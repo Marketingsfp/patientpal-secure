@@ -28,7 +28,7 @@ export function usePickEmitente() {
   useEffect(() => {
     if (!clinicaAtual?.clinica_id) { setEmitentes([]); return; }
     void supabase
-      .from("nfse_emitentes")
+      .from("nfse_emitentes_publico")
       .select("id, nome, cnpj, razao_social")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
@@ -42,7 +42,7 @@ export function usePickEmitente() {
     if (!list.length && clinicaAtual?.clinica_id) {
       // Busca ao vivo caso o useEffect ainda não tenha populado o estado.
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("id, nome, cnpj, razao_social, padrao")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)

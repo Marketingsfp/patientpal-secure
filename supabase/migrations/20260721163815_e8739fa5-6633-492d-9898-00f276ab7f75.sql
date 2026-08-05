@@ -1,0 +1,2 @@
+ALTER TABLE public.cb_convenio_regras DROP CONSTRAINT IF EXISTS cb_convenio_regras_tipo_check;
+ALTER TABLE public.cb_convenio_regras ADD CONSTRAINT cb_convenio_regras_tipo_check CHECK (tipo IN ('consulta','exame','procedimento','cirurgia'));

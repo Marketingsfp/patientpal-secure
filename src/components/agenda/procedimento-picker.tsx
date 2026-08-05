@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Star, Loader2 } from "lucide-react";
+import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 
 export type ProcedimentoOption = {
   id: string;
@@ -97,6 +98,12 @@ export function ProcedimentoPicker({
     return Array.from(g).sort();
   }, [lista]);
 
+  // Bloco "Laboratório — Top 60": exames laboratoriais mais comuns que
+  // existem no cadastro da clínica. É apenas acesso rápido; a busca normal
+  // continua alcançando todos os procedimentos.
+  const [mostrarTop60, setMostrarTop60] = useState(false);
+  const top60Lab = useMemo(() => pickTop60(lista), [lista]);
+
   const filtradas = useMemo(() => {
     const n = normalizar(busca);
     return lista.filter(p => {
@@ -143,6 +150,42 @@ export function ProcedimentoPicker({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {top60Lab.length > 0 && (
+            <div className="rounded-md border p-2 bg-muted/40">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  🧪 Laboratório — Top 60
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">{top60Lab.length}</Badge>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[11px]"
+                  onClick={() => setMostrarTop60((v) => !v)}
+                >
+                  {mostrarTop60 ? "ocultar" : "mostrar"}
+                </Button>
+              </div>
+              {mostrarTop60 && (
+                <div className="flex flex-wrap gap-1 max-h-40 overflow-auto">
+                  {top60Lab.map(({ item, proc }) => (
+                    <Button
+                      key={proc.id}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      title={proc.nome}
+                      onClick={() => onSelect(proc)}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

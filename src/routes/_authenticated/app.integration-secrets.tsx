@@ -4,6 +4,7 @@ import { KeyRound } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/integration-secrets")({
   component: SecretsPageWithTabs,
@@ -14,6 +15,7 @@ interface Row { id: string; chave: string; valor: string; descricao: string | nu
 interface Form { chave: string; valor: string; descricao: string }
 
 function SecretsPage() {
+  const podeEscrever = usePodeEscrever("integration-secrets");
   return (
     <SimpleCrud<Row, Form>
       table="integration_secrets"
@@ -22,6 +24,7 @@ function SecretsPage() {
       subtitle="Chaves de APIs externas usadas por esta clínica (LiveKit, Google, etc.)."
       icon={<KeyRound className="h-6 w-6 text-primary" />}
       searchFields={["chave"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "chave", header: "Chave", render: r => <code className="text-xs font-mono">{r.chave}</code> },
         { key: "valor", header: "Valor", render: r => <span className="text-xs text-muted-foreground">{r.valor.slice(0, 4)}••••{r.valor.slice(-2)}</span> },

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { reagendarAgendamento } from "@/lib/agenda/reagendar-agendamento.functions";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 /**
  * Sprint 3 · S3-C — Modal compacto de reagendamento (Agenda V2).
  * NÃO reusa o Wizard de criação. Só altera 2-3 campos do agendamento
@@ -135,7 +136,7 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="reag-data" className="text-xs">Nova data</Label>
-              <Input id="reag-data" type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
+              <DateInputBR id="reag-data" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="reag-hora" className="text-xs">Novo horário</Label>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ interface Alerta {
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,10 +38,12 @@ function Page() {
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
 
   const marcar = async (a: Alerta) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("fin_alertas").update({ lido: !a.lido }).eq("id", a.id);
     if (error) mostrarErro(error); else await load();
   };
   const remove = async (a: Alerta) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir alerta?")) return;
     const { error } = await supabase.from("fin_alertas").delete().eq("id", a.id);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
@@ -62,10 +66,14 @@ function Page() {
                 <p className="text-xs text-muted-foreground">{new Date(a.data_alerta).toLocaleDateString("pt-BR")}</p>
               </div>
               <Badge variant="outline">{a.tipo_alerta}</Badge>
-              <Button variant="ghost" size="icon" onClick={() => marcar(a)}>
-                <CheckCircle2 className={`h-4 w-4 ${a.lido ? "text-green-600" : ""}`} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              {podeEscrever && (
+                <>
+                  <Button variant="ghost" size="icon" onClick={() => marcar(a)}>
+                    <CheckCircle2 className={`h-4 w-4 ${a.lido ? "text-green-600" : ""}`} />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </>
+              )}
             </CardContent>
           </Card>))}</div>}
     </div>

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -10,25 +10,31 @@ import {
   Wallet,
   CheckCircle2,
   Clock,
-  Undo2,
   Check,
   ChevronsUpDown,
-  BellRing,
   Send,
   Loader2,
   Banknote,
   CreditCard,
   QrCode,
   HelpCircle,
+  Printer,
+  MoreHorizontal,
+  Undo2,
+  CalendarIcon,
 } from "lucide-react";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { logAction } from "@/hooks/use-crud";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,14 +45,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { DateInputBR } from "@/components/ui/date-input-br";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
+import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
-  component: Page,
+  component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
 });
 
@@ -65,7 +87,9 @@ interface Atend {
   agendamento_id?: string | null;
   repasse_pago?: boolean;
   repasse_pago_em?: string | null;
+  repasse_pago_at?: string | null;
   repasse_forma_pagamento?: string | null;
+  repasse_conta_id?: string | null;
   paciente_nome_extra?: string | null;
   agendamento_inicio?: string | null;
   agendamento_status?: string | null;
@@ -141,18 +165,24 @@ function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
   return <HelpCircle className="h-4 w-4 text-muted-foreground" aria-label={forma ?? ""} />;
 }
 
-function Page() {
+function AtendimentosPage() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
-  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  const podeEscrever = usePodeEscrever("financeiro");
+  // Estorno segue a matriz de Perfis de Acesso normalmente (módulo "financeiro"),
+  // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
+  // pode estornar.
+  const podeEstornar = podeEscrever;
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
+  const [pacNameExtra, setPacNameExtra] = useState<Record<string, string>>({});
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Atend | null>(null);
@@ -166,13 +196,367 @@ function Page() {
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
-  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
+  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
+  const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "" });
+  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
+  // Edição pontual do repasse médico de um atendimento (linha da tabela)
+  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: string }>({
+    open: false,
+    atend: null,
+    valor: "",
+  });
+  const [savingRepasse, setSavingRepasse] = useState(false);
+  const abrirEditRepasse = (a: Atend) => {
+    setEditRepasse({ open: true, atend: a, valor: (Number(a.valor_medico) || 0).toFixed(2) });
+  };
+  const salvarEditRepasse = async () => {
+    const a = editRepasse.atend;
+    if (!a) return;
+    const valorNum = Number(editRepasse.valor);
+    if (!Number.isFinite(valorNum) || valorNum < 0) {
+      toast.error("Valor inválido");
+      return;
+    }
+    setSavingRepasse(true);
+    try {
+      const oldValor = Number(a.valor_medico) || 0;
+      const delta = +(valorNum - oldValor).toFixed(2);
+      // 1) Grava o valor no local certo conforme a origem do atendimento.
+      if (a.origem === "agenda") {
+        // Agenda: fin_lancamentos não tem valor_medico; usamos o override.
+        const { error } = await supabase
+          .from("fin_lancamentos")
+          .update({ valor_medico_override: valorNum })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ valor_medico: valorNum })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      // 2) Se o repasse já foi pago, ajusta a despesa vinculada pelo delta
+      //    para o total do lançamento continuar batendo com o pago.
+      let msgExtra = "";
+      if (a.repasse_pago && Math.abs(delta) >= 0.005) {
+        const srcTable = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+        const { data: src } = await supabase
+          .from(srcTable)
+          .select("repasse_lancamento_id")
+          .eq("id", a.id)
+          .maybeSingle();
+        const lancId =
+          (src as { repasse_lancamento_id?: string | null } | null)?.repasse_lancamento_id ?? null;
+        if (lancId) {
+          const { data: desp } = await supabase
+            .from("fin_lancamentos")
+            .select("valor")
+            .eq("id", lancId)
+            .maybeSingle();
+          const valorAtual = Number((desp as { valor?: number | string | null } | null)?.valor) || 0;
+          const novoValor = +(valorAtual + delta).toFixed(2);
+          if (novoValor < 0) {
+            toast.error(
+              `Ajuste inválido: a despesa vinculada ficaria negativa (R$ ${novoValor.toFixed(2)}). Estorne o pagamento antes.`,
+            );
+            return;
+          }
+          const { error: eUp } = await supabase
+            .from("fin_lancamentos")
+            .update({ valor: novoValor })
+            .eq("id", lancId);
+          if (eUp) {
+            mostrarErro(eUp);
+            return;
+          }
+          msgExtra = ` Despesa vinculada ajustada em ${delta >= 0 ? "+" : ""}${delta.toFixed(2)}.`;
+        } else {
+          msgExtra = " (Sem despesa vinculada — nada a ajustar no caixa.)";
+        }
+      }
+      toast.success("Repasse atualizado." + msgExtra);
+      setEditRepasse({ open: false, atend: null, valor: "" });
+      await load();
+    } finally {
+      setSavingRepasse(false);
+    }
+  };
+  // Comprovante de pagamento de repasse (para impressão)
+  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
+  type Comprovante = {
+    clinicaNome: string;
+    medicoNome: string;
+    dataPagamento: string;
+    horaPagamento: string | null;
+    formaPagamento: string;
+    contaNome: string;
+    itens: CompItem[];
+    total: number;
+    qtd: number;
+    emitidoEm: string;
+    reimpressao: boolean;
+    multiplasDatas?: number;
+  } | null;
+  const [comprovante, setComprovante] = useState<Comprovante>(null);
+  const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
+  const [comprovanteOpen, setComprovanteOpen] = useState(false);
+  const printAreaRef = useRef<HTMLDivElement | null>(null);
+  const imprimirComprovante = (somenteResumo = false) => {
+    const source = printAreaRef.current;
+    if (!source) {
+      toast.error("Comprovante não encontrado para impressão.");
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    Object.assign(iframe.style, {
+      position: "fixed",
+      left: "-10000px",
+      top: "0",
+      width: "210mm",
+      height: "297mm",
+      border: "0",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+
+    document.body.appendChild(iframe);
+    const printWindow = iframe.contentWindow;
+    const printDocument = printWindow?.document;
+    if (!printWindow || !printDocument) {
+      iframe.remove();
+      toast.error("Não foi possível preparar a impressão.");
+      return;
+    }
+
+    const cleanup = () => {
+      setTimeout(() => iframe.remove(), 500);
+      printWindow.removeEventListener("afterprint", cleanup);
+    };
+
+    printDocument.open();
+    printDocument.write(`<!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <title>Comprovante de repasse médico</title>
+          <style>
+            @page { size: A4 portrait; margin: 9mm; }
+            html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+            body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; line-height: 1.28; }
+            * { box-sizing: border-box; }
+            .print-shell { width: 100%; max-width: 192mm; margin: 0 auto; }
+            .print-area { width: 100%; max-width: 100%; overflow: visible; background: #fff; color: #111; }
+            .comprovante-bloco { width: 100%; break-after: page; page-break-after: always; }
+            .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
+            .flex { display: flex; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .items-start { align-items: flex-start; }
+            .justify-between { justify-content: space-between; }
+            .gap-8 { gap: 12mm; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .uppercase { text-transform: uppercase; }
+            .font-semibold { font-weight: 600; }
+            .font-extrabold { font-weight: 800; }
+            .text-xs { font-size: 8pt; }
+            .text-sm { font-size: 9.5pt; }
+            .text-base { font-size: 10pt; }
+            .text-lg { font-size: 12pt; }
+            .text-xl { font-size: 13pt; }
+            .tracking-wide { letter-spacing: 0; }
+            .opacity-80 { opacity: .8; }
+            .border, .border-b, .border-t, .border-2, .border-t-4 { border-color: #d4d4d4; }
+            .border { border: 1px solid #d4d4d4; }
+            .border-b { border-bottom: 1px solid #d4d4d4; }
+            .border-t { border-top: 1px solid #d4d4d4; }
+            .border-2 { border: 2px solid #be123c; }
+            .border-t-4 { border-top: 2px dashed #94a3b8; }
+            .rounded-md { border-radius: 4px; }
+            .p-2 { padding: 1.6mm; }
+            .p-3 { padding: 2.4mm; }
+            .pt-1 { padding-top: 1mm; }
+            .pt-4 { padding-top: 3mm; }
+            .pt-8 { padding-top: 4mm; }
+            .pb-3 { padding-bottom: 2.4mm; }
+            .mb-3 { margin-bottom: 2.4mm; }
+            .mt-0\.5 { margin-top: .5mm; }
+            .mt-1 { margin-top: 1mm; }
+            .mt-8 { margin-top: 4mm; }
+            .mt-10 { margin-top: 10mm; }
+            .ml-1 { margin-left: 1mm; }
+            .bg-rose-100 { background: #ffe4e6; }
+            .text-rose-900 { color: #881337; }
+            .text-muted-foreground { color: #555; }
+            .text-primary { color: #111; }
+            .comprovante-resumo {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              column-gap: 8mm;
+              row-gap: 1.4mm;
+              border: 1px solid #d4d4d4;
+              border-radius: 4px;
+              padding: 2.4mm;
+              margin-bottom: 2.5mm;
+            }
+            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { break-inside: avoid; page-break-inside: avoid; }
+            th, td { padding: 1.4mm 1mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: break-word; word-break: normal; }
+            th { text-align: left; font-weight: 700; background: #f4f4f5; }
+            th:nth-child(1), td:nth-child(1) { width: 9%; white-space: nowrap; }
+            th:nth-child(2), td:nth-child(2) { width: 15%; }
+            th:nth-child(3), td:nth-child(3) { width: 18%; }
+            th:nth-child(4), td:nth-child(4) { width: 20%; }
+            th:nth-child(5), td:nth-child(5) { width: 26%; }
+            th:nth-child(6), td:nth-child(6) { width: 12%; text-align: right; white-space: nowrap; }
+            body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) { display: none !important; }
+            body.print-resumo-only .print-area .comprovante-resumo { margin-top: 0 !important; }
+          </style>
+        </head>
+        <body class="${somenteResumo ? "print-resumo-only" : ""}">
+          <main class="print-shell">
+            <div class="print-area">${source.innerHTML}</div>
+          </main>
+        </body>
+      </html>`);
+    printDocument.close();
+
+    printWindow.addEventListener("afterprint", cleanup);
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(cleanup, 60000);
+    }, 100);
+  };
+  const buildComprovante = (
+    itens: Atend[],
+    meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
+  ): Comprovante => {
+    if (!itens.length) return null;
+    const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
+    const medicoNome =
+      medicoIds.size === 1
+        ? (medMap.get([...medicoIds][0]) ?? "—")
+        : `${medicoIds.size} médicos`;
+    const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    const derivarHora = (iso: string | null | undefined): string | null => {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const isBackfill =
+        d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+      if (isBackfill) return null;
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
+    const rows: CompItem[] = itens.map((a) => ({
+      data: a.data,
+      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
+      servico: a.procedimento ?? "—",
+      valorMedico: Number(a.valor_medico) || 0,
+      pagoEm: a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null),
+      pagoHora: derivarHora(a.repasse_pago_at ?? null),
+    }));
+    const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
+    // Registros antigos foram backfillados de `date` para timestamptz em
+    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
+    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
+    let horaPagamento: string | null = null;
+    if (meta.pago_at) {
+      const d = new Date(meta.pago_at);
+      if (!isNaN(d.getTime())) {
+        const isBackfill =
+          d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+        if (!isBackfill) {
+          const hh = d.getHours();
+          const mm = d.getMinutes();
+          horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+        }
+      }
+    }
+    return {
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
+      medicoNome,
+      dataPagamento: meta.data,
+      horaPagamento,
+      formaPagamento: meta.forma_pagamento || "—",
+      contaNome,
+      itens: rows,
+      total,
+      qtd: rows.length,
+      emitidoEm: new Date().toLocaleString("pt-BR"),
+      reimpressao: !!meta.reimpressao,
+    };
+  };
+  const abrirComprovanteDoItem = (a: Atend) => {
+    const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
+    const c = buildComprovante([a], {
+      data: dataPag,
+      forma_pagamento: a.repasse_forma_pagamento || a.forma_pagamento || "",
+      conta_id: a.repasse_conta_id ?? "",
+      pago_at: a.repasse_pago_at ?? null,
+      reimpressao: true,
+    });
+    setComprovante(c);
+    setComprovantes(c ? [c] : []);
+    setComprovanteOpen(true);
+  };
+  // Constrói um comprovante em 2ª via para cada médico presente em `itens`.
+  const abrirSegundaViaLote = (itens: Atend[]) => {
+    if (!itens.length) return;
+    const byMed = new Map<string, Atend[]>();
+    for (const a of itens) {
+      const k = a.medico_id ?? "sem";
+      if (!byMed.has(k)) byMed.set(k, []);
+      byMed.get(k)!.push(a);
+    }
+    const blocos: NonNullable<Comprovante>[] = [];
+    for (const [, list] of byMed) {
+      // Metadados agregados
+      const datas = new Set(list.map((x) => x.repasse_pago_em ?? "").filter(Boolean));
+      const formas = new Set(
+        list.map((x) => x.repasse_forma_pagamento || x.forma_pagamento || "").filter(Boolean),
+      );
+      const contasSet = new Set(list.map((x) => x.repasse_conta_id ?? "").filter(Boolean));
+      const primeiro = list[0];
+      const dataPag =
+        primeiro.repasse_pago_em ??
+        (primeiro.repasse_pago_at ? primeiro.repasse_pago_at.slice(0, 10) : primeiro.data);
+      const c = buildComprovante(list, {
+        data: dataPag,
+        forma_pagamento: formas.size === 1 ? [...formas][0] : formas.size > 1 ? "Vários" : "",
+        conta_id: contasSet.size === 1 ? [...contasSet][0] : "",
+        pago_at: primeiro.repasse_pago_at ?? null,
+        reimpressao: true,
+      });
+      if (c) {
+        c.multiplasDatas = datas.size > 1 ? datas.size : 0;
+        blocos.push(c);
+      }
+    }
+    if (blocos.length) {
+      setComprovante(blocos[0]);
+      setComprovantes(blocos);
+      setComprovanteOpen(true);
+    }
+  };
   const [payingNow, setPayingNow] = useState(false);
 
   // Diálogo de laudo
@@ -180,6 +564,23 @@ function Page() {
   const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
   const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
   const [laudoSaving, setLaudoSaving] = useState(false);
+  // Regras de repasse cadastradas para a agenda do atendimento em edição.
+  // Alimenta o dropdown (só laudadores cadastrados) e o auto-preenchimento
+  // do "Valor do laudo" ao trocar o médico.
+  type LaudoRegra = {
+    laudador_medico_id: string;
+    laudador_nome: string;
+    tipo_repasse: "valor" | "percentual";
+    percentual: number | null;
+    valor: number | null;
+  };
+  const [laudoRegras, setLaudoRegras] = useState<LaudoRegra[]>([]);
+  const [laudoSemRegra, setLaudoSemRegra] = useState(false);
+
+  // Diálogo de vínculo de laudo em lote
+  const [laudoLoteOpen, setLaudoLoteOpen] = useState(false);
+  const [laudoLoteLaudadorId, setLaudoLoteLaudadorId] = useState("");
+  const [laudoLoteSaving, setLaudoLoteSaving] = useState(false);
 
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
@@ -189,6 +590,8 @@ function Page() {
   const [nfseEmitting, setNfseEmitting] = useState(false);
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
 
   useEffect(() => {
     if (!clinicaAtual) {
@@ -196,7 +599,7 @@ function Page() {
       return;
     }
     void supabase
-      .from("nfse_emitentes")
+      .from("nfse_emitentes_publico")
       .select("id, nome, codigo_municipio")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
@@ -223,6 +626,7 @@ function Page() {
   };
 
   const doEmitNfse = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const a = nfseDialog.atend;
     if (!a || !emitenteId || !a.paciente_id) return;
     setNfseEmitting(true);
@@ -236,25 +640,47 @@ function Page() {
       const p = pac as PacFull;
       const valor = Number(a.valor_total) || 0;
       if (valor <= 0) throw new Error("Valor do atendimento é zero");
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: p.nome,
+          cpfCnpj: p.cpf ?? undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+        valorBase: valor,
+      });
+      if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valor, tomador);
+      // Sempre compõe a discriminação com procedimento + paciente + data de
+      // referência, mesmo se o usuário deixou o campo do diálogo em branco.
+      const dataRef = a.agendamento_inicio ?? a.data;
+      const descBase = (nfseDesc && nfseDesc.trim())
+        ? nfseDesc.trim()
+        : montarDiscriminacaoNfse({
+            procedimento: a.procedimento,
+            pacienteNome: p.nome,
+            dataReferencia: dataRef,
+          });
+      const descComDep = tomador.dependenteAtendido
+        ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
+        : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId,
           pacienteId: p.id,
           agendamentoId: a.agendamento_id ?? undefined,
           pagamentoId: a.id ?? undefined,
-          valorServicos: valor,
-          descricaoServicos: nfseDesc || "Serviços prestados",
-          tomador: {
-            nome: p.nome,
-            cpfCnpj: p.cpf ?? undefined,
-            email: p.email ?? undefined,
-            cep: p.cep ?? undefined,
-            logradouro: p.logradouro ?? undefined,
-            numero: p.numero ?? undefined,
-            bairro: p.bairro ?? undefined,
-            municipio: p.cidade ?? undefined,
-            uf: p.estado ?? undefined,
-          },
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
         },
       });
       const nfseId = (res as { id?: string })?.id;
@@ -271,16 +697,70 @@ function Page() {
     }
   };
 
-  const openLaudo = (a: Atend) => {
+  const calcularSugestao = (r: LaudoRegra, valorTotal: number): number => {
+    if (r.tipo_repasse === "percentual") {
+      return Number((valorTotal * ((r.percentual ?? 0) / 100)).toFixed(2));
+    }
+    return Number(r.valor ?? 0);
+  };
+
+  const openLaudo = async (a: Atend) => {
     setLaudoTarget(a);
     setLaudoForm({
       medico_laudador_id: a.medico_laudador_id ?? "",
       valor_laudo: a.valor_laudo ? String(a.valor_laudo) : "",
     });
+    setLaudoSemRegra(false);
+    setLaudoRegras([]);
     setLaudoOpen(true);
+    if (!clinicaAtual || !a.medico_id) return;
+    const { data } = await supabase
+      .from("medico_repasse_laudo")
+      .select(
+        "laudador_medico_id, tipo_repasse, percentual, valor, laudador:medicos!medico_repasse_laudo_laudador_medico_id_fkey(nome)",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("agenda_medico_id", a.medico_id)
+      .eq("ativo", true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const regras: LaudoRegra[] = ((data as any[]) ?? []).map((r) => ({
+      laudador_medico_id: r.laudador_medico_id,
+      laudador_nome: r.laudador?.nome ?? "?",
+      tipo_repasse: r.tipo_repasse,
+      percentual: r.percentual != null ? Number(r.percentual) : null,
+      valor: r.valor != null ? Number(r.valor) : null,
+    }));
+    regras.sort((x, y) => x.laudador_nome.localeCompare(y.laudador_nome));
+    setLaudoRegras(regras);
+    // Auto-sugerir se já vier laudador escolhido e sem valor.
+    if (a.medico_laudador_id && !a.valor_laudo) {
+      const regra = regras.find((r) => r.laudador_medico_id === a.medico_laudador_id);
+      if (regra) {
+        const sug = calcularSugestao(regra, Number(a.valor_total ?? 0));
+        setLaudoForm((f) => ({ ...f, valor_laudo: sug > 0 ? String(sug) : "" }));
+      }
+    }
+  };
+
+  const onChangeLaudador = (id: string) => {
+    setLaudoForm((f) => ({ ...f, medico_laudador_id: id }));
+    const regra = laudoRegras.find((r) => r.laudador_medico_id === id);
+    if (!regra) {
+      setLaudoSemRegra(true);
+      setLaudoForm((f) => ({ ...f, medico_laudador_id: id, valor_laudo: "" }));
+      return;
+    }
+    setLaudoSemRegra(false);
+    const sug = calcularSugestao(regra, Number(laudoTarget?.valor_total ?? 0));
+    setLaudoForm((f) => ({
+      ...f,
+      medico_laudador_id: id,
+      valor_laudo: sug > 0 ? String(sug) : "",
+    }));
   };
 
   const emitirLaudo = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!laudoTarget) return;
     if (!laudoForm.medico_laudador_id) {
       toast.error("Selecione o médico laudador");
@@ -308,118 +788,156 @@ function Page() {
       return;
     }
     toast.success("Laudo emitido — repasse do laudador gerado");
+    // Gera comprovante de pagamento do laudo (mesmo modelo do repasse)
+    const hojeIso = new Date().toISOString();
+    const hoje = hojeIso.slice(0, 10);
+    const itemComprovante: Atend = {
+      ...laudoTarget,
+      medico_id: laudoForm.medico_laudador_id,
+      valor_medico: valor,
+      repasse_pago_em: hoje,
+      repasse_pago_at: hojeIso,
+      repasse_forma_pagamento: laudoTarget.forma_pagamento ?? null,
+      repasse_conta_id: laudoTarget.repasse_conta_id ?? null,
+    };
+    const c = buildComprovante([itemComprovante], {
+      data: hoje,
+      forma_pagamento: laudoTarget.forma_pagamento || "—",
+      conta_id: laudoTarget.repasse_conta_id ?? "",
+      pago_at: hojeIso,
+      reimpressao: false,
+    });
+    if (c) {
+      setComprovante(c);
+      setComprovantes([c]);
+      setComprovanteOpen(true);
+    }
     setLaudoOpen(false);
     setLaudoTarget(null);
     await load();
   };
 
-  // Solicitações de estorno pendentes (vindas do caixa/recepção)
-  interface SolicEst {
-    id: string;
-    paciente_nome: string | null;
-    descricao: string | null;
-    valor: number | null;
-    motivo: string;
-    solicitado_em: string;
-    lancamento_id: string | null;
-    tipo: "erro_caixa" | "devolucao" | null;
-    data_pagamento_original: string | null;
-    data_estorno: string | null;
-  }
-  const [solicitacoes, setSolicitacoes] = useState<SolicEst[]>([]);
-  const loadSolicitacoes = async () => {
-    if (!clinicaAtual) {
-      setSolicitacoes([]);
+  const desvincularLaudo = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (
+      !confirm(
+        "Desvincular o médico laudador deste atendimento?\n\n" +
+          "• O laudo voltará ao status 'Pendente'.\n" +
+          "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
+          "• Você poderá vincular outro médico depois clicando em 'Vincular'.",
+      )
+    )
+      return;
+    const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: null,
+        valor_laudo: 0,
+        laudo_status: null,
+        laudo_emitido_em: null,
+      } as never)
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
       return;
     }
-    const { data } = await supabase
-      .from("estorno_solicitacoes")
-      .select(
-        "id, paciente_nome, descricao, valor, motivo, solicitado_em, lancamento_id, tipo, data_pagamento_original, data_estorno",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("status", "pendente")
-      .order("solicitado_em", { ascending: false });
-    setSolicitacoes((data ?? []) as SolicEst[]);
+    toast.success("Laudador desvinculado");
+    await load();
   };
-  useEffect(() => {
-    void loadSolicitacoes(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
-  useEffect(() => {
+
+  const abrirLaudoLote = () => {
+    if (selectedLaudoElegiveis.length === 0) {
+      toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
+      return;
+    }
+    setLaudoLoteLaudadorId("");
+    setLaudoLoteOpen(true);
+  };
+
+  const vincularLaudoLote = async () => {
     if (!clinicaAtual) return;
-    const ch = supabase
-      .channel(`fin-estornos-${clinicaAtual.clinica_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
-        () => {
-          void loadSolicitacoes();
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(ch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaAtual?.clinica_id]);
-
-  const aprovarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!laudoLoteLaudadorId) {
+      toast.error("Selecione o médico laudador");
       return;
     }
-    // Tenta encontrar o atendimento referente para estornar de fato
-    const alvo = s.lancamento_id ? items.find((x) => x.id === s.lancamento_id) : null;
-    if (alvo) {
-      await estornar(alvo);
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "aprovado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: alvo ? "Estorno executado" : "Aprovado manualmente (processar baixa)",
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação aprovada");
-      void loadSolicitacoes();
-    }
-  };
-
-  const rejeitarSolicitacao = async (s: SolicEst) => {
-    if (!podeEstornar) {
-      toast.error("Sem permissão");
+    const alvos = selectedLaudoElegiveis;
+    if (alvos.length === 0) {
+      toast.info("Nenhum atendimento elegível.");
       return;
     }
-    const resp = window.prompt("Motivo da recusa (opcional):") ?? "";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("estorno_solicitacoes")
-      .update({
-        status: "rejeitado",
-        resolvido_por: user?.id ?? null,
-        resolvido_em: new Date().toISOString(),
-        resposta: resp || null,
-      })
-      .eq("id", s.id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação recusada");
-      void loadSolicitacoes();
+    setLaudoLoteSaving(true);
+    // Busca todas as regras para o laudador escolhido nesta clínica,
+    // indexadas por agenda_medico_id → (tipo, percentual, valor).
+    const { data: regrasData } = await supabase
+      .from("medico_repasse_laudo")
+      .select("agenda_medico_id, tipo_repasse, percentual, valor")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("laudador_medico_id", laudoLoteLaudadorId)
+      .eq("ativo", true);
+    const regraPorAgenda = new Map<string, LaudoRegra>();
+    for (const r of (regrasData as unknown as {
+      agenda_medico_id: string;
+      tipo_repasse: "valor" | "percentual";
+      percentual: number | null;
+      valor: number | null;
+    }[]) ?? []) {
+      regraPorAgenda.set(r.agenda_medico_id, {
+        laudador_medico_id: laudoLoteLaudadorId,
+        laudador_nome: "",
+        tipo_repasse: r.tipo_repasse,
+        percentual: r.percentual != null ? Number(r.percentual) : null,
+        valor: r.valor != null ? Number(r.valor) : null,
+      });
     }
+    let ok = 0;
+    const semRegra: string[] = [];
+    const erros: string[] = [];
+    const nowIso = new Date().toISOString();
+    await Promise.all(
+      alvos.map(async (a) => {
+        if (!a.medico_id) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const regra = regraPorAgenda.get(a.medico_id);
+        if (!regra) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const valor = calcularSugestao(regra, Number(a.valor_total ?? 0));
+        if (!valor || valor <= 0) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+        const { error } = await supabase
+          .from(tabela)
+          .update({
+            medico_laudador_id: laudoLoteLaudadorId,
+            valor_laudo: valor,
+            laudo_status: "emitido",
+            laudo_emitido_em: nowIso,
+          })
+          .eq("id", a.id);
+        if (error) erros.push(error.message);
+        else ok += 1;
+      }),
+    );
+    setLaudoLoteSaving(false);
+    setLaudoLoteOpen(false);
+    if (ok > 0) {
+      const partes = [`${ok} laudo(s) vinculado(s)`];
+      if (semRegra.length) partes.push(`${semRegra.length} sem regra de repasse`);
+      if (erros.length) partes.push(`${erros.length} com erro`);
+      toast.success(partes.join(" • "));
+    } else if (semRegra.length) {
+      toast.error(`Nenhum vinculado — ${semRegra.length} sem regra de repasse cadastrada para este laudador.`);
+    } else if (erros.length) {
+      toast.error(`Falha ao vincular: ${erros[0]}`);
+    }
+    await load();
   };
 
   // Perfil médico: trava o filtro no próprio profissional
@@ -581,33 +1099,70 @@ function Page() {
     }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
-    let qManual = supabase
-      .from("fin_atendimentos")
-      .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("data", fIni)
-      .lte("data", fFim);
-    let qAgenda = supabase
-      .from("fin_lancamentos")
-      .select(
-        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .gte("data", fIni)
-      .lte("data", fFim);
-    if (fMedico !== "todos") {
-      qManual = qManual.eq("medico_id", fMedico);
-      // Para agenda: não filtramos no servidor porque o lançamento pode estar
-      // com medico_id nulo (médico vem do agendamento). Filtramos client-side
-      // logo após o mapeamento abaixo.
-    }
-    const [mr, ar] = await Promise.all([
-      qManual.order("data", { ascending: false }),
-      qAgenda.order("data", { ascending: false }),
+    // Regra de repasse da agenda: a competência é a data marcada no agendamento,
+    // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
+    // libera repasse antes do dia do atendimento/reagendamento.
+    const agendaFimDia = `${fFim}T23:59:59.999`;
+    // PostgREST corta em 1.000 linhas por padrão. Em clínicas movimentadas
+    // (ex.: Menino Jesus com ~3.000 lançamentos no mês), registros ficam de
+    // fora silenciosamente. Paginamos em blocos de 1.000 até esgotar.
+    const PAGE_SIZE = 1000;
+    const buildManual = () => {
+      let q = supabase
+        .from("fin_atendimentos")
+        .select(
+          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fIni)
+        .lte("data", fFim);
+      if (fMedico !== "todos") q = q.eq("medico_id", fMedico);
+      return q;
+    };
+    const buildAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .not("agendamento_id", "is", null)
+        .gte("agendamento.inicio", `${fIni}T00:00:00`)
+        .lte("agendamento.inicio", agendaFimDia);
+    const buildSemAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .is("agendamento_id", null)
+        .gte("data", fIni)
+        .lte("data", fFim);
+    const fetchAllPaged = async <T,>(
+      builder: () => { order: (col: string, opts: { ascending: boolean }) => { range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }> } },
+    ): Promise<{ data: T[]; error: unknown }> => {
+      const acc: T[] = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const res = await builder()
+          .order("data", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (res.error) return { data: acc, error: res.error };
+        const rows = res.data ?? [];
+        acc.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (offset > 100_000) break; // guard-rail
+      }
+      return { data: acc, error: null };
+    };
+    const [mr, ar, sr] = await Promise.all([
+      fetchAllPaged<any>(buildManual as any),
+      fetchAllPaged<any>(buildAgenda as any),
+      fetchAllPaged<any>(buildSemAgenda as any),
     ]);
     if (mr.error) {
       mostrarErro(mr.error);
@@ -619,7 +1174,59 @@ function Page() {
       setLoading(false);
       return;
     }
-    const manuais: Atend[] = (mr.data ?? []).map((r) => {
+    if (sr.error) {
+      mostrarErro(sr.error);
+      setLoading(false);
+      return;
+    }
+    const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    const manualLancamentoIds = (mr.data ?? [])
+      .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
+      .filter((x): x is string => !!x);
+    const lancamentosEspelhoAgenda = new Set<string>();
+    if (manualLancamentoIds.length) {
+      const { data: espelhos, error: espelhoErr } = await supabase
+        .from("fin_lancamentos")
+        .select("id, agendamento_id")
+        .in("id", manualLancamentoIds)
+        .not("agendamento_id", "is", null);
+      if (espelhoErr) {
+        mostrarErro(espelhoErr);
+        setLoading(false);
+        return;
+      }
+      for (const e of espelhos ?? []) lancamentosEspelhoAgenda.add(e.id);
+    }
+    // IDs de fin_lancamentos já carregados — usado para descartar linhas de
+    // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
+    // criada pelo fluxo de atendimento IA antes da correção).
+    const lancIds = new Set(agendaRows.map((r: { id: string }) => r.id));
+    // Também colecionamos o agendamento_id dos lançamentos para descartar
+    // manuais que espelhem o mesmo agendamento (caso o lancamento_id não
+    // tenha sido preenchido no fin_atendimentos, por qualquer motivo).
+    const lancAgendIds = new Set(
+      agendaRows
+        .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
+        .filter((x): x is string => !!x),
+    );
+    const manuaisRaw = (mr.data ?? []).filter(
+      (r: { lancamento_id?: string | null }) => {
+        if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+        if (r.lancamento_id && lancamentosEspelhoAgenda.has(r.lancamento_id)) return false;
+        // Sem lancamento_id: descarta se algum lançamento carregado apontar
+        // para um agendamento que também aparece no lote manual (mesma data,
+        // procedimento e paciente). O DB já tem trigger que impede este caso
+        // em novos inserts; aqui blindamos registros históricos.
+        if (r.lancamento_id && lancAgendIds.size > 0) {
+          const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
+            | { agendamento_id?: string | null }
+            | undefined;
+          if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
+        }
+        return true;
+      },
+    );
+    const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
@@ -641,13 +1248,15 @@ function Page() {
         origem: "manual",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
+        repasse_conta_id: (r as any).repasse_conta_id ?? null,
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
         valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
-    const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
+    const agend: Atend[] = agendaRows.map((r): Atend => {
       const ag = (r as any).agendamento as {
         procedimento: string | null;
         paciente_nome: string | null;
@@ -663,16 +1272,26 @@ function Page() {
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
+      const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
+      // Override manual do repasse (editado na tela). Quando presente,
+      // sobrescreve o cálculo por regra.
+      const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
+      const override =
+        overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+          ? Number(overrideRaw)
+          : null;
+      const valorMedicoFinal = override !== null && Number.isFinite(override) ? override : repasse;
+      const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
       return {
         id: r.id,
-        data: r.data,
+        data: dataRepasse,
         procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
         valor_total: total,
-        valor_medico: repasse,
-        valor_clinica: +(total - repasse).toFixed(2),
+        valor_medico: valorMedicoFinal,
+        valor_clinica: valorClinicaFinal,
         status: "realizado",
         forma_pagamento: r.forma_pagamento,
         medico_id: medIdEff,
@@ -681,7 +1300,9 @@ function Page() {
         origem: "agenda",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
+        repasse_pago_at: (r as any).repasse_pago_at ?? null,
         repasse_forma_pagamento: r.repasse_forma_pagamento,
+        repasse_conta_id: (r as any).repasse_conta_id ?? null,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
         laudo_status: (r as any).laudo_status ?? null,
@@ -697,6 +1318,29 @@ function Page() {
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
     setSel(new Set());
+    // Resolve nomes de pacientes referenciados que estão fora do combobox
+    // (o combobox só carrega 500 por ordem alfabética). Sem isso, atendimentos
+    // com paciente cadastrado aparecem como "—".
+    const knownIds = new Set(pacientes.map((p) => p.id));
+    const missing = new Set<string>();
+    for (const it of unif) {
+      if (it.paciente_id && !knownIds.has(it.paciente_id) && !pacNameExtra[it.paciente_id]) {
+        missing.add(it.paciente_id);
+      }
+    }
+    if (missing.size) {
+      const { data: extra } = await supabase
+        .from("pacientes")
+        .select("id, nome")
+        .in("id", [...missing]);
+      if (extra?.length) {
+        setPacNameExtra((prev) => {
+          const next = { ...prev };
+          for (const p of extra) next[p.id] = p.nome;
+          return next;
+        });
+      }
+    }
     setLoading(false);
   };
   const loadOpts = async () => {
@@ -745,16 +1389,32 @@ function Page() {
     setMedicos(merged);
     setPacientes((p.data ?? []) as Pac[]);
     setContas((c.data ?? []) as Conta[]);
-    // Carrega valor de tabela dos procedimentos para usar como "total cheio"
-    const { data: procs } = await supabase
-      .from("procedimentos")
-      .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true);
+    // Carrega valor de tabela dos procedimentos para usar como "total cheio".
+    // Paginado — mesma razão do medico_convenios (teto de 1000 do PostgREST).
+    const procs: Array<{ nome: string | null; valor_padrao?: number | string | null; valor_dinheiro?: number | string | null; tipo?: string | null; requer_laudo?: boolean | null }> = [];
+    {
+      const CHUNK = 1000;
+      const MAX = 50000;
+      let offset = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("procedimentos")
+          .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("ativo", true)
+          .range(offset, offset + CHUNK - 1);
+        if (error) break;
+        const rows = (data ?? []) as typeof procs;
+        procs.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+    }
     const pmap = new Map<string, number>();
     const tmap = new Map<string, string>();
     const lmap = new Map<string, boolean>();
-    for (const pr of (procs as any[] | null) ?? []) {
+    for (const pr of procs) {
       const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
       if (!pr?.nome) continue;
       const key = norm(String(pr.nome));
@@ -768,12 +1428,29 @@ function Page() {
     setProcLaudo(lmap);
     const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
     if (ids.length) {
-      const { data: cv } = await supabase
-        .from("medico_convenios")
-        .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
-        .in("medico_id", ids)
-        .eq("ativo", true);
-      setConvenios((cv ?? []) as Convenio[]);
+      // Paginado: o PostgREST retorna no máximo 1000 linhas por chamada.
+      // Clínicas com muitos convênios cadastrados por médico ultrapassam
+      // esse teto e faziam alguns convênios sumirem do cálculo de repasse
+      // (caía no repasse padrão do médico). Buscamos em chunks até o fim.
+      const CHUNK = 1000;
+      const MAX = 50000; // salvaguarda
+      const acc: Convenio[] = [];
+      let offset = 0;
+      for (;;) {
+        const { data: cv, error: cvErr } = await supabase
+          .from("medico_convenios")
+          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+          .in("medico_id", ids)
+          .eq("ativo", true)
+          .range(offset, offset + CHUNK - 1);
+        if (cvErr) break;
+        const rows = (cv ?? []) as Convenio[];
+        acc.push(...rows);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset >= MAX) break;
+      }
+      setConvenios(acc);
     } else {
       setConvenios([]);
     }
@@ -836,6 +1513,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -863,6 +1541,7 @@ function Page() {
   };
 
   const remove = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir atendimento?")) return;
 
     try {
@@ -890,85 +1569,271 @@ function Page() {
     }
   };
 
-  const estornar = async (a: Atend) => {
-    if (a.repasse_pago) {
-      toast.error("Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.");
+  const darBaixa = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (
+      !confirm(
+        "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
+      )
+    )
       return;
-    }
-    if (a.origem !== "agenda") {
-      toast.error("Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').");
-      return;
-    }
-    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
-    const { data: lanc, error: eLanc } = await supabase
-      .from("fin_lancamentos")
-      .select("agendamento_id, valor, descricao")
-      .eq("id", a.id)
-      .maybeSingle();
-    if (eLanc) {
-      mostrarErro(eLanc);
-      return;
-    }
-    const agId = lanc?.agendamento_id;
-    if (!agId) {
-      toast.error("Agendamento de origem não encontrado.");
-      return;
-    }
-    const { data: agAntes } = await supabase
-      .from("agendamentos")
-      .select("id, status, fluxo_etapa")
-      .eq("id", agId)
-      .maybeSingle();
-    // 1) Remove os movimentos de caixa associados a este lançamento
-    //    (recebimento e eventual abertura automática não são tocados).
-    const { error: eMov } = await supabase.from("caixa_movimentos").delete().eq("lancamento_id", a.id);
-    if (eMov) {
-      mostrarErro(eMov, "falha ao reverter caixa");
-      return;
-    }
-    // 2) Remove o lançamento de receita (libera ja_pago da fila do caixa
-    //    e zera repasse/relatórios).
-    const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", a.id);
-    if (eDel) {
-      mostrarErro(eDel, "falha ao excluir lançamento");
-      return;
-    }
-    // 3) Reabre o fluxo do agendamento para que possa ser cobrado de novo.
-    const { error: eUpd } = await supabase
-      .from("agendamentos")
-      .update({
-        status: "agendado",
-        fluxo_etapa: "aguardando_recepcao",
-        fluxo_atualizado_em: new Date().toISOString(),
-      })
-      .eq("id", agId);
-    if (eUpd) {
-      mostrarErro(eUpd);
-      return;
-    }
     try {
-      await logAction({
-        table_name: "agendamentos",
-        record_id: agId,
-        action: "ESTORNO",
-        clinica_id: clinicaAtual?.clinica_id,
-        dados_antes: agAntes ?? { id: agId },
-        dados_depois: {
-          id: agId,
-          status: "agendado",
-          fin_lancamentos_id_removido: a.id,
-          valor_estornado: lanc?.valor ?? null,
-        },
-      });
-    } catch {
-      /* auditoria best-effort */
+      if (a.origem === "agenda") {
+        if (!a.agendamento_id) {
+          toast.error("Atendimento sem agendamento vinculado.");
+          return;
+        }
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .eq("id", a.agendamento_id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success("Baixa realizada. Repasse liberado.");
+      await load();
+    } catch (err) {
+      mostrarErro(err);
     }
-    toast.success("Atendimento estornado — receita removida e agendamento liberado para nova cobrança.");
-    await load();
+  };
+
+  const desfazerBaixa = async (a: Atend) => {
+    if (!podeEstornar) {
+      toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (a.repasse_pago) {
+      toast.error("Repasse já foi pago — estorne o pagamento do repasse antes de desfazer a baixa.");
+      return;
+    }
+    if (
+      !confirm(
+        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado'. O pagamento do paciente (se houver) permanece intacto no caixa — só o lançamento-sombra de R$ 0,00 é removido.",
+      )
+    )
+      return;
+    try {
+      // Verifica lançamento(s) em caixa vinculados. Só apagamos os R$ 0,00
+      // (lançamento-sombra "SEM COBRANÇA"). Lançamentos pagos (valor > 0)
+      // permanecem — o pagamento do paciente é trilha independente do
+      // status médico do atendimento.
+      let sombraIds: string[] = [];
+      if (a.origem === "agenda" && a.agendamento_id) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor")
+          .eq("agendamento_id", a.agendamento_id);
+        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+        sombraIds = rows.filter((l) => Number(l.valor) === 0).map((l) => l.id);
+      } else if (a.origem !== "agenda") {
+        const { data: fa } = await supabase
+          .from("fin_atendimentos")
+          .select("lancamento_id")
+          .eq("id", a.id)
+          .maybeSingle();
+        const lancId = (fa as { lancamento_id: string | null } | null)?.lancamento_id ?? null;
+        if (lancId) {
+          const { data: l } = await supabase
+            .from("fin_lancamentos")
+            .select("id, valor")
+            .eq("id", lancId)
+            .maybeSingle();
+          const row = l as { id: string; valor: number | string | null } | null;
+          if (row && Number(row.valor) === 0) sombraIds = [row.id];
+        }
+      }
+
+      if (a.origem === "agenda") {
+        if (!a.agendamento_id) {
+          toast.error("Atendimento sem agendamento vinculado.");
+          return;
+        }
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "confirmado" })
+          .eq("id", a.agendamento_id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "confirmado" })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (sombraIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from("fin_lancamentos")
+          .delete()
+          .in("id", sombraIds);
+        if (delErr) {
+          mostrarErro(delErr);
+          return;
+        }
+      }
+      toast.success("Baixa desfeita.");
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
+  const darBaixaLote = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Confirmar baixa de ${alvos.length} atendimento(s)?\n\nOs médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "realizado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "realizado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
+  const desfazerBaixaLote = async () => {
+    if (!podeEstornar) {
+      toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Desfazer a baixa de ${alvos.length} atendimento(s)?\n\nOs atendimentos voltam para 'Confirmado'. Os pagamentos dos pacientes permanecem intactos no caixa — apenas lançamentos-sombra de R$ 0,00 são removidos.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+
+      // Coleta lançamentos-sombra (R$ 0,00) para apagar.
+      let sombraIds: string[] = [];
+      if (agIds.length) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor, agendamento_id")
+          .in("agendamento_id", agIds);
+        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+        sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+      }
+      if (manualIds.length) {
+        const { data: fas } = await supabase
+          .from("fin_atendimentos")
+          .select("lancamento_id")
+          .in("id", manualIds);
+        const lancIds = ((fas ?? []) as Array<{ lancamento_id: string | null }>)
+          .map((r) => r.lancamento_id)
+          .filter((x): x is string => !!x);
+        if (lancIds.length) {
+          const { data: lancs } = await supabase
+            .from("fin_lancamentos")
+            .select("id, valor")
+            .in("id", lancIds);
+          const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+          sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+        }
+      }
+
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "confirmado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "confirmado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (sombraIds.length) {
+        const { error: delErr } = await supabase
+          .from("fin_lancamentos")
+          .delete()
+          .in("id", sombraIds);
+        if (delErr) {
+          mostrarErro(delErr);
+          return;
+        }
+      }
+      toast.success(`Baixa desfeita em ${alvos.length} atendimento(s).`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
-  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
+  const pacMap = useMemo(() => {
+    const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
+    for (const [id, nome] of Object.entries(pacNameExtra)) if (!m.has(id)) m.set(id, nome);
+    return m;
+  }, [pacientes, pacNameExtra]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
@@ -983,10 +1848,16 @@ function Page() {
         : fTipo === "medico"
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
+    const baseLaudo =
+      fLaudo === "todos"
+        ? baseTipo
+        : fLaudo === "baixado"
+          ? baseTipo.filter((a) => a.laudo_status === "emitido")
+          : baseTipo.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
       norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
-    const arr = [...baseTipo];
+    const arr = [...baseLaudo];
     switch (fOrdem) {
       case "data_asc":
         arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -1013,7 +1884,7 @@ function Page() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem, fTipo]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo]);
   const totais = useMemo(
     () =>
       filteredItems.reduce(
@@ -1032,7 +1903,10 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
+  // Itens selecionáveis: qualquer atendimento com repasse > 0.
+  // As ações do topo validam individualmente o que cada uma aceita
+  // (baixa em lote, pagar repasse, 2ª via).
+  const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
   const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
@@ -1047,45 +1921,69 @@ function Page() {
   };
   const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
   const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+  const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+  const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+  const selectedNaoBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && !isAtendido(a),
+  );
+  const selectedBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && isAtendido(a),
+  );
+  const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
+  const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
+  const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const selectedLaudoElegiveis = selectedItems.filter((a) => {
+    const procKey = a.procedimento ? norm(a.procedimento) : "";
+    const exige = procKey && procLaudo.get(procKey);
+    return exige && a.laudo_status !== "emitido";
+  });
+  const reimprimirSelecionados = () => {
+    if (!podeReimprimir) return;
+    abrirSegundaViaLote(selectedPagos);
+  };
 
   const openPay = () => {
     if (!selectedItems.length) {
       toast.info("Selecione ao menos um atendimento.");
       return;
     }
-    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "" });
+    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "", valor_manual: "" });
     setPayOpen(true);
   };
 
   const confirmarPagamento = async () => {
     if (!clinicaAtual || !selectedItems.length) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setPayingNow(true);
     try {
-      // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
-      // realizados (lançamento confirmado + agendamento com status 'realizado').
-      // Bloqueia o bug de repassar antes do paciente ter sido atendido.
+      // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
+      // realizados e cuja data marcada na agenda já chegou. A mesma regra também
+      // é reforçada no banco pela RPC pagar_repasse_medico.
       const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
       if (agendaIdsCheck.length) {
         const { data: lancs, error: eChk } = await supabase
           .from("fin_lancamentos")
-          .select("id, status, agendamento_id, agendamento:agendamentos(status)")
+          .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
           .in("id", agendaIdsCheck);
         if (eChk) throw eChk;
+        const hojeIso = new Date().toISOString().slice(0, 10);
         const bloq: string[] = [];
         for (const l of (lancs ?? []) as Array<{
           id: string;
           status: string | null;
           agendamento_id: string | null;
-          agendamento: { status: string | null } | null;
+          agendamento: { status: string | null; inicio: string | null } | null;
         }>) {
           const lancOk = l.status === "confirmado";
           const agStatus = l.agendamento?.status ?? null;
+          const dataAgenda = l.agendamento?.inicio?.slice(0, 10) ?? null;
           const agOk = agStatus === "realizado";
-          if (!lancOk || !agOk) bloq.push(l.id);
+          const dataOk = !!dataAgenda && dataAgenda <= hojeIso && dataAgenda <= payForm.data;
+          if (!lancOk || !agOk || !dataOk) bloq.push(l.id);
         }
         if (bloq.length) {
           toast.error(
-            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não foram baixados/realizados. Confirme o pagamento no Caixa e marque o atendimento como realizado antes de gerar o repasse.`,
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não estão liberados. O repasse só pode ser pago no dia marcado do atendimento ou depois, com o atendimento realizado.`,
           );
           setPayingNow(false);
           return;
@@ -1107,52 +2005,97 @@ function Page() {
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
       }
+      // Valor manual (override). Só aplicável quando o pagamento é para
+      // um único médico — se houver mais de um, mostramos aviso e
+      // ignoramos o override para não desbalancear repasses de outros.
+      const valorManualNum = Number((payForm.valor_manual ?? "").toString().replace(",", "."));
+      const usarValorManual = valorManualNum > 0 && byMed.size === 1;
+      if (valorManualNum > 0 && byMed.size > 1) {
+        toast.warning("Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.");
+      }
       for (const [medId, list] of byMed) {
-        const total = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
+        const total = usarValorManual ? valorManualNum : totalCalc;
         if (total <= 0) continue;
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
-        const { data: lanc, error: eLanc } = await supabase
-          .from("fin_lancamentos")
-          .insert({
-            clinica_id: clinicaAtual.clinica_id,
-            tipo: "despesa",
-            descricao: `Repasse médico — ${medNome} (${list.length} atend.)`,
-            valor: total,
-            data: payForm.data,
-            data_vencimento: payForm.data,
-            status: "confirmado",
-            medico_id: medId !== "sem" ? medId : null,
-            conta_id: payForm.conta_id || null,
-            forma_pagamento: payForm.forma_pagamento || null,
-          })
-          .select("id")
-          .single();
-        if (eLanc) throw eLanc;
-        const lancId = lanc?.id ?? null;
-        const upd = {
-          repasse_pago: true,
-          repasse_pago_em: payForm.data,
-          repasse_forma_pagamento: payForm.forma_pagamento || null,
-          repasse_conta_id: payForm.conta_id || null,
-          repasse_lancamento_id: lancId,
-        };
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUserId = userData?.user?.id ?? null;
         const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
         const agendaIds = list.filter((x) => x.origem === "agenda").map((x) => x.id);
-        if (manualIds.length) {
-          const { error } = await supabase.from("fin_atendimentos").update(upd).in("id", manualIds);
-          if (error) throw error;
+        // Cria a despesa e marca todos os atendimentos como pagos numa ÚNICA
+        // transação no banco (RPC pagar_repasse_medico). Se qualquer passo
+        // falhar — inclusive outra aba/retry já tendo pago algum desses
+        // atendimentos nesse meio-tempo — o Postgres desfaz TUDO
+        // automaticamente (transação real), sem depender de rollback manual
+        // no cliente e sem janela onde a despesa exista sem todos os
+        // atendimentos marcados como pagos (ou vice-versa).
+        const { error: eRpc } = await supabase.rpc("pagar_repasse_medico", {
+          _clinica_id: clinicaAtual.clinica_id,
+          _medico_id: medId !== "sem" ? medId : null,
+          _manual_ids: manualIds,
+          _agenda_ids: agendaIds,
+          _total: total,
+          _data: payForm.data,
+          _forma_pagamento: payForm.forma_pagamento || null,
+          _conta_id: payForm.conta_id || null,
+          _criado_por: currentUserId,
+          _medico_nome: medNome,
+        } as never);
+        if (eRpc) {
+          toast.error(
+            (eRpc as { code?: string }).code === "23505"
+              ? `Alguns atendimentos de ${medNome} já haviam sido pagos. Nenhum novo pagamento foi gerado — recarregando.`
+              : `Falha ao pagar repasse de ${medNome}: ${(eRpc as { message?: string }).message ?? "erro desconhecido"}`,
+          );
+          continue;
         }
-        if (agendaIds.length) {
-          const { error } = await supabase.from("fin_lancamentos").update(upd).in("id", agendaIds);
-          if (error) throw error;
+        // Se usamos valor manual, ajusta o valor_medico de cada atendimento
+        // MANUAL proporcionalmente para que o comprovante e o total pago
+        // batam. Para atendimentos de agenda o valor_medico é derivado das
+        // regras de repasse e não é persistido nessa tabela — o total
+        // manual já foi gravado no lançamento de despesa acima.
+        if (usarValorManual) {
+          const centavosAlvo = Math.round(total * 100);
+          const base = totalCalc > 0 ? totalCalc : list.length;
+          let acumulado = 0;
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            let valorItem: number;
+            if (i === list.length - 1) {
+              valorItem = Math.max(0, (centavosAlvo - acumulado) / 100);
+            } else {
+              const peso = totalCalc > 0 ? (Number(item.valor_medico) || 0) / base : 1 / base;
+              const cents = Math.round(centavosAlvo * peso);
+              acumulado += cents;
+              valorItem = cents / 100;
+            }
+            item.valor_medico = valorItem;
+            if (item.origem === "manual") {
+              await supabase.from("fin_atendimentos").update({ valor_medico: valorItem }).eq("id", item.id);
+            }
+          }
         }
       }
       toast.success("Repasses pagos com sucesso");
+      const c = buildComprovante(selectedItems, {
+        ...payForm,
+        pago_at: new Date().toISOString(),
+        reimpressao: false,
+      });
       setPayOpen(false);
+      if (c) {
+        setComprovante(c);
+        setComprovantes([c]);
+        setComprovanteOpen(true);
+      }
       await load();
     } catch (e) {
       const err = e as { message?: string };
       mostrarErro(err);
+      // Sincroniza o estado local com o banco após falha para evitar que
+      // o usuário tente pagar de novo achando que nada foi feito quando na
+      // verdade um médico do lote já foi processado com sucesso.
+      try { await load(); } catch { /* noop */ }
     } finally {
       setPayingNow(false);
     }
@@ -1160,65 +2103,12 @@ function Page() {
 
   return (
     <div className="space-y-3">
-      {podeEstornar && solicitacoes.length > 0 && (
-        <Card className="border-rose-300 bg-rose-50/60">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <BellRing className="h-4 w-4 text-rose-700" />
-              <strong className="text-sm text-rose-900">
-                {solicitacoes.length} solicitação(ões) de estorno pendente(s)
-              </strong>
-              <span className="text-xs text-rose-700/80">enviadas pelo caixa/recepção</span>
-            </div>
-            <ul className="divide-y divide-rose-200/60">
-              {solicitacoes.map((s) => (
-                <li key={s.id} className="py-2 flex flex-wrap items-start gap-2 text-sm">
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="font-medium flex flex-wrap items-center gap-1.5">
-                      <span>{s.paciente_nome ?? "—"}</span>
-                      {s.valor != null && (
-                        <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px] h-4 px-1.5",
-                          s.tipo === "devolucao"
-                            ? "border-amber-400 text-amber-900 bg-amber-100"
-                            : "border-rose-400 text-rose-900 bg-rose-100",
-                        )}
-                      >
-                        {s.tipo === "devolucao" ? "Devolução" : "Erro de caixa"}
-                      </Badge>
-                    </div>
-                    {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
-                    <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
-                    {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
-                      <div className="text-[10px] text-muted-foreground">
-                        {s.data_pagamento_original && (
-                          <>Pago em {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")} • </>
-                        )}
-                        {s.data_estorno && <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>}
-                      </div>
-                    )}
-                    <div className="text-[10px] text-muted-foreground">
-                      {new Date(s.solicitado_em).toLocaleString("pt-BR")}
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <Button size="sm" className="h-7 text-xs" onClick={() => aprovarSolicitacao(s)}>
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar e estornar
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitarSolicitacao(s)}>
-                      Recusar
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs defaultValue="atendimentos" className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+          <TabsTrigger value="comprovantes">Comprovantes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="atendimentos" className="space-y-3 mt-0">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
@@ -1238,7 +2128,7 @@ function Page() {
               }
               exportToExcel(
                 filteredItems.map((a) => ({
-                  data: new Date(a.data).toLocaleDateString("pt-BR"),
+                  data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
                   medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
                   paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "") : "",
                   procedimento: a.procedimento ?? "",
@@ -1274,14 +2164,71 @@ function Page() {
             <Download className="h-4 w-4 mr-2" />
             Exportar Excel
           </Button>
-          {!isMedicoOnly && (
-            <Button onClick={openPay} disabled={!selectedItems.length}>
+          {!isMedicoOnly && podeEscrever && (
+            <Button
+              onClick={openPay}
+              disabled={!podePagar}
+              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+            >
               <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
             </Button>
           )}
+          {!isMedicoOnly && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <MoreHorizontal className="h-4 w-4 mr-2" />
+                  Opções
+                  {selectedItems.length ? ` (${selectedItems.length})` : ""}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  {selectedItems.length
+                    ? `${selectedItems.length} atendimento(s) selecionado(s)`
+                    : "Selecione atendimentos na lista"}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedNaoBaixados.length > 0) darBaixaLote();
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Dar baixa
+                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                  Vincular vários laudos
+                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Dialog open={open} onOpenChange={setOpen}>
-            {!isMedicoOnly && (
+            {!isMedicoOnly && podeEscrever && (
               <DialogTrigger asChild>
                 <Button onClick={openNew} disabled={!clinicaAtual}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -1297,8 +2244,7 @@ function Page() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Data</Label>
-                    <Input
-                      type="date"
+                    <DateInputBR
                       required
                       value={form.data}
                       onChange={(e) => setForm({ ...form, data: e.target.value })}
@@ -1423,11 +2369,11 @@ function Page() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">De</Label>
-              <Input type="date" className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+              <DateInputBR className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Até</Label>
-              <Input type="date" className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+              <DateInputBR className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Status repasse</Label>
@@ -1452,6 +2398,24 @@ function Page() {
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
                   <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">
+                Laudo
+                <span className="ml-1 font-normal text-muted-foreground">
+                  ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados · {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                </span>
+              </Label>
+              <Select value={fLaudo} onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="baixado">Baixados</SelectItem>
+                  <SelectItem value="nao_baixado">Não baixados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1510,21 +2474,22 @@ function Page() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+            <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
           ) : filteredItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
               Nenhum atendimento no período/filtro selecionado.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
+            <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+              <TableHeader className="sticky top-0 z-20">
+                <TableRow className="bg-muted">
                   {!isMedicoOnly && (
                     <TableHead className="w-8 px-2">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                   )}
+                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
@@ -1548,37 +2513,53 @@ function Page() {
                   const procedimentoNome = a.procedimento ?? "—";
 
                   // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
-                  const rowBg = idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
+                  const isSelected = sel.has(`${a.origem}:${a.id}`);
+                  const baixaPendente = !a.repasse_pago && !isAtendido(a);
+                  const rowBg =
+                    isSelected && baixaPendente
+                      ? "bg-amber-50 dark:bg-amber-950/30"
+                      : idx % 2 === 0
+                        ? "bg-background"
+                        : "bg-slate-50 dark:bg-slate-900/40";
 
                   return (
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
-                          {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
-                            isAtendido(a) ? (
-                              <Checkbox
-                                checked={sel.has(`${a.origem}:${a.id}`)}
-                                onCheckedChange={() => toggleOne(a)}
-                                aria-label="Selecionar"
-                                className="h-4 w-4"
-                              />
-                            ) : (
-                              <span title="Aguardando atendimento" className="text-[10px] text-amber-600">
-                                ⏳
-                              </span>
-                            )
-                          ) : null}
+                          {(a.valor_medico ?? 0) > 0 ? (
+                            <Checkbox
+                              checked={sel.has(`${a.origem}:${a.id}`)}
+                              onCheckedChange={() => toggleOne(a)}
+                              aria-label={a.repasse_pago ? "Selecionar para 2ª via" : "Selecionar"}
+                              title={a.repasse_pago ? "Selecionar para reimprimir 2ª via" : undefined}
+                              className="h-4 w-4"
+                            />
+                          ) : (
+                            <span
+                              title="Sem valor de repasse cadastrado para este médico/procedimento"
+                              className="text-[10px] text-muted-foreground whitespace-nowrap"
+                            >
+                              Sem repasse
+                            </span>
+                          )}
                         </TableCell>
                       )}
+                      <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
+                        {String(idx + 1).padStart(3, "0")}
+                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap px-2">
-                        {new Date(a.data).toLocaleDateString("pt-BR")}
+                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "2-digit",
+                        })}
                       </TableCell>
 
                       {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
-                      <TableCell className="text-xs max-w-[120px] truncate px-2" title={medicoNome}>
+                      <TableCell className="text-xs max-w-[90px] truncate px-2" title={medicoNome}>
                         {medicoNome}
                       </TableCell>
-                      <TableCell className="text-xs font-medium max-w-[120px] truncate px-2" title={pacienteNome}>
+                      <TableCell className="text-xs font-medium max-w-[190px] truncate px-2" title={pacienteNome}>
                         {pacienteNome}
                       </TableCell>
                       <TableCell
@@ -1628,18 +2609,58 @@ function Page() {
                         {(() => {
                           const procKey = a.procedimento ? norm(a.procedimento) : "";
                           const exigeLaudo = procKey && procLaudo.get(procKey);
+                          const laudadorNome = a.medico_laudador_id
+                            ? medMap.get(a.medico_laudador_id) ?? null
+                            : null;
                           if (a.laudo_status === "emitido")
                             return (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Emitido
-                              </Badge>
+                              podeEscrever ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                    title={
+                                      laudadorNome
+                                        ? `Laudador: ${laudadorNome}. Clique para desvincular.`
+                                        : "Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                    }
+                                    onClick={() => desvincularLaudo(a)}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                    Vinculado
+                                  </Button>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                    Vinculado
+                                  </Badge>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
+                              )
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
-                          if (!podeEstornar) return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                          if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
                           return (
                             <Button
                               variant="outline"
@@ -1647,7 +2668,7 @@ function Page() {
                               className="h-6 text-[10px] px-2"
                               onClick={() => openLaudo(a)}
                             >
-                              Laudar
+                              Vincular
                             </Button>
                           );
                         })()}
@@ -1664,55 +2685,204 @@ function Page() {
                           {a.origem === "agenda" ? (
                             <div className="flex items-center justify-end gap-0.5">
                               <span className="text-[9px] text-muted-foreground uppercase mr-1">Agenda</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Emitir NFS-e"
-                                onClick={() => openEmitNfse(a)}
-                                disabled={!a.paciente_id}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                              </Button>
-                              {podeEstornar && !a.repasse_pago && (
+                              {podeEscrever && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  title="Estornar"
-                                  onClick={() => estornar(a)}
+                                  title="Emitir NFS-e"
+                                  onClick={() => openEmitNfse(a)}
+                                  disabled={!a.paciente_id}
                                 >
-                                  <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                                  <Send className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
+                              {a.repasse_pago || a.agendamento_status === "realizado" ? (
+                                <Button
+                                  size="sm"
+                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
+                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                  title={
+                                    a.repasse_pago
+                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                      : podeEstornar
+                                        ? "Clique para desfazer a baixa"
+                                        : "Repasse já baixado"
+                                  }
+                                  onClick={() => desfazerBaixa(a)}
+                                >
+                                  <CheckCircle2 className="h-3 w-3" /> Baixado
+                                </Button>
+                              ) : (
+                                podeEscrever && (
+                                  <Button
+                                    size="sm"
+                                    className={cn(
+                                      "h-6 px-2 text-[10px] gap-1 border",
+                                      isSelected
+                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                    )}
+                                    title="Dá baixa (marcar como realizado e liberar repasse)"
+                                    onClick={() => darBaixa(a)}
+                                  >
+                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    Baixar
+                                  </Button>
+                                )
+                              )}
                               {/* Botão de excluir para agenda */}
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "h-7 w-7",
+                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                  )}
+                                  title={
+                                    a.repasse_pago
+                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                      : "Editar repasse médico deste atendimento"
+                                  }
+                                  onClick={() => abrirEditRepasse(a)}
+                                >
+                                  <Wallet className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
+                                  onClick={() => remove(a)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
-                                title="Excluir"
-                                onClick={() => remove(a)}
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
                               >
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                <History className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           ) : (
                             <div className="flex items-center justify-end gap-0.5">
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Emitir NFS-e"
+                                  onClick={() => openEmitNfse(a)}
+                                  disabled={!a.paciente_id}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {podeEscrever && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Imprimir comprovante de repasse"
+                                  onClick={() => abrirComprovanteDoItem(a)}
+                                >
+                                  <Printer className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              )}
+                              {a.repasse_pago || a.status === "realizado" ? (
+                                <Button
+                                  size="sm"
+                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
+                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                  title={
+                                    a.repasse_pago
+                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                      : podeEstornar
+                                        ? "Clique para desfazer a baixa"
+                                        : "Repasse já baixado"
+                                  }
+                                  onClick={() => desfazerBaixa(a)}
+                                >
+                                  <CheckCircle2 className="h-3 w-3" /> Baixado
+                                </Button>
+                              ) : (
+                                podeEscrever && (
+                                  <Button
+                                    size="sm"
+                                    className={cn(
+                                      "h-6 px-2 text-[10px] gap-1 border",
+                                      isSelected
+                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                    )}
+                                    title="Dá baixa (marcar como realizado e liberar repasse)"
+                                    onClick={() => darBaixa(a)}
+                                  >
+                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    Baixar
+                                  </Button>
+                                )
+                              )}
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "h-7 w-7",
+                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                  )}
+                                  title={
+                                    a.repasse_pago
+                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                      : "Editar repasse médico deste atendimento"
+                                  }
+                                  onClick={() => abrirEditRepasse(a)}
+                                >
+                                  <Wallet className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
+                                  onClick={() => remove(a)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
-                                title="Emitir NFS-e"
-                                onClick={() => openEmitNfse(a)}
-                                disabled={!a.paciente_id}
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
                               >
-                                <Send className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                <History className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           )}
@@ -1727,6 +2897,88 @@ function Page() {
         </CardContent>
       </Card>
 
+      {/* Barra de ações do rodapé: repete botões quando houver seleção */}
+      {!isMedicoOnly && selectedItems.length > 0 && (
+        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+          <div className="text-sm">
+            <b>{selectedItems.length}</b> selecionado(s)
+            {selectedPagos.length > 0 && (
+              <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
+            )}
+            {selectedNaoPagos.length > 0 && (
+              <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
+            )}
+            <span className="ml-2 text-muted-foreground">
+              — total {fmt(selectedTotal)}
+            </span>
+            {misturado && (
+              <span className="ml-2 text-xs text-rose-700">
+                Separe pagos e não pagos para agir.
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {podeEscrever && (
+              <Button
+                size="sm"
+                onClick={openPay}
+                disabled={!podePagar}
+                title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <MoreHorizontal className="h-4 w-4 mr-2" />
+                  Opções
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedNaoBaixados.length > 0) darBaixaLote();
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Dar baixa
+                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                  Vincular vários laudos
+                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
+              Limpar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Diálogo pagar repasse */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent className="max-w-md">
@@ -1739,12 +2991,48 @@ function Page() {
               <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
             </div>
             <div className="space-y-2">
-              <Label>Data do pagamento</Label>
+              <Label>Valor do repasse (opcional)</Label>
               <Input
-                type="date"
-                value={payForm.data}
-                onChange={(e) => setPayForm({ ...payForm, data: e.target.value })}
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={`Padrão: ${fmt(selectedTotal)}`}
+                value={payForm.valor_manual}
+                onChange={(e) => setPayForm({ ...payForm, valor_manual: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para usar o valor calculado. Para alterar manualmente, selecione atendimentos de apenas um médico.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Data do pagamento</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !payForm.data && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {payForm.data
+                      ? format(parse(payForm.data, "yyyy-MM-dd", new Date()), "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={ptBR}
+                    selected={payForm.data ? parse(payForm.data, "yyyy-MM-dd", new Date()) : undefined}
+                    onSelect={(d) => d && setPayForm({ ...payForm, data: format(d, "yyyy-MM-dd") })}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                Use uma data anterior para lançar pagamentos retroativos.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Conta</Label>
@@ -1793,11 +3081,167 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo: comprovante de repasse (imprimível) */}
+      <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="no-print">
+            <DialogTitle>
+              Comprovante de pagamento de repasse
+              {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {comprovantes.length > 0 && (
+            <div ref={printAreaRef} className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
+              {comprovantes.map((comprovante, blocoIdx) => (
+                <div
+                  key={blocoIdx}
+                  className={cn(
+                    "comprovante-bloco",
+                    blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
+                  )}
+                >
+                  {comprovante.reimpressao && (
+                <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
+                  <div className="text-xl font-extrabold tracking-wide uppercase">
+                    Segunda via — Reimpressão de comprovante
+                  </div>
+                  <div className="text-sm mt-1">
+                    Pagamento realizado em{" "}
+                    <b>
+                      {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {comprovante.horaPagamento
+                        ? ` às ${comprovante.horaPagamento}`
+                        : " (horário não registrado)"}
+                    </b>
+                    {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
+                      <span className="ml-1">
+                        (contém pagamentos de {comprovante.multiplasDatas} datas)
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-xs mt-0.5 opacity-80">
+                    Reimpressão emitida em {comprovante.emitidoEm}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-start justify-between border-b pb-3 mb-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
+                  <div className="text-lg font-semibold">{comprovante.clinicaNome}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-semibold">Comprovante de repasse médico</div>
+                  <div className="text-xs text-muted-foreground">Emitido em {comprovante.emitidoEm}</div>
+                </div>
+              </div>
+
+              <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+                <div>
+                  <span className="text-xs text-muted-foreground">Médico: </span>
+                  <b>{comprovante.medicoNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Data e hora do pagamento: </span>
+                  <b>
+                    {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {comprovante.horaPagamento
+                      ? ` às ${comprovante.horaPagamento}`
+                      : " (horário não registrado)"}
+                  </b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Forma: </span>
+                  <b>{comprovante.formaPagamento}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Conta: </span>
+                  <b>{comprovante.contaNome}</b>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Atendimentos: </span>
+                  <b>{comprovante.qtd}</b>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">Total pago ao médico: </span>
+                  <b className="text-base text-primary">{fmt(comprovante.total)}</b>
+                </div>
+              </div>
+
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left p-2">Data</th>
+                    <th className="text-left p-2">Pago em</th>
+                    <th className="text-left p-2">Médico</th>
+                    <th className="text-left p-2">Paciente</th>
+                    <th className="text-left p-2">Serviço</th>
+                    <th className="text-right p-2">Valor pago (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comprovante.itens.map((it, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 whitespace-nowrap">
+                        {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </td>
+                      <td className="p-2 whitespace-nowrap">
+                        {it.pagoEm
+                          ? `${new Date(it.pagoEm + "T00:00:00").toLocaleDateString("pt-BR")}${it.pagoHora ? ` às ${it.pagoHora}` : ""}`
+                          : "—"}
+                      </td>
+                      <td className="p-2">{it.medico}</td>
+                      <td className="p-2">{it.paciente}</td>
+                      <td className="p-2">{it.servico}</td>
+                      <td className="p-2 text-right whitespace-nowrap">{fmt(it.valorMedico)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <td className="p-2" colSpan={5}>
+                      Total
+                    </td>
+                    <td className="p-2 text-right">{fmt(comprovante.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura do médico</div>
+                </div>
+                <div className="text-center">
+                  <div className="border-t pt-1">Assinatura da clínica</div>
+                </div>
+              </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter className="no-print">
+            <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => imprimirComprovante(true)}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir resumo (médico)
+            </Button>
+            <Button onClick={() => imprimirComprovante()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo: marcar laudo emitido */}
       <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Marcar laudo emitido</DialogTitle>
+            <DialogTitle>Vincular laudo</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {laudoTarget && (
@@ -1816,7 +3260,72 @@ function Page() {
               <Label>Médico laudador</Label>
               <Select
                 value={laudoForm.medico_laudador_id || undefined}
-                onValueChange={(v) => setLaudoForm({ ...laudoForm, medico_laudador_id: v })}
+                onValueChange={onChangeLaudador}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o médico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(laudoRegras.length > 0
+                    ? laudoRegras.map((r) => ({ id: r.laudador_medico_id, nome: r.laudador_nome }))
+                    : medicos
+                  ).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {laudoRegras.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum laudador cadastrado na aba Repasse desta agenda — informe o valor manualmente.
+                </p>
+              )}
+            </div>
+            {laudoForm.medico_laudador_id && (
+              <div className="space-y-2">
+                <Label>Valor do laudo (R$)</Label>
+                <CurrencyInput
+                  value={laudoForm.valor_laudo}
+                  onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
+                />
+                {laudoSemRegra && (
+                  <p className="text-xs text-muted-foreground">
+                    Sem regra cadastrada para este laudador — informe o valor manualmente.
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaudoOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={emitirLaudo} disabled={laudoSaving}>
+              {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: vincular laudos em lote */}
+      <Dialog open={laudoLoteOpen} onOpenChange={setLaudoLoteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular laudos em lote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/40 p-3 text-xs">
+              <b>{selectedLaudoElegiveis.length}</b> atendimento(s) elegível(is) para vínculo de laudo.
+            </div>
+            <div className="space-y-2">
+              <Label>Médico laudador</Label>
+              <Select
+                value={laudoLoteLaudadorId || undefined}
+                onValueChange={setLaudoLoteLaudadorId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o médico..." />
@@ -1829,24 +3338,21 @@ function Page() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                O valor de cada laudo será calculado automaticamente pela regra de repasse
+                da agenda de cada atendimento. Atendimentos sem regra para este laudador serão ignorados.
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label>Valor do laudo (R$)</Label>
-              <CurrencyInput
-                value={laudoForm.valor_laudo}
-                onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
-            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLaudoOpen(false)}>
+            <Button variant="outline" onClick={() => setLaudoLoteOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={emitirLaudo} disabled={laudoSaving}>
-              {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+            <Button
+              onClick={vincularLaudoLote}
+              disabled={laudoLoteSaving || !laudoLoteLaudadorId}
+            >
+              {laudoLoteSaving ? "Vinculando..." : `Vincular (${selectedLaudoElegiveis.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1925,6 +3431,74 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {tomadorNfseDialog}
+      {descricaoNfseDialog}
+
+      {/* Edição pontual do repasse médico de um atendimento */}
+      <Dialog
+        open={editRepasse.open}
+        onOpenChange={(o) => setEditRepasse((s) => ({ ...s, open: o }))}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar repasse médico</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
+              {fmt(Number(editRepasse.atend?.valor_total) || 0)}
+            </div>
+            {editRepasse.atend?.repasse_pago && (
+              <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
+                Este repasse já foi pago. Ao salvar, a despesa vinculada
+                (fin_lancamentos) será ajustada pela diferença para o caixa
+                continuar batendo. Confirme com o médico antes de gravar.
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>Valor do repasse (R$)</Label>
+              <CurrencyInput
+                value={editRepasse.valor}
+                onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Só ajusta este atendimento. Não altera a regra padrão do médico.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditRepasse({ open: false, atend: null, valor: "" })}
+              disabled={savingRepasse}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvarEditRepasse()} disabled={savingRepasse}>
+              {savingRepasse ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        </TabsContent>
+        <TabsContent value="comprovantes" className="mt-0">
+          <ComprovantesTab />
+        </TabsContent>
+      </Tabs>
+      <HistoricoAtendimentoDialog
+        open={!!historicoAtend}
+        onClose={() => setHistoricoAtend(null)}
+        lancamentoId={historicoAtend?.id ?? null}
+        agendamentoId={historicoAtend?.agendamento_id ?? null}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-landing")({
   component: LandingPagesAdminWithTabs,
@@ -24,6 +25,7 @@ interface Form {
 }
 
 function LandingPagesAdmin() {
+  const podeEscrever = usePodeEscrever("mkt-landing");
   return (
     <SimpleCrud<Row, Form>
       table="mkt_landing_pages"
@@ -32,6 +34,7 @@ function LandingPagesAdmin() {
       subtitle="Páginas públicas de captura de leads."
       icon={<Sparkles className="h-6 w-6 text-primary" />}
       searchFields={["titulo", "slug"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "titulo", header: "Título", render: r => <span className="font-medium">{r.titulo}</span> },
         { key: "slug", header: "URL", render: r => (
@@ -66,9 +69,9 @@ function LandingPagesAdmin() {
             <div className="space-y-1"><Label>Slug (URL) *</Label><Input required value={f.slug} onChange={e => set({ ...f, slug: e.target.value })} placeholder="ofertas-julho" /></div>
           </div>
           <div className="space-y-1"><Label>Subtítulo</Label><Input value={f.subtitulo} onChange={e => set({ ...f, subtitulo: e.target.value })} /></div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Cor primária</Label><Input type="color" value={f.cor_primaria} onChange={e => set({ ...f, cor_primaria: e.target.value })} /></div>
-            <div className="space-y-1 col-span-2"><Label>Texto do botão</Label><Input value={f.cta_label} onChange={e => set({ ...f, cta_label: e.target.value })} /></div>
+            <div className="space-y-1 sm:col-span-2"><Label>Texto do botão</Label><Input value={f.cta_label} onChange={e => set({ ...f, cta_label: e.target.value })} /></div>
           </div>
           <div className="space-y-1"><Label>Imagem hero (URL)</Label><Input value={f.hero_imagem_url} onChange={e => set({ ...f, hero_imagem_url: e.target.value })} placeholder="https://..." /></div>
           <div className="space-y-1"><Label>Conteúdo HTML (opcional)</Label><Textarea rows={5} value={f.conteudo_html} onChange={e => set({ ...f, conteudo_html: e.target.value })} placeholder="<p>Descreva sua oferta...</p>" /></div>

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X, Paperclip, Smile, Search, PanelRightClose, PanelRightOpen, MoreVertical, User, Tag, ArrowLeft } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { chatNina } from "@/lib/nina.functions";
 import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
 import { enviarMensagemWhatsapp, listarTemplatesWhatsapp, criarTemplateWhatsapp, excluirTemplateWhatsapp } from "@/lib/whatsapp.functions";
@@ -434,6 +435,7 @@ interface WppCfg {
 
 function ConfiguracaoWhatsApp() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nina");
   const obter = useServerFn(obterWhatsappConfig);
   const salvar = useServerFn(salvarWhatsappConfig);
   const testar = useServerFn(testarConexaoWhatsapp);
@@ -504,6 +506,7 @@ function ConfiguracaoWhatsApp() {
   };
 
   const onSalvar = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     try {
       await salvar({
@@ -526,6 +529,7 @@ function ConfiguracaoWhatsApp() {
   };
 
   const onTestar = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     // se há valores não salvos, salva antes de testar
     if (form.phone_number_id !== cfg.phone_number_id || form.waba_id !== cfg.waba_id || form.display_name !== cfg.display_name || form.access_token) {
       await onSalvar();
@@ -547,6 +551,7 @@ function ConfiguracaoWhatsApp() {
   };
 
   const onSalvarHorario = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!cfg) return;
     if (horario.inicio >= horario.fim) {
       toast.error("O horário inicial deve ser menor que o final");
@@ -589,7 +594,9 @@ function ConfiguracaoWhatsApp() {
               <CardTitle>Conexões de atendimento</CardTitle>
               <CardDescription>Gerencie os canais conectados à Nina</CardDescription>
             </div>
-            <Button onClick={abrirDialog}><Plus className="h-4 w-4 mr-1" /> Nova Conexão</Button>
+            {podeEscrever && (
+              <Button onClick={abrirDialog}><Plus className="h-4 w-4 mr-1" /> Nova Conexão</Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -608,7 +615,9 @@ function ConfiguracaoWhatsApp() {
               </div>
               <div className="flex items-center gap-2">
                 {statusBadge}
-                <Button variant="ghost" size="icon" onClick={abrirDialog}><Pencil className="h-4 w-4" /></Button>
+                {podeEscrever && (
+                  <Button variant="ghost" size="icon" onClick={abrirDialog}><Pencil className="h-4 w-4" /></Button>
+                )}
               </div>
             </div>
           ) : (
@@ -672,11 +681,13 @@ function ConfiguracaoWhatsApp() {
               />
             </div>
           </div>
-          <div className="flex justify-end">
-            <Button onClick={onSalvarHorario} disabled={savingHorario}>
-              {savingHorario ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…</> : "Salvar horário"}
-            </Button>
-          </div>
+          {podeEscrever && (
+            <div className="flex justify-end">
+              <Button onClick={onSalvarHorario} disabled={savingHorario}>
+                {savingHorario ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…</> : "Salvar horário"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1151,6 +1162,7 @@ interface TplRow {
 
 function TemplatesWhatsapp() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nina");
   const clinicaId = clinicaAtual?.clinica_id;
   const listar = useServerFn(listarTemplatesWhatsapp);
   const criar = useServerFn(criarTemplateWhatsapp);
@@ -1207,6 +1219,7 @@ function TemplatesWhatsapp() {
   };
 
   const submeter = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaId) return;
     if (!/^[a-z0-9_]+$/.test(name)) {
       toast.error("Nome inválido. Use apenas minúsculas, números e _ (underline). Ex: confirmacao_consulta");
@@ -1242,6 +1255,7 @@ function TemplatesWhatsapp() {
   };
 
   const remover = async (n: TplRow) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaId) return;
     if (!confirm(`Excluir o template "${n.name}"? Esta ação não pode ser desfeita.`)) return;
     try {
@@ -1280,9 +1294,11 @@ function TemplatesWhatsapp() {
           <Button variant="outline" onClick={carregar} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
-          <Button onClick={() => { resetForm(); setOpen(true); }} disabled={!clinicaId}>
-            <Plus className="h-4 w-4 mr-2" /> Novo template
-          </Button>
+          {podeEscrever && (
+            <Button onClick={() => { resetForm(); setOpen(true); }} disabled={!clinicaId}>
+              <Plus className="h-4 w-4 mr-2" /> Novo template
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1315,9 +1331,11 @@ function TemplatesWhatsapp() {
                       <p className="text-xs text-red-600 mt-1">Motivo: {t.rejected_reason}</p>
                     )}
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => remover(t)} title="Excluir">
-                    <X className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {podeEscrever && (
+                    <Button variant="ghost" size="icon" onClick={() => remover(t)} title="Excluir">
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

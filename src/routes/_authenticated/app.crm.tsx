@@ -6,6 +6,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/crm")({
   component: CrmPage,
@@ -17,6 +18,7 @@ interface Row { id: string; nome_lead: string; telefone: string | null; email: s
 interface Form { nome_lead: string; telefone: string; email: string; valor_estimado: string; status: Status; origem: string; observacoes: string; }
 
 function CrmPage() {
+  const podeEscrever = usePodeEscrever("crm");
   return (
     <SimpleCrud<Row, Form>
       table="crm_oportunidades"
@@ -26,6 +28,7 @@ function CrmPage() {
       icon={<Target className="h-6 w-6 text-primary" />}
       newLabel="Nova oportunidade"
       editLabel="Editar oportunidade"
+      readOnly={!podeEscrever}
       searchFields={["nome_lead", "telefone", "email"]}
       columns={[
         { key: "nome", header: "Lead", render: r => <span className="font-medium">{r.nome_lead}</span> },
@@ -80,7 +83,7 @@ function CrmPage() {
               <Input type="email" maxLength={255} value={f.email} onChange={e => set({ ...f, email: e.target.value })} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Valor (R$)</Label>
               <CurrencyInput value={f.valor_estimado} onChange={(v) => set({ ...f, valor_estimado: v })} />

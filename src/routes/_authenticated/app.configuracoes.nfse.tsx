@@ -10,6 +10,7 @@ import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { ItemServicoPicker } from "@/components/nfse/item-servico-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/nfse")({
@@ -88,6 +89,7 @@ const REGIMES = [
 ];
 
 function NfseConfigPage() {
+  const podeEscrever = usePodeEscrever("nfse");
   return (
     <div className="space-y-6">
       <ClinicaNfseModoCard />
@@ -99,6 +101,7 @@ function NfseConfigPage() {
       icon={<Building2 className="h-6 w-6 text-primary" />}
       orderBy={{ column: "created_at", ascending: false }}
       dialogClassName="max-w-5xl w-[95vw]"
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "cnpj", header: "CNPJ", className: "w-44", render: (r) => r.cnpj },
@@ -212,12 +215,12 @@ function NfseConfigPage() {
             <div className="space-y-1"><Label>Razão social</Label><Input value={f.razao_social} onChange={(e) => set({ ...f, razao_social: e.target.value })} /></div>
             <div className="space-y-1"><Label>Nome fantasia</Label><Input value={f.nome_fantasia} onChange={(e) => set({ ...f, nome_fantasia: e.target.value })} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Inscrição Municipal</Label><Input value={f.inscricao_municipal} onChange={(e) => set({ ...f, inscricao_municipal: e.target.value })} /></div>
             <div className="space-y-1"><Label>Município</Label><Input value={f.municipio} onChange={(e) => set({ ...f, municipio: e.target.value })} placeholder="São João de Meriti" /></div>
             <div className="space-y-1"><Label>UF</Label><Input maxLength={2} value={f.uf} onChange={(e) => set({ ...f, uf: e.target.value.toUpperCase() })} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Cód. IBGE Município</Label><Input value={f.codigo_municipio} onChange={(e) => set({ ...f, codigo_municipio: e.target.value })} placeholder="3305109" /></div>
             <div className="space-y-1"><Label>CEP</Label><Input value={f.cep} onChange={(e) => set({ ...f, cep: e.target.value })} /></div>
             <div className="space-y-1"><Label>Bairro</Label><Input value={f.bairro} onChange={(e) => set({ ...f, bairro: e.target.value })} /></div>
@@ -234,7 +237,7 @@ function NfseConfigPage() {
 
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-2">Tributação</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>Regime</Label>
                 <Select value={f.regime_tributario} onValueChange={(v) => set({ ...f, regime_tributario: v })}>
@@ -242,7 +245,7 @@ function NfseConfigPage() {
                   <SelectContent>{REGIMES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1 col-span-2">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Cód. nacional serviço (Lista Nacional NFS-e)</Label>
                 <ItemServicoPicker
                   value={f.item_lista_servico}
@@ -260,7 +263,7 @@ function NfseConfigPage() {
 
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-2">Focus NFe</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>Ambiente</Label>
                 <Select value={f.focus_ambiente} onValueChange={(v) => set({ ...f, focus_ambiente: v })}>
@@ -311,6 +314,7 @@ function NfseConfigPage() {
 
 function ClinicaNfseModoCard() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nfse");
   const [modo, setModo] = useState<"por_item" | "agrupada">("por_item");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -332,6 +336,7 @@ function ClinicaNfseModoCard() {
   }, [clinicaAtual]);
 
   const salvar = async (novo: "por_item" | "agrupada") => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     setSaving(true);
     const anterior = modo;
@@ -367,7 +372,7 @@ function ClinicaNfseModoCard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <button
           type="button"
-          disabled={loading || saving}
+          disabled={loading || saving || !podeEscrever}
           onClick={() => salvar("por_item")}
           className={`text-left rounded-md border p-3 transition ${
             modo === "por_item" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
@@ -380,7 +385,7 @@ function ClinicaNfseModoCard() {
         </button>
         <button
           type="button"
-          disabled={loading || saving}
+          disabled={loading || saving || !podeEscrever}
           onClick={() => salvar("agrupada")}
           className={`text-left rounded-md border p-3 transition ${
             modo === "agrupada" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"

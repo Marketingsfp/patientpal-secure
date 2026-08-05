@@ -1,0 +1,1 @@
+UPDATE public.contratos_assinatura SET data_fim = (data_inicio + INTERVAL '1 year')::date WHERE numero = 20261897;

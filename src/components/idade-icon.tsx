@@ -1,6 +1,6 @@
-import iconBebe from "@/assets/icon-bebe.png";
-import iconCriancas from "@/assets/icon-criancas.png";
-import iconIdoso from "@/assets/icon-idoso.png";
+import iconBebe from "@/assets/icon-bebe-removebg-preview.png";
+import iconCriancas from "@/assets/criancas-icon-svg-download-png-4478349-removebg-preview.png";
+import iconIdoso from "@/assets/icon-idoso-removebg-preview.png";
 
 export function calcIdadeAnos(d: string | null | undefined): number | null {
   if (!d) return null;

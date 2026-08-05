@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileSignature } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,17 +26,30 @@ interface Form { titulo: string; tipo: Tipo; conteudo: string; assinado: boolean
 
 function DocumentosPage() {
   const { clinicaAtual } = useClinica();
-  const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
-  const [modelos, setModelos] = useState<{ id: string; nome: string; tipo: Tipo; conteudo: string }[]>([]);
+  const podeEscrever = usePodeEscrever("documentos");
+  const clinicaId = clinicaAtual?.clinica_id;
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
-  useEffect(() => { (async () => {
-    if (!clinicaAtual) return;
-    const [m, md] = await Promise.all([
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("modelos_documentos").select("id, nome, tipo, conteudo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-    ]);
-    setMedicos(m.data ?? []); setModelos((md.data ?? []) as never);
-  })(); }, [clinicaAtual?.clinica_id]);
+  // Catálogo de baixo risco (médicos ativos, modelos de documento) — cache de 5min.
+  const { data: medicos = [] } = useQuery({
+    queryKey: ["documentos-medicos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId!).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data as { id: string; nome: string }[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  const { data: modelos = [] } = useQuery({
+    queryKey: ["documentos-modelos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("modelos_documentos").select("id, nome, tipo, conteudo").eq("clinica_id", clinicaId!).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data ?? []) as { id: string; nome: string; tipo: Tipo; conteudo: string }[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
 
   return (
     <SimpleCrud<Row, Form>
@@ -44,6 +59,7 @@ function DocumentosPage() {
       subtitle="Atestados, receitas e laudos gerados para pacientes."
       icon={<FileSignature className="h-6 w-6 text-primary" />}
       searchFields={["titulo"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "tit", header: "Título", render: r => <span className="font-medium">{r.titulo}</span> },
         { key: "tipo", header: "Tipo", className: "w-32", render: r => <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{TIPO_LABEL[r.tipo]}</span> },
@@ -69,8 +85,8 @@ function DocumentosPage() {
               <SelectContent>{modelos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2"><Label>Título *</Label><Input required value={f.titulo} onChange={e => set({ ...f, titulo: e.target.value })} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2"><Label>Título *</Label><Input required value={f.titulo} onChange={e => set({ ...f, titulo: e.target.value })} /></div>
             <div className="space-y-1"><Label>Tipo</Label>
               <Select value={f.tipo} onValueChange={v => set({ ...f, tipo: v as Tipo })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

@@ -1,1 +1,0 @@
-ALTER TYPE public.tipo_senha ADD VALUE IF NOT EXISTS 'E';

@@ -1,0 +1,1 @@
+DELETE FROM public.fin_atendimentos WHERE id IN ('f2671ac3-1a32-4ce9-9303-1aa13ed47db7','cd3706e9-547c-4d72-bbae-42004b71aed4','eb562a79-f009-4c0a-8952-dd954d6067f1','d2957302-ddef-4e6f-8827-fd7c6f032a53','fe079396-a1bb-4d79-add3-6b2c614257da','647e18aa-4b2c-4a98-a1f3-195e41aa9bc5') AND procedimento LIKE 'TESTE SYNC%';

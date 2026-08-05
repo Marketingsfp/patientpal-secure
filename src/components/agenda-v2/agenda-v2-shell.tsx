@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
   Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft, UserCheck,
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -124,7 +124,6 @@ interface RawAg {
   procedimento: string | null;
   status: string;
   pacote_id: string | null;
-  enfermagem_recurso_id: string | null;
   fluxo_etapa: string | null;
   fluxo_atualizado_em: string | null;
 }
@@ -274,8 +273,7 @@ export function AgendaV2Shell() {
     enabled: !!clinicaId,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaId!);
-      return new Map((data ?? []).map((r) => [r.id, r.nome]));
+      return new Map<string, string>();
     },
   });
 
@@ -303,16 +301,20 @@ export function AgendaV2Shell() {
     queryKey: ["agenda-v2", "ags", clinicaId, diaKey],
     enabled: !!clinicaId,
     staleTime: 60 * 1000,
+    // Mantém a lista anterior visível durante refetch / troca de dia,
+    // evitando "flash" de tela em branco.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       startedAtRef.current = performance.now();
       const start = new Date(diaKey);
       const end = new Date(diaKey); end.setHours(23, 59, 59, 999);
       const { data } = await supabase.from("agendamentos")
-        .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
+        .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,fluxo_etapa,fluxo_atualizado_em")
         .eq("clinica_id", clinicaId!)
         .gte("inicio", start.toISOString())
         .lte("inicio", end.toISOString())
-        .order("inicio", { ascending: true });
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
       return (data ?? []) as RawAg[];
     },
   });
@@ -341,11 +343,12 @@ export function AgendaV2Shell() {
           const start = new Date(key);
           const end = new Date(key); end.setHours(23, 59, 59, 999);
           const { data } = await supabase.from("agendamentos")
-            .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
+            .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,fluxo_etapa,fluxo_atualizado_em")
             .eq("clinica_id", clinicaId)
             .gte("inicio", start.toISOString())
             .lte("inicio", end.toISOString())
-            .order("inicio", { ascending: true });
+            .order("inicio", { ascending: true })
+            .order("id", { ascending: true });
           return (data ?? []) as RawAg[];
         },
       });
@@ -392,9 +395,9 @@ export function AgendaV2Shell() {
         paciente_nome: primeiro.paciente_nome,
         paciente_id: primeiro.paciente_id,
         medico_id: primeiro.medico_id,
-        recurso_id: primeiro.enfermagem_recurso_id,
+        recurso_id: null,
         medico_nome: primeiro.medico_id ? medicos.get(primeiro.medico_id) ?? null : null,
-        recurso_nome: primeiro.enfermagem_recurso_id ? recursos.get(primeiro.enfermagem_recurso_id) ?? null : null,
+        recurso_nome: null,
         inicio: primeiro.inicio,
         fim: group[group.length - 1].fim,
         tipo,

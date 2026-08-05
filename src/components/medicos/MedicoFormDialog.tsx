@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
+import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -15,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MedicoAgendasTab } from "@/components/medicos/MedicoAgendasTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +36,14 @@ interface ConvenioRow {
   percentual: string;
   valor: string;
   ativo: boolean;
+}
+
+interface LaudadorOption { id: string; nome: string; crm: string | null; crm_uf: string | null }
+interface LaudadorRow {
+  laudador_medico_id: string;
+  tipo_repasse: "percentual" | "valor";
+  percentual: string;
+  valor: string;
 }
 
 // Repasse individual agora é sempre vinculado a um serviço (ou categoria
@@ -100,12 +110,23 @@ interface Props {
   editingMedicoId?: string | null;
   onSaved?: () => void;
   asPage?: boolean;
+  // Pré-preenche o nome ao abrir em modo "novo médico" — usado para completar
+  // o cadastro de alguém cujo perfil de acesso já é "Médico" (clinica_memberships)
+  // mas ainda não tem registro em `medicos` (CRM etc.).
+  prefillNome?: string;
+  // Vincula o registro `medicos` recém-criado a este user_id existente (mesmo
+  // caso acima). Sem isso, o médico completado ficaria com um login "solto"
+  // (sem user_id), sem contar como cadastro completo para quem já tinha
+  // perfil de acesso "Médico" — continuaria aparecendo como pendente.
+  prefillUserId?: string;
 }
 
-export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, asPage = false }: Props) {
+export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, asPage = false, prefillNome, prefillUserId }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
+  const { clinicaAtual } = useClinica();
+  const podeGerenciarEquipe = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -117,13 +138,24 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
+  // Laudo Terceiro: catálogo de cardiologistas ativos da clínica + linhas configuradas
+  const [laudadoresCatalog, setLaudadoresCatalog] = useState<LaudadorOption[]>([]);
+  const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
   // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
   const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
+  // Contagem de procedimentos que o médico já tinha no banco no momento da
+  // carga inicial. Serve para detectar (no save) se o formulário está sendo
+  // salvo com a lista vazia por engano — ex.: por bug de exibição — evitando
+  // apagar os vínculos existentes sem confirmação explícita.
+  const initialProcedimentosCountRef = useRef<number>(0);
 
   const [showSenha, setShowSenha] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkQuery, setBulkQuery] = useState("");
   const activeClinicaId = formClinicaId || clinicaId;
 
   const normalizarNome = (s: string) =>
@@ -200,37 +232,84 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return p.nome;
   };
 
-  // Sincroniza a aba "Repasse" com as CATEGORIAS dos serviços selecionados:
+  // Remove automaticamente da lista de serviços do médico qualquer item cujo
+  // procedimento não pertença a nenhuma das especialidades atualmente selecionadas
+  // (via `grupo` do procedimento ou via procedimento_especialidades). Também
+  // descarta itens legados sem procedimento válido. Só roda depois que `procs`
+  // e `procEspMap` estão carregados para não apagar tudo no primeiro render.
+  useEffect(() => {
+    if (!procs.length) return;
+    // Guarda contra condição de corrida: se as especialidades ainda não
+    // carregaram, ou se o formulário ainda tem procedimentos mas nenhuma
+    // especialidade selecionada (form ainda não populado), não filtre — do
+    // contrário todos os itens seriam removidos por falta de referência.
+    if (!esps.length) return;
+    if (form.procedimentos.length > 0 && form.especialidades.length === 0) return;
+    const idsValidos = new Set(procsFiltradosPorEspecialidade.map((p) => p.id));
+    setForm((f) => {
+      if (!f.procedimentos.length) return f;
+      // Segunda proteção dentro do setForm: se por alguma razão o filtro
+      // resultaria em remover TODOS os itens e o form ainda tem
+      // especialidades para casar, é mais seguro não mexer.
+      if (idsValidos.size === 0 && f.especialidades.length > 0) return f;
+      const filtrados = f.procedimentos.filter((item) => {
+        if (!item) return true; // preserva linhas em branco (novo serviço manual)
+        const { pid } = splitItem(item);
+        if (!pid) return true;
+        return idsValidos.has(pid);
+      });
+      if (filtrados.length === f.procedimentos.length) return f;
+      return { ...f, procedimentos: filtrados };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [procs, esps, procEspMap, especialidadesSelecionadasNomes, procsFiltradosPorEspecialidade]);
+
+  // Sincroniza a aba "Repasse" com os serviços selecionados em Especialidades:
   //  • Cada categoria distinta (Consulta / Exame / Procedimento) dos serviços
   //    selecionados vira automaticamente uma linha em REPASSE INDIVIDUAL,
   //    armazenada com nome sentinela `__CAT__:<TIPO>`.
-  //  • Linhas antigas por serviço (cujo nome corresponde a um procedimento
-  //    cadastrado) são removidas — agora o repasse é por categoria.
+  //  • Cada SERVIÇO distinto selecionado também vira automaticamente uma linha
+  //    (chave = nome do procedimento) — permite definir repasse por serviço
+  //    específico direto, sem precisar clicar em "Manual".
+  //  • Linhas de serviço cujo procedimento foi desmarcado são removidas
+  //    somente se estiverem em branco; se preenchidas, permanecem como manual.
   //  • Linhas manuais avulsas (ex.: "Cartão Consulta") são preservadas.
   useEffect(() => {
     if (!procs.length) return;
     setConvenios((cs) => {
       const tiposSelecionados = new Set<string>();
       const nomesServicosSelecionados = new Set<string>();
+      // Preserva o nome original (case) para exibir na tabela.
+      const nomeOriginalPorKey = new Map<string, string>();
       for (const item of form.procedimentos) {
         const { pid } = splitItem(item);
         if (!pid) continue;
         const proc = procs.find((p) => p.id === pid);
         if (proc?.tipo) tiposSelecionados.add(String(proc.tipo).toUpperCase());
-        if (proc?.nome) nomesServicosSelecionados.add(normalizarNome(proc.nome));
+        if (proc?.nome) {
+          const key = normalizarNome(proc.nome);
+          nomesServicosSelecionados.add(key);
+          if (!nomeOriginalPorKey.has(key)) nomeOriginalPorKey.set(key, proc.nome);
+        }
       }
 
-      // Mantém manuais e sentinelas de categoria ainda usadas.
+      // Mantém sentinelas de categoria ainda usadas, linhas de serviço em uso
+      // (ou já preenchidas) e todas as manuais.
       const mantidos = cs.filter((c) => {
         const nome = c.nome ?? "";
         if (nome.startsWith("__CAT__:")) {
           const tipo = nome.slice("__CAT__:".length).toUpperCase();
           return tiposSelecionados.has(tipo);
         }
-        // Preserva TODAS as linhas manuais (em branco ou preenchidas).
-        // Não descartamos mais linhas cujo serviço não esteja selecionado em
-        // Especialidades — isso causava o sumiço silencioso de repasses
-        // cadastrados manualmente.
+        // Se o nome corresponde a um serviço que NÃO está mais selecionado
+        // em Especialidades E a linha está em branco (auto-linha vazia),
+        // descarta. Caso contrário (preenchida ou nome livre), preserva.
+        const key = normalizarNome(nome);
+        const isServicoCadastrado = procs.some((p) => normalizarNome(p.nome) === key);
+        if (isServicoCadastrado && !nomesServicosSelecionados.has(key)) {
+          const vazio = !c.percentual && !c.valor;
+          if (vazio) return false;
+        }
         return true;
       });
 
@@ -239,6 +318,11 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           .filter((c) => (c.nome ?? "").startsWith("__CAT__:"))
           .map((c) => c.nome.slice("__CAT__:".length).toUpperCase()),
       );
+      const existentesServico = new Set(
+        mantidos
+          .filter((c) => !(c.nome ?? "").startsWith("__CAT__:") && c.nome)
+          .map((c) => normalizarNome(c.nome)),
+      );
       const novos: ConvenioRow[] = [];
       const ordem = ["CONSULTA", "EXAME", "PROCEDIMENTO"];
       for (const tipo of ordem) {
@@ -246,6 +330,17 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         if (existentesCat.has(tipo)) continue;
         novos.push({
           nome: `__CAT__:${tipo}`,
+          tipo_repasse: form.tipo_repasse,
+          percentual: "",
+          valor: "",
+          ativo: true,
+        });
+      }
+      // Uma linha por serviço selecionado que ainda não tenha linha.
+      for (const [key, nomeOriginal] of nomeOriginalPorKey) {
+        if (existentesServico.has(key)) continue;
+        novos.push({
+          nome: nomeOriginal,
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
@@ -286,6 +381,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     out.sort((a, b) => a.label.localeCompare(b.label));
     return out;
   }, [form.procedimentos, procs, esps]);
+
+  // Map: chave normalizada do nome do serviço -> rótulo "NOME (ESPECIALIDADE)"
+  // usado para exibir as linhas automáticas por serviço na aba Repasse.
+  const labelServicoPorNomeKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of servicosDoMedico) {
+      m.set(normalizarNome(s.value), s.label);
+    }
+    return m;
+  }, [servicosDoMedico]);
 
   // Load reference data
   useEffect(() => {
@@ -337,7 +442,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setMedicoUserId(null);
       setExistingEmail(null);
       setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
-      setForm(emptyForm());
+      setLaudadores([]);
+      setLaudadoresCatalog([]);
+      initialProcedimentosCountRef.current = 0;
+      setForm({ ...emptyForm(), nome: prefillNome ?? "" });
       return;
     }
     void (async () => {
@@ -384,11 +492,40 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
+      // Laudo terceiro — catálogo de cardiologistas ativos + linhas já cadastradas
+      const cliId = med.clinica_id ?? clinicaId;
+      try {
+        const { data: cardios } = await supabase
+          .from("medicos")
+          .select("id, nome, crm, crm_uf, ativo, medico_especialidades!inner(especialidade:especialidades!inner(nome))")
+          .eq("clinica_id", cliId)
+          .eq("ativo", true)
+          .ilike("medico_especialidades.especialidade.nome", "%cardio%")
+          .neq("id", med.id)
+          .order("nome");
+        const catalog: LaudadorOption[] = ((cardios as any[]) ?? []).map((c) => ({
+          id: c.id, nome: c.nome, crm: c.crm ?? null, crm_uf: c.crm_uf ?? null,
+        }));
+        // dedup (join pode duplicar se médico tiver múltiplas linhas em cardio)
+        const seen = new Set<string>();
+        setLaudadoresCatalog(catalog.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))));
+      } catch { setLaudadoresCatalog([]); }
+      const { data: laudos } = await supabase
+        .from("medico_repasse_laudo")
+        .select("laudador_medico_id, tipo_repasse, percentual, valor")
+        .eq("agenda_medico_id", med.id);
+      setLaudadores(((laudos as any[]) ?? []).map((r) => ({
+        laudador_medico_id: r.laudador_medico_id,
+        tipo_repasse: (r.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: r.percentual != null ? String(r.percentual) : "",
+        valor: r.valor != null ? String(r.valor) : "",
+      })));
       const { data: mprocs } = await supabase
         .from("medico_procedimentos")
         .select("procedimento_id, especialidade_id")
         .eq("medico_id", med.id);
       if (cancelled) return;
+      initialProcedimentosCountRef.current = (mprocs ?? []).length;
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
@@ -425,10 +562,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ativo: (med as { ativo?: boolean }).ativo !== false,
       });
       if (med.user_id) {
-        try {
-          const res = await getLoginFn({ data: { clinicaId: med.clinica_id ?? clinicaId, userId: med.user_id } });
-          setExistingEmail((res as { email?: string | null })?.email ?? null);
-        } catch { setExistingEmail(null); }
+        if (podeGerenciarEquipe) {
+          try {
+            const res = await getLoginFn({ data: { clinicaId: med.clinica_id ?? clinicaId, userId: med.user_id } });
+            setExistingEmail((res as { email?: string | null })?.email ?? null);
+          } catch { setExistingEmail(null); }
+        } else {
+          setExistingEmail(null);
+        }
       } else {
         setExistingEmail(null);
       }
@@ -437,7 +578,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return () => {
       cancelled = true;
     };
-  }, [open, editingMedicoId, clinicaId]);
+  }, [open, editingMedicoId, clinicaId, prefillNome]);
 
   async function salvarNovaSenha() {
     if (!medicoUserId) return;
@@ -464,6 +605,18 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         toast.error("Informe o número do RQE da especialidade marcada");
         return;
       }
+    }
+    // Salvaguarda: se o médico já tinha procedimentos cadastrados no banco
+    // e o formulário está prestes a salvar com a lista vazia, pede
+    // confirmação explícita antes de apagar todos os vínculos. Evita perda
+    // acidental por bug de exibição na aba Procedimentos.
+    const procedimentosPreenchidos = form.procedimentos.filter((x) => !!x).length;
+    const totalAnterior = initialProcedimentosCountRef.current;
+    if (editId && totalAnterior > 0 && procedimentosPreenchidos === 0) {
+      const ok = window.confirm(
+        `Este médico tem ${totalAnterior} procedimento(s) cadastrado(s), mas a lista está vazia neste formulário.\n\nSe você salvar agora, TODOS os procedimentos vinculados serão apagados.\n\nDeseja continuar mesmo assim?`,
+      );
+      if (!ok) return;
     }
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
@@ -509,6 +662,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
       ativo: form.ativo,
+      // Só entra no INSERT (nunca no UPDATE, para não sobrescrever o vínculo
+      // de um médico já existente): liga este novo registro a um user_id que
+      // já tinha perfil de acesso "Médico" mas cadastro incompleto.
+      ...(!editId && prefillUserId ? { user_id: prefillUserId } : {}),
     };
     let medicoId = editId;
     if (editId) {
@@ -588,6 +745,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       if (convRows.length) {
         const { error: e3 } = await supabase.from("medico_convenios").insert(convRows);
         if (e3) { setSaving(false); mostrarErro(e3); return; }
+      }
+    }
+    // Laudo terceiro — replace-all
+    if (medicoId) {
+      await supabase.from("medico_repasse_laudo").delete().eq("agenda_medico_id", medicoId);
+      const laudoRows = laudadores
+        .filter((l) => l.laudador_medico_id && (
+          (l.tipo_repasse === "percentual" && l.percentual.trim() !== "" && Number(l.percentual) > 0) ||
+          (l.tipo_repasse === "valor" && l.valor.trim() !== "" && Number(l.valor) > 0)
+        ))
+        .map((l) => ({
+          clinica_id: activeClinicaId,
+          agenda_medico_id: medicoId!,
+          laudador_medico_id: l.laudador_medico_id,
+          tipo_repasse: l.tipo_repasse,
+          percentual: l.tipo_repasse === "percentual" ? Number(l.percentual) : null,
+          valor: l.tipo_repasse === "valor" ? Number(l.valor) : null,
+          ativo: true,
+        }));
+      if (laudoRows.length) {
+        const { error: eLaudo } = await supabase.from("medico_repasse_laudo").insert(laudoRows);
+        if (eLaudo) { setSaving(false); mostrarErro(eLaudo); return; }
       }
     }
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
@@ -697,8 +876,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   <Label>Nome completo *</Label>
                   <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-2">
                     <Label>CRM *</Label>
                     <Input required value={form.crm} onChange={(e) => setForm({ ...form, crm: e.target.value })} />
                   </div>
@@ -717,10 +896,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <Input value={form.rg} onChange={(e) => setForm({ ...form, rg: e.target.value })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Data de nascimento</Label>
-                    <Input type="date" value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
+                    <DateInputBR value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Nacionalidade</Label>
@@ -731,7 +910,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <Input value={form.estado_civil} onChange={(e) => setForm({ ...form, estado_civil: e.target.value })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Sexo</Label>
                     <Select value={form.sexo} onValueChange={(v) => setForm({ ...form, sexo: v })}>
@@ -791,27 +970,27 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       <h3 className="text-sm font-semibold">Endereço</h3>
                       <p className="text-xs text-muted-foreground">Endereço de referência do médico.</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>CEP</Label>
                         <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} />
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="sm:col-span-2 space-y-2">
                         <Label>Logradouro</Label>
                         <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Número</Label>
                         <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="sm:col-span-2 space-y-2">
                         <Label>Complemento</Label>
                         <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label>Bairro</Label>
                         <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
@@ -1014,6 +1193,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       >
                         <Plus className="h-4 w-4 mr-1" /> Adicionar serviço
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={especialidadesSelecionadasNomes.size === 0 || procsFiltradosPorEspecialidade.length === 0}
+                        onClick={() => {
+                          setBulkSelected(new Set());
+                          setBulkQuery("");
+                          setBulkOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar vários
+                      </Button>
                     </div>
                   </div>
                   {especialidadesSelecionadasNomes.size === 0 ? (
@@ -1025,7 +1217,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                   ) : form.procedimentos.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2 rounded-md border border-border/40 p-2 bg-muted/20">
                       {form.procedimentos
                         .map((item, idx) => {
                           const { pid, eid } = splitItem(item);
@@ -1279,12 +1471,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         <tbody>
                           {convenios.map((c, i) => {
                             const catLbl = labelCategoria(c.nome);
+                            const servicoLbl = !catLbl && c.nome
+                              ? labelServicoPorNomeKey.get(normalizarNome(c.nome)) ?? null
+                              : null;
                             return (
                             <tr key={i} className="border-t align-middle">
                               <td className="px-2 py-1">
                                 {catLbl ? (
                                   <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
                                     {catLbl}
+                                  </div>
+                                ) : servicoLbl ? (
+                                  <div className="px-2 py-1.5 text-sm text-foreground/90">
+                                    {servicoLbl}
                                   </div>
                                 ) : (
                                   <select
@@ -1308,12 +1507,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                 </select>
                               </td>
                               <td className="px-2 py-1">
-                                <Input type="number" step="0.01" min={0}
-                                  value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
-                                  onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
+                                {c.tipo_repasse === "percentual" ? (
+                                  <Input type="number" step="0.01" min={0}
+                                    value={c.percentual}
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, percentual: e.target.value } : x))} />
+                                ) : (
+                                  <CurrencyInput
+                                    value={c.valor}
+                                    onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, valor: v } : x))}
+                                  />
+                                )}
                               </td>
                               <td className="px-2 py-1 text-right">
-                                {catLbl ? null : (
+                                {catLbl || servicoLbl ? null : (
                                   <Button type="button" size="icon" variant="ghost"
                                     onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))} aria-label="Remover">
                                     <Trash2 className="h-4 w-4" />
@@ -1328,6 +1534,121 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
+                {form.nome.trim().toUpperCase() === "ELETROCARDIOGRAMA" && (
+                <div className="space-y-3 pt-4 border-t mt-4">
+                  <div>
+                    <Label>REPASSE LAUDO TERCEIRO</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA) e o laudo é feito por <b>outro médico</b>.
+                      Liste abaixo os cardiologistas ativos da clínica e defina o repasse (percentual ou valor fixo por exame) que cada um recebe pelo laudo.
+                      O financeiro vincula este repasse em <b>Financeiro → Atendimentos</b>, filtrando pelo nome do médico da agenda.
+                    </p>
+                  </div>
+                  {!editingMedicoId ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Salve o médico antes de configurar o repasse de laudo.</p>
+                  ) : laudadoresCatalog.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                      Nenhum cardiologista ativo encontrado nesta clínica. Cadastre médicos com a especialidade <b>Cardiologia</b> para poder configurar o laudo.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr className="text-left">
+                            <th className="px-2 py-2 font-medium">Laudador (Cardiologia)</th>
+                            <th className="px-2 py-2 font-medium w-40">Tipo</th>
+                            <th className="px-2 py-2 font-medium w-36">Valor</th>
+                            <th className="px-2 py-2 font-medium w-12"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {laudadoresCatalog.map((cardio) => {
+                            const row = laudadores.find((l) => l.laudador_medico_id === cardio.id);
+                            const setRow = (patch: Partial<LaudadorRow>) => {
+                              setLaudadores((rows) => {
+                                const idx = rows.findIndex((l) => l.laudador_medico_id === cardio.id);
+                                if (idx === -1) {
+                                  return [...rows, {
+                                    laudador_medico_id: cardio.id,
+                                    tipo_repasse: "percentual",
+                                    percentual: "",
+                                    valor: "",
+                                    ...patch,
+                                  }];
+                                }
+                                return rows.map((r, j) => j === idx ? { ...r, ...patch } : r);
+                              });
+                            };
+                            const tipo = row?.tipo_repasse ?? "percentual";
+                            const value = tipo === "percentual" ? (row?.percentual ?? "") : (row?.valor ?? "");
+                            return (
+                              <tr key={cardio.id} className="border-t align-middle">
+                                <td className="px-2 py-1.5">
+                                  <div className="text-sm text-foreground/90">
+                                    {cardio.nome}
+                                    {cardio.crm && (
+                                      <span className="ml-2 text-xs text-muted-foreground">
+                                        CRM {cardio.crm}{cardio.crm_uf ? `/${cardio.crm_uf}` : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <select
+                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                    value={tipo}
+                                    onChange={(e) => setRow({ tipo_repasse: e.target.value as "percentual" | "valor" })}
+                                  >
+                                    <option value="percentual">% Percentual</option>
+                                    <option value="valor">R$ Valor</option>
+                                  </select>
+                                </td>
+                                <td className="px-2 py-1">
+                                  {tipo === "percentual" ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min={0}
+                                      max={100}
+                                      placeholder="% do faturado"
+                                      value={value}
+                                      onChange={(e) => setRow({ percentual: e.target.value })}
+                                    />
+                                  ) : (
+                                    <CurrencyInput
+                                      value={value}
+                                      onChange={(v) => setRow({ valor: v })}
+                                    />
+                                  )}
+                                </td>
+                                <td className="px-2 py-1 text-right">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Remover configuração de repasse deste laudador"
+                                    disabled={!row}
+                                    onClick={() => {
+                                      setLaudadores((rows) => rows.filter((l) => l.laudador_medico_id !== cardio.id));
+                                      setLaudadoresCatalog((cat) => cat.filter((c) => c.id !== cardio.id));
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Deixe o valor em branco / 0 para o médico que <b>não recebe laudo</b>. Este cadastro não gera lançamento automático — o financeiro decide quando lançar.
+                  </p>
+                </div>
+                )}
               </TabsContent>
 
               <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
@@ -1447,6 +1768,103 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
               </DialogFooter>
             )}
+            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              <DialogContent className="sm:max-w-2xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Adicionar vários serviços</DialogTitle>
+                </DialogHeader>
+                {(() => {
+                  const jaSel = new Set(form.procedimentos.filter(Boolean));
+                  const opts: { value: string; label: string }[] = [];
+                  const pushed = new Set<string>();
+                  for (const p of procsFiltradosPorEspecialidade) {
+                    const choices = procEspChoices.get(p.id) ?? [];
+                    if (choices.length === 0) {
+                      const v = joinItem(p.id, null);
+                      if (!pushed.has(v) && !jaSel.has(v)) { pushed.add(v); opts.push({ value: v, label: p.nome }); }
+                    } else {
+                      for (const c of choices) {
+                        const v = joinItem(p.id, c.id);
+                        if (pushed.has(v) || jaSel.has(v)) continue;
+                        pushed.add(v);
+                        opts.push({ value: v, label: `${p.nome} (${c.nome.toUpperCase()})` });
+                      }
+                    }
+                  }
+                  opts.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+                  const q = bulkQuery.trim().toLowerCase();
+                  const filtered = q ? opts.filter((o) => o.label.toLowerCase().includes(q)) : opts;
+                  const allChecked = filtered.length > 0 && filtered.every((o) => bulkSelected.has(o.value));
+                  return (
+                    <div className="flex flex-col gap-3 min-h-0">
+                      <Input
+                        placeholder="Buscar serviço..."
+                        value={bulkQuery}
+                        onChange={(e) => setBulkQuery(e.target.value)}
+                      />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={allChecked}
+                            onCheckedChange={(v) => {
+                              const next = new Set(bulkSelected);
+                              if (v) filtered.forEach((o) => next.add(o.value));
+                              else filtered.forEach((o) => next.delete(o.value));
+                              setBulkSelected(next);
+                            }}
+                          />
+                          <span>Selecionar todos {q ? "(filtrados)" : ""}</span>
+                        </label>
+                        <span>{bulkSelected.size} selecionado(s)</span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto border rounded-md p-2 space-y-1 min-h-[240px] max-h-[50vh]">
+                        {filtered.length === 0 ? (
+                          <p className="text-xs text-muted-foreground p-2">Nenhum serviço disponível.</p>
+                        ) : (
+                          filtered.map((o) => (
+                            <label key={o.value} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer">
+                              <Checkbox
+                                checked={bulkSelected.has(o.value)}
+                                onCheckedChange={(v) => {
+                                  const next = new Set(bulkSelected);
+                                  if (v) next.add(o.value);
+                                  else next.delete(o.value);
+                                  setBulkSelected(next);
+                                }}
+                              />
+                              <span className="text-sm">{o.label}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+                        <Button
+                          type="button"
+                          disabled={bulkSelected.size === 0}
+                          onClick={() => {
+                            const novos = Array.from(bulkSelected).filter((v) => !jaSel.has(v));
+                            if (novos.length === 0) {
+                              toast.info("Nenhum serviço novo para adicionar.");
+                              setBulkOpen(false);
+                              return;
+                            }
+                            setForm({
+                              ...form,
+                              procedimentos: [...form.procedimentos.filter(Boolean), ...novos],
+                            });
+                            toast.success(`${novos.length} serviço(s) adicionado(s).`);
+                            setBulkOpen(false);
+                          }}
+                        >
+                          Adicionar {bulkSelected.size > 0 ? `(${bulkSelected.size})` : ""}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
           </form>
         );
 

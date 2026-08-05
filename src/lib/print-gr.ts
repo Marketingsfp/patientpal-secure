@@ -1,6 +1,37 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
+ * (o "(XXX)" que vem colado no nome do procedimento) na frente, e a
+ * especialidade principal do médico entre parênteses no fim.
+ *
+ *   procNomeBase="CONSULTA (CARDIOLOGIA)", espMedico="GERIATRIA"
+ *     → "CARDIOLOGIA - CONSULTA (GERIATRIA)"
+ *
+ * Fallbacks: sem "(XXX)" no procedimento, mantém a ordem antiga
+ * (`${espMedico} - ${procNomeBase}`). Especialidades iguais colapsam.
+ */
+function formatServicoLinha(procNomeBase: string, espMedicoRaw: string | null | undefined): string {
+  const base = (procNomeBase ?? "").toUpperCase().trim();
+  const espMedico = (espMedicoRaw ?? "").toUpperCase().trim();
+  const m = base.match(/^(.*)\s*\(([^()]+)\)\s*$/);
+  if (m) {
+    const procLimpo = m[1].trim();
+    const espServico = m[2].trim();
+    if (espServico && espMedico && espServico !== espMedico) {
+      return `${espServico} - ${procLimpo} (${espMedico})`;
+    }
+    if (espServico) {
+      return `${espServico} - ${procLimpo}`;
+    }
+  }
+  if (espMedico && !base.includes(espMedico)) {
+    return `${espMedico} - ${base}`;
+  }
+  return base;
+}
+
+/**
  * Imprime a GR (Guia de Recebimento / Guia de Atendimento) no formato
  * térmico 80mm — compatível com Bematech MP-4200 TH e similares.
  *
@@ -15,6 +46,13 @@ export interface PrintGRInput {
   usuarioId?: string | null;
   /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
   reimpressao?: boolean;
+  /**
+   * Número da ficha (posição da linha na agenda) já calculado pelo chamador.
+   * Quando informado, a guia usa EXATAMENTE este número — garante que a guia
+   * bate com a lista da agenda mesmo havendo slots no mesmo horário. Sem ele,
+   * a posição é recalculada aqui (fallback).
+   */
+  fichaNumero?: number | null;
   pagamento?: {
     valor: number;
     forma_pagamento: string | null;
@@ -46,11 +84,13 @@ const esc = (s: string | null | undefined) =>
 
 const FORMA_LABEL: Record<string, string> = {
   dinheiro: "DINHEIRO",
+  manual: "DINHEIRO",
   pix: "PIX",
   cartao_credito: "CARTÃO CRÉDITO",
   cartao_debito: "CARTÃO DÉBITO",
   boleto: "BOLETO",
   convenio: "CONVÊNIO",
+  convenio_gratuidade: "CONVÊNIO GRATUIDADE",
   transferencia: "TRANSFERÊNCIA",
 };
 
@@ -77,6 +117,96 @@ function numViasGR(pag?: {
 
 const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
 
+/**
+ * Resolve o rótulo do campo "CONV." da GR a partir do tipo_atendimento do
+ * agendamento. Para "convenio", busca o nome do convênio do contrato ativo
+ * do paciente (titular ou dependente). Para "particular", retorna "PARTICULAR".
+ * Retorna null quando não deve renderizar a linha.
+ */
+async function resolveConvLabel(
+  tipoAtendimento: string | null | undefined,
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<string | null> {
+  if (tipoAtendimento === "particular") return "PARTICULAR";
+  if (tipoAtendimento !== "convenio") return null;
+  if (!pacienteId) return "CONVÊNIO";
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    if (t0?.cb_convenios?.nome) return String(t0.cb_convenios.nome).toUpperCase();
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    if (cand?.cb_convenios?.nome) return String(cand.cb_convenios.nome).toUpperCase();
+  } catch { /* fallback */ }
+  return "CONVÊNIO";
+}
+
+/**
+ * Verifica se o paciente tem contrato ativo do cartão de benefícios/convênio
+ * na clínica atual — como titular ou dependente — independente do
+ * `tipo_atendimento` do agendamento. Usado para imprimir na GR o plano/
+ * vínculo mesmo quando o pagamento foi feito no particular.
+ */
+async function resolveVinculoConvenio(
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<{ convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null> {
+  if (!pacienteId) return null;
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    const nomeT = t0?.cb_convenios?.nome;
+    if (nomeT) return { convenioNome: String(nomeT).toUpperCase(), vinculo: "titular" };
+
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,paciente_nome,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    const nomeD = cand?.cb_convenios?.nome;
+    if (nomeD) {
+      return {
+        convenioNome: String(nomeD).toUpperCase(),
+        vinculo: "dependente",
+        titularNome: cand?.paciente_nome ? String(cand.paciente_nome).toUpperCase() : undefined,
+      };
+    }
+  } catch { /* ignora e retorna null */ }
+  return null;
+}
+
+function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
+  if (!v) return "";
+  const suf = v.vinculo === "titular"
+    ? "(TITULAR)"
+    : v.titularNome ? `(DEPENDENTE DE ${esc(v.titularNome)})` : "(DEPENDENTE)";
+  return `<div class="center sm">PLANO: <span class="v">${esc(v.convenioNome)}</span> ${suf}</div>`;
+}
+
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
 function multiplicarVias(ticketsHtml: string, nVias: number): string {
@@ -98,100 +228,73 @@ function multiplicarVias(ticketsHtml: string, nVias: number): string {
 
 // Estilos extras para vias (rótulo e quebra de página).
 const VIA_CSS = `
-  .via-label { text-align: center; font-weight: 600; border: 1px solid #000; border-radius: 6px; padding: 2px 6px; margin: 0 2mm 4px; font-size: 8pt; letter-spacing: 1.2px; color: #000; text-transform: uppercase; }
+  .via-label { text-align: center; font-weight: 700; border: 1px solid #000; padding: 2px 4px; margin: 0 2mm 4px; font-size: 9pt; letter-spacing: 1px; }
   .via-wrap { width: 100%; }
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
 
-/**
- * Folha de estilos compartilhada da GR — layout moderno (sans-serif, sem
- * traços em ASCII, hierarquia tipográfica clara) mantendo o formato 80mm.
- */
-const GR_CSS = `
+// CSS base compartilhado pelos três layouts de GR (individual, agrupada e mensalidade).
+// - Tudo em negrito (font-weight: 700) para legibilidade em impressoras térmicas.
+// - word-break/overflow-wrap para nomes/procedimentos longos não estourarem a largura útil do papel 80mm.
+// - .row usa grid em vez de flex para o valor à direita nunca ser cortado.
+const BASE_CSS = `
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 9.5pt; line-height: 1.35; }
-  .ticket { width: 76mm; padding: 4mm 3.5mm 6mm; background: #fff; border: 1px solid #000; border-radius: 10px; margin: 1mm auto; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  /* Zera espaço extra que o Chrome/driver da térmica reserva no fim da
+     página. Sem isso a bobina saía com ~8–10 cm em branco após a linha
+     "DATA IMPRESSÃO", só desperdiçando papel antes do corte. */
+  html, body { height: auto; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+    font-weight: 500;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
+  }
+  .ticket { width: 76mm; max-width: 100%; padding: 4mm 3mm 3mm; }
+  .ticket:last-child { padding-bottom: 1mm; }
   .center { text-align: center; }
   .right  { text-align: right; }
-  .muted  { color: #000; }
-  .divider { border-top: 1px dashed #000; margin: 3mm 0; }
-  .clinic-name { text-align: center; font-size: 11.5pt; font-weight: 700; letter-spacing: .2px; color: #000; }
-  .clinic-sub { text-align: center; font-size: 7.5pt; color: #000; line-height: 1.3; margin-top: .5mm; }
-  .doc-title { text-align: center; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #000; }
-  .doc-subtitle { text-align: center; font-size: 7.5pt; letter-spacing: 1px; color: #000; text-transform: uppercase; margin-top: .5mm; }
-  .pat-name { font-size: 11pt; font-weight: 700; color: #000; line-height: 1.2; }
-  .grid2 { display: flex; flex-wrap: wrap; margin-top: 2mm; }
-  .cell { width: 50%; padding-right: 2mm; margin-bottom: 1.6mm; }
-  .lbl { display: block; font-size: 6.5pt; letter-spacing: .8px; text-transform: uppercase; color: #000; }
-  .val { display: block; font-size: 9pt; font-weight: 600; color: #000; word-break: break-word; }
-  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; margin-bottom: 1.2mm; }
-  .kv .k { font-size: 7pt; letter-spacing: .8px; text-transform: uppercase; color: #000; white-space: nowrap; }
-  .kv .v { font-size: 9pt; font-weight: 600; color: #000; text-align: right; }
-  .badge { display: inline-block; background: #000; color: #fff; border-radius: 5px; padding: 0.6mm 2mm; font-size: 9.5pt; font-weight: 700; letter-spacing: .5px; }
-  .svc-head { display: flex; font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; color: #000; padding-bottom: 1mm; border-bottom: 1px solid #000; }
-  .svc-row { display: flex; padding: 1.2mm 0; border-bottom: 1px solid #999; }
-  .svc-qtd { width: 10mm; flex: none; font-size: 9pt; font-weight: 600; }
-  .svc-nome { flex: 1; font-size: 9pt; font-weight: 500; color: #000; word-break: break-word; }
-  .total { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3mm; }
-  .total-lbl { font-size: 8.5pt; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #000; }
-  .total-forma { font-size: 6.8pt; letter-spacing: .8px; text-transform: uppercase; color: #000; }
-  .total-val { font-size: 16pt; font-weight: 700; line-height: 1; color: #000; font-variant-numeric: tabular-nums; }
-  .split .kv .v { color: #000; font-weight: 600; }
-  .foot { display: flex; justify-content: space-between; gap: 2mm; font-size: 7pt; color: #000; letter-spacing: .3px; }
-  /* Impressão térmica 80mm: remove moldura de tela e cola no topo/esquerda. */
-  @media print {
-    html, body { width: 80mm; margin: 0; padding: 0; background: #fff; }
-    .ticket {
-      width: 100%; max-width: 100%;
-      margin: 0; padding: 0 2mm 4mm;
-      border: none; border-radius: 0; box-shadow: none;
-      background: #fff;
-    }
+  .bold   { font-weight: 700; }
+  .sm     { font-size: 8.5pt; font-weight: 500; letter-spacing: 0.02em; }
+  .lg     {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 2px 0;
+  }
+  .sep    { border-top: 1px solid #000; margin: 7px 0; }
+  .sep.thin { border-top-width: 1px; opacity: 0.35; margin: 5px 0; }
+  .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
+  .row > * { min-width: 0; }
+  .row .right { justify-self: end; }
+  table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  td      { padding: 2px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  {
+    color: #000;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 8.5pt;
+  }
+  .v      { font-weight: 700; }
+  .qtd    { width: 10mm; }
+  h1, h2, h3 { margin: 0; }
+  /* Cabeçalho da clínica — nome grande, endereço/contatos discretos. */
+  .clinica-nome {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 2px 0 4px;
   }
   ${VIA_CSS}
 `;
-
-/** Rótulo + valor em linha (label à esquerda, valor à direita). */
-const kv = (k: string, v: string) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-/** Célula de grid 2 colunas (rótulo pequeno em cima, valor destacado embaixo). */
-const cell = (k: string, v: string) => `<div class="cell"><span class="lbl">${k}</span><span class="val">${v}</span></div>`;
-
-/** Bloco de dados do paciente: nome à esquerda + grid de 2 colunas. */
-function blocoPaciente(p: {
-  nome: string;
-  prontuario?: string | null;
-  cpf?: string | null;
-  telefone?: string | null;
-  nascimento?: string | null;
-}): string {
-  const cells = [
-    p.prontuario ? cell("Prontuário", esc(p.prontuario)) : "",
-    p.cpf ? cell("CPF", esc(p.cpf)) : "",
-    p.telefone ? cell("Fone", esc(p.telefone)) : "",
-    p.nascimento ? cell("Nasc.", p.nascimento) : "",
-  ].join("");
-  return `<div class="pat-name">${esc(p.nome)}</div>${cells ? `<div class="grid2">${cells}</div>` : ""}`;
-}
-
-/** Cabeçalho da clínica. */
-function blocoClinica(c: { nome?: string | null; telefone?: string | null; cnpj?: string | null } | null, enderecoHtml: string): string {
-  const sub = [enderecoHtml, c?.telefone ? `Fone ${esc(c.telefone)}` : "", c?.cnpj ? `CNPJ ${esc(c.cnpj)}` : ""].filter(Boolean).join(" · ");
-  return `<div class="clinic-name">${esc(c?.nome ?? "")}</div>${sub ? `<div class="clinic-sub">${sub}</div>` : ""}`;
-}
-
-/** Tabela de serviços. */
-function blocoServicos(linhas: Array<{ qtd: string; nome: string }>, tituloCol = "Serviço"): string {
-  return `<div class="svc-head"><div class="svc-qtd">Qtd</div><div class="svc-nome">${tituloCol}</div></div>${linhas
-    .map((l) => `<div class="svc-row"><div class="svc-qtd">${esc(l.qtd)}</div><div class="svc-nome">${esc(l.nome)}</div></div>`)
-    .join("")}`;
-}
-
-/** Bloco de total recebido. */
-function blocoTotal(valorFmt: string, formaLbl: string): string {
-  return `<div class="total"><div><div class="total-lbl">Valor recebido</div><div class="total-forma">(${esc(formaLbl)})</div></div><div class="total-val">${valorFmt}</div></div>`;
-}
 
 // Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
 // O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
@@ -213,12 +316,11 @@ function imprimirViaIframe(html: string): void {
     try { document.body.removeChild(iframe); } catch { /* noop */ }
     throw new Error("Não foi possível inicializar a impressão.");
   }
-  const doc = cw.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  let jaImprimiu = false;
   const dispararPrint = () => {
+    if (jaImprimiu) return;
+    jaImprimiu = true;
     try {
       cw.focus();
       cw.print();
@@ -226,16 +328,36 @@ function imprimirViaIframe(html: string): void {
     // Remove o iframe depois que o diálogo deve ter sido tratado.
     setTimeout(cleanup, 4000);
   };
-  iframe.onload = () => setTimeout(dispararPrint, 80);
-  // Fallback se onload não disparar (alguns navegadores com document.write).
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+  // Registramos o onload ANTES de escrever o documento — alguns navegadores
+  // disparam o load de forma síncrona no doc.close(); atribuir depois perdia o
+  // evento e a impressão só saía pelo fallback (atraso perceptível). Ao carregar,
+  // esperamos as imagens (ex.: logo da clínica) para não imprimir render incompleto.
+  iframe.onload = () => {
+    const imgs = Array.from(cw.document.images ?? []);
+    const pendentes = imgs.filter((im) => !im.complete);
+    if (pendentes.length === 0) { dispararPrint(); return; }
+    let restantes = pendentes.length;
+    const done = () => { restantes -= 1; if (restantes <= 0) dispararPrint(); };
+    pendentes.forEach((im) => {
+      im.addEventListener("load", done);
+      im.addEventListener("error", done);
+    });
+    // Teto de segurança: imprime mesmo se alguma imagem travar (ex.: logo offline).
+    setTimeout(dispararPrint, 2500);
+  };
+  const doc = cw.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  // Fallback caso o onload não dispare (navegadores com document.write).
+  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
 }
 
 export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRInput) {
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -258,7 +380,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -303,7 +425,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.procedimento
       ? supabase
           .from("procedimentos")
-          .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
+          .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
           .eq("clinica_id", clinicaId)
           .ilike("nome", a.procedimento)
           .maybeSingle()
@@ -313,7 +435,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
-  const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+  // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
+  // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
+  // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
+  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
   if (a.medico_id) {
     try {
@@ -335,13 +460,52 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
     } catch { medicoCb = null; }
   }
-  const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+
+  // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
+  // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
+  // do cadastro do médico. Só assim a guia sai coerente com o atendimento quando o
+  // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
+  if (medicoIdEfetivo && procData?.id) {
+    try {
+      const { data: mps } = await supabase
+        .from("medico_procedimentos")
+        .select("especialidade_id")
+        .eq("medico_id", medicoIdEfetivo)
+        .eq("procedimento_id", procData.id)
+        .not("especialidade_id", "is", null);
+      const eids = Array.from(
+        new Set(
+          ((mps ?? []) as Array<{ especialidade_id: string | null }>)
+            .map((r) => r.especialidade_id)
+            .filter((v): v is string => !!v),
+        ),
+      );
+      // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
+      // mesmo serviço estiver vinculado a várias especialidades para este médico
+      // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
+      // mantém a especialidade principal do médico (fallback acima).
+      if (eids.length === 1) {
+        const { data: esp } = await supabase
+          .from("especialidades")
+          .select("nome")
+          .eq("id", eids[0])
+          .maybeSingle();
+        const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
+        if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
+      }
+    } catch { /* mantém o fallback da especialidade principal do médico */ }
+  }
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
   // valor base de cálculo da 1ª via, mantendo o repasse do médico correto.
   let valor: number;
   let isCartaoConsulta = false;
+  // Quando `pagamento` não vem do caller (ex.: botão "Imprimir GR" reimprimindo
+  // uma cobrança antiga), reconstruímos a forma/parcelas/bandeira/misto a partir
+  // do lançamento financeiro. Sem isso a GR caía num fallback "DINHEIRO".
+  let pagResolvido: PrintGRInput["pagamento"] | undefined = pagamento;
   const detectCartaoConsulta = (desc: string | null | undefined): boolean => {
     if (!desc) return false;
     const d = desc.toUpperCase();
@@ -357,19 +521,74 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     valor = Number(pagamento.valor);
   } else {
     let valorPago = 0;
+    let formaResolvida: string | null = null;
+    let parcelasResolvidas: number | null = null;
+    let bandeiraResolvida: string | null = null;
+    let obsResolvida: string | null = null;
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("valor, descricao")
+        .select("valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      for (const l of ((lancs ?? []) as Array<{ valor: number | string; descricao: string | null }>)) {
+      for (const l of ((lancs ?? []) as Array<{
+        valor: number | string; descricao: string | null;
+        forma_pagamento: string | null; parcelas: number | null;
+        bandeira_cartao: string | null; observacoes: string | null;
+      }>)) {
         valorPago += Number(l.valor);
         if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
+        // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
+        // e sem forma) — a cobrança principal é a que dita a forma na GR.
+        if (!formaResolvida && l.forma_pagamento) {
+          formaResolvida = l.forma_pagamento;
+          parcelasResolvidas = l.parcelas;
+          bandeiraResolvida = l.bandeira_cartao;
+          obsResolvida = l.observacoes;
+        }
       }
     } catch { /* segue para fallback */ }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+    if (formaResolvida) {
+      // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (formaResolvida === "misto" && obsResolvida) {
+        const idx = obsResolvida.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = obsResolvida.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+      pagResolvido = {
+        valor,
+        forma_pagamento: formaResolvida,
+        parcelas: parcelasResolvidas,
+        bandeira_cartao: bandeiraResolvida,
+        detalhe,
+      };
+    }
   }
   // Quando o pagamento já vem informado pelo caller, ainda consultamos os
   // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
@@ -386,33 +605,38 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     } catch { /* noop */ }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
-  const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
+  const procNome = formatServicoLinha(procNomeBase, espNome);
 
-  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria)
-  // Conta a ordem cronológica entre agendamentos VÁLIDOS (com paciente real),
-  // ignorando blocos de "Bloqueio"/"Disponível" e horários sem paciente.
+  // Ficha = POSIÇÃO da linha na fila do PROFISSIONAL no dia (mesma regra da
+  // lista da agenda — app.agenda.tsx > fichaPorId): cada médico/agenda tem sua
+  // própria sequência 001, 002, 003… dentro do dia. O chamador (a agenda) passa
+  // o número já calculado em `fichaNumero` — assim a guia bate EXATAMENTE com a
+  // lista. Sem ele, recalcula aqui como fallback particionando por (dia,
+  // profissional, agenda).
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
-  let fichaNum = 0;
-  try {
-    let qFicha = supabase
-      .from("agendamentos")
-      .select("id, inicio, paciente_id, paciente_nome")
-      .gte("inicio", diaIni.toISOString())
-      .lte("inicio", diaFim.toISOString())
-      .order("inicio", { ascending: true });
-    if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
-    else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
-    const { data: lista } = await qFicha;
-    const validos = (lista ?? []).filter((r: any) => {
-      const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
-      return true;
-    });
-    const idx = validos.findIndex((r: any) => r.id === a.id);
-    fichaNum = idx >= 0 ? idx + 1 : 0;
-  } catch { fichaNum = 0; }
+  let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
+  if (fichaNum === 0) {
+    try {
+      const q = supabase
+        .from("agendamentos")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
+        .eq("clinica_id", clinicaId)
+        .gte("inicio", diaIni.toISOString())
+        .lte("inicio", diaFim.toISOString());
+      if (a.medico_id) q.eq("medico_id", a.medico_id); else q.is("medico_id", null);
+      if (a.agenda_id) q.eq("agenda_id", a.agenda_id); else q.is("agenda_id", null);
+      const { data: lista } = await q;
+      const ordenados = [...(lista ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+      });
+      const idx = ordenados.findIndex((r: any) => r.id === a.id);
+      fichaNum = idx >= 0 ? idx + 1 : 0;
+    } catch { fichaNum = 0; }
+  }
   const ficha = fichaNum > 0
     ? String(fichaNum).padStart(3, "0")
     : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
@@ -505,87 +729,119 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
 
-  const formaLbl = pagamento?.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
-  const parcelasTxt = pagamento && pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+  // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
+  // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
+  // fallback silencioso para dinheiro já causou guias mostrando forma errada
+  // para pagamentos reais em débito/pix/etc.
+  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
+    ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
     : "À VISTA";
-  const bandeiraTxt = pagamento?.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
-  const isMisto = pagamento?.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const bandeiraTxt = pagResolvido?.bandeira_cartao ? pagResolvido.bandeira_cartao.toUpperCase() : "";
+  const isMisto = pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
-    ? pagamento!.detalhe!
+    ? pagResolvido!.detalhe!
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabel = await resolveConvLabel(
+    (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    a.paciente_id ?? null,
+    clinicaId,
+  );
+  const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
+
   const ticketHtml = `
   <div class="ticket">
-    ${blocoClinica(c, endereco)}
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
 
-    <div class="divider"></div>
-    <div class="doc-title">Guia de Atendimento</div>
-    <div class="divider"></div>
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE ATENDIMENTO</div>
+    <div class="sep"></div>
 
-    ${blocoPaciente({
-      nome: paciente?.nome ?? a.paciente_nome,
-      prontuario,
-      cpf: paciente?.cpf,
-      telefone: paciente?.telefone,
-      nascimento: paciente?.data_nascimento ? fmtDataSimples(paciente.data_nascimento) : null,
-    })}
+    <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+    ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConv)}
 
-    <div class="divider"></div>
+    <div class="sep"></div>
 
-    ${kv("Ficha", `<span class="badge">${ficha}</span>`)}
-    ${kv("Profissional", esc(medicoNome))}
-    ${kv("Horário", fmtData(a.inicio))}
-    ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
+    <table>
+      <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+      <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
+      <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+    </table>
 
-    <div class="divider"></div>
+    <div class="sep"></div>
 
-    ${blocoServicos([{ qtd: "1", nome: procNome }])}
+    <table>
+      <tr class="bold">
+        <td class="qtd">QTD</td>
+        <td>SERVIÇO</td>
+      </tr>
+      <tr>
+        <td class="qtd">1</td>
+        <td>${esc(procNome)}</td>
+      </tr>
+    </table>
 
     ${valor > 0 ? `
-    ${blocoTotal(fmtBRL(valor), isMisto ? "MISTO" : formaLbl)}
-
-    ${isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
-
-    ${pagamento?.forma_pagamento === "cartao_credito" ? `
-    <div style="margin-top:2mm">
-      ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
-      ${kv("Parcelamento", parcelasTxt)}
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
     ` : ""}
 
-    <div class="divider"></div>
-    <div class="split">
-      ${kv("Clínica", fmtBRL(clinica))}
-      ${kv("Prestador", fmtBRL(prestador))}
-    </div>
+    ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+    </table>
     ` : ""}
 
-    <div class="divider"></div>
-    <div class="foot">
-      <div>Data impressão</div>
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
 
-  const nVias = numViasGR(pagamento);
+  const nVias = numViasGR(pagResolvido);
   const corpoVias = multiplicarVias(ticketHtml, nVias);
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(paciente?.nome ?? a.paciente_nome)}</title>
 <style>
-  ${GR_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -602,8 +858,13 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         via_numero: viaNumero,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
+        ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
     } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
+    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
+    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
+    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
+    // para histórico.
   }
 }
 
@@ -684,7 +945,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento")
       .in("id", ids),
     supabase
       .from("clinicas")
@@ -774,8 +1035,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
     const proc = procByNome.get(normalizar(procNomeBase));
     const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
-    const espUp = espNome ? espNome.toUpperCase() : null;
-    const procNome = espUp && !procNomeBase.includes(espUp) ? `${espUp} - ${procNomeBase}` : procNomeBase;
+    const procNome = formatServicoLinha(procNomeBase, espNome);
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
     const valorPago = valorPagoByAg.get(a.id);
     const valor = valorPago != null && valorPago > 0
@@ -845,32 +1105,36 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição no dia) para cada grupo
+  // Calcula a ficha (posição na fila do PROFISSIONAL no dia) para cada grupo —
+  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: cada
+  // (dia, profissional, agenda) tem sua própria sequência 001, 002, 003…
   const fichaByGrupo = new Map<string, number>();
   await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
     try {
       const dt = new Date(g.inicioRef);
       const ini = new Date(dt); ini.setHours(0,0,0,0);
       const fim = new Date(dt); fim.setHours(23,59,59,999);
-      let q = supabase.from("agendamentos")
-        .select("id, paciente_id, paciente_nome, inicio")
+      const q = supabase.from("agendamentos")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
+        .eq("clinica_id", clinicaId)
         .gte("inicio", ini.toISOString())
-        .lte("inicio", fim.toISOString())
-        .order("inicio", { ascending: true });
-      if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
-      else if (g.medicoId) q = q.eq("medico_id", g.medicoId);
+        .lte("inicio", fim.toISOString());
+      if (g.medicoId) q.eq("medico_id", g.medicoId); else q.is("medico_id", null);
+      if (g.agendaId) q.eq("agenda_id", g.agendaId); else q.is("agenda_id", null);
       const { data } = await q;
-      const validos = (data ?? []).filter((r: any) => {
-        const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
-        return true;
+      const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
       });
-      const idx = validos.findIndex((r: any) => r.id === g.agIdRef);
+      const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
   }));
 
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
+  // "DINHEIRO" quando a forma real é desconhecida.
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
@@ -878,23 +1142,37 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabelAgrupada = await resolveConvLabel(
+    (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    pacIdRef ?? null,
+    clinicaId,
+  );
+  const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
+
   // Cabeçalho da clínica (reutilizado em cada GR)
-  const headerClinica = blocoClinica(c, endereco);
-  const headerPaciente = blocoPaciente({
-    nome: pacienteNome,
-    prontuario: prontuarioPac,
-    cpf: paciente?.cpf,
-    telefone: paciente?.telefone,
-    nascimento: paciente?.data_nascimento ? fmtDataSimples(paciente.data_nascimento) : null,
-  });
+  const headerClinica = `
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+  `;
+  const headerPaciente = `
+    <div class="center bold">${esc(pacienteNome)}</div>
+    ${prontuarioPac ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuarioPac)}</span></div>` : ""}
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConvAgrupada)}
+  `;
 
   const gruposArr = Array.from(grupos.values());
   const dataImpressao = fmtData(new Date().toISOString());
@@ -909,46 +1187,64 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const d = new Date(g.inicioRef);
       return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
     })();
-    const linhas = blocoServicos(g.itens.map((it) => ({ qtd: "1", nome: it.procNome })));
+    const linhas = g.itens
+      .map(
+        (it) => `<tr>
+          <td style="width:14mm">1</td>
+          <td>${esc(it.procNome)}</td>
+        </tr>`
+      )
+      .join("");
     const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
       ? `${pagamento.parcelas}x DE ${fmtBRL(g.subtotal / pagamento.parcelas)}`
       : "À VISTA";
     return `
       <div class="ticket">
         ${headerClinica}
-        <div class="divider"></div>
-        <div class="doc-title">Guia de Atendimento</div>
-        <div class="divider"></div>
+        <div class="sep"></div>
+        <div class="center lg">GUIA DE ATENDIMENTO</div>
+        <div class="sep"></div>
         ${headerPaciente}
-        <div class="divider"></div>
-        ${kv("Ficha", `<span class="badge">${ficha}</span>`)}
-        ${kv("Profissional", esc(g.medicoNome))}
-        ${kv("Horário", fmtData(g.inicioRef))}
-        ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
-        <div class="divider"></div>
-        ${linhas}
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
+          <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
+          <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
+          ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+        </table>
+        <div class="sep"></div>
+        <table>
+          <tr class="bold">
+            <td style="width:14mm">QTD</td>
+            <td>SERVIÇO</td>
+          </tr>
+          ${linhas}
+        </table>
         ${g.subtotal > 0 ? `
-        ${blocoTotal(fmtBRL(g.subtotal), isMisto ? "MISTO" : formaLbl)}
-        ${isLast && isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
+        <div class="row" style="margin-top:8px">
+          <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+          <div class="bold lg">${fmtBRL(g.subtotal)}</div>
+        </div>
+        ${isLast && isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
         ${pagamento.forma_pagamento === "cartao_credito" ? `
-        <div style="margin-top:2mm">
-          ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
-          ${kv("Parcelamento", parcelasTxt)}
-        </div>
+        <table>
+          ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+          <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+        </table>
         ` : ""}
-        <div class="divider"></div>
-        <div class="split">
-          ${kv("Clínica", fmtBRL(g.clinica))}
-          ${kv("Prestador", fmtBRL(g.prestador))}
-        </div>
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+        </table>
         ` : ""}
-        <div class="divider"></div>
-        <div class="foot">
-          <div>Data impressão</div>
+        <div class="sep"></div>
+        <div class="row sm">
+          <div>DATA</div>
           <div>${dataImpressao}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
         </div>
       </div>
-      ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">Corte aqui</div><div class="cut-line"></div></div>` : ""}
+      ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">- - - - - - - - - - - - CORTE AQUI - - - - - - - - - - - -</div><div class="cut-line"></div></div>` : ""}
     `;
   }).join("");
 
@@ -959,10 +1255,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(pacienteNome)}</title>
 <style>
-  ${GR_CSS}
-  .cut    { width: 76mm; padding: 3mm 2mm; text-align: center; margin: 0 auto; }
-  .cut-line { border-top: 1px dashed #000; margin: 2mm 0; }
-  .cut-label { font-size: 6.5pt; letter-spacing: 1.5px; color: #000; text-transform: uppercase; }
+  ${BASE_CSS}
+  .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
+  .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
+  .cut-label { font-size: 8pt; letter-spacing: 1px; }
 </style></head>
 <body>
   ${corpoVias}
@@ -1016,8 +1312,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   // Controle de vias 1ª/2ª via por mensalidade
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
-    .select("via_numero, impresso_por_nome")
+    .select("via_numero, impresso_por_nome, tipo")
     .eq("mensalidade_id", mensalidadeId)
+    .eq("tipo", "mensalidade")
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
   const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
@@ -1066,10 +1363,13 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   const plano = planoRes.data as { nome: string } | null;
   const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
 
+  const isAdesao = Number(m.numero_parcela) === 0;
   const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
   const valor = Number(pagamento.valor ?? m.valor ?? 0);
 
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
+  // "DINHEIRO" quando a forma real é desconhecida.
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
     ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
@@ -1080,52 +1380,77 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
-  const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const descricao = isAdesao
+    ? `TAXA DE ADESAO - CONTRATO #${contrato.numero}${plano?.nome ? ` - ${plano.nome.toUpperCase()}` : ""}`
+    : `MENSALIDADE ${m.numero_parcela}/${totalParcelas} - CONTRATO #${contrato.numero}${plano?.nome ? ` - ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
   const ticketHtml = `
   <div class="ticket">
-    ${blocoClinica(c, endereco)}
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
 
-    <div class="divider"></div>
-    <div class="doc-title">Guia de Recebimento</div>
-    <div class="doc-subtitle">Mensalidade de convênio</div>
-    <div class="divider"></div>
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">${isAdesao ? "TAXA DE ADESAO" : "MENSALIDADE DE CONVÊNIO"}</div>
+    <div class="sep"></div>
 
-    ${blocoPaciente({ nome: tituloPac, cpf: paciente?.cpf, telefone: paciente?.telefone })}
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
 
-    <div class="divider"></div>
+    <div class="sep"></div>
 
-    ${kv("Contrato", `#${contrato.numero}`)}
-    ${kv("Parcela", `<span class="badge">${m.numero_parcela}/${totalParcelas}</span>`)}
-    ${kv("Vencimento", fmtDataSimples(m.vencimento))}
-    ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">COBRANCA:</td><td class="v right">${isAdesao ? "ADESAO" : `${m.numero_parcela}/${totalParcelas}`}</td></tr>
+      <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+    </table>
 
-    <div class="divider"></div>
+    <div class="sep"></div>
 
-    ${blocoServicos([{ qtd: "1", nome: descricao }], "Descrição")}
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricao)}</td>
+      </tr>
+    </table>
 
-    ${blocoTotal(fmtBRL(valor), isMisto ? "MISTO" : formaLbl)}
-
-    ${isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
-
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
-    <div style="margin-top:2mm">
-      ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
-      ${kv("Parcelamento", parcelasTxt)}
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
     ` : ""}
 
-    <div class="divider"></div>
-    <div class="foot">
-      <div>Data impressão</div>
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1137,7 +1462,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(tituloPac)}</title>
 <style>
-  ${GR_CSS}
+  ${BASE_CSS}
 </style></head>
 <body>
   ${corpoVias}
@@ -1153,7 +1478,485 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         via_numero: viaNumero,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
+        tipo: "mensalidade",
       } as never);
     } catch (_) { /* falha silenciosa */ }
   }
+}
+
+// ============================================================================
+// GR DE TAXA DE ADESÃO — cobrada uma única vez, junto com a 1ª mensalidade
+// ============================================================================
+
+export interface PrintGRTaxaAdesaoInput {
+  mensalidadeId: string;
+  clinicaId: string;
+  valorTaxa: number;
+  usuarioNome?: string;
+  usuarioId?: string | null;
+  reimpressao?: boolean;
+  pagamento: {
+    forma_pagamento: string | null;
+    parcelas: number | null;
+    bandeira_cartao: string | null;
+    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+  };
+}
+
+export async function printGuiaTaxaAdesao(input: PrintGRTaxaAdesaoInput) {
+  return printGuiaTaxaAdesaoCore(input);
+}
+
+export async function reimprimirGuiaTaxaAdesao(input: PrintGRTaxaAdesaoInput) {
+  return printGuiaTaxaAdesaoCore({ ...input, reimpressao: true });
+}
+
+async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRTaxaAdesaoInput) {
+  const { data: visExistentes, error: errVias } = await supabase
+    .from("gr_impressoes" as never)
+    .select("via_numero, impresso_por_nome, tipo")
+    .eq("mensalidade_id", mensalidadeId)
+    .eq("tipo", "taxa_adesao")
+    .order("via_numero", { ascending: false });
+  if (errVias) throw new Error(errVias.message);
+  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const ultimaVia = existentes[0]?.via_numero ?? 0;
+  let viaNumero: number;
+  if (reimpressao) {
+    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
+  } else {
+    viaNumero = ultimaVia + 1;
+  }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+
+  const [mensRes, cliRes] = await Promise.all([
+    supabase
+      .from("contrato_mensalidades")
+      .select("id, contrato_id, numero_parcela, vencimento")
+      .eq("id", mensalidadeId)
+      .maybeSingle(),
+    supabase
+      .from("clinicas")
+      .select("nome, endereco, cidade, estado, telefone, cnpj")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+  ]);
+  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string };
+  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+
+  const { data: contratoRow, error: errC } = await supabase
+    .from("contratos_assinatura")
+    .select("id, numero, paciente_id, paciente_nome, plano_id")
+    .eq("id", m.contrato_id)
+    .maybeSingle();
+  if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null };
+
+  const [planoRes, pacRes] = await Promise.all([
+    contrato.plano_id
+      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    contrato.paciente_id
+      ? supabase.from("pacientes").select("nome, cpf, telefone").eq("id", contrato.paciente_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const plano = planoRes.data as { nome: string } | null;
+  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null } | null;
+
+  const valor = Number(valorTaxa ?? 0);
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+    : "À VISTA";
+  const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
+  const detalheRows = isMisto
+    ? pagamento.detalhe!
+        .map((d) => {
+          const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
+          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+        })
+        .join("")
+    : "";
+
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
+  const descricao = `TAXA DE ADESÃO — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const tituloPac = paciente?.nome ?? contrato.paciente_nome;
+
+  const ticketHtml = `
+  <div class="ticket">
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">TAXA DE ADESÃO — CARTÃO DE BENEFÍCIOS</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+
+    <div class="sep"></div>
+
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">REFERÊNCIA:</td><td class="v right">PARCELA ${m.numero_parcela}</td></tr>
+      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
+    </table>
+
+    <div class="sep"></div>
+
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricao)}</td>
+      </tr>
+    </table>
+
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valor)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
+    </div>
+  </div>`;
+
+  const nVias = numViasGR({ forma_pagamento: pagamento.forma_pagamento });
+  const corpoVias = multiplicarVias(ticketHtml, nVias);
+
+  const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<title>GR TAXA - ${esc(tituloPac)}</title>
+<style>
+  ${BASE_CSS}
+</style></head>
+<body>
+  ${corpoVias}
+</body></html>`;
+
+  imprimirViaIframe(html);
+
+  if (!reimpressao) {
+    try {
+      await supabase.from("gr_impressoes" as never).insert({
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: viaNumero,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+        tipo: "taxa_adesao",
+      } as never);
+    } catch (_) { /* falha silenciosa */ }
+  }
+}
+
+// ============================================================================
+// GR COMBINADA — mensalidade + taxa de adesão em UM único pop-up
+// ============================================================================
+// Emite uma via de cada GR (mensalidade e taxa) no mesmo documento,
+// separadas por espaço. Se o operador quiser 2 cópias, usa o campo
+// "Cópias" do próprio diálogo de impressão do navegador.
+
+export interface PrintGRMensalidadeComTaxaInput extends PrintGRMensalidadeInput {
+  valorTaxa: number;
+}
+
+export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTaxaInput) {
+  const { mensalidadeId, clinicaId, usuarioNome, usuarioId, valorTaxa, pagamento } = input;
+
+  // -----------------------------------------------------------------
+  // 1) Controle de vias — busca as impressões existentes para os dois tipos.
+  // -----------------------------------------------------------------
+  const { data: visRows } = await supabase
+    .from("gr_impressoes" as never)
+    .select("via_numero, impresso_por_nome, tipo")
+    .eq("mensalidade_id", mensalidadeId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .order("via_numero", { ascending: false });
+  const visExistentes = (visRows as Array<{ via_numero: number; impresso_por_nome: string | null; tipo: string }> | null) ?? [];
+  const viasMens = visExistentes.filter((r) => r.tipo === "mensalidade");
+  const viasTaxa = visExistentes.filter((r) => r.tipo === "taxa_adesao");
+  const viaNumeroMens = (viasMens[0]?.via_numero ?? 0) + 1;
+  const viaNumeroTaxa = (viasTaxa[0]?.via_numero ?? 0) + 1;
+  const usuarioMensPrimeiro = viasMens.length ? viasMens[viasMens.length - 1].impresso_por_nome : null;
+  const usuarioTaxaPrimeiro = viasTaxa.length ? viasTaxa[viasTaxa.length - 1].impresso_por_nome : null;
+  const usuarioMensNome = usuarioMensPrimeiro ?? usuarioNome;
+  const usuarioTaxaNome = usuarioTaxaPrimeiro ?? usuarioNome;
+
+  // -----------------------------------------------------------------
+  // 2) Busca dados compartilhados (clínica, mensalidade, contrato, paciente, plano).
+  // -----------------------------------------------------------------
+  const [mensRes, cliRes] = await Promise.all([
+    supabase
+      .from("contrato_mensalidades")
+      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em")
+      .eq("id", mensalidadeId)
+      .maybeSingle(),
+    supabase
+      .from("clinicas")
+      .select("nome, endereco, cidade, estado, telefone, cnpj")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+  ]);
+  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null };
+  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+
+  const { data: contratoRow, error: errC } = await supabase
+    .from("contratos_assinatura")
+    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .eq("id", m.contrato_id)
+    .maybeSingle();
+  if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+
+  const [planoRes, pacRes] = await Promise.all([
+    contrato.plano_id
+      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    contrato.paciente_id
+      ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const plano = planoRes.data as { nome: string } | null;
+  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+
+  // -----------------------------------------------------------------
+  // 3) Formatação comum de pagamento.
+  // -----------------------------------------------------------------
+  const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
+  const valorMens = Number(pagamento.valor ?? m.valor ?? 0);
+  const valorTax = Number(valorTaxa ?? 0);
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
+  const parcelasTxtMens = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valorMens / pagamento.parcelas)}`
+    : "À VISTA";
+  const parcelasTxtTaxa = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valorTax / pagamento.parcelas)}`
+    : "À VISTA";
+  const detalheRows = isMisto
+    ? pagamento.detalhe!
+        .map((d) => {
+          const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
+          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+        })
+        .join("")
+    : "";
+
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const tituloPac = paciente?.nome ?? contrato.paciente_nome;
+
+  // -----------------------------------------------------------------
+  // 4) Ticket 1 — Mensalidade.
+  // -----------------------------------------------------------------
+  const descricaoMens = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const viaTextoMens = `IMPRESSÃO Nº ${viaNumeroMens}`;
+  const ticketMens = `
+  <div class="ticket">
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">MENSALIDADE DE CONVÊNIO</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+
+    <div class="sep"></div>
+
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
+      <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
+      ${usuarioMensNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioMensNome)}</span></td></tr>` : ""}
+    </table>
+
+    <div class="sep"></div>
+
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricaoMens)}</td>
+      </tr>
+    </table>
+
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valorMens)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtMens}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumeroMens >= 2 ? ` — ${viaTextoMens}` : ""}</div>
+    </div>
+  </div>`;
+
+  // -----------------------------------------------------------------
+  // 5) Ticket 2 — Taxa de adesão.
+  // -----------------------------------------------------------------
+  const descricaoTaxa = `TAXA DE ADESÃO — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const viaTextoTaxa = `IMPRESSÃO Nº ${viaNumeroTaxa}`;
+  const ticketTaxa = `
+  <div class="ticket">
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">TAXA DE ADESÃO — CARTÃO DE BENEFÍCIOS</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+
+    <div class="sep"></div>
+
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">REFERÊNCIA:</td><td class="v right">PARCELA ${m.numero_parcela}</td></tr>
+      ${usuarioTaxaNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioTaxaNome)}</span></td></tr>` : ""}
+    </table>
+
+    <div class="sep"></div>
+
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricaoTaxa)}</td>
+      </tr>
+    </table>
+
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valorTax)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtTaxa}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumeroTaxa >= 2 ? ` — ${viaTextoTaxa}` : ""}</div>
+    </div>
+  </div>`;
+
+  // -----------------------------------------------------------------
+  // 6) Monta um único documento com as duas GRs, separadas por espaço.
+  // -----------------------------------------------------------------
+  // Linha de corte entre as duas GRs (tracejada, com legenda ✂).
+  const linhaCorte = `
+    <div style="margin:6mm 0; text-align:center; font-size:8pt; color:#000;">
+      <div style="border-top:1px dashed #000; position:relative; height:0;">
+        <span style="position:relative; top:-7px; background:#fff; padding:0 4px;">✂ &nbsp; corte aqui &nbsp; ✂</span>
+      </div>
+    </div>`;
+  const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<title>GR - ${esc(tituloPac)}</title>
+<style>
+  ${BASE_CSS}
+</style></head>
+<body>
+  ${ticketMens}
+  ${linhaCorte}
+  ${ticketTaxa}
+</body></html>`;
+
+  imprimirViaIframe(html);
+
+  // -----------------------------------------------------------------
+  // 7) Registra auditoria — uma linha por tipo.
+  // -----------------------------------------------------------------
+  try {
+    await supabase.from("gr_impressoes" as never).insert([
+      {
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: viaNumeroMens,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+        tipo: "mensalidade",
+      },
+      {
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: viaNumeroTaxa,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+        tipo: "taxa_adesao",
+      },
+    ] as never);
+  } catch (_) { /* falha silenciosa */ }
 }

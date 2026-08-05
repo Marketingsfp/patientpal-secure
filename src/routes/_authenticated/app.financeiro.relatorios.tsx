@@ -5,13 +5,13 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { useUserPref } from "@/hooks/use-user-pref";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios")({
   component: Page,
   head: () => ({ meta: [{ title: "Relatórios — Financeiro" }] }),
@@ -48,15 +48,9 @@ async function fetchAll(builder: () => any): Promise<Record<string, unknown>[]> 
 
 function Page() {
   const { clinicaAtual } = useClinica();
-  const [tipo, setTipo] = useUserPref<"lancamentos" | "atendimentos" | "notas">(
-    "fin.relatorios.tipo",
-    "lancamentos"
-  );
-  const [from, setFrom] = useUserPref(
-    "fin.relatorios.de",
-    new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
-  );
-  const [to, setTo] = useUserPref("fin.relatorios.ate", new Date().toISOString().slice(0, 10));
+  const [tipo, setTipo] = useState<"lancamentos" | "atendimentos" | "notas">("lancamentos");
+  const [from, setFrom] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
 
   const gerar = async () => {
@@ -106,9 +100,9 @@ function Page() {
                 </SelectContent>
               </Select></div>
             <div className="space-y-2"><Label>De</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <DateInputBR value={from} onChange={(e) => setFrom(e.target.value)} /></div>
             <div className="space-y-2"><Label>Até</Label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <DateInputBR value={to} onChange={(e) => setTo(e.target.value)} /></div>
           </div>
           <Button onClick={gerar} disabled={loading || !clinicaAtual}>
             <Download className="h-4 w-4 mr-2" />{loading ? "Gerando..." : "Baixar CSV"}

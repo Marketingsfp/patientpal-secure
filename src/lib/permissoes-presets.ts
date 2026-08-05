@@ -16,7 +16,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Operação
   "agenda", "checkin", "caixa", "chat", "clientes", "dashboard", "fluxo",
   "orcamentos", "recepcao", "triagem-enfermagem", "cartao-beneficios",
-  "painel", "documentos",
+  "painel", "documentos", "atendimento-multiplo",
   // Inteligência
   "atendimento-ia", "crm", "alertas-enfermagem", "consulta-rapida", "nina",
   "odontologia", "prontuarios", "anamneses", "exames-resultados",
@@ -25,15 +25,14 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Cadastros
   "equipe", "especialidades", "disponibilidades", "prontuario-modelos",
   "perfis", "unidades", "medicos", "procedimentos", "planos", "estoque",
-  "modelos-documentos", "clinicas",
+  "modelos-documentos", "clinicas", "tipos-servico",
   // RH
   "hr-ponto", "hr-contratos", "hr-ferias", "hr-holerites", "treinamentos",
   "lms-admin",
   // Gestão
   "cargos", "financeiro", "funcionarios", "relatorios", "auditoria", "setores",
   "boletos", "contratos", "nfse", "integration-secrets", "lgpd",
-  // Sistema
-  "perfil-proprio",
+  "painel-executivo",
 ];
 
 export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
@@ -41,7 +40,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   gestor: {
     dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
     chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
-    caixa: "read", financeiro: "read", boletos: "read", contratos: "read",
+    caixa: "read", financeiro: "write", boletos: "read", contratos: "read",
     nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
     equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
     "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
@@ -50,30 +49,37 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
     estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
     "consulta-rapida": "read", "alertas-enfermagem": "read",
-    "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
+    "cartao-beneficios": "read",
+    "painel-executivo": "write", "atendimento-multiplo": "read",
+    "tipos-servico": "read",
   },
   medico: {
     agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
-    "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
+    "consulta-rapida": "read", "prontuario-modelos": "read",
     odontologia: "write", prontuarios: "write", anamneses: "write",
     documentos: "write", clientes: "read", chat: "write",
+    "atendimento-multiplo": "write", caixa: "read",
   },
   recepcao: {
     agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
-    orcamentos: "write", "consulta-rapida": "read", "perfil-proprio": "write",
-    checkin: "write", painel: "write",
+    orcamentos: "write", "consulta-rapida": "read",
+    // Antes "painel" (bug: ROUTE_TO_MODULE mapeava /app/painel, que é o
+    // Dashboard, para a chave errada). Corrigido para "dashboard" — preserva
+    // o acesso ao Dashboard que este preset sempre pretendeu dar.
+    checkin: "write", dashboard: "write",
     chat: "write", "cartao-beneficios": "read", caixa: "write",
-    procedimentos: "read",
+    procedimentos: "read", nfse: "write",
+    "atendimento-multiplo": "write", "tipos-servico": "read",
   },
   caixa: {
     caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
-    "consulta-rapida": "read", "perfil-proprio": "write",
-    boletos: "write", nfse: "read", contratos: "read",
+    "consulta-rapida": "read",
+    boletos: "write", nfse: "write", contratos: "read",
     "cartao-beneficios": "read", chat: "write",
   },
   financeiro: {
     financeiro: "write", caixa: "read", relatorios: "write", orcamentos: "read",
-    clientes: "read", "cartao-beneficios": "write", "perfil-proprio": "write",
+    clientes: "read", "cartao-beneficios": "write",
     boletos: "write", nfse: "write", contratos: "write", planos: "read",
     "hr-holerites": "read", "hr-contratos": "read", auditoria: "read",
     "integration-secrets": "read", chat: "write", dashboard: "read",
@@ -81,9 +87,11 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   enfermeiro: {
     "triagem-enfermagem": "write", "alertas-enfermagem": "write",
     agenda: "read", clientes: "read", "consulta-rapida": "read",
-    "atendimento-ia": "read", "perfil-proprio": "write",
+    "atendimento-ia": "read",
     anamneses: "write", prontuarios: "read", estoque: "read",
     documentos: "read", chat: "write", orcamentos: "write",
+    "atendimento-multiplo": "write",
+    caixa: "read",
   },
 };
 

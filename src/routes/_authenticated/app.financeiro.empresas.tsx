@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ const EMPTY = { nome: "", cnpj: "", telefone: "", email: "", observacoes: "" };
 
 function FinEmpresasPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -73,6 +75,7 @@ function FinEmpresasPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) { toast.error("Selecione uma clínica"); return; }
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -95,6 +98,7 @@ function FinEmpresasPage() {
   };
 
   const handleDelete = async (e: Empresa) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir empresa "${e.nome}"?`)) return;
     const { error } = await supabase.from("fin_empresas").update({ ativo: false }).eq("id", e.id);
     if (error) { mostrarErro(error); return; }
@@ -112,11 +116,13 @@ function FinEmpresasPage() {
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNew} disabled={!clinicaAtual}>
-              <Plus className="h-4 w-4 mr-2" /> Nova empresa
-            </Button>
-          </DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild>
+              <Button onClick={openNew} disabled={!clinicaAtual}>
+                <Plus className="h-4 w-4 mr-2" /> Nova empresa
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editing ? "Editar empresa" : "Nova empresa"}</DialogTitle>
@@ -181,14 +187,16 @@ function FinEmpresasPage() {
                     {e.email && <p className="text-sm text-muted-foreground truncate">{e.email}</p>}
                     <div className="mt-3 flex items-center gap-2">
                       <Badge variant="secondary">Ativa</Badge>
-                      <div className="ml-auto flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(e)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(e)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+                      {podeEscrever && (
+                        <div className="ml-auto flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(e)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(e)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

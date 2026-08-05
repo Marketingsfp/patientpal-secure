@@ -80,11 +80,7 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
   const textoAtual = valor || fallback || "—";
 
   if (disabled || lista.length === 0) {
-    return (
-      <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium uppercase text-slate-700">
-        {textoAtual}
-      </span>
-    );
+    return <Badge variant="outline" className="text-xs">{textoAtual}</Badge>;
   }
 
   return (
@@ -93,7 +89,7 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
         <button
           type="button"
           title="Clique para trocar o serviço"
-          className="group inline-flex items-center gap-1 rounded-md border-0 bg-slate-100 px-2 py-1 text-xs font-medium uppercase text-slate-700 transition-colors hover:bg-slate-200/80"
+          className="group inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs uppercase font-medium hover:bg-muted hover:border-primary"
         >
           <span className="truncate max-w-[180px]">{textoAtual}</span>
           <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />

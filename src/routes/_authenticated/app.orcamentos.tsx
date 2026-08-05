@@ -6,6 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -17,9 +18,11 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
+import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 type AuditRow = {
   id: string;
   user_email: string | null;
@@ -179,6 +182,7 @@ type Procedimento = {
   valor_cartao_debito: number | null;
   valor_padrao: number | null;
   preparo: string | null;
+  valor_variavel?: boolean | null;
 };
 
 type Item = {
@@ -203,6 +207,7 @@ const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("orcamentos");
   const navigate = useNavigate();
   const [list, setList] = useState<Orc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,6 +338,7 @@ function OrcamentosPage() {
   };
 
   const remover = async (id: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir este orçamento?")) return;
     const { error } = await supabase.from("orcamentos").delete().eq("id", id);
     if (error) return mostrarErro(error);
@@ -347,7 +353,7 @@ function OrcamentosPage() {
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="space-y-4 flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-md bg-primary/10"><FileText className="h-6 w-6 text-primary" /></div>
@@ -368,7 +374,9 @@ function OrcamentosPage() {
           <Button variant="outline" onClick={exportarCsv} className="gap-2" title="Exportar relatório CSV">
             <Download className="h-4 w-4" /> Exportar
           </Button>
-          <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+          {podeEscrever && (
+            <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+          )}
         </div>
       </div>
 
@@ -398,9 +406,9 @@ function OrcamentosPage() {
         </div>
         {periodo === "personalizado" && (
           <div className="flex items-center gap-1">
-            <Input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
+            <DateInputBR value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
             <span className="text-xs text-muted-foreground">até</span>
-            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
+            <DateInputBR value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
           </div>
         )}
         <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
@@ -427,9 +435,10 @@ function OrcamentosPage() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
+      <div className="rounded-md border bg-card overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+        <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
+          <thead className="bg-muted sticky top-0 z-20">
             <tr className="text-left">
               <th className="px-3 py-2 w-20">Nº</th>
               <th className="px-3 py-2 w-32">Data</th>
@@ -519,27 +528,32 @@ function OrcamentosPage() {
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConversaoId(o.id)}
-                      title="Converter itens (vender, agendar, cancelar, NFS-e)"
-                    >
-                      <Workflow className="h-4 w-4 text-primary" />
-                    </Button>
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConversaoId(o.id)}
+                        title="Converter itens (vender, agendar, cancelar, NFS-e)"
+                      >
+                        <Workflow className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     {podeVerHistorico && (
                       <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
                         <History className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    {podeEscrever && (
+                      <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    )}
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {open && clinicaAtual && (
@@ -596,6 +610,7 @@ function NovoOrcamentoDialog({
   const [medicoId, setMedicoId] = useState<string>("");
   const [medicoExterno, setMedicoExterno] = useState(false);
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
+  const [medicoParticular, setMedicoParticular] = useState(false);
   const [medicos, setMedicos] = useState<MedicoOpt[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<string[]>(["Dinheiro"]);
   const [valoresPagamento, setValoresPagamento] = useState<Record<string, number>>({});
@@ -609,25 +624,14 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
-  const [labProcIds, setLabProcIds] = useState<Set<string> | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      const { data: esps } = await supabase
-        .from("especialidades")
-        .select("id")
-        .ilike("nome", "%labor%");
-      const espIds = (esps ?? []).map((e) => e.id);
-      if (espIds.length === 0) { setLabProcIds(new Set()); return; }
-      const { data: pe } = await supabase
-        .from("procedimento_especialidades")
-        .select("procedimento_id")
-        .eq("clinica_id", clinicaId)
-        .in("especialidade_id", espIds);
-      setLabProcIds(new Set((pe ?? []).map((r) => r.procedimento_id as string)));
-    })();
-  }, [open, clinicaId]);
+  // Bloco "Laboratório — Top 60": lista curta de acesso rápido para exames
+  // laboratoriais. Não substitui a busca — apenas destaca os mais comuns.
+  const [labProcs, setLabProcs] = useState<Procedimento[]>([]);
+  const [mostrarTop60, setMostrarTop60] = useState(true);
+  // Categoria Laboratório é identificada diretamente em `procedimentos`
+  // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
+  // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
+  // PostgREST no `.in("id", ids)`.
 
   useEffect(() => {
     (async () => {
@@ -660,11 +664,20 @@ function NovoOrcamentoDialog({
 
   const alternarMedicoExterno = (externo: boolean) => {
     setMedicoExterno(externo);
+    setMedicoParticular(false);
     if (externo) {
       setMedicoId("");
     } else {
       setClinicaSolicitante("");
     }
+  };
+
+  const ativarParticular = () => {
+    setMedicoParticular(true);
+    setMedicoExterno(false);
+    setMedicoId("");
+    setMedicoNome("");
+    setClinicaSolicitante("");
   };
 
   const selecionarPaciente = (p: PatientOption | null) => {
@@ -679,34 +692,52 @@ function NovoOrcamentoDialog({
   useEffect(() => {
     let cancel = false;
     if (procQuery.trim().length < 2) { setProcResults([]); return; }
-    if (categoria && labProcIds == null) return;
     setSearchingProc(true);
     const t = setTimeout(async () => {
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
+      const safeQ = sanitizePostgrestSearch(procQuery);
+      const safeNorm = sanitizePostgrestSearch(norm);
       let q = supabase
         .from("procedimentos")
-        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
         .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
+        .eq("ativo", true);
+      if (safeQ.length > 0 || safeNorm.length > 0) {
+        const parts: string[] = [];
+        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
+        if (safeNorm.length > 0 && safeNorm !== safeQ)
+          parts.push(`nome.ilike.%${safeNorm}%`);
+        q = q.or(parts.join(","));
+      }
       if (categoria === "laboratorio") {
-        const ids = Array.from(labProcIds ?? []);
-        if (ids.length === 0) {
-          if (!cancel) { setProcResults([]); setSearchingProc(false); }
-          return;
-        }
-        q = q.in("id", ids);
+        q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
       } else if (categoria === "demais") {
-        const ids = Array.from(labProcIds ?? []);
-        if (ids.length > 0) {
-          q = q.not("id", "in", `(${ids.join(",")})`);
-        }
+        q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
       }
       const { data } = await q.limit(20);
       if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
     }, 250);
     return () => { cancel = true; clearTimeout(t); };
-  }, [procQuery, clinicaId, categoria, labProcIds]);
+  }, [procQuery, clinicaId, categoria]);
+
+  // Pré-carrega os procedimentos laboratoriais quando o orçamento é do
+  // tipo Laboratório, para montar o bloco Top 60 sem depender da busca.
+  useEffect(() => {
+    if (categoria !== "laboratorio" || !clinicaId) { setLabProcs([]); return; }
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")
+        .limit(2000);
+      if (!cancel) setLabProcs((data ?? []) as Procedimento[]);
+    })();
+    return () => { cancel = true; };
+  }, [categoria, clinicaId]);
 
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
@@ -789,6 +820,9 @@ function NovoOrcamentoDialog({
     if (p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
+    if (p.valor_variavel) {
+      toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`, { duration: 6000 });
+    }
     setProcQuery("");
     setProcResults([]);
   };
@@ -857,9 +891,13 @@ function NovoOrcamentoDialog({
         categoria,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
-        medico_nome: medicoNome.trim() || null,
-        medico_externo: medicoExterno,
-        clinica_solicitante: medicoExterno ? (clinicaSolicitante.trim() || null) : null,
+        medico_nome: medicoParticular ? "Particular" : (medicoNome.trim() || null),
+        medico_externo: medicoParticular ? false : medicoExterno,
+        clinica_solicitante: medicoParticular
+          ? "Particular (sem solicitante)"
+          : medicoExterno
+            ? (clinicaSolicitante.trim() || null)
+            : null,
         forma_pagamento: formasPagamento.join(" + "),
         valores_pagamento: valoresPag,
         validade_dias: validade,
@@ -957,23 +995,34 @@ function NovoOrcamentoDialog({
             <div className="space-y-1"><Label>Telefone</Label><Input maxLength={20} value={pacienteTelefone} onChange={(e) => setPacienteTelefone(e.target.value.replace(/[<>]/g, ""))} /></div>
             <div className="space-y-1 md:col-span-2">
               <Label>Médico solicitante</Label>
-              <div className="flex gap-1 rounded-md border p-1 w-fit">
+               <div className="flex flex-wrap gap-1 rounded-md border p-1 w-fit">
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(false)}
-                  className={`px-3 py-1 text-sm rounded ${!medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   Da nossa clínica
                 </button>
                 <button
                   type="button"
                   onClick={() => alternarMedicoExterno(true)}
-                  className={`px-3 py-1 text-sm rounded ${medicoExterno ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  className={`px-3 py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   De outro local
                 </button>
+                <button
+                  type="button"
+                  onClick={ativarParticular}
+                  className={`px-3 py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  Particular
+                </button>
               </div>
-              {!medicoExterno ? (
+              {medicoParticular ? (
+                <p className="text-xs text-muted-foreground">
+                  Paciente sem médico solicitante — atendimento particular por procura direta.
+                </p>
+              ) : !medicoExterno ? (
                 <SearchableSelect
                   options={medicoOptions}
                   value={medicoId}
@@ -1041,6 +1090,51 @@ function NovoOrcamentoDialog({
 
           <div className="space-y-2 border-t pt-3">
             <Label>Adicionar serviço</Label>
+            {categoria === "laboratorio" && (() => {
+              const top60 = pickTop60(labProcs);
+              if (top60.length === 0) return null;
+              return (
+                <div className="rounded-md border p-2 bg-muted/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                      🧪 Laboratório — Top 60
+                      <span className="ml-2 text-[10px] font-normal normal-case text-muted-foreground/80">
+                        ({top60.length} disponíveis no seu cadastro)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[11px]"
+                      onClick={() => setMostrarTop60((v) => !v)}
+                    >
+                      {mostrarTop60 ? "ocultar" : "mostrar"}
+                    </Button>
+                  </div>
+                  {mostrarTop60 && (
+                    <div className="flex flex-wrap gap-1 max-h-40 overflow-auto">
+                      {top60.map(({ item, proc }) => (
+                        <Button
+                          key={proc.id}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          title={proc.nome}
+                          onClick={() => adicionarProc(proc)}
+                        >
+                          {item.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Os demais exames continuam disponíveis pela busca abaixo.
+                  </p>
+                </div>
+              );
+            })()}
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-9" placeholder="Buscar serviço da tabela…" value={procQuery} onChange={(e) => setProcQuery(e.target.value)} />

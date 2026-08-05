@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Activity, Video, ClipboardList, LogOut, Calendar, CalendarPlus } from "lucide-react";
+import { Activity, Video, ClipboardList, LogOut, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
@@ -64,7 +64,6 @@ function MinhasConsultasPage() {
         </div>
         <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm overflow-x-auto">
           <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Início</Link>
-          <Link to="/paciente/agendar" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Agendar</Link>
           <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap">Consultas</Link>
           <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Cartões</Link>
           <Link to="/paciente/financeiro" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Financeiro</Link>
@@ -73,17 +72,8 @@ function MinhasConsultasPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold">Minhas consultas</h1>
-            {userEmail && <p className="text-xs text-muted-foreground">{userEmail}</p>}
-          </div>
-          <Button asChild size="sm" className="shrink-0">
-            <Link to="/paciente/agendar">
-              <CalendarPlus className="h-4 w-4 mr-1" /> Agendar
-            </Link>
-          </Button>
-        </div>
+        <h1 className="text-xl font-bold">Minhas consultas</h1>
+        {userEmail && <p className="text-xs text-muted-foreground">{userEmail}</p>}
 
         {loading ? (
           <p className="mt-6 text-sm text-muted-foreground">Carregando…</p>
@@ -92,13 +82,6 @@ function MinhasConsultasPage() {
             Nenhuma consulta encontrada para o seu e-mail.
             <br />
             Confirme com a clínica se o cadastro do paciente usa este mesmo e-mail.
-            <div className="mt-4">
-              <Button asChild size="sm">
-                <Link to="/paciente/agendar">
-                  <CalendarPlus className="h-4 w-4 mr-1" /> Agendar atendimento
-                </Link>
-              </Button>
-            </div>
           </Card>
         ) : (
           <div className="mt-4 space-y-3">
