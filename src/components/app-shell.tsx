@@ -856,7 +856,7 @@ export function AppShell() {
             )}
           </div>
           <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
-            {visibleNavRows.map((row) => {
+            {visibleNavRows.map((row, rowIndex) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
                 if (!pathOk) return false;
@@ -869,7 +869,15 @@ export function AppShell() {
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
               const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
               return (
-                <div key={row.label} className="space-y-1">
+                <div
+                  key={row.label}
+                  className={cn(
+                    // Linhas divisórias: separa visualmente cada grupo do menu e,
+                    // dentro do grupo, cada item (linha sutil entre irmãos).
+                    "space-y-1 [&>a+a]:border-t [&>a+a]:border-white/10 [&>div+a]:border-t [&>div+a]:border-white/10 [&>a+div]:border-t [&>a+div]:border-white/10",
+                    rowIndex > 0 && "mt-5 border-t border-white/15 pt-4",
+                  )}
+                >
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
