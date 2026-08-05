@@ -855,7 +855,7 @@ export function AppShell() {
               </Button>
             )}
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
+          <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto sidebar-scroll">
             {visibleNavRows.map((row, rowIndex) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
