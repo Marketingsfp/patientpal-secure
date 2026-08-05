@@ -874,7 +874,7 @@ export function AppShell() {
                   className={cn(
                     // Linhas divisórias: separa visualmente cada grupo do menu e,
                     // dentro do grupo, cada item (linha sutil entre irmãos).
-                    "space-y-1 [&>a+a]:border-t [&>a+a]:border-white/10 [&>div+a]:border-t [&>div+a]:border-white/10 [&>a+div]:border-t [&>a+div]:border-white/10",
+                    "space-y-1 [&>*+*]:border-t [&>*+*]:border-white/15 [&>*+*]:pt-1",
                     rowIndex > 0 && "mt-5 border-t border-white/15 pt-4",
                   )}
                 >
