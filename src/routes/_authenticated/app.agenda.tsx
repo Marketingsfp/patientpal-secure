@@ -2189,7 +2189,12 @@ function AgendaPage() {
    * bloqueio/atraso (tom "error") apenas fecha, sem reabrir a cobrança.
    */
   const fecharAvisoConvenio = useCallback(() => {
-    const reabrirPagamento = avisoConvenio?.tom !== "error" && formaPagCtx !== null;
+    // Só reabre a cobrança quando ela NÃO está na tela. Se a escolha da forma
+    // de pagamento (ou o pagamento em si) já estiver aberta — caso do fluxo
+    // "Salvar/Pagar", em que o aviso aparece junto com a cobrança —, apenas
+    // fecha o aviso para não duplicar as telas de pagamento.
+    const reabrirPagamento =
+      avisoConvenio?.tom !== "error" && formaPagCtx !== null && !formaPagOpen && !pagamentoOpen;
     setAvisoConvenio(null);
     if (!reabrirPagamento) return;
     setFormaPagOpen(true);
@@ -2199,7 +2204,7 @@ function AgendaPage() {
         alvo?.focus();
       });
     });
-  }, [avisoConvenio, formaPagCtx]);
+  }, [avisoConvenio, formaPagCtx, formaPagOpen, pagamentoOpen]);
   /**
    * Fator de desconto do convênio apurado na cobrança atual, por item do
    * orçamento e forma de pagamento. Usado para ajustar sinal/saldo e a baixa
