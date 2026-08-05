@@ -510,6 +510,45 @@ function PainelClock() {
   return <span>{now.toLocaleTimeString("pt-BR")}</span>;
 }
 
+// Indicador do serviço de voz personalizada: online / offline + último erro.
+function TtsStatusBadge({
+  status,
+}: {
+  status: { estado: "desconhecido" | "online" | "offline"; erro: string | null; em: number | null };
+}) {
+  const offline = status.estado === "offline";
+  const online = status.estado === "online";
+  const hora = status.em ? new Date(status.em).toLocaleTimeString("pt-BR") : null;
+  return (
+    <div
+      title={
+        offline
+          ? `${status.erro ?? "Serviço de voz indisponível"}${hora ? ` — ${hora}` : ""}`
+          : online
+            ? `Voz personalizada funcionando${hora ? ` — ${hora}` : ""}`
+            : "Aguardando a primeira chamada para verificar a voz"
+      }
+      className={`flex items-center gap-2 rounded-full border px-[clamp(0.5rem,0.9vw,0.9rem)] py-[clamp(0.2rem,0.4vw,0.4rem)] text-[clamp(0.6rem,0.9vw,0.8rem)] font-semibold uppercase tracking-widest ${
+        offline
+          ? "border-destructive/40 bg-destructive/10 text-destructive"
+          : online
+            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+            : "border-muted-foreground/30 bg-muted/20 text-muted-foreground"
+      }`}
+    >
+      {offline ? <VolumeX className="h-4 w-4 shrink-0" /> : <Volume2 className="h-4 w-4 shrink-0" />}
+      <span className="hidden sm:inline">
+        Voz {offline ? "offline" : online ? "online" : "—"}
+      </span>
+      {offline && status.erro && (
+        <span className="hidden md:inline normal-case tracking-normal font-medium opacity-90">
+          · {status.erro}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Transforma o erro do serviço de voz em um texto curto e legível
 // (ex.: "Erro 502 no servidor de voz").
 function descreverErroTts(err: unknown): string {
