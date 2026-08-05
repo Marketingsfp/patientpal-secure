@@ -1034,12 +1034,16 @@ export function AppShell() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
+        <header
+          className="sticky top-0 z-30 h-[50px] text-white border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 sm:px-5"
+          style={{ backgroundColor: corSidebar }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
           {!isChooser && (
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-muted shrink-0"
+              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-white/10 shrink-0"
               aria-label="Abrir menu"
               title="Menu"
             >
@@ -1047,15 +1051,18 @@ export function AppShell() {
             </button>
           )}
           <Link to="/app" className="flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
-            <Activity className="h-5 w-5 shrink-0 text-primary" />
+            <Activity className="h-5 w-5 shrink-0 text-white" />
             <span className="hidden sm:inline font-semibold tracking-tight truncate">ClinicaOS</span>
           </Link>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 min-w-0">
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 hidden sm:flex items-center justify-center shrink-0">
+            <div className="hidden sm:flex items-center justify-center shrink-0">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
-                className="h-7 w-auto object-contain"
+                className="h-7 w-auto object-contain drop-shadow-sm"
               />
             </div>
           )}
@@ -1067,7 +1074,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[120px] sm:w-[180px] md:w-[240px] max-w-full min-w-0 h-8 text-xs shrink">
+              <SelectTrigger className="w-[120px] sm:w-[180px] md:w-[240px] max-w-full min-w-0 h-8 text-xs shrink border-0 bg-transparent text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/10">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -1093,15 +1100,17 @@ export function AppShell() {
               </SelectContent>
             </Select>
           )}
-          <div className="flex-1 flex justify-center px-2 min-w-0">
-            <UniversalSearchBar />
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center justify-end gap-2 min-w-0">
+            <div className="hidden md:flex min-w-0 max-w-[280px]">
+              <UniversalSearchBar />
+            </div>
             {uxMelhorias && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 p-0 rounded-full"
+                className="h-9 w-9 p-0 rounded-full text-white hover:bg-white/10 hover:text-white"
                 title={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
                 aria-label={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
                 onClick={() => theme.set(theme.isDark ? "light" : "dark")}
@@ -1112,7 +1121,7 @@ export function AppShell() {
             <Button
               variant="ghost"
               size="sm"
-              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-white hover:bg-white/10 hover:text-white"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
