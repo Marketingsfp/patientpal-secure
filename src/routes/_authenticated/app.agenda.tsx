@@ -2184,6 +2184,23 @@ function AgendaPage() {
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
   /**
+   * Fecha o aviso do convênio e devolve o foco para a escolha da forma de
+   * pagamento (sem perder nada do que já foi preenchido). Em avisos de
+   * bloqueio/atraso (tom "error") apenas fecha, sem reabrir a cobrança.
+   */
+  const fecharAvisoConvenio = useCallback(() => {
+    const reabrirPagamento = avisoConvenio?.tom !== "error" && formaPagCtx !== null;
+    setAvisoConvenio(null);
+    if (!reabrirPagamento) return;
+    setFormaPagOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const alvo = document.querySelector<HTMLElement>("[data-forma-pag-opcao]");
+        alvo?.focus();
+      });
+    });
+  }, [avisoConvenio, formaPagCtx]);
+  /**
    * Fator de desconto do convênio apurado na cobrança atual, por item do
    * orçamento e forma de pagamento. Usado para ajustar sinal/saldo e a baixa
    * do item depois que o pagamento é gravado.
