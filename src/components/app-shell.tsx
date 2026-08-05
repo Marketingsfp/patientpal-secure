@@ -170,13 +170,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Operação",
     items: [
+      { to: "/app/painel", label: "Dashboard — Início", icon: LayoutDashboard },
       { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
       { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
       { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
       { to: "/app/caixa", label: "Caixa", icon: Wallet },
       { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
       { to: "/app/clientes", label: "Clientes", icon: Contact },
-      { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/painel-executivo", label: "Painel Executivo", icon: FileBarChart2 },
       { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
       { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
@@ -855,8 +855,8 @@ export function AppShell() {
               </Button>
             )}
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
-            {visibleNavRows.map((row) => {
+          <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto sidebar-scroll">
+            {visibleNavRows.map((row, rowIndex) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
                 if (!pathOk) return false;
@@ -869,7 +869,15 @@ export function AppShell() {
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
               const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
               return (
-                <div key={row.label} className="space-y-1">
+                <div
+                  key={row.label}
+                  className={cn(
+                    // Linhas divisórias: separa visualmente cada grupo do menu e,
+                    // dentro do grupo, cada item (linha sutil entre irmãos).
+                    "space-y-1 [&>*+*]:border-t [&>*+*]:border-white/15 [&>*+*]:pt-1",
+                    rowIndex > 0 && "mt-5 border-t border-white/15 pt-4",
+                  )}
+                >
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
@@ -1161,9 +1169,15 @@ export function AppShell() {
                 ClinicaOS
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-2 py-3 space-y-4">
-              {visibleNavRows.map((row) => (
-                <div key={row.label} className="space-y-1">
+            <nav className="px-2 py-3">
+              {visibleNavRows.map((row, rowIndex) => (
+                <div
+                  key={row.label}
+                  className={cn(
+                    "space-y-1 [&>a+a]:border-t [&>a+a]:border-white/10",
+                    rowIndex > 0 && "mt-4 border-t border-white/15 pt-3",
+                  )}
+                >
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
                     {row.label}
                   </div>
