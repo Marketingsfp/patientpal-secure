@@ -594,6 +594,29 @@ export function AppShell() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
+  // Resultado da busca do menu lateral (sem acento, case-insensitive).
+  const termoMenu = buscaMenu.trim();
+  const buscandoMenu = termoMenu.length > 0;
+  const searchedNavRows = useMemo(() => {
+    if (!buscandoMenu) return visibleNavRows;
+    const norm = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const alvo = norm(termoMenu);
+    return visibleNavRows
+      .map((row) => {
+        const items = row.items
+          .map((it) => {
+            if (!isParent(it)) return norm(it.label).includes(alvo) ? it : null;
+            if (norm(it.label).includes(alvo)) return it;
+            const children = it.children.filter((c) => norm(c.label).includes(alvo));
+            return children.length > 0 ? { ...it, children } : null;
+          })
+          .filter((it): it is NavItem => it !== null);
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+  }, [visibleNavRows, buscandoMenu, termoMenu]);
+
   // Solta um item do menu sobre outro do MESMO grupo: insere na posição do
   // alvo e salva a lista completa de chaves do grupo no perfil do usuário.
   const soltarItemMenu = (rowLabel: string, targetKey: string) => {
