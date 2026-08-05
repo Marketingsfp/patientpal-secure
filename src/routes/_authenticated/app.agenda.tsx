@@ -7401,7 +7401,7 @@ function AgendaPage() {
       <Dialog
         open={avisoConvenio !== null}
         onOpenChange={(o) => {
-          if (!o) setAvisoConvenio(null);
+          if (!o) fecharAvisoConvenio();
         }}
       >
         <DialogContent
@@ -7418,7 +7418,7 @@ function AgendaPage() {
           <div className="whitespace-pre-line text-sm leading-relaxed">{avisoConvenio?.mensagem}</div>
           <DialogFooter>
             <Button
-              onClick={() => setAvisoConvenio(null)}
+              onClick={fecharAvisoConvenio}
               variant={avisoConvenio?.tom === "error" ? "destructive" : "default"}
             >
               Entendi
