@@ -137,7 +137,7 @@ export function SessionCard({
   /**
    * Sprint 3 · S3-A — abre o prontuário/atendimento IA para o
    * primeiro agendamento da sessão. Reusa a rota já existente
-   * `/app/atendimento-ia/$agendamentoId` (mesma da Agenda Express).
+   * `/app/atendimento-ia/$agendamentoId`.
    */
   onOpenProntuario?: (agendamentoId: string) => void;
   /** Sprint 3 · S3-C — abre o modal de reagendamento desta sessão. */

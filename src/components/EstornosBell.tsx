@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,7 +29,9 @@ export function EstornosBell() {
   const [items, setItems] = useState<Solic[]>([]);
   const [open, setOpen] = useState(false);
 
-  const podeAprovar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  // Segue a matriz de Perfis de Acesso (módulo "financeiro"), não mais uma
+  // lista fixa de papéis.
+  const podeAprovar = usePodeEscrever("financeiro");
 
   const load = useCallback(async () => {
     if (!clinicaAtual) { setItems([]); return; }
@@ -103,8 +106,6 @@ export function EstornosBell() {
           variant="ghost"
           size="sm"
           className="h-9 w-9 p-0 rounded-full relative"
-          data-notifications-trigger
-          aria-label="Notificações"
           title={count > 0 ? `${count} solicitação(ões) de estorno` : "Notificações"}
         >
           <Bell className="h-4 w-4" />
@@ -148,7 +149,7 @@ export function EstornosBell() {
                 </div>
                 <div className="flex gap-1.5 pt-1">
                   {podeAprovar && (
-                    <Link to="/app/financeiro/atendimentos" onClick={() => setOpen(false)}>
+                    <Link to="/app/financeiro/estorno" onClick={() => setOpen(false)}>
                       <Button size="sm" variant="default" className="h-7 text-xs">
                         <ExternalLink className="h-3 w-3 mr-1" /> Abrir financeiro
                       </Button>

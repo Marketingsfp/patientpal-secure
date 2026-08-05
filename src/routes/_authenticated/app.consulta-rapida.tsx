@@ -20,6 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { getContextoClinica } from "@/lib/nina.functions";
 
 export const Route = createFileRoute("/_authenticated/app/consulta-rapida")({
@@ -72,6 +73,7 @@ const fmtMoney = (n: number) =>
 
 function ConsultaRapidaPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("consulta-rapida");
   const getCtx = useServerFn(getContextoClinica);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -118,6 +120,7 @@ function ConsultaRapidaPage() {
   };
   const saveProc = async (e: FormEvent) => {
     e.preventDefault();
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (!procForm.nome.trim()) { toast.error("Informe o nome."); return; }
     setSavingProc(true);
@@ -163,6 +166,7 @@ function ConsultaRapidaPage() {
   };
   const saveMed = async (e: FormEvent) => {
     e.preventDefault();
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (!medForm.nome.trim()) { toast.error("Informe o nome."); return; }
     setSavingMed(true);
@@ -249,11 +253,13 @@ function ConsultaRapidaPage() {
         </TabsList>
 
         <TabsContent value="medicos" className="mt-4">
-          <div className="mb-3 flex justify-end">
-            <Button size="sm" onClick={openNovoMed} className="gap-1">
-              <Plus className="h-4 w-4" /> Novo médico
-            </Button>
-          </div>
+          {podeEscrever && (
+            <div className="mb-3 flex justify-end">
+              <Button size="sm" onClick={openNovoMed} className="gap-1">
+                <Plus className="h-4 w-4" /> Novo médico
+              </Button>
+            </div>
+          )}
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : medicosFiltrados.length === 0 ? (
@@ -273,9 +279,11 @@ function ConsultaRapidaPage() {
                           CRM {m.crm}/{m.crm_uf}
                         </CardDescription>
                       </div>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => openEditMed(m)} title="Editar">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      {podeEscrever && (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => openEditMed(m)} title="Editar">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
@@ -306,11 +314,13 @@ function ConsultaRapidaPage() {
         </TabsContent>
 
         <TabsContent value="procs" className="mt-4">
-          <div className="mb-3 flex justify-end">
-            <Button size="sm" onClick={openNovoProc} className="gap-1">
-              <Plus className="h-4 w-4" /> Novo serviço
-            </Button>
-          </div>
+          {podeEscrever && (
+            <div className="mb-3 flex justify-end">
+              <Button size="sm" onClick={openNovoProc} className="gap-1">
+                <Plus className="h-4 w-4" /> Novo serviço
+              </Button>
+            </div>
+          )}
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : procsFiltrados.length === 0 ? (
@@ -342,9 +352,11 @@ function ConsultaRapidaPage() {
                           </div>
                           <div className="font-semibold">{fmtMoney(p.valor_cartao)}</div>
                         </div>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditProc(p)} title="Editar">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {podeEscrever && (
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditProc(p)} title="Editar">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     {p.preparo && (
@@ -390,7 +402,7 @@ function ConsultaRapidaPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Dinheiro (R$)</Label>
                 <CurrencyInput value={procForm.valor_dinheiro} onChange={(v) => setProcForm({ ...procForm, valor_dinheiro: v })} />
@@ -428,8 +440,8 @@ function ConsultaRapidaPage() {
               <Label>Nome *</Label>
               <Input value={medForm.nome} onChange={(e) => setMedForm({ ...medForm, nome: e.target.value })} required />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>CRM</Label>
                 <Input value={medForm.crm} onChange={(e) => setMedForm({ ...medForm, crm: e.target.value })} />
               </div>

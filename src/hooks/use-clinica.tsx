@@ -36,7 +36,7 @@ interface ClinicaContextValue {
   refresh: () => Promise<void>;
 }
 
-const ClinicaContext = createContext<ClinicaContextValue | undefined>(undefined);
+export const ClinicaContext = createContext<ClinicaContextValue | undefined>(undefined);
 const STORAGE_KEY = "clinica_atual_id";
 const TODAS_KEY = "clinica_modo_todas";
 const MEMBERSHIPS_CACHE_KEY = "clinica_memberships_cache_v1";

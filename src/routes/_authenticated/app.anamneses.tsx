@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/anamneses")({
   component: AnamnesePage,
@@ -17,6 +18,7 @@ interface Row { id: string; nome: string; descricao: string | null; perguntas: P
 interface Form { nome: string; descricao: string; perguntas: Pergunta[]; ativo: boolean; }
 
 function AnamnesePage() {
+  const podeEscrever = usePodeEscrever("anamneses");
   return (
     <SimpleCrud<Row, Form>
       table="anamnese_modelos"
@@ -26,6 +28,7 @@ function AnamnesePage() {
       icon={<ClipboardCheck className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}
       searchFields={["nome"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "qtd", header: "Perguntas", className: "w-28", render: r => (r.perguntas ?? []).length },

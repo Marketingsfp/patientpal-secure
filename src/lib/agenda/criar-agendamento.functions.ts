@@ -3,9 +3,9 @@
 //
 // Regras preservadas literalmente:
 //   1. Bloqueio de agendamento quando paciente não tem telefone/data_nascimento.
-//   2. Bloqueio quando médico não tem agenda aberta no dia (nenhum slot).
+//   2. Bloqueio quando médico/recurso de enfermagem não tem agenda aberta no dia (nenhum slot).
 //   3. Bloqueio quando não há slot `DISPONÍVEL` cobrindo o intervalo escolhido.
-//   4. Bypass de checagem de slot para recursos de enfermagem.
+//   4. (removido) Bypass de checagem de slot para recursos de enfermagem.
 //   5. Bloqueio por mensalidade vencida (cartão benefícios) quando
 //      tipo_atendimento = "convenio".
 //   6. INSERT em `agendamentos` (novo) OU UPDATE (edição).
@@ -17,10 +17,18 @@
 // inicio`, procedimento não-vazio, edição de agendamento pago, etc.)
 // permanecem inline no `submit` clássico — não são migradas nesta etapa.
 //
-// O caller é responsável por: montar o payload final, decidir se a checagem
-// de agenda/slot é necessária (`mudou_horario_ou_medico` && !recurso), fazer
-// toasts, controlar `setSaving`, invalidar queries e fechar o modal. Este
-// arquivo NÃO altera nenhum desses fluxos.
+// O caller é responsável por: montar o payload final, fazer toasts,
+// controlar `setSaving`, invalidar queries e fechar o modal. Este arquivo
+// NÃO altera nenhum desses fluxos.
+//
+// CRIT-04: a checagem de "esse horário está dentro do expediente?" NÃO é
+// mais decidida pelo caller (`checagens.validar_agenda_aberta` é ignorada
+// para esse fim) — o próprio servidor decide, comparando o payload contra
+// o que já está gravado no banco. Um caller que "esqueça" de pedir a
+// checagem não consegue mais burlar a validação.
+//
+// Recursos de enfermagem foram removidos do sistema — hoje só existe o
+// caminho `medico_id`.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -35,7 +43,6 @@ export type CriarAgendamentoInput = {
     paciente_nome: string;
     paciente_id: string | null;
     medico_id: string | null;
-    enfermagem_recurso_id: string | null;
     inicio: string;
     fim: string;
     procedimento: string | null;
@@ -44,15 +51,18 @@ export type CriarAgendamentoInput = {
     data_pagamento: string | null;
     orcamento_id: string | null;
     tipo_atendimento: "particular" | "convenio";
+    forma_pagamento_prevista: string | null;
+    especialidade_id?: string | null;
   };
   procedimentos?: string[];
   multi_exames_modo?: "laboratorio" | "imagem" | null;
-  // Checagens que consultam o banco — o caller diz se devem rodar (mantém a
-  // mesma gate do submit clássico, que só valida agenda quando mudou o
-  // horário/médico e o médico não é recurso).
+  // Checagens que consultam o banco.
   checagens: {
     validar_paciente_completo: boolean; // sempre true na clássica
-    validar_agenda_aberta: boolean;     // form.medico_id && mudouHorarioOuMedico && !ehRecurso
+    // Mantido por compatibilidade — NÃO é mais usado para decidir se a
+    // checagem de agenda/slot roda (CRIT-04). O servidor decide sozinho;
+    // ver criarAgendamento.handler.
+    validar_agenda_aberta: boolean;
     validar_inadimplencia: boolean;     // paciente_id && tipo_atendimento === "convenio"
   };
   pending_orc_item_ids: string[];
@@ -120,6 +130,23 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       .filter(Boolean)));
     const multiModo = procedimentos.length > 1 ? data.multi_exames_modo ?? null : null;
 
+    // ---------- 0. Procedimento obrigatório (2026-07-16) ----------
+    // Vale para agendamentos de paciente real (paciente_id preenchido).
+    // Slots operacionais (DISPONÍVEL/BLOQUEIO) não têm paciente_id e ficam
+    // fora dessa checagem.
+    if (payload.paciente_id) {
+      const textoPayload = String(payload.procedimento ?? "").trim();
+      const temProcedimentoNaLista = procedimentos.length > 0;
+      if (!textoPayload && !temProcedimentoNaLista) {
+        return {
+          ok: false,
+          validation_error: {
+            message: "Selecione o procedimento antes de salvar o agendamento.",
+          },
+        };
+      }
+    }
+
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
     if (checagens.validar_paciente_completo && payload.paciente_id) {
       const { data: pacCheck } = await supabase
@@ -140,8 +167,97 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       }
     }
 
+    // Snapshot do próprio slot (paciente_nome) no momento da validação — usado
+    // logo abaixo como trava otimista no UPDATE, para fechar a janela entre
+    // "validei que está livre" e "gravei o agendamento" onde dois operadores
+    // simultâneos poderiam consumir o mesmo horário (um sobrescreveria o
+    // outro silenciosamente, sem erro).
+    let slotPacienteNomeNaValidacao: string | null = null;
+
+    // CRIT-04 + ALTA (recursos de enfermagem): antes o CALLER decidia (via
+    // checagens.validar_agenda_aberta) se a checagem "esse horário está
+    // dentro do expediente?" rodava — bastava não setar essa flag para
+    // criar/mover um agendamento para qualquer horário sem o servidor
+    // nunca conferir. E a checagem SÓ existia para médico: agendamentos de
+    // recurso de enfermagem (salas/equipamentos, que também têm horários
+    // pré-gerados como "DISPONÍVEL") pulavam a checagem de conflito por
+    // completo — dois pacientes podiam cair no mesmo recurso/horário sem
+    // erro nenhum, e sem a trava otimista contra corrida (que depende desta
+    // mesma checagem ter rodado).
+    //
+    // Agora quem decide é o próprio servidor, para os dois casos: roda
+    // sempre que há médico OU recurso de enfermagem, e o recurso/horário
+    // está de fato mudando — comparado ao que já está GRAVADO no banco,
+    // nunca ao que o caller alega em `checagens`.
+    const recursoField: "medico_id" | null = payload.medico_id ? "medico_id" : null;
+    const recursoId = payload.medico_id;
+
+    // Uma única leitura do registro atual (edição) — usada para decidir se
+    // agenda/paciente/horário estão de fato mudando, servindo às duas
+    // checagens abaixo (MED-03) e à de recurso mais adiante.
+    const atual = editing_id
+      ? (await supabase
+          .from("agendamentos")
+          .select("medico_id, paciente_id, inicio, fim")
+          .eq("id", editing_id)
+          .maybeSingle()).data
+      : null;
+    const horarioMudou = !editing_id || !atual
+      || new Date(atual.inicio).getTime() !== new Date(payload.inicio).getTime()
+      || new Date(atual.fim).getTime() !== new Date(payload.fim).getTime();
+
+    let precisaValidarAgenda = false;
+    if (recursoField && recursoId) {
+      if (!editing_id || !atual) {
+        // Criação nova (ou registro atual não encontrado): sempre precisa
+        // validar — falha fechado, não aberto.
+        precisaValidarAgenda = true;
+      } else {
+        const atualRecursoId = atual.medico_id;
+        precisaValidarAgenda = atualRecursoId !== recursoId || horarioMudou;
+      }
+    }
+
+    // MED-03: nada conferia se o PACIENTE já tinha outro agendamento
+    // (com qualquer médico/recurso) no mesmo horário, nem bloqueava criar
+    // um agendamento numa data já passada — em nenhuma das telas, porque
+    // essa checagem nunca existiu neste ponto único e compartilhado.
+    if (horarioMudou) {
+      const hojeInicio = new Date();
+      hojeInicio.setHours(0, 0, 0, 0);
+      if (new Date(payload.inicio).getTime() < hojeInicio.getTime()) {
+        return {
+          ok: false,
+          validation_error: {
+            message: "Não é possível criar ou mover um agendamento para uma data que já passou.",
+          },
+        };
+      }
+    }
+    const pacienteOuHorarioMudou = horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
+    if (payload.paciente_id && pacienteOuHorarioMudou) {
+      const { data: conflitos } = await supabase
+        .from("agendamentos")
+        .select("id, inicio")
+        .eq("clinica_id", clinica_id)
+        .eq("paciente_id", payload.paciente_id)
+        .neq("status", "cancelado")
+        .lt("inicio", payload.fim)
+        .gt("fim", payload.inicio);
+      const conflito = (conflitos ?? []).find((c) => c.id !== editing_id);
+      if (conflito) {
+        return {
+          ok: false,
+          validation_error: {
+            message: `Este paciente já tem outro agendamento nesse horário (${new Date(conflito.inicio).toLocaleString("pt-BR")}). Escolha outro horário ou cancele o conflito primeiro.`,
+          },
+        };
+      }
+    }
+
     // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo (2440-2478) ----------
-    if (checagens.validar_agenda_aberta && payload.medico_id) {
+    if (precisaValidarAgenda && recursoField && recursoId) {
+      const rotuloRecurso = "médico";
       const di = new Date(payload.inicio);
       const df = new Date(payload.fim);
       const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
@@ -150,17 +266,20 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         .from("agendamentos")
         .select("id,paciente_nome,inicio,fim", { count: "exact", head: false })
         .eq("clinica_id", clinica_id)
-        .eq("medico_id", payload.medico_id)
+        .eq(recursoField, recursoId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia)
         .limit(500);
       const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
+      if (editing_id) {
+        slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
+      }
       const excluindoEditing = editing_id ? lista.filter((x) => x.id !== editing_id) : lista;
       if (excluindoEditing.length === 0) {
         return {
           ok: false,
           validation_error: {
-            message: "Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.",
+            message: `Este ${rotuloRecurso} não tem agenda aberta nessa data. Gere os horários antes de agendar.`,
           },
         };
       }
@@ -176,7 +295,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         return {
           ok: false,
           validation_error: {
-            message: "Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.",
+            message: `Não há horário livre desse ${rotuloRecurso} cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários.`,
           },
         };
       }
@@ -206,74 +325,96 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
     let siblingIds: string[] = [];
-    if (editing_id) {
-      if (multiModo === "imagem") {
-        const [primeiro, ...restantes] = procedimentos;
-        const { error } = await supabase
-          .from("agendamentos")
-          .update({ ...payload, procedimento: primeiro })
-          .eq("id", editing_id);
-        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-        if (restantes.length > 0) {
-          const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
-          const { data: novosIrmaos, error: insertError } = await supabase
-            .from("agendamentos")
-            .insert(rows)
-            .select("id");
-          if (insertError) return { ok: false, pg_error: toPgErrorLikeLocal(insertError) };
-          siblingIds = ((novosIrmaos ?? []) as Array<{ id: string }>).map((r) => r.id);
-        }
-      } else {
-        const payloadEdicao = multiModo === "laboratorio"
-        ? { ...payload, procedimento: procedimentos.join(" + ") }
-        : payload;
-        const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
-        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+    // Erro de conflito compartilhado pelos dois ramos de UPDATE abaixo: a
+    // condição extra .eq("paciente_nome", snapshot) faz o UPDATE não casar
+    // nenhuma linha se outro operador já ocupou este exato horário entre a
+    // validação (passo 2/3/4) e este ponto — sem isso, o segundo UPDATE
+    // simplesmente sobrescrevia o primeiro paciente em silêncio.
+    const conflitoDeSlot: CriarAgendamentoResult = {
+      ok: false,
+      validation_error: {
+        message: "Este horário acabou de ser ocupado por outro atendimento. Atualize a agenda e escolha outro horário.",
+      },
+    };
+    if (multiModo === "imagem") {
+      // Principal (UPDATE ou INSERT) + irmãos (INSERT) numa única transação
+      // (RPC) — antes eram passos separados: se a inserção dos irmãos
+      // falhasse depois do UPDATE do principal já commitado, o agendamento
+      // principal ficava alterado sozinho, sem os irmãos. A RPC também
+      // grava atendimento_grupo_id em todas as linhas, vinculando o
+      // multi-exame como um grupo (antes não havia vínculo nenhum entre
+      // as linhas irmãs).
+      const grupoId = (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.()
+        ?? Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
+      const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_multi_imagem", {
+        _editing_id: editing_id,
+        _clinica_id: clinica_id,
+        _paciente_id: payload.paciente_id,
+        _paciente_nome: payload.paciente_nome,
+        _medico_id: payload.medico_id,
+        _inicio: payload.inicio,
+        _fim: payload.fim,
+        _procedimentos: procedimentos,
+        _status: payload.status,
+        _observacoes: payload.observacoes,
+        _data_pagamento: payload.data_pagamento,
+        _orcamento_id: payload.orcamento_id,
+        _tipo_atendimento: payload.tipo_atendimento,
+        _forma_pagamento_prevista: payload.forma_pagamento_prevista,
+        _especialidade_id: payload.especialidade_id ?? null,
+        _grupo_id: grupoId,
+        _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+        _orcamento_item_ids: pending_orc_item_ids,
+      } as never);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") return conflitoDeSlot;
+        return { ok: false, pg_error: toPgErrorLikeLocal(error) };
       }
-    } else if (multiModo === "imagem") {
-      const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
-      const { data: novos, error } = await supabase
-        .from("agendamentos")
-        .insert(rows)
-        .select("id")
-        .limit(procedimentos.length);
-      if (error || !novos || novos.length === 0) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-      const ids = (novos as Array<{ id: string }>).map((r) => r.id);
-      novoId = ids[0];
-      siblingIds = ids.slice(1);
+      const resultado = (rpcData ?? {}) as { principal_id?: string; sibling_ids?: string[] };
+      if (!resultado.principal_id) {
+        return { ok: false, pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar multi-exame.")) };
+      }
+      novoId = resultado.principal_id;
+      siblingIds = resultado.sibling_ids ?? [];
     } else {
-      const payloadNovo = multiModo === "laboratorio"
-        ? { ...payload, procedimento: procedimentos.join(" + ") }
-        : payload;
-      const { data: novo, error } = await supabase
-        .from("agendamentos")
-        .insert(payloadNovo)
-        .select("id")
-        .single();
-      if (error || !novo) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-      novoId = novo.id;
-    }
-
-    // ---------- 7. Vínculos com agendamento_orcamento_itens (2530-2550) ----------
-    let vinculo_warning: { pg_error: PgErrorLike } | undefined;
-    if (payload.orcamento_id && novoId && pending_orc_item_ids.length > 0) {
-      const vinculos = pending_orc_item_ids.map((itemId) => ({
-        clinica_id,
-        agendamento_id: novoId!,
-        orcamento_id: payload.orcamento_id!,
-        orcamento_item_id: itemId,
-      }));
-      if (editing_id) {
-        await supabase
-          .from("agendamento_orcamento_itens")
-          .delete()
-          .eq("agendamento_id", editing_id);
+      // ALTA-12: antes o vínculo com agendamento_orcamento_itens (passo 7)
+      // rodava DEPOIS de já ter salvo o agendamento, como passo separado —
+      // se falhasse, o agendamento ficava criado (sucesso!) mas os itens do
+      // orçamento ficavam órfãos, nunca marcados como agendados/cobrados, e
+      // o erro virava só um aviso fácil de ignorar (vinculo_warning). A RPC
+      // agora grava agendamento + vínculo na MESMA transação.
+      const procedimentoFinal = multiModo === "laboratorio"
+        ? procedimentos.join(" + ")
+        : payload.procedimento;
+      const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_e_vincular_orcamento", {
+        _editing_id: editing_id,
+        _clinica_id: clinica_id,
+        _paciente_id: payload.paciente_id,
+        _paciente_nome: payload.paciente_nome,
+        _medico_id: payload.medico_id,
+        _inicio: payload.inicio,
+        _fim: payload.fim,
+        _procedimento: procedimentoFinal,
+        _status: payload.status,
+        _observacoes: payload.observacoes,
+        _data_pagamento: payload.data_pagamento,
+        _orcamento_id: payload.orcamento_id,
+        _tipo_atendimento: payload.tipo_atendimento,
+        _forma_pagamento_prevista: payload.forma_pagamento_prevista,
+        _especialidade_id: payload.especialidade_id ?? null,
+        _orcamento_item_ids: pending_orc_item_ids,
+        _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      } as never);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") return conflitoDeSlot;
+        return { ok: false, pg_error: toPgErrorLikeLocal(error) };
       }
-      const { error: vErr } = await supabase
-        .from("agendamento_orcamento_itens")
-        .insert(vinculos as never);
-      if (vErr) vinculo_warning = { pg_error: toPgErrorLikeLocal(vErr) };
+      const resultado = (rpcData ?? {}) as { id?: string };
+      if (!resultado.id) {
+        return { ok: false, pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar agendamento.")) };
+      }
+      novoId = resultado.id;
     }
 
-    return { ok: true, id: novoId!, sibling_ids: siblingIds, vinculo_warning };
+    return { ok: true, id: novoId!, sibling_ids: siblingIds };
   });

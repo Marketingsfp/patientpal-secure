@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-segmentos")({
   component: SegmentosPageWithTabs,
@@ -15,6 +16,7 @@ interface Row { id: string; nome: string; descricao: string | null; filtros: Rec
 interface Form { nome: string; descricao: string; filtros: string; }
 
 function SegmentosPage() {
+  const podeEscrever = usePodeEscrever("mkt-segmentos");
   return (
     <SimpleCrud<Row, Form>
       table="mkt_segmentos"
@@ -23,6 +25,7 @@ function SegmentosPage() {
       subtitle="Públicos salvos para campanhas — defina filtros em JSON."
       icon={<Filter className="h-6 w-6 text-primary" />}
       searchFields={["nome"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "desc", header: "Descrição", render: r => <span className="text-sm text-muted-foreground">{r.descricao ?? "—"}</span> },

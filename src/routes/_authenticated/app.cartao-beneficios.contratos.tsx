@@ -10,5 +10,5 @@ export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/cont
 
 function RouteComponent() {
   const { contratoId } = Route.useSearch();
-  return <ContratosPage initialContratoId={contratoId} />;
+  return <ContratosPage initialContratoId={contratoId} modulo="cartao-beneficios" />;
 }

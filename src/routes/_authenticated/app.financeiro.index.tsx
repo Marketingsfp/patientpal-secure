@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/")({
 
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [stats, setStats] = useState({ receitas: 0, despesas: 0, repasse: 0, cartaoConsulta: 0, consultaPart: 0, exames: 0 });
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
@@ -70,14 +72,16 @@ function FinDashboard() {
           <h1 className="text-2xl font-semibold">Financeiro — {clinicaAtual?.clinica.nome}</h1>
           <p className="text-sm text-muted-foreground">Visão geral do período</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <Plus className="h-4 w-4 mr-1" /> Receita
-          </Button>
-          <Button onClick={() => setOpen("despesa")} variant="destructive">
-            <Minus className="h-4 w-4 mr-1" /> Despesa
-          </Button>
-        </div>
+        {podeEscrever && (
+          <div className="flex gap-2">
+            <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-1" /> Receita
+            </Button>
+            <Button onClick={() => setOpen("despesa")} variant="destructive">
+              <Minus className="h-4 w-4 mr-1" /> Despesa
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -188,13 +192,13 @@ function KpiCard({ icon: Icon, label, value, accent, onClick }: { icon: React.El
   const colorMap = { primary: "text-primary bg-primary/10", success: "text-success bg-success/10", destructive: "text-destructive bg-destructive/10", warning: "text-warning bg-warning/10" };
   return (
     <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}>
-      <CardContent className="pt-6 flex items-center gap-4">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${colorMap[accent]}`}>
+      <CardContent className="pt-6 flex items-center gap-3">
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${colorMap[accent]}`}>
           <Icon className="h-6 w-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="text-2xl font-semibold truncate">{value}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-tight line-clamp-2">{label}</p>
+          <p className="mt-1 text-lg xl:text-xl font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight" title={value}>{value}</p>
         </div>
       </CardContent>
     </Card>

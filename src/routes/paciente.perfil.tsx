@@ -119,11 +119,11 @@ function PerfilPage() {
                 <div className="space-y-1"><Label>Telefone</Label><Input value={p.telefone ?? ""} onChange={e => update(idx, { telefone: e.target.value })} /></div>
                 <div className="space-y-1"><Label>CEP</Label><Input value={p.cep ?? ""} onChange={e => update(idx, { cep: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 col-span-2"><Label>Logradouro</Label><Input value={p.logradouro ?? ""} onChange={e => update(idx, { logradouro: e.target.value })} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1 sm:col-span-2"><Label>Logradouro</Label><Input value={p.logradouro ?? ""} onChange={e => update(idx, { logradouro: e.target.value })} /></div>
                 <div className="space-y-1"><Label>Número</Label><Input value={p.numero ?? ""} onChange={e => update(idx, { numero: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1"><Label>Bairro</Label><Input value={p.bairro ?? ""} onChange={e => update(idx, { bairro: e.target.value })} /></div>
                 <div className="space-y-1"><Label>Cidade</Label><Input value={p.cidade ?? ""} onChange={e => update(idx, { cidade: e.target.value })} /></div>
                 <div className="space-y-1"><Label>UF</Label><Input value={p.estado ?? ""} maxLength={2} onChange={e => update(idx, { estado: e.target.value.toUpperCase() })} /></div>

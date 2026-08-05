@@ -6,13 +6,16 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
+import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -26,7 +29,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
@@ -61,6 +64,7 @@ interface Procedimento {
   permite_venda_direta?: boolean | null;
   permite_encaixe?: boolean | null;
   tempo_padrao_min?: number | null;
+  valor_variavel?: boolean | null;
 }
 interface Cartao {
   id: string;
@@ -69,7 +73,14 @@ interface Cartao {
   percentual_desconto: number;
   ativo: boolean;
 }
-interface CbConvenio { id: string; nome: string; ativo: boolean }
+interface CbConvenio {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  acrescimo_cartao_modo?: "percentual" | "valor_fixo" | null;
+  acrescimo_cartao_percentual?: number | null;
+  acrescimo_cartao_valor?: number | null;
+}
 interface ConvValor { valor_dinheiro: number; valor_outros: number }
 interface CbConvenioRegra {
   id: string;
@@ -97,7 +108,7 @@ const EMPTY = {
   valor_cartao_consulta: "0", valor_cartao_desconto: "0",
   duracao_minutos: "30", observacoes: "", preparo: "", ativo: true,
   // Regras do procedimento (arquitetura de plataforma — fn_regras_procedimento)
-  fluxo_atendimento: "consulta_padrao",
+  fluxo_atendimento: "consulta_medica",
   agenda_obrigatoria: true,
   medico_obrigatorio: false,
   sala_obrigatoria: false,
@@ -105,6 +116,7 @@ const EMPTY = {
   permite_venda_direta: false,
   permite_encaixe: true,
   tempo_padrao_min: "30",
+  valor_variavel: false,
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -327,6 +339,7 @@ const PACOTES_EXAMES: PacoteExames[] = [
 
 function ProcedimentosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("procedimentos");
 
   // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
@@ -458,7 +471,7 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     const { data, error } = await (supabase as any)
       .from("cb_convenios")
-      .select("id,nome,ativo")
+      .select("id,nome,ativo,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
@@ -530,7 +543,11 @@ function ProcedimentosPage() {
         const r = findRegra(regrasDoConv, espId, form.tipo, editing?.id ?? null);
         const calc = computeValor(r, baseDin, baseOut);
         if (calc) {
-          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
+          const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
+            ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
+            : null;
+          const outrosAcr = applyAcrescimoCartao(calc.outros, acr, c.nome);
+          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: outrosAcr.toFixed(2) };
         } else if (!prev[c.id]) {
           next[c.id] = { dinheiro: "0", outros: "0" };
         }
@@ -606,7 +623,12 @@ function ProcedimentosPage() {
       Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
       Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0),
     );
-    if (calculado) return { valor_dinheiro: calculado.dinheiro, valor_outros: calculado.outros };
+    if (calculado) {
+      const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
+        ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
+        : null;
+      return { valor_dinheiro: calculado.dinheiro, valor_outros: applyAcrescimoCartao(calculado.outros, acr, c.nome) };
+    }
     return salvo ?? { valor_dinheiro: 0, valor_outros: 0 };
   };
 
@@ -690,7 +712,7 @@ function ProcedimentosPage() {
       valor_cartao_consulta: String(p.valor_cartao_consulta ?? 0),
       valor_cartao_desconto: String(p.valor_cartao_desconto ?? 0),
       duracao_minutos: String(p.duracao_minutos), observacoes: p.observacoes ?? "", preparo: p.preparo ?? "", ativo: p.ativo,
-      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_padrao",
+      fluxo_atendimento: p.fluxo_atendimento ?? "consulta_medica",
       agenda_obrigatoria: p.agenda_obrigatoria ?? true,
       medico_obrigatorio: p.medico_obrigatorio ?? false,
       sala_obrigatoria: p.sala_obrigatoria ?? false,
@@ -698,6 +720,7 @@ function ProcedimentosPage() {
       permite_venda_direta: p.permite_venda_direta ?? false,
       permite_encaixe: p.permite_encaixe ?? true,
       tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
+      valor_variavel: !!p.valor_variavel,
     });
     setOpen(true);
   };
@@ -705,9 +728,11 @@ function ProcedimentosPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
-    const vDinheiro = Number(form.valor_dinheiro) || 0;
-    const vCartao = Number(form.valor_pix_cartao) || 0;
+    const isVariavel = !!form.valor_variavel;
+    const vDinheiro = isVariavel ? 0 : (Number(form.valor_dinheiro) || 0);
+    const vCartao = isVariavel ? 0 : (Number(form.valor_pix_cartao) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: form.nome.trim(),
@@ -721,12 +746,13 @@ function ProcedimentosPage() {
       valor_cartao_credito: vCartao,
       valor_cartao_debito: vCartao,
       valor_cartao: vCartao, // legado
-      valor_cartao_consulta: Number(form.valor_cartao_consulta) || 0,
-      valor_cartao_desconto: Number(form.valor_cartao_desconto) || 0,
+      valor_cartao_consulta: isVariavel ? 0 : (Number(form.valor_cartao_consulta) || 0),
+      valor_cartao_desconto: isVariavel ? 0 : (Number(form.valor_cartao_desconto) || 0),
       duracao_minutos: Math.max(0, Number(form.duracao_minutos) || 0),
       observacoes: form.observacoes.trim() || null,
       preparo: form.preparo.trim() || null,
       ativo: form.ativo,
+      valor_variavel: isVariavel,
       // Regras do procedimento (configuração > código)
       fluxo_atendimento: form.fluxo_atendimento || null,
       agenda_obrigatoria: !!form.agenda_obrigatoria,
@@ -766,6 +792,7 @@ function ProcedimentosPage() {
 
   const executarSalvar = async (payload: any) => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     let procId = editing?.id;
     if (editing) {
@@ -804,6 +831,10 @@ function ProcedimentosPage() {
             convenio_id: c.id,
             valor_dinheiro: Number(v.dinheiro) || 0,
             valor_outros: Number(v.outros) || 0,
+            // Digitado à mão no cadastro do serviço — "Reaplicar regras" (cartão
+            // benefícios) preserva linhas origem='manual' e só limpa/recalcula
+            // as origem='regra'.
+            origem: "manual",
           };
         });
       const { error: errConv } = await (supabase as any)
@@ -814,21 +845,25 @@ function ProcedimentosPage() {
     setSaving(false);
     toast.success(editing ? "Atualizado." : "Cadastrado.");
     setOpen(false);
+    invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
     void loadVincEsp();
     void loadConvValores();
   };
 
   const onDelete = async (p: Procedimento) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir ${p.nome}?`)) return;
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
+    if (clinicaAtual) invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
   };
 
   const seedPacote = async (pacote: PacoteExames) => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSeeding(true);
     const { data: existentes } = await supabase
       .from("procedimentos")
@@ -920,29 +955,31 @@ function ProcedimentosPage() {
       {/* ============ SERVIÇOS (unificado) ============ */}
       <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={seeding}>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {seeding ? "Cadastrando…" : "Carregar pacote de exames"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>Pacotes prontos</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {PACOTES_EXAMES.map(p => (
-                  <DropdownMenuItem key={p.id} onClick={() => seedPacote(p)}>
-                    <span className="font-medium">{p.label}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">{p.itens.length}</span>
+            {podeEscrever && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={seeding}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {seeding ? "Cadastrando…" : "Carregar pacote de exames"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Pacotes prontos</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PACOTES_EXAMES.map(p => (
+                    <DropdownMenuItem key={p.id} onClick={() => seedPacote(p)}>
+                      <span className="font-medium">{p.label}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">{p.itens.length}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={seedTodosPacotes}>
+                    <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                    Carregar todos os pacotes
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={seedTodosPacotes}>
-                  <Sparkles className="h-4 w-4 mr-2 text-primary" />
-                  Carregar todos os pacotes
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button
               variant="outline"
               onClick={() => {
@@ -976,7 +1013,9 @@ function ProcedimentosPage() {
             >
               <Download className="h-4 w-4 mr-2" /> Exportar Excel
             </Button>
-            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+            {podeEscrever && (
+              <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+            )}
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
@@ -1071,12 +1110,23 @@ function ProcedimentosPage() {
                       <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>{tipoLabel(p.tipo)}</span>
                     </TableCell>
                     <TableCell className="font-medium">{p.nome}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">Variável</span>
+                        : fmtBRL(Number(p.valor_dinheiro ?? p.valor_dinheiro_pix))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.valor_variavel
+                        ? <span className="text-muted-foreground">—</span>
+                        : fmtBRL(Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao))}
+                    </TableCell>
                     {convenios.map(c => {
                       const v = getConvValorExibicao(p, c);
                       return (
                         <TableCell key={c.id} className="text-right tabular-nums">
+                          {p.valor_variavel ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
                           <div className="leading-tight">
                             <div title={`Dinheiro: ${fmtBRL(v.valor_dinheiro)}`}>
                               <span className="text-muted-foreground mr-1">D</span>{fmtBRL(v.valor_dinheiro)}
@@ -1085,6 +1135,7 @@ function ProcedimentosPage() {
                               <span className="mr-1">C</span>{fmtBRL(v.valor_outros)}
                             </div>
                           </div>
+                          )}
                         </TableCell>
                       );
                     })}
@@ -1094,8 +1145,12 @@ function ProcedimentosPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(p)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      {podeEscrever && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(p)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1161,15 +1216,15 @@ function ProcedimentosPage() {
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[95vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0 bg-background">
             <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
-            <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2">
+          <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+            <div className="space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4 flex-1 min-h-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Nome *</Label>
                 <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
               </div>
@@ -1178,8 +1233,8 @@ function ProcedimentosPage() {
                 <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} placeholder="TUSS" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
                 <Label>Especialidade</Label>
                 <Select
                   value={grupoSelecionadoKey}
@@ -1244,23 +1299,39 @@ function ProcedimentosPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Valores por forma de pagamento</p>
+                  {form.valor_variavel && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Valor variável ativo — o valor será informado na hora da cobrança.
+                    </p>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Switch
+                    checked={!!form.valor_variavel}
+                    onCheckedChange={(v) => setForm({ ...form, valor_variavel: !!v })}
+                  />
+                  <span className="font-medium">Valor variável</span>
+                </label>
+              </div>
+              <div className={`grid grid-cols-2 gap-3 ${form.valor_variavel ? "opacity-50 pointer-events-none" : ""}`}>
                 <div className="space-y-1">
                   <Label>Dinheiro (R$)</Label>
-                  <CurrencyInput value={form.valor_dinheiro}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_dinheiro} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_dinheiro: v })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Pix / Débito / Crédito (R$)</Label>
-                  <CurrencyInput value={form.valor_pix_cartao}
+                  <CurrencyInput value={form.valor_variavel ? "0" : form.valor_pix_cartao} disabled={form.valor_variavel}
                     onChange={(v) => setForm({ ...form, valor_pix_cartao: v })} />
                   <p className="text-[10px] text-muted-foreground">Mesmo valor para Pix, Cartão de Débito e Crédito.</p>
                 </div>
               </div>
             </div>
 
-            {convenios.length > 0 && (
+            {convenios.length > 0 && !form.valor_variavel && (
               <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase">Valores por convênio (Cartão Benefícios)</p>
                 <div className="space-y-3">
@@ -1334,13 +1405,12 @@ function ProcedimentosPage() {
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="consulta_padrao">Consulta padrão (com médico)</SelectItem>
-                      <SelectItem value="exame_com_laudo">Exame com laudo</SelectItem>
-                      <SelectItem value="exame_sem_laudo">Exame sem laudo</SelectItem>
-                      <SelectItem value="procedimento_enfermagem">Procedimento de enfermagem</SelectItem>
-                      <SelectItem value="laboratorio">Coleta laboratorial</SelectItem>
-                      <SelectItem value="entrega_domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
-                      <SelectItem value="balcao">Venda de balcão</SelectItem>
+                      <SelectItem value="consulta_medica">Consulta padrão (com médico)</SelectItem>
+                      <SelectItem value="exame_agendado">Exame com laudo</SelectItem>
+                      <SelectItem value="equipamento">Exame sem laudo</SelectItem>
+                      <SelectItem value="lab_agendado">Coleta laboratorial</SelectItem>
+                      <SelectItem value="domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
+                      <SelectItem value="venda_balcao">Venda de balcão</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1419,7 +1489,7 @@ function ProcedimentosPage() {
               </p>
             </div>
             </div>
-            <DialogFooter className="bg-background border-t px-6 py-3">
+            <DialogFooter className="bg-background border-t px-6 py-3 shrink-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>

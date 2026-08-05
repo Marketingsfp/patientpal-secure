@@ -15,14 +15,38 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
 
+// A receita já foi gravada (RPC atômica) quando o split é calculado — não dá
+// para desfazer retroativamente. Se o split falhar, deixamos uma pendência
+// visível e persistente no próprio lançamento (em vez de só console.error),
+// para o financeiro encontrar e recalcular depois.
+async function marcarSplitPendente(lancamentoId: string, motivo: string) {
+  const { data: atual } = await supabase
+    .from("fin_lancamentos")
+    .select("observacoes")
+    .eq("id", lancamentoId)
+    .maybeSingle();
+  const obsAtual = (atual as { observacoes: string | null } | null)?.observacoes ?? "";
+  const marcador = `[SPLIT PENDENTE — recalcular divisão de repasse] ${motivo}`.trim();
+  const novaObs = [obsAtual, marcador].filter(Boolean).join(" | ");
+  await supabase
+    .from("fin_lancamentos")
+    .update({ observacoes: novaObs } as never)
+    .eq("id", lancamentoId);
+}
+
 export interface LancamentoSavedData {
+  lancamento_id: string;
   valor: number;
   forma_pagamento: string | null;
   parcelas: number | null;
   bandeira_cartao: string | null;
   emitir_nfse: boolean;
+  /** Data (YYYY-MM-DD) escolhida no diálogo — permite que quem chama repasse
+   *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
+  data: string;
   pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
 }
 
@@ -63,7 +87,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [saving, setSaving] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
-  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string }>>([
+  const [pagamentos, setPagamentos] = useState<Array<{ forma: string; recebido: string; bandeira?: string; parcelas?: string }>>([
     { forma: "dinheiro", recebido: "" },
   ]);
   // ----- Desconto (apenas para gerente/admin/financeiro) -----
@@ -75,6 +99,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  // ----- Cortesia (categoria especial: exige justificativa + supervisor) -----
+  const [cortesiaJustificativa, setCortesiaJustificativa] = useState("");
+  // Marca a intenção da autenticação do supervisor: "desconto" | "cortesia"
+  const [authIntent, setAuthIntent] = useState<"desconto" | "cortesia">("desconto");
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -97,7 +125,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
     setSupervisorInfo(null); setSupervisorOpen(false);
+    setCortesiaJustificativa(""); setAuthIntent("desconto");
     setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
+    // Reset dos campos de pagamento: evita que estado remanescente de uma
+    // abertura anterior (ex.: linhas mistas sem bandeira, bandeira já
+    // preenchida em outro atendimento) bloqueie o Save do próximo pagamento.
+    setBandeiraCartao("");
+    setParcelas("1");
+    setValorRecebido("");
+    setPagamentoMisto(false);
+    setPagamentos([{ forma: "dinheiro", recebido: "" }]);
+    setEmitirNfse(false);
+    setObservacoes("");
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -105,6 +144,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       } else {
         setFormaPagamento(initialFormaPagamento);
       }
+    } else {
+      setFormaPagamento("");
     }
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
@@ -242,6 +283,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     boleto: "Boleto",
     convenio: "Convênio",
     transferencia: "Transferência",
+    manual: "Manual",
   };
 
   const handleSave = async () => {
@@ -253,6 +295,32 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (valorNum <= 0) {
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
+    }
+    // Forma de pagamento é obrigatória para receitas fora do fluxo "misto"
+    // (que já valida a soma das linhas mais abaixo). Sem essa checagem, o
+    // fluxo de "Valor manual" da agenda (que abre este diálogo com a forma
+    // propositalmente em branco) permitia salvar com forma_pagamento NULL —
+    // a guia impressa então caía num fallback "DINHEIRO" mesmo quando o
+    // pagamento real foi em débito/pix/etc, divergindo do que de fato ocorreu.
+    if (tipo === "receita" && !pagamentoMisto && !formaPagamento) {
+      toast.error("Selecione a forma de pagamento.");
+      return;
+    }
+    // ----- Cortesia: exige justificativa + autorização de supervisor -----
+    const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    if (ehCortesia) {
+      if (!cortesiaJustificativa.trim()) {
+        toast.error("Informe a justificativa da cortesia.");
+        return;
+      }
+      if (!ehSupervisor && !supervisorInfo) {
+        toast.error("É necessária a autorização de um supervisor para aplicar cortesia.");
+        setAuthIntent("cortesia");
+        setSupervisorOpen(true);
+        return;
+      }
     }
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
@@ -288,7 +356,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
     // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
     // duplicada para procedimento dentro do bloco de splits.
-    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    type AgPrefetch = {
+      medico_id: string | null;
+      paciente_id: string | null;
+      procedimento: string | null;
+      paciente_nome: string | null;
+    };
     let agPrefetch: AgPrefetch | null = null;
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
@@ -298,12 +371,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .select("id")
               .eq("agendamento_id", agendamentoId)
               .eq("tipo", "receita")
+              .neq("status", "cancelado")
               .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
         supabase
           .from("agendamentos")
-          .select("medico_id, paciente_id, procedimento")
+          .select("medico_id, paciente_id, procedimento, pacientes:paciente_id(nome)")
           .eq("id", agendamentoId)
           .maybeSingle(),
       ]);
@@ -313,7 +387,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         onOpenChange(false);
         return;
       }
-      agPrefetch = (agRes.data as AgPrefetch | null) ?? null;
+      const raw = agRes.data as any;
+      agPrefetch = raw
+        ? {
+            medico_id: raw.medico_id ?? null,
+            paciente_id: raw.paciente_id ?? null,
+            procedimento: raw.procedimento ?? null,
+            paciente_nome: raw.pacientes?.nome ?? null,
+          }
+        : null;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
@@ -347,20 +429,45 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error("Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).");
         setSaving(false); return;
       }
+      const creditoSemBandeira = validIdx.find(({ p }) => p.forma === "cartao_credito" && !p.bandeira);
+      if (creditoSemBandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
+        setSaving(false); return;
+      }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
-      formaFinal = "misto";
-      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+      // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
+      // (evita marcar como "misto" quando na prática só houve uma forma).
+      if (validIdx.length === 1) {
+        const { p, i } = validIdx[0];
+        formaFinal = p.forma;
         const { pago, troco } = linhasCalc[i];
-        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
         if (p.forma === "dinheiro" && troco > 0) {
-          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+          obsExtra = `Recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)}`;
+        } else if (p.forma === "cartao_credito") {
+          const parc = Number(p.parcelas || 1) || 1;
+          const band = (p.bandeira ?? "").toUpperCase();
+          obsExtra = `Cartão Crédito ${band} ${parc}x — ${formatBRL(pago)}`;
         }
-        return base;
-      }).join("; ");
+      } else {
+        formaFinal = "misto";
+        obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+          const { pago, troco } = linhasCalc[i];
+          const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+          if (p.forma === "dinheiro" && troco > 0) {
+            return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+          }
+          if (p.forma === "cartao_credito") {
+            const parc = Number(p.parcelas || 1) || 1;
+            const band = (p.bandeira ?? "").toUpperCase();
+            return `${base} (${band} ${parc}x)`;
+          }
+          return base;
+        }).join("; ");
+      }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
@@ -372,7 +479,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
         + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
-    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+    let cortesiaObs = "";
+    if (ehCortesia) {
+      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    }
+    const obsFinal = [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -381,28 +493,93 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
-    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
+    // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
+    // da primeira linha de crédito para os campos de topo do lançamento
+    // (usados por relatórios e pela impressão da GR).
+    const mistoCredito = pagamentoMisto
+      ? pagamentos.find((p) => p.forma === "cartao_credito" && Number(p.recebido || 0) > 0)
+      : null;
+    const bandeiraFinal = isCredito
+      ? bandeiraCartao
+      : (mistoCredito?.bandeira ?? null);
+    const parcelasFinal = isCredito
+      ? (Number(parcelas) || 1)
+      : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
+    // -------------------------------------------------------------------
+    // Abordagem B: chama RPC atômica `fn_registrar_lancamento_e_caixa`.
+    // Garante que fin_lancamentos + caixa_movimentos são inseridos na mesma
+    // transação Postgres — se qualquer um falhar, ambos são revertidos pelo
+    // próprio banco (zero janela de inconsistência).
+    // -------------------------------------------------------------------
+    const registraNoCaixa =
+      !!user?.id &&
+      (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+
+    const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
       tipo,
-      descricao: descricao.trim(),
+      // Blindagem: quando o lançamento está vinculado a um agendamento,
+      // garantimos que o nome do paciente presente na descrição seja o
+      // do agendamento (evita herdar nome antigo do formulário).
+      descricao: (() => {
+        const desc = descricao.trim();
+        const nome = agPrefetch?.paciente_nome?.trim();
+        if (!nome) return desc;
+        const sep = " — ";
+        // Se já começa com o nome certo, mantém.
+        if (desc.toUpperCase().startsWith(nome.toUpperCase())) return desc;
+        // Se começa com outro nome (padrão "NOME — RESTO"), troca o prefixo.
+        const idx = desc.indexOf(sep);
+        if (idx > 0) return `${nome}${desc.slice(idx)}`;
+        // Caso contrário, prefixa o nome.
+        return desc ? `${nome}${sep}${desc}` : nome;
+      })(),
       valor: Number(valor),
       data,
+      status: "confirmado",
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
       forma_pagamento: formaFinal,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
-      parcelas: isCredito ? Number(parcelas) || 1 : null,
+      bandeira_cartao: bandeiraFinal,
+      parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
-      status: "confirmado",
       agendamento_id: agendamentoId ?? null,
       medico_id: medicoId,
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
-    } as never).select("id").single();
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    };
+    const pMovimento = registraNoCaixa
+      ? {
+          user_id: user!.id,
+          user_nome:
+            (user!.user_metadata as { nome?: string } | null)?.nome ?? user!.email ?? null,
+          tipo: tipo === "receita" ? "recebimento" : "despesa",
+          valor: Number(valor),
+          descricao: descricao.trim(),
+          forma_pagamento: formaFinal,
+        }
+      : null;
+
+    const { data: rpcData, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("fn_registrar_lancamento_e_caixa", {
+      p_lancamento: pLancamento,
+      p_movimento: pMovimento,
+    });
+    if (error) {
+      setSaving(false);
+      mostrarErro(error);
+      return;
+    }
+    const rpcResult = (rpcData ?? {}) as { lancamento_id?: string };
+    if (!rpcResult.lancamento_id) {
+      setSaving(false);
+      toast.error("Falha ao registrar: retorno inesperado da função de banco.");
+      return;
+    }
+    const lancInserido: { id: string } = { id: rpcResult.lancamento_id };
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
@@ -428,6 +605,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Antes esse cálculo só era feito em memória (na hora de imprimir a GR
     // ou nos relatórios). Agora persistimos em `pagamento_splits` para que o
     // histórico de repasses fique rastreável e somável por consulta direta.
+    let splitFalhou = false;
     try {
       if (tipo === "receita" && lancInserido?.id && Number(valor) > 0) {
         const splits: Array<{
@@ -520,74 +698,38 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         }
         if (splits.length > 0) {
           const { error: errSplit } = await supabase.from("pagamento_splits").insert(splits as never);
-          if (errSplit) console.error("Falha ao gravar splits:", errSplit);
+          if (errSplit) {
+            console.error("Falha ao gravar splits:", errSplit);
+            splitFalhou = true;
+            await marcarSplitPendente(lancInserido.id, errSplit.message);
+          }
         }
       }
     } catch (e) {
       console.error("Erro no cálculo de splits:", e);
-    }
-    // Integração com Caixa: registra movimento na sessão aberta do usuário.
-    // Se não houver sessão aberta, abre uma automaticamente com valor 0.
-    try {
-      if (user?.id && Number(valor) > 0) {
-        // Pode existir mais de uma sessão aberta por histórico — pega a mais recente
-        // em vez de usar maybeSingle() (que retorna erro/null quando há múltiplas)
-        // e acabar abrindo uma nova a cada lançamento.
-        let { data: sess } = await supabase
-          .from("caixa_sessoes")
-          .select("id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("user_id", user.id)
-          .eq("status", "aberto")
-          .order("aberto_em", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!sess) {
-          const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
-          const { data: novaSess, error: errSess } = await supabase
-            .from("caixa_sessoes")
-            .insert({
-              clinica_id: clinicaAtual.clinica_id,
-              user_id: user.id,
-              user_nome: nome,
-              valor_abertura: 0,
-              status: "aberto",
-              observacoes: "Aberto automaticamente pelo sistema",
-            } as never)
-            .select("id")
-            .single();
-          if (errSess) throw errSess;
-          sess = novaSess;
-          // movimento de abertura
-          await supabase.from("caixa_movimentos").insert({
-            sessao_id: sess!.id,
-            clinica_id: clinicaAtual.clinica_id,
-            user_id: user.id,
-            tipo: "abertura",
-            valor: 0,
-            descricao: "Abertura automática",
-          } as never);
-        }
-        await supabase.from("caixa_movimentos").insert({
-          sessao_id: sess!.id,
-          clinica_id: clinicaAtual.clinica_id,
-          user_id: user.id,
-          tipo: tipo === "receita" ? "recebimento" : "despesa",
-          valor: Number(valor),
-          descricao: descricao.trim(),
-          forma_pagamento: formaFinal,
-          lancamento_id: lancInserido?.id ?? null,
-        } as never);
+      if (tipo === "receita" && lancInserido?.id) {
+        splitFalhou = true;
+        await marcarSplitPendente(lancInserido.id, e instanceof Error ? e.message : String(e));
       }
-    } catch (e) {
-      console.error("Falha ao registrar no caixa:", e);
+    }
+    // Lançamento + caixa foram gravados atomicamente pela RPC — sucesso.
+    setSaving(false);
+    if (splitFalhou) {
+      toast.warning(
+        `${tipo === "receita" ? "Receita" : "Despesa"} registrada, mas houve falha ao calcular a divisão de repasse (médico/clínica). Pendência marcada no lançamento — avise o financeiro para recalcular.`,
+        { duration: 10000 },
+      );
+    } else {
+      toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     }
     onSavedWithData?.({
+      lancamento_id: lancInserido.id,
       valor: Number(valor),
       forma_pagamento: formaFinal,
-      parcelas: isCredito ? (Number(parcelas) || 1) : null,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
+      parcelas: parcelasFinal,
+      bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
+      data,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({
@@ -636,16 +778,14 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <CurrencyInput
                 value={valor}
                 onChange={setValor}
-                disabled={!!initialValor}
-                readOnly={!!initialValor}
               />
               {!!initialValor && (
-                <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
+                <p className="text-xs text-muted-foreground">Sugerido pelo serviço — editável</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label>Data</Label>
-              <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              <DateInputBR value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
           {tipo === "receita" && !!initialValor && (
@@ -667,6 +807,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                     if (ehSupervisor) {
                       setDescontoAtivo(true);
                     } else {
+                      setAuthIntent("desconto");
                       setSupervisorOpen(true);
                     }
                   }}
@@ -750,6 +891,30 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               </p>
             )}
           </div>
+          {(() => {
+            const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const cat = categorias.find((c) => c.id === categoriaId);
+            const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
+            if (!ehCortesia) return null;
+            return (
+              <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Justificativa da cortesia * <span className="text-xs text-muted-foreground">(exige autorização do supervisor)</span>
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                  )}
+                </div>
+                <Textarea
+                  rows={2}
+                  value={cortesiaJustificativa}
+                  onChange={(e) => setCortesiaJustificativa(e.target.value)}
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                />
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Conta</Label>
@@ -780,6 +945,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                   <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="convenio">Convênio</SelectItem>
                   <SelectItem value="transferencia">Transferência</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -862,6 +1028,47 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                         Troco: <strong>{formatBRL(trocoP)}</strong>
                       </div>
                     )}
+                    {p.forma === "cartao_credito" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Bandeira *</Label>
+                          <Select
+                            value={p.bandeira ?? ""}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, bandeira: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="visa">Visa</SelectItem>
+                              <SelectItem value="mastercard">Mastercard</SelectItem>
+                              <SelectItem value="elo">Elo</SelectItem>
+                              <SelectItem value="amex">American Express</SelectItem>
+                              <SelectItem value="hipercard">Hipercard</SelectItem>
+                              <SelectItem value="diners">Diners</SelectItem>
+                              <SelectItem value="outra">Outra</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Parcelas</Label>
+                          <Select
+                            value={p.parcelas ?? "1"}
+                            onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, parcelas: v } : q))}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => {
+                                const base = Number(p.recebido || 0);
+                                return (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n}x {n === 1 ? "(à vista)" : `de ${(base / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -939,9 +1146,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     <SupervisorAuthDialog
       open={supervisorOpen}
       onOpenChange={setSupervisorOpen}
-      acao="aplicar desconto"
+      acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
       onAuthorized={(info) => {
         setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+        if (authIntent === "cortesia") {
+          // Não ativa desconto; apenas registra a autorização para a cortesia.
+          return;
+        }
         setDescontoAutorizado(info.nome);
         setDescontoAtivo(true);
       }}

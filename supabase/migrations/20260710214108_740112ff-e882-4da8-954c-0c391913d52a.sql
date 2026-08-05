@@ -1,0 +1,1 @@
+DELETE FROM public.caixa_movimentos WHERE descricao LIKE 'TESTE_QA_CAIXA_%';

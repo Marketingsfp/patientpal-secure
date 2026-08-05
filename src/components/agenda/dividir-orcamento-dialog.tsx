@@ -14,6 +14,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertTriangle, Package, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export type DividirItem = {
   id: string;
   descricao: string;
@@ -74,6 +75,26 @@ const hmToMin = (s: string) => {
 const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
+  // Se TODOS os itens forem de laboratório (por grupo, tipo ou nome), colapsa
+  // em um único grupo. Laboratório nunca é dividido entre profissionais —
+  // vira um único agendamento no médico/recurso "Laboratório".
+  const ehLab = (it: DividirItem) => {
+    const g = norm(it.grupo);
+    const t = norm(it.tipo);
+    return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
+  };
+  if (itens.length > 0 && itens.every(ehLab)) {
+    return [{
+      key: "LABORATORIO",
+      label: "Laboratório",
+      itens: [...itens],
+      medico_id: "",
+      data: "",
+      hora: "",
+      duracao: 30,
+      observacoes: "",
+    }];
+  }
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
     const g = norm(it.grupo) || norm(it.tipo) || "OUTROS";
@@ -119,15 +140,7 @@ async function computarSlots(
   const dow = dia.getDay(); // 0..6
 
   let dispos: DispoRow[] = [];
-  if (ehRecurso) {
-    const { data } = await supabase
-      .from("enfermagem_recurso_disponibilidades")
-      .select("dia_semana, hora_inicio, hora_fim, intervalo_min")
-      .eq("recurso_id", profId)
-      .eq("dia_semana", dow)
-      .eq("ativo", true);
-    dispos = (data ?? []) as DispoRow[];
-  } else {
+  if (!ehRecurso) {
     const { data } = await supabase
       .from("medico_disponibilidades")
       .select("dia_semana, hora_inicio, hora_fim, intervalo_min, vigencia_inicio, vigencia_fim")
@@ -145,12 +158,7 @@ async function computarSlots(
   const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
   const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
   const ags = ehRecurso
-    ? await supabase
-        .from("agendamentos")
-        .select("id, inicio, fim, status, paciente_id, paciente_nome")
-        .eq("enfermagem_recurso_id", profId)
-        .gte("inicio", inicioDia)
-        .lte("inicio", fimDia)
+    ? { data: [] as unknown[] }
     : await supabase
         .from("agendamentos")
         .select("id, inicio, fim, status, paciente_id, paciente_nome")
@@ -219,11 +227,17 @@ export function DividirOrcamentoDialog({
       const gs = agruparItens(itens).map((g, i) => {
         const d = new Date(base);
         d.setMinutes(d.getMinutes() + i * 30);
-        return { ...g, data: toDateStr(d), hora: toHmStr(d) };
+        // Pré-seleciona o profissional "Laboratório" quando o grupo é lab.
+        let medico_id = "";
+        if (g.key === "LABORATORIO") {
+          const lab = medicos.find((m) => norm(m.nome).includes("LABORATORIO"));
+          if (lab) medico_id = lab.id;
+        }
+        return { ...g, data: toDateStr(d), hora: toHmStr(d), medico_id };
       });
       setGrupos(gs);
     }
-  }, [open, itens, inicioPadrao]);
+  }, [open, itens, inicioPadrao, medicos]);
 
   // Carrega vínculos profissionais x procedimentos do orçamento.
   useEffect(() => {
@@ -240,16 +254,11 @@ export function DividirOrcamentoDialog({
     (async () => {
       setLoadingVinc(true);
       try {
-        const [{ data: mp }, { data: rp }] = await Promise.all([
-          supabase
-            .from("medico_procedimentos")
-            .select("medico_id, procedimento_id")
-            .in("procedimento_id", procIds),
-          supabase
-            .from("enfermagem_recurso_procedimentos")
-            .select("recurso_id, procedimento_id")
-            .in("procedimento_id", procIds),
-        ]);
+        const { data: mp } = await supabase
+          .from("medico_procedimentos")
+          .select("medico_id, procedimento_id")
+          .in("procedimento_id", procIds);
+        const rp: Array<{ recurso_id: string | null; procedimento_id: string | null }> = [];
         if (cancel) return;
         const m = new Map<string, Set<string>>();
         for (const r of mp ?? []) {
@@ -258,7 +267,7 @@ export function DividirOrcamentoDialog({
           m.get(r.procedimento_id)!.add(r.medico_id);
         }
         const re = new Map<string, Set<string>>();
-        for (const r of rp ?? []) {
+        for (const r of rp) {
           if (!r.procedimento_id || !r.recurso_id) continue;
           if (!re.has(r.procedimento_id)) re.set(r.procedimento_id, new Set());
           re.get(r.procedimento_id)!.add(r.recurso_id);
@@ -404,7 +413,6 @@ export function DividirOrcamentoDialog({
           paciente_nome: orcamento.paciente_nome ?? "",
           paciente_id: orcamento.paciente_id ?? null,
           medico_id: ehRecurso ? null : g.medico_id,
-          enfermagem_recurso_id: ehRecurso ? g.medico_id : null,
           inicio: inicioIso,
           fim: fimIso,
           procedimento: montarDescricao(g),
@@ -528,8 +536,7 @@ export function DividirOrcamentoDialog({
                 </div>
                 <div>
                   <Label className="text-xs">Data</Label>
-                  <Input
-                    type="date"
+                  <DateInputBR
                     value={g.data}
                     onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
                   />

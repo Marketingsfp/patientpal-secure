@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Award, BookOpen, CheckCircle2, PlayCircle } from "lucide-react";
 // realmente emite o certificado.
 
 export const Route = createFileRoute("/_authenticated/app/treinamentos")({
-  component: TreinamentosPageWithTabs,
+  component: TreinamentosPage,
 });
 
 type Curso = { id: string; titulo: string; descricao: string | null; capa_url: string | null; carga_horaria_min: number };
@@ -25,27 +26,31 @@ type Modulo = { id: string; curso_id: string; titulo: string; ordem: number };
 function TreinamentosPage() {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("treinamentos");
   const clinicaId = clinicaAtual?.clinica_id;
 
-  const [cursos, setCursos] = useState<Curso[]>([]);
   const [cursoSel, setCursoSel] = useState<string | null>(null);
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [licoes, setLicoes] = useState<Licao[]>([]);
   const [concluidas, setConcluidas] = useState<Set<string>>(new Set());
   const [licaoAtiva, setLicaoAtiva] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!clinicaId) return;
-    (async () => {
-      const { data } = await supabase
+  // Catálogo de cursos publicados — baixo risco (raramente muda), cache de 5min.
+  const { data: cursos = [] } = useQuery({
+    queryKey: ["lms-cursos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from("lms_cursos")
         .select("id, titulo, descricao, capa_url, carga_horaria_min")
-        .eq("clinica_id", clinicaId)
+        .eq("clinica_id", clinicaId!)
         .eq("publicado", true)
         .order("created_at", { ascending: false });
-      setCursos((data ?? []) as Curso[]);
-    })();
-  }, [clinicaId]);
+      if (error) throw error;
+      return (data ?? []) as Curso[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     if (!cursoSel || !user) return;
@@ -68,6 +73,7 @@ function TreinamentosPage() {
   const cursoObj = cursos.find((c) => c.id === cursoSel);
 
   async function concluirLicao() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!licao || !user || !cursoSel) return;
     if (concluidas.has(licao.id)) return;
     const { error } = await supabase.from("lms_progresso").insert({
@@ -145,7 +151,7 @@ function TreinamentosPage() {
         <div className="flex items-center gap-3">
           <div className="w-48"><Progress value={progresso} /></div>
           <span className="text-sm text-muted-foreground">{progresso}%</span>
-          {progresso === 100 && (
+          {progresso === 100 && podeEscrever && (
             <Button onClick={emitirCertificado}><Award className="h-4 w-4 mr-1" /> Baixar certificado</Button>
           )}
         </div>
@@ -190,21 +196,15 @@ function TreinamentosPage() {
               {licao.conteudo && (
                 <div className="prose prose-sm max-w-none whitespace-pre-wrap">{licao.conteudo}</div>
               )}
-              <Button onClick={concluirLicao} disabled={concluidas.has(licao.id)}>
-                {concluidas.has(licao.id) ? "Concluída" : "Marcar como concluída"}
-              </Button>
+              {podeEscrever && (
+                <Button onClick={concluirLicao} disabled={concluidas.has(licao.id)}>
+                  {concluidas.has(licao.id) ? "Concluída" : "Marcar como concluída"}
+                </Button>
+              )}
             </div>
           )}
         </Card>
       </div>
     </div>
-  );
-}
-function TreinamentosPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <TreinamentosPage />
-    </>
   );
 }

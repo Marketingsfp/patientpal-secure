@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-leads")({
   component: LeadsPageWithTabs,
@@ -27,6 +28,7 @@ const statusCor: Record<string, string> = {
 };
 
 function LeadsPage() {
+  const podeEscrever = usePodeEscrever("mkt-leads");
   return (
     <SimpleCrud<Row, Form>
       table="mkt_leads"
@@ -35,6 +37,7 @@ function LeadsPage() {
       subtitle="Contatos capturados pelas landing pages e formulários."
       icon={<Users className="h-6 w-6 text-primary" />}
       searchFields={["nome", "telefone", "email"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "contato", header: "Contato", render: r => (

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ElementType } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ElementType } from "react";
 import {
   Building2, Bell, CalendarDays, Users, RotateCcw, MessageCircle,
   CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain, Filter, X,
@@ -16,7 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
+import { cn } from "@/lib/utils";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
   head: () => ({ meta: [{ title: "Painel — ClinicaOS" }] }),
@@ -41,6 +44,8 @@ type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
+  // Stagger + count-up nos KPIs — só São Francisco de Paula (flag ux_melhorias).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
   const [carregando, setCarregando] = useState(false);
@@ -402,11 +407,11 @@ function DashboardPage() {
           />
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
-            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
+            <DateInputBR value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">até</Label>
-            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
+            <DateInputBR value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
           </div>
           <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>
@@ -453,7 +458,8 @@ function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <KpiAnimContext.Provider value={uxMelhorias}>
+      <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
         {/* Informações rápidas — lembrete para a equipe */}
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 space-y-3">
@@ -482,7 +488,7 @@ function DashboardPage() {
             : <ul className="space-y-1 text-sm">{data.alertas.map(al => <li key={al.id} className="truncate">• {al.mensagem}</li>)}</ul>}
         </KpiCard>
 
-        <KpiCard icon={CalendarDays} title="Agendamentos" big={fmtInt(a.total)} onClick={() => openDrill("agend_total")}>
+        <KpiCard icon={CalendarDays} title="Agendamentos" value={a.total} format={fmtInt} onClick={() => openDrill("agend_total")}>
           <SubGrid items={[
             { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
             { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
@@ -491,28 +497,28 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Users} title="Clientes Agendados" big={fmtInt(a.novos + a.regulares)} onClick={() => openDrill("clientes_total")}>
+        <KpiCard icon={Users} title="Clientes Agendados" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
           <SubGrid items={[
             { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
             { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={RotateCcw} title="Retornos" big={fmtInt(a.retornos)} onClick={() => openDrill("retornos")}>
+        <KpiCard icon={RotateCcw} title="Retornos" value={a.retornos} format={fmtInt} onClick={() => openDrill("retornos")}>
           <SubGrid items={[
             { label: "Sem Agenda", value: fmtInt(a.semAgenda), onClick: () => openDrill("retornos_sem") },
             { label: "Agendados", value: fmtInt(a.retornos), onClick: () => openDrill("retornos") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={MessageCircle} title="Mensagens Enviadas" big={fmtInt(data.msgs.enviadas)}>
+        <KpiCard icon={MessageCircle} title="Mensagens Enviadas" value={data.msgs.enviadas} format={fmtInt}>
           <SubGrid items={[
             { label: "Respostas", value: fmtInt(data.msgs.respostas) },
             { label: "Total", value: fmtInt(data.msgs.total) },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" big={fmtInt(data.conf.presencas + data.conf.ausencias)} onClick={() => openDrill("conf_total")}>
+        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" value={data.conf.presencas + data.conf.ausencias} format={fmtInt} onClick={() => openDrill("conf_total")}>
           <SubGrid items={[
             { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_pres") },
             { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_aus") },
@@ -520,7 +526,7 @@ function DashboardPage() {
         </KpiCard>
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)} onClick={() => openDrill("vendas")}>
+        <KpiCard icon={Handshake} title="Vendas" value={data.vendas.total} format={fmtMoney} onClick={() => openDrill("vendas")}>
           <SubGrid items={[
             { label: "Conversão", value: "—" },
             { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
@@ -529,7 +535,7 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)} onClick={() => openDrill("pag_real")}>
+        <KpiCard icon={CreditCard} title="Pagamentos" value={data.pagamentos.realizado + data.pagamentos.aPagar} format={fmtMoney} onClick={() => openDrill("pag_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.pagamentos.realizado), onClick: () => openDrill("pag_real") },
             { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar), onClick: () => openDrill("pag_apagar") },
@@ -538,7 +544,7 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)} onClick={() => openDrill("rec_real")}>
+        <KpiCard icon={Banknote} title="Recebimentos" value={data.recebimentos.realizado + data.recebimentos.aReceber} format={fmtMoney} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
@@ -547,7 +553,7 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)} onClick={() => openDrill("rec_real")}>
+        <KpiCard icon={Receipt} title="Recebimentos Qtd." value={data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber} format={fmtInt} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
@@ -556,7 +562,7 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)} onClick={() => openDrill("comissoes")}>
+        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" value={data.comissoes.pagas} format={fmtMoney} onClick={() => openDrill("comissoes")}>
           <SubGrid items={[
             { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
             { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
@@ -564,13 +570,15 @@ function DashboardPage() {
         </KpiCard>
         )}
       </div>
+      </KpiAnimContext.Provider>
 
       {data.porMedico.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Total de Agendamentos por médico</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <KpiAnimContext.Provider value={uxMelhorias}>
+          <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
             {data.porMedico.map((m) => (
-              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} big={fmtInt(m.total)} small onClick={() => openDrill("medico", { nome: m.nome })}>
+              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} value={m.total} format={fmtInt} small onClick={() => openDrill("medico", { nome: m.nome })}>
                 <SubGrid items={[
                   { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
                   { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
@@ -578,6 +586,7 @@ function DashboardPage() {
               </KpiCard>
             ))}
           </div>
+          </KpiAnimContext.Provider>
         </div>
       )}
 
@@ -614,23 +623,61 @@ function DashboardPage() {
   );
 }
 
-function KpiCard({ icon: Icon, title, big, small, children, onClick }: {
-  icon: ElementType; title: string; big?: string; small?: boolean; children?: React.ReactNode; onClick?: () => void;
+// Contexto que liga o count-up dos KPIs — provido pela flag ux_melhorias
+// (só São Francisco de Paula) uma única vez em DashboardPage.
+const KpiAnimContext = createContext(false);
+
+function KpiCard({ icon: Icon, title, value, format, small, children, onClick }: {
+  icon: ElementType; title: string; value?: number; format?: (n: number) => string;
+  small?: boolean; children?: React.ReactNode; onClick?: () => void;
 }) {
+  const animado = useContext(KpiAnimContext);
+  const big = value !== undefined && format
+    ? (animado ? <CountUpNumber value={value} format={format} /> : format(value))
+    : undefined;
   return (
     <Card className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1">
-            <Icon className="h-4 w-4 text-primary shrink-0" />
-            <span className="truncate" title={title}>{title}</span>
+          <div className="flex items-start gap-2 text-sm text-muted-foreground min-w-0 flex-1">
+            <Icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <span className="line-clamp-2 leading-tight" title={title}>{title}</span>
           </div>
-          {big !== undefined && <div className="text-2xl font-semibold tabular-nums shrink-0">{big}</div>}
+          {big !== undefined && <div className="text-xl lg:text-2xl font-semibold tabular-nums shrink-0 whitespace-nowrap">{big}</div>}
         </div>
         {children && <div className="mt-4 pt-3 border-t border-border">{children}</div>}
       </CardContent>
     </Card>
   );
+}
+
+/** Anima o número de `from` (valor anterior, 0 no primeiro carregamento) até
+ * `value`, reformatando a cada quadro. Respeita prefers-reduced-motion. */
+function CountUpNumber({ value, format }: { value: number; format: (n: number) => string }) {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = value;
+    prevRef.current = value;
+    const reduceMotion = typeof window !== "undefined"
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (from === to || reduceMotion) { setDisplay(to); return; }
+    const toIsInt = Number.isInteger(to);
+    const duration = 600;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const atual = from + (to - from) * eased;
+      setDisplay(t < 1 ? (toIsInt ? Math.round(atual) : atual) : to);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(display)}</>;
 }
 
 function SubGrid({ items }: { items: { label: string; value: string; pct?: string; onClick?: () => void }[] }) {

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/campanhas")({
   component: CampanhasPageWithTabs,
@@ -16,6 +17,7 @@ interface Row { id: string; nome: string; tipo: string; mensagem: string; segmen
 interface Form { nome: string; tipo: string; mensagem: string; segmento: string; status: string; agendada_para: string; }
 
 function CampanhasPage() {
+  const podeEscrever = usePodeEscrever("campanhas");
   return (
     <SimpleCrud<Row, Form>
       table="campanhas_marketing"
@@ -24,6 +26,7 @@ function CampanhasPage() {
       subtitle="Envios em massa de WhatsApp, e-mail ou SMS."
       icon={<Megaphone className="h-6 w-6 text-primary" />}
       searchFields={["nome"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "tipo", header: "Canal", className: "w-28", render: r => <span className="capitalize text-sm">{r.tipo}</span> },
@@ -35,8 +38,8 @@ function CampanhasPage() {
       toPayload={f => ({ nome: f.nome.trim(), tipo: f.tipo, mensagem: f.mensagem, segmento: f.segmento || null, status: f.status, agendada_para: f.agendada_para ? new Date(f.agendada_para).toISOString() : null })}
       renderForm={(f, set) => (
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2"><Label>Nome *</Label><Input required value={f.nome} onChange={e => set({ ...f, nome: e.target.value })} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1 sm:col-span-2"><Label>Nome *</Label><Input required value={f.nome} onChange={e => set({ ...f, nome: e.target.value })} /></div>
             <div className="space-y-1"><Label>Canal</Label>
               <Select value={f.tipo} onValueChange={v => set({ ...f, tipo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

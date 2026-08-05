@@ -1,30 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight,
-  ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Printer,
-} from "lucide-react";
+import { Info, Plus, Rows3, LayoutList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { useUserPref } from "@/hooks/use-user-pref";
-import { useAuth } from "@/hooks/use-auth";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   ListShell, VirtualList, QuickFilters,
   type StatusTab, type QuickFilterOption,
 } from "@/components/list-shell";
 import { ClienteCard } from "./cliente-card";
-import { exportarPacientesCSV, exportarPacientesPDF } from "./exportar";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
 import { ResumoBar } from "./resumo-bar";
@@ -40,22 +27,6 @@ type ChipV =
   | "particular" | "associado" | "cartao"
   | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
 type ResumoMode = "none" | "aniv" | "inativos";
-type CampoBusca = "todos" | "nome" | "id" | "convenio";
-type OrdemBusca = "relevancia" | "nome" | "cadastro";
-type DirOrdem = "asc" | "desc";
-
-const ORDEM_OPTS: ReadonlyArray<{ value: OrdemBusca; label: string; title: string }> = [
-  { value: "relevancia", label: "Relevância", title: "Ordem de relevância da busca" },
-  { value: "nome", label: "Nome", title: "Ordenar por nome" },
-  { value: "cadastro", label: "Cadastro", title: "Ordenar por data de cadastro" },
-];
-
-const CAMPO_OPTS: ReadonlyArray<{ value: CampoBusca; label: string }> = [
-  { value: "todos", label: "Todos os campos" },
-  { value: "nome", label: "Nome" },
-  { value: "id", label: "ID / Prontuário" },
-  { value: "convenio", label: "Convênio" },
-];
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "todos", label: "Todos" },
@@ -90,17 +61,12 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const { clinicaAtual, clinicaIds } = useClinica();
   const [rows, setRows] = useState<PacienteV2[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useUserPref<string>("clientes:q", "");
-  const [tab, setTab] = useUserPref<TabV>("clientes:tab", "todos");
-  const [chips, setChips] = useUserPref<ChipV[]>("clientes:chips", []);
-  const [resumoMode, setResumoMode] = useUserPref<ResumoMode>("clientes:resumo", "none");
+  const [q, setQ] = useState("");
+  const [tab, setTab] = useState<TabV>("todos");
+  const [chips, setChips] = useState<ChipV[]>([]);
+  const [resumoMode, setResumoMode] = useState<ResumoMode>("none");
   const [drawer, setDrawer] = useState<PacienteV2 | null>(null);
-  const [pageSize, setPageSize] = useUserPref<number>("clientes:page-size", 25);
-  const [page, setPage] = useUserPref<number>("clientes:page", 1);
-  const [campo, setCampo] = useUserPref<CampoBusca>("clientes:campo", "todos");
-  const [convenio, setConvenio] = useUserPref<string>("clientes:convenio", "todos");
-  const [ordem, setOrdem] = useUserPref<OrdemBusca>("clientes:ordem", "relevancia");
-  const [dirOrdem, setDirOrdem] = useUserPref<DirOrdem>("clientes:ordem-dir", "asc");
+  const [pageSize, setPageSize] = useState(50);
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
 
@@ -188,22 +154,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
 
   const filtrados = useMemo(() => {
     let r = rows;
-    const termo = q.trim().toLowerCase();
-    if (termo && campo !== "todos") {
-      r = r.filter((p) => {
-        if (campo === "nome") return (p.nome ?? "").toLowerCase().includes(termo);
-        if (campo === "id") {
-          return [p.codigo_prontuario, p.codigo_prontuario_anterior, p.numero_pasta, p.id]
-            .some((v) => String(v ?? "").toLowerCase().includes(termo));
-        }
-        return (p.associado_convenio ?? "").toLowerCase().includes(termo);
-      });
-    }
-    if (convenio !== "todos") {
-      r = convenio === "__particular__"
-        ? r.filter((p) => !p.associado_convenio && !p.tem_cartao_beneficios)
-        : r.filter((p) => (p.associado_convenio ?? "") === convenio);
-    }
     if (tab === "ativos") r = r.filter((p) => p.ativo);
     else if (tab === "inativos") r = r.filter((p) => !p.ativo);
     else if (tab === "incompletos") r = r.filter(cadastroIncompleto);
@@ -218,118 +168,11 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (chips.includes("sem_tel")) r = r.filter(semTelefone);
     if (chips.includes("sem_cpf")) r = r.filter(semCpf);
     return r;
-  }, [rows, tab, chips, q, campo, convenio]);
+  }, [rows, tab, chips]);
 
-  // Ordenação dos resultados. "Relevância" preserva a ordem devolvida pela busca.
-  const ordenados = useMemo(() => {
-    const posicao = new Map(rows.map((p, i) => [p.id, i]));
-    const sinal = dirOrdem === "asc" ? 1 : -1;
-    const arr = [...filtrados];
-    arr.sort((a, b) => {
-      if (ordem === "nome") {
-        return sinal * (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR", { sensitivity: "base" });
-      }
-      if (ordem === "cadastro") {
-        const ta = a.created_at ? Date.parse(a.created_at) : 0;
-        const tb = b.created_at ? Date.parse(b.created_at) : 0;
-        return sinal * (ta - tb);
-      }
-      return sinal * ((posicao.get(a.id) ?? 0) - (posicao.get(b.id) ?? 0));
-    });
-    return arr;
-  }, [filtrados, rows, ordem, dirOrdem]);
-
-  const aplicarOrdem = (v: OrdemBusca) => {
-    if (v === ordem) {
-      setDirOrdem((d) => (d === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setOrdem(v);
-    // Padrões úteis: nome A→Z, cadastro mais recente primeiro.
-    setDirOrdem(v === "cadastro" ? "desc" : "asc");
-  };
-
-  const conveniosDisponiveis = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of rows) if (p.associado_convenio) set.add(p.associado_convenio);
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [rows]);
-
-  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / pageSize));
-  const paginaAtual = Math.min(page, totalPaginas);
-  const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
-
-  // Descrição dos filtros ativos, impressa no cabeçalho do PDF.
-  const resumoExport = [
-    q.trim() ? `busca “${q.trim()}”` : null,
-    tab !== "todos" ? (TAB_OPTS.find((t) => t.value === tab)?.label ?? null) : null,
-    convenio !== "todos"
-      ? convenio === "__particular__" ? "Particular" : `Convênio ${convenio}`
-      : null,
-    chips.length ? `filtros: ${chips.join(", ")}` : null,
-  ].filter(Boolean).join(" · ");
-
-  // ---- Navegação por teclado nos resultados (roving tabindex) ----
-  const listaRef = useRef<HTMLDivElement>(null);
-  const [focoIdx, setFocoIdx] = useState(0);
-  const [navTeclado, setNavTeclado] = useState(false);
-
-  useEffect(() => { setFocoIdx(0); }, [paginaAtual, pageSize, q, campo, convenio, tab, chips, ordem, dirOrdem]);
-
-  useEffect(() => {
-    if (!navTeclado) return;
-    const alvo = listaRef.current?.querySelector<HTMLElement>(`[data-cliente-idx="${focoIdx}"]`);
-    if (alvo) {
-      alvo.scrollIntoView({ block: "nearest" });
-      alvo.focus({ preventScroll: true });
-    }
-  }, [focoIdx, navTeclado, visiveis.length]);
-
-  const onListaKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const total = visiveis.length;
-    if (total === 0) return;
-    const mover = (next: number) => {
-      e.preventDefault();
-      setNavTeclado(true);
-      setFocoIdx(Math.max(0, Math.min(total - 1, next)));
-    };
-    switch (e.key) {
-      case "ArrowDown": return mover(focoIdx + 1);
-      case "ArrowUp": return mover(focoIdx - 1);
-      case "PageDown": return mover(focoIdx + 10);
-      case "PageUp": return mover(focoIdx - 10);
-      case "Home": return mover(0);
-      case "End": return mover(total - 1);
-      case "Enter": {
-        const p = visiveis[focoIdx];
-        if (!p) return;
-        e.preventDefault();
-        if (e.altKey) window.location.assign(`/app/clientes/${p.id}/editar`);
-        else setDrawer(p);
-        return;
-      }
-      default:
-        return;
-    }
-  };
-
-  // Só reseta a página depois que as preferências salvas terminarem de hidratar,
-  // senão a página restaurada seria descartada ao carregar os filtros.
-  const { user } = useAuth();
-  const [prefsProntas, setPrefsProntas] = useState(false);
-  useEffect(() => {
-    if (!user?.id) return;
-    const id = requestAnimationFrame(() => setPrefsProntas(true));
-    return () => cancelAnimationFrame(id);
-  }, [user?.id]);
-  useEffect(() => {
-    if (!prefsProntas) return;
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, campo, convenio, tab, chips, pageSize, prefsProntas]);
+  const visiveis = filtrados.slice(0, pageSize);
 
   const kpi: ClientesKpi = useMemo(() => {
-    // (KPIs abaixo)
     let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
     let associados = 0, cartao = 0, particular = 0;
     for (const p of filtrados) {
@@ -382,33 +225,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
                   <Switch checked={compactPref} onCheckedChange={onToggleCompact} data-testid="toggle-compact" />
                 </Label>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" disabled={ordenados.length === 0}>
-                    <Download className="h-4 w-4 sm:mr-1" />
-                    <span className="hidden sm:inline">Exportar</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                    {ordenados.length} resultado(s) filtrado(s)
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => exportarPacientesCSV(ordenados)}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV (todos os filtrados)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => exportarPacientesPDF(ordenados, resumoExport)}>
-                    <Printer className="h-4 w-4 mr-2" /> PDF (todos os filtrados)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => exportarPacientesCSV(visiveis)}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV (página atual)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => exportarPacientesPDF(visiveis, `${resumoExport} · página ${paginaAtual}`)}>
-                    <Printer className="h-4 w-4 mr-2" /> PDF (página atual)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               <Button size="sm" asChild>
                 <Link to="/app/clientes"><Plus className="h-4 w-4 mr-1" /> Novo</Link>
               </Button>
@@ -423,58 +239,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           onTabChange={setTab}
           chips={
             <div className="flex flex-wrap items-center gap-3">
-              <Select value={campo} onValueChange={(v) => setCampo(v as CampoBusca)}>
-                <SelectTrigger className="h-8 w-[168px] text-xs" aria-label="Campo da busca">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CAMPO_OPTS.map((o) => (
-                    <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={convenio} onValueChange={setConvenio}>
-                <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Filtrar por convênio">
-                  <SelectValue placeholder="Convênio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos" className="text-xs">Todos os convênios</SelectItem>
-                  <SelectItem value="__particular__" className="text-xs">Particular</SelectItem>
-                  {conveniosDisponiveis.map((c) => (
-                    <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
-              <div
-                className="inline-flex items-center gap-1 rounded-md border bg-muted/40 p-0.5"
-                role="group"
-                aria-label="Ordenar resultados"
-              >
-                <span className="px-1.5 text-[11px] text-muted-foreground hidden sm:inline">Ordenar</span>
-                {ORDEM_OPTS.map((o) => {
-                  const ativo = ordem === o.value;
-                  const Icon = !ativo ? ArrowUpDown : dirOrdem === "asc" ? ArrowUp : ArrowDown;
-                  return (
-                    <button
-                      key={o.value}
-                      type="button"
-                      title={o.title}
-                      aria-pressed={ativo}
-                      aria-label={`${o.title}${ativo ? (dirOrdem === "asc" ? " (crescente)" : " (decrescente)") : ""}`}
-                      onClick={() => aplicarOrdem(o.value)}
-                      className={`inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        ativo
-                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {o.label}
-                      <Icon className={`h-3 w-3 ${ativo ? "opacity-100" : "opacity-50"}`} />
-                    </button>
-                  );
-                })}
-              </div>
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="h-3.5 w-3.5" />
@@ -486,7 +251,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             </div>
           }
           loading={loading}
-          isEmpty={!loading && ordenados.length === 0}
+          isEmpty={!loading && filtrados.length === 0}
           empty={
             modoBusca
               ? <div>Nenhum paciente encontrado para <b>“{q}”</b>.</div>
@@ -494,78 +259,21 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           }
           bodyClassName="bg-background"
         >
-          <div
-            ref={listaRef}
-            role="listbox"
-            aria-label="Resultados de pacientes"
-            tabIndex={-1}
-            onKeyDown={onListaKeyDown}
-            onFocus={() => setNavTeclado(true)}
-          >
-            <VirtualList<PacienteV2>
-              items={visiveis}
-              estimateSize={compactPref ? 52 : 78}
-              overscan={10}
-              getKey={(p) => p.id}
-              renderItem={(p, i) => (
-                <div className="px-2 py-1" role="option" aria-selected={i === focoIdx}>
-                  <ClienteCard
-                    p={p}
-                    compact={compactPref}
-                    termo={modoBusca ? q.trim() : ""}
-                    index={i}
-                    active={i === focoIdx}
-                    onOpen={setDrawer}
-                  />
-                </div>
-              )}
-            />
-          </div>
-          {!loading && visiveis.length > 0 && (
-            <p className="px-2 pb-2 pt-1 text-[11px] text-muted-foreground">
-              Teclado: <kbd className="rounded border px-1">↑</kbd>/<kbd className="rounded border px-1">↓</kbd> navegar ·{" "}
-              <kbd className="rounded border px-1">Enter</kbd> abrir detalhes ·{" "}
-              <kbd className="rounded border px-1">Alt+Enter</kbd> abrir perfil
-            </p>
-          )}
+          <VirtualList<PacienteV2>
+            items={visiveis}
+            estimateSize={compactPref ? 52 : 78}
+            overscan={10}
+            getKey={(p) => p.id}
+            onEndReached={() => {
+              if (pageSize < filtrados.length) setPageSize((s) => Math.min(s + 50, filtrados.length));
+            }}
+            renderItem={(p) => (
+              <div className="px-2 py-1">
+                <ClienteCard p={p} compact={compactPref} onOpen={setDrawer} />
+              </div>
+            )}
+          />
         </ListShell>
-        {!loading && ordenados.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, ordenados.length)} de{" "}
-              {ordenados.length}
-            </span>
-            <div className="flex items-center gap-2">
-              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-                <SelectTrigger className="h-8 w-[110px] text-xs" aria-label="Itens por página">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[25, 50, 100].map((n) => (
-                    <SelectItem key={n} value={String(n)} className="text-xs">{n} por página</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline" size="sm" className="h-8"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={paginaAtual <= 1}
-                aria-label="Página anterior"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">{paginaAtual}/{totalPaginas}</span>
-              <Button
-                variant="outline" size="sm" className="h-8"
-                onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-                disabled={paginaAtual >= totalPaginas}
-                aria-label="Próxima página"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
       <ClientesKpiBar k={kpi} modoBusca={modoBusca} />
       <ClienteDrawer paciente={drawer} onClose={() => setDrawer(null)} />

@@ -1,26 +1,18 @@
-import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard, ExternalLink } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   cadastroIncompleto, calcularIdade, fmtCPF, fmtNasc, fmtTel,
   isAniversarianteHoje, pagadorLabel, semCpf, semTelefone, type PacienteV2,
 } from "./status-utils";
-import { Highlight } from "./highlight";
 
 interface Props {
   p: PacienteV2;
   compact?: boolean;
-  /** Termo pesquisado, para realçar os trechos que casaram. */
-  termo?: string;
-  /** Posição na lista, usada pela navegação por teclado. */
-  index?: number;
-  /** Item focado pela navegação por teclado (roving tabindex). */
-  active?: boolean;
   onOpen: (p: PacienteV2) => void;
 }
 
-export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props) {
+export function ClienteCard({ p, compact, onOpen }: Props) {
   const { tipo, label } = pagadorLabel(p);
   const incompleto = cadastroIncompleto(p);
   const aniversariante = isAniversarianteHoje(p.data_nascimento);
@@ -35,33 +27,11 @@ export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props)
       : "border-l-emerald-500";
 
   return (
-    <div className="relative group">
-    <Link
-      to="/app/clientes/$pacienteId/editar"
-      params={{ pacienteId: p.id }}
-      onClick={(e) => e.stopPropagation()}
-      aria-label={`Abrir perfil de ${p.nome}`}
-      title="Abrir perfil (Alt+clique no card)"
-      className="absolute right-2 top-2 z-10 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
-    >
-      <ExternalLink className="h-3.5 w-3.5" />
-    </Link>
     <button
       type="button"
-      data-cliente-idx={index}
-      tabIndex={index == null ? undefined : active ? 0 : -1}
-      aria-label={`${p.nome} — Enter abre detalhes, Alt+Enter abre o perfil`}
-      onClick={(e) => {
-        if (e.altKey) {
-          window.location.assign(`/app/clientes/${p.id}/editar`);
-          return;
-        }
-        onOpen(p);
-      }}
+      onClick={() => onOpen(p)}
       className={cn(
         "w-full text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        active && "bg-accent/40",
         "border-l-4", borderClass,
         compact ? "px-3 py-2" : "px-3 py-3",
       )}
@@ -79,16 +49,16 @@ export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props)
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
-              <Highlight text={p.nome} termo={termo} />
+              {p.nome}
             </span>
             {p.codigo_prontuario && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
-                Prontuário <Highlight text={String(p.codigo_prontuario)} termo={termo} />
+                Prontuário {p.codigo_prontuario}
               </span>
             )}
             {p.numero_pasta && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
-                Pasta <Highlight text={String(p.numero_pasta)} termo={termo} />
+                Pasta {p.numero_pasta}
               </span>
             )}
             <Badge
@@ -132,26 +102,21 @@ export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props)
           </div>
           {!compact && (
             <div className="mt-0.5 text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
-              <span>CPF: <Highlight text={fmtCPF(p.cpf)} termo={termo} /></span>
+              <span>CPF: {fmtCPF(p.cpf)}</span>
               <span className="inline-flex items-center gap-1">
-                <Phone className="h-3 w-3" /> <Highlight text={fmtTel(p.telefone)} termo={termo} />
+                <Phone className="h-3 w-3" /> {fmtTel(p.telefone)}
               </span>
-              <span>
-                Nasc.: <Highlight text={fmtNasc(p.data_nascimento)} termo={termo} />
-                {idade !== null ? ` · ${idade}a` : ""}
-              </span>
+              <span>Nasc.: {fmtNasc(p.data_nascimento)}{idade !== null ? ` · ${idade}a` : ""}</span>
               {(p.cidade || p.estado) && (
-                <span className="truncate">
-                  <Highlight text={[p.cidade, p.estado].filter(Boolean).join("/")} termo={termo} />
-                </span>
+                <span className="truncate">{[p.cidade, p.estado].filter(Boolean).join("/")}</span>
               )}
             </div>
           )}
           {compact && (
             <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-3">
-              <span><Highlight text={fmtCPF(p.cpf)} termo={termo} /></span>
-              <span><Highlight text={fmtTel(p.telefone)} termo={termo} /></span>
-              <span><Highlight text={fmtNasc(p.data_nascimento)} termo={termo} /></span>
+              <span>{fmtCPF(p.cpf)}</span>
+              <span>{fmtTel(p.telefone)}</span>
+              <span>{fmtNasc(p.data_nascimento)}</span>
             </div>
           )}
         </div>
@@ -162,6 +127,5 @@ export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props)
         </div>
       </div>
     </button>
-    </div>
   );
 }

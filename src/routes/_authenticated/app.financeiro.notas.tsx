@@ -3,10 +3,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Plus, FileText, Pencil, Trash2, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -18,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/notas")({
   component: Page,
   head: () => ({ meta: [{ title: "Notas Pacientes — Financeiro" }] }),
@@ -43,6 +48,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Nota[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +63,8 @@ function Page() {
   const [emitting, setEmitting] = useState(false);
   const emitirFn = useServerFn(emitirNfse);
   const consultarFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -75,7 +83,7 @@ function Page() {
   };
   const loadEmit = async () => {
     if (!clinicaAtual) return;
-    const { data } = await supabase.from("nfse_emitentes")
+    const { data } = await supabase.from("nfse_emitentes_publico")
       .select("id, nome, codigo_municipio")
       .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
     const list = (data ?? []) as Emitente[];
@@ -93,6 +101,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, numero: form.numero || null, serie: form.serie || null,
@@ -108,12 +117,14 @@ function Page() {
   };
 
   const remove = async (n: Nota) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir nota ${n.numero ?? ""}?`)) return;
     const { error } = await supabase.from("fin_notas_pacientes").delete().eq("id", n.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };
 
   const openEmit = async (n: Nota) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
     setDescricao(n.observacoes || `Serviços médicos prestados${n.paciente_id ? ` ao paciente ${pacMap.get(n.paciente_id) ?? ""}` : ""}`.trim());
     setTomadorCpf("");
@@ -127,6 +138,7 @@ function Page() {
   const [tomadorCpf, setTomadorCpf] = useState("");
 
   const doEmit = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const n = emitDialog.nota;
     if (!n || !emitenteId) return;
     if (!n.paciente_id) { toast.error("Vincule um paciente à nota antes de emitir."); return; }
@@ -137,19 +149,11 @@ function Page() {
         .eq("id", n.paciente_id).maybeSingle();
       if (pacErr || !pac) throw new Error("Paciente não encontrado");
       const p = pac as PacFull;
-      const cpfLimpo = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
-      if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
-        throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
-      }
-      const res = await emitirFn({ data: {
-        emitenteId,
-        pacienteId: p.id,
-        pagamentoId: n.id ?? undefined,
-        valorServicos: Number(n.valor),
-        descricaoServicos: descricao || "Serviços prestados",
-        tomador: {
+      const cpfPaciente = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      const tomador = await pickTomadorNfse({
+        paciente: {
           nome: p.nome,
-          cpfCnpj: cpfLimpo,
+          cpfCnpj: cpfPaciente || undefined,
           email: p.email ?? undefined,
           cep: p.cep ?? undefined,
           logradouro: p.logradouro ?? undefined,
@@ -158,6 +162,34 @@ function Page() {
           municipio: p.cidade ?? undefined,
           uf: p.estado ?? undefined,
         },
+        valorBase: Number(n.valor) || 0,
+      });
+      if (!tomador) { setEmitting(false); toast.error("Emissão cancelada."); return; }
+      const cpfLimpo = (tomador.cpfCnpj ?? "").replace(/\D/g, "");
+      if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
+        throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
+      }
+      const parcial = aplicarValorParcial(Number(n.valor) || 0, tomador);
+      const descBase = (descricao && descricao.trim())
+        ? descricao.trim()
+        : montarDiscriminacaoNfse({
+            procedimento: null,
+            pacienteNome: p.nome,
+            dataReferencia: n.data_emissao,
+          });
+      const descComDep = tomador.dependenteAtendido
+        ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
+        : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { setEmitting(false); toast.error("Emissão cancelada."); return; }
+      const res = await emitirFn({ data: {
+        emitenteId,
+        pacienteId: p.id,
+        pagamentoId: n.id ?? undefined,
+        valorServicos: parcial.valor,
+        descricaoServicos: descFinal,
+        tomador: { ...tomador, cpfCnpj: cpfLimpo },
       } });
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
@@ -187,17 +219,19 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Notas dos pacientes</h1>
           <p className="text-sm text-muted-foreground">Registro e controle de NFs emitidas</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova nota</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova nota</Button></DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} nota</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Número</Label>
                   <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Série</Label>
                   <Input value={form.serie} onChange={(e) => setForm({ ...form, serie: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
+                  <DateInputBR required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor *</Label>
@@ -240,18 +274,28 @@ function Page() {
             </TableRow></TableHeader>
             <TableBody>{items.map((n) => (
               <TableRow key={n.id}>
-                <TableCell className="text-sm">{new Date(n.data_emissao).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{
+                  /^\d{4}-\d{2}-\d{2}$/.test(n.data_emissao)
+                    ? new Date(`${n.data_emissao}T12:00:00`).toLocaleDateString("pt-BR")
+                    : new Date(n.data_emissao).toLocaleDateString("pt-BR")
+                }</TableCell>
                 <TableCell className="text-sm">{n.numero ?? "—"} {n.serie && `/ ${n.serie}`}</TableCell>
                 <TableCell className="text-sm">{n.paciente_id ? pacMap.get(n.paciente_id) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={n.status === "emitida" ? "default" : "secondary"}>{n.status}</Badge></TableCell>
                 <TableCell className="text-right font-medium">{fmt(Number(n.valor))}</TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmit(n)} disabled={!n.paciente_id}>
-                    <Send className="h-3.5 w-3.5" />
-                  </Button>
+                  {podeEscrever && (
+                    <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmit(n)} disabled={!n.paciente_id}>
+                      <Send className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   {n.url_pdf && <a href={n.url_pdf} target="_blank" rel="noopener noreferrer"><Button variant="ghost" size="icon"><ExternalLink className="h-3.5 w-3.5" /></Button></a>}
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => remove(n)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                  {podeEscrever && (
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => remove(n)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>))}
             </TableBody>
@@ -298,6 +342,8 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {tomadorNfseDialog}
+      {descricaoNfseDialog}
     </div>
   );
 }

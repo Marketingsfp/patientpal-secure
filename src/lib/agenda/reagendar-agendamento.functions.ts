@@ -18,7 +18,7 @@
 //   caso Passo 4 falhe.
 //
 // NÃO altera: paciente_id, paciente_nome, procedimento, status, pacote_id,
-// orcamento_id, data_pagamento, enfermagem_recurso_id, fluxo_etapa,
+// orcamento_id, data_pagamento, fluxo_etapa,
 // fluxo_atualizado_em, executado_por, executado_em.
 
 import { createServerFn } from "@tanstack/react-start";
@@ -76,7 +76,7 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
     // ---------- 0. Carrega origem ----------
     const { data: origem, error: e0 } = await supabase
       .from("agendamentos")
-      .select("id,clinica_id,inicio,fim,medico_id,status,paciente_nome,observacoes,enfermagem_recurso_id")
+      .select("id,clinica_id,inicio,fim,medico_id,status,paciente_nome,observacoes")
       .eq("id", agendamento_id)
       .maybeSingle();
     if (e0) return { ok: false, pg_error: toPgErrorLike(e0) };
@@ -91,17 +91,6 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
         ok: false,
         validation_error: {
           message: "Este agendamento não pode ser reagendado (status " + origem.status + ").",
-        },
-      };
-    }
-
-    // Reagendar de recurso de enfermagem fica fora do escopo do MVP —
-    // requer regra própria de disponibilidade (bypass de slot na clássica).
-    if (origem.enfermagem_recurso_id) {
-      return {
-        ok: false,
-        validation_error: {
-          message: "Reagendamento de recursos de enfermagem ainda não é suportado na Agenda V2. Use a agenda clássica.",
         },
       };
     }

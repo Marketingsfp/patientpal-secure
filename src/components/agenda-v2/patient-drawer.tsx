@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { HhpChip } from "@/design-system/hhp";
 import { HhpDrawer } from "@/design-system/hhp/drawer";
 import type { StatusAgendamento } from "@/lib/agenda/status-agendamento.functions";
+import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 
 export interface DrawerPatientData {
   paciente_id?: string | null;
@@ -142,6 +143,12 @@ export function PatientDrawer({
     >
       {data && (
           <div className="animate-in fade-in duration-150">
+            {/* Alerta de ficha em uso simultâneo por outro funcionário */}
+            {open && primeiroAgendamentoId && (
+              <div className="px-6 pt-4">
+                <FichaEmUsoAlert agendamentoId={primeiroAgendamentoId} />
+              </div>
+            )}
             {/* 1. Cabeçalho */}
             <div className="px-6 pt-7 pb-5 border-b border-slate-100">
               <div className="flex items-start gap-4">
@@ -194,7 +201,7 @@ export function PatientDrawer({
                 />
               )}
               <SectionTitle>Ações rápidas</SectionTitle>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <QuickAction
                   icon={<Stethoscope className="h-4 w-4" />}
                   label="Prontuário"
@@ -401,7 +408,7 @@ function QuickAction({
 
 // Sprint 3 · S3-A — painel do Prontuário no drawer. Substitui o
 // placeholder por um resumo do procedimento atual + CTA que abre o
-// Atendimento IA daquele agendamento (mesma rota da Agenda Express).
+// Atendimento IA daquele agendamento.
 function ProntuarioPanel({
   proc,
   canOpen,

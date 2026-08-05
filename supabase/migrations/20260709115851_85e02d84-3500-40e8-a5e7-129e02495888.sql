@@ -1,0 +1,2 @@
+ALTER TABLE public.agendamentos ADD COLUMN IF NOT EXISTS forma_pagamento_prevista TEXT NULL;
+COMMENT ON COLUMN public.agendamentos.forma_pagamento_prevista IS 'Forma de pagamento prevista informada no agendamento (dinheiro, pix, cartao_credito, cartao_debito). A forma real é definida na cobrança.';

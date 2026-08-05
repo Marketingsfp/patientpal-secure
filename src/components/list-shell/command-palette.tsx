@@ -127,10 +127,9 @@ export function useDefaultScreenEntries(): CommandEntry[] {
     const mk = (label: string, to: string, hint?: string, keywords?: string[]): CommandEntry => ({
       id: `nav:${to}`, label, hint, group: "Telas", keywords, onSelect: nav(to),
     });
-    return [
+    const all: (CommandEntry | null)[] = [
       mk("Início", "/app", "Painel inicial"),
       mk("Agenda", "/app/agenda"),
-      mk("Agenda Express", "/app/agenda/express"),
       mk("Recepção", "/app/recepcao"),
       mk("Check-in", "/app/checkin"),
       mk("Clientes", "/app/clientes"),
@@ -149,15 +148,14 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
       mk("Empresas associadas", "/app/cartao-beneficios/convenios", "Empresas / entidades associadas", ["empresa","associada","grupos"]),
       mk("Financeiro — Movimento", "/app/financeiro/movimento"),
-      mk("Financeiro — Atendimentos", "/app/financeiro/atendimentos"),
       mk("Financeiro — Notas", "/app/financeiro/notas"),
       mk("Financeiro — Relatórios", "/app/financeiro/relatorios"),
       mk("Boletos", "/app/boletos"),
       mk("NFS-e", "/app/nfse"),
       mk("Procedimentos", "/app/procedimentos"),
       mk("Especialidades", "/app/especialidades"),
-      mk("Médicos", "/app/medicos"),
-      mk("Equipe", "/app/equipe"),
+      mk("Médicos", "/app/equipe"),
+      mk("Funcionários", "/app/hr-contratos"),
       mk("Unidades", "/app/unidades"),
       mk("Clínicas", "/app/clinicas"),
       mk("Perfis de acesso", "/app/perfis"),
@@ -165,5 +163,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("LGPD", "/app/lgpd"),
       mk("Relatórios", "/app/relatorios"),
     ];
+    return all.filter((e): e is CommandEntry => e !== null);
   }, [navigate]);
 }

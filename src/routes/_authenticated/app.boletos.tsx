@@ -6,7 +6,9 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/boletos")({
   component: BoletosPage,
   head: () => ({ meta: [{ title: "Boletos — ClinicaOS" }] }),
@@ -17,6 +19,7 @@ interface Form { valor: string; vencimento: string; nosso_numero: string; linha_
 const STATUS = ["pendente","pago","vencido","cancelado"];
 
 function BoletosPage() {
+  const podeEscrever = usePodeEscrever("boletos");
   return (
     <SimpleCrud<Row, Form>
       table="boletos"
@@ -25,6 +28,7 @@ function BoletosPage() {
       subtitle="Emita e acompanhe boletos integrados."
       icon={<Barcode className="h-6 w-6 text-primary" />}
       orderBy={{ column: "vencimento", ascending: false }}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nn", header: "Nosso número", render: r => r.nosso_numero ?? "—" },
         { key: "venc", header: "Vencimento", className: "w-32", render: r => new Date(r.vencimento).toLocaleDateString("pt-BR") },
@@ -36,9 +40,9 @@ function BoletosPage() {
       toPayload={f => ({ valor: Number(f.valor) || 0, vencimento: f.vencimento, nosso_numero: f.nosso_numero || null, linha_digitavel: f.linha_digitavel || null, status: f.status, observacoes: f.observacoes || null })}
       renderForm={(f, set) => (
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={f.valor} onChange={(v) => set({ ...f, valor: v })} /></div>
-            <div className="space-y-1"><Label>Vencimento *</Label><Input type="date" required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Vencimento *</Label><DateInputBR required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
             <div className="space-y-1"><Label>Status</Label>
               <Select value={f.status} onValueChange={v => set({ ...f, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

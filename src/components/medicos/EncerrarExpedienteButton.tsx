@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, PowerOff, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, PowerOff, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -120,7 +120,7 @@ export function EncerrarExpedienteButton() {
     return (
       <Button size="sm" variant="outline" className="h-7 text-[11px] px-2"
         onClick={() => setOpen(true)}>
-        <PowerOff className="h-3 w-3 mr-1.5" /> Encerrar expediente
+        <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
       </Button>
     );
   }
@@ -129,7 +129,7 @@ export function EncerrarExpedienteButton() {
     <>
       <Button size="sm" variant="outline" className="h-7 text-[11px] px-2"
         onClick={() => setOpen(true)}>
-        <PowerOff className="h-3 w-3 mr-1.5" /> Encerrar expediente
+        <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
         {encerrados.size > 0 && (
           <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
             {encerrados.size}

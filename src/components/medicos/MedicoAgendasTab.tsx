@@ -87,14 +87,26 @@ export function MedicoAgendasTab({
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId, procedimentoIdsKey]);
 
   const criar = async () => {
-    const nome = nova.trim();
-    if (!nome) { toast.error("Informe o nome"); return; }
-    const { data, error } = await supabase
+    const base = nova.trim();
+    if (!base) { toast.error("Informe o nome"); return; }
+    // Existe unique index (medico_id, lower(nome)) em medico_agendas.
+    // Se o nome colidir com uma agenda já existente do médico, gera um sufixo
+    // numérico automaticamente ("AGENDA 2", "AGENDA 3"…) para o usuário
+    // conseguir criar mais horários sem precisar renomear manualmente.
+    const nomesExistentes = new Set(agendas.map((x) => x.nome.trim().toLowerCase()));
+    let nome = base;
+    if (nomesExistentes.has(nome.toLowerCase())) {
+      let n = 2;
+      while (nomesExistentes.has(`${base} ${n}`.toLowerCase())) n++;
+      nome = `${base} ${n}`;
+    }
+    const { error } = await supabase
       .from("medico_agendas")
       .insert({ clinica_id: clinicaId, medico_id: medicoId, nome, ordem: agendas.length } as never)
       .select("id")
       .single();
     if (error) { mostrarErro(error); return; }
+    if (nome !== base) toast.success(`Agenda criada como "${nome}" (já existia uma "${base}").`);
     setNova("");
     await load();
   };

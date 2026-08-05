@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,29 +46,35 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive"> = {
 
 function LgpdPage() {
   const { clinicaAtual } = useClinica();
-  const [rows, setRows] = useState<Solicitacao[]>([]);
-  const [loading, setLoading] = useState(true);
+  const podeEscrever = usePodeEscrever("lgpd");
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ tipo: "acesso", descricao: "" });
   const [saving, setSaving] = useState(false);
   const [respondendo, setRespondendo] = useState<Solicitacao | null>(null);
   const [respostaForm, setRespostaForm] = useState({ status: "atendida", resposta: "" });
 
-  async function load() {
-    if (!clinicaAtual) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("lgpd_solicitacoes")
-      .select("id,tipo,descricao,status,resposta,respondido_em,created_at")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("created_at", { ascending: false });
-    if (error) mostrarErro(error);
-    else setRows((data ?? []) as Solicitacao[]);
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Baixo impacto de staleness (nenhum efeito financeiro/clínico) — cache de 5min.
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ["lgpd-solicitacoes", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lgpd_solicitacoes")
+        .select("id,tipo,descricao,status,resposta,respondido_em,created_at")
+        .eq("clinica_id", clinicaId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Solicitacao[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["lgpd-solicitacoes", clinicaId] });
 
   async function criarSolicitacao() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (!form.descricao.trim()) { toast.error("Descreva sua solicitação"); return; }
     setSaving(true);
@@ -86,6 +94,7 @@ function LgpdPage() {
   }
 
   async function responder() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!respondendo) return;
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("lgpd_solicitacoes").update({
@@ -108,7 +117,7 @@ function LgpdPage() {
           <h1 className="text-xl font-bold">LGPD — Lei Geral de Proteção de Dados</h1>
           <p className="text-sm text-muted-foreground">Gerencie consentimentos e solicitações dos titulares de dados.</p>
         </div>
-        <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
+        {podeEscrever && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>}
       </div>
 
       <Card className="p-4">
@@ -141,9 +150,11 @@ function LgpdPage() {
                 <TableCell className="text-sm text-muted-foreground line-clamp-2 max-w-md">{r.descricao}</TableCell>
                 <TableCell><Badge variant={STATUS_COLORS[r.status] ?? "secondary"}>{r.status}</Badge></TableCell>
                 <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => { setRespondendo(r); setRespostaForm({ status: r.status, resposta: r.resposta ?? "" }); }}>
-                    Responder
-                  </Button>
+                  {podeEscrever && (
+                    <Button size="sm" variant="ghost" onClick={() => { setRespondendo(r); setRespostaForm({ status: r.status, resposta: r.resposta ?? "" }); }}>
+                      Responder
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -171,7 +182,7 @@ function LgpdPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={criarSolicitacao} disabled={saving}>{saving ? "Enviando…" : "Enviar"}</Button>
+            <Button onClick={criarSolicitacao} disabled={saving || !podeEscrever}>{saving ? "Enviando…" : "Enviar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -205,7 +216,7 @@ function LgpdPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRespondendo(null)}>Cancelar</Button>
-            <Button onClick={responder}>Salvar</Button>
+            <Button onClick={responder} disabled={!podeEscrever}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

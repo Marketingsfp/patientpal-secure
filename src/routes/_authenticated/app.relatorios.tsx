@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { useUserPref } from "@/hooks/use-user-pref";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,6 @@ import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -21,11 +19,14 @@ import {
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
   HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
+  CloudRain, Sun,
 } from "lucide-react";
+import { getClimaPeriodo, type ClimaDia } from "@/lib/clima";
 import { CuboBI } from "@/components/relatorios/CuboBI";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -363,9 +364,8 @@ const RELATORIOS: Relatorio[] = [
 
 function RelatoriosPage() {
   const { clinicaAtual } = useClinica();
-  const [aba, setAba] = useUserPref("relatorios.aba", "dashboard");
-  const [ini, setIni] = useUserPref("relatorios.de", mesAtras);
-  const [fim, setFim] = useUserPref("relatorios.ate", hoje);
+  const [ini, setIni] = useState(mesAtras);
+  const [fim, setFim] = useState(hoje);
   const [loading, setLoading] = useState<string | null>(null);
 
   async function baixar(r: Relatorio) {
@@ -396,7 +396,7 @@ function RelatoriosPage() {
         <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
-      <Tabs value={aba} onValueChange={setAba}>
+      <Tabs defaultValue="dashboard">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
           <TabsList>
             <TabsTrigger value="dashboard" className="gap-2">
@@ -415,11 +415,11 @@ function RelatoriosPage() {
           <div className="flex items-end gap-2">
             <div>
               <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
-              <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
             </div>
             <div>
               <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
-              <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
             </div>
           </div>
         </div>
@@ -512,6 +512,28 @@ function DashboardView({
   const [loading, setLoading] = useState(false);
   const [raw, setRaw] = useState<RawData | null>(null);
   const [drill, setDrill] = useState<null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas">(null);
+  // Clima diário (chuva) no período — carregado à parte para não travar o dashboard
+  const [clima, setClima] = useState<Map<string, ClimaDia> | null>(null);
+  const [climaIndisponivel, setClimaIndisponivel] = useState(false);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    let cancel = false;
+    setClima(null);
+    setClimaIndisponivel(false);
+    (async () => {
+      try {
+        const m = await getClimaPeriodo(clinicaId, ini, fim);
+        if (cancel) return;
+        if (m === null) setClimaIndisponivel(true);
+        else setClima(m);
+      } catch (e) {
+        console.error("clima:", e);
+        if (!cancel) setClimaIndisponivel(true);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [clinicaId, ini, fim]);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -631,6 +653,67 @@ function DashboardView({
     [data],
   );
 
+  // Linhas do card Movimento × Clima: um registro por dia do período (até hoje),
+  // cruzando chuva com nº de agendamentos e receita do dia.
+  const climaRows = useMemo(() => {
+    if (!raw) return [];
+    const fimReal = fim > hoje ? hoje : fim;
+    if (ini > fimReal) return [];
+    const agendPorDia = new Map<string, number>();
+    raw.agend.forEach((a) => {
+      const d = a.inicio.slice(0, 10);
+      agendPorDia.set(d, (agendPorDia.get(d) ?? 0) + 1);
+    });
+    const receitaPorDia = new Map<string, number>();
+    raw.fin.forEach((f) => {
+      if (f.tipo !== "receita") return;
+      const d = f.data.slice(0, 10);
+      receitaPorDia.set(d, (receitaPorDia.get(d) ?? 0) + f.valor);
+    });
+    const rows: { dia: string; clima: ClimaDia | null; agend: number; receita: number }[] = [];
+    const cursor = new Date(ini + "T12:00:00");
+    const end = new Date(fimReal + "T12:00:00");
+    while (cursor <= end) {
+      const d = cursor.toISOString().slice(0, 10);
+      rows.push({
+        dia: d,
+        clima: clima?.get(d) ?? null,
+        agend: agendPorDia.get(d) ?? 0,
+        receita: receitaPorDia.get(d) ?? 0,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return rows;
+  }, [raw, clima, ini, fim]);
+
+  const climaResumo = useMemo(() => {
+    const comClima = climaRows.filter((r) => r.clima !== null);
+    const chuva = comClima.filter((r) => r.clima!.choveu);
+    const semChuva = comClima.filter((r) => !r.clima!.choveu);
+    const media = (l: typeof climaRows) =>
+      l.length === 0 ? null : l.reduce((acc, r) => acc + r.agend, 0) / l.length;
+    return {
+      diasChuva: chuva.length,
+      diasSem: semChuva.length,
+      mediaAgendChuva: media(chuva),
+      mediaAgendSem: media(semChuva),
+    };
+  }, [climaRows]);
+
+  function exportarClima() {
+    const flat = climaRows.map((r) => ({
+      Data: r.dia.split("-").reverse().join("/"),
+      "Choveu?": r.clima ? (r.clima.choveu ? "Sim" : "Não") : "Sem dado",
+      "Precipitação (mm)": r.clima?.precipitacao_mm ?? "",
+      "Temp. mín (°C)": r.clima?.temp_min ?? "",
+      "Temp. máx (°C)": r.clima?.temp_max ?? "",
+      Agendamentos: r.agend,
+      Receita: r.receita,
+    }));
+    if (!flat.length) { toast.info("Nada para exportar."); return; }
+    exportToExcel(flat, `movimento-clima-${ini}-a-${fim}`);
+  }
+
   // ---------- widgets editáveis ----------
   const ALL_WIDGETS: { id: string; label: string; group: "kpi" | "chart" }[] = [
     { id: "kpi_agend", label: "KPI — Agendamentos", group: "kpi" },
@@ -640,6 +723,7 @@ function DashboardView({
     { id: "kpi_rec", label: "KPI — Receitas", group: "kpi" },
     { id: "kpi_desp", label: "KPI — Despesas", group: "kpi" },
     { id: "ch_fin_dia", label: "Gráfico — Receitas vs Despesas por dia", group: "chart" },
+    { id: "ch_clima", label: "Tabela — Movimento × Clima (chuva)", group: "chart" },
     { id: "ch_agend_status", label: "Gráfico — Agendamentos por status", group: "chart" },
     { id: "ch_agend_medico", label: "Gráfico — Agendamentos por médico", group: "chart" },
     { id: "ch_fin_cat", label: "Gráfico — Financeiro por categoria", group: "chart" },
@@ -766,6 +850,91 @@ function DashboardView({
         </Card>
       )}
 
+      {/* Movimento × Clima — chuva por dia vs agendamentos/receita */}
+      {on("ch_clima") && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CloudRain className="h-4 w-4 text-sky-500" /> Movimento × Clima (por dia)
+              </CardTitle>
+              <Button onClick={exportarClima} variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" /> Exportar Excel
+              </Button>
+            </div>
+            {clima && climaResumo.diasChuva + climaResumo.diasSem > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {climaResumo.diasChuva} dia{climaResumo.diasChuva === 1 ? "" : "s"} com chuva e {climaResumo.diasSem} sem chuva no período.
+                {climaResumo.mediaAgendChuva !== null && climaResumo.mediaAgendSem !== null && (
+                  <> Média de agendamentos: <b className="text-sky-600">{climaResumo.mediaAgendChuva.toFixed(1)}/dia com chuva</b> vs{" "}
+                  <b className="text-amber-600">{climaResumo.mediaAgendSem.toFixed(1)}/dia sem chuva</b>.</>
+                )}
+              </p>
+            )}
+          </CardHeader>
+          <CardContent>
+            {climaIndisponivel ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Não foi possível obter o clima. Cadastre a cidade ou as coordenadas (latitude/longitude) da clínica.
+              </p>
+            ) : !clima ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Carregando clima…</p>
+            ) : climaRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Sem dias no período.</p>
+            ) : (
+              <div className="max-h-96 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-28">Data</TableHead>
+                      <TableHead className="w-40">Clima</TableHead>
+                      <TableHead className="w-28 text-right">Chuva (mm)</TableHead>
+                      <TableHead className="w-32 text-right">Temp. mín/máx</TableHead>
+                      <TableHead className="text-right">Agendamentos</TableHead>
+                      <TableHead className="text-right">Receita</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {climaRows.map((r) => (
+                      <TableRow key={r.dia} className={r.clima?.choveu ? "bg-sky-50/60 dark:bg-sky-950/20" : undefined}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {r.dia.split("-").reverse().join("/")}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {r.clima ? (
+                            r.clima.choveu ? (
+                              <span className="inline-flex items-center gap-1.5 text-sky-700 dark:text-sky-400 font-medium">
+                                <CloudRain className="h-4 w-4" /> Chuva
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                                <Sun className="h-4 w-4" /> Sem chuva
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sem dado</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {r.clima?.precipitacao_mm != null ? r.clima.precipitacao_mm.toFixed(1) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-xs whitespace-nowrap">
+                          {r.clima?.temp_min != null && r.clima?.temp_max != null
+                            ? `${Math.round(r.clima.temp_min)}° / ${Math.round(r.clima.temp_max)}°`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">{r.agend}</TableCell>
+                        <TableCell className="text-right text-xs">{fmtBRL(r.receita)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pies */}
       {chartsVisible > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -880,10 +1049,6 @@ type AgendDiaRow = {
 
 function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const [loading, setLoading] = useState(false);
-  const [ordem, setOrdem] = useUserPref<"recentes" | "antigos" | "paciente" | "consulta">(
-    "relatorios.agend-diario.ordem",
-    "recentes"
-  );
   const [rows, setRows] = useState<AgendDiaRow[]>([]);
   const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
   const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
@@ -960,14 +1125,6 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
   }, [clinicaId, ini, fim]);
 
   const agrupado = useMemo(() => {
-    const ordenar = (lista: AgendDiaRow[]) =>
-      [...lista].sort((a, b) => {
-        if (ordem === "antigos") return a.created_at.localeCompare(b.created_at);
-        if (ordem === "paciente")
-          return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR");
-        if (ordem === "consulta") return a.inicio.localeCompare(b.inicio);
-        return b.created_at.localeCompare(a.created_at);
-      });
     const bySetor = new Map<string, Map<string, AgendDiaRow[]>>();
     for (const r of rows) {
       const uid = r.criado_por ?? "";
@@ -983,11 +1140,11 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         setor,
         total: Array.from(m.values()).reduce((acc, l) => acc + l.length, 0),
         atendentes: Array.from(m.entries())
-          .map(([nome, lista]) => ({ nome, lista: ordenar(lista) }))
+          .map(([nome, lista]) => ({ nome, lista }))
           .sort((a, b) => b.lista.length - a.lista.length),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [rows, profMap, setorMap, ordem]);
+  }, [rows, profMap, setorMap]);
 
   const totalGeral = rows.length;
 
@@ -1027,18 +1184,6 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">Ordenar por</Label>
-            <Select value={ordem} onValueChange={(v) => setOrdem(v as typeof ordem)}>
-              <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recentes">Criação (mais recentes)</SelectItem>
-                <SelectItem value="antigos">Criação (mais antigos)</SelectItem>
-                <SelectItem value="consulta">Data da consulta</SelectItem>
-                <SelectItem value="paciente">Paciente (A–Z)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Total no período</div>
             <div className="text-2xl font-bold">{totalGeral}</div>
