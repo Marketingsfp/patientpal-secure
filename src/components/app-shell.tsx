@@ -26,8 +26,6 @@ import {
   ShieldCheck,
   BarChart3,
   Wallet,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   Search,
   HeartPulse,
@@ -53,8 +51,6 @@ import {
   FileBarChart2,
   Moon,
   Sun,
-  Pin,
-  PinOff,
   Menu as MenuIcon,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
@@ -364,27 +360,9 @@ export function AppShell() {
     }
   };
   const lastArrowNavAtRef = useRef(0);
-  const [collapsedManual, setCollapsedManual] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    if (window.innerWidth < 1024) return true;
-    return window.localStorage.getItem("appshell:collapsed") === "1";
-  });
-  // Menu que expande ao passar o mouse (só São Francisco de Paula).
-  // `fixadoAberto` é um "alfinete" opcional: mantém aberto sem depender do
-  // mouse. Chave própria no localStorage para não afetar o menu clássico.
-  const [hoverSidebar, setHoverSidebar] = useState(false);
-  const [fixadoAberto, setFixadoAberto] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("appshell:menu-fixado") === "1";
-  });
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:menu-fixado", fixadoAberto ? "1" : "0");
-    }
-  }, [fixadoAberto]);
-  // Com a flag: recolhido por padrão, expande no hover (ou se estiver fixado).
-  // Sem a flag: exatamente o comportamento anterior (só o botão controla).
-  const collapsed = uxMelhorias ? !fixadoAberto && !hoverSidebar : collapsedManual;
+  // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
+  // aberta pelo botão hamburguer do cabeçalho (drawer).
+  const collapsed = false;
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -398,20 +376,6 @@ export function AppShell() {
       window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
     }
   }, [openGroups]);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:collapsed", collapsedManual ? "1" : "0");
-    }
-  }, [collapsedManual]);
-  // Auto-collapse on small screens
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onResize = () => {
-      if (window.innerWidth < 1024) setCollapsedManual(true);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
@@ -814,46 +778,18 @@ export function AppShell() {
     <div className={cn("flex bg-background overflow-hidden", uxMelhorias ? "h-[100dvh]" : "h-screen")}>
       {!isChooser && (
         <aside
-          onMouseEnter={uxMelhorias ? () => setHoverSidebar(true) : undefined}
-          onMouseLeave={uxMelhorias ? () => setHoverSidebar(false) : undefined}
           className={cn(
-            "transition-all duration-200 shrink-0 text-white overflow-hidden hidden md:flex flex-col",
+            "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-56 2xl:w-64",
+            "w-56 2xl:w-64",
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
+          <div className="px-3 py-3 border-b border-white/10 flex items-center gap-2">
             <Link to="/app" className="flex items-center gap-2 min-w-0">
               <Activity className="h-5 w-5 shrink-0" />
-              {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
+              <span className="font-semibold tracking-tight truncate">ClinicaOS</span>
             </Link>
-            {/* No modo hover o botão vira "fixar aberto" e só aparece com o
-              menu expandido — recolhido, basta passar o mouse. */}
-            {uxMelhorias ? (
-              !collapsed && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
-                  onClick={() => setFixadoAberto((v) => !v)}
-                  title={fixadoAberto ? "Desafixar (expandir só ao passar o mouse)" : "Fixar menu aberto"}
-                  aria-pressed={fixadoAberto}
-                >
-                  {fixadoAberto ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                </Button>
-              )
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
-                onClick={() => setCollapsedManual((v) => !v)}
-                title={collapsed ? "Expandir menu" : "Recolher menu"}
-              >
-                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              </Button>
-            )}
           </div>
           <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
             {visibleNavRows.map((row) => {
@@ -1028,7 +964,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="md:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-muted shrink-0"
+              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-muted shrink-0"
               aria-label="Abrir menu"
               title="Menu"
             >
@@ -1161,7 +1097,7 @@ export function AppShell() {
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden sidebar-scroll"
+            className="w-[280px] p-0 border-0 text-white overflow-y-auto lg:hidden sidebar-scroll"
             style={{ backgroundColor: corSidebar }}
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
