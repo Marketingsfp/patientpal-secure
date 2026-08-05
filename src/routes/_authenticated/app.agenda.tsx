@@ -8719,33 +8719,33 @@ function AgendaPage() {
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="hidden lg:block rounded-lg border border-border bg-card overflow-x-auto">
-          <Table className="min-w-[820px] xl:min-w-[900px]">
+        <div className="hidden lg:block rounded-lg border border-border bg-card">
+          <Table className="w-full table-fixed">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
-                <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
+                <TableHead className="w-[3%] rounded-tl-lg px-2" title="Selecione para ações em lote">
                   <Checkbox
                     checked={paginados.length > 0 && selecionados.size === paginados.length}
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[5%] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
-                <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
-                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="min-w-[110px] xl:min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[5%] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
+                <TableHead className="w-[8%] px-2 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="w-[11%] px-2 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
+                <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="min-w-[130px] xl:min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[19%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="min-w-[100px] xl:min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[14%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
-                <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+                <TableHead className="w-[10%] px-2 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -8841,19 +8841,19 @@ function AgendaPage() {
                       <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 text-sm font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-2 text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Profissional */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2">
                         {(() => {
                           const label = medicoNomeAgendamento(a);
                           const m = medicos.find((x) => x.id === a.medico_id);
                           const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                           return (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm truncate max-w-[110px]" title={label}>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="text-sm truncate" title={label}>
                                 {label}
                               </span>
                               {manual && (
@@ -8867,16 +8867,16 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Cliente */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2">
                         {ocultarPaciente ? (
-                          <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
+                          <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
-                          <span className="text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
+                          <span className="block truncate text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="flex items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline max-w-full"
+                            className="flex min-w-0 max-w-full items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline"
                             title={a.paciente_nome}
                           >
                             {a.status === "confirmado" && (
@@ -8891,7 +8891,7 @@ function AgendaPage() {
                                 <IdCard className="h-3.5 w-3.5 text-emerald-600" />
                               </span>
                             )}
-                            <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
+                            <span className="truncate">{a.paciente_nome}</span>
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
                                 ORÇ
@@ -8902,7 +8902,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2 min-w-0">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -8917,7 +8917,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-2.5">
+                      <TableCell className="py-2.5 px-2">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
@@ -8944,8 +8944,8 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="py-1.5 text-right">
-                        <div className="flex items-center justify-end gap-0.5">
+                      <TableCell className="py-1.5 px-1 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-0.5">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
                           {!ehLivre &&
                             !realizado &&
