@@ -170,13 +170,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Operação",
     items: [
+      { to: "/app/painel", label: "Dashboard — Início", icon: LayoutDashboard },
       { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
       { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
       { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
       { to: "/app/caixa", label: "Caixa", icon: Wallet },
       { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
       { to: "/app/clientes", label: "Clientes", icon: Contact },
-      { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/painel-executivo", label: "Painel Executivo", icon: FileBarChart2 },
       { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
       { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
