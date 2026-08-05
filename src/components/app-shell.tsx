@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,6 +16,7 @@ import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
+import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useTheme } from "@/hooks/use-theme";
 import { useMenuOrdem } from "@/hooks/use-menu-ordem";
@@ -119,6 +120,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
     { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
+    { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
     ],
   },
   {
@@ -171,7 +173,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
-    { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
     { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
     { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
@@ -208,6 +209,9 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Configurações",
     items: [
     { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
+    { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
+    { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
+    { to: "/app/backups", label: "Backups", icon: ShieldCheck },
     ],
   },
 ];
@@ -365,7 +369,7 @@ export function AppShell() {
       /servico|procediment|exame/.test(t) ? "/app/procedimentos" :
       /or[çc]amento/.test(t) ? "/app/orcamentos" :
       /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t) ? "/app/cartao-beneficios/contratos" :
-      /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :
+      /modelo|template/.test(t) ? "/app/cartao-beneficios/convenios" :
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/unidades" :
@@ -436,8 +440,14 @@ export function AppShell() {
   // Bypass exclusivo do Rodrigo: vê todas as telas criadas, sem filtro de
   // permissão nem de subsystem. Não afeta nenhum outro usuário.
   const isRodrigoFullAccess = (user?.email ?? "").toLowerCase() === "rodrigorss2301@gmail.com";
+  // Admin também ignora o filtro de subsystem: um admin já tem allowed=null em
+  // usePermissoes, então não faz sentido esconder grupos inteiros porque ele
+  // clicou uma vez em "Gestor Clínico" / "Gestão de Pessoas" no seletor /app.
+  // (O filtro de subsystem segue valendo para papéis operacionais.)
+  const isAdminFullMenu = clinicaAtual?.role === "admin";
+  const bypassSubsystem = isRodrigoFullAccess || isAdminFullMenu;
 
-  const filteredByGroup = isRodrigoFullAccess
+  const filteredByGroup = bypassSubsystem
     ? navRows
     : subsystem
       ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
@@ -445,7 +455,7 @@ export function AppShell() {
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
     const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
-    const items = !isRodrigoFullAccess && subsystem === "gestao-pessoas"
+    const items = !bypassSubsystem && subsystem === "gestao-pessoas"
       ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
@@ -978,6 +988,7 @@ export function AppShell() {
               <span className="text-base font-semibold">?</span>
             </Button>
             <EstornosBell />
+            <TTSToggle />
           </div>
         </header>
         <main

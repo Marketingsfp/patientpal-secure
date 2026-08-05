@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
@@ -38,6 +39,7 @@ import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -55,7 +57,7 @@ export const Route = createFileRoute("/_authenticated/app/caixa")({
  * `outros` como residual.
  */
 const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
-type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros";
+type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros" | "indeterminado";
 
 function normalizarForma(f: string | null | undefined): FormaBucket {
   const k = (f ?? "").toLowerCase().trim();
@@ -128,8 +130,28 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
 const FORMA_LABEL: Record<FormaBucket, string> = {
   dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
   boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
-  misto: "Misto", outros: "Outros",
+  misto: "Misto", outros: "Outros", indeterminado: "Indeterminado (conferir)",
 };
+
+/**
+ * Falha 2.8 — decomposição do "misto" a partir de DADO ESTRUTURADO
+ * (`fin_lancamentos.composicao_pagamento`). O texto da observação vira
+ * apenas fallback legado. Retorna `null` quando não há fonte confiável —
+ * nesse caso o valor NUNCA deve ser contabilizado como Dinheiro.
+ */
+function partesDaComposicao(comp: unknown): Partial<Record<FormaBucket, number>> | null {
+  if (!comp || typeof comp !== "object") return null;
+  const arr = (comp as { partes?: unknown }).partes;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const out: Partial<Record<FormaBucket, number>> = {};
+  for (const p of arr as Array<{ forma?: string; valor?: number | string }>) {
+    const b = normalizarForma(p?.forma);
+    const v = Number(p?.valor ?? 0);
+    if (!v || b === "misto") continue;
+    out[b] = (out[b] ?? 0) + v;
+  }
+  return Object.keys(out).length ? out : null;
+}
 function formatarFormaPagamento(
   m: { forma_pagamento: string | null; lancamento_id?: string | null },
   mistoObs: Record<string, string>,
@@ -158,9 +180,17 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
+  // `?classico=1` força a tela clássica (usado pelos botões do caixa novo
+  // que delegam ações ao clássico). Sem isso, navegar para /app/caixa
+  // continuava caindo no caixa novo e "nada acontecia".
+  const forcaClassico = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("classico") === "1";
+  // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
+  // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
+  useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
+  if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
 
@@ -178,6 +208,36 @@ interface Mov {
   created_at: string;
   lancamento_id?: string | null;
 }
+type MovEnrich = {
+  servico: string | null;
+  medico: string | null;
+  paciente: string | null;
+  paciente_id: string | null;
+  ficha: number | null;
+  /** ID do usuário que faturou (fin_lancamentos.criado_por) — pode diferir
+   *  do operador de caixa (caixa_movimentos.user_id) em cobranças
+   *  centralizadas. Usado para exibir "Quem faturou" na coluna Usuário. */
+  faturado_por_id: string | null;
+};
+type LancamentoEnrichRow = {
+  id: string;
+  medico_id: string | null;
+  agendamento_id: string | null;
+  paciente_id: string | null;
+  descricao: string | null;
+  status: string | null;
+  criado_por: string | null;
+};
+type AgendamentoEnrichRow = {
+  id: string;
+  procedimento: string | null;
+  paciente_id: string | null;
+  medico_id: string | null;
+  ficha_numero: number | null;
+  inicio: string | null;
+  agenda_id: string | null;
+  paciente_nome: string | null;
+};
 interface FilaCaixa {
   id: string;
   paciente_id: string | null;
@@ -264,6 +324,30 @@ function pacienteFromDescricao(desc: string | null): string | null {
     return nome;
   }
   return null;
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+function saoPauloDayKey(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+function saoPauloDayRange(day: string): { start: string; end: string } {
+  return {
+    start: `${day}T00:00:00.000-03:00`,
+    end: `${day}T23:59:59.999-03:00`,
+  };
+}
+
+function formatFichaCaixa(ficha: number | null | undefined): string {
+  return typeof ficha === "number" && ficha > 0 ? String(ficha).padStart(3, "0") : "—";
 }
 
 const BANDEIRAS_CARTAO = [
@@ -359,7 +443,17 @@ function Page() {
   // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>>(new Map());
+  // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
+  // para o botão de estorno de sangria (que não tem lançamento financeiro).
+  const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
+  // Mapa user_id → nome de exibição. Alimenta a coluna "Usuário" (quem
+  // faturou) em Movimentos, no Detalhe de sessão, no drill-down do saldo
+  // e na exportação/impressão. Cobre tanto o operador do caixa
+  // (caixa_movimentos.user_id) quanto o autor do lançamento financeiro
+  // (fin_lancamentos.criado_por) — que podem divergir em cobranças
+  // centralizadas (ex.: financeiro/laboratório).
+  const [userNamesById, setUserNamesById] = useState<Map<string, string>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
@@ -754,7 +848,7 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", user.id)
         .order("aberto_em", { ascending: false })
-        .limit(20),
+        .limit(5),
     ]);
     const aberta = abertaRes.data;
     setMinhaSessao((aberta ?? null) as Sessao | null);
@@ -766,77 +860,132 @@ function Page() {
     const enrichMovsList = async (
       movsList: Mov[],
     ): Promise<{
-      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>;
+      enrich: Map<string, MovEnrich>;
       cancelados: Set<string>;
     }> => {
-      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>();
+      const enrich = new Map<string, MovEnrich>();
       const cancelados = new Set<string>();
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       if (lancIds.length === 0) return { enrich, cancelados };
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
-        .in("id", lancIds);
-      const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; paciente_id: string | null; descricao: string | null; status: string | null }>;
+      const lancRows: LancamentoEnrichRow[] = [];
+      for (const ids of chunkArray(lancIds, 200)) {
+        const { data, error } = await supabase
+          .from("fin_lancamentos")
+          .select("id, medico_id, agendamento_id, paciente_id, descricao, status, criado_por")
+          .in("id", ids);
+        if (error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por lançamento", error);
+          continue;
+        }
+        lancRows.push(...((data ?? []) as LancamentoEnrichRow[]));
+      }
       for (const l of lancRows) {
         if (l.status === "cancelado") cancelados.add(l.id);
       }
-      const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
+      const medIds = new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x));
       const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
-      const pacIds = Array.from(new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x)));
-      const [medRes, agRes, pacRes] = await Promise.all([
-        medIds.length > 0
-          ? supabase.from("medicos").select("id, nome").in("id", medIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
-        agIds.length > 0
-          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id").in("id", agIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }> }),
-        pacIds.length > 0
-          ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
-      ]);
-      const medMap = new Map<string, string>();
-      for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (m.nome) medMap.set(m.id, m.nome);
+      const pacIds = new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x));
+
+      const agChunks = chunkArray(agIds, 200);
+      const agResults = await Promise.all(
+        agChunks.map((ids) =>
+          supabase
+            .from("agendamentos")
+            .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
+            .in("id", ids),
+        ),
+      );
+      const agRows: AgendamentoEnrichRow[] = [];
+      for (const r of agResults) {
+        if (r.error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por agendamento", r.error);
+          continue;
+        }
+        agRows.push(...((r.data ?? []) as AgendamentoEnrichRow[]));
       }
-      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null }>();
-      const procIds = new Set<string>();
-      const pacIdsExtra = new Set<string>();
-      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }>) {
-        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id });
-        if (a.procedimento_id) procIds.add(a.procedimento_id);
+
+      const agMap = new Map<string, AgendamentoEnrichRow>();
+      for (const a of agRows) {
+        agMap.set(a.id, a);
+        if (a.medico_id) medIds.add(a.medico_id);
         // Paciente pelo agendamento cobre casos em que fin_lancamentos
         // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
         // por caminhos antigos).
-        if (a.paciente_id && !pacIds.includes(a.paciente_id)) pacIdsExtra.add(a.paciente_id);
+        if (a.paciente_id) pacIds.add(a.paciente_id);
+      }
+
+      const medChunks = chunkArray(Array.from(medIds), 200);
+      const pacChunks = chunkArray(Array.from(pacIds), 200);
+      const [medResults, pacResults] = await Promise.all([
+        Promise.all(medChunks.map((ids) => supabase.from("medicos").select("id, nome").in("id", ids))),
+        Promise.all(pacChunks.map((ids) => supabase.from("pacientes").select("id, nome").in("id", ids))),
+      ]);
+      const medMap = new Map<string, string>();
+      for (const r of medResults) {
+        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por médico", r.error); continue; }
+        for (const m of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (m.nome) medMap.set(m.id, m.nome);
+        }
       }
       const pacMap = new Map<string, string>();
-      for (const p of (pacRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (p.nome) pacMap.set(p.id, p.nome);
-      }
-      if (pacIdsExtra.size > 0) {
-        const { data: pacsExtra } = await supabase
-          .from("pacientes")
-          .select("id, nome")
-          .in("id", Array.from(pacIdsExtra));
-        for (const p of (pacsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+      for (const r of pacResults) {
+        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por paciente", r.error); continue; }
+        for (const p of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
       }
-      const procMap = new Map<string, string>();
-      if (procIds.size > 0) {
-        const { data: procs } = await supabase
-          .from("procedimentos")
-          .select("id, nome")
-          .in("id", Array.from(procIds));
-        for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (p.nome) procMap.set(p.id, p.nome);
+
+      const fichaCalculadaPorAg = new Map<string, number>();
+      // Fichas calculadas: em vez de uma consulta por (dia, médico, agenda) —
+      // que gerava dezenas de idas ao banco em série — buscamos os
+      // agendamentos do dia inteiro UMA vez por dia (em paralelo) e
+      // classificamos por (médico, agenda) no navegador. Mesma numeração
+      // final, custo drasticamente menor.
+      const diasFicha = new Set<string>();
+      for (const a of agRows) {
+        if (typeof a.ficha_numero === "number" && a.ficha_numero > 0) continue;
+        const day = saoPauloDayKey(a.inicio);
+        if (day) diasFicha.add(day);
+      }
+      if (diasFicha.size > 0) {
+        const dias = Array.from(diasFicha);
+        const diaResults = await Promise.all(
+          dias.map((day) => {
+            const range = saoPauloDayRange(day);
+            return supabase
+              .from("agendamentos")
+              .select("id, inicio, paciente_nome, medico_id, agenda_id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .gte("inicio", range.start)
+              .lte("inicio", range.end)
+              .range(0, 9999);
+          }),
+        );
+        type FichaRow = { id: string; inicio: string | null; paciente_nome: string | null; medico_id: string | null; agenda_id: string | null };
+        for (const r of diaResults) {
+          if (r.error) { console.warn("Falha ao calcular ficha no caixa", r.error); continue; }
+          const rows = (r.data ?? []) as FichaRow[];
+          const porGrupo = new Map<string, FichaRow[]>();
+          for (const row of rows) {
+            const key = `${row.medico_id ?? "__sem_profissional__"}::${row.agenda_id ?? "__sem_agenda__"}`;
+            const arr = porGrupo.get(key) ?? [];
+            arr.push(row);
+            porGrupo.set(key, arr);
+          }
+          for (const arr of porGrupo.values()) {
+            arr.sort((a, b) => {
+              const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
+              if (t !== 0) return t;
+              return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+            });
+            arr.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
+          }
         }
       }
+
       for (const l of lancRows) {
         const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
-        const procId = agInfo?.procedimento_id ?? null;
-        const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+        const servicoFromProc = agInfo?.procedimento ?? null;
         // fallback: extrai serviço da descrição do lançamento
         let servico = servicoFromProc;
         if (!servico && l.descricao) {
@@ -849,11 +998,14 @@ function Page() {
         // linha usará pacienteFromDescricao() no render.
         const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
         const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
+        const medIdEfetivo = l.medico_id ?? agInfo?.medico_id ?? null;
         enrich.set(l.id, {
           servico,
-          medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
+          ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
+          faturado_por_id: l.criado_por ?? null,
         });
       }
       return { enrich, cancelados };
@@ -905,28 +1057,49 @@ function Page() {
   // às movimentações atuais para trocar o botão pelo rótulo
   // "Aguardando aprovação" quando o financeiro ainda não decidiu.
   const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
+    if (!clinicaAtual) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
     const ids = Array.from(new Set(
       minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
     ));
-    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
-    const { data } = await supabase
+    const sangriaIds = Array.from(new Set(
+      minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id),
+    ));
+    if (ids.length === 0 && sangriaIds.length === 0) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
+    let q = supabase
       .from("estorno_solicitacoes")
-      .select("lancamento_id, status")
+      .select("lancamento_id, caixa_movimento_id, status")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("lancamento_id", ids)
       .in("status", ["pendente", "aprovado"]);
-    const map = new Map<string, "pendente" | "aprovado">();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
-      if (!r.lancamento_id) continue;
-      // pendente prevalece sobre aprovado caso ambos existam
-      const prev = map.get(r.lancamento_id);
-      if (prev === "pendente") continue;
-      if (r.status === "pendente" || r.status === "aprovado") {
-        map.set(r.lancamento_id, r.status);
+    // OR entre os dois filtros de id (lancamento OU caixa_movimento).
+    const parts: string[] = [];
+    if (ids.length > 0) parts.push(`lancamento_id.in.(${ids.join(",")})`);
+    if (sangriaIds.length > 0) parts.push(`caixa_movimento_id.in.(${sangriaIds.join(",")})`);
+    q = q.or(parts.join(","));
+    const { data } = await q;
+    const mapLanc = new Map<string, "pendente" | "aprovado">();
+    const mapMov  = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; caixa_movimento_id: string | null; status: string }>) {
+      const st = r.status === "pendente" || r.status === "aprovado" ? r.status : null;
+      if (!st) continue;
+      if (r.lancamento_id) {
+        const prev = mapLanc.get(r.lancamento_id);
+        if (prev !== "pendente") mapLanc.set(r.lancamento_id, st);
+      }
+      if (r.caixa_movimento_id) {
+        const prev = mapMov.get(r.caixa_movimento_id);
+        if (prev !== "pendente") mapMov.set(r.caixa_movimento_id, st);
       }
     }
-    setEstornosPorLanc(map);
+    setEstornosPorLanc(mapLanc);
+    setEstornosPorMov(mapMov);
   }, [clinicaAtual, minhasMovs]);
 
   useEffect(() => {
@@ -1256,6 +1429,23 @@ function Page() {
   // Decomposição de pagamentos "misto" — busca observações dos lançamentos
   // vinculados às movimentações da sessão atual. Chave = lancamento_id.
   const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
+  // Composição estruturada por lançamento (falha 2.8). `null` = legado/sem dado.
+  const [mistoComp, setMistoComp] = useState<Record<string, Partial<Record<FormaBucket, number>> | null>>({});
+  // Flag por clínica: quando ligada, a decomposição usa o dado estruturado e
+  // o resíduo sem fonte confiável vai para "Indeterminado" em vez de Dinheiro.
+  // Desligar a flag restaura o comportamento antigo (rollback sem deploy).
+  const { enabled: mistoEstruturado } = useClinicFeatureFlag("caixa_misto_estruturado");
+  const residualBucket: FormaBucket = mistoEstruturado ? "indeterminado" : "dinheiro";
+  /** Partes decompostas de um movimento "misto": estruturado → observação. */
+  const partesDoMov = useCallback((m: { lancamento_id?: string | null }): Partial<Record<FormaBucket, number>> => {
+    const id = m.lancamento_id ?? undefined;
+    if (!id) return {};
+    if (mistoEstruturado) {
+      const est = mistoComp[id];
+      if (est) return est;
+    }
+    return decomporMistoObs(mistoObs[id]);
+  }, [mistoComp, mistoObs, mistoEstruturado]);
   const mistoLancIds = useMemo(() => {
     const ids = new Set<string>();
     const scan = (arr: Mov[]) => arr.forEach((m) => {
@@ -1274,8 +1464,16 @@ function Page() {
     if (pendentes.length === 0) return;
     (async () => {
       const { data } = await supabase.from("fin_lancamentos")
-        .select("id, observacoes").in("id", pendentes);
+        .select("id, observacoes, composicao_pagamento").in("id", pendentes);
       if (!alive || !data) return;
+      setMistoComp((prev) => {
+        const next = { ...prev };
+        for (const row of data as Array<{ id: string; composicao_pagamento?: unknown }>) {
+          next[row.id] = partesDaComposicao(row.composicao_pagamento);
+        }
+        for (const id of pendentes) if (!(id in next)) next[id] = null;
+        return next;
+      });
       setMistoObs((prev) => {
         const next = { ...prev };
         for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
@@ -1287,13 +1485,57 @@ function Page() {
     return () => { alive = false; };
   }, [mistoLancIds, mistoObs]);
 
+  // Resolve nomes de usuários referenciados por movimentos e enriquecimentos
+  // (operador do caixa + quem faturou o lançamento). Executa em lotes de 200
+  // e cacheia no state para evitar refetch a cada re-render.
+  useEffect(() => {
+    const alvo = new Set<string>();
+    const scanMovs = (arr: Mov[]) => arr.forEach((m) => { if (m.user_id) alvo.add(m.user_id); });
+    scanMovs(minhasMovs);
+    scanMovs(minhasMovsHist);
+    scanMovs(detalheMovs);
+    scanMovs(todosMovs);
+    enrichPorLanc.forEach((e) => { if (e.faturado_por_id) alvo.add(e.faturado_por_id); });
+    const pendentes = Array.from(alvo).filter((id) => !userNamesById.has(id));
+    if (pendentes.length === 0) return;
+    let alive = true;
+    (async () => {
+      const acc = new Map<string, string>();
+      for (const ids of chunkArray(pendentes, 200)) {
+        const { data } = await supabase.from("profiles").select("id, nome").in("id", ids);
+        for (const p of ((data ?? []) as Array<{ id: string; nome: string | null }>)) {
+          acc.set(p.id, (p.nome ?? "").trim() || p.id.slice(0, 8));
+        }
+        // marca também os não retornados para não refazer o fetch em loop
+        for (const id of ids) if (!acc.has(id)) acc.set(id, id.slice(0, 8));
+      }
+      if (!alive) return;
+      setUserNamesById((prev) => {
+        const next = new Map(prev);
+        acc.forEach((v, k) => next.set(k, v));
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [minhasMovs, minhasMovsHist, detalheMovs, todosMovs, enrichPorLanc, userNamesById]);
+
+  /** Retorna o nome de quem faturou o movimento (prioriza
+   *  fin_lancamentos.criado_por → autor real do lançamento; fallback para
+   *  caixa_movimentos.user_id → operador do caixa que registrou o mov). */
+  const usuarioNomeFor = useCallback((m: Mov): string => {
+    const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+    const uid = enr?.faturado_por_id ?? m.user_id ?? null;
+    if (!uid) return "—";
+    return userNamesById.get(uid) ?? "…";
+  }, [enrichPorLanc, userNamesById]);
+
   // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
   // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
   // "misto" são decompostos pelas observações do fin_lancamento.
   const entradasPorForma = useMemo(() => {
     const r: Record<string, number> & { total: number } = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, total: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0, total: 0,
     };
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
@@ -1301,8 +1543,7 @@ function Page() {
       r.total += v;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0);
@@ -1311,13 +1552,13 @@ function Page() {
         // Diferença (ex.: obs ainda não carregada, ou parcela sem label
         // reconhecido) vai para "outros" para preservar o total.
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] += v;
       }
     });
     return r;
-  }, [minhasMovs, mistoObs]);
+  }, [minhasMovs, partesDoMov, residualBucket]);
 
   // Quebra do "Saldo" por dia (com base em created_at das movimentações
   // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
@@ -1334,7 +1575,7 @@ function Page() {
     const mapa = new Map<string, DiaResumo>();
     const bucketInit = (): Record<string, number> => ({
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     });
     for (const m of minhasMovs) {
       const d = new Date(m.created_at);
@@ -1351,15 +1592,14 @@ function Page() {
         r.entradas += v;
         const bucket = bucketDeMov(m);
         if (bucket === "misto") {
-          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-          const partes = decomporMistoObs(obs);
+          const partes = partesDoMov(m);
           let somado = 0;
           for (const [k, val] of Object.entries(partes)) {
             r.porForma[k] = (r.porForma[k] ?? 0) + (val ?? 0);
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma.dinheiro += resto;
+          if (Math.abs(resto) > 0.005) r.porForma[residualBucket] = (r.porForma[residualBucket] ?? 0) + resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
@@ -1368,7 +1608,7 @@ function Page() {
       }
     }
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
-  }, [minhasMovs, mistoObs]);
+  }, [minhasMovs, partesDoMov, residualBucket]);
 
   // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
   // com o `<DateInputBR>` do modal de fechamento.
@@ -1391,7 +1631,7 @@ function Page() {
   const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     };
     movsDoDiaFechamento.forEach((m) => {
       // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
@@ -1410,8 +1650,7 @@ function Page() {
       const v = Number(m.valor || 0) * sinal;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
@@ -1421,13 +1660,13 @@ function Page() {
         // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
         // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
         // recebimentos reais. O operador pode ajustar no modal de fechamento.
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
     });
     return r;
-  }, [movsDoDiaFechamento, mistoObs]);
+  }, [movsDoDiaFechamento, partesDoMov, residualBucket]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
@@ -1546,7 +1785,7 @@ function Page() {
   const entradasPorFormaSessao = useCallback((sid: string) => {
     const r: Record<string, number> = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     };
     todosMovs.forEach((m) => {
       if (m.sessao_id !== sid) return;
@@ -1564,21 +1803,20 @@ function Page() {
       const v = Number(m.valor || 0) * sinal;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
     });
     return r;
-  }, [todosMovs, mistoObs]);
+  }, [todosMovs, partesDoMov, residualBucket]);
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -1987,8 +2225,7 @@ function Page() {
       // (mesma lógica exibida em tela) para que o "Resumo por tipo de moeda"
       // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
       // de agrupar tudo em "MISTO".
-      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+      const partes = bucket === "misto" ? partesDoMov(m) : {};
       const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
       const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
       if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
@@ -2067,6 +2304,7 @@ function Page() {
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
+      Usuario: usuarioNomeFor(m),
       Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
     }));
     const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
@@ -2085,6 +2323,7 @@ function Page() {
         <td>${TIPO_LABEL[m.tipo]}</td>
         <td>${esc(m.descricao ?? "")}</td>
         <td>${esc(m.forma_pagamento ?? "—")}</td>
+        <td>${esc(usuarioNomeFor(m))}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -2108,7 +2347,7 @@ function Page() {
         <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
       </div>
       <table><thead><tr>
-        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Usuário</th><th style="text-align:right;">Valor</th>
       </tr></thead><tbody>${linhas}</tbody></table>
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
@@ -2469,15 +2708,17 @@ function Page() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
+                        <TableHead>Ficha</TableHead>
+                        <TableHead>Usuário</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {minhasMovsFiltrados.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground">
+                       {minhasMovsFiltrados.length === 0 ? (
+                         <TableRow>
+                           <TableCell colSpan={12} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : "Sem movimentos no período"}
@@ -2487,10 +2728,11 @@ function Page() {
                          const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
                          const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
                          const medico = enr?.medico ?? null;
+                         const ficha = enr?.ficha ?? null;
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                         const usuario = usuarioNomeFor(m);
                          const bucket = bucketDeMov(m);
-                         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                         const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                         const partes = bucket === "misto" ? partesDoMov(m) : {};
                          const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                          if (bucket === "misto" && entradas.length > 0) {
                            return entradas.map(([k, v], idx) => (
@@ -2502,6 +2744,8 @@ function Page() {
                                <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
+                                <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
+                               <TableCell className="text-xs uppercase" title={usuario}>{idx === 0 ? usuario : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2529,6 +2773,8 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
+                           <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
+                          <TableCell className="text-xs uppercase" title={usuario}>{usuario}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
@@ -2576,6 +2822,43 @@ function Page() {
                               >
                                 <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
                               </Button>
+                                );
+                              })()
+                            )}
+                            {m.tipo === "sangria" && podeEscrever && (
+                              (() => {
+                                const st = estornosPorMov.get(m.id);
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Esta sangria já foi estornada"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornada
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button
+                                    type="button" size="sm" variant="outline"
+                                    className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                    title="Solicitar estorno da sangria ao financeiro"
+                                    onClick={() => setEstornoFor(m)}
+                                  >
+                                    <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                  </Button>
                                 );
                               })()
                             )}
@@ -3011,7 +3294,15 @@ function Page() {
             <DialogDescription>
               Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
               {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
+              {" · "}Esperado em espécie: <strong>{fmt(porFormaDoDiaFechamento.dinheiro ?? 0)}</strong>
             </DialogDescription>
+            {Math.abs(porFormaDoDiaFechamento.indeterminado ?? 0) > 0.005 && (
+              <p className="text-xs text-destructive">
+                Atenção: {fmt(porFormaDoDiaFechamento.indeterminado ?? 0)} sem forma de pagamento
+                identificada (pagamento misto sem composição registrada). Esse valor NÃO foi somado
+                ao esperado em espécie — confira manualmente antes de fechar.
+              </p>
+            )}
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
@@ -3034,14 +3325,13 @@ function Page() {
                     const v = Number(m.valor || 0) * sinal;
                     const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = decomporMistoObs(obs);
+                      const partes = partesDoMov(m);
                       let somado = 0;
                       for (const [k, val] of Object.entries(partes)) {
                         pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf.dinheiro = (pf.dinheiro ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005) pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
@@ -3062,11 +3352,11 @@ function Page() {
             </div>
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
               // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
               // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
               // agora contam em "Dinheiro" via bucketDeMov.
-              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
+              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -3175,8 +3465,8 @@ function Page() {
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
+              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -3547,14 +3837,14 @@ function Page() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Forma</TableHead>
+                      <TableHead>Usuário</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {detalheMovs.flatMap((m) => {
                       const bucket = bucketDeMov(m);
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const partes = bucket === "misto" ? partesDoMov(m) : {};
                       const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (
@@ -3564,6 +3854,7 @@ function Page() {
                             <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
                             <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                             <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className="text-xs uppercase">{idx === 0 ? usuarioNomeFor(m) : ""}</TableCell>
                             <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                               {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
                             </TableCell>
@@ -3577,6 +3868,7 @@ function Page() {
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
                           <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
@@ -3596,7 +3888,9 @@ function Page() {
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
+        caixaMovimentoId={estornoFor?.tipo === "sangria" ? estornoFor.id : null}
         pacienteNome={(() => {
+          if (estornoFor?.tipo === "sangria") return null;
           const d = estornoFor?.descricao ?? "";
           // Formato esperado: "NOME PACIENTE — PROCEDIMENTO"
           const idx = d.indexOf("—");
@@ -3649,8 +3943,7 @@ function Page() {
                     })
                     .flatMap((m) => {
                       const bucket = bucketDeMov(m);
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const partes = bucket === "misto" ? partesDoMov(m) : {};
                       const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (

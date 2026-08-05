@@ -1,0 +1,1 @@
+UPDATE public.cb_convenios SET modelo_contrato = NULL WHERE id = '4fdce541-5b2b-4816-ba7d-911b36741b7d';

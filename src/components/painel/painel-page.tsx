@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
+import {
+  speak as ttsSpeak,
+  isUserTtsEnabled,
+  getUserTtsRate,
+  subscribeClinicaTtsConfig,
+} from "@/lib/tts-service";
 type Senha = {
   id: string;
   codigo: string;
@@ -216,10 +222,42 @@ export function PainelPage() {
     processarFilaFala();
   }
 
+  // Quando a velocidade/habilitação do TTS mudar (mesma aba OU outra aba
+  // via storage event), interrompemos a fala nativa em curso e a próxima
+  // criação de utterance pegará a nova velocidade automaticamente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reagir = () => {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      // Libera a fila para o próximo processamento com a nova velocidade.
+      falandoRef.current = false;
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "tts:rate" || e.key === "tts:enabled") reagir();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("tts:changed", reagir);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("tts:changed", reagir);
+    };
+  }, []);
+
+  // Escuta em tempo real (Realtime) a configuração de voz salva por qualquer
+  // navegador. Quando a velocidade/habilitação mudar em outro dispositivo,
+  // interrompemos a fala corrente e a próxima criação de utterance/áudio
+  // já usará a nova velocidade — sem precisar recarregar o painel.
+  useEffect(() => {
+    const clinicaId = clinicaAtual?.clinica_id;
+    if (!clinicaId) return;
+    return subscribeClinicaTtsConfig(clinicaId);
+  }, [clinicaAtual?.clinica_id]);
+
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
-    utter.rate = 0.9;
+    // Usa a mesma velocidade configurada para o TTS Piper (fallback nativo).
+    utter.rate = getUserTtsRate();
     const voz = vozFemininaRef.current ?? escolherVozFeminina();
     if (voz) utter.voice = voz;
     utter.onstart = () => {
@@ -262,23 +300,58 @@ export function PainelPage() {
     if (!prox) return;
     falandoRef.current = true;
     const texto = textoDaSenha(prox.senha);
+
+    // Piper TTS local (Menino Jesus): usa o backend de IA quando habilitado,
+    // com fallback silencioso para SpeechSynthesis nativo se falhar.
+    const nomeClinica = (clinicaAtual?.clinica?.nome ?? "").toLowerCase();
+    const usarPiper = nomeClinica.includes("menino jesus") && isUserTtsEnabled();
+    if (usarPiper) {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      tocarDing();
+      const liberar = () => {
+        falandoRef.current = false;
+        processarFilaFala();
+      };
+      // primeira leitura → intervalo → repetição → libera fila
+      void ttsSpeak(texto, {
+        onEnd: () => {
+          window.setTimeout(() => {
+            void ttsSpeak(texto, { onEnd: liberar, onError: liberar, interrupt: false });
+          }, 800);
+        },
+        onError: () => {
+          // fallback: se Piper falhou, cai no SpeechSynthesis do navegador
+          falandoRef.current = false;
+          filaFalaRef.current.unshift(prox);
+          fallbackSpeechSynth();
+        },
+      });
+      return;
+    }
+    fallbackSpeechSynth();
+
+    function fallbackSpeechSynth() {
+      falandoRef.current = true;
+      const item = prox!;
     try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
     window.speechSynthesis.resume();
     tocarDing();
-    const primeira = criarFala(texto, prox.key);
-    const segunda = criarFala(texto, prox.key);
-    // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
-    segunda.onend = () => {
-      falandoRef.current = false;
-      processarFilaFala();
-    };
-    segunda.onerror = segunda.onend;
+    const primeira = criarFala(texto, item.key);
     // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
     window.speechSynthesis.speak(primeira);
     window.setTimeout(() => {
       window.speechSynthesis.resume();
+      // Cria a segunda leitura só agora para pegar a velocidade ATUAL
+      // (caso o usuário tenha alterado o slider entre a 1ª e a 2ª chamada).
+      const segunda = criarFala(texto, item.key);
+      segunda.onend = () => {
+        falandoRef.current = false;
+        processarFilaFala();
+      };
+      segunda.onerror = segunda.onend;
       window.speechSynthesis.speak(segunda);
     }, 3800);
+    }
   }
 
   function tocarDing() {

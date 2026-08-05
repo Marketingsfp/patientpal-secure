@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  carregarMapaConvenioPacientes,
+  resolverModalidade,
+  type MapaConvenioPaciente,
+} from "@/lib/convenio/modalidade";
+import {
   Plus,
   Pencil,
   Trash2,
@@ -176,11 +181,13 @@ function AtendimentosPage() {
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
-  const [pacNameExtra, setPacNameExtra] = useState<Record<string, string>>({});
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
+  // Vínculo de convênio por paciente (contrato ativo) — decide Cartão
+  // Consulta/Desconto pelo cadastro, não pelo texto do lançamento.
+  const [mapaConvenio, setMapaConvenio] = useState<MapaConvenioPaciente>(new Map());
   const [loading, setLoading] = useState(true);
   const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   const [open, setOpen] = useState(false);
@@ -189,10 +196,8 @@ function AtendimentosPage() {
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
-  const primeiroDia = new Date();
-  primeiroDia.setDate(1);
   const [fMedico, setFMedico] = useState<string>("todos");
-  const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
+  const [fIni, setFIni] = useState<string>(hoje);
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
@@ -945,6 +950,20 @@ function AtendimentosPage() {
     if (isMedicoOnly && medicoLogadoId) setFMedico(medicoLogadoId);
   }, [isMedicoOnly, medicoLogadoId]);
 
+  // Carrega o vínculo de convênio (contrato ativo) de todos os pacientes.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const cid = clinicaAtual?.clinica_id;
+      if (!cid) return;
+      const m = await carregarMapaConvenioPacientes(cid);
+      if (!cancel) setMapaConvenio(m);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [clinicaAtual?.clinica_id]);
+
   const norm = (s: string) =>
     s
       .normalize("NFD")
@@ -989,6 +1008,28 @@ function AtendimentosPage() {
     );
   };
 
+  // Índices O(1) para o cálculo de repasse, que roda uma vez por linha em
+  // `load()`. Antes disso eram `medicos.find`/`convenios.find` (O(n) cada),
+  // repetidos por linha × variante de nome — em clínicas com milhares de
+  // atendimentos e convênios isso somava milhões de comparações (incluindo
+  // `norm()`, que já é caro por si só) e travava a main thread após o fetch.
+  const medicosById = useMemo(() => new Map(medicos.map((m) => [m.id, m])), [medicos]);
+  const convenioIdx = useMemo(() => {
+    // chave normalizada "medicoId|norm(nome)" — casa com `procVariants`, que
+    // já devolve variantes normalizadas.
+    const porNomeNorm = new Map<string, Convenio>();
+    // chave crua "medicoId|nome" — para o sentinel de categoria (__CAT__:x),
+    // que NÃO é normalizado na comparação original.
+    const porNomeCru = new Map<string, Convenio>();
+    for (const cv of convenios) {
+      const kNorm = `${cv.medico_id}|${norm(cv.nome)}`;
+      if (!porNomeNorm.has(kNorm)) porNomeNorm.set(kNorm, cv);
+      const kCru = `${cv.medico_id}|${cv.nome}`;
+      if (!porNomeCru.has(kCru)) porNomeCru.set(kCru, cv);
+    }
+    return { porNomeNorm, porNomeCru };
+  }, [convenios]);
+
   // Calcula repasse e também o "total" efetivo (valor do convênio quando o paciente
   // não paga em dinheiro, ex.: ANGIOLOGIA por convênio). Retorna { total, repasse }.
   const calcRepasseFull = (
@@ -996,13 +1037,20 @@ function AtendimentosPage() {
     totalPago: number,
     procNome: string | null,
     descricao?: string | null,
+    /** Modalidade vinda do cadastro (contrato ativo) — prevalece sobre o texto. */
+    modalidade?: "cartao_consulta" | "cartao_desconto" | null,
   ): { total: number; repasse: number } => {
     if (!medicoId) return { total: totalPago, repasse: 0 };
-    const med = medicos.find((m) => m.id === medicoId);
+    const med = medicosById.get(medicoId);
     // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
     // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
-    // convênio particular). Detecta pela descrição do lançamento.
-    if (isCartaoConsultaDesc(descricao) && med?.aceita_cartao_beneficios) {
+    // convênio particular). Detecta pelo CADASTRO do paciente (contrato ativo)
+    // e, só como fallback histórico, pela descrição do lançamento.
+    const ehConvenio =
+      modalidade === "cartao_consulta" ||
+      modalidade === "cartao_desconto" ||
+      (modalidade == null && isCartaoConsultaDesc(descricao));
+    if (ehConvenio && med?.aceita_cartao_beneficios) {
       if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
         return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
       }
@@ -1018,7 +1066,7 @@ function AtendimentosPage() {
       const variants = procVariants(procNome);
       let c: Convenio | undefined;
       for (const alvo of variants) {
-        c = convenios.find((cv) => cv.medico_id === medicoId && norm(cv.nome) === alvo);
+        c = convenioIdx.porNomeNorm.get(`${medicoId}|${alvo}`);
         if (c) break;
       }
       // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
@@ -1030,7 +1078,7 @@ function AtendimentosPage() {
         }
         if (tipo) {
           const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
-          c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
+          c = convenioIdx.porNomeCru.get(`${medicoId}|${sentinel}`);
         }
       }
       if (c) {
@@ -1107,11 +1155,14 @@ function AtendimentosPage() {
     // (ex.: Menino Jesus com ~3.000 lançamentos no mês), registros ficam de
     // fora silenciosamente. Paginamos em blocos de 1.000 até esgotar.
     const PAGE_SIZE = 1000;
+    // `paciente:pacientes(nome)` vem embutido via FK para resolver o nome mesmo
+    // quando o paciente está fora dos 500 primeiros do combobox (`loadOpts`) —
+    // evita a query extra de "nomes faltantes" que rodava depois do fetch.
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
         .select(
-          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id, paciente:pacientes(nome)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
@@ -1123,7 +1174,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1135,7 +1186,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1231,7 +1282,13 @@ function AtendimentosPage() {
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
       // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
-      const { total, repasse } = calcRepasseFull(r.medico_id, pago, r.procedimento, null);
+      const { total, repasse } = calcRepasseFull(
+        r.medico_id,
+        pago,
+        r.procedimento,
+        null,
+        resolverModalidade({ pacienteId: r.paciente_id, mapa: mapaConvenio }),
+      );
       const valorMedico = repasse > 0 ? repasse : Number(r.valor_medico);
       const valorTotal = total > 0 ? total : pago;
       return {
@@ -1245,6 +1302,9 @@ function AtendimentosPage() {
         forma_pagamento: r.forma_pagamento,
         medico_id: r.medico_id,
         paciente_id: r.paciente_id,
+        // Fallback do nome via FK embutida na query (`paciente:pacientes(nome)`)
+        // — cobre pacientes fora dos 500 do combobox sem query extra depois.
+        paciente_nome_extra: (r as any).paciente?.nome ?? null,
         origem: "manual",
         repasse_pago: !!r.repasse_pago,
         repasse_pago_em: r.repasse_pago_em,
@@ -1269,12 +1329,27 @@ function AtendimentosPage() {
       // vinculado, a "cauda" da descrição costuma ser tipo de contrato/forma
       // (CONTRATO, RECEBIMENTOS DIVERSOS, AJUSTE…), não o serviço realizado.
       const proc = ag?.procedimento ?? null;
-      const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
+      // Prioridade: nome digitado no agendamento > nome cadastral (via FK
+      // embutida, cobre paciente fora dos 500 do combobox) > cauda da descrição.
+      const pacNomeExtra =
+        ag?.paciente_nome ??
+        (r as any).paciente?.nome ??
+        ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
-      const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
+      const { total, repasse } = calcRepasseFull(
+        medIdEff,
+        pago,
+        proc,
+        r.descricao ?? null,
+        resolverModalidade({
+          modalidadeLancamento: (r as { convenio_modalidade?: string | null }).convenio_modalidade ?? null,
+          pacienteId: pacIdEff,
+          mapa: mapaConvenio,
+        }),
+      );
       // Override manual do repasse (editado na tela). Quando presente,
       // sobrescreve o cálculo por regra.
       const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
@@ -1318,81 +1393,45 @@ function AtendimentosPage() {
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
     setItems(unif);
     setSel(new Set());
-    // Resolve nomes de pacientes referenciados que estão fora do combobox
-    // (o combobox só carrega 500 por ordem alfabética). Sem isso, atendimentos
-    // com paciente cadastrado aparecem como "—".
-    const knownIds = new Set(pacientes.map((p) => p.id));
-    const missing = new Set<string>();
-    for (const it of unif) {
-      if (it.paciente_id && !knownIds.has(it.paciente_id) && !pacNameExtra[it.paciente_id]) {
-        missing.add(it.paciente_id);
-      }
-    }
-    if (missing.size) {
-      const { data: extra } = await supabase
-        .from("pacientes")
-        .select("id, nome")
-        .in("id", [...missing]);
-      if (extra?.length) {
-        setPacNameExtra((prev) => {
-          const next = { ...prev };
-          for (const p of extra) next[p.id] = p.nome;
-          return next;
-        });
-      }
-    }
     setLoading(false);
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
-    const [m, p, c] = await Promise.all([
+    const clinicaId = clinicaAtual.clinica_id;
+    // As 4 fases (médicos, pacientes/contas, regras de repasse, procedimentos)
+    // rodavam em série — cada `await` esperava a anterior terminar antes de
+    // sequer abrir a próxima conexão. Nenhuma delas depende das outras, então
+    // todas disparam juntas agora. `medicosReq` é convertido para uma Promise
+    // nativa (via `Promise.resolve`) porque também alimenta `conveniosReq` —
+    // reutilizar o builder do Supabase diretamente faria a query de médicos
+    // rodar duas vezes (o builder é "thenable" e reexecuta a cada `.then`).
+    const medicosReq = Promise.resolve(
       supabase
         .from("medicos")
         .select("id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
-        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .order("nome"),
-      supabase
-        .from("pacientes")
-        .select("id, nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome")
-        .limit(500),
-      supabase
-        .from("fin_contas")
-        .select("id, nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-    ]);
-    const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
-    const repMap = new Map<
-      string,
-      { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
-    >();
-    for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
-    const merged: Medico[] = ((m.data ?? []) as any[]).map((x) => {
-      const r = repMap.get(x.id);
-      return {
-        id: x.id,
-        nome: x.nome,
-        tipo_repasse: r?.tipo_repasse ?? "percentual",
-        percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
-        valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
-        aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
-        cb_tipo_repasse: x.cb_tipo_repasse ?? null,
-        cb_valor_repasse: x.cb_valor_repasse ?? null,
-        cb_percentual_repasse: x.cb_percentual_repasse ?? null,
-      };
-    });
-    setMedicos(merged);
-    setPacientes((p.data ?? []) as Pac[]);
-    setContas((c.data ?? []) as Conta[]);
-    // Carrega valor de tabela dos procedimentos para usar como "total cheio".
-    // Paginado — mesma razão do medico_convenios (teto de 1000 do PostgREST).
-    const procs: Array<{ nome: string | null; valor_padrao?: number | string | null; valor_dinheiro?: number | string | null; tipo?: string | null; requer_laudo?: boolean | null }> = [];
-    {
+    );
+    const pacientesReq = supabase
+      .from("pacientes")
+      .select("id, nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .limit(500);
+    const contasReq = supabase
+      .from("fin_contas")
+      .select("id, nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .order("nome");
+    const repReq = supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId });
+    // Valor de tabela dos procedimentos, para usar como "total cheio". Paginado
+    // — mesma razão do medico_convenios (teto de 1000 do PostgREST) — mas a
+    // paginação em si não depende de nenhuma das outras requisições.
+    const procsReq = (async () => {
+      const procs: Array<{ nome: string | null; valor_padrao?: number | string | null; valor_dinheiro?: number | string | null; tipo?: string | null; requer_laudo?: boolean | null }> = [];
       const CHUNK = 1000;
       const MAX = 50000;
       let offset = 0;
@@ -1400,7 +1439,7 @@ function AtendimentosPage() {
         const { data, error } = await supabase
           .from("procedimentos")
           .select("nome, valor_padrao, valor_dinheiro, tipo, requer_laudo")
-          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .range(offset, offset + CHUNK - 1);
         if (error) break;
@@ -1410,24 +1449,14 @@ function AtendimentosPage() {
         offset += CHUNK;
         if (offset >= MAX) break;
       }
-    }
-    const pmap = new Map<string, number>();
-    const tmap = new Map<string, string>();
-    const lmap = new Map<string, boolean>();
-    for (const pr of procs) {
-      const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
-      if (!pr?.nome) continue;
-      const key = norm(String(pr.nome));
-      // mantém o maior valor caso haja duplicidade entre unidades
-      if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
-      if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
-      if (pr.requer_laudo) lmap.set(key, true);
-    }
-    setProcValores(pmap);
-    setProcTipos(tmap);
-    setProcLaudo(lmap);
-    const ids = ((m.data ?? []) as Medico[]).map((x) => x.id);
-    if (ids.length) {
+      return procs;
+    })();
+    // Convênios por médico só podem começar depois que os IDs dos médicos
+    // chegarem — mas não esperam pacientes/contas/regras/procedimentos, que
+    // seguem em paralelo.
+    const conveniosReq = medicosReq.then(async ({ data: mData }) => {
+      const ids = ((mData ?? []) as Medico[]).map((x) => x.id);
+      if (!ids.length) return [] as Convenio[];
       // Paginado: o PostgREST retorna no máximo 1000 linhas por chamada.
       // Clínicas com muitos convênios cadastrados por médico ultrapassam
       // esse teto e faziam alguns convênios sumirem do cálculo de repasse
@@ -1450,10 +1479,56 @@ function AtendimentosPage() {
         offset += CHUNK;
         if (offset >= MAX) break;
       }
-      setConvenios(acc);
-    } else {
-      setConvenios([]);
+      return acc;
+    });
+
+    const [m, p, c, { data: rep }, procs, convenios] = await Promise.all([
+      medicosReq,
+      pacientesReq,
+      contasReq,
+      repReq,
+      procsReq,
+      conveniosReq,
+    ]);
+
+    const repMap = new Map<
+      string,
+      { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
+    >();
+    for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
+    const merged: Medico[] = ((m.data ?? []) as any[]).map((x) => {
+      const r = repMap.get(x.id);
+      return {
+        id: x.id,
+        nome: x.nome,
+        tipo_repasse: r?.tipo_repasse ?? "percentual",
+        percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
+        valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+        aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
+        cb_tipo_repasse: x.cb_tipo_repasse ?? null,
+        cb_valor_repasse: x.cb_valor_repasse ?? null,
+        cb_percentual_repasse: x.cb_percentual_repasse ?? null,
+      };
+    });
+    setMedicos(merged);
+    setPacientes((p.data ?? []) as Pac[]);
+    setContas((c.data ?? []) as Conta[]);
+    const pmap = new Map<string, number>();
+    const tmap = new Map<string, string>();
+    const lmap = new Map<string, boolean>();
+    for (const pr of procs) {
+      const v = Number(pr.valor_padrao ?? pr.valor_dinheiro ?? 0);
+      if (!pr?.nome) continue;
+      const key = norm(String(pr.nome));
+      // mantém o maior valor caso haja duplicidade entre unidades
+      if (v > (pmap.get(key) ?? 0)) pmap.set(key, v);
+      if (pr.tipo && !tmap.has(key)) tmap.set(key, String(pr.tipo));
+      if (pr.requer_laudo) lmap.set(key, true);
     }
+    setProcValores(pmap);
+    setProcTipos(tmap);
+    setProcLaudo(lmap);
+    setConvenios(convenios);
     setOptsReady(true);
   };
   useEffect(() => {
@@ -1475,6 +1550,7 @@ function AtendimentosPage() {
       medicos.length,
       convenios.length,
       procValores.size,
+      mapaConvenio,
     ],
   );
 
@@ -1829,11 +1905,10 @@ function AtendimentosPage() {
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
-  const pacMap = useMemo(() => {
-    const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
-    for (const [id, nome] of Object.entries(pacNameExtra)) if (!m.has(id)) m.set(id, nome);
-    return m;
-  }, [pacientes, pacNameExtra]);
+  // Nome do paciente: o combobox só traz os 500 primeiros (`pacientes`), por
+  // isso o fallback usa `a.paciente_nome_extra` (vem embutido na query em
+  // `load`, via FK `paciente:pacientes(nome)`) — ver uso em `filteredItems`.
+  const pacMap = useMemo(() => new Map(pacientes.map((p) => [p.id, p.nome])), [pacientes]);
   const filteredItems = useMemo(() => {
     const q = norm(fPaciente.trim());
     const base = !q
@@ -1906,8 +1981,46 @@ function AtendimentosPage() {
   // Itens selecionáveis: qualquer atendimento com repasse > 0.
   // As ações do topo validam individualmente o que cada uma aceita
   // (baixa em lote, pagar repasse, 2ª via).
-  const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
-  const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
+  // Memoizado: sem isso eram 9 varreduras completas de `filteredItems`/
+  // `selectedItems` — nenhuma memoizada — refeitas a cada render (inclusive
+  // ao digitar em qualquer campo da tela), o que travava o clique de
+  // seleção com milhares de linhas na tabela.
+  const {
+    selectables,
+    allSelected,
+    selectedItems,
+    selectedTotal,
+    selectedPagos,
+    selectedNaoPagos,
+    selectedNaoBaixados,
+    selectedBaixados,
+    selectedLaudoElegiveis,
+  } = useMemo(() => {
+    const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
+    const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
+    const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
+    const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
+    const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+    const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
+    const selectedNaoBaixados = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
+    const selectedBaixados = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
+    const selectedLaudoElegiveis = selectedItems.filter((a) => {
+      const procKey = a.procedimento ? norm(a.procedimento) : "";
+      const exige = procKey && procLaudo.get(procKey);
+      return exige && a.laudo_status !== "emitido";
+    });
+    return {
+      selectables,
+      allSelected,
+      selectedItems,
+      selectedTotal,
+      selectedPagos,
+      selectedNaoPagos,
+      selectedNaoBaixados,
+      selectedBaixados,
+      selectedLaudoElegiveis,
+    };
+  }, [filteredItems, sel, procLaudo]);
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
     else setSel(new Set(selectables.map((a) => `${a.origem}:${a.id}`)));
@@ -1919,24 +2032,9 @@ function AtendimentosPage() {
     else next.add(k);
     setSel(next);
   };
-  const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
-  const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
-  const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
-  const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
-  const selectedNaoBaixados = selectedItems.filter(
-    (a) => !a.repasse_pago && !isAtendido(a),
-  );
-  const selectedBaixados = selectedItems.filter(
-    (a) => !a.repasse_pago && isAtendido(a),
-  );
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
-  const selectedLaudoElegiveis = selectedItems.filter((a) => {
-    const procKey = a.procedimento ? norm(a.procedimento) : "";
-    const exige = procKey && procLaudo.get(procKey);
-    return exige && a.laudo_status !== "emitido";
-  });
   const reimprimirSelecionados = () => {
     if (!podeReimprimir) return;
     abrirSegundaViaLote(selectedPagos);
@@ -2515,12 +2613,17 @@ function AtendimentosPage() {
                   // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
                   const isSelected = sel.has(`${a.origem}:${a.id}`);
                   const baixaPendente = !a.repasse_pago && !isAtendido(a);
+                  // Atendimento externo (faturado em outra clínica) — destaque
+                  // vermelho bem claro para diferenciar do fluxo normal.
+                  const ehExterno = (a.forma_pagamento ?? "").trim().toLowerCase() === "externo";
                   const rowBg =
                     isSelected && baixaPendente
                       ? "bg-amber-50 dark:bg-amber-950/30"
-                      : idx % 2 === 0
-                        ? "bg-background"
-                        : "bg-slate-50 dark:bg-slate-900/40";
+                      : ehExterno
+                        ? "bg-rose-50 dark:bg-rose-950/30"
+                        : idx % 2 === 0
+                          ? "bg-background"
+                          : "bg-slate-50 dark:bg-slate-900/40";
 
                   return (
                     <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>

@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PlanosPage } from "@/components/pages/planos-page";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// A aba "Modelos" foi unificada em Convênios > Informações.
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/modelos")({
-  component: () => <PlanosPage modulo="cartao-beneficios" />,
-  head: () => ({ meta: [{ title: "Modelos de contrato — Cartão Benefícios" }] }),
+  beforeLoad: () => {
+    throw redirect({ to: "/app/cartao-beneficios/convenios" });
+  },
 });

@@ -9,7 +9,10 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.2.2",
@@ -76,6 +79,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.575.0",
     "nitro": "3.0.260603-beta",
+    "pdfjs-dist": "^6.1.200",
     "qrcode": "^1.5.4",
     "qz-tray": "^2.2.6",
     "react": "^19.2.0",

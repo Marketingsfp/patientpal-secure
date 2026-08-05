@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Contrato {
   id: string;
@@ -54,6 +55,7 @@ export function PacienteCartoesBeneficios({
   const [parentesco, setParentesco] = useState("");
   const [saving, setSaving] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
+  const { user } = useAuth();
 
   const load = async () => {
     setLoading(true);

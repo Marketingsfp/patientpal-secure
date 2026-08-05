@@ -42,6 +42,7 @@ const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeOb
   { value: "sem_condicoes", label: "Sem condições financeiras", pedeObs: false },
   { value: "nao_usa", label: "Não usa o convênio", pedeObs: false },
   { value: "insatisfacao", label: "Insatisfação com o convênio", pedeObs: true },
+  { value: "duplicidade_bd", label: "Duplicidade - Banco de dados", pedeObs: true },
   { value: "outros", label: "Outros", pedeObs: true },
 ];
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -72,10 +73,10 @@ import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato } from "@/lib/print-contrato";
+import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
-import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
+import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -88,6 +89,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
@@ -101,6 +103,22 @@ const fmtDcurto = (s?: string | null) => {
   const d = new Date(s + (s.length === 10 ? "T00:00:00" : ""));
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
+};
+const fmtCPFDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return s || "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+const fmtCEPDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 8) return s || "—";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+const fmtTelDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s || "—";
 };
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -161,7 +179,6 @@ type Contrato = {
   numero: number;
   paciente_nome: string;
   convenio_id: string | null;
-  plano_id: string | null;
   valor_mensal: number;
   status: string;
   data_inicio: string;
@@ -225,6 +242,8 @@ type Dep = {
   tipo: string;
   cpf?: string | null;
   codigo_prontuario?: string | null;
+  data_nascimento?: string | null;
+  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
@@ -309,14 +328,32 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       .order("created_at", { ascending: false });
     const s = termo.trim();
     if (s.length >= 2) {
-      // Busca no servidor: por nome do paciente (ilike) e, quando o termo for
-      // numérico, também pelo número do contrato. Isso evita perder registros
-      // fora dos 500 mais recentes (clínicas com >500 contratos).
+      // Busca no servidor. O campo `paciente_nome` no contrato é um snapshot
+      // histórico e em vários contratos antigos veio truncado (ex.: "MARIA
+      // CRISTINA DE SOUZA D"). Para o nome completo funcionar, buscamos
+      // também os pacientes atuais por nome/CPF/prontuário/pasta e incluímos
+      // seus IDs no OR.
       const soDigitos = /^\d+$/.test(s);
-      const orExpr = soDigitos
-        ? `paciente_nome.ilike.%${s}%,numero.eq.${s}`
-        : `paciente_nome.ilike.%${s}%`;
-      contratosQuery = contratosQuery.or(orExpr).limit(200);
+      const digits = s.replace(/\D/g, "");
+      const escLike = s.replace(/[,()]/g, " ");
+      const pacFilters: string[] = [`nome.ilike.%${escLike}%`];
+      if (digits.length >= 2) {
+        pacFilters.push(`cpf.ilike.%${digits}%`);
+        pacFilters.push(`codigo_prontuario.eq.${digits}`);
+        pacFilters.push(`codigo_prontuario_anterior.eq.${digits}`);
+        pacFilters.push(`numero_pasta.eq.${digits}`);
+      }
+      const { data: pacMatch } = await supabase
+        .from("pacientes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .or(pacFilters.join(","))
+        .limit(200);
+      const pacIdsMatch = ((pacMatch ?? []) as Array<{ id: string }>).map((p) => p.id);
+      const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
+      if (soDigitos) orParts.push(`numero.eq.${s}`);
+      if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
+      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
     } else {
       contratosQuery = contratosQuery.limit(500);
     }
@@ -431,8 +468,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   }, [initialContratoId, loading, list, detail]);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    // Filtro local de texto foi desativado — a busca por nome/CPF/prontuário
+    // já é feita no servidor com JOIN em pacientes (nome atualizado). O
+    // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
+    // truncado, então filtrar por ele aqui esconderia resultados válidos.
+    const base = list;
     const hojeStr = new Date().toISOString().slice(0, 10);
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
@@ -606,10 +646,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           Contratos
         </h1>
         {podeEscrever && (
+          <div className="flex items-center gap-2">
           <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
             <Plus className="h-4 w-4 mr-2" />
             Vendas
           </Button>
+          </div>
         )}
       </div>
       {convenios.length === 0 && !loading ? (
@@ -1320,7 +1362,11 @@ function NovoContratoForm({
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
+      // demais seguem mês a mês, cobrindo exatamente 12 meses até
+      // data_termino (data_inicio + 1 ano). Ex.: início 01/02/2026 →
+      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
+      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
       const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
@@ -2113,6 +2159,7 @@ function DetalheContrato({
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
   const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
+  const [nfseEmitindoLote, setNfseEmitindoLote] = useState(false);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
@@ -2170,7 +2217,6 @@ function DetalheContrato({
   const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
-  const [regerando, setRegerando] = useState(false);
   useEffect(() => {
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
@@ -2627,80 +2673,6 @@ function DetalheContrato({
     await load();
   };
 
-  // Regera as 12 parcelas do contrato usando valor_mensal e dia_vencimento já salvos.
-  // Regra: 1ª parcela SEMPRE cai no mês da data_inicio (com dia_vencimento),
-  // as 11 seguintes seguem mês a mês. Preserva parcelas já pagas/existentes
-  // (não apaga o que não é 'pendente' e não é futura).
-  const regerarParcelasFuturas = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const dataIni = (contrato as any).data_inicio as string | null;
-    if (!dataIni) { toast.error("Contrato sem data de início."); return; }
-    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 0));
-    if (!dia) { toast.error("Contrato sem dia de vencimento válido."); return; }
-    const valor = Number((contrato as any).valor_mensal ?? 0);
-    if (!Number.isFinite(valor) || valor < 0) { toast.error("Valor mensal inválido."); return; }
-    if (!confirm("Isso apaga as parcelas pendentes futuras e recria 12 parcelas a partir do mês da data de início. Continuar?")) return;
-
-    setRegerando(true);
-    try {
-      const hoje = new Date().toISOString().slice(0, 10);
-      await supabase
-        .from("contrato_mensalidades")
-        .delete()
-        .eq("contrato_id", contrato.id)
-        .eq("status", "pendente")
-        .gt("numero_parcela", 0)
-        .gt("vencimento", hoje);
-
-      const { data: restantes } = await supabase
-        .from("contrato_mensalidades")
-        .select("numero_parcela")
-        .eq("contrato_id", contrato.id)
-        .gt("numero_parcela", 0)
-        .order("numero_parcela", { ascending: false });
-      const existentes = restantes ?? [];
-      const maxExistente = existentes.reduce(
-        (mx, r) => Math.max(mx, Number((r as { numero_parcela: number }).numero_parcela) || 0),
-        0,
-      );
-      const restantesParaGerar = Math.max(0, 12 - existentes.length);
-      // Base = mês/ano da data_inicio. A parcela N (1..12) cai no
-      // (mês_inicio + N - 1). Só geramos as parcelas cujo número ainda
-      // não existe no contrato.
-      const [yy, mm] = dataIni.slice(0, 10).split("-").map((s) => Number(s));
-      const baseYear = yy;
-      const baseMonth = (mm || 1) - 1; // 0-index
-      const rows: any[] = [];
-      let gerados = 0;
-      let prox = maxExistente + 1;
-      while (gerados < restantesParaGerar && prox <= 12) {
-        const offset = prox - 1;
-        const ref = new Date(baseYear, baseMonth + offset, 1);
-        const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-        const d = Math.min(dia, lastDay);
-        const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
-        rows.push({
-          contrato_id: contrato.id,
-          clinica_id: (contrato as any).clinica_id,
-          numero_parcela: prox,
-          vencimento: venc.toISOString().slice(0, 10),
-          valor,
-          status: "pendente",
-        });
-        prox++;
-        gerados++;
-      }
-      if (rows.length > 0) {
-        const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-        if (insErr) { mostrarErro(insErr, "falha ao gerar parcelas"); return; }
-      }
-      toast.success(`Parcelas regeradas (${rows.length} nova(s)).`);
-      await load();
-    } finally {
-      setRegerando(false);
-    }
-  };
-
   const confirmarCancelamento = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const opcao = MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao);
@@ -2733,11 +2705,45 @@ function DetalheContrato({
     setCancelObs("");
   };
 
+  const [revertendoCancelamento, setRevertendoCancelamento] = useState(false);
+  const reverterCancelamento = async () => {
+    if (roleAtual !== "admin") {
+      toast.error("Apenas Admin pode reverter cancelamento.");
+      return;
+    }
+    if (!cancelado) return;
+    const ok = window.confirm(
+      "Reverter o cancelamento deste contrato?\n\nO status voltará para ATIVO e o plano/benefícios serão reativados. As mensalidades canceladas NÃO serão reabertas automaticamente — reabra manualmente se necessário.",
+    );
+    if (!ok) return;
+    setRevertendoCancelamento(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        status: "ativo",
+        cancelado_em: null,
+        cancelamento_motivo: null,
+      } as any)
+      .eq("id", contrato.id);
+    setRevertendoCancelamento(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Cancelamento revertido — contrato reativado.");
+    setCanceladoEm(null);
+    setCancelMotivoAtual(null);
+    await load();
+  };
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
+  // Isenção de juros + multa para a mensalidade atualmente em pagamento.
+  // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
+  const [isencaoEncargos, setIsencaoEncargos] = useState<{ autorizadoPorNome: string; autorizadoPorUserId: string } | null>(null);
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -2805,13 +2811,17 @@ function DetalheContrato({
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
     let prontMap: Record<string, string | null> = {};
+    let nascMap: Record<string, string | null> = {};
+    let telMap: Record<string, string | null> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, codigo_prontuario")
+        .select("id, cpf, codigo_prontuario, data_nascimento, telefone")
         .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
       prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
+      nascMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.data_nascimento]));
+      telMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.telefone]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2821,6 +2831,8 @@ function DetalheContrato({
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
       codigo_prontuario: prontMap[r.paciente_id] ?? null,
+      data_nascimento: nascMap[r.paciente_id] ?? null,
+      telefone: telMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -2947,15 +2959,22 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse")
-      .select("id, numero, status, url_pdf, pagamento_id")
+      .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("pagamento_id", ids)
+      .overlaps("pagamento_ids", ids)
       .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
         const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
-          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>) {
+          const linkedIds = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linkedIds) {
+            if (ids.includes(pid)) {
+              map[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
         }
         setNfsePorLancamento(map);
       });
@@ -3134,6 +3153,86 @@ function DetalheContrato({
     setFormaPagOpen(true);
   };
 
+  // Reimprime a 2ª via da GR de uma mensalidade paga (com lançamento real
+  // no caixa). Só habilita quando existe lancamento_id — parcelas marcadas
+  // como "Paga (histórica)" não geram GR porque não houve pagamento real.
+  // A GR sai idêntica à 1ª via (mesmo usuário original), acrescentando ao
+  // final o nome de quem está reimprimindo.
+  const [reimprimindoId, setReimprimindoId] = useState<string | null>(null);
+  const reimprimirGrMensalidade = async (m: Mens) => {
+    if (!clinicaAtual) return;
+    if (m.status !== "pago") {
+      toast.error("Só é possível reimprimir GR de parcelas pagas.");
+      return;
+    }
+    if (!m.lancamento_id) {
+      toast.error("Esta parcela foi marcada como paga (histórica) — não há pagamento real, não há GR a reimprimir.");
+      return;
+    }
+    setReimprimindoId(m.id);
+    try {
+      const { data: lanc, error } = await supabase
+        .from("fin_lancamentos")
+        .select("valor, forma_pagamento, parcelas, bandeira_cartao, observacoes")
+        .eq("id", m.lancamento_id)
+        .maybeSingle();
+      if (error || !lanc) throw new Error(error?.message ?? "Lançamento não encontrado.");
+      const l = lanc as { valor: number | string; forma_pagamento: string | null; parcelas: number | null; bandeira_cartao: string | null; observacoes: string | null };
+
+      // Reconstrói o detalhe do misto a partir das observações (mesma
+      // convenção usada em print-gr.ts para reimpressões de atendimento).
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (l.forma_pagamento === "misto" && l.observacoes) {
+        const idx = l.observacoes.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = l.observacoes.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+
+      const reimpressoPorNome = user?.user_metadata?.nome ?? user?.email ?? "Usuário";
+      await reimprimirGuiaMensalidade({
+        mensalidadeId: m.id,
+        clinicaId: clinicaAtual.clinica_id,
+        reimpressoPorNome,
+        reimpressoPorId: user?.id ?? null,
+        pagamento: {
+          valor: Number(m.valor_pago ?? l.valor ?? m.valor),
+          forma_pagamento: l.forma_pagamento,
+          parcelas: l.parcelas,
+          bandeira_cartao: l.bandeira_cartao,
+          detalhe,
+        },
+      });
+      toast.success("2ª via da GR enviada para impressão.");
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setReimprimindoId(null);
+    }
+  };
+
   // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
@@ -3221,6 +3320,122 @@ function DetalheContrato({
     }
   };
 
+  // Competência textual para a descrição agrupada.
+  const mesExtenso = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+
+  // Emite UMA NFS-e para várias parcelas pagas (mensalidades/taxas) do mesmo
+  // contrato/paciente. Soma valores, monta descrição consolidada e vincula
+  // todos os lançamentos via nfse.pagamento_ids.
+  const emitirNfseAgrupada = async (parcelas: Mens[]) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual) return;
+    if (parcelas.length < 2) { toast.error("Selecione ao menos 2 parcelas pagas."); return; }
+    if (!emitentes.length || !emitenteId) {
+      toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
+      return;
+    }
+    // Validações: todas pagas, com lancamento_id, sem NFS-e ativa.
+    const invalida = parcelas.find((m) => m.status !== "pago" || !m.lancamento_id);
+    if (invalida) { toast.error("Selecione apenas parcelas pagas com lançamento financeiro."); return; }
+    const jaEmitida = parcelas.find((m) => m.lancamento_id && nfsePorLancamento[m.lancamento_id]);
+    if (jaEmitida) { toast.error("Uma ou mais parcelas selecionadas já têm NFS-e ativa. Cancele-as antes de reemitir."); return; }
+    const pac = pacienteFull ?? {};
+    const nomePac = contrato.paciente_nome ?? "";
+    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    const valorTotal = parcelas.reduce(
+      (s, m) => s + (Number(m.valor_pago ?? m.valor) || 0),
+      0,
+    );
+    if (valorTotal <= 0) { toast.error("Valor total é zero."); return; }
+    setNfseEmitindoLote(true);
+    try {
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: nomePac,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase: valorTotal,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorTotal, tomador);
+      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      // Descrição consolidada, agrupando adesão/taxas separadas das mensalidades.
+      const mensSort = [...parcelas].sort(
+        (a, b) => a.vencimento.localeCompare(b.vencimento),
+      );
+      const linhasMens = mensSort
+        .filter((m) => !isAdesao(m) && !isTaxaInclusao(m))
+        .map((m) => `Mensalidade ${m.numero_parcela} (${mesExtenso(m.vencimento)})`);
+      const linhasTaxas = mensSort
+        .filter((m) => isAdesao(m) || isTaxaInclusao(m))
+        .map((m) => isAdesao(m) ? "Taxa de adesão" : "Taxa de inclusão de dependente");
+      const itens = [...linhasTaxas, ...linhasMens].join("; ");
+      const rotulo = `${itens}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
+      const descComDep = tomador.dependenteAtendido
+        ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
+        : rotulo;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
+      const pagamentoIds = mensSort.map((m) => m.lancamento_id as string);
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: paciente_id,
+          pagamentoId: pagamentoIds[0],
+          pagamentoIds,
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      toast.success("NFS-e agrupada enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+      }
+      // Atualiza o mapa: consulta pelas parcelas vinculadas ao array.
+      const { data } = await supabase
+        .from("nfse")
+        .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .overlaps("pagamento_ids", pagamentoIds)
+        .neq("status", "cancelada");
+      const rows = (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>;
+      setNfsePorLancamento((prev) => {
+        const next = { ...prev };
+        for (const r of rows) {
+          const linked = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linked) {
+            if (pagamentoIds.includes(pid)) {
+              next[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
+        }
+        return next;
+      });
+      limparHistSel();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setNfseEmitindoLote(false);
+    }
+  };
+
   // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas.
   // Regra de negócio: tolerância de 5 dias corridos após o vencimento — nesse
   // intervalo não incidem encargos. A partir do 6º dia de atraso aplica-se
@@ -3229,6 +3444,9 @@ function DetalheContrato({
     if (!m) return 0;
     const base = Number(m.valor) || 0;
     if (m.status === "pago") return base;
+    // Se um gestor autorizou a isenção de juros e multa para ESTA parcela,
+    // devolve o valor original — sem multa e sem juros.
+    if (isencaoEncargos && pagMens?.id === m.id) return base;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
@@ -3679,6 +3897,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = fmtD(d?.data_nascimento);
+      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelDisplay(d?.telefone) || "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -3686,10 +3906,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
       CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
       CIDADE: _cl.cidade ?? "",
       PACIENTE_NOME: contrato.paciente_nome ?? "",
-      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_CPF: fmtCPFDisplay(_pa.cpf),
       PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
       PACIENTE_ENDERECO: enderecoPaciente,
-      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+      PACIENTE_NUMERO: _pa.numero ?? "",
+      PACIENTE_BAIRRO: _pa.bairro ?? "",
+      PACIENTE_CIDADE: _pa.cidade ?? "",
+      PACIENTE_ESTADO: _pa.estado ?? "",
+      PACIENTE_CEP: fmtCEPDisplay(_pa.cep),
+      PACIENTE_TELEFONE: fmtTelDisplay(_pa.telefone),
       PACIENTE_EMAIL: _pa.email ?? "",
       VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
       TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
@@ -3769,6 +3995,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
             </div>
+          ) : cancelado && roleAtual === "admin" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reverterCancelamento}
+              disabled={revertendoCancelamento}
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+              title="Reverter o cancelamento e reativar o contrato (somente Admin)."
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              {revertendoCancelamento ? "Revertendo..." : "Reverter cancelamento"}
+            </Button>
           ) : (
             <div className="w-[160px]" />
           )}
@@ -4044,37 +4282,66 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever && !(cancelado && !isAdmin) ? (() => {
                   const selecionaveis = mens.filter(
-                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                    (m) => !(isAdesao(m) && adesaoEmbutida),
                   );
                   const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
-                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  const total = selecionadas.reduce(
+                    (s, m) => s + (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
+                    0,
+                  );
                   if (selecionadas.length === 0) return null;
+                  const pendentes = selecionadas.filter((m) => m.status !== "pago");
+                  const pagasComLanc = selecionadas.filter((m) => m.status === "pago" && !!m.lancamento_id);
+                  const pagasSemNfse = pagasComLanc.filter((m) => !nfsePorLancamento[m.lancamento_id!]);
+                  const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
+                  const soPagasElegiveis = pendentes.length === 0 && pagasSemNfse.length === selecionadas.length && selecionadas.length >= 2;
+                  const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
                   return (
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
                       <div>
                         <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
                         <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                        {mistura ? (
+                          <span className="ml-2 text-destructive">Separe pagas e pendentes em seleções distintas.</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={limparHistSel}
-                          disabled={aplicandoHistLote}
+                          disabled={aplicandoHistLote || nfseEmitindoLote}
                         >
                           Limpar seleção
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={marcarPagasHistoricasEmLote}
-                          disabled={aplicandoHistLote}
-                        >
-                          {aplicandoHistLote ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : null}
-                          Marcar selecionadas como Paga (histórica)
-                        </Button>
+                        {soPendentes ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={marcarPagasHistoricasEmLote}
+                            disabled={aplicandoHistLote}
+                          >
+                            {aplicandoHistLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : null}
+                            Marcar selecionadas como Paga (histórica)
+                          </Button>
+                        ) : null}
+                        {podeEmitirNfse && soPagasElegiveis ? (
+                          <Button
+                            size="sm"
+                            onClick={() => emitirNfseAgrupada(pagasSemNfse)}
+                            disabled={nfseEmitindoLote || !emitenteId}
+                            title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
+                          >
+                            {nfseEmitindoLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <FileText className="h-3 w-3 mr-1" />
+                            )}
+                            Emitir NFS-e agrupada ({pagasSemNfse.length})
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -4086,16 +4353,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         {podeEscrever && !(cancelado && !isAdmin) ? (
                           <TableHead className="w-8">
                             {(() => {
-                              const selecionaveis = mens.filter(
-                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
-                              );
+                              const selecionaveis = mens.filter((m) => {
+                                if (isAdesao(m) && adesaoEmbutida) return false;
+                                if (m.status === "pago") {
+                                  return !!m.lancamento_id && !nfsePorLancamento[m.lancamento_id];
+                                }
+                                return true;
+                              });
                               const allSel = selecionaveis.length > 0 &&
                                 selecionaveis.every((m) => selectedHistIds.has(m.id));
                               const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
                               return (
                                 <input
                                   type="checkbox"
-                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  aria-label="Selecionar todas as parcelas elegíveis"
                                   ref={(el) => {
                                     if (el) el.indeterminate = !allSel && someSel;
                                   }}
@@ -4162,14 +4433,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <TableRow>
                           {podeEscrever && !(cancelado && !isAdmin) ? (
                             <TableCell className="w-8">
-                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
-                                <input
-                                  type="checkbox"
-                                  aria-label="Selecionar parcela para pagamento histórico"
-                                  checked={selectedHistIds.has(m.id)}
-                                  onChange={() => toggleHistSel(m.id)}
-                                />
-                              ) : null}
+                              {(() => {
+                                if (isAdesao(m) && adesaoEmbutida) return null;
+                                if (m.status === "pago" && (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])) return null;
+                                return (
+                                  <input
+                                    type="checkbox"
+                                    aria-label="Selecionar parcela"
+                                    checked={selectedHistIds.has(m.id)}
+                                    onChange={() => toggleHistSel(m.id)}
+                                  />
+                                );
+                              })()}
                             </TableCell>
                           ) : null}
                           <TableCell>
@@ -4331,6 +4606,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                     </>
                                   )}
                                 </>
+                              ) : null}
+                              {m.status === "pago" && m.lancamento_id ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Reimprimir 2ª via da GR"
+                                  disabled={reimprimindoId === m.id}
+                                  onClick={() => reimprimirGrMensalidade(m)}
+                                >
+                                  {reimprimindoId === m.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Printer className="h-3 w-3" />
+                                  )}
+                                </Button>
                               ) : null}
                               {isAdmin && podeEscrever ? (
                                 <Button
@@ -4548,17 +4838,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                 <span className="text-xs text-muted-foreground">
-                  A 1ª parcela é gerada no mês da data de início; as 11 seguintes seguem mês a mês.
+                  A 1ª parcela é gerada no mês seguinte à data de início; as 11 seguintes seguem mês a mês, cobrindo 12 meses até a data de término.
                 </span>
                 <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={regerarParcelasFuturas}
-                    disabled={(cancelado && !isAdmin) || regerando || savingDados || !podeEscrever}
-                  >
-                    {regerando ? "Regerando…" : "Regerar 12 parcelas"}
-                  </Button>
                   <Button
                     size="sm"
                     onClick={salvarDadosFinanceiros}
@@ -4763,6 +5045,67 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   Imprimir Contrato
                 </Button>
               </div>
+              <div className="rounded-md border bg-card p-4 mb-3 space-y-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Contratante — Titular
+                  </div>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                    {[
+                      ["Nome", contrato.paciente_nome],
+                      ["CPF", fmtCPFDisplay(pacienteFull?.cpf)],
+                      ["Nascimento", pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—"],
+                      ["Prontuário", pacienteFull?.codigo_prontuario ?? "—"],
+                      ["Telefone", fmtTelDisplay(pacienteFull?.telefone)],
+                      ["E-mail", pacienteFull?.email ?? "—"],
+                      ["Endereço", [pacienteFull?.logradouro, pacienteFull?.numero].filter(Boolean).join(", ") || "—"],
+                      ["Bairro", pacienteFull?.bairro ?? "—"],
+                      ["Cidade/UF", [pacienteFull?.cidade, pacienteFull?.estado].filter(Boolean).join("/") || "—"],
+                      ["CEP", fmtCEPDisplay(pacienteFull?.cep)],
+                    ].map(([label, value]) => (
+                      <div key={label as string} className="grid grid-cols-[9rem_minmax(0,1fr)] items-baseline gap-2 border-b border-dashed border-border/50 py-1">
+                        <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+                        <dd className="min-w-0 truncate font-medium">{(value as string) || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Associados / Dependentes ({depsAtivos.length})
+                  </div>
+                  {depsAtivos.length === 0 ? (
+                    <div className="text-sm text-muted-foreground italic">Nenhum dependente ativo.</div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">#</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Parentesco</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Prontuário</TableHead>
+                            <TableHead>Tipo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {depsAtivos.map((d, i) => (
+                            <TableRow key={d.id}>
+                              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                              <TableCell className="font-medium">{d.paciente_nome}</TableCell>
+                              <TableCell>{d.parentesco || "—"}</TableCell>
+                              <TableCell>{fmtCPFDisplay(d.cpf)}</TableCell>
+                              <TableCell>{d.codigo_prontuario ?? "—"}</TableCell>
+                              <TableCell className="capitalize">{d.tipo}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </div>
               {contratoTexto ? (
                 /<[a-z][\s\S]*>/i.test(contratoTexto) ? (
                   <div
@@ -4874,7 +5217,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </DialogContent>
       </Dialog>
 
-      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+      <Dialog
+        open={formaPagOpen}
+        onOpenChange={(v) => {
+          setFormaPagOpen(v);
+          if (!v) setIsencaoEncargos(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
@@ -4914,6 +5263,29 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           {pagMens && pagDiasAtraso > 5 ? (
+            isencaoEncargos ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1">
+                <div className="font-semibold">Juros e multa isentados</div>
+                <div className="text-muted-foreground">
+                  Autorizado por <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando o valor original da parcela.
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-500/30">
+                  <span>Valor a cobrar</span>
+                  <span className="font-semibold">{BRL(Number(pagMens.valor))}</span>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setIsencaoEncargos(null)}
+                  >
+                    Reaplicar juros e multa
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>
@@ -4931,7 +5303,50 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>Total com encargos</span>
                 <span>{BRL(pagValorFinal)}</span>
               </div>
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs w-full"
+                onClick={async () => {
+                  if (!pagMens || !clinicaAtual) return;
+                  const nome = (user?.user_metadata as any)?.nome || user?.email || "Usuário";
+                  const valorOriginal = Number(pagMens.valor) || 0;
+                  const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
+                  try {
+                    await supabase.from("audit_log").insert({
+                      clinica_id: clinicaAtual.clinica_id,
+                      user_id: user?.id ?? null,
+                      user_email: user?.email ?? null,
+                      table_name: "contrato_mensalidades",
+                      record_id: pagMens.id,
+                      action: "UPDATE",
+                      dados_depois: {
+                        acao: "isentar_juros_multa_mensalidade",
+                        contrato_id: contrato.id,
+                        contrato_numero: contrato.numero,
+                        numero_parcela: pagMens.numero_parcela,
+                        valor_original: valorOriginal,
+                        valor_com_encargos: Number(valorComEncargos.toFixed(2)),
+                        dias_atraso: pagDiasAtraso,
+                        autorizado_por_user_id: user?.id ?? null,
+                        autorizado_por_nome: nome,
+                        autorizado_por_email: user?.email ?? null,
+                      },
+                    });
+                  } catch (e) {
+                    console.error("Falha ao registrar auditoria de isenção", e);
+                  }
+                  setIsencaoEncargos({ autorizadoPorNome: nome, autorizadoPorUserId: user?.id ?? "" });
+                  toast.success("Juros e multa isentados.");
+                }}
+              >
+                Isentar juros e multa
+              </Button>
             </div>
+            </div>
+            )
           ) : null}
           <div className="grid gap-2 mt-2">
             {formaOpcoes.map((op, idx) => (
@@ -4970,6 +5385,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           }
         }}
         tipo="receita"
+        pacienteIdFixo={((contrato as any).paciente_id as string | null) ?? null}
         initialDescricao={
           pagMens
             ? isAdesao(pagMens)

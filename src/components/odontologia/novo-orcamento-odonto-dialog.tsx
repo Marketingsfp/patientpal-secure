@@ -13,6 +13,8 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -36,18 +38,23 @@ interface Item {
   procedimento_id: string | null;
   dentes: number[];
   valores_formas: Record<string, number> | null;
+  /** Sinal (entrada) em R$ deste item. 0/null = pagamento único. */
+  sinal_valor: number | null;
 }
 
 interface Props {
   open: boolean;
   onClose: () => void;
   clinicaId: string;
-  pacienteId: string;
-  pacienteNome: string;
-  pacienteTelefone: string | null;
+  /** Paciente pré-selecionado (opcional) — pode ser trocado dentro do diálogo. */
+  pacienteId?: string | null;
+  pacienteNome?: string | null;
+  pacienteTelefone?: string | null;
   especialidadeOdontoId: string;
   userId: string | null;
   onCreated: (id: string) => void;
+  /** Quando informado, o diálogo entra em modo edição deste orçamento. */
+  orcamentoId?: string | null;
 }
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"] as const;
@@ -62,8 +69,15 @@ function valorPorForma(p: Procedimento, f: string): number {
 
 export function NovoOrcamentoOdontoDialog({
   open, onClose, clinicaId, pacienteId, pacienteNome, pacienteTelefone,
-  especialidadeOdontoId, userId, onCreated,
+  especialidadeOdontoId, userId, onCreated, orcamentoId = null,
 }: Props) {
+  const editando = !!orcamentoId;
+  // Paciente do orçamento — inicia com o filtro da tela, mas é editável aqui.
+  const [paciente, setPaciente] = useState<PatientOption | null>(
+    pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+  );
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickInitial, setQuickInitial] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [medicoId, setMedicoId] = useState("");
@@ -73,6 +87,7 @@ export function NovoOrcamentoOdontoDialog({
   const [observacoes, setObservacoes] = useState("");
   const [itens, setItens] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
+  const [carregando, setCarregando] = useState(false);
 
   // Seleção corrente no odontograma (dentes que receberão o próximo serviço)
   const [selecao, setSelecao] = useState<number[]>([]);
@@ -86,6 +101,9 @@ export function NovoOrcamentoOdontoDialog({
 
   useEffect(() => {
     if (!open) return;
+    setPaciente(
+      pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+    );
     void (async () => {
       // Médicos que atendem Odontologia (join via medico_especialidades)
       const { data: medRows } = await supabase
@@ -116,6 +134,59 @@ export function NovoOrcamentoOdontoDialog({
       setProcsOdonto((procRows ?? []) as Procedimento[]);
     })();
   }, [open, clinicaId, especialidadeOdontoId]);
+
+  // Modo edição: carrega o orçamento e seus itens
+  useEffect(() => {
+    if (!open || !orcamentoId) return;
+    let cancelado = false;
+    setCarregando(true);
+    void (async () => {
+      const [{ data: orc, error }, { data: itensRows }] = await Promise.all([
+        supabase
+          .from("orcamentos")
+          .select("id, paciente_id, paciente_nome, paciente_telefone, medico_id, medico_nome, forma_pagamento, desconto, validade_dias, observacoes")
+          .eq("id", orcamentoId)
+          .maybeSingle(),
+        supabase
+          .from("orcamento_itens")
+          .select("procedimento_id, descricao, quantidade, valor_unitario, valores_formas, dentes, sinal_valor, ordem")
+          .eq("orcamento_id", orcamentoId)
+          .order("ordem"),
+      ]);
+      if (cancelado) return;
+      if (error || !orc) { setCarregando(false); return mostrarErro(error); }
+      const o = orc as unknown as {
+        paciente_id: string | null; paciente_nome: string | null; paciente_telefone: string | null;
+        medico_id: string | null; medico_nome: string | null; forma_pagamento: string | null;
+        desconto: number | null; validade_dias: number | null; observacoes: string | null;
+      };
+      setPaciente(o.paciente_id ? ({ id: o.paciente_id, nome: o.paciente_nome ?? "", telefone: o.paciente_telefone ?? null } as PatientOption) : null);
+      setMedicoId(o.medico_id ?? "");
+      setMedicoNome(o.medico_nome ?? "");
+      const formas = (o.forma_pagamento ?? "").split("+").map((s) => s.trim()).filter(Boolean);
+      setFormasPagamento(formas.length ? formas : ["Dinheiro"]);
+      setDesconto(Number(o.desconto ?? 0));
+      setValidade(Number(o.validade_dias ?? 30));
+      setObservacoes(o.observacoes ?? "");
+      setItens(
+        ((itensRows ?? []) as unknown as Array<{
+          procedimento_id: string | null; descricao: string | null; quantidade: number | null;
+          valor_unitario: number | null; valores_formas: Record<string, number> | null;
+          dentes: number[] | null; sinal_valor: number | null;
+        }>).map((r) => ({
+          descricao: r.descricao ?? "",
+          quantidade: Number(r.quantidade ?? 1) || 1,
+          valor_unitario: Number(r.valor_unitario ?? 0),
+          procedimento_id: r.procedimento_id ?? null,
+          dentes: Array.isArray(r.dentes) ? r.dentes.map(Number) : [],
+          valores_formas: r.valores_formas ?? null,
+          sinal_valor: r.sinal_valor != null ? Number(r.sinal_valor) : null,
+        })),
+      );
+      setCarregando(false);
+    })();
+    return () => { cancelado = true; };
+  }, [open, orcamentoId]);
 
   useEffect(() => {
     if (!open) {
@@ -170,6 +241,7 @@ export function NovoOrcamentoOdontoDialog({
           procedimento_id: p.id,
           dentes: d != null ? [d] : [],
           valores_formas: valores,
+          sinal_valor: null,
         });
         if (p.valor_variavel) algumVariavel = true;
       }
@@ -230,6 +302,7 @@ export function NovoOrcamentoOdontoDialog({
   }, [formasPagamento, itens, desconto]);
 
   const salvar = async () => {
+    if (!paciente?.id) return toast.error("Selecione o paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
     for (let i = 0; i < itens.length; i++) {
@@ -240,6 +313,10 @@ export function NovoOrcamentoOdontoDialog({
       const vu = Number(it.valor_unitario);
       if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
       if (it.dentes.length > 32) return toast.error(`Item ${i + 1}: máximo 32 dentes`);
+      const sinal = Number(it.sinal_valor ?? 0);
+      const totalItem = (Number(it.quantidade) || 0) * vu;
+      if (sinal < 0) return toast.error(`Item ${i + 1}: sinal não pode ser negativo`);
+      if (sinal > totalItem) return toast.error(`Item ${i + 1}: sinal não pode ser maior que o total do item`);
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
     if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
@@ -248,16 +325,59 @@ export function NovoOrcamentoOdontoDialog({
     setSaving(true);
     const valoresPag = formasPagamento.length > 1 ? { ...totaisPorForma } : null;
 
+    const montarItens = (id: string) =>
+      itens.map((i, idx) => ({
+        orcamento_id: id,
+        procedimento_id: i.procedimento_id,
+        descricao: i.descricao,
+        quantidade: Number(i.quantidade) || 1,
+        valor_unitario: Number(i.valor_unitario) || 0,
+        valor_total: (Number(i.quantidade) || 0) * (Number(i.valor_unitario) || 0),
+        ordem: idx,
+        valores_formas: i.valores_formas ?? null,
+        dentes: i.dentes.length ? i.dentes : null,
+        sinal_valor: Number(i.sinal_valor ?? 0) > 0 ? Number(i.sinal_valor) : null,
+      }));
+
+    if (orcamentoId) {
+      const { error: eUp } = await supabase
+        .from("orcamentos")
+        .update({
+          paciente_id: paciente!.id,
+          paciente_nome: paciente!.nome,
+          paciente_telefone: paciente?.telefone ?? null,
+          medico_id: medicoId || null,
+          medico_nome: medicoNome.trim() || null,
+          forma_pagamento: formasPagamento.join(" + "),
+          valores_pagamento: valoresPag,
+          validade_dias: validade,
+          desconto: Number(desconto) || 0,
+          valor_total: total,
+          observacoes: observacoes.trim() || null,
+        })
+        .eq("id", orcamentoId);
+      if (eUp) { setSaving(false); return mostrarErro(eUp); }
+      const { error: eDel } = await supabase.from("orcamento_itens").delete().eq("orcamento_id", orcamentoId);
+      if (eDel) { setSaving(false); return mostrarErro(eDel); }
+      const { error: eIns } = await supabase.from("orcamento_itens").insert(montarItens(orcamentoId));
+      setSaving(false);
+      if (eIns) return mostrarErro(eIns);
+      toast.success("Orçamento atualizado");
+      onCreated(orcamentoId);
+      return;
+    }
+
     const { data: orc, error } = await supabase
       .from("orcamentos")
       .insert({
         clinica_id: clinicaId,
         numero: 0,
+        serie: "D",
         categoria: "demais",
         especialidade_id: especialidadeOdontoId,
-        paciente_id: pacienteId,
-        paciente_nome: pacienteNome,
-        paciente_telefone: pacienteTelefone,
+        paciente_id: paciente!.id,
+        paciente_nome: paciente!.nome,
+        paciente_telefone: paciente?.telefone ?? null,
         medico_id: medicoId || null,
         medico_nome: medicoNome.trim() || null,
         forma_pagamento: formasPagamento.join(" + "),
@@ -272,22 +392,12 @@ export function NovoOrcamentoOdontoDialog({
       .single();
     if (error || !orc) { setSaving(false); return mostrarErro(error); }
 
-    const payload = itens.map((i, idx) => ({
-      orcamento_id: orc.id,
-      procedimento_id: i.procedimento_id,
-      descricao: i.descricao,
-      quantidade: Number(i.quantidade) || 1,
-      valor_unitario: Number(i.valor_unitario) || 0,
-      valor_total: (Number(i.quantidade) || 0) * (Number(i.valor_unitario) || 0),
-      ordem: idx,
-      valores_formas: i.valores_formas ?? null,
-      dentes: i.dentes.length ? i.dentes : null,
-    }));
+    const payload = montarItens(orc.id);
     const { error: e2 } = await supabase.from("orcamento_itens").insert(payload);
     setSaving(false);
     if (e2) return mostrarErro(e2);
     toast.success("Orçamento odontológico criado");
-    try { await printOrcamento(orc.id, clinicaId); } catch (e) { toast.error((e as Error).message); }
+    try { await printOrcamento(orc.id, clinicaId, "a4"); } catch (e) { toast.error((e as Error).message); }
     onCreated(orc.id);
   };
 
@@ -295,14 +405,23 @@ export function NovoOrcamentoOdontoDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo orçamento — Odontologia</DialogTitle>
+          <DialogTitle>{editando ? "Editar orçamento — Odontologia" : "Novo orçamento — Odontologia"}</DialogTitle>
         </DialogHeader>
+
+        {carregando && <p className="text-sm text-muted-foreground">Carregando orçamento…</p>}
 
         <div className="space-y-4">
           {/* Cabeçalho compacto */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Paciente</Label><Input value={pacienteNome} disabled /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone ?? ""} disabled /></div>
+            <div className="space-y-1">
+              <Label>Paciente</Label>
+              <PatientSearchInput
+                value={paciente}
+                onSelect={(p) => setPaciente(p)}
+                onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
+              />
+            </div>
+            <div className="space-y-1"><Label>Telefone</Label><Input value={paciente?.telefone ?? ""} disabled /></div>
             <div className="space-y-1">
               <Label>Dentista</Label>
               <select
@@ -488,6 +607,26 @@ export function NovoOrcamentoOdontoDialog({
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
                           </div>
+                          <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2 items-center rounded-md bg-muted/30 p-2">
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-muted-foreground">Sinal (entrada) R$</div>
+                              <CurrencyInput
+                                value={it.sinal_valor ? it.sinal_valor.toFixed(2) : ""}
+                                onChange={(v) => atualizarItem(idx, "sinal_valor", v === "" ? null : Number(v))}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {Number(it.sinal_valor ?? 0) > 0 ? (
+                                Number(it.sinal_valor) > sub ? (
+                                  <span className="text-destructive">Sinal maior que o total deste item</span>
+                                ) : (
+                                  <>Saldo ao final: <span className="font-medium text-foreground">R$ {(sub - Number(it.sinal_valor)).toFixed(2)}</span></>
+                                )
+                              ) : (
+                                <>Deixe vazio para pagamento único (sem sinal).</>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -532,8 +671,18 @@ export function NovoOrcamentoOdontoDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar orçamento"}</Button>
+          <Button onClick={salvar} disabled={saving || carregando}>
+            {saving ? "Salvando…" : editando ? "Salvar alterações" : "Salvar orçamento"}
+          </Button>
         </DialogFooter>
+
+        <QuickPatientDialog
+          open={quickOpen}
+          onOpenChange={setQuickOpen}
+          clinicaId={clinicaId}
+          nomeInicial={quickInitial}
+          onCreated={(p) => { setPaciente(p); setQuickOpen(false); }}
+        />
       </DialogContent>
     </Dialog>
   );

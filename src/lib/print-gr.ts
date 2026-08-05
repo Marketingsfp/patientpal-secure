@@ -199,13 +199,41 @@ async function resolveVinculoConvenio(
   return null;
 }
 
-function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
-  if (!v) return "";
-  const suf = v.vinculo === "titular"
-    ? "(TITULAR)"
-    : v.titularNome ? `(DEPENDENTE DE ${esc(v.titularNome)})` : "(DEPENDENTE)";
-  return `<div class="center sm">PLANO: <span class="v">${esc(v.convenioNome)}</span> ${suf}</div>`;
+/**
+ * Verifica se algum lançamento financeiro confirmado dos agendamentos
+ * indicados aplica o desconto do convênio informado (nome aparece na
+ * descrição). Usado para corrigir a impressão da GR quando o agendamento
+ * ficou gravado como "particular" mas a taxa do convênio foi cobrada — o
+ * campo CONV. deve mostrar o nome do convênio, não PARTICULAR.
+ */
+async function agendamentoUsouConvenio(
+  agendamentoIds: Array<string | null | undefined>,
+  convenioNome: string | null | undefined,
+): Promise<boolean> {
+  if (!convenioNome) return false;
+  const ids = agendamentoIds.filter((x): x is string => !!x);
+  if (!ids.length) return false;
+  try {
+    const { data } = await supabase
+      .from("fin_lancamentos")
+      .select("descricao")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado");
+    const alvo = convenioNome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+    for (const r of (data ?? []) as Array<{ descricao: string | null }>) {
+      const d = (r.descricao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      if (d.includes(alvo)) return true;
+    }
+  } catch { /* ignora */ }
+  return false;
 }
+
+// renderLinhaVinculo removida: linha PLANO com (TITULAR)/(DEPENDENTE DE X)
+// quebrava a impressão térmica. Mantido apenas o nome do convênio na linha CONV.
 
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
@@ -374,13 +402,41 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
+  // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
+  // operador logado que está imprimindo. Ordem de resolução:
+  //   1) fin_lancamentos.criado_por → profiles.nome (fonte da verdade)
+  //   2) impresso_por_nome gravado na 1ª via (histórico)
+  //   3) usuarioNome do caller (fallback quando não há lançamento)
+  let usuarioFinalNome: string | null | undefined = undefined;
+  try {
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("criado_por, created_at")
+      .eq("agendamento_id", agendamentoId)
+      .eq("tipo", "receita")
+      .neq("status", "cancelado")
+      .order("created_at", { ascending: true });
+    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
+      .map((l) => l.criado_por)
+      .find((v): v is string => !!v);
+    if (criadoPor) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", criadoPor)
+        .maybeSingle();
+      const nome = (prof as { nome: string | null } | null)?.nome;
+      if (nome) usuarioFinalNome = nome;
+    }
+  } catch { /* segue para fallback */ }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -460,7 +516,41 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
     } catch { medicoCb = null; }
   }
-  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  let procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  // Fallback: a.procedimento pode vir com sufixos como "(ECG) (CARDIOLOGIA)"
+  // que não existem exatamente na tabela `procedimentos`. Tenta variantes
+  // progressivamente mais curtas (removendo parênteses do fim) para achar o
+  // procedimento cadastrado e preservar o valor de tabela — essencial para
+  // gratuidades, onde não há valor pago para fallback.
+  if (!procData && a.procedimento) {
+    const stripParens = (s: string): string[] => {
+      const out: string[] = [];
+      let cur = s.trim();
+      out.push(cur);
+      for (let i = 0; i < 3; i++) {
+        const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+        if (!m) break;
+        cur = m[1].trim();
+        if (cur) out.push(cur);
+      }
+      const semParens = s.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      if (semParens && !out.includes(semParens)) out.push(semParens);
+      return out;
+    };
+    for (const alvo of stripParens(a.procedimento)) {
+      if (alvo === a.procedimento) continue;
+      const { data: pAlt } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", alvo)
+        .maybeSingle();
+      if (pAlt) {
+        procData = pAlt as unknown as typeof procData;
+        break;
+      }
+    }
+  }
 
   // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
   // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
@@ -598,7 +688,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .from("fin_lancamentos")
         .select("descricao")
         .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita");
+        .eq("tipo", "receita")
+        .neq("status", "cancelado");
       for (const l of ((lancs ?? []) as Array<{ descricao: string | null }>)) {
         if (detectCartaoConsulta(l.descricao)) { isCartaoConsulta = true; break; }
       }
@@ -640,7 +731,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const ficha = fichaNum > 0
     ? String(fichaNum).padStart(3, "0")
     : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
-  const prontuario = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
+  const prontuario = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
   // senão usa o padrão do médico (tipo_repasse / percentual / valor).
@@ -668,6 +759,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     return Array.from(out).filter(Boolean);
   };
 
+  // Gratuidade: paciente isento (nenhum lançamento pago). Clínica e prestador
+  // continuam recebendo normalmente, usando o valor de tabela do procedimento
+  // como base do cálculo.
+  const isGratuidade = !pagamento && valor === 0;
+  const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;
   let prestador = 0;
   let repasseFixoConvenio = false;
   // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
@@ -680,7 +776,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       // limitar pelo valor pago.
       repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
-      prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
+      prestador = +(valorBase * Number(medicoCb.percentual) / 100).toFixed(2);
     }
   } else if (a.medico_id) {
     const { data: convs } = await supabase
@@ -706,28 +802,29 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
         if (valor <= 0) repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-        prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+        prestador = +(valorBase * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
         // sem tipo/valor cadastrado para o serviço → usa padrão do médico
         if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
           prestador = Number(medicoData.valor_repasse_padrao);
         } else {
-          prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
         }
       }
     } else if (medicoData) {
       if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
         prestador = Number(medicoData.valor_repasse_padrao);
       } else {
-        prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
       }
     }
   }
   // Só limita o repasse pelo valor pago quando NÃO é repasse fixo de convênio.
+  // Em gratuidade, o "teto" passa a ser o valor de tabela (valorBase).
   if (!repasseFixoConvenio) {
-    prestador = Math.min(prestador, valor);
+    prestador = Math.min(prestador, valorBase);
   }
-  const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
+  const clinica = +(Math.max(0, valorBase - prestador)).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
@@ -753,12 +850,115 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabel = await resolveConvLabel(
+  // Odontologia (e demais serviços com cobrança em duas etapas): quando o
+  // atendimento está vinculado a itens de orçamento com SINAL, a guia mostra
+  // SINAL / SALDO FINAL / TOTAL. Sem itens com sinal, nada muda na guia.
+  let sinalBloco = { sinal: 0, saldo: 0, total: 0, pago: 0 };
+  try {
+    const { data: links } = await supabase
+      .from("agendamento_orcamento_itens")
+      .select("orcamento_item_id")
+      .eq("agendamento_id", agendamentoId);
+    const itemIds = ((links ?? []) as Array<{ orcamento_item_id: string | null }>)
+      .map((l) => l.orcamento_item_id)
+      .filter((v): v is string => !!v);
+    if (itemIds.length > 0) {
+      const { data: itensOrc } = await supabase
+        .from("orcamento_itens")
+        .select("quantidade, valor_unitario, valor_total, sinal_valor, valor_pago")
+        .in("id", itemIds);
+      for (const it of ((itensOrc ?? []) as Array<{
+        quantidade: number | null; valor_unitario: number | null;
+        valor_total: number | null; sinal_valor: number | null; valor_pago: number | null;
+      }>)) {
+        const sinalIt = Number(it.sinal_valor ?? 0);
+        if (sinalIt <= 0) continue;
+        const q = Number(it.quantidade ?? 1) || 1;
+        const totalIt = Number(it.valor_total ?? q * Number(it.valor_unitario ?? 0));
+        sinalBloco.sinal += sinalIt;
+        sinalBloco.total += totalIt;
+        sinalBloco.saldo += Math.max(0, totalIt - sinalIt);
+        sinalBloco.pago += Number(it.valor_pago ?? 0);
+      }
+    }
+  } catch { /* sem bloco de sinal */ }
+  const temSinal = sinalBloco.sinal > 0;
+  // O que já estava pago ANTES desta guia = total pago registrado menos o valor
+  // recebido agora. "Falta pagar" considera todos os pagamentos do item.
+  const pagoTotalSinal = Math.round(Math.min(sinalBloco.total, sinalBloco.pago) * 100) / 100;
+  const pagoAnteriorSinal = Math.round(Math.max(0, pagoTotalSinal - Number(valor || 0)) * 100) / 100;
+  const faltaPagarSinal = Math.round(Math.max(0, sinalBloco.total - pagoTotalSinal) * 100) / 100;
+  // Se o único pagamento anterior foi o próprio sinal, as duas linhas seriam
+  // idênticas — nesse caso imprime uma linha só: "SINAL (JÁ PAGO)".
+  const sinalJaPago = pagoAnteriorSinal > 0 && Math.abs(pagoAnteriorSinal - sinalBloco.sinal) <= 0.004;
+  const sinalHtml = temSinal ? `
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">SINAL${sinalJaPago ? " (JÁ PAGO)" : ""}:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
+      ${pagoAnteriorSinal > 0 && !sinalJaPago ? `<tr><td class="label">JÁ PAGO ANTES:</td><td class="v right">${fmtBRL(pagoAnteriorSinal)}</td></tr>` : ""}
+      <tr><td class="label">PAGAMENTO ATUAL:</td><td class="v right">${fmtBRL(Number(valor || 0))}</td></tr>
+      <tr><td class="label">FALTA PAGAR:</td><td class="v right">${faltaPagarSinal <= 0.004 ? "QUITADO" : fmtBRL(faltaPagarSinal)}</td></tr>
+      <tr class="bold"><td class="label">TOTAL:</td><td class="v right">${fmtBRL(sinalBloco.total)}</td></tr>
+    </table>` : "";
+
+  let convLabel = await resolveConvLabel(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     a.paciente_id ?? null,
     clinicaId,
   );
   const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
+  // Corrige o rótulo quando o agendamento ficou gravado como "particular"
+  // mas o desconto do convênio foi aplicado no caixa (paciente pagou a taxa
+  // do convênio em dinheiro/PIX/cartão). Nesse caso a GR deve exibir o
+  // nome do convênio, não PARTICULAR.
+  if (convLabel === "PARTICULAR" && vinculoConv?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio([a.id], vinculoConv.convenioNome);
+    if (usouConv) convLabel = vinculoConv.convenioNome.toUpperCase();
+  }
+
+  // Sufixo (TITULAR)/(DEPENDENTE DE X) foi removido: causava quebra de
+  // layout na impressão térmica (linha muito longa). Mantém apenas o nome
+  // do convênio na linha CONV.
+  void vinculoConv;
+
+  // ---- Atendimento externo -------------------------------------------------
+  // Paciente atendido aqui, mas faturado em outra clínica: não há
+  // fin_lancamentos nem caixa. A guia sai igual às demais, mas com selo de
+  // origem e com os valores vindos de fin_atendimentos (valor_medico já
+  // calculado no registro do externo).
+  const agExt = a as unknown as {
+    origem_externa?: boolean | null;
+    origem_clinica_nome?: string | null;
+    origem_valor?: number | null;
+  };
+  const ehExterno = agExt.origem_externa === true;
+  let externoValorTabela = Number(agExt.origem_valor ?? 0);
+  let externoRepasse = 0;
+  if (ehExterno) {
+    try {
+      const { data: fa } = await supabase
+        .from("fin_atendimentos")
+        .select("valor_total, valor_medico")
+        .eq("agendamento_id", agendamentoId)
+        .maybeSingle();
+      const f = (fa as { valor_total: number | null; valor_medico: number | null } | null) ?? null;
+      if (f) {
+        if (!(externoValorTabela > 0)) externoValorTabela = Number(f.valor_total ?? 0);
+        externoRepasse = Number(f.valor_medico ?? 0);
+      }
+    } catch { /* guia sai mesmo sem o financeiro */ }
+  }
+  const externoSeloHtml = ehExterno ? `
+    ${agExt.origem_clinica_nome ? `<div class="center sm">ORIGEM: <span class="v">${esc(String(agExt.origem_clinica_nome).toUpperCase())}</span></div>` : ""}
+    <div class="center sm">SEM COBRANCA NESTA UNIDADE</div>
+    <div class="sep"></div>` : "";
+  const externoValoresHtml = ehExterno ? `
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">VALOR TABELA:</td><td class="v right">${fmtBRL(externoValorTabela)}</td></tr>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(0)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(externoRepasse)}</td></tr>
+    </table>` : "";
 
   const ticketHtml = `
   <div class="ticket">
@@ -768,16 +968,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
 
     <div class="sep"></div>
-    <div class="center lg">GUIA DE ATENDIMENTO</div>
+    <div class="center lg">${ehExterno ? "GUIA DE ATENDIMENTO EXTERNO" : "GUIA DE ATENDIMENTO"}</div>
     <div class="sep"></div>
-
+    ${externoSeloHtml}
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
     ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-    ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
-    ${renderLinhaVinculo(vinculoConv)}
+    ${convLabel ? `<div class="center sm">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
 
     <div class="sep"></div>
 
@@ -800,8 +999,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         <td>${esc(procNome)}</td>
       </tr>
     </table>
+    ${sinalHtml}
 
-    ${valor > 0 ? `
+    ${ehExterno ? externoValoresHtml : valor > 0 ? `
     <div class="row" style="margin-top:8px">
       <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
       <div class="bold lg">${fmtBRL(valor)}</div>
@@ -825,7 +1025,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
       <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
     </table>
-    ` : ""}
+    ` : (isGratuidade && (clinica > 0 || prestador > 0) ? `
+    <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+    <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
+    </table>
+    ` : "")}
 
     <div class="sep"></div>
     <div class="row sm">
@@ -939,7 +1147,31 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  // "USUÁRIO:" = quem faturou (autor do lançamento), sempre. Ordem: criador do
+  // fin_lancamento → nome gravado na 1ª via → usuarioNome do caller.
+  let usuarioFinalNome: string | null | undefined = undefined;
+  try {
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("criado_por, created_at")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .neq("status", "cancelado")
+      .order("created_at", { ascending: true });
+    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
+      .map((l) => l.criado_por)
+      .find((v): v is string => !!v);
+    if (criadoPor) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", criadoPor)
+        .maybeSingle();
+      const nome = (prof as { nome: string | null } | null)?.nome;
+      if (nome) usuarioFinalNome = nome;
+    }
+  } catch { /* segue para fallback */ }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
@@ -973,9 +1205,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
+  // Agendamentos que têm lançamento confirmado mas com valor total 0 →
+  // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
+  const gratuidadeByAg = new Map<string, boolean>();
   for (const l of ((lancsRes.data ?? []) as Array<{ agendamento_id: string | null; valor: number | string }>)) {
     if (!l.agendamento_id) continue;
     valorPagoByAg.set(l.agendamento_id, (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor));
+    gratuidadeByAg.set(l.agendamento_id, true);
+  }
+  // Depois de somar, mantém true só quando o total é 0.
+  for (const [k, total] of valorPagoByAg.entries()) {
+    if (total > 0) gratuidadeByAg.set(k, false);
   }
 
   // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
@@ -989,7 +1229,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     : { data: null };
   const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
-  const prontuarioPac = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
+  const prontuarioPac = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Busca dados de todos os médicos envolvidos + seus convênios
   const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
@@ -1027,8 +1267,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
 
   // Agrupa por médico
-  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string };
-  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
+  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string; gratuidade: boolean };
+  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string; allGratuidade: boolean; anyPago: boolean };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
@@ -1096,8 +1336,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     // GR independente com o repasse calculado só para aquele serviço.
     const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
-    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
+    const gratuidade = gratuidadeByAg.get(a.id) === true;
+    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio, allGratuidade: true, anyPago: false };
+    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
+    if (!gratuidade) g.anyPago = true;
+    if (!gratuidade) g.allGratuidade = false;
     if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
@@ -1150,12 +1393,19 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabelAgrupada = await resolveConvLabel(
+  let convLabelAgrupada = await resolveConvLabel(
     (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     pacIdRef ?? null,
     clinicaId,
   );
   const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
+  if (convLabelAgrupada === "PARTICULAR" && vinculoConvAgrupada?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio(
+      ags.map((x) => x.id),
+      vinculoConvAgrupada.convenioNome,
+    );
+    if (usouConv) convLabelAgrupada = vinculoConvAgrupada.convenioNome.toUpperCase();
+  }
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
@@ -1170,8 +1420,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-    ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
-    ${renderLinhaVinculo(vinculoConvAgrupada)}
+    ${convLabelAgrupada ? `<div class="center sm">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
   `;
 
   const gruposArr = Array.from(grupos.values());
@@ -1220,7 +1469,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           </tr>
           ${linhas}
         </table>
-        ${g.subtotal > 0 ? `
+        ${g.allGratuidade ? `
+        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+        <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+        ${(g.clinica > 0 || g.prestador > 0) ? `
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+        </table>
+        ` : ""}
+        ` : g.subtotal > 0 ? `
         <div class="row" style="margin-top:8px">
           <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
           <div class="bold lg">${fmtBRL(g.subtotal)}</div>
@@ -1291,6 +1550,9 @@ export interface PrintGRMensalidadeInput {
   usuarioNome?: string;
   usuarioId?: string | null;
   reimpressao?: boolean;
+  /** Nome de quem está reimprimindo esta 2ª via — impresso ao final da GR. */
+  reimpressoPorNome?: string;
+  reimpressoPorId?: string | null;
   pagamento: {
     valor: number;
     forma_pagamento: string | null;
@@ -1298,6 +1560,32 @@ export interface PrintGRMensalidadeInput {
     bandeira_cartao: string | null;
     detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
   };
+}
+
+
+// ============================================================================
+// NUMERAÇÃO PRÓPRIA DA GR DE MENSALIDADE (Cartão Consulta / Cartão Desconto)
+// ----------------------------------------------------------------------------
+// A mensalidade não usa a ficha posicional da agenda: ela recebe uma sequência
+// própria por clínica/dia (GR MENS. Nº 1, 2, 3…). Ainda assim, cada impressão
+// fica registrada em gr_impressoes, de modo que a contagem de GRs do dia soma
+// atendimentos + mensalidades.
+// ============================================================================
+async function proximoNumeroGRMensalidade(clinicaId: string): Promise<number> {
+  const hoje = new Date();
+  const ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0).toISOString();
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59).toISOString();
+  const { data } = await supabase
+    .from("gr_impressoes" as never)
+    .select("ficha_numero")
+    .eq("clinica_id", clinicaId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .eq("via_numero", 1)
+    .gte("created_at", ini)
+    .lte("created_at", fim);
+  const rows = (data as Array<{ ficha_numero: number | null }> | null) ?? [];
+  const maior = rows.reduce((mx, r) => Math.max(mx, Number(r.ficha_numero ?? 0)), 0);
+  return Math.max(maior + 1, rows.length + 1);
 }
 
 export async function printGuiaMensalidade(input: PrintGRMensalidadeInput) {
@@ -1308,7 +1596,7 @@ export async function reimprimirGuiaMensalidade(input: PrintGRMensalidadeInput) 
   return printGuiaMensalidadeCore({ ...input, reimpressao: true });
 }
 
-async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRMensalidadeInput) {
+async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao, reimpressoPorNome, reimpressoPorId, pagamento }: PrintGRMensalidadeInput) {
   // Controle de vias 1ª/2ª via por mensalidade
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -1326,12 +1614,26 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  // Número próprio de GR da mensalidade (sequência diária por clínica).
+  const { data: grPrevRows } = await supabase
+    .from("gr_impressoes" as never)
+    .select("ficha_numero")
+    .eq("mensalidade_id", mensalidadeId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .not("ficha_numero", "is", null)
+    .order("via_numero", { ascending: true })
+    .limit(1);
+  const grNumeroExistente = ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
+  const grNumero = grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
+  // "USUÁRIO:" = quem faturou (criador do lançamento), sempre — 1ª via e
+  // reimpressões. Resolvido abaixo após carregar a mensalidade; caller fica
+  // como último fallback.
+  let usuarioFinalNome: string | null | undefined = undefined;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
       .from("contrato_mensalidades")
-      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em")
+      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em, lancamento_id")
       .eq("id", mensalidadeId)
       .maybeSingle(),
     supabase
@@ -1341,20 +1643,43 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       .maybeSingle(),
   ]);
   if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
-  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null };
+  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null; lancamento_id: string | null };
   const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+
+  // Resolve o usuário SEMPRE via fin_lancamentos.criado_por → profiles.nome.
+  // Não usa o operador logado; o "USUÁRIO:" tem que ser quem faturou.
+  if (m.lancamento_id) {
+    try {
+      const { data: lanc } = await supabase
+        .from("fin_lancamentos")
+        .select("criado_por")
+        .eq("id", m.lancamento_id)
+        .maybeSingle();
+      const criadoPor = (lanc as { criado_por: string | null } | null)?.criado_por;
+      if (criadoPor) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("nome")
+          .eq("id", criadoPor)
+          .maybeSingle();
+        const nome = (prof as { nome: string | null } | null)?.nome;
+        if (nome) usuarioFinalNome = nome;
+      }
+    } catch { /* mantém oculto se não conseguir resolver */ }
+  }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id, num_parcelas")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
@@ -1402,6 +1727,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     <div class="sep"></div>
     <div class="center lg">GUIA DE RECEBIMENTO</div>
     <div class="center sm">${isAdesao ? "TAXA DE ADESAO" : "MENSALIDADE DE CONVÊNIO"}</div>
+    ${grNumero ? `<div class="center bold">GR MENS. Nº ${grNumero}</div>` : ""}
     <div class="sep"></div>
 
     <div class="center bold">${esc(tituloPac)}</div>
@@ -1453,6 +1779,12 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
+    ${reimpressao && reimpressoPorNome ? `
+    <div class="sep"></div>
+    <div class="center sm">*** 2ª VIA — REIMPRESSÃO ***</div>
+    <div class="center sm">REIMPRESSO POR: <span class="v">${esc(reimpressoPorNome)}</span></div>
+    <div class="center sm">EM ${fmtData(new Date().toISOString())}</div>
+    ` : ""}
   </div>`;
 
   const nVias = numViasGR(pagamento);
@@ -1479,6 +1811,20 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
         tipo: "mensalidade",
+        ficha_numero: grNumero,
+      } as never);
+    } catch (_) { /* falha silenciosa */ }
+  } else if (reimpressoPorNome) {
+    // Registra também as reimpressões, para auditoria (não afeta a 1ª via original).
+    try {
+      await supabase.from("gr_impressoes" as never).insert({
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: ultimaVia + 1,
+        impresso_por: reimpressoPorId ?? null,
+        impresso_por_nome: reimpressoPorNome,
+        tipo: "mensalidade",
+        ficha_numero: grNumero,
       } as never);
     } catch (_) { /* falha silenciosa */ }
   }
@@ -1528,7 +1874,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
@@ -1548,15 +1894,15 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone").eq("id", contrato.paciente_id).maybeSingle()
@@ -1732,15 +2078,15 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id, num_parcelas")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()

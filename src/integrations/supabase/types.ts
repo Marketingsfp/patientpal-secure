@@ -372,6 +372,11 @@ export type Database = {
           observacoes: string | null
           orcamento_id: string | null
           orcamento_item_id: string | null
+          origem_clinica_id: string | null
+          origem_clinica_nome: string | null
+          origem_externa: boolean
+          origem_gr_numero: string | null
+          origem_valor: number | null
           paciente_id: string | null
           paciente_nome: string
           pacote_id: string | null
@@ -408,6 +413,11 @@ export type Database = {
           observacoes?: string | null
           orcamento_id?: string | null
           orcamento_item_id?: string | null
+          origem_clinica_id?: string | null
+          origem_clinica_nome?: string | null
+          origem_externa?: boolean
+          origem_gr_numero?: string | null
+          origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome: string
           pacote_id?: string | null
@@ -444,6 +454,11 @@ export type Database = {
           observacoes?: string | null
           orcamento_id?: string | null
           orcamento_item_id?: string | null
+          origem_clinica_id?: string | null
+          origem_clinica_nome?: string | null
+          origem_externa?: boolean
+          origem_gr_numero?: string | null
+          origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome?: string
           pacote_id?: string | null
@@ -489,6 +504,13 @@ export type Database = {
             columns: ["orcamento_item_id"]
             isOneToOne: false
             referencedRelation: "orcamento_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_origem_clinica_id_fkey"
+            columns: ["origem_clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
@@ -2011,6 +2033,7 @@ export type Database = {
           updated_at: string
           valor: number | null
           valor_cartao: number | null
+          valor_outros: number | null
         }
         Insert: {
           ativo?: boolean
@@ -2038,6 +2061,7 @@ export type Database = {
           updated_at?: string
           valor?: number | null
           valor_cartao?: number | null
+          valor_outros?: number | null
         }
         Update: {
           ativo?: boolean
@@ -2065,6 +2089,7 @@ export type Database = {
           updated_at?: string
           valor?: number | null
           valor_cartao?: number | null
+          valor_outros?: number | null
         }
         Relationships: [
           {
@@ -2111,6 +2136,7 @@ export type Database = {
           id: string
           informativo_html: string | null
           max_dependentes: number
+          modalidade: string | null
           modelo_contrato: string | null
           nome: string
           num_parcelas: number
@@ -2134,6 +2160,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           max_dependentes?: number
+          modalidade?: string | null
           modelo_contrato?: string | null
           nome: string
           num_parcelas?: number
@@ -2157,6 +2184,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           max_dependentes?: number
+          modalidade?: string | null
           modelo_contrato?: string | null
           nome?: string
           num_parcelas?: number
@@ -2468,6 +2496,38 @@ export type Database = {
           },
         ]
       }
+      clinica_tts_config: {
+        Row: {
+          clinica_id: string
+          enabled: boolean
+          rate: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          clinica_id: string
+          enabled?: boolean
+          rate?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          enabled?: boolean
+          rate?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinica_tts_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinicas: {
         Row: {
           ativo: boolean
@@ -2770,7 +2830,6 @@ export type Database = {
           origem: string
           paciente_id: string
           paciente_nome: string
-          plano_id: string | null
           renovado_em: string | null
           sem_carencia: boolean
           sem_carencia_em: string | null
@@ -2779,6 +2838,7 @@ export type Database = {
           status: string
           tabela_legada: boolean
           taxa_adesao: number
+          teste: boolean
           titular_apenas_financeiro: boolean
           token_publico: string | null
           updated_at: string
@@ -2808,7 +2868,6 @@ export type Database = {
           origem?: string
           paciente_id: string
           paciente_nome: string
-          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2817,6 +2876,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          teste?: boolean
           titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
@@ -2846,7 +2906,6 @@ export type Database = {
           origem?: string
           paciente_id?: string
           paciente_nome?: string
-          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2855,6 +2914,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          teste?: boolean
           titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
@@ -2873,13 +2933,6 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contratos_assinatura_plano_id_fkey"
-            columns: ["plano_id"]
-            isOneToOne: false
-            referencedRelation: "planos_assinatura"
             referencedColumns: ["id"]
           },
         ]
@@ -2962,6 +3015,111 @@ export type Database = {
           telefone?: string | null
           updated_at?: string
           valor_estimado?: number
+        }
+        Relationships: []
+      }
+      dev_relatorio_destinatarios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          telefone: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          telefone: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          telefone?: string
+        }
+        Relationships: []
+      }
+      dev_relatorio_entradas: {
+        Row: {
+          area: string | null
+          chave_loop: string | null
+          created_at: string
+          created_by: string | null
+          data: string
+          descricao: string | null
+          hora: string
+          id: string
+          loop_manual: boolean
+          loop_motivo: string | null
+          origem: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          area?: string | null
+          chave_loop?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          hora?: string
+          id?: string
+          loop_manual?: boolean
+          loop_motivo?: string | null
+          origem?: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          area?: string | null
+          chave_loop?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          hora?: string
+          id?: string
+          loop_manual?: boolean
+          loop_motivo?: string | null
+          origem?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dev_relatorio_envios: {
+        Row: {
+          data: string
+          destinatarios: number
+          enviado_em: string
+          erro: string | null
+          id: string
+          mensagem: string | null
+          status: string
+        }
+        Insert: {
+          data: string
+          destinatarios?: number
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+        }
+        Update: {
+          data?: string
+          destinatarios?: number
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
         }
         Relationships: []
       }
@@ -3118,6 +3276,7 @@ export type Database = {
       estorno_solicitacoes: {
         Row: {
           agendamento_id: string | null
+          caixa_movimento_id: string | null
           clinica_id: string
           created_at: string
           data_estorno: string | null
@@ -3139,6 +3298,7 @@ export type Database = {
         }
         Insert: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id: string
           created_at?: string
           data_estorno?: string | null
@@ -3160,6 +3320,7 @@ export type Database = {
         }
         Update: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id?: string
           created_at?: string
           data_estorno?: string | null
@@ -3337,6 +3498,7 @@ export type Database = {
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: string
+          teste: boolean
           updated_at: string
           valor_clinica: number
           valor_laudo: number
@@ -3371,6 +3533,7 @@ export type Database = {
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
+          teste?: boolean
           updated_at?: string
           valor_clinica?: number
           valor_laudo?: number
@@ -3405,6 +3568,7 @@ export type Database = {
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
+          teste?: boolean
           updated_at?: string
           valor_clinica?: number
           valor_laudo?: number
@@ -3601,7 +3765,11 @@ export type Database = {
           bandeira_cartao: string | null
           categoria_id: string | null
           clinica_id: string
+          composicao_pagamento: Json | null
           conta_id: string | null
+          contrato_id: string | null
+          convenio_id: string | null
+          convenio_modalidade: string | null
           created_at: string
           criado_por: string | null
           data: string
@@ -3644,7 +3812,11 @@ export type Database = {
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id: string
+          composicao_pagamento?: Json | null
           conta_id?: string | null
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_modalidade?: string | null
           created_at?: string
           criado_por?: string | null
           data?: string
@@ -3687,7 +3859,11 @@ export type Database = {
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id?: string
+          composicao_pagamento?: Json | null
           conta_id?: string | null
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_modalidade?: string | null
           created_at?: string
           criado_por?: string | null
           data?: string
@@ -3744,6 +3920,20 @@ export type Database = {
             columns: ["conta_id"]
             isOneToOne: false
             referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
             referencedColumns: ["id"]
           },
           {
@@ -4515,6 +4705,36 @@ export type Database = {
           },
         ]
       }
+      lab_allowlist_contatos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          tipo: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          tipo: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          tipo?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       lgpd_consentimentos: {
         Row: {
           aceito: boolean
@@ -5049,6 +5269,11 @@ export type Database = {
       medico_convenios: {
         Row: {
           ativo: boolean
+          cartao_consulta_valor: number | null
+          cartao_desconto_valor: number | null
+          convenio_percentual: number | null
+          convenio_tipo_repasse: string | null
+          convenio_valor: number | null
           created_at: string
           id: string
           medico_id: string
@@ -5060,6 +5285,11 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cartao_consulta_valor?: number | null
+          cartao_desconto_valor?: number | null
+          convenio_percentual?: number | null
+          convenio_tipo_repasse?: string | null
+          convenio_valor?: number | null
           created_at?: string
           id?: string
           medico_id: string
@@ -5071,6 +5301,11 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cartao_consulta_valor?: number | null
+          cartao_desconto_valor?: number | null
+          convenio_percentual?: number | null
+          convenio_tipo_repasse?: string | null
+          convenio_valor?: number | null
           created_at?: string
           id?: string
           medico_id?: string
@@ -5358,6 +5593,7 @@ export type Database = {
           clinica_id: string
           complemento: string | null
           conta: string | null
+          convenio_contrato_id: string | null
           cpf: string | null
           created_at: string
           crm: string
@@ -5376,6 +5612,7 @@ export type Database = {
           nacionalidade: string | null
           nome: string
           numero: string | null
+          paciente_id: string | null
           paytime_recipient_id: string | null
           percentual_repasse_padrao: number
           pix_chave: string | null
@@ -5408,6 +5645,7 @@ export type Database = {
           clinica_id: string
           complemento?: string | null
           conta?: string | null
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           crm: string
@@ -5426,6 +5664,7 @@ export type Database = {
           nacionalidade?: string | null
           nome: string
           numero?: string | null
+          paciente_id?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
@@ -5458,6 +5697,7 @@ export type Database = {
           clinica_id?: string
           complemento?: string | null
           conta?: string | null
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           crm?: string
@@ -5476,6 +5716,7 @@ export type Database = {
           nacionalidade?: string | null
           nome?: string
           numero?: string | null
+          paciente_id?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
@@ -5503,10 +5744,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "medicos_convenio_contrato_id_fkey"
+            columns: ["convenio_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "medicos_especialidade_id_fkey"
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
             referencedColumns: ["id"]
           },
           {
@@ -5805,6 +6060,7 @@ export type Database = {
           orcamento_id: string | null
           paciente_id: string | null
           pagamento_id: string | null
+          pagamento_ids: string[]
           payload_envio: Json | null
           payload_resposta: Json | null
           rps_numero: number | null
@@ -5844,6 +6100,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null
@@ -5883,6 +6140,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null
@@ -5916,24 +6174,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "nfse_emitente_id_fkey"
-            columns: ["emitente_id"]
-            isOneToOne: false
-            referencedRelation: "nfse_emitentes_publico"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "nfse_orcamento_id_fkey"
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nfse_pagamento_id_fkey"
-            columns: ["pagamento_id"]
-            isOneToOne: false
-            referencedRelation: "pagamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -6438,6 +6682,9 @@ export type Database = {
           pago_em: string | null
           procedimento_id: string | null
           quantidade: number
+          saldo_pago_em: string | null
+          sinal_pago_em: string | null
+          sinal_valor: number | null
           status_alterado_em: string | null
           status_alterado_por: string | null
           status_fin_em: string | null
@@ -6445,6 +6692,7 @@ export type Database = {
           status_item: string
           status_op_em: string | null
           status_operacional: string
+          valor_pago: number
           valor_total: number
           valor_unitario: number
           valores_formas: Json | null
@@ -6465,6 +6713,9 @@ export type Database = {
           pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
+          saldo_pago_em?: string | null
+          sinal_pago_em?: string | null
+          sinal_valor?: number | null
           status_alterado_em?: string | null
           status_alterado_por?: string | null
           status_fin_em?: string | null
@@ -6472,6 +6723,7 @@ export type Database = {
           status_item?: string
           status_op_em?: string | null
           status_operacional?: string
+          valor_pago?: number
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
@@ -6492,6 +6744,9 @@ export type Database = {
           pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
+          saldo_pago_em?: string | null
+          sinal_pago_em?: string | null
+          sinal_valor?: number | null
           status_alterado_em?: string | null
           status_alterado_por?: string | null
           status_fin_em?: string | null
@@ -6499,6 +6754,7 @@ export type Database = {
           status_item?: string
           status_op_em?: string | null
           status_operacional?: string
+          valor_pago?: number
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
@@ -6547,6 +6803,7 @@ export type Database = {
           paciente_id: string | null
           paciente_nome: string
           paciente_telefone: string | null
+          serie: string
           status: string
           updated_at: string
           validade_dias: number
@@ -6572,6 +6829,7 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome: string
           paciente_telefone?: string | null
+          serie?: string
           status?: string
           updated_at?: string
           validade_dias?: number
@@ -6597,6 +6855,7 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome?: string
           paciente_telefone?: string | null
+          serie?: string
           status?: string
           updated_at?: string
           validade_dias?: number
@@ -6693,6 +6952,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }
         Insert: {
@@ -6729,6 +6989,7 @@ export type Database = {
           sexo?: string
           telefone?: string | null
           telefone2?: string | null
+          teste?: boolean
           updated_at?: string
         }
         Update: {
@@ -6765,6 +7026,7 @@ export type Database = {
           sexo?: string
           telefone?: string | null
           telefone2?: string | null
+          teste?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -7008,60 +7270,60 @@ export type Database = {
         }
         Relationships: []
       }
-      planos_assinatura: {
+      planos_assinatura_arquivo: {
         Row: {
-          ativo: boolean
-          clinica_id: string
-          created_at: string
+          ativo: boolean | null
+          clinica_id: string | null
+          created_at: string | null
           descricao_beneficios: string | null
-          fidelidade_meses: number
-          id: string
-          max_agregados: number
-          max_dependentes: number
-          nome: string
-          num_parcelas: number
-          taxa_adesao: number
+          fidelidade_meses: number | null
+          id: string | null
+          max_agregados: number | null
+          max_dependentes: number | null
+          nome: string | null
+          num_parcelas: number | null
+          taxa_adesao: number | null
           template_contrato: string | null
-          tipo: string
-          updated_at: string
-          valor_mensal: number
-          vigencia_meses: number
+          tipo: string | null
+          updated_at: string | null
+          valor_mensal: number | null
+          vigencia_meses: number | null
         }
         Insert: {
-          ativo?: boolean
-          clinica_id: string
-          created_at?: string
+          ativo?: boolean | null
+          clinica_id?: string | null
+          created_at?: string | null
           descricao_beneficios?: string | null
-          fidelidade_meses?: number
-          id?: string
-          max_agregados?: number
-          max_dependentes?: number
-          nome: string
-          num_parcelas?: number
-          taxa_adesao?: number
+          fidelidade_meses?: number | null
+          id?: string | null
+          max_agregados?: number | null
+          max_dependentes?: number | null
+          nome?: string | null
+          num_parcelas?: number | null
+          taxa_adesao?: number | null
           template_contrato?: string | null
-          tipo?: string
-          updated_at?: string
-          valor_mensal?: number
-          vigencia_meses?: number
+          tipo?: string | null
+          updated_at?: string | null
+          valor_mensal?: number | null
+          vigencia_meses?: number | null
         }
         Update: {
-          ativo?: boolean
-          clinica_id?: string
-          created_at?: string
+          ativo?: boolean | null
+          clinica_id?: string | null
+          created_at?: string | null
           descricao_beneficios?: string | null
-          fidelidade_meses?: number
-          id?: string
-          max_agregados?: number
-          max_dependentes?: number
-          nome?: string
-          num_parcelas?: number
-          taxa_adesao?: number
+          fidelidade_meses?: number | null
+          id?: string | null
+          max_agregados?: number | null
+          max_dependentes?: number | null
+          nome?: string | null
+          num_parcelas?: number | null
+          taxa_adesao?: number | null
           template_contrato?: string | null
-          tipo?: string
-          updated_at?: string
-          valor_mensal?: number
-          vigencia_meses?: number
+          tipo?: string | null
+          updated_at?: string | null
+          valor_mensal?: number | null
+          vigencia_meses?: number | null
         }
         Relationships: []
       }
@@ -7636,6 +7898,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      qa_cb_casos: {
+        Row: {
+          caso: number
+          cenario: string
+          clinica_id: string
+          contrato_id: string | null
+          convenio_id: string | null
+          convenio_nome: string | null
+          created_at: string
+          detalhe: string | null
+          execucao: string
+          forma: string | null
+          id: string
+          observacao: string | null
+          paciente_id: string | null
+          passou: boolean
+          procedimento_id: string | null
+          procedimento_nome: string | null
+          valor_esperado: number
+          valor_obtido: number
+          valor_particular: number
+        }
+        Insert: {
+          caso: number
+          cenario: string
+          clinica_id: string
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_nome?: string | null
+          created_at?: string
+          detalhe?: string | null
+          execucao: string
+          forma?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id?: string | null
+          passou?: boolean
+          procedimento_id?: string | null
+          procedimento_nome?: string | null
+          valor_esperado?: number
+          valor_obtido?: number
+          valor_particular?: number
+        }
+        Update: {
+          caso?: number
+          cenario?: string
+          clinica_id?: string
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_nome?: string | null
+          created_at?: string
+          detalhe?: string | null
+          execucao?: string
+          forma?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id?: string | null
+          passou?: boolean
+          procedimento_id?: string | null
+          procedimento_nome?: string | null
+          valor_esperado?: number
+          valor_obtido?: number
+          valor_particular?: number
+        }
+        Relationships: []
       }
       regras_rateio: {
         Row: {
@@ -8321,89 +8649,7 @@ export type Database = {
           updated_at: string | null
           usar_ambiente_nacional: boolean | null
         }
-        Insert: {
-          aliquota_iss?: number | null
-          ativo?: boolean | null
-          bairro?: string | null
-          cep?: string | null
-          certificado_validade?: string | null
-          clinica_id?: string | null
-          cnpj?: string | null
-          codigo_cnae?: string | null
-          codigo_municipio?: string | null
-          codigo_tributario_municipio?: string | null
-          complemento?: string | null
-          created_at?: string | null
-          descricao_servico_padrao?: string | null
-          email?: string | null
-          focus_ambiente?: string | null
-          id?: string | null
-          incentivador_cultural?: boolean | null
-          inscricao_estadual?: string | null
-          inscricao_municipal?: string | null
-          item_lista_servico?: string | null
-          logradouro?: string | null
-          municipio?: string | null
-          nome?: string | null
-          nome_fantasia?: string | null
-          numero?: string | null
-          optante_simples?: boolean | null
-          padrao?: boolean | null
-          razao_social?: string | null
-          regime_tributario?: string | null
-          rps_proximo_numero?: number | null
-          rps_serie?: string | null
-          telefone?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          usar_ambiente_nacional?: boolean | null
-        }
-        Update: {
-          aliquota_iss?: number | null
-          ativo?: boolean | null
-          bairro?: string | null
-          cep?: string | null
-          certificado_validade?: string | null
-          clinica_id?: string | null
-          cnpj?: string | null
-          codigo_cnae?: string | null
-          codigo_municipio?: string | null
-          codigo_tributario_municipio?: string | null
-          complemento?: string | null
-          created_at?: string | null
-          descricao_servico_padrao?: string | null
-          email?: string | null
-          focus_ambiente?: string | null
-          id?: string | null
-          incentivador_cultural?: boolean | null
-          inscricao_estadual?: string | null
-          inscricao_municipal?: string | null
-          item_lista_servico?: string | null
-          logradouro?: string | null
-          municipio?: string | null
-          nome?: string | null
-          nome_fantasia?: string | null
-          numero?: string | null
-          optante_simples?: boolean | null
-          padrao?: boolean | null
-          razao_social?: string | null
-          regime_tributario?: string | null
-          rps_proximo_numero?: number | null
-          rps_serie?: string | null
-          telefone?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          usar_ambiente_nacional?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nfse_emitentes_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_pacientes_duplicados_suspeitos: {
         Row: {
@@ -8417,6 +8663,14 @@ export type Database = {
       }
     }
     Functions: {
+      __actor_set_trocar_convenio: { Args: never; Returns: undefined }
+      _composicao_partes: {
+        Args: { p_comp: Json }
+        Returns: {
+          forma: string
+          valor: number
+        }[]
+      }
       _do_fix_phones_prontuarios_mj: {
         Args: never
         Returns: {
@@ -8441,6 +8695,13 @@ export type Database = {
       _mj_null_all: { Args: never; Returns: number }
       _mj_set_batch: { Args: { _limit?: number }; Returns: number }
       _mj_tmp_batch: { Args: { _limit?: number }; Returns: number }
+      _parse_misto_obs: {
+        Args: { p_obs: string }
+        Returns: {
+          forma: string
+          valor: number
+        }[]
+      }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
       assinar_contrato_publico: {
@@ -8508,6 +8769,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }[]
         SetofOptions: {
@@ -8775,6 +9037,10 @@ export type Database = {
         Args: { _clinica_id: string; _lancamento_id: string }
         Returns: Json
       }
+      estornar_sangria: {
+        Args: { _clinica_id?: string; _movimento_id: string }
+        Returns: Json
+      }
       feature_flag_ativa: {
         Args: { _clinica_id: string; _flag_key: string }
         Returns: boolean
@@ -8930,6 +9196,8 @@ export type Database = {
         }
         Returns: string
       }
+      is_admin_global: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_ou_gestor: { Args: { _user_id: string }; Returns: boolean }
       is_chat_member: {
         Args: { _canal_id: string; _user_id: string }
         Returns: boolean
@@ -8938,6 +9206,7 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
@@ -8970,6 +9239,46 @@ export type Database = {
           tipo: string
         }[]
       }
+      listar_nfse_emitentes_publico: {
+        Args: never
+        Returns: {
+          aliquota_iss: number
+          ativo: boolean
+          bairro: string
+          cep: string
+          certificado_validade: string
+          clinica_id: string
+          cnpj: string
+          codigo_cnae: string
+          codigo_municipio: string
+          codigo_tributario_municipio: string
+          complemento: string
+          created_at: string
+          descricao_servico_padrao: string
+          email: string
+          focus_ambiente: string
+          id: string
+          incentivador_cultural: boolean
+          inscricao_estadual: string
+          inscricao_municipal: string
+          item_lista_servico: string
+          logradouro: string
+          municipio: string
+          nome: string
+          nome_fantasia: string
+          numero: string
+          optante_simples: boolean
+          padrao: boolean
+          razao_social: string
+          regime_tributario: string
+          rps_proximo_numero: number
+          rps_serie: string
+          telefone: string
+          uf: string
+          updated_at: string
+          usar_ambiente_nacional: boolean
+        }[]
+      }
       log_action: {
         Args: {
           _action: string
@@ -8985,7 +9294,23 @@ export type Database = {
         Args: { p_item_id: string; p_motivo: string }
         Returns: Json
       }
+      medico_convenio_add_dependente: {
+        Args: { _medico_id: string; _paciente_id: string; _parentesco: string }
+        Returns: string
+      }
+      medico_convenio_remove_dependente: {
+        Args: { _dependente_id: string }
+        Returns: undefined
+      }
       medico_dados_sensiveis: { Args: { _medico_id: string }; Returns: Json }
+      medico_toggle_convenio_funcionario: {
+        Args: {
+          _habilitar: boolean
+          _medico_id: string
+          _titular_paciente_id: string
+        }
+        Returns: string
+      }
       medicos_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
@@ -9099,6 +9424,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }[]
         SetofOptions: {

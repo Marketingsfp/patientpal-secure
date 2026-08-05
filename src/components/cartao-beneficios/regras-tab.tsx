@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw, Timer, Pencil } from "lucide-react";
+import { Plus, Trash2, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -73,9 +73,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
+  /** Combinações "especialidadeId|tipo" existentes em serviços ativos. */
+  const [paresEspTipo, setParesEspTipo] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [reapplying, setReapplying] = useState(false);
-  const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
@@ -124,6 +124,30 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
     setProcedimentos(allProcs);
+
+    // Combinações especialidade+tipo que realmente existem em serviços ativos.
+    // Serve só para avisar quando uma regra foi cadastrada com um tipo que não
+    // corresponde a nenhum serviço (ex.: Odontologia + "exame").
+    try {
+      const tipoDe = new Map(allProcs.map(p => [p.id, (p.tipo ?? "").toLowerCase()]));
+      const pares = new Set<string>();
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("procedimento_especialidades")
+          .select("procedimento_id, especialidade_id")
+          .range(from, from + PAGE - 1);
+        if (error) break;
+        const page = data ?? [];
+        for (const row of page as Array<{ procedimento_id: string; especialidade_id: string }>) {
+          const t = tipoDe.get(row.procedimento_id);
+          if (t === undefined) continue; // serviço inativo/de outra clínica
+          pares.add(`${row.especialidade_id}|${t}`);
+          pares.add(`${row.especialidade_id}|`);
+        }
+        if (page.length < PAGE) break;
+      }
+      setParesEspTipo(pares);
+    } catch { /* aviso é opcional */ }
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
@@ -156,12 +180,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     return m;
   }, [especialidades]);
 
-  // ---- Exceções (apenas convênio FUNCIONARIO) ---------------------------
+  /** Regra por especialidade+tipo que não corresponde a nenhum serviço ativo. */
+  const regraSemServico = (r: CbRegra) => {
+    if (r.procedimento_id || !r.especialidade_id || !r.tipo) return false;
+    if (paresEspTipo.size === 0) return false;
+    return !paresEspTipo.has(`${r.especialidade_id}|${(r.tipo ?? "").toLowerCase()}`);
+  };
+
+  // ---- Exceções às regras (todos os convênios) --------------------------
   // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
   // Gravamos como regra específica por procedimento com percentual = 0 e
   // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
   // com procedimento_id, então a exceção vence sobre regras por categoria.
   const isFuncionario = isConvenioFuncionario(convenioNome);
+  void isFuncionario;
   const [excSel, setExcSel] = useState<string[]>([]);
   const [excSaving, setExcSaving] = useState(false);
   const excecoes = useMemo(
@@ -225,9 +257,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const items = regras
       .map((r, idx) => ({ r, idx }))
       .filter(({ r }) => {
-        // Exceções do convênio FUNCIONARIO ficam apenas no bloco próprio.
+        // Exceções ficam apenas no bloco próprio "Exceção às regras".
         if (
-          isFuncionario &&
           r.procedimento_id &&
           r.modo === "percentual_desconto" &&
           Number(r.percentual) === 0 &&
@@ -269,7 +300,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById, isFuncionario]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
 
   const prioridadesUsadas = useMemo(() => {
     const s = new Set<number>();
@@ -342,125 +373,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
+    // Não há mais reaplicação em massa: os valores por serviço são mantidos
+    // manualmente e a Agenda/Caixa calculam sempre pela regra viva.
   };
 
-  /**
-   * Reaplica as regras do convênio a todos os serviços da clínica:
-   * para cada serviço, resolve a especialidade (via procedimento_especialidades
-   * para consultas N:N, ou via campo grupo) e o tipo, calcula o valor e
-   * faz upsert em procedimento_cb_convenio_valores.
-   */
-  const reaplicar = async () => {
-    if (!convenioId) return;
-    if (!confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
-    setReapplying(true);
-    setProgress("Carregando serviços…");
-    try {
-      // 1) carrega procedimentos (paginado, db-max-rows = 1000)
-      const PAGE = 1000;
-      const procs: any[] = [];
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
-          .from("procedimentos")
-          .select("id,grupo,tipo,valor_dinheiro,valor_dinheiro_pix,valor_padrao,valor_pix,valor_cartao_credito,valor_cartao_debito,valor_cartao")
-          .eq("clinica_id", clinicaId)
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        const page = data ?? [];
-        procs.push(...page);
-        if (page.length < PAGE) break;
-      }
-
-      // 2) carrega vínculos N:N de especialidades
-      const { data: vinc, error: errVinc } = await supabase
-        .from("procedimento_especialidades")
-        .select("procedimento_id,especialidade_id")
-        .eq("clinica_id", clinicaId);
-      if (errVinc) throw errVinc;
-      const vincMap = new Map<string, string[]>();
-      (vinc ?? []).forEach((v: any) => {
-        const arr = vincMap.get(v.procedimento_id) ?? [];
-        arr.push(v.especialidade_id);
-        vincMap.set(v.procedimento_id, arr);
-      });
-
-      // 3) índice especialidade por nome (normalizado)
-      const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      const espByName = new Map<string, string>();
-      especialidades.forEach(e => espByName.set(norm(e.nome), e.id));
-
-      // 4) calcula valores
-      setProgress(`Processando ${procs.length} serviços…`);
-      const upserts: any[] = [];
-      for (const p of procs) {
-        const baseDin = Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao) || 0;
-        const baseOut = Number(
-          p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao,
-        ) || 0;
-        const tipo = (p.tipo ?? "").toLowerCase() || null;
-        // tenta cada especialidade possível e usa a melhor regra
-        const possibleEspIds: (string | null)[] = [];
-        const nn = vincMap.get(p.id) ?? [];
-        possibleEspIds.push(...nn);
-        if (p.grupo) {
-          const id = espByName.get(norm(p.grupo));
-          if (id && !possibleEspIds.includes(id)) possibleEspIds.push(id);
-        }
-        if (possibleEspIds.length === 0) possibleEspIds.push(null);
-        let best: ReturnType<typeof computeValor> = null;
-        let bestScore = -1;
-        for (const eid of possibleEspIds) {
-          const r = findRegra(regras, eid, tipo, p.id);
-          if (!r) continue;
-          const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
-          if (sc > bestScore) {
-            const v = computeValor(r, baseDin, baseOut);
-            if (v) { best = v; bestScore = sc; }
-          }
-        }
-        if (best) {
-          upserts.push({
-            clinica_id: clinicaId,
-            procedimento_id: p.id,
-            convenio_id: convenioId,
-            valor_dinheiro: best.dinheiro,
-            valor_outros: best.outros,
-            origem: "regra",
-          });
-        }
-      }
-
-      // 4.5) Limpa valores calculados por regra na rodada anterior — sem
-      // isso, um procedimento que deixou de casar com qualquer regra (regra
-      // removida ou alterada) ficava com o preço antigo indefinidamente.
-      // Valores digitados manualmente (origem='manual') não são tocados.
-      setProgress("Limpando valores calculados anteriores…");
-      const { error: errClear } = await (supabase as any)
-        .from("procedimento_cb_convenio_valores")
-        .delete()
-        .eq("clinica_id", clinicaId)
-        .eq("convenio_id", convenioId)
-        .eq("origem", "regra");
-      if (errClear) throw errClear;
-
-      // 5) upsert em lotes
-      const BATCH = 500;
-      for (let i = 0; i < upserts.length; i += BATCH) {
-        const slice = upserts.slice(i, i + BATCH);
-        setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
-        const { error } = await (supabase as any)
-          .from("procedimento_cb_convenio_valores")
-          .upsert(slice, { onConflict: "procedimento_id,convenio_id" });
-        if (error) throw error;
-      }
-      toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
-    } catch (err: any) {
-      mostrarErro(err);
-    } finally {
-      setReapplying(false);
-      setProgress("");
-    }
-  };
 
   if (!convenioId) {
     return (
@@ -470,14 +386,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {isFuncionario && (
-        <div className="border rounded-md p-3 bg-muted/30 space-y-3">
+  const blocoExcecoes = (
+    <div className="border border-destructive/30 rounded-md p-3 bg-destructive/5 space-y-3">
           <div>
-            <div className="font-medium">Exceções (sem desconto)</div>
+            <div className="font-medium text-destructive">Exceção às regras (sem desconto)</div>
             <p className="text-xs text-muted-foreground">
-              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria ou especialidade.
+              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria, tipo ou especialidade. Serviços que não estão nas regras nem nas exceções também são cobrados como particular.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
@@ -502,7 +416,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           {excecoes.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
           ) : (
-            <ul className="divide-y border rounded-md bg-background">
+             <ul className="divide-y divide-destructive/20 border border-destructive/20 rounded-md bg-background">
               {excecoes.map(e => (
                 <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                   <span className="truncate">{procById.get(e.procedimento_id as string) ?? "(serviço removido)"}</span>
@@ -518,8 +432,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               ))}
             </ul>
           )}
-        </div>
-      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
@@ -530,10 +447,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div className="flex flex-col items-end gap-2">
           <Button variant="ghost" size="sm" onClick={addRegra}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar regra
-          </Button>
-          <Button variant="outline" size="sm" onClick={reaplicar} disabled={reapplying || regras.length === 0}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
-            {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
         </div>
       </div>
@@ -712,6 +625,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {regraSemServico(r) && (
+                    <span
+                      className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                      title="Nenhum serviço ativo desta especialidade tem esse tipo. Esta regra não será aplicada em nenhum atendimento."
+                    >
+                      sem serviço
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <SearchableSelect
@@ -837,6 +758,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </Button>
       </div>
 
+      {blocoExcecoes}
+
       <LimiteDialog
         idx={limiteIdx}
         regras={regras}
@@ -921,6 +844,7 @@ function LimiteDialog({
                   <SelectItem value="dia">Por dia</SelectItem>
                   <SelectItem value="semana">Por semana</SelectItem>
                   <SelectItem value="mes">Por mês</SelectItem>
+                  <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                   <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
@@ -1051,6 +975,62 @@ function NovaRegraDialog({
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
 
+  // Regra "base" por especialidade deste convênio para o procedimento selecionado.
+  // Serve para avisar o operador (e pré-preencher) que ao salvar uma regra por
+  // procedimento, ele está sobrescrevendo o preço cartão/PIX do convênio.
+  const [regraBase, setRegraBase] = useState<{
+    valor: number | null;
+    valor_cartao: number | null;
+    especialidade_nome: string;
+  } | null>(null);
+  const [valorCartaoTocado, setValorCartaoTocado] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!r.procedimento_id) { setRegraBase(null); return; }
+    let cancel = false;
+    (async () => {
+      // especialidades do procedimento
+      const { data: pes } = await (supabase as any)
+        .from("procedimento_especialidades")
+        .select("especialidade_id, especialidades(nome)")
+        .eq("procedimento_id", r.procedimento_id);
+      const espIds = (pes ?? []).map((x: any) => x.especialidade_id);
+      if (!espIds.length) { if (!cancel) setRegraBase(null); return; }
+      const { data: regras } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .select("valor, valor_cartao, especialidade_id, prioridade")
+        .eq("convenio_id", convenioId)
+        .in("especialidade_id", espIds)
+        .is("procedimento_id", null)
+        .eq("modo", "valor_fixo")
+        .eq("ativo", true)
+        .eq("gratuito", false)
+        .order("prioridade", { ascending: false });
+      const escolhida = (regras ?? []).find(
+        (x: any) => x.valor_cartao != null && Number(x.valor_cartao) > 0
+      ) ?? (regras ?? [])[0];
+      if (!escolhida) { if (!cancel) setRegraBase(null); return; }
+      const espNome =
+        (pes ?? []).find((x: any) => x.especialidade_id === escolhida.especialidade_id)
+          ?.especialidades?.nome ?? "especialidade";
+      if (cancel) return;
+      setRegraBase({
+        valor: escolhida.valor != null ? Number(escolhida.valor) : null,
+        valor_cartao: escolhida.valor_cartao != null ? Number(escolhida.valor_cartao) : null,
+        especialidade_nome: espNome,
+      });
+      // Pré-preenche valor_cartao se estiver vazio/zerado e o usuário ainda não digitou
+      if (!isEdit && !valorCartaoTocado && (r.valor_cartao == null || Number(r.valor_cartao) === 0)) {
+        if (escolhida.valor_cartao != null && Number(escolhida.valor_cartao) > 0) {
+          setR(prev => ({ ...prev, valor_cartao: Number(escolhida.valor_cartao) }));
+        }
+      }
+    })();
+    return () => { cancel = true; };
+    /* eslint-disable-next-line */
+  }, [open, r.procedimento_id, convenioId]);
+
   const procOptsFiltrados = useMemo(() => {
     if (!r.tipo) return procOpts;
     const t = r.tipo.toLowerCase();
@@ -1062,11 +1042,41 @@ function NovaRegraDialog({
   const preview = (() => {
     const v = computeValor(r, 100, 100);
     if (!v) return "—";
-    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
+    if (r.modo === "valor_fixo") {
+      return v.dinheiro !== v.outros
+        ? `R$ ${v.dinheiro.toFixed(2)} dinheiro / R$ ${v.outros.toFixed(2)} Pix-cartão (fixo)`
+        : `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
+    }
     return `de R$100 → R$ ${v.dinheiro.toFixed(2)} (${r.percentual}% off)`;
   })();
 
   const salvarNovo = async () => {
+    // Guarda: se o operador está criando/editando uma regra por procedimento e
+    // deixou o valor cartão/PIX igual ao dinheiro (ou zero) enquanto existe uma
+    // regra por especialidade do convênio com valor cartão diferente, confirma
+    // antes de sobrescrever silenciosamente o benefício do cartão.
+    if (
+      r.modo === "valor_fixo" &&
+      r.procedimento_id &&
+      !r.gratuito &&
+      regraBase &&
+      regraBase.valor_cartao != null &&
+      regraBase.valor_cartao > 0
+    ) {
+      const vc = r.valor_cartao != null ? Number(r.valor_cartao) : 0;
+      const vd = Number(r.valor) || 0;
+      const cartaoDivergente = Math.abs(vc - regraBase.valor_cartao) > 0.009;
+      const cartaoIgualDinheiro = Math.abs(vc - vd) < 0.009;
+      if (cartaoDivergente && (cartaoIgualDinheiro || vc === 0)) {
+        const ok = window.confirm(
+          `Atenção: a regra por especialidade (${regraBase.especialidade_nome}) deste convênio ` +
+          `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
+          `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +
+          `o que substitui o preço do convênio.\n\nDeseja continuar mesmo assim?`
+        );
+        if (!ok) return;
+      }
+    }
     setSaving(true);
     const payload: any = {
       clinica_id: clinicaId,
@@ -1218,7 +1228,7 @@ function NovaRegraDialog({
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
-                  onChange={(v) => upd({ valor_cartao: v ? parseFloat(v) : 0 })}
+                  onChange={(v) => { setValorCartaoTocado(true); upd({ valor_cartao: v ? parseFloat(v) : 0 }); }}
                 />
               ) : (
                 <Input
@@ -1230,6 +1240,16 @@ function NovaRegraDialog({
               <p className="text-[11px] text-muted-foreground">
                 Usado quando o pagamento é em PIX, débito ou crédito.
               </p>
+              {r.procedimento_id && regraBase && r.modo === "valor_fixo" && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  Regra do convênio para <b>{regraBase.especialidade_nome}</b>:{" "}
+                  R$ {(regraBase.valor ?? 0).toFixed(2)} dinheiro
+                  {regraBase.valor_cartao != null && (
+                    <> / R$ {regraBase.valor_cartao.toFixed(2)} cartão·PIX</>
+                  )}
+                  . Esta regra por serviço <b>substitui</b> esses valores.
+                </p>
+              )}
             </div>
           </div>
 
@@ -1289,6 +1309,7 @@ function NovaRegraDialog({
                     <SelectItem value="dia">Por dia</SelectItem>
                     <SelectItem value="semana">Por semana</SelectItem>
                     <SelectItem value="mes">Por mês</SelectItem>
+                    <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                     <SelectItem value="contrato">Por contrato</SelectItem>
                   </SelectContent>
                 </Select>

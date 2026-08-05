@@ -11,6 +11,25 @@ const TIPO_LABEL: Record<string, string> = {
   R: "RETORNO",
 };
 
+// jsPDF é dinâmico para não carregar no bundle inicial do totem. O chunk é
+// baixado uma única vez — `precarregarGeradorPdf` permite tirar esse download
+// do caminho da impressão, enquanto o paciente ainda está no menu.
+let jsPdfPromise: Promise<typeof import("jspdf")> | null = null;
+function carregarJsPdf(): Promise<typeof import("jspdf")> {
+  if (!jsPdfPromise) {
+    jsPdfPromise = import("jspdf").catch((e) => {
+      jsPdfPromise = null; // não cacheia falha de rede
+      throw e;
+    });
+  }
+  return jsPdfPromise;
+}
+
+/** Aquecimento do gerador de PDF; nunca lança. */
+export function precarregarGeradorPdf(): void {
+  void carregarJsPdf().catch(() => { /* segue no fallback HTML */ });
+}
+
 /**
  * Gera um PDF 80mm da senha (base64, sem o prefixo data:) para envio
  * ao QZ Tray via `imprimirDocumentoSilencioso`. Mantém o mesmo layout
@@ -31,8 +50,7 @@ export async function gerarSenhaPdfBase64(params: {
     minute: "2-digit",
   });
 
-  // jsPDF é dinâmico para não carregar no bundle inicial do totem.
-  const { jsPDF } = await import("jspdf");
+  const { jsPDF } = await carregarJsPdf();
   // 80mm de largura; altura suficiente para o cupom.
   const doc = new jsPDF({ unit: "mm", format: [80, 120] });
   const w = 80;

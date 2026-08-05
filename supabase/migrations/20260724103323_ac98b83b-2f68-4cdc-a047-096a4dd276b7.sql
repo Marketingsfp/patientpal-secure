@@ -1,0 +1,2 @@
+-- Ver arquivo /tmp/tpl/migration.sql
+-- inline abaixo:

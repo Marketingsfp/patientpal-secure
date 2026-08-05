@@ -24,6 +24,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { limparExternoCore } from "./atendimento-externo.server";
 
 export const STATUS_AGENDAMENTO = [
   "agendado",
@@ -119,6 +120,21 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
       .update(payload as never)
       .in("id", ids);
     if (error) throw new Error(error.message);
+
+    // Cancelamento também desfaz o atendimento externo (remove o registro no
+    // Financeiro e zera as marcações de origem), deixando só o histórico.
+    if (novo_status === "cancelado") {
+      const claims = context.claims as
+        | { email?: string; user_metadata?: { nome?: string } }
+        | null;
+      for (const id of ids) {
+        const res = await limparExternoCore(supabase as never, id, {
+          email: claims?.email ?? null,
+          nome: claims?.user_metadata?.nome ?? null,
+        });
+        if (!res.ok) throw new Error(res.message);
+      }
+    }
 
     return { ids, count: ids.length };
   });
