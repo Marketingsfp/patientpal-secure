@@ -703,9 +703,9 @@ function Page() {
                   <Input type="time" className="w-28" value={gerar.hora_fim}
                     onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Intervalo (min)</label>
-                  <Input type="number" min={1} placeholder="padrão" className="w-28"
+                 <div>
+                   <label className="text-xs text-muted-foreground">Duração de cada horário (min)</label>
+                   <Input type="number" min={5} step={5} placeholder="padrão" className="w-28"
                     value={gerar.intervalo_min}
                     onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
                 </div>
@@ -750,12 +750,21 @@ function Page() {
                   </button>
                 </div>
               </div>
-              {slotsPreview.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
-                  {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
-                </p>
-              )}
+               {slotsPreview.length > 0 && (
+                 <p className="text-xs text-muted-foreground">
+                   Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
+                   {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}. Exemplo do primeiro:{" "}
+                   <strong>{slotsPreview[0].inicio}–{slotsPreview[0].fim}</strong>.
+                 </p>
+               )}
+               {duracaoMinimaPreview !== null && duracaoMinimaPreview < 5 && (
+                 <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2">
+                   Atenção: a duração configurada gera horários de <strong>{duracaoMinimaPreview} min</strong>
+                   {" "}(ex.: {slotsPreview[0]?.inicio}–{slotsPreview[0]?.fim}), o que deixa as vagas sobrepostas na
+                   agenda. Esse campo é a <strong>duração de cada horário</strong>, não a quantidade de fichas —
+                   para limitar fichas use o campo "Limite de fichas". Ajuste para 5 min ou mais antes de gerar.
+                 </p>
+               )}
               <p className="text-xs text-muted-foreground">
                 Se a data já tiver horários criados, os novos serão adicionados <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já existentes.
               </p>
