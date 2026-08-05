@@ -110,6 +110,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
@@ -815,10 +816,15 @@ export function AppShell() {
         >
           <div className="px-3 py-3 border-b border-white/10 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <Link to="/app" className="flex items-center gap-2 min-w-0">
-                <Activity className="h-5 w-5 shrink-0" />
-                <span className="font-semibold tracking-tight truncate">ClinicaOS</span>
-              </Link>
+              <SidebarUserMenu
+                userId={user?.id}
+                userName={userName}
+                email={user?.email}
+                initial={initial}
+                color={clinicColor}
+                onChangePassword={() => setPwOpen(true)}
+                onSignOut={() => void handleSignOut()}
+              />
               <button
                 type="button"
                 onClick={() => {
@@ -1040,35 +1046,10 @@ export function AppShell() {
               <MenuIcon className="h-5 w-5" />
             </button>
           )}
-          <div className="flex items-center gap-2 min-w-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                  style={{ backgroundColor: clinicColor }}
-                  title="Conta"
-                >
-                  {initial}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel className="truncate">{userName || user?.email}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setPwOpen(true)}>
-                  <KeyRound className="h-4 w-4 mr-2" />
-                  Alterar senha
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void handleSignOut()}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <p className="hidden md:block text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>
-              {userName}
-            </p>
-          </div>
+          <Link to="/app" className="flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
+            <Activity className="h-5 w-5 shrink-0 text-primary" />
+            <span className="hidden sm:inline font-semibold tracking-tight truncate">ClinicaOS</span>
+          </Link>
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
             <div className="bg-white rounded-lg shadow-sm border px-2 py-1 hidden sm:flex items-center justify-center shrink-0">
               <img
@@ -1171,8 +1152,16 @@ export function AppShell() {
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
-                <Activity className="h-5 w-5" />
-                ClinicaOS
+                <SidebarUserMenu
+                  userId={user?.id}
+                  userName={userName}
+                  email={user?.email}
+                  initial={initial}
+                  color={clinicColor}
+                  onChangePassword={() => setPwOpen(true)}
+                  onSignOut={() => void handleSignOut()}
+                />
+                <span className="sr-only">Menu</span>
               </SheetTitle>
             </SheetHeader>
             <nav className="px-2 py-3 space-y-4 sidebar-mono">
