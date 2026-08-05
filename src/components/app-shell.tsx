@@ -1169,9 +1169,15 @@ export function AppShell() {
                 ClinicaOS
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-2 py-3 space-y-4">
-              {visibleNavRows.map((row) => (
-                <div key={row.label} className="space-y-1">
+            <nav className="px-2 py-3">
+              {visibleNavRows.map((row, rowIndex) => (
+                <div
+                  key={row.label}
+                  className={cn(
+                    "space-y-1 [&>a+a]:border-t [&>a+a]:border-white/10",
+                    rowIndex > 0 && "mt-4 border-t border-white/15 pt-3",
+                  )}
+                >
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
                     {row.label}
                   </div>
