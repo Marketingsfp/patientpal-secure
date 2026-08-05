@@ -304,10 +304,16 @@ export function PainelPage() {
     // Piper TTS local (Menino Jesus): usa o backend de IA quando habilitado,
     // com fallback silencioso para SpeechSynthesis nativo se falhar.
     const nomeClinica = (clinicaAtual?.clinica?.nome ?? "").toLowerCase();
-    const usarPiper = nomeClinica.includes("menino jesus") && isUserTtsEnabled();
+    const usarPiper =
+      nomeClinica.includes("menino jesus") &&
+      isUserTtsEnabled() &&
+      Date.now() > piperBloqueadoAteRef.current;
     if (usarPiper) {
       try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
       tocarDing();
+      // A partir daqui a chamada não está mais "pendente de gesto":
+      // evita que qualquer clique na tela reenfileire o mesmo anúncio.
+      if (chamadaPendenteRef.current?.key === prox.key) chamadaPendenteRef.current = null;
       const liberar = () => {
         falandoRef.current = false;
         processarFilaFala();
@@ -320,9 +326,10 @@ export function PainelPage() {
           }, 800);
         },
         onError: () => {
-          // fallback: se Piper falhou, cai no SpeechSynthesis do navegador
-          falandoRef.current = false;
-          filaFalaRef.current.unshift(prox);
+          // Piper indisponível: pausa as tentativas por 5 minutos e faz UMA
+          // leitura pelo SpeechSynthesis nativo (sem reenfileirar — reenfileirar
+          // causava anúncio em loop infinito quando o servidor estava fora).
+          piperBloqueadoAteRef.current = Date.now() + 5 * 60_000;
           fallbackSpeechSynth();
         },
       });
