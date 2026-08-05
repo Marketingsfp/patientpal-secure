@@ -8738,14 +8738,14 @@ function AgendaPage() {
                 <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[19%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[18%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="w-[14%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[13%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
-                <TableHead className="w-[10%] px-2 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[9%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+                <TableHead className="w-[13%] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -8902,7 +8902,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5 px-2 min-w-0">
+                      <TableCell className="py-1.5 px-2 min-w-0 max-w-0 truncate">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -8917,7 +8917,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-2.5 px-2">
+                      <TableCell className="py-2.5 px-2 max-w-0">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
@@ -8935,17 +8935,19 @@ function AgendaPage() {
                           </Button>
                           ); })()
                         ) : estornoPend ? (
-                          <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
+                          <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs max-w-full truncate">
                             Estorno solicitado
                           </Badge>
                         ) : (
-                          <Badge className={`${STATUS_COR[a.status]} text-xs`}>{STATUS_LABEL[a.status]}</Badge>
+                          <Badge className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`} title={STATUS_LABEL[a.status]}>
+                            {STATUS_LABEL[a.status]}
+                          </Badge>
                         )}
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="py-1.5 px-1 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-0.5">
+                      <TableCell className="py-1.5 px-3 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
                           {!ehLivre &&
                             !realizado &&
