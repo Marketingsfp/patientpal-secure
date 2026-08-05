@@ -9218,6 +9218,15 @@ export type Database = {
           procedimento: string
         }[]
       }
+      has_module_access: {
+        Args: {
+          _clinica_id: string
+          _modulo: string
+          _nivel?: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _clinica_id: string
