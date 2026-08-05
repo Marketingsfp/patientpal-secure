@@ -8841,19 +8841,19 @@ function AgendaPage() {
                       <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 text-sm font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-2 text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Profissional */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2">
                         {(() => {
                           const label = medicoNomeAgendamento(a);
                           const m = medicos.find((x) => x.id === a.medico_id);
                           const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                           return (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm truncate max-w-[110px]" title={label}>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="text-sm truncate" title={label}>
                                 {label}
                               </span>
                               {manual && (
@@ -8867,16 +8867,16 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Cliente */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2">
                         {ocultarPaciente ? (
-                          <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
+                          <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
-                          <span className="text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
+                          <span className="block truncate text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="flex items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline max-w-full"
+                            className="flex min-w-0 max-w-full items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline"
                             title={a.paciente_nome}
                           >
                             {a.status === "confirmado" && (
@@ -8891,7 +8891,7 @@ function AgendaPage() {
                                 <IdCard className="h-3.5 w-3.5 text-emerald-600" />
                               </span>
                             )}
-                            <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
+                            <span className="truncate">{a.paciente_nome}</span>
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
                                 ORÇ
@@ -8902,7 +8902,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 px-2 min-w-0">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
