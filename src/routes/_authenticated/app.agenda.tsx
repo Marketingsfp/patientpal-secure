@@ -8738,14 +8738,14 @@ function AgendaPage() {
                 <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[21%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[19%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
                 <TableHead className="w-[14%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
-                <TableHead className="w-[8%] px-2 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[10%] px-2 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -8917,7 +8917,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-2.5">
+                      <TableCell className="py-2.5 px-2">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
@@ -8944,8 +8944,8 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="py-1.5 text-right">
-                        <div className="flex items-center justify-end gap-0.5">
+                      <TableCell className="py-1.5 px-1 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-0.5">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
                           {!ehLivre &&
                             !realizado &&
