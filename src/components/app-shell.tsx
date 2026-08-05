@@ -869,7 +869,16 @@ export function AppShell() {
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
               const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
               return (
-                <div key={row.label} className="space-y-1">
+                <div
+                  key={row.label}
+                  className={cn(
+                    "space-y-1",
+                    // Divisores sutis entre os itens do menu (só quando expandido),
+                    // para organizar visualmente a lista longa sem poluir.
+                    !collapsed &&
+                      "[&>a+a]:border-t [&>a+a]:border-white/10 [&>a+div]:border-t [&>a+div]:border-white/10 [&>div+a]:border-t [&>div+a]:border-white/10 [&>div+div]:border-t [&>div+div]:border-white/10 [&>a+a]:pt-2 [&>a+div]:pt-1 [&>div+a]:pt-2 [&>div+div]:pt-1 [&>a+a]:rounded-none [&>a+a]:mt-1",
+                  )}
+                >
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
