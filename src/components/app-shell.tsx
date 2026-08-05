@@ -170,13 +170,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Operação",
     items: [
-      { to: "/app/painel", label: "Dashboard — Início", icon: LayoutDashboard },
       { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
       { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
       { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
       { to: "/app/caixa", label: "Caixa", icon: Wallet },
       { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
       { to: "/app/clientes", label: "Clientes", icon: Contact },
+      { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/painel-executivo", label: "Painel Executivo", icon: FileBarChart2 },
       { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
       { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
@@ -855,8 +855,8 @@ export function AppShell() {
               </Button>
             )}
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto sidebar-scroll">
-            {visibleNavRows.map((row, rowIndex) => {
+          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
+            {visibleNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
                 if (!pathOk) return false;
@@ -869,15 +869,7 @@ export function AppShell() {
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
               const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
               return (
-                <div
-                  key={row.label}
-                  className={cn(
-                    // Linhas divisórias: separa visualmente cada grupo do menu e,
-                    // dentro do grupo, cada item (linha sutil entre irmãos).
-                    "space-y-0.5 [&>*+*]:border-t [&>*+*]:border-white/10 [&>*+*]:pt-0.5",
-                    rowIndex > 0 && "mt-4 border-t border-white/20 pt-3",
-                  )}
-                >
+                <div key={row.label} className="space-y-1">
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
@@ -911,7 +903,7 @@ export function AppShell() {
                                 onClick={() =>
                                   setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))
                                 }
-                                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${subActive ? "bg-white/10 text-white" : "text-white/65 hover:bg-white/5 hover:text-white"}${hoverScaleCls}`}
+                                className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-4 w-4 shrink-0" />
@@ -936,7 +928,7 @@ export function AppShell() {
                                       rel="noopener noreferrer"
                                       title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
-                                      className={`relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-9 pr-3"} py-2.5 text-sm font-medium transition-colors text-white/60 hover:bg-white/5 hover:text-white${hoverScaleCls}`}
+                                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-4 w-4 shrink-0" />
                                       {!collapsed && <span className="truncate">{child.label}</span>}
@@ -964,10 +956,10 @@ export function AppShell() {
                                       event.preventDefault();
                                       irPara(href);
                                     }}
-                                    className={`relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-9 pr-3"} py-2.5 text-sm font-medium transition-colors ${
+                                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                       active
-                                        ? "bg-white/10 text-white before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary"
-                                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                                        ? "bg-white text-slate-900 shadow-sm"
+                                        : "text-white/85 hover:bg-white/10 hover:text-white"
                                     }${hoverScaleCls}`}
                                   >
                                     <child.icon className="h-4 w-4 shrink-0" />
@@ -1001,10 +993,10 @@ export function AppShell() {
                           }}
                           {...dragProps(row.label, navItemKey(item))}
                           className={cn(
-                            `relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2.5 text-sm font-medium transition-colors ${
+                            `relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                               active
-                                ? "bg-white/10 text-white before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary"
-                                : "text-white/60 hover:bg-white/5 hover:text-white"
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-white/85 hover:bg-white/10 hover:text-white"
                             }${hoverScaleCls}`,
                             dragCls(navItemKey(item)),
                           )}
@@ -1169,15 +1161,9 @@ export function AppShell() {
                 ClinicaOS
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-2 py-3">
-              {visibleNavRows.map((row, rowIndex) => (
-                <div
-                  key={row.label}
-                  className={cn(
-                    "space-y-1 [&>a+a]:border-t [&>a+a]:border-white/10",
-                    rowIndex > 0 && "mt-4 border-t border-white/15 pt-3",
-                  )}
-                >
+            <nav className="px-2 py-3 space-y-4">
+              {visibleNavRows.map((row) => (
+                <div key={row.label} className="space-y-1">
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
                     {row.label}
                   </div>
