@@ -110,6 +110,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
