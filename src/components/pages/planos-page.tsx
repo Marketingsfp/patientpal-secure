@@ -16,6 +16,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+// A tabela planos_assinatura existe no banco, mas ainda não consta nos tipos
+// gerados do client. Usamos um alias sem tipagem apenas para esta tela.
+const db = supabase as unknown as {
+  from: (t: string) => any;
+};
+
 type Plano = {
   id: string;
   clinica_id: string;
@@ -46,7 +52,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("planos_assinatura")
       .select("*")
       .eq("clinica_id", clinicaAtual.clinica_id)
@@ -60,7 +66,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
 
   const novo = async () => {
     if (!clinicaAtual || !podeEscrever) return;
-    const { data, error } = await supabase.from("planos_assinatura").insert({
+    const { data, error } = await db.from("planos_assinatura").insert({
       clinica_id: clinicaAtual.clinica_id,
       nome: "Novo plano",
       tipo: "outro",
@@ -77,7 +83,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
   const salvar = async (p: Plano) => {
     if (!podeEscrever) return;
     const { id, ...rest } = p;
-    const { error } = await supabase.from("planos_assinatura").update(rest).eq("id", id);
+    const { error } = await db.from("planos_assinatura").update(rest).eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Plano salvo");
     setEditing(null);
@@ -87,7 +93,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
   const excluir = async (id: string) => {
     if (!podeEscrever) return;
     if (!confirm("Excluir este plano?")) return;
-    const { error } = await supabase.from("planos_assinatura").delete().eq("id", id);
+    const { error } = await db.from("planos_assinatura").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Excluído");
     load();
