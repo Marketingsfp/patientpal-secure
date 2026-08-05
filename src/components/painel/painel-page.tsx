@@ -329,15 +329,17 @@ export function PainelPage() {
       // primeira leitura → intervalo → repetição → libera fila
       void ttsSpeak(texto, {
         onEnd: () => {
+          setTtsStatus({ estado: "online", erro: null, em: Date.now() });
           window.setTimeout(() => {
             void ttsSpeak(texto, { onEnd: liberar, onError: liberar, interrupt: false });
           }, 800);
         },
-        onError: () => {
+        onError: (err) => {
           // Piper indisponível: pausa as tentativas por 5 minutos e faz UMA
           // leitura pelo SpeechSynthesis nativo (sem reenfileirar — reenfileirar
           // causava anúncio em loop infinito quando o servidor estava fora).
           piperBloqueadoAteRef.current = Date.now() + 5 * 60_000;
+          setTtsStatus({ estado: "offline", erro: descreverErroTts(err), em: Date.now() });
           fallbackSpeechSynth();
         },
       });
