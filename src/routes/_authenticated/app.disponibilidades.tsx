@@ -436,6 +436,20 @@ function Page() {
     return out;
   }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
 
+  // Menor duração (em minutos) entre os slots pré-visualizados — usada para
+  // avisar quando a configuração gera vagas de 1–4 min (sobrepostas).
+  const duracaoMinimaPreview = useMemo(() => {
+    if (slotsPreview.length === 0) return null;
+    const min = (hhmm: string) => {
+      const [h, m] = hhmm.split(":").map(Number);
+      return h * 60 + m;
+    };
+    return slotsPreview.reduce(
+      (acc, s) => Math.min(acc, min(s.fim) - min(s.inicio)),
+      Number.POSITIVE_INFINITY,
+    );
+  }, [slotsPreview]);
+
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
   const cidadesDisponiveis = Array.from(
@@ -452,6 +466,10 @@ function Page() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
+    if (duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
+      toast.error(`Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`);
+      return;
+    }
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
     try {
@@ -703,9 +721,9 @@ function Page() {
                   <Input type="time" className="w-28" value={gerar.hora_fim}
                     onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Intervalo (min)</label>
-                  <Input type="number" min={1} placeholder="padrão" className="w-28"
+                 <div>
+                   <label className="text-xs text-muted-foreground">Duração de cada horário (min)</label>
+                   <Input type="number" min={5} step={5} placeholder="padrão" className="w-28"
                     value={gerar.intervalo_min}
                     onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
                 </div>
@@ -750,12 +768,21 @@ function Page() {
                   </button>
                 </div>
               </div>
-              {slotsPreview.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
-                  {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
-                </p>
-              )}
+               {slotsPreview.length > 0 && (
+                 <p className="text-xs text-muted-foreground">
+                   Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
+                   {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}. Exemplo do primeiro:{" "}
+                   <strong>{slotsPreview[0].inicio}–{slotsPreview[0].fim}</strong>.
+                 </p>
+               )}
+               {duracaoMinimaPreview !== null && duracaoMinimaPreview < 5 && (
+                 <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2">
+                   Atenção: a duração configurada gera horários de <strong>{duracaoMinimaPreview} min</strong>
+                   {" "}(ex.: {slotsPreview[0]?.inicio}–{slotsPreview[0]?.fim}), o que deixa as vagas sobrepostas na
+                   agenda. Esse campo é a <strong>duração de cada horário</strong>, não a quantidade de fichas —
+                   para limitar fichas use o campo "Limite de fichas". Ajuste para 5 min ou mais antes de gerar.
+                 </p>
+               )}
               <p className="text-xs text-muted-foreground">
                 Se a data já tiver horários criados, os novos serão adicionados <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já existentes.
               </p>
@@ -974,7 +1001,7 @@ function Page() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Intervalo (min)</label>
-                      <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
+                      <Input type="number" min={5} max={480} step={5} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Vigência de</label>
@@ -1036,7 +1063,7 @@ function Page() {
                                   <Input type="number" min={1} placeholder="sem limite" className="w-28" value={editRow.limite_pacientes} onChange={(e) => setEditRow({ ...editRow, limite_pacientes: e.target.value })} />
                                 </TableCell>
                                 <TableCell>
-                                  <Input type="number" min={1} max={480} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
+                                  <Input type="number" min={5} max={480} step={5} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
