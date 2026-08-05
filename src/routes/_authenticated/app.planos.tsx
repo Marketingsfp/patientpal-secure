@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PlanosPage } from "@/components/pages/planos-page";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Tela unificada: os "planos" agora são cadastrados em
+// Cartão Benefícios > Convênios > Informações.
 export const Route = createFileRoute("/_authenticated/app/planos")({
-  component: PlanosPage,
-  head: () => ({ meta: [{ title: "Planos de Assinatura — ClinicaOS" }] }),
+  beforeLoad: () => {
+    throw redirect({ to: "/app/cartao-beneficios/convenios" });
+  },
 });

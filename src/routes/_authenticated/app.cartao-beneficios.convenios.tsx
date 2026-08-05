@@ -119,6 +119,7 @@ type Convenio = {
   max_dependentes: number;
   fidelidade_meses: number;
   vigencia_meses: number;
+  modalidade: string | null;
   beneficios: string | null;
   modelo_contrato: string | null;
   informativo_html: string | null;
@@ -167,6 +168,9 @@ function ConveniosPage() {
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
   const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(12);
+  // Modalidade do convênio: define qual repasse do médico será usado
+  // (Cartão Consulta ou Cartão Desconto) nos atendimentos do paciente.
+  const [modalidade, setModalidade] = useState<"cartao_consulta" | "cartao_desconto">("cartao_consulta");
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
   const [informativoHtml, setInformativoHtml] = useState("");
@@ -303,6 +307,7 @@ function ConveniosPage() {
     setNome(""); setDescricao(""); setAtivo(true);
     setTaxaAdesao(0); setTaxaInclusaoDep(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
+    setModalidade("cartao_consulta");
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
     setTermoInclusaoHtml("");
@@ -325,6 +330,7 @@ function ConveniosPage() {
     setMaxDependentes(c.max_dependentes ?? 0);
     setFidelidadeMeses(c.fidelidade_meses ?? 0);
     setVigenciaMeses(c.vigencia_meses ?? 12);
+    setModalidade(c.modalidade === "cartao_desconto" ? "cartao_desconto" : "cartao_consulta");
     setBeneficiosTxt(c.beneficios ?? "");
     setModeloContrato(c.modelo_contrato ?? "");
     const stripped = (c.informativo_html ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, "").trim();
@@ -416,6 +422,7 @@ function ConveniosPage() {
       fidelidade_meses: fidelidadeMeses,
       vigencia_meses: vigenciaMeses,
       beneficios: benefClean || null,
+      modalidade,
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
       termo_inclusao_html: termoInclusaoHtml.trim() || null,
@@ -631,6 +638,19 @@ function ConveniosPage() {
                   <Label>Vigência (meses)</Label>
                   <Input type="number" min="0" value={vigenciaMeses}
                     onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Modalidade</Label>
+                  <Select value={modalidade} onValueChange={(v) => setModalidade(v as typeof modalidade)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cartao_consulta">Cartão Consulta</SelectItem>
+                      <SelectItem value="cartao_desconto">Cartão Desconto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Define qual repasse cadastrado no médico será usado para os pacientes deste convênio.
+                  </p>
                 </div>
               </div>
               <div>
@@ -870,7 +890,7 @@ function ConveniosPage() {
                       : undefined
                 }
               >
-                {saving ? "Salvando…" : "Salvar"}
+                {saving ? "Salvando…" : "Salvar convênio"}
               </Button>
             </div>
           </CardContent>

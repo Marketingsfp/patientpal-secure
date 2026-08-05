@@ -31,11 +31,13 @@ import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as ApiTtsProxyRouteImport } from './routes/api/tts-proxy'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -122,9 +124,11 @@ import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
+import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos-externos'
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
+import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
@@ -248,6 +252,11 @@ const CheckinTokenRoute = CheckinTokenRouteImport.update({
   path: '/checkin/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTtsProxyRoute = ApiTtsProxyRouteImport.update({
+  id: '/api/tts-proxy',
+  path: '/api/tts-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -271,6 +280,11 @@ const PainelTTokenRoute = PainelTTokenRouteImport.update({
 const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
   path: '/p/contrato/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
+  id: '/api/public/tts',
+  path: '/api/public/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppUnidadesRoute =
@@ -769,6 +783,12 @@ const AuthenticatedAppFinanceiroBiRoute =
     path: '/bi',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroAtendimentosExternosRoute =
+  AuthenticatedAppFinanceiroAtendimentosExternosRouteImport.update({
+    id: '/atendimentos-externos',
+    path: '/atendimentos-externos',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroAtendimentosRoute =
   AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
     id: '/atendimentos',
@@ -786,6 +806,12 @@ const AuthenticatedAppFinanceiroAlertasRoute =
     id: '/alertas',
     path: '/alertas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesVozRoute =
+  AuthenticatedAppConfiguracoesVozRouteImport.update({
+    id: '/configuracoes/voz',
+    path: '/configuracoes/voz',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppConfiguracoesPainelTotemRoute =
   AuthenticatedAppConfiguracoesPainelTotemRouteImport.update({
@@ -878,6 +904,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -951,6 +978,7 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -965,9 +993,11 @@ export interface FileRoutesByFullPath {
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
+  '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1007,6 +1037,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1077,6 +1108,7 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1091,9 +1123,11 @@ export interface FileRoutesByTo {
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
+  '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1136,6 +1170,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1209,6 +1244,7 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel_/t/$token': typeof PainelTTokenRoute
   '/totem_/t/$token': typeof TotemTTokenRoute
@@ -1223,9 +1259,11 @@ export interface FileRoutesById {
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
+  '/_authenticated/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/_authenticated/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1268,6 +1306,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/totem'
     | '/app'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1341,6 +1380,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1355,9 +1395,11 @@ export interface FileRouteTypes {
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
+    | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
+    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1397,6 +1439,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1467,6 +1510,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1481,9 +1525,11 @@ export interface FileRouteTypes {
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
+    | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
+    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1525,6 +1571,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/totem'
     | '/_authenticated/app'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1598,6 +1645,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel_/t/$token'
     | '/totem_/t/$token'
@@ -1612,9 +1660,11 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/configuracoes/painel-totem'
+    | '/_authenticated/app/configuracoes/voz'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
+    | '/_authenticated/app/financeiro/atendimentos-externos'
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
@@ -1656,6 +1706,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
+  ApiTtsProxyRoute: typeof ApiTtsProxyRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1666,6 +1717,7 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
@@ -1830,6 +1882,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckinTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tts-proxy': {
+      id: '/api/tts-proxy'
+      path: '/api/tts-proxy'
+      fullPath: '/api/tts-proxy'
+      preLoaderRoute: typeof ApiTtsProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -1863,6 +1922,13 @@ declare module '@tanstack/react-router' {
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tts': {
+      id: '/api/public/tts'
+      path: '/api/public/tts'
+      fullPath: '/api/public/tts'
+      preLoaderRoute: typeof ApiPublicTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -2467,6 +2533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/atendimentos-externos': {
+      id: '/_authenticated/app/financeiro/atendimentos-externos'
+      path: '/atendimentos-externos'
+      fullPath: '/app/financeiro/atendimentos-externos'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/atendimentos': {
       id: '/_authenticated/app/financeiro/atendimentos'
       path: '/atendimentos'
@@ -2487,6 +2560,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/financeiro/alertas'
       preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/configuracoes/voz': {
+      id: '/_authenticated/app/configuracoes/voz'
+      path: '/configuracoes/voz'
+      fullPath: '/app/configuracoes/voz'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesVozRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/configuracoes/painel-totem': {
       id: '/_authenticated/app/configuracoes/painel-totem'
@@ -2651,6 +2731,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroAlertasRoute: typeof AuthenticatedAppFinanceiroAlertasRoute
   AuthenticatedAppFinanceiroAnaliticoRoute: typeof AuthenticatedAppFinanceiroAnaliticoRoute
   AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  AuthenticatedAppFinanceiroAtendimentosExternosRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
@@ -2673,6 +2754,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroAnaliticoRoute,
     AuthenticatedAppFinanceiroAtendimentosRoute:
       AuthenticatedAppFinanceiroAtendimentosRoute,
+    AuthenticatedAppFinanceiroAtendimentosExternosRoute:
+      AuthenticatedAppFinanceiroAtendimentosExternosRoute,
     AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
     AuthenticatedAppFinanceiroCategoriasRoute:
       AuthenticatedAppFinanceiroCategoriasRoute,
@@ -2768,6 +2851,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
+  AuthenticatedAppConfiguracoesVozRoute: typeof AuthenticatedAppConfiguracoesVozRoute
   AuthenticatedAppHrContratosIdRoute: typeof AuthenticatedAppHrContratosIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
@@ -2858,6 +2942,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppConfiguracoesNfseRoute,
   AuthenticatedAppConfiguracoesPainelTotemRoute:
     AuthenticatedAppConfiguracoesPainelTotemRoute,
+  AuthenticatedAppConfiguracoesVozRoute: AuthenticatedAppConfiguracoesVozRoute,
   AuthenticatedAppHrContratosIdRoute: AuthenticatedAppHrContratosIdRoute,
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
@@ -2910,6 +2995,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
+  ApiTtsProxyRoute: ApiTtsProxyRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
@@ -2920,6 +3006,7 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  ApiPublicTtsRoute: ApiPublicTtsRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,
@@ -2930,13 +3017,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

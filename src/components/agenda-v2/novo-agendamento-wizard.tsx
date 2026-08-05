@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
+import { notify } from "@/lib/notify";
+import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X, AlertTriangle } from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
+import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
+import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +49,7 @@ type MedicoLite = {
 
 type SlotLivre = { id: string; inicio: string; fim: string };
 
-type TipoAtendimento = "particular" | "convenio";
+type TipoAtendimento = "particular" | "convenio" | "externo";
 
 type EspecialidadeOpt = { id: string; nome: string; isPrincipal: boolean };
 
@@ -86,6 +90,7 @@ export function NovoAgendamentoWizard({
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const queryClient = useQueryClient();
   const criarAgendamentoFn = useServerFn(criarAgendamento);
+  const marcarExternoFn = useServerFn(marcarAtendimentoExterno);
 
   const [stepIdx, setStepIdx] = useState(0);
   const step: StepKey = STEPS[stepIdx].key;
@@ -96,6 +101,16 @@ export function NovoAgendamentoWizard({
   const [dataDia, setDataDia] = useState<string>(toLocalDateKey(new Date()));
   const [slot, setSlot] = useState<SlotLivre | null>(null);
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
+  // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
+  const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
+  const [externoValor, setExternoValor] = useState<number | null>(null);
+  const [externoBuscando, setExternoBuscando] = useState(false);
+  const [externoTemConvenio, setExternoTemConvenio] = useState(false);
+  const [externoConvenios, setExternoConvenios] = useState<
+    Array<{ id: string; nome: string; modalidade: "cartao_consulta" | "cartao_desconto" }>
+  >([]);
+  const [externoConvenioId, setExternoConvenioId] = useState<string>("");
+  const [externoRepasse, setExternoRepasse] = useState<number | null>(null);
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -112,6 +127,51 @@ export function NovoAgendamentoWizard({
   // de walk-in.
   // -------------------------------------------------------------------------
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+
+  // Convênios da clínica + detecção do contrato ativo do paciente.
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId) return;
+    let cancelado = false;
+    void (async () => {
+      const lista = await listarConveniosClinica(clinicaId);
+      if (cancelado) return;
+      setExternoConvenios(lista);
+      const vinculo = await buscarVinculoConvenio(clinicaId, paciente?.id ?? null);
+      if (cancelado || !vinculo) return;
+      setExternoTemConvenio(true);
+      setExternoConvenioId(vinculo.convenioId);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, paciente?.id]);
+
+  // Repasse automático do atendimento externo — cadastro de repasse do médico.
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId || !procedimento?.nome) {
+      setExternoValor(null);
+      setExternoRepasse(null);
+      return;
+    }
+    if (externoTemConvenio && !externoConvenioId) { setExternoRepasse(null); return; }
+    const modalidade = externoTemConvenio
+      ? externoConvenios.find((c) => c.id === externoConvenioId)?.modalidade ?? null
+      : null;
+    let cancelado = false;
+    setExternoBuscando(true);
+    void (async () => {
+      const r = await calcularRepasseExterno({
+        clinicaId,
+        medicoId: medico?.id ?? null,
+        procedimento: procedimento.nome,
+        modalidade,
+      });
+      if (cancelado) return;
+      setExternoValor(r.valorTabela > 0 ? r.valorTabela : null);
+      setExternoRepasse(r.repasse);
+      setExternoBuscando(false);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, procedimento?.nome, medico?.id, externoTemConvenio, externoConvenioId, externoConvenios]);
+
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
   const [qcNasc, setQcNasc] = useState("");
@@ -133,6 +193,12 @@ export function NovoAgendamentoWizard({
     setDataDia(toLocalDateKey(new Date()));
     setSlot(null);
     setTipoAtendimento("particular");
+    setExternoClinicaNome("");
+    setExternoValor(null);
+    setExternoBuscando(false);
+    setExternoTemConvenio(false);
+    setExternoConvenioId("");
+    setExternoRepasse(null);
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
@@ -274,10 +340,10 @@ export function NovoAgendamentoWizard({
     const nasc = qcNasc.trim();
     const telDigits = qcTel.replace(/\D/g, "");
     const cpfDigits = qcCpf.replace(/\D/g, "");
-    if (nome.length < 3) { toast.error("Informe o nome completo"); return; }
-    if (!nasc) { toast.error("Data de nascimento é obrigatória"); return; }
-    if (telDigits.length < 10) { toast.error("Telefone com DDD é obrigatório"); return; }
-    if (cpfDigits && cpfDigits.length !== 11) { toast.error("CPF inválido"); return; }
+    if (nome.length < 3) { notify.error("Informe o nome completo"); return; }
+    if (!nasc) { notify.error("Data de nascimento é obrigatória"); return; }
+    if (telDigits.length < 10) { notify.error("Telefone com DDD é obrigatório"); return; }
+    if (cpfDigits && cpfDigits.length !== 11) { notify.error("CPF inválido"); return; }
     setQcSaving(true);
     try {
       const { data, error } = await supabase
@@ -304,10 +370,10 @@ export function NovoAgendamentoWizard({
       };
       setPaciente(novo);
       resetQuickCreate();
-      toast.success("Paciente cadastrado");
+      notify.success("Paciente cadastrado");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao cadastrar paciente";
-      toast.error(msg);
+      notify.error(msg);
       setQcSaving(false);
     }
   }
@@ -347,7 +413,9 @@ export function NovoAgendamentoWizard({
             observacoes: "[V2]",
             data_pagamento: null,
             orcamento_id: null,
-            tipo_atendimento: tipoAtendimento,
+            // criarAgendamento só aceita "particular"|"convenio". O modo
+            // "externo" é armazenado depois via marcarAtendimentoExterno.
+            tipo_atendimento: tipoAtendimento === "externo" ? "particular" : tipoAtendimento,
             forma_pagamento_prevista: null,
             especialidade_id: especialidadeId,
           },
@@ -366,7 +434,7 @@ export function NovoAgendamentoWizard({
           const opts = result.validation_error.toast_duration
             ? { duration: result.validation_error.toast_duration }
             : undefined;
-          toast.error(result.validation_error.message, opts);
+          notify.error(result.validation_error.message, opts);
         } else {
           mostrarErro(result.pg_error);
         }
@@ -377,7 +445,31 @@ export function NovoAgendamentoWizard({
         mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
       }
 
-      toast.success("Salvo");
+      if (tipoAtendimento === "externo" && result.id) {
+        if (!externoClinicaNome.trim()) {
+          notify.error("Informe a clínica de origem.");
+          setSaving(false);
+          return;
+        }
+        const mkRes = await marcarExternoFn({
+          data: {
+            agendamento_id: result.id,
+            clinica_id: clinicaId,
+            origem_clinica_id: null,
+            origem_clinica_nome: externoClinicaNome.trim(),
+            origem_valor: externoValor && externoValor > 0 ? externoValor : null,
+            repasse_medico: externoRepasse != null ? externoRepasse : null,
+            convenio_id: externoTemConvenio ? externoConvenioId : null,
+          },
+        });
+        if (!mkRes.ok) {
+          notify.error(mkRes.message);
+          setSaving(false);
+          return;
+        }
+      }
+
+      notify.success("Salvo");
       // Invalida todas as views do dia da Agenda V2 (prefix match).
       await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
       reset();
@@ -385,7 +477,7 @@ export function NovoAgendamentoWizard({
     } catch (e) {
       setSaving(false);
       const msg = e instanceof Error ? e.message : "Erro ao salvar agendamento";
-      toast.error(msg);
+      notify.error(msg);
     }
   }
 
@@ -656,7 +748,7 @@ export function NovoAgendamentoWizard({
           <div className="pt-3 border-t border-slate-200">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Tipo de atendimento</div>
             <div className="flex gap-2">
-              {(["particular", "convenio"] as const).map((t) => (
+              {(["particular", "convenio", "externo"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -668,10 +760,80 @@ export function NovoAgendamentoWizard({
                       : "border-slate-200 text-slate-600 hover:bg-slate-50",
                   )}
                 >
-                  {t === "particular" ? "Particular" : "Convênio (cartão benefícios)"}
+                  {t === "particular"
+                    ? "Particular"
+                    : t === "convenio"
+                    ? "Convênio (cartão benefícios)"
+                    : "Externo (outra clínica)"}
                 </button>
               ))}
             </div>
+
+            {tipoAtendimento === "externo" && (
+              <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
+                <p className="text-[11px] text-orange-800">
+                  Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui —
+                  gera apenas o registro de repasse para o médico.
+                </p>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Clínica de origem</label>
+                  <input
+                    value={externoClinicaNome}
+                    onChange={(e) => setExternoClinicaNome(e.target.value)}
+                    placeholder="Ex.: Policlínica Menino Jesus"
+                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={externoTemConvenio}
+                      onChange={(e) => {
+                        setExternoTemConvenio(e.target.checked);
+                        if (!e.target.checked) setExternoConvenioId("");
+                      }}
+                    />
+                    <span>Paciente tem convênio</span>
+                  </label>
+                  {externoTemConvenio && (
+                    <select
+                      value={externoConvenioId}
+                      onChange={(e) => setExternoConvenioId(e.target.value)}
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-2 text-sm bg-white"
+                    >
+                      <option value="">Selecione o convênio</option>
+                      {externoConvenios.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Repasse do médico</label>
+                  <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
+                    {externoBuscando
+                      ? <span className="text-xs font-normal text-slate-500">Calculando…</span>
+                      : externoTemConvenio && !externoConvenioId
+                      ? <span className="text-xs font-normal text-slate-500">Selecione o convênio</span>
+                      : externoRepasse != null && externoRepasse > 0
+                      ? `R$ ${externoRepasse.toFixed(2).replace(".", ",")}`
+                      : <span className="text-xs font-normal text-slate-500">Sem regra de repasse cadastrada (R$ 0,00)</span>}
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Calculado pelo cadastro de repasse do médico
+                    {externoTemConvenio ? " (regras de convênio)" : " (particular)"} — não editável.
+                  </p>
+                  <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-900">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no
+                      movimento de caixa da atendente e não gera nota fiscal.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-200">

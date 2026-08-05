@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 export interface TomadorPayload {
   nome: string;
@@ -255,36 +256,42 @@ export function usePickTomador() {
         </div>
 
         <div className="space-y-2 border-t pt-3">
-          <Label>Emitir nota de quanto do valor?</Label>
+          <Label>Valor a emitir na NFS-e (R$)</Label>
           <div className="flex flex-wrap items-center gap-2">
-            {[100, 75, 50, 25].map((p) => (
-              <Button
-                key={p}
-                type="button"
-                size="sm"
-                variant={percentual === p ? "default" : "outline"}
-                onClick={() => { setPercentual(p); setErro(""); }}
-              >
-                {p}%
-              </Button>
-            ))}
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                step={1}
-                className="w-24"
-                value={percentual}
-                onChange={(e) => { setPercentual(Number(e.target.value) || 0); setErro(""); }}
+            {[100, 75, 50, 25].map((p) => {
+              const v = +((Number(valorBase) || 0) * p / 100).toFixed(2);
+              const ativo = Math.abs(valorFinal - v) < 0.005;
+              return (
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={ativo ? "default" : "outline"}
+                  disabled={!valorBase}
+                  onClick={() => { setPercentual(p); setErro(""); }}
+                >
+                  {fmtBRL(v)}
+                </Button>
+              );
+            })}
+            <div className="w-32">
+              <CurrencyInput
+                value={valorFinal.toFixed(2)}
+                onChange={(v) => {
+                  const n = Number(v) || 0;
+                  const base = Number(valorBase) || 0;
+                  if (base <= 0) { setPercentual(100); return; }
+                  const pct = Math.max(1, Math.min(100, (n / base) * 100));
+                  setPercentual(pct);
+                  setErro("");
+                }}
               />
-              <span className="text-sm text-muted-foreground">%</span>
             </div>
           </div>
           {valorBase > 0 && (
             <p className="text-xs text-muted-foreground">
-              Valor total: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e: <b>{fmtBRL(valorFinal)}</b>
-              {percentual < 100 ? " (nota parcial)" : ""}
+              Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e: <b>{fmtBRL(valorFinal)}</b>
+              {valorFinal < valorBase ? " (nota parcial)" : ""}
             </p>
           )}
         </div>

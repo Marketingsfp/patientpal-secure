@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Users, Download, Eye, IdCard } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,7 +166,7 @@ function ClientesPage() {
         ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
           .from("pacientes")
-          .select("id", { count: "estimated", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("clinica_id", clinicaAtual.clinica_id);
       const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
       if (requestId !== loadSeq.current) return;
@@ -213,7 +213,7 @@ function ClientesPage() {
     queryFn: async () => {
       const { count, error } = await supabase
         .from("pacientes")
-        .select("id", { count: "estimated", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("clinica_id", clinicaId!);
       if (error) throw error;
       return count ?? 0;
@@ -307,39 +307,39 @@ function ClientesPage() {
       const [titRes, depRes] = await Promise.all([
         supabase
           .from("contratos_assinatura")
-          .select("paciente_id, plano_id")
+          .select("paciente_id, convenio_id")
           .eq("clinica_id", clinicaId!)
           .eq("status", "ativo")
           .in("paciente_id", ids),
         supabase
           .from("contrato_dependentes")
-          .select("paciente_id, contrato:contratos_assinatura!inner(plano_id, status, clinica_id)")
+          .select("paciente_id, contrato:contratos_assinatura!inner(convenio_id, status, clinica_id)")
           .eq("ativo", true)
           .eq("contrato.status", "ativo")
           .eq("contrato.clinica_id", clinicaId!)
           .in("paciente_id", ids),
       ]);
-      const planoIds = new Set<string>();
-      (titRes.data ?? []).forEach((r: any) => { if (r.plano_id) planoIds.add(r.plano_id); });
-      (depRes.data ?? []).forEach((r: any) => { if (r.contrato?.plano_id) planoIds.add(r.contrato.plano_id); });
+      const convenioIds = new Set<string>();
+      (titRes.data ?? []).forEach((r: any) => { if (r.convenio_id) convenioIds.add(r.convenio_id); });
+      (depRes.data ?? []).forEach((r: any) => { if (r.contrato?.convenio_id) convenioIds.add(r.contrato.convenio_id); });
       const planos = new Map<string, string>();
-      if (planoIds.size > 0) {
+      if (convenioIds.size > 0) {
         const { data: pls } = await supabase
-          .from("planos_assinatura")
+          .from("cb_convenios")
           .select("id, nome")
-          .in("id", Array.from(planoIds));
+          .in("id", Array.from(convenioIds));
         (pls ?? []).forEach((p: any) => planos.set(p.id, p.nome));
       }
       // Dependentes primeiro; titular sobrescreve (prioridade).
       (depRes.data ?? []).forEach((r: any) => {
         if (!r.paciente_id) return;
-        const nome = r.contrato?.plano_id ? planos.get(r.contrato.plano_id) : undefined;
+        const nome = r.contrato?.convenio_id ? planos.get(r.contrato.convenio_id) : undefined;
         if (!nome) return;
         map.set(r.paciente_id, { tipo: "dependente", convenio: nome });
       });
       (titRes.data ?? []).forEach((r: any) => {
         if (!r.paciente_id) return;
-        const nome = r.plano_id ? planos.get(r.plano_id) : undefined;
+        const nome = r.convenio_id ? planos.get(r.convenio_id) : undefined;
         if (!nome) return;
         map.set(r.paciente_id, { tipo: "titular", convenio: nome });
       });
@@ -430,6 +430,9 @@ function ClientesPage() {
           {podeEscrever && (
             <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
           )}
+          <Button variant="outline" onClick={refrescar} disabled={loading} title="Atualizar contagem e lista">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
+          </Button>
         </div>
       </div>
 
@@ -490,7 +493,7 @@ function ClientesPage() {
               </TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
-                <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">

@@ -1,0 +1,1 @@
+ALTER TABLE public.nfse DROP CONSTRAINT IF EXISTS nfse_pagamento_id_fkey;

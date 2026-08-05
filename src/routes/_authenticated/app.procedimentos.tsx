@@ -29,7 +29,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
@@ -471,7 +471,7 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     const { data, error } = await (supabase as any)
       .from("cb_convenios")
-      .select("id,nome,ativo,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+      .select("id,nome,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
@@ -506,7 +506,7 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     const { data, error } = await (supabase as any)
       .from("cb_convenio_regras")
-      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo")
+      .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true);
     if (error) { mostrarErro(error); return; }
@@ -543,11 +543,7 @@ function ProcedimentosPage() {
         const r = findRegra(regrasDoConv, espId, form.tipo, editing?.id ?? null);
         const calc = computeValor(r, baseDin, baseOut);
         if (calc) {
-          const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
-            ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
-            : null;
-          const outrosAcr = applyAcrescimoCartao(calc.outros, acr, c.nome);
-          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: outrosAcr.toFixed(2) };
+          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
         } else if (!prev[c.id]) {
           next[c.id] = { dinheiro: "0", outros: "0" };
         }
@@ -611,9 +607,11 @@ function ProcedimentosPage() {
   const grupoExisteNasEspecialidades = especialidades.some(e => especialidadeKey(e.nome) === grupoSelecionadoKey);
 
   const getConvValorExibicao = (p: Procedimento, c: CbConvenio): ConvValor => {
-    const salvo = convValores.get(`${p.id}::${c.id}`);
-    if (salvo && (salvo.valor_dinheiro > 0 || salvo.valor_outros > 0)) return salvo;
-
+    // Fonte única: sempre calcula a partir da regra viva (cb_convenio_regras).
+    // O cache procedimento_cb_convenio_valores continua sendo gravado pelo
+    // "Reaplicar", mas nunca é lido aqui — evita divergência entre o valor
+    // exibido nesta grade e o valor cobrado na Agenda quando o operador
+    // altera uma regra sem reaplicar.
     const espId = p.grupo
       ? (especialidades.find(e => especialidadeKey(e.nome) === especialidadeKey(p.grupo))?.id ?? null)
       : null;
@@ -624,11 +622,11 @@ function ProcedimentosPage() {
       Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0),
     );
     if (calculado) {
-      const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
-        ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
-        : null;
-      return { valor_dinheiro: calculado.dinheiro, valor_outros: applyAcrescimoCartao(calculado.outros, acr, c.nome) };
+      return { valor_dinheiro: calculado.dinheiro, valor_outros: calculado.outros };
     }
+    // Fallback: se não há regra, mas há valor manual salvo em cache
+    // (origem='manual' pelo cadastro individual), respeita o manual.
+    const salvo = convValores.get(`${p.id}::${c.id}`);
     return salvo ?? { valor_dinheiro: 0, valor_outros: 0 };
   };
 

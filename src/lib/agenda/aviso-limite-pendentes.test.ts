@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   calcularAvisoLimitePendentes,
+  deveBloquearPorLimitePendente,
   normalizarProcedimento,
 } from "./aviso-limite-pendentes";
 
@@ -161,5 +162,110 @@ describe("calcularAvisoLimitePendentes — demais benefícios", () => {
       procedimentoNome: "X",
     });
     expect(aviso).toContain("serão bloqueados pelo convênio");
+  });
+});
+
+describe("deveBloquearPorLimitePendente", () => {
+  it("bloqueia a segunda consulta pendente quando o modo é 'bloquear' (limite 1)", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: false, limite_qtd: 1, excedente_modo: "bloquear" },
+        pendentes: [{ procedimento: "Consulta" }],
+        usados: 0,
+        procedimentoNome: "Consulta",
+      }),
+    ).toBe(true);
+  });
+
+  it("bloqueia gratuidade quando pendente é do MESMO serviço", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: true, limite_qtd: 1, excedente_modo: "bloquear" },
+        pendentes: [{ procedimento: "consulta medica" }],
+        usados: 0,
+        procedimentoNome: "Consulta Médica",
+      }),
+    ).toBe(true);
+  });
+
+  it("NÃO bloqueia gratuidade quando o pendente é de outro serviço", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: true, limite_qtd: 1, excedente_modo: "bloquear" },
+        pendentes: [{ procedimento: "Ecocardiograma" }],
+        usados: 0,
+        procedimentoNome: "Consulta",
+      }),
+    ).toBe(false);
+  });
+
+  it("NÃO bloqueia quando ainda cabe na cota", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: false, limite_qtd: 3, excedente_modo: "bloquear" },
+        pendentes: [{ procedimento: "X" }],
+        usados: 0,
+        procedimentoNome: "X",
+      }),
+    ).toBe(false);
+  });
+
+  it("NÃO bloqueia quando modo é 'particular'", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: false, limite_qtd: 1, excedente_modo: "particular" },
+        pendentes: [{ procedimento: "X" }],
+        usados: 0,
+        procedimentoNome: "X",
+      }),
+    ).toBe(false);
+  });
+
+  it("NÃO bloqueia quando modo é 'percentual_particular'", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: {
+          gratuito: false,
+          limite_qtd: 1,
+          excedente_modo: "percentual_particular",
+          excedente_percentual: 30,
+        },
+        pendentes: [{ procedimento: "X" }],
+        usados: 0,
+        procedimentoNome: "X",
+      }),
+    ).toBe(false);
+  });
+
+  it("NÃO bloqueia quando modo é 'valor_fixo' ou 'regra_padrao_convenio'", () => {
+    for (const modo of ["valor_fixo", "regra_padrao_convenio"] as const) {
+      expect(
+        deveBloquearPorLimitePendente({
+          beneficio: { gratuito: false, limite_qtd: 1, excedente_modo: modo },
+          pendentes: [{ procedimento: "X" }],
+          usados: 0,
+          procedimentoNome: "X",
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("NÃO bloqueia quando não há pendentes ou limite é 0", () => {
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: false, limite_qtd: 1, excedente_modo: "bloquear" },
+        pendentes: [],
+        usados: 0,
+        procedimentoNome: "X",
+      }),
+    ).toBe(false);
+    expect(
+      deveBloquearPorLimitePendente({
+        beneficio: { gratuito: false, limite_qtd: 0, excedente_modo: "bloquear" },
+        pendentes: [{ procedimento: "X" }],
+        usados: 0,
+        procedimentoNome: "X",
+      }),
+    ).toBe(false);
   });
 });

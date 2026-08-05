@@ -503,7 +503,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       // 1) contratos onde paciente é titular
       const { data: tit } = await supabase
         .from("contratos_assinatura")
-        .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+        .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, convenio_id")
         .eq("paciente_id", editing.id);
       // 2) contratos onde paciente é dependente
       const { data: deps } = await supabase
@@ -516,7 +516,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       if (contratoIdsDep.length > 0) {
         const { data } = await supabase
           .from("contratos_assinatura")
-          .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, plano_id")
+          .select("id, numero, status, paciente_id, paciente_nome, data_inicio, data_fim, dia_vencimento, valor_mensal, num_parcelas, forma_pagamento, convenio_id")
           .in("id", contratoIdsDep);
         depContratos = data ?? [];
       }
@@ -531,10 +531,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         setConvList([]); setConvLoading(false); return;
       }
       const allIds = todos.map((c) => c.id);
-      const planoIds = Array.from(new Set(todos.map((c) => c.plano_id).filter(Boolean)));
+      const planoIds = Array.from(new Set(todos.map((c) => c.convenio_id).filter(Boolean)));
       const [planosRes, depsRes, parcelasRes] = await Promise.all([
         planoIds.length > 0
-          ? supabase.from("planos_assinatura").select("id, nome, vigencia_meses").in("id", planoIds)
+          ? supabase.from("cb_convenios").select("id, nome, vigencia_meses").in("id", planoIds)
           : Promise.resolve({ data: [] as any[] }),
         supabase
           .from("contrato_dependentes")
@@ -565,7 +565,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         });
       }
       const lista: ConvContrato[] = todos.map((c) => {
-        const plano = c.plano_id ? planoMap[c.plano_id] : null;
+        const plano = c.convenio_id ? planoMap[c.convenio_id] : null;
         return {
           id: c.id, numero: c.numero, status: c.status,
           paciente_id: c.paciente_id, paciente_nome: c.paciente_nome,

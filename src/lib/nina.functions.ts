@@ -146,7 +146,7 @@ function montarContextoTexto(ctx: {
   }>;
   procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
   especialidades?: string[];
-  convenios?: Array<{ nome: string; tipo: string; valor_mensal: number; max_dependentes: number; descricao_beneficios: string | null }>;
+  convenios?: Array<{ nome: string; modalidade: string; valor_mensal: number; max_dependentes: number; descricao: string | null }>;
   clinica?: { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; email: string | null } | null;
   agendaResumo?: Array<{ medico: string; total: number; livres: number; ocupados: number }>;
 }) {
@@ -172,7 +172,7 @@ function montarContextoTexto(ctx: {
   const convText = (ctx.convenios ?? [])
     .map(
       (c) =>
-        `- ${c.nome} [${c.tipo}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao_beneficios ? ` | ${c.descricao_beneficios.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
+        `- ${c.nome} [${c.modalidade}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao ? ` | ${c.descricao.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
     )
     .join("\n") || "(nenhum)";
   const clinicaText = ctx.clinica
@@ -239,8 +239,8 @@ export const chatNina = createServerFn({ method: "POST" })
         .select("id, nome")
         .eq("ativo", true),
       supabase
-        .from("planos_assinatura")
-        .select("nome, tipo, valor_mensal, max_dependentes, descricao_beneficios")
+        .from("cb_convenios")
+        .select("nome, modalidade, valor_mensal, max_dependentes, descricao")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       supabase

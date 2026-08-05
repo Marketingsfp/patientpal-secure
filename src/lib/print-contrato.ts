@@ -1,4 +1,33 @@
 import { supabase } from "@/integrations/supabase/client";
+import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
+
+const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
+
+const fmtCPF = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length !== 11) return s ?? "";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+
+const fmtCEP = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length !== 8) return s ?? "";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+
+const fmtTelefone = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s ?? "";
+};
+
+// Override por convênio: quando o convênio corresponder a um destes IDs,
+// o modelo hard-coded (fiel ao PDF original) prevalece sobre o modelo salvo no banco.
+export const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
+  // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
+  "4fdce541-5b2b-4816-ba7d-911b36741b7d": CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS,
+};
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
@@ -32,7 +61,16 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
   out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
     vars[key] && String(vars[key]).trim() ? "" : body,
   );
-  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => esc(vars[k] ?? ""));
+  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+    const raw = vars[k] ?? "";
+    const safe = esc(raw);
+    // Reduz o tamanho real da fonte (não só o transform visual) para os
+    // valores longos caberem na coluna dos templates absolutos.
+    const len = raw.length;
+    if (len <= 20) return safe;
+    const pct = len > 42 ? 62 : len > 36 ? 68 : len > 30 ? 75 : len > 26 ? 82 : 90;
+    return `<span style="font-size:${pct}%;letter-spacing:-0.02em;white-space:nowrap;">${safe}</span>`;
+  });
 }
 
 // 🔥 HTML DO CONTRATO - COMPLETO
@@ -46,7 +84,7 @@ const TEXTO_CONTRATO_HTML = `
 
   <p style="text-align: justify; text-indent: 2em;">Pelo presente instrumento, e na melhor forma de Direito, os signatários:</p>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0; background: #f9f9f9;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>CONTRATADA: POLICARDMED SERV. E SOLUÇÕES EM MEDICINA EIRELI</strong></p>
     <p style="margin: 4px 0;"><strong>CNPJ:</strong> 27.045.917/0001-69</p>
     <p style="margin: 4px 0;"><strong>Endereço:</strong> Rua Expedicionários, nº 148</p>
@@ -54,7 +92,7 @@ const TEXTO_CONTRATO_HTML = `
     <p style="margin: 4px 0;"><strong>CEP:</strong> 25.520-591</p>
   </div>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>CONTRATANTE: ASSOCIADO TITULAR</strong></p>
     <p style="margin: 4px 0;"><strong>Nome:</strong> {{PACIENTE_NOME}}</p>
     <p style="margin: 4px 0;"><strong>CPF:</strong> {{PACIENTE_CPF}}</p>
@@ -65,62 +103,62 @@ const TEXTO_CONTRATO_HTML = `
     <p style="margin: 4px 0;"><strong>Vencimento:</strong> {{DATA_HOJE}}</p>
   </div>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>ASSOCIADOS DEPENDENTES</strong></p>
     <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
       <thead>
-        <tr style="background: #e8e8e8;">
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">#</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Nome</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Nascimento</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Parentesco</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Telefone</th>
+        <tr>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">#</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Nome</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Nascimento</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Parentesco</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Telefone</th>
         </tr>
       </thead>
       <tbody>
         {{#DEPENDENTE_1}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">1</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">1</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_1}}
         {{#DEPENDENTE_2}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">2</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">2</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_2}}
         {{#DEPENDENTE_3}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">3</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">3</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_3}}
         {{#DEPENDENTE_4}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">4</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">4</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_4}}
         {{#DEPENDENTE_5}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">5</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">5</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_5}}
       </tbody>
@@ -156,7 +194,7 @@ const TEXTO_CONTRATO_HTML = `
   <p style="text-align: justify; text-indent: 2em;"><strong>Parágrafo Segundo:</strong> Os ASSOCIADOS farão o pagamento mensal das parcelas, bem como, o valor da taxa de franquia, de acordo com a tabela disponibilizada pela CONTRATADA na sede de atendimento, referente às especialidades descritas na Cláusula Primeira e seus parágrafos.</p>
   <p style="text-align: justify; text-indent: 2em;"><strong>Parágrafo Terceiro:</strong> Não haverá devolução das importâncias pagas, ainda que não utilizados os benefícios.</p>
   <p style="text-align: justify; text-indent: 2em;"><strong>Parágrafo Quarto:</strong> O valor da mensalidade será reajustado todo mês de janeiro, de acordo com o Índice de Variação de Custos Médicos Hospitalares (VCMH).</p>
-  <p style="text-align: justify; text-indent: 2em;"><strong>Parágrafo Quinto:</strong> O pagamento deverá ser efetuado sempre na data do vencimento, com tolerância de 5 (cinco) dias corridos, no caso de atraso, serão cobrados multa de 10% (dez por cento), além de juros de 0,033% ao dia.</p>
+  <p style="text-align: justify; text-indent: 2em;"><strong>Parágrafo Quinto:</strong> O pagamento deverá ser efetuado sempre na data do vencimento, com tolerância de 5 (cinco) dias corridos, no caso de atraso, serão cobrados multa de 10% (dez por cento), além de juros de 0,33% ao dia.</p>
 
   <h3 style="font-size: 13pt; font-weight: bold; color: #1a3a6b; border-bottom: 2px solid #1a3a6b; padding-bottom: 5px; margin-top: 25px;">CLÁUSULA QUARTA: DO ATENDIMENTO POR TELEMEDICINA</h3>
   <p style="text-align: justify; text-indent: 2em;">O titular e seus dependentes, devidamente cadastrados, terão direito ao benefício para o atendimento por telemedicina, conforme os termos e condições estabelecidos neste contrato.</p>
@@ -238,6 +276,14 @@ export async function printContrato(contratoId: string) {
     .eq("id", (c as any).clinica_id)
     .maybeSingle();
 
+  const { data: cv } = (c as any).convenio_id
+    ? await supabase
+        .from("cb_convenios")
+        .select("modelo_contrato")
+        .eq("id", (c as any).convenio_id)
+        .maybeSingle()
+    : { data: null as any };
+
   const { data: pa } = await supabase
     .from("pacientes")
     .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
@@ -281,23 +327,40 @@ export async function printContrato(contratoId: string) {
     const idx = i + 1;
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
-    depSlotVars[`DEPENDENTE_${idx}_CPF`] = pac?.cpf ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_CPF`] = fmtCPF(pac?.cpf);
     depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento ? fmtData(pac.data_nascimento) : "";
-    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelefone(pac?.telefone ?? d?.telefone);
   }
 
-  const corpo = applyTemplate(TEXTO_CONTRATO_HTML, {
+  const cvTpl = (cv as any)?.modelo_contrato;
+  const pick = (v: any) => (v && String(v).replace(/<[^>]+>/g, "").trim().length > 0 ? v : null);
+  const overrideTpl = (c as any).convenio_id
+    ? CONVENIO_TEMPLATE_OVERRIDES[(c as any).convenio_id]
+    : null;
+  const templateBody = overrideTpl ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
+
+  const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
-    PACIENTE_CPF: _pa.cpf ?? "",
+    PACIENTE_CPF: fmtCPF(_pa.cpf),
     PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
     PACIENTE_ENDERECO: enderecoPaciente,
-    PACIENTE_TELEFONE: _pa.telefone ?? "",
+    PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+    PACIENTE_NUMERO: _pa.numero ?? "",
+    PACIENTE_BAIRRO: _pa.bairro ?? "",
+    PACIENTE_CIDADE: _pa.cidade ?? "",
+    PACIENTE_ESTADO: _pa.estado ?? "",
+    PACIENTE_CEP: fmtCEP(_pa.cep),
+    PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
     PACIENTE_EMAIL: _pa.email ?? "",
     DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
     ...depSlotVars,
   });
 
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+  const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
+
+  const bodyHtml = isFullHtml
+    ? corpo
+    : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
   @page { size: A4; margin: 15mm; }
@@ -312,12 +375,50 @@ export async function printContrato(contratoId: string) {
 </style>
 </head><body>
 ${corpo}
-<script>window.onload=()=>{setTimeout(()=>{window.print();},500);};</script>
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=900,height=700");
-  if (!w) throw new Error("Bloqueador de pop-up impediu a impressão");
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Remove qualquer auto-print embutido no template — vamos disparar via iframe.
+  const cleanHtml = bodyHtml.replace(
+    /<script[^>]*>[\s\S]*?window\.print\([\s\S]*?<\/script>/gi,
+    "",
+  );
+
+  // Iframe invisível: imprime sem bloquear a janela mãe e é removido ao final.
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    try { iframe.parentNode?.removeChild(iframe); } catch { /* noop */ }
+  };
+
+  iframe.onload = () => {
+    const win = iframe.contentWindow;
+    if (!win) { cleanup(); return; }
+    // Aguarda o layout/imagens antes de imprimir.
+    setTimeout(() => {
+      try {
+        win.onafterprint = () => setTimeout(cleanup, 100);
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+      }
+      // Fallback: remove o iframe mesmo se onafterprint não disparar.
+      setTimeout(cleanup, 60_000);
+    }, 350);
+  };
+
+  const doc = iframe.contentDocument;
+  if (!doc) { cleanup(); throw new Error("Não foi possível preparar a impressão"); }
+  doc.open();
+  doc.write(cleanHtml);
+  doc.close();
 }

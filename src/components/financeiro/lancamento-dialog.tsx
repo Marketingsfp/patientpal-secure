@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
+import { hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
@@ -60,11 +61,22 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /** Paciente (titular) a vincular quando o recebimento não vem de um
+   *  agendamento — ex.: mensalidade do cartão e pagamento avulso. Garante que
+   *  a coluna "Paciente" do Caixa mostre o nome. */
+  pacienteIdFixo?: string | null;
   /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
   categoriaFixaNome?: string;
+  /** Orçamento com entrada (sinal): mostra Já pago / Pagando agora / Falta pagar. */
+  resumoSaldo?: {
+    total: number;
+    pago: number;
+    restante: number;
+    itens?: Array<{ id: string; descricao: string; total: number; sinal: number; pago: number; restante: number }>;
+  } | null;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, pacienteIdFixo, categoriaFixaNome, resumoSaldo }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -74,7 +86,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
-  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(() => hojeBR());
   const [categoriaId, setCategoriaId] = useState<string>("");
   const [contaId, setContaId] = useState<string>("");
   const [formaPagamento, setFormaPagamento] = useState<string>("");
@@ -121,6 +133,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
     if (initialValor !== undefined) setValor(initialValor);
     if (initialValor !== undefined) setValorOriginal(initialValor);
+    // Reset defensivo do campo "data": o useState inicial só roda uma vez
+    // por ciclo de vida do componente, então sem este reset uma data
+    // retroativa escolhida em um lançamento anterior permanecia gravada e
+    // era enviada como data do próximo lançamento (bug: pagamento saía
+    // com data de dias atrás mesmo tendo sido feito hoje).
+    setData(hojeBR());
     // Reseta desconto a cada abertura
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
@@ -174,12 +192,18 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         try {
           const { data: ag } = await supabase
             .from("agendamentos")
-            .select("paciente_id, tipo_atendimento")
+            .select("paciente_id, tipo_atendimento, inicio")
             .eq("id", agendamentoId)
             .maybeSingle();
           const pid = ag?.paciente_id ?? null;
           const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
           setTipoAgendamento(tipoAg);
+          // IMPORTANTE: a "data" do lançamento é a data do RECEBIMENTO
+          // (hoje), nunca a data do atendimento. Sobrescrever com
+          // `agendamentos.inicio` fazia pagamentos nascerem com data futura
+          // (agendamento à frente) ou falsamente retroativa, jogando o
+          // movimento no caixa de outro dia. A data do atendimento continua
+          // rastreável pelo vínculo `agendamento_id`.
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
@@ -254,23 +278,33 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
     ? recebidoNum - valorNum
     : 0;
-  // Compute "pago" (effective amount applied to total) and "troco" per row.
-  // Cash: pago = min(recebido, remaining-before-this-row); excess = troco.
-  // Other forms: pago = recebido, troco = 0.
+  // Compute "pago" (valor aplicado ao total) e "troco" por linha.
+  //
+  // Correção 2.6/2.7: a alocação NÃO pode depender da ordem das linhas.
+  // Antes, "Dinheiro" na 1ª linha absorvia todo o total (min(recebido,
+  // restante)) e a forma seguinte virava excedente → "Soma difere do total"
+  // num pagamento correto. Agora as formas eletrônicas (pix/cartão/etc.) são
+  // aplicadas primeiro — elas nunca geram troco — e o dinheiro fica como
+  // forma residual, absorvendo o que falta e gerando troco do excedente.
   const linhasCalc = (() => {
+    const out = pagamentos.map(() => ({ pago: 0, troco: 0 }));
     let restante = valorNum;
-    return pagamentos.map((p) => {
+    // 1ª passada: formas sem troco.
+    pagamentos.forEach((p, i) => {
+      if (!p.forma || p.forma === "dinheiro") return;
       const rec = Number(p.recebido || 0);
-      let pago = 0, troco = 0;
-      if (p.forma === "dinheiro") {
-        pago = Math.min(rec, Math.max(0, restante));
-        troco = Math.max(0, rec - pago);
-      } else {
-        pago = rec;
-      }
-      restante = Math.max(0, restante - pago);
-      return { pago, troco };
+      out[i] = { pago: rec, troco: 0 };
+      restante = restante - rec;
     });
+    // 2ª passada: dinheiro (residual, na ordem em que aparece).
+    pagamentos.forEach((p, i) => {
+      if (p.forma !== "dinheiro") return;
+      const rec = Number(p.recebido || 0);
+      const pago = Math.min(rec, Math.max(0, restante));
+      out[i] = { pago, troco: Math.max(0, rec - pago) };
+      restante = restante - pago;
+    });
+    return out;
   })();
   const totalPagoMisto = linhasCalc.reduce((s, l) => s + l.pago, 0);
   const restanteMisto = Math.max(0, valorNum - totalPagoMisto);
@@ -337,6 +371,34 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         );
         return;
       }
+    }
+    // ------------------------------------------------------------------
+    // Data retroativa: avisa o operador e envia o movimento para o caixa
+    // do dia escolhido (não para o de hoje). Se a sessão daquele dia já
+    // estiver fechada, o backend soma o valor ao fechamento existente e
+    // registra observação de "retroativo lançado em ...".
+    // ------------------------------------------------------------------
+    const _hojeISO = hojeBR();
+    // Data futura nunca é válida em caixa: bloqueia antes de gravar.
+    if (data && data > _hojeISO) {
+      const [aaaa, mm, dd] = data.split("-");
+      toast.error(
+        `Data inválida: ${dd}/${mm}/${aaaa} está no futuro. O lançamento deve usar a data do recebimento (hoje).`,
+        { duration: 8000 },
+      );
+      return;
+    }
+    const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
+    if (_ehRetroativo) {
+      const [aaaa, mm, dd] = data.split("-");
+      const ok = window.confirm(
+        `Atenção: a data escolhida é retroativa (${dd}/${mm}/${aaaa}).\n\n` +
+        `O movimento será registrado no caixa do dia ${dd}/${mm}/${aaaa} ` +
+        `(não no caixa de hoje). Se o caixa daquele dia já estiver fechado, ` +
+        `o valor será somado ao fechamento com observação de retroativo.\n\n` +
+        `Deseja continuar?`,
+      );
+      if (!ok) return;
     }
     setSaving(true);
     if (descontoAtivo) {
@@ -412,10 +474,19 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     let formaFinal: string | null = formaPagamento || null;
     let obsExtra = "";
+    // Composição estruturada do pagamento (fonte de verdade para o caixa).
+    // A observação em texto passa a ser apenas exibição / fallback legado.
+    let composicao: { versao: number; origem: string; troco: number; partes: Array<{ forma: string; valor: number }> } | null = null;
     if (pagamentoMisto) {
+      // Linhas com valor aplicado (compõem o total) e linhas só com troco
+      // (dinheiro recebido acima do restante) — estas últimas não somam ao
+      // total, mas precisam existir para o troco não sumir (falha 2.7).
       const validIdx = pagamentos
         .map((p, i) => ({ p, i }))
         .filter(({ p, i }) => p.forma && linhasCalc[i].pago > 0);
+      const trocoIdx = pagamentos
+        .map((p, i) => ({ p, i }))
+        .filter(({ p, i }) => p.forma === "dinheiro" && linhasCalc[i].pago <= 0 && linhasCalc[i].troco > 0);
       if (validIdx.length === 0) {
         toast.error("Adicione ao menos uma forma de pagamento");
         setSaving(false); return;
@@ -434,11 +505,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
         setSaving(false); return;
       }
+      // Compara o valor APLICADO (líquido de troco) com o total — nunca o
+      // valor bruto recebido, e independente da ordem das linhas.
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
-        toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
+        toast.error(`Soma aplicada (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
+      composicao = {
+        versao: 1,
+        origem: "lancamento_dialog",
+        troco: Math.round(trocoMisto * 100) / 100,
+        partes: validIdx.map(({ p, i }) => ({
+          forma: p.forma,
+          valor: Math.round(linhasCalc[i].pago * 100) / 100,
+        })),
+      };
       // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
       // (evita marcar como "misto" quando na prática só houve uma forma).
       if (validIdx.length === 1) {
@@ -468,8 +550,24 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           return base;
         }).join("; ");
       }
+      // Troco de linhas de dinheiro que não aplicaram valor (excedente puro)
+      // — antes eram descartadas silenciosamente.
+      if (trocoIdx.length > 0) {
+        const somaTroco = trocoIdx.reduce((s, { i }) => s + linhasCalc[i].troco, 0);
+        obsExtra += `${obsExtra ? " " : ""}| Troco em dinheiro: ${formatBRL(somaTroco)} (recebido a mais)`;
+      }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
+      composicao = {
+        versao: 1, origem: "lancamento_dialog",
+        troco: Math.round(trocoDinheiro * 100) / 100,
+        partes: [{ forma: "dinheiro", valor: Math.round(valorNum * 100) / 100 }],
+      };
+    } else if (formaPagamento) {
+      composicao = {
+        versao: 1, origem: "lancamento_dialog", troco: 0,
+        partes: [{ forma: formaPagamento, valor: Math.round(valorNum * 100) / 100 }],
+      };
     }
     let descontoObs = "";
     if (descontoAtivo && descontoNum > 0) {
@@ -493,6 +591,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
+    // Sem agendamento (mensalidade / pagamento avulso): usa o titular informado.
+    if (!pacienteId && pacienteIdFixo) pacienteId = pacienteIdFixo;
     // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
     // da primeira linha de crédito para os campos de topo do lançamento
     // (usados por relatórios e pela impressão da GR).
@@ -544,6 +644,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
+      // Dado estruturado (falha 2.8): o caixa passa a ler daqui em vez de
+      // interpretar o texto da observação.
+      composicao_pagamento: composicao,
       agendamento_id: agendamentoId ?? null,
       medico_id: medicoId,
       paciente_id: pacienteId,
@@ -558,6 +661,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           valor: Number(valor),
           descricao: descricao.trim(),
           forma_pagamento: formaFinal,
+          // Lançamento retroativo cai no caixa do dia escolhido — não no
+          // caixa de hoje. Quando a data é hoje, o backend usa a sessão
+          // aberta atual normalmente.
+          forcar_sessao_hoje: false,
         }
       : null;
 
@@ -589,7 +696,19 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
         const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
         const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
-        const pagouComoConvenio = catEhConvenio || formaEhConvenio || mistoTemConvenio;
+        // Um atendimento com desconto aplicado do convênio consome o benefício
+        // mesmo quando a taxa é paga em dinheiro/PIX/cartão. Antes, só forma
+        // "convenio" ou categoria do convênio marcavam o agendamento como
+        // `convenio`, e ele ficava gravado como "particular" — não consumindo
+        // a cota diária (ex.: 1 consulta R$ 9,99/dia) e liberando o mesmo
+        // desconto de novo no segundo atendimento do dia. A descrição do
+        // lançamento contém o nome do convênio quando a Agenda aplicou o
+        // desconto, então usamos isso como sinal adicional.
+        const descNorm = norm(descricao ?? "");
+        const descIndicaConvenio =
+          !!convenioNome && descNorm.includes(norm(convenioNome));
+        const pagouComoConvenio =
+          catEhConvenio || formaEhConvenio || mistoTemConvenio || descIndicaConvenio;
         const novoTipo = pagouComoConvenio ? "convenio" : "particular";
         if (novoTipo !== tipoAgendamento) {
           await supabase
@@ -772,6 +891,52 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             <Label>Descrição *</Label>
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
           </div>
+          {resumoSaldo && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-1">
+              <div className="font-medium">Orçamento com entrada — pagamento parcelado</div>
+              {resumoSaldo.itens && resumoSaldo.itens.length > 0 && (
+                <div className="divide-y rounded-md border bg-background">
+                  {resumoSaldo.itens.map((it) => (
+                    <div key={it.id} className="px-2 py-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-medium">{it.descricao}</span>
+                        {it.sinal > 0 ? (
+                          <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            Entrada {formatBRL(it.sinal)}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[10px] text-muted-foreground">sem entrada</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        Total {formatBRL(it.total)} · Já pago {formatBRL(it.pago)} · Falta {formatBRL(it.restante)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-4">
+                <span className="text-muted-foreground">Total:</span>
+                <span className="font-medium tabular-nums">{formatBRL(resumoSaldo.total)}</span>
+                <span className="text-muted-foreground">Já pago:</span>
+                <span className="font-medium tabular-nums">{formatBRL(resumoSaldo.pago)}</span>
+                <span className="text-muted-foreground">Pagando agora:</span>
+                <span className="font-medium tabular-nums">
+                  {formatBRL(Math.min(valorNum, resumoSaldo.restante))}
+                </span>
+                <span className="text-muted-foreground">Falta pagar:</span>
+                <span className="font-semibold tabular-nums">
+                  {formatBRL(Math.max(0, resumoSaldo.restante - valorNum))}
+                </span>
+              </div>
+              {valorNum > resumoSaldo.restante + 0.004 && (
+                <p className="text-xs text-destructive">
+                  O valor informado é maior que o saldo do orçamento. O excedente
+                  ({formatBRL(valorNum - resumoSaldo.restante)}) não será abatido do orçamento.
+                </p>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Valor *</Label>

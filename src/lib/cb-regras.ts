@@ -17,9 +17,9 @@ export interface CbRegra {
   prioridade: number;
   ativo?: boolean;
   limite_qtd?: number | null;
-  limite_periodo?: string | null; // "dia" | "semana" | "mes"
+  limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "contrato"
   limite_escopo?: string | null;  // "contrato" | "paciente"
-  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
+  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
   /**
@@ -74,11 +74,18 @@ export function findRegra(
     return true;
   });
   if (candidates.length === 0) return null;
+  // Especificidade (serviço > especialidade > tipo) continua mandando. Dentro
+  // do MESMO nível de especificidade, uma regra de gratuidade vence qualquer
+  // regra de desconto, independentemente da prioridade cadastrada — antes uma
+  // regra de 10% com prioridade 100 sobrepunha a gratuidade com prioridade 10
+  // no mesmo serviço (ex.: ECG saindo R$ 45,90 em vez de gratuito). A
+  // prioridade só desempata entre regras do mesmo tipo.
   const score = (r: CbRegra) =>
-    (r.procedimento_id ? 100 : 0)
-    + (r.especialidade_id ? 10 : 0)
-    + (r.tipo ? 5 : 0)
-    + (r.prioridade || 0) * 0.01;
+    (r.procedimento_id ? 1000 : 0)
+    + (r.especialidade_id ? 100 : 0)
+    + (r.tipo ? 50 : 0)
+    + (r.gratuito ? 10 : 0)
+    + (r.prioridade || 0) * 0.001;
   return candidates.slice().sort((a, b) => score(b) - score(a))[0];
 }
 
