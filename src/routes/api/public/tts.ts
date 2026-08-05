@@ -17,6 +17,40 @@ const TTS_UPSTREAM =
   process.env.TTS_UPSTREAM_URL ?? "https://server-mj.tailec426c.ts.net/api/tts";
 const MAX_TEXT = 4000;
 
+/**
+ * Fallback: quando o Piper local está fora do ar (502/timeout), sintetiza a voz
+ * pela IA da plataforma para o painel não quebrar.
+ */
+async function fallbackTts(text: string): Promise<Response> {
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "tts indisponível" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json", ...CORS },
+    });
+  }
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini-tts",
+      input: text,
+      voice: "alloy",
+      response_format: "wav",
+    }),
+  });
+  if (!res.ok) {
+    return new Response(JSON.stringify({ error: "tts indisponível" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json", ...CORS },
+    });
+  }
+  return new Response(await res.arrayBuffer(), {
+    status: 200,
+    headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store", ...CORS },
+  });
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -54,11 +88,7 @@ export const Route = createFileRoute("/api/public/tts")({
             body: JSON.stringify({ text }),
           });
           if (!upstream.ok) {
-            const detail = await upstream.text().catch(() => "");
-            return new Response(
-              JSON.stringify({ error: "tts upstream failed", status: upstream.status, detail: detail.slice(0, 500) }),
-              { status: 502, headers: { "Content-Type": "application/json", ...CORS } },
-            );
+            return await fallbackTts(text);
           }
           const buf = await upstream.arrayBuffer();
           return new Response(buf, {
@@ -69,11 +99,8 @@ export const Route = createFileRoute("/api/public/tts")({
               ...CORS,
             },
           });
-        } catch (err) {
-          return new Response(
-            JSON.stringify({ error: "tts upstream unreachable", detail: String(err).slice(0, 300) }),
-            { status: 502, headers: { "Content-Type": "application/json", ...CORS } },
-          );
+        } catch {
+          return await fallbackTts(text);
         }
       },
     },
