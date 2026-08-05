@@ -906,7 +906,7 @@ export function AppShell() {
                       if (isParent(item)) {
                         const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                         const subKey = `${row.label}::${item.label}`;
-                        const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
+                        const subOpen = collapsed || buscandoMenu ? true : (openGroups[subKey] ?? false);
                         return (
                           <div
                             key={subKey}
