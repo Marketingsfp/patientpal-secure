@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { Loader2 } from "lucide-react";
+import { Loader2, Volume2, VolumeX } from "lucide-react";
 import {
   speak as ttsSpeak,
   isUserTtsEnabled,
@@ -30,6 +30,12 @@ export function PainelPage() {
   const falandoRef = useRef<boolean>(false);
   // Quando o servidor Piper falha, evitamos tentar de novo por alguns minutos.
   const piperBloqueadoAteRef = useRef<number>(0);
+  // Estado visível do serviço de voz personalizada (Piper).
+  const [ttsStatus, setTtsStatus] = useState<{
+    estado: "desconhecido" | "online" | "offline";
+    erro: string | null;
+    em: number | null;
+  }>({ estado: "desconhecido", erro: null, em: null });
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
   // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
   // Sem botão manual — a troca acontece sozinha ao longo do dia.
