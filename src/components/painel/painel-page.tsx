@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { Loader2 } from "lucide-react";
+import { Loader2, Volume2, VolumeX } from "lucide-react";
 import {
   speak as ttsSpeak,
   isUserTtsEnabled,
@@ -30,6 +30,12 @@ export function PainelPage() {
   const falandoRef = useRef<boolean>(false);
   // Quando o servidor Piper falha, evitamos tentar de novo por alguns minutos.
   const piperBloqueadoAteRef = useRef<number>(0);
+  // Estado visível do serviço de voz personalizada (Piper).
+  const [ttsStatus, setTtsStatus] = useState<{
+    estado: "desconhecido" | "online" | "offline";
+    erro: string | null;
+    em: number | null;
+  }>({ estado: "desconhecido", erro: null, em: null });
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
   // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
   // Sem botão manual — a troca acontece sozinha ao longo do dia.
@@ -323,15 +329,17 @@ export function PainelPage() {
       // primeira leitura → intervalo → repetição → libera fila
       void ttsSpeak(texto, {
         onEnd: () => {
+          setTtsStatus({ estado: "online", erro: null, em: Date.now() });
           window.setTimeout(() => {
             void ttsSpeak(texto, { onEnd: liberar, onError: liberar, interrupt: false });
           }, 800);
         },
-        onError: () => {
+        onError: (err) => {
           // Piper indisponível: pausa as tentativas por 5 minutos e faz UMA
           // leitura pelo SpeechSynthesis nativo (sem reenfileirar — reenfileirar
           // causava anúncio em loop infinito quando o servidor estava fora).
           piperBloqueadoAteRef.current = Date.now() + 5 * 60_000;
+          setTtsStatus({ estado: "offline", erro: descreverErroTts(err), em: Date.now() });
           fallbackSpeechSynth();
         },
       });
@@ -402,6 +410,7 @@ export function PainelPage() {
           <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
+          <TtsStatusBadge status={ttsStatus} />
           <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}><PainelClock /></div>
         </div>
       </header>
@@ -499,4 +508,54 @@ function PainelClock() {
     return () => clearInterval(t);
   }, []);
   return <span>{now.toLocaleTimeString("pt-BR")}</span>;
+}
+
+// Indicador do serviço de voz personalizada: online / offline + último erro.
+function TtsStatusBadge({
+  status,
+}: {
+  status: { estado: "desconhecido" | "online" | "offline"; erro: string | null; em: number | null };
+}) {
+  const offline = status.estado === "offline";
+  const online = status.estado === "online";
+  const hora = status.em ? new Date(status.em).toLocaleTimeString("pt-BR") : null;
+  return (
+    <div
+      title={
+        offline
+          ? `${status.erro ?? "Serviço de voz indisponível"}${hora ? ` — ${hora}` : ""}`
+          : online
+            ? `Voz personalizada funcionando${hora ? ` — ${hora}` : ""}`
+            : "Aguardando a primeira chamada para verificar a voz"
+      }
+      className={`flex items-center gap-2 rounded-full border px-[clamp(0.5rem,0.9vw,0.9rem)] py-[clamp(0.2rem,0.4vw,0.4rem)] text-[clamp(0.6rem,0.9vw,0.8rem)] font-semibold uppercase tracking-widest ${
+        offline
+          ? "border-destructive/40 bg-destructive/10 text-destructive"
+          : online
+            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+            : "border-muted-foreground/30 bg-muted/20 text-muted-foreground"
+      }`}
+    >
+      {offline ? <VolumeX className="h-4 w-4 shrink-0" /> : <Volume2 className="h-4 w-4 shrink-0" />}
+      <span className="hidden sm:inline">
+        Voz {offline ? "offline" : online ? "online" : "—"}
+      </span>
+      {offline && status.erro && (
+        <span className="hidden md:inline normal-case tracking-normal font-medium opacity-90">
+          · {status.erro}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Transforma o erro do serviço de voz em um texto curto e legível
+// (ex.: "Erro 502 no servidor de voz").
+function descreverErroTts(err: unknown): string {
+  const msg =
+    err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  const status = msg.match(/\b(4\d{2}|5\d{2})\b/)?.[1];
+  if (status) return `Erro ${status} no servidor de voz`;
+  if (!msg) return "Servidor de voz não respondeu";
+  return msg.slice(0, 80);
 }
