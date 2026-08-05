@@ -1035,10 +1035,10 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header
-          className="sticky top-0 z-30 h-[50px] text-white border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 sm:px-5"
+          className="sticky top-0 z-30 h-14 text-white border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
           {!isChooser && (
             <button
               type="button"
@@ -1056,13 +1056,13 @@ export function AppShell() {
           </Link>
           </div>
 
-          <div className="flex items-center justify-center gap-2 min-w-0">
+          <div className="flex items-center justify-center gap-3 min-w-0">
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="hidden sm:flex items-center justify-center shrink-0">
+            <div className="hidden sm:flex items-center justify-center shrink-0 rounded-lg bg-white/95 px-2 py-1 shadow-sm ring-1 ring-white/20">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
-                className="h-7 w-auto object-contain drop-shadow-sm"
+                className="h-7 w-auto object-contain"
               />
             </div>
           )}
@@ -1074,7 +1074,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[120px] sm:w-[180px] md:w-[240px] max-w-full min-w-0 h-8 text-xs shrink border-0 bg-transparent text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/10">
+              <SelectTrigger className="w-[130px] sm:w-[200px] md:w-[260px] max-w-full min-w-0 h-9 px-2.5 text-xs font-medium shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -1102,8 +1102,8 @@ export function AppShell() {
           )}
           </div>
 
-          <div className="flex items-center justify-end gap-2 min-w-0">
-            <div className="hidden md:flex min-w-0 max-w-[280px]">
+          <div className="flex items-center justify-end gap-1.5 min-w-0">
+            <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
               <UniversalSearchBar />
             </div>
             {uxMelhorias && (
