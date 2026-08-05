@@ -101,12 +101,17 @@ function NinaPage() {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
   useEffect(() => {
+    // Só normaliza o hash enquanto o usuário ainda está na tela da Nina.
+    // Sem essa guarda, ao clicar em outro item do menu a rota muda, o hash
+    // fica vazio e este efeito redirecionava de volta para /app/nina —
+    // prendendo o usuário na tela.
+    if (location.pathname !== "/app/nina") return;
     if (!hashAba) {
       navigate({ to: "/app/nina", hash: "atend-inbox", replace: true });
     } else if (hashAba === "chat") {
       navigate({ to: "/app/nina", hash: "atend-inbox", replace: true });
     }
-  }, [hashAba, navigate]);
+  }, [hashAba, navigate, location.pathname]);
   const [draft, setDraft] = useState("");
   const [busca, setBusca] = useState("");
   const [loadingConv, setLoadingConv] = useState(false);
