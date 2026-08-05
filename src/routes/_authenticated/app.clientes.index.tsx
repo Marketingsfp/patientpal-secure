@@ -22,6 +22,7 @@ import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/page/page-header";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
@@ -350,21 +351,37 @@ function ClientesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" /> Clientes
-            {totalPacientes !== null && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({totalPacientes.toLocaleString("pt-BR")} {totalPacientes === 1 ? "paciente" : "pacientes"})
-              </span>
-            )}
-          </h1>
-          <p className="text-sm text-muted-foreground">Cadastre e gerencie os pacientes da clínica.</p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        icon={<Users />}
+        title="Clientes"
+        meta={
+          totalPacientes !== null
+            ? `${totalPacientes.toLocaleString("pt-BR")} ${totalPacientes === 1 ? "paciente" : "pacientes"}`
+            : undefined
+        }
+        description="Cadastre e gerencie os pacientes da clínica."
+        primaryAction={
+          podeEscrever ? (
+            <Button size="sm" onClick={() => setOpenNovo(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
+            </Button>
+          ) : undefined
+        }
+        actions={
+          <>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Atualizar lista de clientes"
+            title="Atualizar contagem e lista"
+            onClick={refrescar}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
           <Button
             variant="outline"
+            size="sm"
             onClick={async () => {
               if (!clinicaAtual) return;
               const PAGE = 1000;
@@ -425,16 +442,11 @@ function ClientesPage() {
               toast.success(`${all.length} clientes exportados.`);
             }}
           >
-            <Download className="h-4 w-4 mr-2" /> Exportar Excel
+            <Download className="h-4 w-4 mr-1.5" /> Exportar Excel
           </Button>
-          {podeEscrever && (
-            <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
-          )}
-          <Button variant="outline" onClick={refrescar} disabled={loading} title="Atualizar contagem e lista">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="relative max-w-md">
@@ -492,10 +504,10 @@ function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : filtrados.map(p => (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} className="h-12">
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
+                <TableCell className="max-w-[320px] font-medium">
+                  <div className="flex min-w-0 items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
                         <img src={fotoSigned[p.id]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
@@ -503,7 +515,7 @@ function ClientesPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <span>{p.nome}</span>
+                    <span className="truncate" title={p.nome}>{p.nome}</span>
                     {convenios?.get(p.id) && (
                       <IdCard
                         className="h-4 w-4 text-emerald-600 shrink-0"
@@ -514,10 +526,10 @@ function ClientesPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.cpf ?? "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
-                <TableCell className="text-sm text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.telefone ?? "—"}</TableCell>
+                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.cpf ?? "—"}</TableCell>
+                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
+                <TableCell className="text-sm whitespace-nowrap text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
+                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.telefone ?? "—"}</TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                     {p.ativo ? "Ativo" : "Inativo"}
@@ -553,7 +565,16 @@ function ClientesPage() {
             {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length} de{" "}
             {totalPacientes.toLocaleString("pt-BR")}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina(0)}
+              title="Primeira página"
+            >
+              Primeira
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -569,6 +590,15 @@ function ClientesPage() {
               onClick={() => setPagina((p) => p + 1)}
             >
               Próxima
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes}
+              onClick={() => setPagina(Math.max(0, Math.ceil(totalPacientes / LIMITE_LISTA) - 1))}
+              title="Última página"
+            >
+              Última
             </Button>
           </div>
         </div>

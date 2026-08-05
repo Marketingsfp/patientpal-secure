@@ -6260,7 +6260,10 @@ function AgendaPage() {
     if (isExame(a.medico_nome)) return a.medico_nome;
     return `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}`;
   };
-  const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // Formato brasileiro 24h ("10:00"), nunca "10:00 AM" — o AM/PM quebrava a
+  // coluna Horário em três linhas e inflava a altura de todas as linhas.
+  const fmtHora = (iso: string) =>
+    new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
@@ -6342,17 +6345,19 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 xl:h-12 xl:w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
-            <CalendarDays className="h-5 w-5 xl:h-6 xl:w-6" />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <CalendarDays className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
-            <p className="hidden xl:block text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight">Agendas</h1>
+            <p className="hidden truncate text-xs text-muted-foreground lg:block">
+              Filtre e gerencie os agendamentos da clínica.
+            </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
           {!turboDisabled && <TurboModeToggle />}
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
@@ -8835,9 +8840,9 @@ function AgendaPage() {
                       {/* Data */}
                       <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
 
-                      {/* Horário */}
-                      <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
-                        {fmtHora(a.inicio)} - {fmtHora(a.fim)}
+                      {/* Horário — uma linha só, tabular, 24h */}
+                      <TableCell className="py-1.5 text-sm font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                        {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Profissional */}
