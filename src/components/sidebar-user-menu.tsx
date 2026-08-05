@@ -18,6 +18,8 @@ interface Props {
   email?: string | null;
   initial: string;
   color: string;
+  /** Quando verdadeiro, mostra avatar + nome em linha (uso no rodapé). */
+  showName?: boolean;
   onChangePassword: () => void;
   onSignOut: () => void;
 }
@@ -52,6 +54,7 @@ export function SidebarUserMenu({
   email,
   initial,
   color,
+  showName = false,
   onChangePassword,
   onSignOut,
 }: Props) {
@@ -114,6 +117,31 @@ export function SidebarUserMenu({
       />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
+          {showName ? (
+            <button
+              type="button"
+              className="w-full flex items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
+              title={userName || email || "Conta"}
+              aria-label="Conta do usuário"
+            >
+              <span
+                className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 ring-1 ring-white/20"
+                style={{ backgroundColor: color }}
+              >
+                {avatar ? (
+                  <img src={avatar} alt="Foto de perfil" className="h-full w-full object-cover" />
+                ) : (
+                  initial
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-white">{userName || email}</span>
+                {userName && email && (
+                  <span className="block truncate text-[11px] text-white/60">{email}</span>
+                )}
+              </span>
+            </button>
+          ) : (
           <button
             type="button"
             className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 ring-1 ring-white/20 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/60"
@@ -127,6 +155,7 @@ export function SidebarUserMenu({
               initial
             )}
           </button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="w-56">
           <DropdownMenuLabel className="truncate">{userName || email}</DropdownMenuLabel>

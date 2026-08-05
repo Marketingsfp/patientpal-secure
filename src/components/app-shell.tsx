@@ -817,15 +817,10 @@ export function AppShell() {
         >
           <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
             <div className="flex w-full items-center justify-between gap-2">
-              <SidebarUserMenu
-                userId={user?.id}
-                userName={userName}
-                email={user?.email}
-                initial={initial}
-                color={clinicColor}
-                onChangePassword={() => setPwOpen(true)}
-                onSignOut={() => void handleSignOut()}
-              />
+              <Link to="/app" className="flex items-center gap-2 min-w-0" title="ClinicaOS">
+                <Activity className="h-5 w-5 shrink-0 text-white" />
+                <span className="font-semibold tracking-tight truncate text-white">ClinicaOS</span>
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -1033,6 +1028,18 @@ export function AppShell() {
               );
             })}
           </nav>
+          <div className="shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20">
+            <SidebarUserMenu
+              userId={user?.id}
+              userName={userName}
+              email={user?.email}
+              initial={initial}
+              color={clinicColor}
+              showName
+              onChangePassword={() => setPwOpen(true)}
+              onSignOut={() => void handleSignOut()}
+            />
+          </div>
         </aside>
       )}
 
@@ -1053,9 +1060,8 @@ export function AppShell() {
               <MenuIcon className="h-5 w-5" />
             </button>
           )}
-          <Link to="/app" className="flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
+          <Link to="/app" className="lg:hidden flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
             <Activity className="h-5 w-5 shrink-0 text-white" />
-            <span className="hidden sm:inline font-semibold tracking-tight truncate">ClinicaOS</span>
           </Link>
           </div>
 
@@ -1166,15 +1172,8 @@ export function AppShell() {
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
-                <SidebarUserMenu
-                  userId={user?.id}
-                  userName={userName}
-                  email={user?.email}
-                  initial={initial}
-                  color={clinicColor}
-                  onChangePassword={() => setPwOpen(true)}
-                  onSignOut={() => void handleSignOut()}
-                />
+                <Activity className="h-5 w-5 shrink-0 text-white" />
+                ClinicaOS
                 <span className="sr-only">Menu</span>
               </SheetTitle>
             </SheetHeader>
@@ -1240,6 +1239,18 @@ export function AppShell() {
                 </div>
               ))}
             </nav>
+            <div className="px-2 py-3 mt-auto border-t border-white/15">
+              <SidebarUserMenu
+                userId={user?.id}
+                userName={userName}
+                email={user?.email}
+                initial={initial}
+                color={clinicColor}
+                showName
+                onChangePassword={() => setPwOpen(true)}
+                onSignOut={() => void handleSignOut()}
+              />
+            </div>
           </SheetContent>
         </Sheet>
       )}
