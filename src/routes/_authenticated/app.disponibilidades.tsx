@@ -436,6 +436,20 @@ function Page() {
     return out;
   }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
 
+  // Menor duração (em minutos) entre os slots pré-visualizados — usada para
+  // avisar quando a configuração gera vagas de 1–4 min (sobrepostas).
+  const duracaoMinimaPreview = useMemo(() => {
+    if (slotsPreview.length === 0) return null;
+    const min = (hhmm: string) => {
+      const [h, m] = hhmm.split(":").map(Number);
+      return h * 60 + m;
+    };
+    return slotsPreview.reduce(
+      (acc, s) => Math.min(acc, min(s.fim) - min(s.inicio)),
+      Number.POSITIVE_INFINITY,
+    );
+  }, [slotsPreview]);
+
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
   const cidadesDisponiveis = Array.from(
