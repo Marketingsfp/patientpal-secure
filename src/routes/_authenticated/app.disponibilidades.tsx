@@ -1001,7 +1001,7 @@ function Page() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Intervalo (min)</label>
-                      <Input type="number" min={1} max={480} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
+                      <Input type="number" min={5} max={480} step={5} placeholder="padrão do médico" className="w-36" value={novo.intervalo_min} onChange={(e) => setNovo({ ...novo, intervalo_min: e.target.value })} />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Vigência de</label>
@@ -1063,7 +1063,7 @@ function Page() {
                                   <Input type="number" min={1} placeholder="sem limite" className="w-28" value={editRow.limite_pacientes} onChange={(e) => setEditRow({ ...editRow, limite_pacientes: e.target.value })} />
                                 </TableCell>
                                 <TableCell>
-                                  <Input type="number" min={1} max={480} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
+                                  <Input type="number" min={5} max={480} step={5} placeholder="padrão" className="w-28" value={editRow.intervalo_min} onChange={(e) => setEditRow({ ...editRow, intervalo_min: e.target.value })} />
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
