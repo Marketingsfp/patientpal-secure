@@ -519,12 +519,3 @@ function descreverErroTts(err: unknown): string {
   if (!msg) return "Servidor de voz não respondeu";
   return msg.slice(0, 80);
 }
-
-function PainelClockUnused() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return <span>{now.toLocaleTimeString("pt-BR")}</span>;
-}
