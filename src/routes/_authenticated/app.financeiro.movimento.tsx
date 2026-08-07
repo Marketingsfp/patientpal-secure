@@ -25,6 +25,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")({
   component: Page,
@@ -123,6 +127,8 @@ function Page() {
   const modoMobile = uxMelhorias && isMobile;
   const [estornando, setEstornando] = useState<string | null>(null);
   const [estornoSangria, setEstornoSangria] = useState<Lanc | null>(null);
+  const [confirmDel, setConfirmDel] = useState<Lanc | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
@@ -527,9 +533,15 @@ function Page() {
     toast.success("Salvo"); setOpen(false); await load(); await loadResumo();
   };
 
-  const remove = async (l: Lanc) => {
-    if (!confirm(`Excluir "${l.descricao}"?`)) return;
+  const remove = (l: Lanc) => { setConfirmDel(l); };
+
+  const confirmarExclusao = async () => {
+    const l = confirmDel;
+    if (!l) return;
+    setDeleting(true);
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
+    setDeleting(false);
+    setConfirmDel(null);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); await loadResumo(); }
   };
 
@@ -1216,6 +1228,39 @@ function Page() {
         caixaMovimentoId={estornoSangria?.id ?? null}
         onCreated={() => { setEstornoSangria(null); load(); }}
       />
+      <AlertDialog open={!!confirmDel} onOpenChange={(v) => { if (!v && !deleting) setConfirmDel(null); }}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              Excluir lançamento
+            </AlertDialogTitle>
+            <AlertDialogDescription className="pt-1">
+              Esta ação não pode ser desfeita. O lançamento abaixo será removido definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {confirmDel && (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-medium leading-snug">{confirmDel.descricao}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {new Date(`${confirmDel.data}T00:00:00`).toLocaleDateString("pt-BR")} · {fmt(Number(confirmDel.valor))}
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
