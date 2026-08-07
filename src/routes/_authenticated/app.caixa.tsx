@@ -1041,7 +1041,65 @@ function Page() {
         .filter((m) => m.sessao_id === sid)
         .slice()
         .sort((a, b) => a.created_at.localeCompare(b.created_at));
-      setMinhasMovs(abertaMovs);
+      // ---- Despesas do financeiro que não geraram movimento de caixa ----
+      // Repasses, contas e outras despesas lançadas direto no módulo
+      // Financeiro não criam linha em `caixa_movimentos`. Sem isso o card
+      // "Saídas" mostrava R$ 0,00 mesmo com despesas confirmadas no dia.
+      // Aqui elas entram como movimentos virtuais (id prefixado com "fin:"),
+      // alimentando Saídas, saldo e o resumo por dia.
+      const despesasVirtuais: Mov[] = [];
+      try {
+        const iniSessao = localYMDStr((aberta as Sessao).aberto_em);
+        const hojeStr = localYMDStr(new Date().toISOString());
+        const { data: desp } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor, descricao, forma_pagamento, created_at, criado_por, data")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("tipo", "despesa")
+          .eq("status", "confirmado")
+          .gte("data", iniSessao)
+          .lte("data", hojeStr);
+        const despRows = (desp ?? []) as Array<{
+          id: string; valor: number | null; descricao: string | null;
+          forma_pagamento: string | null; created_at: string; criado_por: string | null;
+        }>;
+        if (despRows.length > 0) {
+          // Exclui as que já possuem movimento de caixa (em qualquer sessão
+          // da clínica), para não contar em dobro.
+          const jaNoCaixa = new Set<string>();
+          for (const ids of chunkArray(despRows.map((d) => d.id), 200)) {
+            const { data: movsLig } = await supabase
+              .from("caixa_movimentos")
+              .select("lancamento_id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .in("lancamento_id", ids);
+            for (const r of ((movsLig ?? []) as Array<{ lancamento_id: string | null }>)) {
+              if (r.lancamento_id) jaNoCaixa.add(r.lancamento_id);
+            }
+          }
+          for (const d of despRows) {
+            if (jaNoCaixa.has(d.id)) continue;
+            despesasVirtuais.push({
+              id: `fin:${d.id}`,
+              sessao_id: sid,
+              user_id: d.criado_por ?? user.id,
+              tipo: "despesa",
+              valor: Number(d.valor) || 0,
+              descricao: d.descricao,
+              forma_pagamento: d.forma_pagamento,
+              created_at: d.created_at,
+              lancamento_id: d.id,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Falha ao integrar despesas do financeiro ao caixa", e);
+      }
+      setMinhasMovs(
+        despesasVirtuais.length === 0
+          ? abertaMovs
+          : [...abertaMovs, ...despesasVirtuais].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+      );
     } else {
       setMinhasMovs([]);
     }
