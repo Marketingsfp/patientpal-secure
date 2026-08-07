@@ -351,6 +351,9 @@ export type Database = {
           agenda_id: string | null
           atendimento_grupo_id: string | null
           clinica_id: string
+          convenio_autorizado: boolean
+          convenio_autorizado_em: string | null
+          convenio_autorizado_por: string | null
           created_at: string
           criado_por: string | null
           data_pagamento: string | null
@@ -393,6 +396,9 @@ export type Database = {
           agenda_id?: string | null
           atendimento_grupo_id?: string | null
           clinica_id: string
+          convenio_autorizado?: boolean
+          convenio_autorizado_em?: string | null
+          convenio_autorizado_por?: string | null
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
@@ -435,6 +441,9 @@ export type Database = {
           agenda_id?: string | null
           atendimento_grupo_id?: string | null
           clinica_id?: string
+          convenio_autorizado?: boolean
+          convenio_autorizado_em?: string | null
+          convenio_autorizado_por?: string | null
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
