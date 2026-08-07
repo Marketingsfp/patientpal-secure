@@ -222,7 +222,7 @@ export function SessionCard({
             <div className={cn("shrink-0 tabular-nums text-slate-500 font-medium", dim.time)}>
               {fmt(data.inicio)}
               {data.fim && data.fim !== data.inicio ? (
-                <span className="text-slate-300"> – {fmt(data.fim)}</span>
+                <span className="text-slate-500 dark:text-slate-400"> – {fmt(data.fim)}</span>
               ) : null}
             </div>
           </div>
@@ -236,13 +236,13 @@ export function SessionCard({
             <span className="text-xs text-slate-500 truncate">{titulo}</span>
             {data.medico_nome && (
               <>
-                <span className="text-slate-300">·</span>
+                <span className="text-slate-500 dark:text-slate-400">·</span>
                 <span className="text-xs text-slate-500 truncate">{data.medico_nome}</span>
               </>
             )}
             {data.recurso_nome && density !== "compacto" && (
               <>
-                <span className="text-slate-300">·</span>
+                <span className="text-slate-500 dark:text-slate-400">·</span>
                 <span className="text-xs text-slate-500 truncate">{data.recurso_nome}</span>
               </>
             )}
@@ -264,7 +264,7 @@ export function SessionCard({
                   { label: "Atendimento", done: data.status === "em_atendimento" || data.status === "realizado" },
                 ]}
               />
-              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-400">
                 <span className="uppercase tracking-wider">
                   {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
                 </span>
@@ -336,7 +336,7 @@ export function SessionCard({
         <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3" style={{ paddingLeft: dim.photo + 16 }}>
           {data.items.map((it) => (
             <li key={it.id} className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="text-slate-300">›</span>
+              <span className="text-slate-500 dark:text-slate-400">›</span>
               <span className="truncate">{it.procedimento_nome}</span>
             </li>
           ))}
@@ -404,7 +404,7 @@ function StatusMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
           Alterar status
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

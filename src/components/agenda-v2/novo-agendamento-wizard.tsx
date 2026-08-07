@@ -511,7 +511,7 @@ export function NovoAgendamentoWizard({
                     <button
                       type="button"
                       onClick={resetQuickCreate}
-                      className="text-slate-400 hover:text-slate-700"
+                      className="text-slate-600 dark:text-slate-400 hover:text-slate-700"
                       aria-label="Cancelar cadastro rápido"
                     >
                       <X className="h-4 w-4" />
@@ -564,7 +564,7 @@ export function NovoAgendamentoWizard({
                     onClick={handleQuickCreatePaciente}
                     className={cn(
                       "inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
-                      qcSaving ? "bg-slate-200 text-slate-400" : "bg-indigo-600 text-white hover:bg-indigo-700",
+                      qcSaving ? "bg-slate-200 text-slate-600 dark:text-slate-400" : "bg-indigo-600 text-white hover:bg-indigo-700",
                     )}
                   >
                     {qcSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -645,7 +645,7 @@ export function NovoAgendamentoWizard({
               </button>
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-slate-400">
+          <p className="mt-4 text-[11px] text-slate-600 dark:text-slate-400">
             Fase F: recursos de enfermagem ainda não estão disponíveis pelo wizard V2 — use a Agenda clássica.
           </p>
           {medico && (
@@ -687,7 +687,7 @@ export function NovoAgendamentoWizard({
       {step === "horario" && (
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Data</label>
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">Data</label>
             <DateInputBR
               value={dataDia}
               onChange={(e) => { setDataDia(e.target.value); setSlot(null); }}
@@ -746,7 +746,7 @@ export function NovoAgendamentoWizard({
           </div>
 
           <div className="pt-3 border-t border-slate-200">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Tipo de atendimento</div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">Tipo de atendimento</div>
             <div className="flex gap-2">
               {(["particular", "convenio", "externo"] as const).map((t) => (
                 <button
@@ -836,7 +836,7 @@ export function NovoAgendamentoWizard({
             )}
           </div>
 
-          <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-200">
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-3 border-t border-slate-200">
             Rastreabilidade: o agendamento será gravado com <code>observacoes = &quot;[V2]&quot;</code> durante o piloto da Agenda V2.
           </p>
         </div>
@@ -860,7 +860,7 @@ export function NovoAgendamentoWizard({
         onClick={() => (stepIdx === STEPS.length - 1 ? handleConfirmar() : setStepIdx((i) => i + 1))}
         className={cn(
           "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-semibold transition-all",
-          (canNext && !saving) ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-200 text-slate-400 cursor-not-allowed",
+          (canNext && !saving) ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-200 text-slate-600 dark:text-slate-400 cursor-not-allowed",
         )}
       >
         {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

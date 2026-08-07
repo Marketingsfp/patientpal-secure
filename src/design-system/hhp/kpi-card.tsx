@@ -54,7 +54,7 @@ export function HhpKpiCard({
         style={{ background: "var(--clinic-accent)" }}
       />
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 leading-tight line-clamp-2 min-w-0">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 leading-tight line-clamp-2 min-w-0">
           {label}
         </span>
         <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", HHP_TONE_BG[tone])}>
@@ -73,7 +73,7 @@ export function HhpKpiCard({
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>
         {delta !== undefined && delta !== 0 && (
-          <span className={cn("text-[10px] font-semibold tabular-nums", delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-400")}>
+          <span className={cn("text-[10px] font-semibold tabular-nums", delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-600 dark:text-slate-400")}>
             {delta > 0 ? "+" : ""}{delta}
           </span>
         )}

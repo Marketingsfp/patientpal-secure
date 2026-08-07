@@ -973,7 +973,7 @@ export function AgendaV2Shell() {
 
             <div className="flex items-center gap-0.5 ml-1">
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(-1)} aria-label="Dia anterior">
-                <ChevronLeft className="h-4 w-4 text-slate-400" />
+                <ChevronLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </Button>
               <Button
                 variant="ghost"
@@ -984,7 +984,7 @@ export function AgendaV2Shell() {
                 Hoje
               </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-slate-100" onClick={() => navDia(1)} aria-label="Próximo dia">
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </Button>
               <Button
                 variant="ghost"
@@ -994,7 +994,7 @@ export function AgendaV2Shell() {
                 aria-label="Atalhos de teclado"
                 title="Atalhos (?)"
               >
-                <Keyboard className="h-4 w-4 text-slate-400" />
+                <Keyboard className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </Button>
             </div>
           </>
@@ -1002,13 +1002,13 @@ export function AgendaV2Shell() {
       >
         <HhpToolbar>
           <div className="relative flex-1 min-w-0 md:min-w-64 max-w-md w-full sm:w-auto">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 dark:text-slate-400 pointer-events-none" />
             <Input
               placeholder="Buscar paciente, médico, sala, exame…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               ref={searchInputRef}
-              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-400 transition-colors duration-150"
+              className="pl-10 h-10 rounded-2xl bg-slate-100 border-transparent focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-slate-200 text-sm placeholder:text-slate-600 dark:text-slate-400 transition-colors duration-150"
               aria-label="Busca"
             />
           </div>
@@ -1067,14 +1067,14 @@ export function AgendaV2Shell() {
             </Button>
           )}
           <div className="text-xs text-slate-500 inline-flex items-center gap-2 ml-auto">
-            <Sparkles className="h-3 w-3 text-slate-400" />
+            <Sparkles className="h-3 w-3 text-slate-600 dark:text-slate-400" />
             <span className="tabular-nums">
               {rows === null
                 ? "carregando…"
                 : `${filtradas.length} ${filtradas.length === 1 ? "sessão" : "sessões"}`}
             </span>
             {loadedMs !== null && (
-              <span className="text-slate-400 tabular-nums">
+              <span className="text-slate-600 dark:text-slate-400 tabular-nums">
                 · query {loadedMs}ms{renderMs !== null && ` · render ${renderMs}ms`}
               </span>
             )}
@@ -1127,7 +1127,7 @@ export function AgendaV2Shell() {
                   <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
                       "sticky top-0 tabular-nums pt-1",
-                      foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-400",
+                      foco ? "text-[13px] font-semibold text-slate-500" : "text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400",
                     )}>
                       {String(hora).padStart(2, "0")}:00
                     </div>
@@ -1168,7 +1168,7 @@ export function AgendaV2Shell() {
                         <button
                           type="button"
                           onClick={() => openWizardForHora(hora)}
-                          className="group flex items-center gap-2 text-[11px] text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                          className="group flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                           aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
                           title="Clique para agendar neste horário"
                         >

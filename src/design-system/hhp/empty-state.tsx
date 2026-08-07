@@ -17,7 +17,7 @@ export interface HhpEmptyStateProps {
 export function HhpEmptyState({ icon: Icon, title, description, action, className }: HhpEmptyStateProps) {
   return (
     <div className={cn("h-full flex flex-col items-center justify-center text-center p-6 gap-3", className)}>
-      <Icon className="h-12 w-12 text-slate-300" strokeWidth={1.5} />
+      <Icon className="h-12 w-12 text-slate-500 dark:text-slate-400" strokeWidth={1.5} />
       <div className="text-sm font-semibold text-slate-700">{title}</div>
       {description && (
         <div className="text-xs text-slate-500 max-w-sm">{description}</div>

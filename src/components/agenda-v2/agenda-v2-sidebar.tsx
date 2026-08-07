@@ -45,7 +45,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
   const ocupacao = totalRecursos > 0 ? Math.round((usadosRecursos / totalRecursos) * 100) : 0;
 
   const cardCls = "rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]";
-  const labelCls = "text-[10px] font-semibold uppercase tracking-widest text-slate-400";
+  const labelCls = "text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400";
 
   return (
     <aside className="w-64 shrink-0 bg-gradient-to-b from-[#FAFBFC] to-[#F5F6F8] border-r border-slate-200/60 flex flex-col overflow-y-auto">
@@ -68,7 +68,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             >
               {clinicaNome}
             </div>
-            <div className="text-[10px] text-slate-400 uppercase tracking-wider">
+            <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-wider">
               {dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             </div>
           </div>
@@ -92,7 +92,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               >
                 {sessoes.length}
               </div>
-              <div className="text-[10px] text-slate-400 mt-1.5">sessões</div>
+              <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1.5">sessões</div>
             </div>
             <div className="text-right">
               <div
@@ -105,7 +105,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               >
                 {ocupacao}%
               </div>
-              <div className="text-[10px] text-slate-400 mt-1.5">ocupação</div>
+              <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1.5">ocupação</div>
             </div>
           </div>
           <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
@@ -121,7 +121,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
           <div className={cn(labelCls, "mb-3")}>Sessões</div>
           <ul className="space-y-2">
             {porTipo.length === 0 && (
-              <li className="text-xs text-slate-400">Nenhuma sessão</li>
+              <li className="text-xs text-slate-600 dark:text-slate-400">Nenhuma sessão</li>
             )}
             {porTipo.map(([tipo, n]) => {
               const est = TIPO_SESSAO_ESTILO[tipo];
@@ -143,7 +143,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
           <div className={cn(labelCls, "mb-3")}>Recursos</div>
           <ul className="space-y-3">
             {recursos.length === 0 && (
-              <li className="text-xs text-slate-400">Sem recursos cadastrados</li>
+              <li className="text-xs text-slate-600 dark:text-slate-400">Sem recursos cadastrados</li>
             )}
             {recursos.slice(0, 6).map((r) => {
               const pct = r.total > 0 ? Math.round((r.usados / r.total) * 100) : 0;
@@ -152,7 +152,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
                 <li key={r.id}>
                   <div className="flex items-center justify-between text-[11px] mb-1">
                     <span className="text-slate-600 truncate mr-2">{r.nome}</span>
-                    <span className="tabular-nums text-slate-400 shrink-0">{r.usados}/{r.total}</span>
+                    <span className="tabular-nums text-slate-600 dark:text-slate-400 shrink-0">{r.usados}/{r.total}</span>
                   </div>
                   <div className="h-[3px] rounded-full bg-slate-100 overflow-hidden">
                     <div className={cn("h-full transition-all", tone)} style={{ width: `${pct}%` }} />
@@ -167,7 +167,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         <section className={cardCls}>
           <div className="flex items-center justify-between mb-3">
             <span className={labelCls}>Escala do dia</span>
-            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400">
               <Users className="h-3 w-3" /> {equipeOnline.length}
             </span>
           </div>
@@ -191,7 +191,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               </div>
             )}
             {equipeOnline.length === 0 && (
-              <div className="text-xs text-slate-400 inline-flex items-center gap-1">
+              <div className="text-xs text-slate-600 dark:text-slate-400 inline-flex items-center gap-1">
                 <Clock className="h-3 w-3" /> sem escala hoje
               </div>
             )}

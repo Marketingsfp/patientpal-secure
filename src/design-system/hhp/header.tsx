@@ -33,7 +33,7 @@ export function HhpPageHeader({
               {title}
             </h1>
             {eyebrow && (
-              <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest text-slate-400 capitalize truncate">
+              <p className="text-[10px] md:text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 capitalize truncate">
                 {eyebrow}
               </p>
             )}

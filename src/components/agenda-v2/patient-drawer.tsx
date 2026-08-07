@@ -178,7 +178,7 @@ export function PatientDrawer({
                     )}
                   </div>
                   {data.chegou_em && (
-                    <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-400">
+                    <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
                       Chegou {data.chegou_em}
                     </p>
                   )}
@@ -223,7 +223,7 @@ export function PatientDrawer({
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
                   <Sparkles className="h-3 w-3" /> Sugestões da IA
                 </div>
-                <span className="text-[10px] text-slate-400">3 sinais</span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-400">3 sinais</span>
               </div>
               <div className="space-y-1.5">
                 <AiChip
@@ -284,13 +284,13 @@ export function PatientDrawer({
                 {tab === "historico" && (
                   <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
                     {data.historico.length === 0 ? (
-                      <p className="text-xs text-slate-400">Sem eventos registrados.</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">Sem eventos registrados.</p>
                     ) : (
                       <ol className="space-y-2">
                         {data.historico.map((h, i) => (
                           <li key={i} className="flex justify-between text-xs">
                             <span className="text-slate-600">{h.etapa.replace(/_/g, " ")}</span>
-                            <span className="text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
+                            <span className="text-slate-600 dark:text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
                           </li>
                         ))}
                       </ol>
@@ -308,7 +308,7 @@ export function PatientDrawer({
             </div>
 
             {openMs !== null && (
-              <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-300 tabular-nums text-right">
+              <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-500 dark:text-slate-400 tabular-nums text-right">
                 aberto em {openMs}ms
               </div>
             )}
@@ -320,7 +320,7 @@ export function PatientDrawer({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
+    <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
       {children}
     </div>
   );
@@ -331,7 +331,7 @@ function MetaChip({ label, muted, tabular }: { label: string; muted?: boolean; t
     <span className={cn(
       "inline-flex items-center px-1.5 rounded",
       tabular && "tabular-nums",
-      muted ? "text-slate-400" : "text-slate-600",
+      muted ? "text-slate-600 dark:text-slate-400" : "text-slate-600",
     )}>
       {label}
     </span>
@@ -360,13 +360,13 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
                 "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
                 past && "bg-emerald-500 text-white",
                 current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
-                !past && !current && "bg-white text-slate-400 border border-slate-200",
+                !past && !current && "bg-white text-slate-600 dark:text-slate-400 border border-slate-200",
               )}>
                 {past ? <Check className="h-3 w-3" /> : i + 1}
               </div>
               <div className={cn(
                 "text-[10px] leading-tight text-center max-w-full truncate px-1",
-                current ? "font-semibold text-slate-900" : past ? "text-slate-600" : "text-slate-400",
+                current ? "font-semibold text-slate-900" : past ? "text-slate-600" : "text-slate-600 dark:text-slate-400",
               )}>
                 {e.label}
               </div>
@@ -446,7 +446,7 @@ function ProntuarioPanel({
         <ArrowUpRight className="h-3.5 w-3.5" />
         Abrir prontuário completo
       </button>
-      <p className="text-[10px] text-slate-400 leading-relaxed">
+      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
         A tela do prontuário abre no mesmo destino usado pela Agenda clássica e
         pela fila de Atendimento IA — nenhuma regra clínica é alterada.
       </p>
@@ -572,7 +572,7 @@ function PanelCard({
       "rounded-xl border p-3 space-y-1",
       tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
     )}>
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
         <span className="text-slate-500">{icon}</span> {title}
       </div>
       <p className="text-[11px] text-slate-600 leading-snug">{body}</p>

@@ -188,7 +188,7 @@ function DashboardOperacional() {
               <ul className="divide-y divide-slate-100">
                 {filaAtual.map((a) => (
                   <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="text-xs tabular-nums text-slate-400 w-11 shrink-0">{hhmm(a.inicio)}</span>
+                    <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400 w-11 shrink-0">{hhmm(a.inicio)}</span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-slate-800 truncate">{a.paciente_nome ?? "Paciente"}</div>
                       <div className="text-[11px] text-slate-500 truncate">{a.procedimento ?? "—"}</div>
@@ -219,7 +219,7 @@ function DashboardOperacional() {
                   {senhasAguardando.slice(0, 6).map((s) => (
                     <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
                       <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
-                      <span className="text-[11px] text-slate-400">{hhmm(s.emitida_em)}</span>
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
                     </li>
                   ))}
                 </ul>
@@ -284,7 +284,7 @@ function DashboardOperacional() {
                   (d?.caixas ?? []).map((c) => (
                     <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
                       <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
-                      <span className="text-[11px] text-slate-400">desde {hhmm(c.aberto_em)}</span>
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400">desde {hhmm(c.aberto_em)}</span>
                     </div>
                   ))
                 )}
@@ -293,7 +293,7 @@ function DashboardOperacional() {
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
           <Megaphone className="h-3.5 w-3.5" />
           Indicadores estratégicos, financeiros e comparativos estão no{" "}
           <Link to="/app/painel-executivo" className="underline underline-offset-2 hover:text-slate-600">Painel Executivo</Link>.
@@ -325,7 +325,7 @@ function Painel({
       <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
-          {subtitle && <p className="text-[11px] text-slate-400 truncate">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{subtitle}</p>}
         </div>
         {action}
       </header>
@@ -345,7 +345,7 @@ function LinkMais({ to }: { to: string }) {
 function MiniStat({ label, value, tone }: { label: string; value: number | string; tone: "warn" | "info" }) {
   return (
     <div className={cn("rounded-xl px-3 py-2", tone === "warn" ? "bg-amber-50" : "bg-sky-50")}>
-      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">{label}</div>
+      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 dark:text-slate-400">{label}</div>
       <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>
     </div>
   );

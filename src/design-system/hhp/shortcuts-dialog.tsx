@@ -31,7 +31,7 @@ export function HhpShortcutsDialog({
           {groups.map((g, gi) => (
             <React.Fragment key={g.group}>
               {gi > 0 && <div className="border-t border-slate-100" />}
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                 {g.group}
               </div>
               {g.items.map((s) => (
@@ -45,7 +45,7 @@ export function HhpShortcutsDialog({
             </React.Fragment>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 pt-2">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-2">
           Padrão Health Hub Pro{moduleName ? ` — ${moduleName}` : ""}.
         </p>
       </DialogContent>
