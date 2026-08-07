@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
