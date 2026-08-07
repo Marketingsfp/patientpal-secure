@@ -691,16 +691,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
-    // Campos que devem aceitar apenas letras (com acentos), espaço, hífen e apóstrofo.
+    // Campos que devem aceitar apenas letras (com acentos) e espaço.
     const somenteLetras = field === "nome" || field === "responsavel_nome";
-    const sanitize = (v: string) =>
-      somenteLetras
-        ? v.replace(/[^\p{L}\s'’\-\.]/gu, "").replace(/\s{2,}/g, " ")
-        : v;
     return {
       field: field as string,
       value: form[field] as string,
-      onChange: (v: string) => setForm(f => ({ ...f, [field]: sanitize(v) } as FormState)),
+      onChange: (v: string) => {
+        if (somenteLetras) {
+          const erro = erroCaractereNome(v);
+          setErrosNome((e) => ({ ...e, [field as string]: erro }));
+          setForm(f => ({ ...f, [field]: sanitizarNomePessoa(v) } as FormState));
+          return;
+        }
+        setForm(f => ({ ...f, [field]: v } as FormState));
+      },
       onVoice: () => active ? stopVoice() : startVoice(field),
       voiceActive: active,
       speechSupported,
@@ -709,13 +713,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const nomeTrim = form.nome.trim();
-    if (!nomeTrim) { toast.error("Informe o nome."); return; }
-    if (nomeTrim.length > 200) { toast.error("Nome muito longo (máx. 200 caracteres)."); return; }
-    // Exige pelo menos uma letra (aceita acentos) — bloqueia nomes só com números/símbolos
-    if (!/\p{L}/u.test(nomeTrim)) { toast.error("Nome deve conter letras."); return; }
-    // Bloqueia HTML/script embutido
-    if (/[<>]/.test(nomeTrim)) { toast.error("Nome contém caracteres inválidos."); return; }
+    const vNome = validarNomePessoa(form.nome);
+    if (!vNome.valido) {
+      setErrosNome((er) => ({ ...er, nome: vNome.mensagem }));
+      toast.error(vNome.mensagem ?? "Nome inválido.");
+      return;
+    }
+    const nomeTrim = vNome.valor;
+    const vResp = validarNomePessoa(form.responsavel_nome, { obrigatorio: false });
+    if (!vResp.valido) {
+      setErrosNome((er) => ({ ...er, responsavel_nome: vResp.mensagem }));
+      toast.error(vResp.mensagem ?? "Nome do responsável inválido.");
+      return;
+    }
     if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
     if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
     // Faixa plausível da data de nascimento
