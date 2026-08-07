@@ -67,7 +67,7 @@ export function SearchableMultiSelect({
           disabled={disabled}
           className={cn("w-full justify-between font-normal min-h-10 h-auto py-2", className)}
         >
-          <span className="min-w-0 flex-1 text-left text-sm leading-5">
+          <span className="min-w-0 flex-1 text-left text-sm leading-5 text-foreground font-medium">
             {selectedLabels.length > 0 ? (
               <span className="line-clamp-2">
                 {selectedLabels.join(" + ")}
