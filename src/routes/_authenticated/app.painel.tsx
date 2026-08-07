@@ -1,1011 +1,360 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ElementType } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Building2, Bell, CalendarDays, Users, RotateCcw, MessageCircle,
-  CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain, Filter, X,
+  CalendarPlus, UserCheck, Search, Banknote, Ticket, Stethoscope,
+  Clock, Users, AlertTriangle, Activity, CheckCircle2, XCircle,
+  RefreshCw, Megaphone, ArrowRight, Wallet, ListChecks,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { Card, CardContent } from "@/components/ui/card";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { HhpPageHeader, HhpKpiCard, HhpKpiRow, HhpEmptyState } from "@/design-system/hhp";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/painel")({
-  component: DashboardPage,
-  head: () => ({ meta: [{ title: "Painel — ClinicaOS" }] }),
+  component: DashboardOperacional,
+  head: () => ({
+    meta: [
+      { title: "Dashboard operacional — ClinicaOS" },
+      { name: "description", content: "Fila ao vivo, check-ins do dia, próximos atendimentos e alertas imediatos da clínica." },
+      { property: "og:title", content: "Dashboard operacional — ClinicaOS" },
+      { property: "og:description", content: "Acompanhe a operação do dia em tempo real." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
-const fmtMoney = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtInt = (n: number) => n.toLocaleString("pt-BR");
-const pct = (num: number, den: number) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : "0%");
-
-type Periodo = { de: string; ate: string };
-
-const hojeISO = () => new Date().toISOString().slice(0, 10);
-
-type DrillSpec = {
-  title: string;
-  columns: { key: string; label: string; align?: "left" | "right" }[];
-  rows: Array<Record<string, string | number>>;
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-type RawAg = { id: string; status: string; medico_id: string | null; paciente_id: string | null; procedimento: string | null; inicio: string | null };
-type RawLanc = { id: string; tipo: string; status: string; valor: number; medico_id: string | null };
-type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_id: string | null; status: string };
+const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--");
 
-function DashboardPage() {
-  const { memberships, clinicaAtual, loading } = useClinica();
-  // Stagger + count-up nos KPIs — só São Francisco de Paula (flag ux_melhorias).
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
-  const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
-  const [carregando, setCarregando] = useState(false);
-  const [medicosLista, setMedicosLista] = useState<{ id: string; nome: string }[]>([]);
-  const [especialidadesLista, setEspecialidadesLista] = useState<{ id: string; nome: string }[]>([]);
-  const [medEspMap, setMedEspMap] = useState<Record<string, string[]>>({}); // medico_id -> [esp_id]
-  const [medicosSel, setMedicosSel] = useState<string[]>([]);
-  const [especialidadesSel, setEspecialidadesSel] = useState<string[]>([]);
-  const [buscaMed, setBuscaMed] = useState("");
-  const [buscaEsp, setBuscaEsp] = useState("");
-  const [data, setData] = useState({
-    alertas: [] as { id: string; mensagem: string }[],
-    agend: { total: 0, atendidos: 0, faltas: 0, pagos: 0, naoPagos: 0, novos: 0, regulares: 0, retornos: 0, semAgenda: 0 },
-    msgs: { enviadas: 0, respostas: 0, total: 0 },
-    conf: { presencas: 0, ausencias: 0 },
-    vendas: { total: 0, orcamentos: 0 },
-    pagamentos: { realizado: 0, aPagar: 0 },
-    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0, atendimentos: 0, qtdAtendimentos: 0, mensConsulta: 0, qtdMensConsulta: 0, mensDesconto: 0, qtdMensDesconto: 0, mensOutros: 0, qtdMensOutros: 0 },
-    comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
-    // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
-    grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
-    // Pagamentos recebidos no período, separando o que é do próprio dia
-    // do que se refere a atendimentos/competências de outras datas.
-    caixaDia: { total: 0, doDia: 0, outrasDatas: 0, qtd: 0 },
-    porMedico: [] as { nome: string; total: number; pagos: number; novos: number }[],
-  });
-  const [rawAgs, setRawAgs] = useState<RawAg[]>([]);
-  const [rawLancs, setRawLancs] = useState<RawLanc[]>([]);
-  const [rawAtends, setRawAtends] = useState<RawAtend[]>([]);
-  const [pagosAgIds, setPagosAgIds] = useState<Set<string>>(new Set());
-  const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
-  const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
-  const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
-  const [drill, setDrill] = useState<DrillSpec | null>(null);
-  const [drillBusca, setDrillBusca] = useState("");
-  // GRs de mensalidade do período (para o detalhamento com nome do paciente)
-  const [grMensLista, setGrMensLista] = useState<Array<{ ficha: number | null; quando: string | null; paciente: string }>>([]);
+type Ag = {
+  id: string; paciente_nome: string | null; inicio: string | null; status: string;
+  fluxo_etapa: string | null; procedimento: string | null; prioridade: string | null;
+};
+type Senha = { id: string; codigo: string | null; tipo: string; numero: number; status: string; emitida_em: string | null; guiche: string | null };
+type Alerta = { id: string; titulo: string | null; paciente_nome: string | null; severidade: string | null; created_at: string };
+type CaixaSessao = { id: string; user_nome: string | null; aberto_em: string; valor_abertura: number | null };
 
-  // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
-  const medicosFiltradosIds = useMemo(() => {
-    let ids = medicosLista.map(m => m.id);
-    if (medicosSel.length > 0) ids = ids.filter(id => medicosSel.includes(id));
-    if (especialidadesSel.length > 0) {
-      ids = ids.filter(id => (medEspMap[id] ?? []).some(e => especialidadesSel.includes(e)));
-    }
-    return ids;
-  }, [medicosLista, medicosSel, especialidadesSel, medEspMap]);
-  const filtrosAtivos = medicosSel.length > 0 || especialidadesSel.length > 0;
+const ETAPA_LABEL: Record<string, string> = {
+  aguardando_recepcao: "Aguardando recepção",
+  recepcao: "Na recepção",
+  caixa: "No caixa",
+  triagem: "Em triagem",
+  atendimento: "Em atendimento",
+  exame: "Em exame",
+  finalizado: "Finalizado",
+};
 
-  const load = async () => {
-    if (!clinicaAtual) return;
-    setCarregando(true);
-    const cid = clinicaAtual.clinica_id;
-    const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
-    const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
+function DashboardOperacional() {
+  const { clinicaIds, clinicaAtual, loading } = useClinica();
+  const qc = useQueryClient();
+  const dia = hojeISO();
+  const ids = clinicaIds;
+  const enabled = ids.length > 0;
 
-    const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR, procR] = await Promise.all([
-      supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
-      supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
-      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id,contrato_id,descricao").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
-      supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
-      supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
-      supabase.from("especialidades").select("id,nome"),
-      supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
-      supabase.from("procedimentos").select("nome,tipo_procedimento").eq("clinica_id", cid).eq("ativo", true),
-    ]);
-
-    // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
-    // cada pagamento de mensalidade conta como uma GR do dia.
-    const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id,mensalidade_id,agendamento_id,ficha_numero,created_at").eq("clinica_id", cid)
-        .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
-        .gte("created_at", ini).lte("created_at", fim),
-      // Recebimentos efetivados no período (data de lançamento no caixa),
-      // independentemente da competência/data do atendimento.
-      supabase.from("fin_lancamentos").select("id,valor,data,tipo,status")
-        .eq("clinica_id", cid).eq("tipo", "receita").eq("status", "confirmado")
-        .gte("created_at", ini).lte("created_at", fim),
-    ]);
-
-    const medsAll = (medicosR.data ?? []) as { id: string; nome: string }[];
-    const espAll = (espR.data ?? []) as { id: string; nome: string }[];
-    const medEspAll = (medEspR.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>;
-
-    // Atualiza listas para os filtros
-    setMedicosLista(medsAll.slice().sort((a, b) => a.nome.localeCompare(b.nome)));
-    setEspecialidadesLista(espAll.slice().sort((a, b) => a.nome.localeCompare(b.nome)));
-    const mapTmp: Record<string, string[]> = {};
-    for (const me of medEspAll) {
-      (mapTmp[me.medico_id] ||= []).push(me.especialidade_id);
-    }
-    setMedEspMap(mapTmp);
-
-    // Aplica filtros de médico / especialidade
-    let medsFiltrados = medsAll;
-    if (medicosSel.length > 0) {
-      medsFiltrados = medsFiltrados.filter(m => medicosSel.includes(m.id));
-    }
-    if (especialidadesSel.length > 0) {
-      medsFiltrados = medsFiltrados.filter(m =>
-        (mapTmp[m.id] ?? []).some(e => especialidadesSel.includes(e)),
-      );
-    }
-    const filtroAtivo = medicosSel.length > 0 || especialidadesSel.length > 0;
-    const medIdsPermitidos = new Set(medsFiltrados.map(m => m.id));
-    const passaFiltro = (mid: string | null) => !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
-
-    // Só contam fichas realmente ocupadas por um paciente — os slots vazios
-    // gerados na grade de horários (paciente_id nulo) não são agendamentos.
-    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id) && !!a.paciente_id);
-    const lancs = (lancR.data ?? []).filter(l => !filtroAtivo || passaFiltro(l.medico_id));
-    const atends = (atendR.data ?? []).filter(a => passaFiltro(a.medico_id));
-    const meds = medsFiltrados;
-
-    // Identifica médicos cuja especialidade é "Laboratório"
-    // Regra de contagem: 1 paciente por GR/procedimento, exceto laboratório
-    // (vários exames do mesmo paciente no mesmo dia contam como 1).
-    const espLabIds = new Set(
-      espAll
-        .filter(e => (e.nome ?? "").toLowerCase().includes("laborat"))
-        .map(e => e.id),
-    );
-    const labMedicoIds = new Set<string>();
-    for (const me of medEspAll) {
-      if (espLabIds.has(me.especialidade_id)) labMedicoIds.add(me.medico_id);
-    }
-    // Categoria por procedimento (fonte da verdade); fallback = especialidade do médico.
-    const catResolver = buildCategoriaResolver(
-      (procR.data ?? []) as { nome: string; tipo_procedimento: string | null }[],
-    );
-    const isLabAg = (a: { medico_id: string | null; procedimento?: string | null }) => {
-      if (a.procedimento) return catResolver.categoriaDoTexto(a.procedimento) === "laboratorio";
-      return !!a.medico_id && labMedicoIds.has(a.medico_id);
-    };
-    const contarGRs = <T extends { medico_id: string | null; paciente_id?: string | null; inicio?: string | null; procedimento?: string | null; id: string }>(arr: T[]) => {
-      const naoLab = arr.filter(x => !isLabAg(x)).length;
-      const grupos = new Set<string>();
-      for (const x of arr.filter(isLabAg)) {
-        const dia = (x.inicio ?? "").slice(0, 10);
-        grupos.add(`${x.paciente_id ?? x.id}|${dia}`);
-      }
-      return naoLab + grupos.size;
-    };
-
-    // Agendamentos (contagem por GR/procedimento, com regra de laboratório)
-    const total = contarGRs(ags);
-    const atendidos = contarGRs(ags.filter(a => a.status === "realizado"));
-    const faltas = contarGRs(ags.filter(a => a.status === "faltou"));
-    const retornos = contarGRs(ags.filter(a => (a.procedimento ?? "").toLowerCase().includes("retorno")));
-    const semAgenda = ags.filter(a => !a.medico_id).length;
-
-    // Novos x regulares (a partir de paciente_id em agendamentos do período vs histórico)
-    const pacIds = Array.from(new Set(ags.map(a => a.paciente_id).filter(Boolean) as string[]));
-    let novos = 0, regulares = 0;
-    let setExistentes = new Set<string>();
-    if (pacIds.length > 0) {
-      const { data: hist } = await supabase
-        .from("agendamentos").select("paciente_id,inicio")
-        .eq("clinica_id", cid).in("paciente_id", pacIds).lt("inicio", ini);
-      setExistentes = new Set((hist ?? []).map(h => h.paciente_id) as string[]);
-      novos = pacIds.filter(p => !setExistentes.has(p)).length;
-      regulares = pacIds.length - novos;
-    }
-
-    // Financeiro
-    const receitas = lancs.filter(l => l.tipo === "receita");
-    const despesas = lancs.filter(l => l.tipo === "despesa");
-    const recebRealizado = receitas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
-    const recebAReceber = receitas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
-    const qtdReceb = receitas.filter(l => l.status === "confirmado").length;
-    const qtdAReceber = receitas.filter(l => l.status === "pendente").length;
-    // Parte do recebido que vem de mensalidades do cartão.
-    // Alguns lançamentos antigos não gravam contrato_id — nesses casos
-    // identificamos pela descrição ("MENSALIDADE ..." / "TAXA DE ADESÃO ...").
-    const ehMensalidade = (l: { contrato_id?: string | null; descricao?: string | null }) => {
-      if (l.contrato_id) return true;
-      const d = (l.descricao ?? "").toUpperCase();
-      return d.startsWith("MENSALIDADE") || d.includes("TAXA DE ADES");
-    };
-    const recMens = receitas.filter(l => l.status === "confirmado" && ehMensalidade(l));
-    const recebMensalidades = recMens.reduce((s, l) => s + Number(l.valor || 0), 0);
-    // Separa as mensalidades por tipo de cartão (Consulta x Desconto),
-    // olhando o convênio do contrato de cada lançamento.
-    const contratoIds = Array.from(new Set(recMens.map(l => l.contrato_id).filter(Boolean) as string[]));
-    const tipoPorContrato = new Map<string, string>();
-    if (contratoIds.length > 0) {
-      const { data: ctrRows } = await supabase
-        .from("contratos_assinatura").select("id,convenio_id").in("id", contratoIds);
-      const convIds = Array.from(new Set(((ctrRows ?? []) as Array<{ convenio_id: string | null }>)
-        .map(c => c.convenio_id).filter(Boolean) as string[]));
-      const nomePorConv = new Map<string, string>();
-      if (convIds.length > 0) {
-        const { data: convRows } = await supabase.from("cb_convenios").select("id,nome").in("id", convIds);
-        for (const c of (convRows ?? []) as Array<{ id: string; nome: string | null }>) {
-          nomePorConv.set(c.id, (c.nome ?? "").toUpperCase());
-        }
-      }
-      for (const c of (ctrRows ?? []) as Array<{ id: string; convenio_id: string | null }>) {
-        const nome = c.convenio_id ? (nomePorConv.get(c.convenio_id) ?? "") : "";
-        tipoPorContrato.set(c.id, nome.includes("DESCONTO") ? "desconto" : nome.includes("CONSULTA") ? "consulta" : "outros");
-      }
-    }
-    let mensConsulta = 0, qtdMensConsulta = 0, mensDesconto = 0, qtdMensDesconto = 0, mensOutros = 0, qtdMensOutros = 0;
-    for (const l of recMens) {
-      const v = Number(l.valor || 0);
-      const tipo = l.contrato_id ? (tipoPorContrato.get(l.contrato_id) ?? "outros") : "outros";
-      if (tipo === "desconto") { mensDesconto += v; qtdMensDesconto++; }
-      else if (tipo === "consulta") { mensConsulta += v; qtdMensConsulta++; }
-      else { mensOutros += v; qtdMensOutros++; }
-    }
-    const recebAtendimentos = recebRealizado - recebMensalidades;
-    const qtdRecebAtendimentos = qtdReceb - recMens.length;
-    const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
-    const pagAPagar = despesas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
-
-    const vendasTotal = atends.reduce((s, a) => s + Number(a.valor_total || 0), 0);
-    const comissoesPagas = atends.reduce((s, a) => s + Number(a.valor_medico || 0), 0);
-
-    // Pagamentos das fichas: consideramos pago o agendamento que tem
-    // recebimento confirmado no caixa (fin_lancamentos.agendamento_id) ou
-    // atendimento financeiro quitado. O status da agenda ("realizado") não
-    // significa pagamento — por isso antes tudo aparecia como "não pago".
-    const agIds = ags.map(x => x.id);
-    const pagosSet = new Set<string>();
-    if (agIds.length > 0) {
-      for (let i = 0; i < agIds.length; i += 500) {
-        const { data: pagosR } = await supabase
-          .from("fin_lancamentos")
-          .select("agendamento_id,status,tipo")
-          .eq("clinica_id", cid)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .in("agendamento_id", agIds.slice(i, i + 500));
-        for (const l of (pagosR ?? []) as Array<{ agendamento_id: string | null }>) {
-          if (l.agendamento_id) pagosSet.add(l.agendamento_id);
-        }
-      }
-    }
-    setPagosAgIds(pagosSet);
-    const pagos = contarGRs(ags.filter(x => pagosSet.has(x.id)));
-    const naoPagos = Math.max(0, total - pagos);
-
-    // Por médico
-    const porMedico = meds.map(m => {
-      const agendados = ags.filter(a => a.medico_id === m.id);
-      const pacIdsM = Array.from(new Set(agendados.map(a => a.paciente_id).filter(Boolean) as string[]));
+  const q = useQuery({
+    queryKey: ["dashboard-operacional", ids.join("|"), dia],
+    enabled,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const de = `${dia}T00:00:00`;
+      const ate = `${dia}T23:59:59`;
+      const [ags, senhas, alertas, caixas] = await Promise.all([
+        supabase.from("agendamentos")
+          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade")
+          .in("clinica_id", ids).gte("inicio", de).lte("inicio", ate).order("inicio"),
+        supabase.from("senhas")
+          .select("id,codigo,tipo,numero,status,emitida_em,guiche")
+          .in("clinica_id", ids).eq("data_dia", dia).order("emitida_em", { ascending: false }).limit(50),
+        supabase.from("alertas_enfermagem")
+          .select("id,titulo,paciente_nome,severidade,created_at")
+          .in("clinica_id", ids).eq("status", "aberto").order("created_at", { ascending: false }).limit(8),
+        supabase.from("caixa_sessoes")
+          .select("id,user_nome,aberto_em,valor_abertura")
+          .in("clinica_id", ids).eq("status", "aberto").order("aberto_em"),
+      ]);
       return {
-        nome: m.nome,
-        total: contarGRs(agendados),
-        pagos: contarGRs(agendados.filter(a => a.status === "realizado")),
-        novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
+        ags: (ags.data ?? []) as Ag[],
+        senhas: (senhas.data ?? []) as Senha[],
+        alertas: (alertas.data ?? []) as Alerta[],
+        caixas: (caixas.data ?? []) as CaixaSessao[],
       };
-    })
-      // "Médicos do dia": só entram profissionais com agenda no período ou
-      // com pagamento/atendimento lançado na data selecionada.
-      .filter(m => {
-        const med = meds.find(x => x.nome === m.nome);
-        const temMovimento = !!med && (
-          atends.some(at => at.medico_id === med.id) || lancs.some(l => l.medico_id === med.id)
-        );
-        return m.total > 0 || temMovimento;
-      })
-      .sort((a, b) => b.total - a.total);
+    },
+  });
 
-    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; agendamento_id: string | null; ficha_numero: number | null; created_at: string | null }>;
-    const qtdMensGR = grMensRows.length;
-    // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
-    const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
-    const nomePorMens = new Map<string, string>();
-    if (mensIds.length > 0) {
-      const { data: mens } = await supabase
-        .from("contrato_mensalidades").select("id,contrato_id").in("id", mensIds);
-      const contratoIds = Array.from(new Set(((mens ?? []) as Array<{ contrato_id: string | null }>).map(m => m.contrato_id).filter(Boolean) as string[]));
-      const nomePorContrato = new Map<string, string>();
-      if (contratoIds.length > 0) {
-        const { data: cts } = await supabase
-          .from("contratos_assinatura").select("id,paciente_nome").in("id", contratoIds);
-        for (const c of (cts ?? []) as Array<{ id: string; paciente_nome: string | null }>) {
-          nomePorContrato.set(c.id, c.paciente_nome ?? "—");
-        }
-      }
-      for (const m of (mens ?? []) as Array<{ id: string; contrato_id: string | null }>) {
-        nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
-      }
-    }
-    // Fallback do nome: algumas GRs de mensalidade não gravam mensalidade_id,
-    // mas guardam o agendamento — daí puxamos o paciente.
-    const agIdsGr = Array.from(new Set(grMensRows.map(g => g.agendamento_id).filter(Boolean) as string[]));
-    const nomePorAgGr = new Map<string, string>();
-    if (agIdsGr.length > 0) {
-      const { data: agsGr } = await supabase
-        .from("agendamentos").select("id,paciente_id").in("id", agIdsGr);
-      const pacIdsGr = Array.from(new Set(((agsGr ?? []) as Array<{ paciente_id: string | null }>).map(a => a.paciente_id).filter(Boolean) as string[]));
-      const nomePorPacGr = new Map<string, string>();
-      if (pacIdsGr.length > 0) {
-        const { data: pacsGr } = await supabase.from("pacientes").select("id,nome").in("id", pacIdsGr);
-        for (const p of (pacsGr ?? []) as Array<{ id: string; nome: string | null }>) nomePorPacGr.set(p.id, p.nome ?? "—");
-      }
-      for (const a of (agsGr ?? []) as Array<{ id: string; paciente_id: string | null }>) {
-        nomePorAgGr.set(a.id, (a.paciente_id && nomePorPacGr.get(a.paciente_id)) || "—");
-      }
-    }
-    setGrMensLista(grMensRows.map(g => ({
-      ficha: g.ficha_numero,
-      quando: g.created_at,
-      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id))
-        || (g.agendamento_id && nomePorAgGr.get(g.agendamento_id))
-        || "—",
-    })));
-    const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
-    const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
-    const caixaDoDia = recebidos
-      .filter(r => (r.data ?? "") >= periodo.de && (r.data ?? "") <= periodo.ate)
-      .reduce((s2, r) => s2 + Number(r.valor || 0), 0);
+  const refresh = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["dashboard-operacional"] });
+  }, [qc]);
+  useRealtimeRefresh(["agendamentos", "senhas", "alertas_enfermagem", "caixa_sessoes"], refresh, enabled);
 
-    setData({
-      alertas: alertasR.data ?? [],
-      // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
-      // GRs pagas no período: atendidos + pagos para outras datas + mensalidades do cartão.
-      grs: {
-        agendamentos: atendidos,
-        mensalidades: qtdMensGR,
-        outrosDias: Math.max(0, pagos - atendidos),
-        total: Math.max(pagos, atendidos) + qtdMensGR,
-      },
-      caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
-      agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
-      msgs: { enviadas: 0, respostas: 0, total: 0 },
-      conf: { presencas: atendidos, ausencias: faltas },
-      vendas: { total: vendasTotal, orcamentos: 0 },
-      pagamentos: { realizado: pagRealizado, aPagar: pagAPagar },
-      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length, atendimentos: recebAtendimentos, qtdAtendimentos: qtdRecebAtendimentos, mensConsulta, qtdMensConsulta, mensDesconto, qtdMensDesconto, mensOutros, qtdMensOutros },
-      comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
-      porMedico,
-    });
-    setRawAgs(ags as RawAg[]);
-    setRawLancs(lancs as RawLanc[]);
-    setRawAtends(atends as RawAtend[]);
-    const novosSet = new Set(pacIds.filter(p => !setExistentes.has(p)));
-    setNovosIds(novosSet);
-    setMedNomes(new Map(medsAll.map(m => [m.id, m.nome] as const)));
-    // Buscar nomes de pacientes
-    if (pacIds.length > 0) {
-      const { data: pacs } = await supabase.from("pacientes").select("id,nome").in("id", pacIds).limit(5000);
-      setPacNomes(new Map(((pacs ?? []) as { id: string; nome: string }[]).map(p => [p.id, p.nome] as const)));
-    } else {
-      setPacNomes(new Map());
-    }
-    setCarregando(false);
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, periodo.de, periodo.ate, medicosSel, especialidadesSel]);
-
-  if (loading) return <p className="text-muted-foreground">Carregando...</p>;
-
-  if (memberships.length === 0) {
-    return (
-      <div className="mx-auto mt-12 max-w-xl text-center">
-        <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Building2 className="h-7 w-7" />
-        </div>
-        <h1 className="text-2xl font-semibold">Bem-vindo ao ClinicaOS!</h1>
-        <p className="mt-2 text-muted-foreground">Para começar, crie sua primeira clínica.</p>
-        <Button asChild className="mt-6" size="lg"><Link to="/app/unidades">Criar minha primeira clínica</Link></Button>
-      </div>
-    );
-  }
-
-  const a = data.agend;
-
-  const fmtDt = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
-  const pacNome = (id: string | null) => (id ? (pacNomes.get(id) ?? "—") : "—");
-  const medNome = (id: string | null) => (id ? (medNomes.get(id) ?? "—") : "Sem profissional");
-  const moneyBRL = (n: number) => `R$ ${fmtMoney(Number(n || 0))}`;
-
-  const openDrill = (kind: string, ctx?: Record<string, string>) => {
-    setDrillBusca("");
-    if (kind === "alertas") {
-      setDrill({
-        title: `Central de alertas (${data.alertas.length})`,
-        columns: [{ key: "mensagem", label: "Mensagem" }],
-        rows: data.alertas.map(al => ({ mensagem: al.mensagem })),
-      });
-    } else if (kind.startsWith("agend")) {
-      const filtroFn = (g: RawAg) => {
-        if (kind === "agend_total") return true;
-        if (kind === "agend_atendidos") return g.status === "realizado";
-        if (kind === "agend_faltas") return g.status === "faltou";
-        if (kind === "agend_pagos") return pagosAgIds.has(g.id);
-        if (kind === "agend_naopagos") return !pagosAgIds.has(g.id);
-        return true;
-      };
-      const titulos: Record<string, string> = {
-        agend_total: "Todos os agendamentos",
-        agend_atendidos: "Agendamentos atendidos",
-        agend_faltas: "Faltas",
-        agend_pagos: "Agendamentos pagos",
-        agend_naopagos: "Agendamentos não pagos",
-      };
-      const lista = rawAgs.filter(filtroFn);
-      setDrill({
-        title: `${titulos[kind] ?? "Agendamentos"} (${lista.length})`,
-        columns: [
-          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
-          { key: "medico", label: "Profissional" }, { key: "proc", label: "Procedimento" },
-          { key: "status", label: "Status" },
-        ],
-        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
-      });
-    } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
-      // (mantido)
-      const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
-      const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
-      const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
-      setDrill({
-        title: `${titulos[kind]} (${lista.length})`,
-        columns: [{ key: "paciente", label: "Paciente" }, { key: "tipo", label: "Tipo" }],
-        rows: lista.map(p => ({ paciente: pacNome(p), tipo: novosIds.has(p) ? "Novo" : "Regular" })),
-      });
-    } else if (kind === "retornos") {
-      const lista = rawAgs.filter(g => (g.procedimento ?? "").toLowerCase().includes("retorno"));
-      setDrill({
-        title: `Retornos agendados (${lista.length})`,
-        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
-        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
-      });
-    } else if (kind === "retornos_sem") {
-      const lista = rawAgs.filter(g => !g.medico_id);
-      setDrill({
-        title: `Sem profissional definido (${lista.length})`,
-        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }],
-        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—" })),
-      });
-    } else if (kind === "conf_pres" || kind === "conf_aus" || kind === "conf_total") {
-      const lista = rawAgs.filter(g => kind === "conf_total" ? (g.status === "realizado" || g.status === "faltou") : kind === "conf_pres" ? g.status === "realizado" : g.status === "faltou");
-      const titulos: Record<string, string> = { conf_total: "Confirmações", conf_pres: "Presenças", conf_aus: "Ausências" };
-      setDrill({
-        title: `${titulos[kind]} (${lista.length})`,
-        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
-        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
-      });
-    } else if (kind === "vendas") {
-      setDrill({
-        title: `Vendas / atendimentos (${rawAtends.length})`,
-        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }, { key: "comissao", label: "Comissão médico", align: "right" }],
-        rows: rawAtends.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
-      });
-    } else if (kind.startsWith("pag_") || kind.startsWith("rec_")) {
-      const isRec = kind.startsWith("rec_");
-      const tipo = isRec ? "receita" : "despesa";
-      const status = kind.endsWith("real") ? "confirmado" : "pendente";
-      const lista = rawLancs.filter(l => l.tipo === tipo && l.status === status);
-      const tot = lista.reduce((s, l) => s + Number(l.valor || 0), 0);
-      const titulos: Record<string, string> = {
-        pag_real: "Pagamentos realizados", pag_apagar: "Pagamentos a pagar",
-        rec_real: "Recebimentos realizados", rec_areceber: "Recebimentos a receber",
-      };
-      setDrill({
-        title: `${titulos[kind] ?? "Lançamentos"} — ${moneyBRL(tot)} (${lista.length})`,
-        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }],
-        rows: lista.map(l => ({ medico: medNome(l.medico_id), status: l.status, valor: moneyBRL(l.valor) })),
-      });
-    } else if (kind === "comissoes") {
-      const lista = rawAtends.filter(at => Number(at.valor_medico || 0) > 0);
-      setDrill({
-        title: `Comissões (${lista.length})`,
-        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Atendimento", align: "right" }, { key: "comissao", label: "Comissão", align: "right" }],
-        rows: lista.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
-      });
-    } else if (kind === "medico" && ctx?.nome) {
-      const lista = rawAgs.filter(g => medNome(g.medico_id) === ctx.nome);
-      setDrill({
-        title: `Agendamentos — ${ctx.nome} (${lista.length})`,
-        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
-        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
-      });
-    } else if (kind === "grs_total" || kind === "grs_mens" || kind === "grs_outros") {
-      const rowsMens = grMensLista.map(m => ({
-        data: fmtDt(m.quando),
-        paciente: m.paciente,
-        proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
-        origem: "Mensalidade",
-      }));
-      const mapAg = (g: RawAg) => ({
-        data: fmtDt(g.inicio),
-        paciente: pacNome(g.paciente_id),
-        proc: g.procedimento ?? "—",
-        origem: g.status === "realizado" ? "Atendido" : "Pago p/ outro dia",
-      });
-      const rowsAtendidos = rawAgs.filter(g => g.status === "realizado").map(mapAg);
-      const rowsOutros = rawAgs.filter(g => g.status !== "realizado" && pagosAgIds.has(g.id)).map(mapAg);
-      const rows = kind === "grs_mens" ? rowsMens
-        : kind === "grs_outros" ? rowsOutros
-        : [...rowsAtendidos, ...rowsOutros, ...rowsMens];
-      setDrill({
-        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : kind === "grs_outros" ? "GRs pagas para outros dias" : "GRs pagas no período"} (${rows.length})`,
-        columns: [
-          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
-          { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
-        ],
-        rows,
-      });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Painel</h1>
-          <p className="text-sm text-muted-foreground">{clinicaAtual?.clinica.nome} {carregando && "• atualizando…"}</p>
-        </div>
-        <div className="flex items-end gap-2">
-          <MultiSelectFiltro
-            label="Profissional"
-            placeholder="Todos os profissionais"
-            options={medicosLista.filter(m =>
-              especialidadesSel.length === 0 ||
-              (medEspMap[m.id] ?? []).some(e => especialidadesSel.includes(e))
-            ).map(m => ({ value: m.id, label: m.nome }))}
-            selected={medicosSel}
-            onChange={setMedicosSel}
-            busca={buscaMed}
-            setBusca={setBuscaMed}
-          />
-          <MultiSelectFiltro
-            label="Especialidade"
-            placeholder="Todas as especialidades"
-            options={especialidadesLista.map(e => ({ value: e.id, label: e.nome }))}
-            selected={especialidadesSel}
-            onChange={setEspecialidadesSel}
-            busca={buscaEsp}
-            setBusca={setBuscaEsp}
-          />
-          <div className="space-y-1">
-            <Label className="text-xs">Período</Label>
-            <DateInputBR value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">até</Label>
-            <DateInputBR value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
-          </div>
-          <Button variant="outline" onClick={load}>Atualizar</Button>
-        </div>
-      </div>
-
-      {filtrosAtivos && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Filtros ativos:</span>
-          {medicosSel.map(id => {
-            const m = medicosLista.find(x => x.id === id);
-            if (!m) return null;
-            return (
-              <Badge key={`m-${id}`} variant="secondary" className="gap-1">
-                {m.nome}
-                <button onClick={() => setMedicosSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            );
-          })}
-          {especialidadesSel.map(id => {
-            const e = especialidadesLista.find(x => x.id === id);
-            if (!e) return null;
-            return (
-              <Badge key={`e-${id}`} variant="outline" className="gap-1">
-                {e.nome}
-                <button onClick={() => setEspecialidadesSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            );
-          })}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => { setMedicosSel([]); setEspecialidadesSel([]); }}
-          >
-            Limpar
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            ({medicosFiltradosIds.length} {medicosFiltradosIds.length === 1 ? "profissional" : "profissionais"})
-          </span>
-        </div>
-      )}
-
-      <KpiAnimContext.Provider value={uxMelhorias}>
-      <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
-        {/* Informações rápidas — lembrete para a equipe */}
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Informações rápidas</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Tire dúvidas sobre médicos, horários e valores de exames sem precisar lembrar de cor.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button asChild size="sm" variant="default" className="w-full justify-start">
-                <Link to="/app/consulta-rapida"><BookOpen className="h-4 w-4 mr-1 shrink-0" /> Abrir tabela</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="w-full justify-start">
-                <Link to="/app/nina"><Brain className="h-4 w-4 mr-1 shrink-0" /> Perguntar à Nina</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Alertas */}
-        <KpiCard icon={Bell} title="Central de Alertas" onClick={() => openDrill("alertas")}>
-          {data.alertas.length === 0
-            ? <p className="text-sm text-muted-foreground">Oba! Nenhum alerta.</p>
-            : <ul className="space-y-1 text-sm">{data.alertas.map(al => <li key={al.id} className="truncate">• {al.mensagem}</li>)}</ul>}
-        </KpiCard>
-
-        <KpiCard icon={CalendarDays} title="Agendamentos" value={a.total} format={fmtInt} onClick={() => openDrill("agend_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            No período filtrado · contado por GR (serviços do mesmo paciente no mesmo atendimento contam como 1)
-          </p>
-          <SubGrid items={[
-            { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
-            { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
-            { label: "Pagos", value: fmtInt(a.pagos), pct: pct(a.pagos, a.total), onClick: () => openDrill("agend_pagos") },
-            { label: "Não Pagos", value: fmtInt(a.naoPagos), pct: pct(a.naoPagos, a.total), onClick: () => openDrill("agend_naopagos") },
-          ]} />
-        </KpiCard>
-
-        <KpiCard icon={Receipt} title="GRs pagas no período" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Segue o filtro de Período acima
-          </p>
-          <SubGrid items={[
-            { label: "Atendidos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
-            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
-            { label: "Pagas para outros dias", value: fmtInt(data.grs.outrosDias), onClick: () => openDrill("grs_outros") },
-          ]} />
-        </KpiCard>
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Pagamentos no período" value={data.caixaDia.total} format={fmtMoney}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Recebimentos lançados no caixa dentro do período filtrado
-          </p>
-          <SubGrid items={[
-            { label: `Atendimentos (${fmtInt(data.recebimentos.qtdAtendimentos)})`, value: fmtMoney(data.recebimentos.atendimentos) },
-            { label: `Mensalidades do cartão (${fmtInt(data.recebimentos.qtdMensalidades)})`, value: fmtMoney(data.recebimentos.mensalidades) },
-          ]} />
-          <p className="text-[11px] text-muted-foreground">
-            Mensalidades por cartão — Consulta: {fmtMoney(data.recebimentos.mensConsulta)} ({fmtInt(data.recebimentos.qtdMensConsulta)})
-            {" · "}Desconto: {fmtMoney(data.recebimentos.mensDesconto)} ({fmtInt(data.recebimentos.qtdMensDesconto)})
-            {data.recebimentos.qtdMensOutros > 0 && <> {" · "}Outros: {fmtMoney(data.recebimentos.mensOutros)} ({fmtInt(data.recebimentos.qtdMensOutros)})</>}
-          </p>
-        </KpiCard>
-        )}
-
-        <KpiCard icon={Users} title="Pacientes distintos na agenda" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Quantas pessoas diferentes foram atendidas/marcadas no período (o card "Agendamentos" conta fichas/GRs, por isso é maior)
-          </p>
-          <SubGrid items={[
-            { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
-            { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
-          ]} />
-        </KpiCard>
-
-        <KpiCard icon={RotateCcw} title="Retornos" value={a.retornos} format={fmtInt} onClick={() => openDrill("retornos")}>
-          <SubGrid items={[
-            { label: "Sem Agenda", value: fmtInt(a.semAgenda), onClick: () => openDrill("retornos_sem") },
-            { label: "Agendados", value: fmtInt(a.retornos), onClick: () => openDrill("retornos") },
-          ]} />
-        </KpiCard>
-
-        <KpiCard icon={MessageCircle} title="Mensagens Enviadas" value={data.msgs.enviadas} format={fmtInt}>
-          <SubGrid items={[
-            { label: "Respostas", value: fmtInt(data.msgs.respostas) },
-            { label: "Total", value: fmtInt(data.msgs.total) },
-          ]} />
-        </KpiCard>
-
-        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" value={data.conf.presencas + data.conf.ausencias} format={fmtInt} onClick={() => openDrill("conf_total")}>
-          <SubGrid items={[
-            { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_pres") },
-            { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_aus") },
-          ]} />
-        </KpiCard>
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={Handshake} title="Vendas" value={data.vendas.total} format={fmtMoney} onClick={() => openDrill("vendas")}>
-          <SubGrid items={[
-            { label: "Conversão", value: "—" },
-            { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
-          ]} />
-        </KpiCard>
-        )}
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={CreditCard} title="Pagamentos" value={data.pagamentos.realizado + data.pagamentos.aPagar} format={fmtMoney} onClick={() => openDrill("pag_real")}>
-          <SubGrid items={[
-            { label: "Realizado", value: fmtMoney(data.pagamentos.realizado), onClick: () => openDrill("pag_real") },
-            { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar), onClick: () => openDrill("pag_apagar") },
-          ]} />
-        </KpiCard>
-        )}
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Recebimentos" value={data.recebimentos.realizado + data.recebimentos.aReceber} format={fmtMoney} onClick={() => openDrill("rec_real")}>
-          <SubGrid items={[
-            { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
-            { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
-          ]} />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Atendimentos: {fmtMoney(data.recebimentos.atendimentos)} ({fmtInt(data.recebimentos.qtdAtendimentos)})
-            {" · "}Mensalidades do cartão: {fmtMoney(data.recebimentos.mensalidades)} ({fmtInt(data.recebimentos.qtdMensalidades)})
-          </p>
-        </KpiCard>
-        )}
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={Receipt} title="Lançamentos de recebimento (Qtd.)" value={data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber} format={fmtInt} onClick={() => openDrill("rec_real")}>
-          <SubGrid items={[
-            { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
-            { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
-          ]} />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Conta lançamentos no caixa (não GRs). Sendo {fmtInt(data.recebimentos.qtdAtendimentos)} de atendimentos e {fmtInt(data.recebimentos.qtdMensalidades)} de mensalidades do cartão.
-          </p>
-        </KpiCard>
-        )}
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" value={data.comissoes.pagas} format={fmtMoney} onClick={() => openDrill("comissoes")}>
-          <SubGrid items={[
-            { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
-            { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
-          ]} />
-        </KpiCard>
-        )}
-      </div>
-      </KpiAnimContext.Provider>
-
-      {data.porMedico.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Médicos do dia — total de atendimentos</h2>
-          <KpiAnimContext.Provider value={uxMelhorias}>
-          <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
-            {data.porMedico.map((m) => (
-              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} value={m.total} format={fmtInt} small onClick={() => openDrill("medico", { nome: m.nome })}>
-                <SubGrid items={[
-                  { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
-                  { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
-                ]} />
-              </KpiCard>
-            ))}
-          </div>
-          </KpiAnimContext.Provider>
-        </div>
-      )}
-
-      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) { setDrill(null); setDrillBusca(""); } }}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
-          <Input
-            value={drillBusca}
-            onChange={(e) => setDrillBusca(e.target.value)}
-            placeholder="Filtrar por nome do paciente, procedimento..."
-            className="mb-2"
-          />
-          <div className="overflow-auto flex-1">
-            {(() => {
-              if (!drill) return null;
-              const termo = drillBusca.trim().toLowerCase();
-              const linhas = termo
-                ? drill.rows.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(termo)))
-                : drill.rows;
-              if (linhas.length === 0) {
-                return <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>;
-              }
-              return (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {drill.columns.map((c) => (
-                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {linhas.map((r, i) => (
-                    <TableRow key={i}>
-                      {drill.columns.map((c) => (
-                        <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              );
-            })()}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// Contexto que liga o count-up dos KPIs — provido pela flag ux_melhorias
-// (só São Francisco de Paula) uma única vez em DashboardPage.
-const KpiAnimContext = createContext(false);
-
-function KpiCard({ icon: Icon, title, value, format, small, children, onClick }: {
-  icon: ElementType; title: string; value?: number; format?: (n: number) => string;
-  small?: boolean; children?: React.ReactNode; onClick?: () => void;
-}) {
-  const animado = useContext(KpiAnimContext);
-  const big = value !== undefined && format
-    ? (animado ? <CountUpNumber value={value} format={format} /> : format(value))
-    : undefined;
-  return (
-    <Card className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 text-sm text-muted-foreground min-w-0 flex-1">
-            <Icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span className="line-clamp-2 leading-tight" title={title}>{title}</span>
-          </div>
-          {big !== undefined && <div className="text-xl lg:text-2xl font-semibold tabular-nums shrink-0 whitespace-nowrap">{big}</div>}
-        </div>
-        {children && <div className="mt-4 pt-3 border-t border-border">{children}</div>}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Anima o número de `from` (valor anterior, 0 no primeiro carregamento) até
- * `value`, reformatando a cada quadro. Respeita prefers-reduced-motion. */
-function CountUpNumber({ value, format }: { value: number; format: (n: number) => string }) {
-  const [display, setDisplay] = useState(0);
-  const prevRef = useRef(0);
-  useEffect(() => {
-    const from = prevRef.current;
-    const to = value;
-    prevRef.current = value;
-    const reduceMotion = typeof window !== "undefined"
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (from === to || reduceMotion) { setDisplay(to); return; }
-    const toIsInt = Number.isInteger(to);
-    const duration = 600;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const atual = from + (to - from) * eased;
-      setDisplay(t < 1 ? (toIsInt ? Math.round(atual) : atual) : to);
-      if (t < 1) raf = requestAnimationFrame(tick);
+  const d = q.data;
+  const k = useMemo(() => {
+    const ags = d?.ags ?? [];
+    const naFila = ags.filter((a) => ["recepcao", "caixa", "triagem"].includes(a.fluxo_etapa ?? ""));
+    const emAtend = ags.filter((a) => ["atendimento", "exame"].includes(a.fluxo_etapa ?? ""));
+    const checkins = ags.filter((a) => a.fluxo_etapa && a.fluxo_etapa !== "aguardando_recepcao");
+    return {
+      agendados: ags.length,
+      checkins: checkins.length,
+      naFila: naFila.length,
+      emAtend: emAtend.length,
+      concluidos: ags.filter((a) => a.status === "realizado" || a.fluxo_etapa === "finalizado").length,
+      faltas: ags.filter((a) => a.status === "faltou").length,
+      aguardando: ags.filter((a) => !a.fluxo_etapa || a.fluxo_etapa === "aguardando_recepcao").length,
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value]);
-  return <>{format(display)}</>;
-}
+  }, [d]);
 
-function SubGrid({ items }: { items: { label: string; value: string; pct?: string; onClick?: () => void }[] }) {
+  const proximos = useMemo(() => {
+    const agora = Date.now();
+    return (d?.ags ?? [])
+      .filter((a) => a.inicio && new Date(a.inicio).getTime() >= agora && !["cancelado", "realizado", "faltou"].includes(a.status))
+      .slice(0, 8);
+  }, [d]);
+
+  const filaAtual = useMemo(
+    () => (d?.ags ?? []).filter((a) => ["recepcao", "caixa", "triagem", "atendimento", "exame"].includes(a.fluxo_etapa ?? "")).slice(0, 10),
+    [d],
+  );
+
+  const senhasAguardando = (d?.senhas ?? []).filter((s) => s.status === "emitida");
+  const ultimaChamada = (d?.senhas ?? []).find((s) => s.status === "chamada");
+
+  const carregando = loading || q.isLoading;
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {items.map((it) => (
-        <div
-          key={it.label}
-          onClick={it.onClick ? (e) => { e.stopPropagation(); it.onClick!(); } : undefined}
-          className={it.onClick ? "cursor-pointer rounded px-1 -mx-1 hover:bg-accent" : ""}
-        >
-          <div className="text-xs text-muted-foreground">{it.label}</div>
-          <div className="text-sm font-medium tabular-nums">
-            {it.value}{it.pct && <span className="ml-1 text-xs text-muted-foreground">{it.pct}</span>}
+    <div className="flex flex-col h-full min-h-0 overflow-y-auto bg-slate-50/60">
+      <HhpPageHeader
+        title="Dashboard operacional"
+        eyebrow={`${clinicaAtual?.clinica.nome ?? "Clínica"} · ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}`}
+        actions={
+          <>
+            <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> ao vivo
+            </span>
+            <Button variant="outline" size="sm" onClick={refresh} disabled={q.isFetching}>
+              <RefreshCw className={cn("h-4 w-4 mr-1.5", q.isFetching && "animate-spin")} /> Atualizar
+            </Button>
+          </>
+        }
+      />
+
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+        {/* Atalhos rápidos */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+          <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
+          <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
+          <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
+          <Atalho to="/app/caixa" icon={Banknote} label="Caixa" />
+          <Atalho to="/app/clientes" icon={Search} label="Buscar paciente" />
+          <Atalho to="/app/fluxo" icon={Stethoscope} label="Fluxo do paciente" />
+        </div>
+
+        {/* KPIs operacionais do dia */}
+        {carregando ? (
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+          </div>
+        ) : (
+          <HhpKpiRow>
+            <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
+            <HhpKpiCard label="Check-ins feitos" value={k.checkins} icon={UserCheck} tone="ok" hint="Pacientes que já chegaram" />
+            <HhpKpiCard label="Aguardando chegada" value={k.aguardando} icon={Clock} tone="default" />
+            <HhpKpiCard label="Na fila" value={k.naFila} icon={ListChecks} tone="warn" hint="Recepção, caixa e triagem" />
+            <HhpKpiCard label="Em atendimento" value={k.emAtend} icon={Activity} tone="info" />
+            <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
+          </HhpKpiRow>
+        )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {/* Fila ao vivo */}
+          <Painel
+            title="Fila ao vivo"
+            subtitle="Pacientes dentro da clínica agora"
+            action={<LinkMais to="/app/fluxo" />}
+            className="xl:col-span-2"
+          >
+            {carregando ? <Linhas /> : filaAtual.length === 0 ? (
+              <HhpEmptyState icon={Users} title="Ninguém na fila" description="Assim que um paciente fizer check-in ele aparece aqui em tempo real." />
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {filaAtual.map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-xs tabular-nums text-slate-400 w-11 shrink-0">{hhmm(a.inicio)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-slate-800 truncate">{a.paciente_nome ?? "Paciente"}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{a.procedimento ?? "—"}</div>
+                    </div>
+                    {a.prioridade && a.prioridade !== "normal" && (
+                      <Badge variant="destructive" className="text-[10px]">{a.prioridade}</Badge>
+                    )}
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
+                      {ETAPA_LABEL[a.fluxo_etapa ?? ""] ?? a.fluxo_etapa}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Painel>
+
+          {/* Senhas */}
+          <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />}>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
+                <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
+              </div>
+              {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {senhasAguardando.slice(0, 6).map((s) => (
+                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                      <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
+                      <span className="text-[11px] text-slate-400">{hhmm(s.emitida_em)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Painel>
+
+          {/* Próximos atendimentos */}
+          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />} className="xl:col-span-2">
+            {carregando ? <Linhas /> : proximos.length === 0 ? (
+              <HhpEmptyState icon={CalendarPlus} title="Nada mais agendado hoje" description="Use os atalhos acima para criar um novo agendamento." />
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {proximos.map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-sm font-semibold tabular-nums text-slate-700 w-12 shrink-0">{hhmm(a.inicio)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-slate-800 truncate">{a.paciente_nome ?? "Paciente"}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{a.procedimento ?? "—"}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{a.status}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Painel>
+
+          {/* Alertas + caixa */}
+          <div className="space-y-4">
+            <Painel title="Alertas imediatos" subtitle="Enfermagem e faltas" action={<LinkMais to="/app/alertas-enfermagem" />}>
+              <div className="p-4 space-y-2">
+                {k.faltas > 0 && (
+                  <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-100 px-3 py-2">
+                    <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                    <span className="text-xs text-rose-700">{k.faltas} falta(s) registrada(s) hoje</span>
+                  </div>
+                )}
+                {(d?.alertas ?? []).map((a) => (
+                  <div key={a.id} className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-amber-800 truncate">{a.titulo ?? "Alerta"}</div>
+                      <div className="text-[11px] text-amber-700/80 truncate">{a.paciente_nome ?? "—"}</div>
+                    </div>
+                  </div>
+                ))}
+                {!carregando && k.faltas === 0 && (d?.alertas ?? []).length === 0 && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                    <CheckCircle2 className="h-4 w-4" /> Nenhum alerta em aberto.
+                  </div>
+                )}
+              </div>
+            </Painel>
+
+            <Painel title="Caixas abertos" subtitle="Operadores em turno" action={<LinkMais to="/app/caixa" />}>
+              <div className="p-4 space-y-2">
+                {carregando ? <Linhas n={2} /> : (d?.caixas ?? []).length === 0 ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Wallet className="h-4 w-4" /> Nenhum caixa aberto no momento.
+                  </div>
+                ) : (
+                  (d?.caixas ?? []).map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                      <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
+                      <span className="text-[11px] text-slate-400">desde {hhmm(c.aberto_em)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Painel>
           </div>
         </div>
-      ))}
+
+        <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+          <Megaphone className="h-3.5 w-3.5" />
+          Indicadores estratégicos, financeiros e comparativos estão no{" "}
+          <Link to="/app/painel-executivo" className="underline underline-offset-2 hover:text-slate-600">Painel Executivo</Link>.
+        </p>
+      </div>
     </div>
   );
 }
 
-function MultiSelectFiltro({
-  label, placeholder, options, selected, onChange, busca, setBusca,
-}: {
-  label: string;
-  placeholder: string;
-  options: { value: string; label: string }[];
-  selected: string[];
-  onChange: (v: string[]) => void;
-  busca: string;
-  setBusca: (v: string) => void;
-}) {
-  const filtradas = busca.trim()
-    ? options.filter(o => o.label.toLowerCase().includes(busca.toLowerCase()))
-    : options;
-  const toggle = (v: string) => {
-    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
-  };
-  const resumo = selected.length === 0
-    ? placeholder
-    : selected.length === 1
-      ? options.find(o => o.value === selected[0])?.label ?? "1 selecionado"
-      : `${selected.length} selecionados`;
+function Atalho({ to, icon: Icon, label }: { to: string; icon: typeof Users; label: string }) {
   return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="w-56 justify-between font-normal">
-            <span className="flex items-center gap-2 truncate">
-              <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="truncate">{resumo}</span>
-            </span>
-            {selected.length > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{selected.length}</Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="end">
-          <div className="p-2 border-b">
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder={`Buscar ${label.toLowerCase()}...`}
-              className="h-8"
-            />
-          </div>
-          <div className="max-h-72 overflow-y-auto p-1">
-            {filtradas.length === 0 ? (
-              <p className="p-3 text-sm text-muted-foreground text-center">Nada encontrado.</p>
-            ) : (
-              filtradas.map(o => {
-                const checked = selected.includes(o.value);
-                return (
-                  <label
-                    key={o.value}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
-                  >
-                    <Checkbox checked={checked} onCheckedChange={() => toggle(o.value)} />
-                    <span className="truncate">{o.label}</span>
-                  </label>
-                );
-              })
-            )}
-          </div>
-          {selected.length > 0 && (
-            <div className="p-2 border-t flex justify-end">
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange([])}>
-                Limpar seleção
-              </Button>
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
+    <Link
+      to={to as never}
+      className="group flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-slate-200 hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
+    >
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="text-xs font-medium text-slate-700 leading-tight">{label}</span>
+    </Link>
+  );
+}
+
+function Painel({
+  title, subtitle, action, children, className,
+}: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={cn("rounded-2xl border border-slate-100 bg-white overflow-hidden", className)}>
+      <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
+          {subtitle && <p className="text-[11px] text-slate-400 truncate">{subtitle}</p>}
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function LinkMais({ to }: { to: string }) {
+  return (
+    <Link to={to as never} className="text-[11px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 shrink-0">
+      abrir <ArrowRight className="h-3 w-3" />
+    </Link>
+  );
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: number | string; tone: "warn" | "info" }) {
+  return (
+    <div className={cn("rounded-xl px-3 py-2", tone === "warn" ? "bg-amber-50" : "bg-sky-50")}>
+      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">{label}</div>
+      <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>
+    </div>
+  );
+}
+
+function Linhas({ n = 5 }: { n?: number }) {
+  return (
+    <div className="p-4 space-y-2">
+      {Array.from({ length: n }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
     </div>
   );
 }
