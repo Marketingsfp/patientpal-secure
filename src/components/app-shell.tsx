@@ -361,7 +361,6 @@ export function AppShell() {
         .catch(() => {});
     }
   };
-  const lastArrowNavAtRef = useRef(0);
   // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
   // aberta pelo botão hamburguer do cabeçalho (drawer).
   const collapsed = false;
