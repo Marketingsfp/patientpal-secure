@@ -575,6 +575,17 @@ function ClientesPage() {
                         </Link>
                       </Button>
                     )}
+                    {podeEscrever && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Excluir cliente"
+                        disabled={excluindoId === p.id}
+                        onClick={() => void excluirCliente(p)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
