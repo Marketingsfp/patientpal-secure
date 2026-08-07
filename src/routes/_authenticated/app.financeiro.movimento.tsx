@@ -1228,6 +1228,39 @@ function Page() {
         caixaMovimentoId={estornoSangria?.id ?? null}
         onCreated={() => { setEstornoSangria(null); load(); }}
       />
+      <AlertDialog open={!!confirmDel} onOpenChange={(v) => { if (!v && !deleting) setConfirmDel(null); }}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              Excluir lançamento
+            </AlertDialogTitle>
+            <AlertDialogDescription className="pt-1">
+              Esta ação não pode ser desfeita. O lançamento abaixo será removido definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {confirmDel && (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-medium leading-snug">{confirmDel.descricao}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {new Date(`${confirmDel.data}T00:00:00`).toLocaleDateString("pt-BR")} · {fmt(Number(confirmDel.valor))}
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
