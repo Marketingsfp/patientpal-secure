@@ -1169,6 +1169,9 @@ export function AppShell() {
             side="left"
             className="w-[280px] p-0 border-0 text-white overflow-y-auto lg:hidden sidebar-scroll"
             style={{ backgroundColor: corSidebar }}
+            onPointerDownOutside={() => setMobileNavOpen(false)}
+            onInteractOutside={() => setMobileNavOpen(false)}
+            onEscapeKeyDown={() => setMobileNavOpen(false)}
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
