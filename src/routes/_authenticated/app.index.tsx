@@ -35,7 +35,7 @@ function PortalLauncher() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-4 py-14 overflow-hidden bg-linear-to-b from-slate-50 via-white to-slate-100">
+    <div className="relative w-full max-w-none min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-4 sm:px-8 lg:px-12 py-14 overflow-hidden bg-linear-to-b from-slate-50 via-white to-slate-100">
       {/* Ambiência: luzes suaves de fundo */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-indigo-400/20 blur-[120px]" />
@@ -44,7 +44,7 @@ function PortalLauncher() {
         <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgb(15_23_42/0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgb(15_23_42/0.04)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
       </div>
 
-      <div className="relative w-full max-w-5xl">
+      <div className="relative w-full max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur-sm">
             Bem-vindo de volta
@@ -57,7 +57,7 @@ function PortalLauncher() {
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:gap-8">
           {PORTAIS.map((portal) => {
             const Icon = portal.icon;
             return (
