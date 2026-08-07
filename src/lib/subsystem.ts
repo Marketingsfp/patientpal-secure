@@ -3,13 +3,15 @@ export type SubsystemId = "recepcao" | "gestao-pessoas";
 const KEY = "appshell:subsystem";
 const EVT = "subsystem-change";
 
-export const SUBSYSTEMS: Record<SubsystemId, { label: string; groups: string[] }> = {
+export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; groups: string[] }> = {
   "recepcao": {
-    label: "Gestor Clínico",
-    groups: ["Operação", "Cartão Benefícios", "Inteligência", "Marketing", "Cadastros", "Recursos Humanos", "Gestão", "Configurações"],
+    label: "Clínica Médica",
+    home: "/app/agenda",
+    groups: ["Operação", "Cartão Benefícios", "Inteligência", "Marketing", "Cadastros", "Gestão", "Configurações"],
   },
   "gestao-pessoas": {
-    label: "Gestão de Pessoas",
+    label: "Funcionários / RH",
+    home: "/app/hr-ponto",
     groups: ["Recursos Humanos", "Gestão", "Configurações"],
   },
 };
