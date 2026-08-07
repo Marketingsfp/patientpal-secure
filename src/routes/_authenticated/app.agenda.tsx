@@ -9167,6 +9167,15 @@ function AgendaPage() {
                               {podeEscrever && !ehLivre && (
                                 <>
                                   <DropdownMenuSeparator />
+                                  {(a.tipo_atendimento ?? "particular") === "convenio" && (
+                                    <DropdownMenuItem
+                                      onClick={() => alternarAutorizacaoConvenio(a)}
+                                      className={a.convenio_autorizado ? "text-muted-foreground" : "text-emerald-600"}
+                                    >
+                                      <ShieldCheck className="h-4 w-4 mr-2" />
+                                      {a.convenio_autorizado ? "Remover autorização do convênio" : "Autorizar convênio"}
+                                    </DropdownMenuItem>
+                                  )}
                                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                                     <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                                       <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
