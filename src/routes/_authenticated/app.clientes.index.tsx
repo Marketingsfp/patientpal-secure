@@ -538,7 +538,7 @@ function ClientesPage() {
                   checked={filtrados.length > 0 && selecionados.length === filtrados.length
                     ? true
                     : selecionados.length > 0 ? "indeterminate" : false}
-                  onCheckedChange={(v) => setSelecionados(v ? filtrados.map((p) => p.id) : [])}
+                  onCheckedChange={(v: boolean | "indeterminate") => setSelecionados(v ? filtrados.map((p) => p.id) : [])}
                 />
               </TableHead>
               <TableHead className="w-28">Prontuário</TableHead>
@@ -581,7 +581,7 @@ function ClientesPage() {
                   <Checkbox
                     aria-label={`Selecionar ${p.nome}`}
                     checked={selecionados.includes(p.id)}
-                    onCheckedChange={(v) => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
+                    onCheckedChange={(v: boolean | "indeterminate") => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
                   />
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
