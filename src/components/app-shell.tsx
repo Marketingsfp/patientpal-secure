@@ -874,7 +874,7 @@ export function AppShell() {
             )}
             {searchedNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
-                const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
+                const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(`${to}/`));
                 if (!pathOk) return false;
                 if (!hash) return true;
                 return (location.hash ?? "").replace(/^#/, "") === hash;
@@ -992,7 +992,7 @@ export function AppShell() {
                       const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
                       const active =
                         location.pathname === item.to ||
-                        (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
+                        (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`)) ||
                         aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                       const href = item.to;
                       return (
@@ -1229,7 +1229,7 @@ export function AppShell() {
                       );
                     }
                     const active =
-                      location.pathname === item.to || (item.to !== "/app" && location.pathname.startsWith(item.to));
+                      location.pathname === item.to || (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`));
                     return (
                       <a
                         key={item.to}
