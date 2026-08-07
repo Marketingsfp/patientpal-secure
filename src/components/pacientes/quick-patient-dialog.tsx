@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ export function QuickPatientDialog({
   onCreated,
 }: QuickPatientDialogProps) {
   const [nome, setNome] = useState("");
+  const [erroNome, setErroNome] = useState<string | null>(null);
   const [cpf, setCpf] = useState("");
   const [dataNasc, setDataNasc] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -52,6 +54,7 @@ export function QuickPatientDialog({
   useEffect(() => {
     if (open) {
       setNome((nomeInicial ?? "").trim());
+      setErroNome(null);
       setCpf("");
       setDataNasc("");
       setTelefone("");
@@ -62,11 +65,14 @@ export function QuickPatientDialog({
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
-    const nomeLimpo = nome.trim();
-    if (nomeLimpo.length < 3) {
-      toast.error("Informe o nome completo do paciente.");
+    const vNome = validarNomePessoa(nome);
+    if (!vNome.valido || vNome.valor.length < 3) {
+      const msg = vNome.mensagem ?? "Informe o nome completo do paciente.";
+      setErroNome(msg);
+      toast.error(msg);
       return;
     }
+    const nomeLimpo = vNome.valor;
     if (cpf && !isCPFValido(cpf)) {
       toast.error("CPF inválido.");
       return;
@@ -145,9 +151,14 @@ export function QuickPatientDialog({
             <Input
               autoFocus
               value={nome}
-              onChange={(e) => setNome(e.target.value)}
+              onChange={(e) => {
+                setErroNome(erroCaractereNome(e.target.value));
+                setNome(sanitizarNomePessoa(e.target.value));
+              }}
               placeholder="Nome do paciente"
+              maxLength={200}
             />
+            {erroNome && <p className="text-xs text-destructive mt-1">{erroNome}</p>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
