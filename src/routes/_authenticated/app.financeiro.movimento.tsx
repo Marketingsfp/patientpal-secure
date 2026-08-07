@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download, Undo2, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download, Undo2, Printer, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -1264,6 +1264,46 @@ function Page() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={!!confirmEst} onOpenChange={(v) => { if (!v) setConfirmEst(null); }}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+              Confirmar Estorno
+            </AlertDialogTitle>
+            <AlertDialogDescription className="pt-1">
+              O lançamento abaixo será marcado como estornado e o atendimento vinculado voltará a ficar pendente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {confirmEst && (
+            <div className="space-y-2">
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                <p className="font-medium leading-snug">{confirmEst.lanc.descricao}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {new Date(`${confirmEst.lanc.data}T00:00:00`).toLocaleDateString("pt-BR")}
+                </p>
+                <p className="mt-2 text-base font-semibold tabular-nums">{fmt(Number(confirmEst.lanc.valor))}</p>
+              </div>
+              {confirmEst.aviso && (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700">
+                  {confirmEst.aviso}
+                </p>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void executarEstorno(); }}
+              className="bg-amber-600 text-white hover:bg-amber-600/90"
+            >
+              Confirmar Estorno
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
