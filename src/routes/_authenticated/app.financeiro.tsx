@@ -2,14 +2,9 @@ import { createFileRoute, Link, Outlet, useLocation, Navigate } from "@tanstack/
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight, Stethoscope,
+  Sparkles, AlertTriangle, Undo2, Stethoscope,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { cn } from "@/lib/utils";
 
@@ -39,26 +34,6 @@ const subnav = [
 function FinLayout() {
   const location = useLocation();
   const { allowed, configured } = usePermissoes();
-  // Altura de tela correta em navegador mobile (barra de endereço) e
-  // submenu responsivo (vira barra horizontal no celular) — piloto São
-  // Francisco de Paula (flag ux_melhorias).
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const isMobile = useIsMobile();
-  const modoMobile = uxMelhorias && isMobile;
-  // ATENÇÃO: todos os hooks (useState/useEffect) precisam ficar ACIMA de
-  // qualquer `return` condicional. O redirecionamento de rota-pai abaixo é um
-  // early-return que, se colocado antes destes hooks, muda a quantidade de
-  // hooks entre renders quando as permissões carregam (Set vazio → Set final),
-  // violando as Rules of Hooks e derrubando a tela com o error boundary.
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("fin-subnav:collapsed") === "1";
-  });
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("fin-subnav:collapsed", collapsed ? "1" : "0");
-  }, [collapsed]);
-
   // Filtra as abas do submenu com base nas permissões do perfil.
   // - Admin (allowed === null) vê tudo.
   // - Cada aba mapeia para um módulo via ROUTE_TO_MODULE (moduloDaRota).
@@ -87,106 +62,34 @@ function FinLayout() {
     return <Navigate to={primeiraAbaSub.to} replace />;
   }
   return (
-    <TooltipProvider delayDuration={300}>
-    <div className={cn(
-      "gap-3 -m-4",
-      modoMobile ? "flex flex-col" : "flex",
-      uxMelhorias ? "h-[calc(100dvh-4rem)]" : "h-[calc(100vh-4rem)]",
-    )}>
-      <aside className={cn(
-        "bg-card p-2 shrink-0 transition-all duration-200",
-        modoMobile
-          ? "w-full border-b border-border overflow-x-auto"
-          : cn(
-              collapsed ? "w-12" : "w-48",
-              "relative overflow-y-auto h-full border-r border-border/70",
-              "after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-px",
-              "after:bg-gradient-to-b after:from-transparent after:via-border after:to-transparent",
-              "shadow-[1px_0_0_0_hsl(var(--background))]",
-            ),
-      )}>
-        {!modoMobile && (
-          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
-            {!collapsed && (
-              <p className="px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Financeiro
-              </p>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setCollapsed((v) => !v)}
-              title={collapsed ? "Expandir menu" : "Recolher menu"}
-              aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </div>
-        )}
-        <nav className={modoMobile ? "flex items-center gap-1.5" : "space-y-0.5"}>
+    <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col">
+      <div className="shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
+        <nav className="flex items-center gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:thin]">
           {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
-            // Barra horizontal no celular: sempre ícone + rótulo, sem o
-            // estado "recolhido" (não faz sentido numa faixa que já rola).
-            if (modoMobile) {
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`flex items-center gap-1.5 shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors ${
-                    active
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-foreground/70 hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </Link>
-              );
-            }
-            if (collapsed) {
-              return (
-                <Tooltip key={item.to}>
-                  <TooltipTrigger asChild>
-                    <Link
-                      to={item.to}
-                      className={`flex items-center justify-center rounded-md h-9 w-9 mx-auto transition-colors ${
-                        active
-                          ? "bg-primary/10 text-primary"
-                          : "text-foreground/70 hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      <item.icon className="h-4 w-4" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
-                </Tooltip>
-              );
-            }
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors ${
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition-colors",
                   active
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-foreground/70 hover:bg-muted hover:text-foreground"
-                }`}
+                    ? "bg-primary/10 font-medium text-primary shadow-xs"
+                    : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-      </aside>
-      <div className={cn("flex-1 p-3 overflow-auto min-w-0", !modoMobile && "h-full")}>
+      </div>
+      <div className="min-w-0 flex-1 overflow-auto p-3">
         <Outlet />
       </div>
     </div>
-    </TooltipProvider>
   );
 }
