@@ -531,6 +531,15 @@ function ClientesPage() {
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
             <TableRow className="bg-muted">
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Selecionar todos"
+                  checked={filtrados.length > 0 && selecionados.length === filtrados.length
+                    ? true
+                    : selecionados.length > 0 ? "indeterminate" : false}
+                  onCheckedChange={(v) => setSelecionados(v ? filtrados.map((p) => p.id) : [])}
+                />
+              </TableHead>
               <TableHead className="w-28">Prontuário</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead className="w-36">CPF</TableHead>
@@ -544,14 +553,14 @@ function ClientesPage() {
           <TableBody>
             {loading ? (
               <TableSkeletonRows
-                cols={8}
-                fallback={<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
+                cols={9}
+                fallback={<TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
               />
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="p-0">
+                <TableCell colSpan={9} className="p-0">
                   <EmptyState
                     icon={<Users className="h-10 w-10" />}
                     titulo="Nenhum cliente encontrado."
@@ -566,7 +575,14 @@ function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : filtrados.map(p => (
-              <TableRow key={p.id} className="h-12">
+              <TableRow key={p.id} className="h-12" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
+                <TableCell className="w-10">
+                  <Checkbox
+                    aria-label={`Selecionar ${p.nome}`}
+                    checked={selecionados.includes(p.id)}
+                    onCheckedChange={(v) => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
+                  />
+                </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
                 <TableCell className="max-w-[320px] font-medium">
                   <div className="flex min-w-0 items-center gap-2">
