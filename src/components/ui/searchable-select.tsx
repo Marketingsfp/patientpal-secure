@@ -42,12 +42,17 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn(
+            "w-full justify-between font-normal disabled:opacity-100",
+            className,
+          )}
         >
           <span
             className={cn(
-              "truncate text-left",
-              selected ? "text-foreground font-medium" : "text-muted-foreground",
+              "truncate text-left opacity-100",
+              selected
+                ? "text-slate-900 dark:text-slate-50 font-medium"
+                : "text-muted-foreground",
             )}
           >
             {selected ? selected.label : placeholder}
