@@ -321,6 +321,61 @@ const BASE_CSS = `
     text-align: center;
     padding: 2px 0 4px;
   }
+  /* ---- Refino visual da GR (cards, grid de paciente, tabela e totais) ----
+     Fundos claros precisam de print-color-adjust para não sumirem no PDF. */
+  .card, .titulo-guia, .tbl-serv th, .box-total, .chip {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .titulo-guia {
+    background: #000; color: #fff;
+    text-align: center; text-transform: uppercase;
+    font-size: 11pt; font-weight: 800; letter-spacing: 0.16em;
+    padding: 3px 0; border-radius: 2px; margin: 6px 0;
+  }
+  .card {
+    background: #f2f2f2; border: 1px solid #000;
+    border-radius: 3px; padding: 5px 6px; margin: 5px 0;
+  }
+  .card + .card { margin-top: 4px; }
+  .nome-paciente {
+    text-align: center; font-size: 11.5pt; font-weight: 800;
+    text-transform: uppercase; line-height: 1.2;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 6px; margin-top: 4px; }
+  .grid2 .full { grid-column: 1 / -1; }
+  .campo { min-width: 0; }
+  .campo .k {
+    display: block; font-size: 7pt; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75;
+  }
+  .campo .v2 { display: block; font-size: 9.5pt; font-weight: 700; line-height: 1.2; }
+  .tbl-serv { margin-top: 2px; }
+  .tbl-serv th {
+    background: #000; color: #fff; font-size: 7.5pt; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 4px; text-align: left;
+  }
+  .tbl-serv th.right, .tbl-serv td.right { text-align: right; }
+  .tbl-serv td { padding: 3px 4px; border-bottom: 1px dotted #999; font-weight: 700; font-size: 9.5pt; }
+  .tbl-serv tr:last-child td { border-bottom: 0; }
+  .box-total {
+    background: #f2f2f2; border: 1.5px solid #000; border-radius: 3px;
+    padding: 6px; margin-top: 6px;
+  }
+  .box-total .linha-principal {
+    display: grid; grid-template-columns: minmax(0,1fr) auto;
+    align-items: end; gap: 6px;
+  }
+  .box-total .valor-grande { font-size: 16pt; font-weight: 800; letter-spacing: 0.01em; }
+  .box-total .divisao { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px; }
+  .rodape-guia {
+    margin-top: 6px; border-top: 1px solid #000; padding-top: 4px;
+    display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px;
+    font-size: 8pt; font-weight: 600;
+  }
+  @media print {
+    .ticket { page-break-inside: avoid; break-inside: avoid; }
+  }
   ${VIA_CSS}
 `;
 
