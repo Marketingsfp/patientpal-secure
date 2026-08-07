@@ -65,9 +65,9 @@ export function SearchableMultiSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal min-h-10 h-auto py-2", className)}
+          className={cn("w-full justify-between font-normal min-h-10 h-auto py-2 disabled:opacity-100", className)}
         >
-          <span className="min-w-0 flex-1 text-left text-sm leading-5 text-foreground font-medium">
+          <span className="min-w-0 flex-1 text-left text-sm leading-5 text-slate-900 dark:text-slate-50 font-medium opacity-100">
             {selectedLabels.length > 0 ? (
               <span className="line-clamp-2">
                 {selectedLabels.join(" + ")}
