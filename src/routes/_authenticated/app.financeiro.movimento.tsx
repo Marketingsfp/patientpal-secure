@@ -1088,7 +1088,9 @@ function Page() {
                               ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
                               : l.tipo === "receita" ? "text-green-600" : "text-red-600"
                           }`}>
-                            {l.tipo === "transferencia" ? (l.transferSentido === "entrada" ? "↑" : "↓") : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}
+                             <span className="whitespace-nowrap inline-block">
+                               {`${l.tipo === "transferencia" ? (l.transferSentido === "entrada" ? "↑" : "↓") : (l.tipo === "receita" ? "+" : "-")}\u00A0${fmt(Number(l.valor))}`}
+                             </span>
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -1160,14 +1162,17 @@ function Page() {
                     <TableCell className="text-sm text-right tabular-nums">{typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                     <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
-                    <TableCell className={`text-right font-medium ${
+                     <TableCell className={`text-right font-medium whitespace-nowrap ${
                       l.tipo === "transferencia"
                         ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
                         : l.tipo === "receita" ? "text-green-600" : "text-red-600"
                     }`}>
-                      {l.tipo === "transferencia"
-                        ? (l.transferSentido === "entrada" ? "↑" : "↓")
-                        : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
+                      <span className="whitespace-nowrap inline-block">
+                        {`${l.tipo === "transferencia"
+                          ? (l.transferSentido === "entrada" ? "↑" : "↓")
+                          : (l.tipo === "receita" ? "+" : "-")}\u00A0${fmt(Number(l.valor))}`}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-0.5">
                         {podeEstornar && !l._mistoParte && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
