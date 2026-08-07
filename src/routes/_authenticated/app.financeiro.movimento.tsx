@@ -577,7 +577,13 @@ function Page() {
       : ehSombraLegado
         ? "\n\nEste atendimento foi pago em grupo (pagamento antigo). Ao estornar, o valor total do lançamento principal NÃO é ajustado automaticamente — se necessário, ajuste manualmente o lançamento principal do grupo."
         : "";
-    if (!confirm(`Estornar "${l.descricao}" no valor de ${fmt(Number(l.valor))}?${avisoGrupo}`)) return;
+    setConfirmEst({ lanc: l, aviso: avisoGrupo.trim() });
+  };
+
+  const executarEstorno = async () => {
+    const l = confirmEst?.lanc;
+    if (!l) return;
+    setConfirmEst(null);
     setEstornando(l.id);
     try {
       const { data: lanc, error: eLanc } = await supabase
