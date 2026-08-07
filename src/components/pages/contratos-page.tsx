@@ -2637,9 +2637,9 @@ function DetalheContrato({
     }
   };
 
-  const descartarRascunhos = () => {
+  const descartarRascunhos = async () => {
     if (totalRascunhos === 0) return;
-    if (!await confirmDialog("Descartar todas as alterações não salvas?")) return;
+    if (!(await confirmDialog("Descartar todas as alterações não salvas?"))) return;
     setRascunhos({});
   };
 
