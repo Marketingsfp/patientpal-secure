@@ -670,27 +670,8 @@ export function AppShell() {
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
-  // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
-  const flatNavLeaves = useMemo(() => {
-    const leaves: string[] = [];
-    for (const row of visibleNavRows) {
-      const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
-      if (!open) continue;
-      for (const item of row.items) {
-        if (isParent(item)) {
-          const subKey = `${row.label}::${item.label}`;
-          const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
-          if (!subOpen) continue;
-          for (const c of item.children) leaves.push(c.to);
-        } else {
-          leaves.push(item.to);
-        }
-      }
-    }
-    return leaves;
-  }, [visibleNavRows, openGroups, collapsed, subsystem]);
-
+  // Navegação do menu lateral por setas ↑/↓ (Home/End vão ao primeiro/último).
+  // Só move o foco; o Enter do próprio link é quem abre a página.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const isArrow = e.key === "ArrowDown" || e.key === "ArrowUp";
