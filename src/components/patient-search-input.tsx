@@ -275,7 +275,7 @@ export function PatientSearchInput({
                       Associado - {p.associado_tipo === "dependente" ? "dependente" : "titular"} — {p.associado_convenio}
                     </span>
                   ) : (
-                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-500 dark:text-slate-400">
                       Particular
                     </span>
                   )}

@@ -59,9 +59,9 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   recebimento: "bg-green-500/10 text-green-700 dark:text-green-300",
   sangria: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   despesa: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  fechamento: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  fechamento: "bg-slate-500/10 text-slate-700 dark:text-slate-500 dark:text-slate-400",
   estorno: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  reabertura: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  reabertura: "bg-slate-500/10 text-slate-700 dark:text-slate-500 dark:text-slate-400",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1, sangria: -1, despesa: -1, fechamento: 0,

@@ -126,8 +126,8 @@ export function AiInsightsStrip({
           <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
             Sugestões da IA
           </span>
-          <span className="text-[11px] text-slate-400">· {chips.length}</span>
-          <span className="ml-auto text-slate-400">
+          <span className="text-[11px] text-slate-600 dark:text-slate-400">· {chips.length}</span>
+          <span className="ml-auto text-slate-600 dark:text-slate-400">
             {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </span>
         </button>

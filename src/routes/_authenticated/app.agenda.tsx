@@ -8445,7 +8445,7 @@ function AgendaPage() {
 
           {/* Profissional */}
           <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -8458,7 +8458,7 @@ function AgendaPage() {
 
           {/* Tipo de Agenda */}
           <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo de agenda</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
             <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
               <SelectTrigger className="h-8 text-xs w-full">
                 <SelectValue placeholder="TODAS" />
@@ -8493,7 +8493,7 @@ function AgendaPage() {
 
           {/* Situação */}
           <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger className="h-8 text-xs w-full">
                 <SelectValue placeholder="TODOS" />
@@ -8511,7 +8511,7 @@ function AgendaPage() {
 
           {/* Data */}
           <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -8532,7 +8532,7 @@ function AgendaPage() {
 
           {/* Especialidade */}
           <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger className="h-8 text-xs w-full">
                 <SelectValue placeholder="TODOS" />
@@ -8546,7 +8546,7 @@ function AgendaPage() {
 
           {/* Cliente + Ações rápidas juntos */}
           <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
             <div className="flex items-center gap-1">
               <Input
                 value={filtroCliente}
@@ -9115,7 +9115,7 @@ function AgendaPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-md hover:bg-slate-100 text-slate-400"
+                                className="h-7 w-7 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
