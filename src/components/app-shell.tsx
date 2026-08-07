@@ -361,7 +361,6 @@ export function AppShell() {
         .catch(() => {});
     }
   };
-  const lastArrowNavAtRef = useRef(0);
   // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
   // aberta pelo botão hamburguer do cabeçalho (drawer).
   const collapsed = false;
@@ -670,68 +669,49 @@ export function AppShell() {
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
-  // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
-  const flatNavLeaves = useMemo(() => {
-    const leaves: string[] = [];
-    for (const row of visibleNavRows) {
-      const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
-      if (!open) continue;
-      for (const item of row.items) {
-        if (isParent(item)) {
-          const subKey = `${row.label}::${item.label}`;
-          const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
-          if (!subOpen) continue;
-          for (const c of item.children) leaves.push(c.to);
-        } else {
-          leaves.push(item.to);
-        }
-      }
-    }
-    return leaves;
-  }, [visibleNavRows, openGroups, collapsed, subsystem]);
-
+  // Navegação do menu lateral por setas ↑/↓ (Home/End vão ao primeiro/último).
+  // Só move o foco; o Enter do próprio link é quem abre a página.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      const navRoot = navScrollRef.current;
+      const isArrow = e.key === "ArrowDown" || e.key === "ArrowUp";
+      const isEdge = e.key === "Home" || e.key === "End";
+      if (!isArrow && !isEdge) return;
       const tgt = e.target as HTMLElement | null;
       if (tgt) {
         const tag = tgt.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
         if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
       }
+      // Só age quando o foco (ou o clique atual) está dentro de um menu lateral.
       const activeElement = typeof document !== "undefined" ? document.activeElement : null;
-      const isUsingSidebar = !!(
-        navRoot &&
-        ((tgt && navRoot.contains(tgt)) || (activeElement instanceof HTMLElement && navRoot.contains(activeElement)))
+      const focused = activeElement instanceof HTMLElement ? activeElement : null;
+      const navRoot =
+        (focused?.closest("nav") as HTMLElement | null) ??
+        (tgt?.closest("nav") as HTMLElement | null) ??
+        null;
+      if (!navRoot) return;
+      const items = Array.from(navRoot.querySelectorAll<HTMLElement>("[data-nav-to]")).filter(
+        (el) => el.offsetParent !== null,
       );
-      if (!isUsingSidebar) return;
-      if (flatNavLeaves.length === 0) return;
-      const path = location.pathname;
-      let idx = flatNavLeaves.reduce((best, to, i) => {
-        const matches = path === to || (to !== "/app" && path.startsWith(`${to}/`));
-        if (!matches) return best;
-        return best < 0 || to.length > flatNavLeaves[best].length ? i : best;
-      }, -1);
-      if (idx < 0) return;
-      const next = e.key === "ArrowDown" ? Math.min(flatNavLeaves.length - 1, idx + 1) : Math.max(0, idx - 1);
-      if (next === idx) return;
-      const now = Date.now();
-      if (now - lastArrowNavAtRef.current < 120) return;
-      lastArrowNavAtRef.current = now;
+      if (items.length === 0) return;
+
+      // Índice atual: item focado; senão parte do item ativo (rota atual).
+      let idx = focused ? items.findIndex((el) => el === focused || el.contains(focused)) : -1;
+      if (idx < 0) idx = items.findIndex((el) => el.dataset.navActive === "true");
+
+      let next: number;
+      if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = items.length - 1;
+      else if (idx < 0) next = e.key === "ArrowDown" ? 0 : items.length - 1;
+      else next = e.key === "ArrowDown" ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+
       e.preventDefault();
-      navigate({ to: flatNavLeaves[next] });
-      window.setTimeout(() => {
-        const nextLink = Array.from(navRoot?.querySelectorAll<HTMLElement>("[data-nav-to]") ?? []).find(
-          (el) => el.dataset.navTo === flatNavLeaves[next],
-        );
-        nextLink?.focus({ preventScroll: true });
-      }, 0);
+      // Apenas move o foco — o Enter (padrão do link) é que abre a página.
+      items[next]?.focus({ preventScroll: false });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flatNavLeaves, location.pathname, navigate]);
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
