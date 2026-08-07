@@ -135,6 +135,7 @@ type Agendamento = {
   orcamento_numero?: number | null;
   pacote_id?: string | null;
   tipo_atendimento?: TipoAtendimento | null;
+  convenio_autorizado?: boolean | null;
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
