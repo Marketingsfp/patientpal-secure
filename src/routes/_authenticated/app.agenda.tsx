@@ -1996,6 +1996,9 @@ function AgendaPage() {
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+  // A coluna `foto_url` guarda apenas o caminho no armazenamento; a exibição
+  // precisa de uma URL assinada (mesmo padrão do cadastro de clientes).
+  const [pacInfoFoto, setPacInfoFoto] = useState<string | null>(null);
   const [editarPacienteOpen, setEditarPacienteOpen] = useState(false);
   const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
   const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
