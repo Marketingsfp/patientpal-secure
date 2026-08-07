@@ -668,10 +668,78 @@ function Page() {
         } catch { /* auditoria best-effort */ }
       }
       toast.success("Lançamento estornado");
+      // Registra o estorno na fila da aba "Estorno" para acompanhamento.
+      await registrarNaFilaEstorno(l, lanc?.agendamento_id ?? null, Number(lanc?.valor ?? l.valor));
       await load();
       await loadResumo();
     } finally {
       setEstornando(null);
+    }
+  };
+
+  /**
+   * Garante que todo estorno feito direto no Mov. Caixa apareça na aba
+   * "Estorno": cria (ou reaproveita) a solicitação e já a marca como aprovada.
+   * Best-effort — se falhar, o estorno em si continua válido.
+   */
+  const registrarNaFilaEstorno = async (
+    l: Lanc,
+    agendamentoId: string | null,
+    valor: number,
+  ) => {
+    if (!clinicaAtual) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const agora = new Date().toISOString();
+      const hoje = agora.slice(0, 10);
+      const resposta = "Estorno executado diretamente no Movimento de Caixa.";
+
+      // Reaproveita solicitação pendente já existente para este lançamento.
+      const { data: existente } = await supabase
+        .from("estorno_solicitacoes")
+        .select("id")
+        .eq("lancamento_id", l.id)
+        .eq("status", "pendente")
+        .maybeSingle();
+
+      let solicitacaoId = existente?.id ?? null;
+      if (!solicitacaoId) {
+        const { data: nova, error: eIns } = await supabase
+          .from("estorno_solicitacoes")
+          .insert({
+            clinica_id: clinicaAtual.clinica_id,
+            lancamento_id: l.id,
+            agendamento_id: agendamentoId,
+            paciente_nome: l.descricao?.split("—")[0]?.trim() || null,
+            descricao: l.descricao,
+            valor,
+            motivo: "Estorno realizado pelo Movimento de Caixa.",
+            tipo: "erro_caixa",
+            status: "pendente",
+            solicitado_por: user.id,
+            data_pagamento_original: l.data ?? null,
+            data_estorno: hoje,
+          })
+          .select("id")
+          .maybeSingle();
+        if (eIns) return;
+        solicitacaoId = nova?.id ?? null;
+      }
+      if (!solicitacaoId) return;
+
+      await supabase
+        .from("estorno_solicitacoes")
+        .update({
+          status: "aprovado",
+          resolvido_por: user.id,
+          resolvido_em: agora,
+          resposta,
+          data_estorno: hoje,
+        })
+        .eq("id", solicitacaoId);
+    } catch {
+      /* registro na fila é best-effort */
     }
   };
 
