@@ -5211,6 +5211,18 @@ function AgendaPage() {
         toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
         return;
       }
+      // Regra global: o paciente paga na chegada — sem pagamento (ou sem
+      // autorização do convênio) o atendimento não pode ser realizado.
+      const ehConvenio = (a.tipo_atendimento ?? "particular") === "convenio";
+      if (ehConvenio) {
+        if (!a.convenio_autorizado) {
+          toast.error("Convênio sem autorização confirmada. Confirme a autorização na recepção antes de realizar o atendimento.");
+          return;
+        }
+      } else if (!pagosSet.has(a.id) && !a.data_pagamento) {
+        toast.error("Pagamento não identificado. O paciente deve pagar na chegada — registre o recebimento no caixa antes de realizar o atendimento.");
+        return;
+      }
     }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
     // re-agendado em outro horário sem ficar preso a este slot.
