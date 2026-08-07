@@ -2570,8 +2570,8 @@ function AtendimentosPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-0">
+      <div className="rounded-xl bg-card">
+        <div className="p-0">
           {loading ? (
             <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
           ) : filteredItems.length === 0 ? (
@@ -2580,9 +2580,12 @@ function AtendimentosPage() {
               Nenhum atendimento no período/filtro selecionado.
             </div>
           ) : (
-            <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+            <Table
+              containerClassName="max-h-[70vh] scroll-slim rounded-xl border-0"
+              className="max-lg:table max-lg:overflow-visible border-separate border-spacing-0"
+            >
               <TableHeader className="sticky top-0 z-20">
-                <TableRow className="bg-muted">
+                <TableRow className="bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 border-0 [&>th]:border-b [&>th]:border-border/60 [&>th]:h-9 [&>th]:text-muted-foreground [&>th]:uppercase [&>th]:tracking-wide hover:bg-background/90">
                   {!isMedicoOnly && (
                     <TableHead className="w-8 px-2">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
