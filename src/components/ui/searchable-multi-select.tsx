@@ -73,7 +73,7 @@ export function SearchableMultiSelect({
                 {selectedLabels.join(" + ")}
               </span>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="font-normal text-muted-foreground">{placeholder}</span>
             )}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
