@@ -647,6 +647,31 @@ function ClientesPage() {
         </Table>
       </div>
 
+      {selecionados.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur">
+            <span className="text-sm font-medium whitespace-nowrap">
+              {selecionados.length} selecionado{selecionados.length > 1 ? "s" : ""}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setSelecionados([])} disabled={excluindoLote}>
+              Limpar
+            </Button>
+            {podeEscrever && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-full"
+                disabled={excluindoLote}
+                onClick={() => void excluirSelecionados()}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                {excluindoLote ? "Excluindo…" : "Excluir selecionados"}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
           <div className="text-muted-foreground">
