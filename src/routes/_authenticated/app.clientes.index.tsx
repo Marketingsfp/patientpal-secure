@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { confirmDialog } from "@/lib/confirm";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -295,6 +296,31 @@ function ClientesPage() {
 
   const filtrados = items;
 
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const excluirCliente = async (p: Paciente) => {
+    const ok = await confirmDialog({
+      title: "Excluir cliente",
+      description: `Tem certeza que deseja excluir "${p.nome}"? Esta ação não pode ser desfeita.`,
+      tone: "danger",
+      confirmText: "Excluir",
+    });
+    if (!ok) return;
+    setExcluindoId(p.id);
+    const { error } = await supabase.from("pacientes").delete().eq("id", p.id);
+    setExcluindoId(null);
+    if (error) {
+      if ((error as { code?: string }).code === "23503") {
+        toast.error("Este cliente possui registros vinculados (agendamentos, financeiro ou prontuário) e não pode ser excluído.");
+      } else {
+        mostrarErro(error);
+      }
+      return;
+    }
+    setItemsManual((cur) => cur.filter((x) => x.id !== p.id));
+    toast.success("Cliente excluído.");
+    refrescar();
+  };
+
   // Convênios ativos dos pacientes visíveis (Cartão Benefícios).
   // Exibimos um badge ao lado do nome, no mesmo padrão da busca da agenda.
   const idsKey = filtrados.map(p => p.id).sort().join(",");
@@ -547,6 +573,17 @@ function ClientesPage() {
                         <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
                           <Pencil className="h-4 w-4" />
                         </Link>
+                      </Button>
+                    )}
+                    {podeEscrever && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Excluir cliente"
+                        disabled={excluindoId === p.id}
+                        onClick={() => void excluirCliente(p)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
                   </div>
