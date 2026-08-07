@@ -1684,8 +1684,12 @@ function Page() {
   // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
   // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
   const movsDoDiaFechamento = useMemo(() => {
-    if (!dataFechamento) return minhasMovs;
-    return minhasMovs.filter((m) => localYMD(m.created_at) === dataFechamento);
+    // Despesas virtuais (vindas do Financeiro, sem movimento físico de caixa)
+    // não entram na conferência de fechamento — o dinheiro em gaveta não foi
+    // afetado por elas.
+    const reais = minhasMovs.filter((m) => !m.id.startsWith("fin:"));
+    if (!dataFechamento) return reais;
+    return reais.filter((m) => localYMD(m.created_at) === dataFechamento);
   }, [minhasMovs, dataFechamento]);
   const saldoDoDiaFechamento = useMemo(() => {
     return movsDoDiaFechamento.reduce(
