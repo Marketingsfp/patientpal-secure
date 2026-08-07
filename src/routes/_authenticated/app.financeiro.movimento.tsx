@@ -128,6 +128,7 @@ function Page() {
   const [estornando, setEstornando] = useState<string | null>(null);
   const [estornoSangria, setEstornoSangria] = useState<Lanc | null>(null);
   const [confirmDel, setConfirmDel] = useState<Lanc | null>(null);
+  const [confirmEst, setConfirmEst] = useState<{ lanc: Lanc; aviso: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
