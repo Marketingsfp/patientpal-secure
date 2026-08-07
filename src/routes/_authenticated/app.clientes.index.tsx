@@ -296,6 +296,31 @@ function ClientesPage() {
 
   const filtrados = items;
 
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const excluirCliente = async (p: Paciente) => {
+    const ok = await confirmDialog({
+      title: "Excluir cliente",
+      description: `Tem certeza que deseja excluir "${p.nome}"? Esta ação não pode ser desfeita.`,
+      tone: "danger",
+      confirmText: "Excluir",
+    });
+    if (!ok) return;
+    setExcluindoId(p.id);
+    const { error } = await supabase.from("pacientes").delete().eq("id", p.id);
+    setExcluindoId(null);
+    if (error) {
+      if ((error as { code?: string }).code === "23503") {
+        toast.error("Este cliente possui registros vinculados (agendamentos, financeiro ou prontuário) e não pode ser excluído.");
+      } else {
+        mostrarErro(error);
+      }
+      return;
+    }
+    setItemsManual((cur) => cur.filter((x) => x.id !== p.id));
+    toast.success("Cliente excluído.");
+    refrescar();
+  };
+
   // Convênios ativos dos pacientes visíveis (Cartão Benefícios).
   // Exibimos um badge ao lado do nome, no mesmo padrão da busca da agenda.
   const idsKey = filtrados.map(p => p.id).sort().join(",");
