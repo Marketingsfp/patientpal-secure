@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
 import { Users, Search, Plus, Trash2, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -149,7 +150,7 @@ function DependentesPage() {
 
   const remover = async (depId: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm("Excluir este dependente?")) return;
+    if (!await confirmDialog("Excluir este dependente?")) return;
     const { error } = await supabase
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -938,7 +939,7 @@ export function AtendRoteamento() {
             <div className="flex gap-1 shrink-0">
               <Button size="icon" variant="ghost" onClick={() => abrirEdit(r)}><Pencil className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={async () => {
-                if (!confirm("Excluir regra?")) return;
+                if (!await confirmDialog("Excluir regra?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluída"); }
                 catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>

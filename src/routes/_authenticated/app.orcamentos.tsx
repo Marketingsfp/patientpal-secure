@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, Printer, Trash2, Search, AlertTriangle, Calendar, Columns2, CheckCircle2, CircleDashed, Download, History, Workflow } from "lucide-react";
 import { toast } from "sonner";
@@ -339,7 +340,7 @@ function OrcamentosPage() {
 
   const remover = async (id: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm("Excluir este orçamento?")) return;
+    if (!await confirmDialog("Excluir este orçamento?")) return;
     const { error } = await supabase.from("orcamentos").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Orçamento excluído");

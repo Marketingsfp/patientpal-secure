@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Plus, Trash2, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -319,7 +320,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const remove = async (idx: number) => {
     const r = regras[idx];
-    if (!confirm("Excluir esta regra?")) return;
+    if (!await confirmDialog("Excluir esta regra?")) return;
     if (!r.id.startsWith("new-")) {
       const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", r.id);
       if (error) { mostrarErro(error); return; }
@@ -1068,7 +1069,7 @@ function NovaRegraDialog({
       const cartaoDivergente = Math.abs(vc - regraBase.valor_cartao) > 0.009;
       const cartaoIgualDinheiro = Math.abs(vc - vd) < 0.009;
       if (cartaoDivergente && (cartaoIgualDinheiro || vc === 0)) {
-        const ok = window.confirm(
+        const ok = await confirmDialog(
           `Atenção: a regra por especialidade (${regraBase.especialidade_nome}) deste convênio ` +
           `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
           `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +

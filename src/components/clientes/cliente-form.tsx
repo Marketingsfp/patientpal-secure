@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -672,7 +673,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   async function revogarBiometria() {
     if (!editing) return;
-    if (!confirm(`Remover a biometria facial de ${editing.nome}? (direito de exclusão — LGPD)`)) return;
+    if (!await confirmDialog(`Remover a biometria facial de ${editing.nome}? (direito de exclusão — LGPD)`)) return;
     setBioLoading(true);
     const { error } = await supabase.from("paciente_biometria")
       .update({ revogado_em: new Date().toISOString() })

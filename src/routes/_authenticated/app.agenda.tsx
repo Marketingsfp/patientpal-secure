@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -3863,7 +3864,7 @@ function AgendaPage() {
       toast.info("Nenhum atendimento elegível na seleção.");
       return;
     }
-    if (!confirm(`Baixar ${validos.length} atendimento(s) como Realizado?`)) return;
+    if (!await confirmDialog(`Baixar ${validos.length} atendimento(s) como Realizado?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const nowIso = new Date().toISOString();
     const { error } = await supabase
@@ -3914,7 +3915,7 @@ function AgendaPage() {
     const msg = temRepassePago
       ? `Reabrir atendimento de ${a.paciente_nome}?\n\n⚠️ O repasse JÁ foi pago. A despesa do repasse será ESTORNADA e o status voltará para "Confirmado".\n\nO pagamento da receita NÃO será estornado (use Financeiro → Estornar pagamento se necessário).`
       : `Reabrir atendimento de ${a.paciente_nome}?\n\nO status voltará para "Confirmado".`;
-    if (!confirm(msg)) return;
+    if (!await confirmDialog(msg)) return;
     try {
       if (temRepassePago) {
         const desp = (lanc as any).repasse_lancamento_id as string | null;
@@ -3985,7 +3986,7 @@ function AgendaPage() {
     };
 
     if (!uxMelhorias) {
-      if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
+      if (!await confirmDialog(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
       await apagarNoBanco();
       toast.success(`${ids.length} horário(s) excluído(s).`);
       setSelecionados(new Set());
@@ -3993,7 +3994,7 @@ function AgendaPage() {
     }
 
     // Piloto São Francisco: some da tela na hora, mas só apaga do banco
-    // depois de alguns segundos — dá tempo do usuário desfazer, sem confirm().
+    // depois de alguns segundos — dá tempo do usuário desfazer, sem await confirmDialog().
     setSelecionados(new Set());
     setItems((prev) => prev.filter((a) => !ids.includes(a.id)));
     let desfeito = false;
@@ -4903,7 +4904,7 @@ function AgendaPage() {
           });
           const msg =
             `Este paciente já está agendado para o(s) mesmo(s) serviço(s) e ainda não pagou:\n\n${linhas.join("\n")}\n\nDeseja criar um novo agendamento mesmo assim?`;
-          if (!window.confirm(msg)) {
+          if (!await confirmDialog(msg)) {
             return;
           }
         }
@@ -5129,7 +5130,7 @@ function AgendaPage() {
       return;
     }
     if (
-      !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
+      !await confirmDialog(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
     // Atendimento externo: desfaz o registro no Financeiro e zera as marcações
@@ -5231,7 +5232,7 @@ function AgendaPage() {
           .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
           .map((x) => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
           .join("\n");
-        const ok = confirm(
+        const ok = await confirmDialog(
           `Este agendamento faz parte de um pacote do orçamento, com mais ${outros.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`,
         );
         if (ok) idsParaAtualizar = [a.id, ...outros.map((x) => x.id)];
@@ -5268,7 +5269,7 @@ function AgendaPage() {
       toast.info("Este atendimento já foi baixado.");
       return;
     }
-    if (!confirm(`Dar baixa como Realizado no atendimento de ${a.paciente_nome}?`)) return;
+    if (!await confirmDialog(`Dar baixa como Realizado no atendimento de ${a.paciente_nome}?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
     if (!uid) {
       toast.error("Sessão expirada");
@@ -5300,7 +5301,7 @@ function AgendaPage() {
       return;
     }
     if (
-      !confirm(
+      !await confirmDialog(
         `Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`,
       )
     )
@@ -5822,7 +5823,7 @@ function AgendaPage() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!window.confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
+    if (!await confirmDialog("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: "aguardando_recepcao", fluxo_atualizado_em: new Date().toISOString() } as never)

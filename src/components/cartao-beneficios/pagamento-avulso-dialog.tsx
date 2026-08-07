@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
@@ -250,7 +251,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         (c.observacoes ?? "").toUpperCase().includes(rotuloMes(refMes).toUpperCase()),
     );
     if (!dup) return true;
-    return window.confirm(
+    return await confirmDialog(
       `Já existe um pagamento avulso registrado hoje para ${paciente.nome} referente a ${rotuloMes(refMes)}` +
         (dup.numero ? ` (contrato #${dup.numero})` : "") +
         `.\n\nDeseja mesmo registrar outro? Isso criará um novo contrato e um novo lançamento no caixa.`,

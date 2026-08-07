@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -251,7 +252,7 @@ function ChatPage() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!confirm("Tem certeza que deseja apagar esta conversa para todos?")) return;
+    if (!await confirmDialog("Tem certeza que deseja apagar esta conversa para todos?")) return;
     const { error } = await supabase.from("chat_canais").delete().eq("id", id);
     if (error) {
       mostrarErro(error, "erro ao excluir");

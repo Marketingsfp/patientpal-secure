@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +91,7 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
   }
 
   async function desabilitar() {
-    if (!confirm("Deseja realmente desligar o Convênio Funcionário deste médico? Os dependentes também serão desativados.")) return;
+    if (!await confirmDialog("Deseja realmente desligar o Convênio Funcionário deste médico? Os dependentes também serão desativados.")) return;
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.rpc as any)("medico_toggle_convenio_funcionario", {
@@ -123,7 +124,7 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
   }
 
   async function removerDependente(depId: string) {
-    if (!confirm("Remover este dependente do convênio?")) return;
+    if (!await confirmDialog("Remover este dependente do convênio?")) return;
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.rpc as any)("medico_convenio_remove_dependente", { _dependente_id: depId });

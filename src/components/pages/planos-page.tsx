@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { CreditCard, Plus, Save, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -92,7 +93,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
 
   const excluir = async (id: string) => {
     if (!podeEscrever) return;
-    if (!confirm("Excluir este plano?")) return;
+    if (!await confirmDialog("Excluir este plano?")) return;
     const { error } = await db.from("planos_assinatura").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Excluído");

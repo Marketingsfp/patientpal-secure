@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   carregarMapaConvenioPacientes,
@@ -825,7 +826,7 @@ function AtendimentosPage() {
   const desvincularLaudo = async (a: Atend) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (
-      !confirm(
+      !await confirmDialog(
         "Desvincular o médico laudador deste atendimento?\n\n" +
           "• O laudo voltará ao status 'Pendente'.\n" +
           "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
@@ -1618,7 +1619,7 @@ function AtendimentosPage() {
 
   const remove = async (a: Atend) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm("Excluir atendimento?")) return;
+    if (!await confirmDialog("Excluir atendimento?")) return;
 
     try {
       let error;
@@ -1648,7 +1649,7 @@ function AtendimentosPage() {
   const darBaixa = async (a: Atend) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (
-      !confirm(
+      !await confirmDialog(
         "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
       )
     )
@@ -1698,7 +1699,7 @@ function AtendimentosPage() {
       return;
     }
     if (
-      !confirm(
+      !await confirmDialog(
         "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado'. O pagamento do paciente (se houver) permanece intacto no caixa — só o lançamento-sombra de R$ 0,00 é removido.",
       )
     )
@@ -1779,7 +1780,7 @@ function AtendimentosPage() {
     const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
     if (alvos.length === 0) return;
     if (
-      !confirm(
+      !await confirmDialog(
         `Confirmar baixa de ${alvos.length} atendimento(s)?\n\nOs médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento.`,
       )
     )
@@ -1828,7 +1829,7 @@ function AtendimentosPage() {
     const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
     if (alvos.length === 0) return;
     if (
-      !confirm(
+      !await confirmDialog(
         `Desfazer a baixa de ${alvos.length} atendimento(s)?\n\nOs atendimentos voltam para 'Confirmado'. Os pagamentos dos pacientes permanecem intactos no caixa — apenas lançamentos-sombra de R$ 0,00 são removidos.`,
       )
     )

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -391,7 +392,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
     if (_ehRetroativo) {
       const [aaaa, mm, dd] = data.split("-");
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         `Atenção: a data escolhida é retroativa (${dd}/${mm}/${aaaa}).\n\n` +
         `O movimento será registrado no caixa do dia ${dd}/${mm}/${aaaa} ` +
         `(não no caixa de hoje). Se o caixa daquele dia já estiver fechado, ` +

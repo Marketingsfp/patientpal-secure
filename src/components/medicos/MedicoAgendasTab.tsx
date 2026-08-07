@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -126,7 +127,7 @@ export function MedicoAgendasTab({
   };
 
   const remover = async (a: Agenda) => {
-    if (!confirm(
+    if (!await confirmDialog(
       `Remover agenda "${a.nome}"?\n\n` +
       `- Os horários semanais (disponibilidades) desta agenda serão removidos.\n` +
       `- Consultas já agendadas NÃO serão excluídas, mas perderão o vínculo com esta agenda.`
