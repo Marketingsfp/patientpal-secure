@@ -2171,6 +2171,21 @@ function AgendaPage() {
         }
       }
       setPacInfo(base);
+      if (base.foto_url) {
+        try {
+          const caminho = String(base.foto_url);
+          if (/^https?:\/\//i.test(caminho)) {
+            setPacInfoFoto(caminho);
+          } else {
+            const { data: signed } = await supabase.storage
+              .from("pacientes-fotos")
+              .createSignedUrl(caminho, 3600);
+            if (signed?.signedUrl) setPacInfoFoto(signed.signedUrl);
+          }
+        } catch (e) {
+          console.warn("pacInfo foto:", e);
+        }
+      }
     }
     setPacInfoLoading(false);
   };
