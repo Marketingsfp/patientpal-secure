@@ -9219,14 +9219,27 @@ function AgendaPage() {
           ) : pacInfo ? (
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
-                {pacInfo.foto_url ? (
-                  <img
-                    src={pacInfo.foto_url}
-                    alt={pacInfo.nome}
-                    className="h-14 w-14 rounded-full object-cover border"
-                  />
-                ) : null}
-                <div>
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-muted">
+                  <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground">
+                    {(pacInfo.nome ?? "")
+                      .trim()
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((p: string) => p.charAt(0))
+                      .join("")
+                      .toUpperCase()}
+                  </span>
+                  {pacInfo.foto_url ? (
+                    <img
+                      src={pacInfo.foto_url}
+                      alt=""
+                      loading="lazy"
+                      className="relative h-full w-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+                  ) : null}
+                </div>
+                <div className="min-w-0">
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
                     <div className="text-xs text-muted-foreground">Serviço nº {pacInfo.numero_pasta}</div>
