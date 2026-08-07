@@ -1996,6 +1996,9 @@ function AgendaPage() {
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+  // A coluna `foto_url` guarda apenas o caminho no armazenamento; a exibição
+  // precisa de uma URL assinada (mesmo padrão do cadastro de clientes).
+  const [pacInfoFoto, setPacInfoFoto] = useState<string | null>(null);
   const [editarPacienteOpen, setEditarPacienteOpen] = useState(false);
   const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
   const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
@@ -2111,6 +2114,7 @@ function AgendaPage() {
   const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
     setPacInfoOpen(true);
     setPacInfo({ nome: nomeFallback });
+    setPacInfoFoto(null);
     if (!pacienteId) return;
     setPacInfoLoading(true);
     const { data } = await supabase
@@ -2167,6 +2171,21 @@ function AgendaPage() {
         }
       }
       setPacInfo(base);
+      if (base.foto_url) {
+        try {
+          const caminho = String(base.foto_url);
+          if (/^https?:\/\//i.test(caminho)) {
+            setPacInfoFoto(caminho);
+          } else {
+            const { data: signed } = await supabase.storage
+              .from("pacientes-fotos")
+              .createSignedUrl(caminho, 3600);
+            if (signed?.signedUrl) setPacInfoFoto(signed.signedUrl);
+          }
+        } catch (e) {
+          console.warn("pacInfo foto:", e);
+        }
+      }
     }
     setPacInfoLoading(false);
   };
@@ -9229,13 +9248,13 @@ function AgendaPage() {
                       .join("")
                       .toUpperCase()}
                   </span>
-                  {pacInfo.foto_url ? (
+                  {pacInfoFoto ? (
                     <img
-                      src={pacInfo.foto_url}
+                      src={pacInfoFoto}
                       alt=""
                       loading="lazy"
                       className="relative h-full w-full object-cover"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      onError={() => setPacInfoFoto(null)}
                     />
                   ) : null}
                 </div>
