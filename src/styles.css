@@ -668,3 +668,22 @@ html.theme-emerald {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -0.01em;
 }
+
+/* Valores preenchidos em controles nativos: alto contraste; placeholders suaves. */
+@layer base {
+  select,
+  select option,
+  input,
+  textarea {
+    color: var(--foreground);
+  }
+  select:disabled,
+  input:disabled,
+  textarea:disabled {
+    color: var(--foreground);
+  }
+  select:invalid,
+  select option[value=""] {
+    color: var(--muted-foreground);
+  }
+}
