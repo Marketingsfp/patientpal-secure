@@ -135,6 +135,7 @@ type Agendamento = {
   orcamento_numero?: number | null;
   pacote_id?: string | null;
   tipo_atendimento?: TipoAtendimento | null;
+  convenio_autorizado?: boolean | null;
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
@@ -2485,7 +2486,7 @@ function AgendaPage() {
     const reqId = ++loadReqId.current;
     setLoading(true);
     const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
@@ -5210,6 +5211,18 @@ function AgendaPage() {
         toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
         return;
       }
+      // Regra global: o paciente paga na chegada — sem pagamento (ou sem
+      // autorização do convênio) o atendimento não pode ser realizado.
+      const ehConvenio = (a.tipo_atendimento ?? "particular") === "convenio";
+      if (ehConvenio) {
+        if (!a.convenio_autorizado) {
+          toast.error("Convênio sem autorização confirmada. Confirme a autorização na recepção antes de realizar o atendimento.");
+          return;
+        }
+      } else if (!pagosSet.has(a.id) && !a.data_pagamento) {
+        toast.error("Pagamento não identificado. O paciente deve pagar na chegada — registre o recebimento no caixa antes de realizar o atendimento.");
+        return;
+      }
     }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
     // re-agendado em outro horário sem ficar preso a este slot.
@@ -5249,6 +5262,34 @@ function AgendaPage() {
         }
       }
       if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
+      await load();
+    }
+  };
+
+  // Confirmação da autorização do convênio (libera a execução do atendimento).
+  const alternarAutorizacaoConvenio = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const novo = !a.convenio_autorizado;
+    if (!novo) {
+      const ok = await confirmDialog(
+        "Remover a autorização do convênio deste atendimento? Ele voltará a ficar bloqueado para execução.",
+      );
+      if (!ok) return;
+    }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        convenio_autorizado: novo,
+        convenio_autorizado_em: novo ? new Date().toISOString() : null,
+        convenio_autorizado_por: novo ? (user?.id ?? null) : null,
+      } as never)
+      .eq("id", a.id);
+    if (error) mostrarErro(error);
+    else {
+      toast.success(novo ? "Autorização do convênio confirmada." : "Autorização do convênio removida.");
       await load();
     }
   };
@@ -9126,6 +9167,15 @@ function AgendaPage() {
                               {podeEscrever && !ehLivre && (
                                 <>
                                   <DropdownMenuSeparator />
+                                  {(a.tipo_atendimento ?? "particular") === "convenio" && (
+                                    <DropdownMenuItem
+                                      onClick={() => alternarAutorizacaoConvenio(a)}
+                                      className={a.convenio_autorizado ? "text-muted-foreground" : "text-emerald-600"}
+                                    >
+                                      <ShieldCheck className="h-4 w-4 mr-2" />
+                                      {a.convenio_autorizado ? "Remover autorização do convênio" : "Autorizar convênio"}
+                                    </DropdownMenuItem>
+                                  )}
                                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                                     <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                                       <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
