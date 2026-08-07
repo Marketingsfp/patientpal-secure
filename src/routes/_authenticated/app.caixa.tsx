@@ -1433,6 +1433,10 @@ function Page() {
   }, [clinicaAtual, isManager, fIni, fFim, fUserId]);
 
   useEffect(() => { void load(); }, [load]);
+  // Sincronia em tempo real: qualquer despesa/receita lançada no Financeiro
+  // (ou movimento de caixa de outro operador) atualiza na hora o resumo do dia,
+  // as Saídas e o saldo atual.
+  useRealtimeRefresh(["fin_lancamentos", "caixa_movimentos"], load);
   useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
 
   // Membros da clínica para o seletor de destino de sangria/suprimento
