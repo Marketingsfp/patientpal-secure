@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, LogOut, ImageUp } from "lucide-react";
+import { KeyRound, LogOut, ImageUp, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -22,6 +22,8 @@ interface Props {
   showName?: boolean;
   onChangePassword: () => void;
   onSignOut: () => void;
+  /** Volta para o hub de portais. */
+  onSwitchPortal?: () => void;
 }
 
 /** Redimensiona a foto para 128px e devolve um data URL leve (JPEG). */
@@ -57,6 +59,7 @@ export function SidebarUserMenu({
   showName = false,
   onChangePassword,
   onSignOut,
+  onSwitchPortal,
 }: Props) {
   const [avatar, setAvatar] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -168,6 +171,16 @@ export function SidebarUserMenu({
             <KeyRound className="h-4 w-4 mr-2" />
             Alterar senha
           </DropdownMenuItem>
+          {onSwitchPortal && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onSwitchPortal}>
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Trocar de portal
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onSelect={onSignOut}>
             <LogOut className="h-4 w-4 mr-2" />
             Sair
