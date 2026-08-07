@@ -97,7 +97,13 @@ function FinLayout() {
         "bg-card p-2 shrink-0 transition-all duration-200",
         modoMobile
           ? "w-full border-b border-border overflow-x-auto"
-          : cn(collapsed ? "w-12" : "w-48", "border-r border-border overflow-y-auto h-full"),
+          : cn(
+              collapsed ? "w-12" : "w-48",
+              "relative overflow-y-auto h-full border-r border-border/70",
+              "after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-px",
+              "after:bg-gradient-to-b after:from-transparent after:via-border after:to-transparent",
+              "shadow-[1px_0_0_0_hsl(var(--background))]",
+            ),
       )}>
         {!modoMobile && (
           <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
