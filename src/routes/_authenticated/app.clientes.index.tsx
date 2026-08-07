@@ -297,6 +297,8 @@ function ClientesPage() {
   const filtrados = items;
 
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [excluindoLote, setExcluindoLote] = useState(false);
   const excluirCliente = async (p: Paciente) => {
     const ok = await confirmDialog({
       title: "Excluir cliente",
@@ -317,7 +319,41 @@ function ClientesPage() {
       return;
     }
     setItemsManual((cur) => cur.filter((x) => x.id !== p.id));
+    setSelecionados((cur) => cur.filter((id) => id !== p.id));
     toast.success("Cliente excluído.");
+    refrescar();
+  };
+
+  const excluirSelecionados = async () => {
+    if (selecionados.length === 0) return;
+    const ok = await confirmDialog({
+      title: `Excluir ${selecionados.length} cliente(s)`,
+      description: `Tem certeza que deseja excluir ${selecionados.length} cliente(s) selecionado(s)? Esta ação não pode ser desfeita.`,
+      tone: "danger",
+      confirmText: "Excluir selecionados",
+    });
+    if (!ok) return;
+    setExcluindoLote(true);
+    const excluidos: string[] = [];
+    let bloqueados = 0;
+    for (const id of selecionados) {
+      const { error } = await supabase.from("pacientes").delete().eq("id", id);
+      if (error) {
+        if ((error as { code?: string }).code === "23503") bloqueados++;
+        else { mostrarErro(error); break; }
+      } else {
+        excluidos.push(id);
+      }
+    }
+    setExcluindoLote(false);
+    if (excluidos.length > 0) {
+      setItemsManual((cur) => cur.filter((x) => !excluidos.includes(x.id)));
+      toast.success(`${excluidos.length} cliente(s) excluído(s).`);
+    }
+    if (bloqueados > 0) {
+      toast.error(`${bloqueados} cliente(s) possuem registros vinculados e não puderam ser excluídos.`);
+    }
+    setSelecionados([]);
     refrescar();
   };
 
