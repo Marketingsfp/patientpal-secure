@@ -9225,7 +9225,7 @@ function AgendaPage() {
                       .trim()
                       .split(/\s+/)
                       .slice(0, 2)
-                      .map((p) => p.charAt(0))
+                      .map((p: string) => p.charAt(0))
                       .join("")
                       .toUpperCase()}
                   </span>
