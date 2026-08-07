@@ -64,7 +64,7 @@ function FinLayout() {
   return (
     <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col">
       <div className="shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
-        <nav className="flex items-center gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:thin]">
+        <nav className="flex flex-wrap items-center gap-1.5 px-3 py-2.5">
           {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
@@ -74,13 +74,14 @@ function FinLayout() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition-colors",
+                  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[13px] font-medium",
+                  "transition-all duration-200",
                   active
-                    ? "bg-primary/10 font-medium text-primary shadow-xs"
-                    : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground",
                 )}
               >
-                <item.icon className="h-4 w-4 shrink-0" />
+                <item.icon className={cn("h-4 w-4 shrink-0 transition-colors", active ? "" : "text-muted-foreground/70 group-hover:text-primary")} />
                 {item.label}
               </Link>
             );
