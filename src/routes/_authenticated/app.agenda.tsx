@@ -5284,7 +5284,7 @@ function AgendaPage() {
       .update({
         convenio_autorizado: novo,
         convenio_autorizado_em: novo ? new Date().toISOString() : null,
-        convenio_autorizado_por: novo ? (userId ?? null) : null,
+        convenio_autorizado_por: novo ? (user?.id ?? null) : null,
       } as never)
       .eq("id", a.id);
     if (error) mostrarErro(error);
