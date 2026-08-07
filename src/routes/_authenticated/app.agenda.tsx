@@ -9248,13 +9248,13 @@ function AgendaPage() {
                       .join("")
                       .toUpperCase()}
                   </span>
-                  {pacInfo.foto_url ? (
+                  {pacInfoFoto ? (
                     <img
-                      src={pacInfo.foto_url}
+                      src={pacInfoFoto}
                       alt=""
                       loading="lazy"
                       className="relative h-full w-full object-cover"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      onError={() => setPacInfoFoto(null)}
                     />
                   ) : null}
                 </div>
