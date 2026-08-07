@@ -2114,6 +2114,7 @@ function AgendaPage() {
   const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
     setPacInfoOpen(true);
     setPacInfo({ nome: nomeFallback });
+    setPacInfoFoto(null);
     if (!pacienteId) return;
     setPacInfoLoading(true);
     const { data } = await supabase
