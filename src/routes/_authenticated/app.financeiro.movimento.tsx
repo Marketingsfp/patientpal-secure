@@ -127,6 +127,8 @@ function Page() {
   const modoMobile = uxMelhorias && isMobile;
   const [estornando, setEstornando] = useState<string | null>(null);
   const [estornoSangria, setEstornoSangria] = useState<Lanc | null>(null);
+  const [confirmDel, setConfirmDel] = useState<Lanc | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
@@ -531,9 +533,15 @@ function Page() {
     toast.success("Salvo"); setOpen(false); await load(); await loadResumo();
   };
 
-  const remove = async (l: Lanc) => {
-    if (!confirm(`Excluir "${l.descricao}"?`)) return;
+  const remove = (l: Lanc) => { setConfirmDel(l); };
+
+  const confirmarExclusao = async () => {
+    const l = confirmDel;
+    if (!l) return;
+    setDeleting(true);
     const { error } = await supabase.from("fin_lancamentos").delete().eq("id", l.id);
+    setDeleting(false);
+    setConfirmDel(null);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); await loadResumo(); }
   };
 
