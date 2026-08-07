@@ -1,17 +1,12 @@
-import { createFileRoute, Link, Outlet, useLocation, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, Navigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight, Stethoscope,
+  Sparkles, AlertTriangle, Undo2, Stethoscope,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
