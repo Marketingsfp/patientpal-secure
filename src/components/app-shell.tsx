@@ -260,27 +260,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Gestão",
     items: [
       { to: "/app/cargos", label: "Cargos", icon: Briefcase },
-      {
-        label: "Financeiro",
-        icon: DollarSign,
-        children: [
-          { to: "/app/financeiro", label: "Dashboard", icon: LayoutDashboard },
-          { to: "/app/financeiro/movimento", label: "Mov. Caixa", icon: ArrowRightLeft },
-          { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
-          { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
-          { to: "/app/financeiro/analitico", label: "Analítico", icon: FileBarChart2 },
-          { to: "/app/financeiro/estorno", label: "Estorno", icon: ArrowRightLeft },
-          { to: "/app/financeiro/empresas", label: "Empresas", icon: Building2 },
-          { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
-          { to: "/app/financeiro/relatorios", label: "Relatórios", icon: FileBarChart2 },
-          { to: "/app/financeiro/estatisticas", label: "Estatísticas", icon: BarChart3 },
-          { to: "/app/financeiro/lembretes", label: "Lembretes", icon: BellRing },
-          { to: "/app/financeiro/categorias", label: "Categorias", icon: Filter },
-          { to: "/app/financeiro/contas", label: "Contas", icon: Wallet },
-          { to: "/app/financeiro/regras-ia", label: "Regras IA", icon: Sparkles },
-          { to: "/app/financeiro/alertas", label: "Alertas", icon: ShieldCheck },
-        ],
-      },
+      { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
       { to: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: FileText },
       { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
       { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
@@ -570,20 +550,11 @@ export function AppShell() {
           const items = row.items
             .map((item) => {
               if (isParent(item)) {
-                // Grupos com filhos de módulos diferentes (ex.: Financeiro)
-                // filtram aba por aba; submódulos ainda não configurados
-                // herdam o acesso do módulo-pai.
-                if (allowedModules === null) return item;
-                const children = item.children.filter((c) => {
-                  const mod = ROUTE_TO_MODULE[c.to];
-                  if (mod === null) return true;
-                  if (mod === undefined) return false;
-                  if (allowedModules.has(mod)) return true;
-                  const pai = SUBMODULE_PARENT[mod];
-                  return Boolean(pai && !configuredModules?.has(mod) && allowedModules.has(pai));
-                });
-                if (children.length === 0) return null;
-                return { ...item, children };
+                // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
+                // dos filhos. Atualmente Nina compartilha o módulo "nina".
+                const baseTo = item.children[0]?.to;
+                if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
+                return item;
               }
               return leafAllowed(item.to, allowedModules) ? item : null;
             })
