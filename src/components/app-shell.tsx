@@ -1167,20 +1167,20 @@ export function AppShell() {
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] p-0 border-0 text-white overflow-y-auto lg:hidden sidebar-scroll"
+            className="w-[280px] p-0 border-0 text-white lg:hidden flex flex-col h-full max-h-[100dvh] overflow-hidden"
             style={{ backgroundColor: corSidebar }}
             onPointerDownOutside={() => setMobileNavOpen(false)}
             onInteractOutside={() => setMobileNavOpen(false)}
             onEscapeKeyDown={() => setMobileNavOpen(false)}
           >
-            <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
+            <SheetHeader className="shrink-0 px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
                 <Activity className="h-5 w-5 shrink-0 text-white" />
                 ClinicaOS
                 <span className="sr-only">Menu</span>
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-2 py-3 space-y-4 sidebar-mono">
+            <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-4 sidebar-mono sidebar-scroll">
               {visibleNavRows.map((row) => (
                 <div key={row.label} className="space-y-1">
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
@@ -1242,7 +1242,7 @@ export function AppShell() {
                 </div>
               ))}
             </nav>
-            <div className="px-2 py-3 mt-auto border-t border-white/15">
+            <div className="shrink-0 px-2 py-3 border-t border-white/15 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <SidebarUserMenu
                 userId={user?.id}
                 userName={userName}
