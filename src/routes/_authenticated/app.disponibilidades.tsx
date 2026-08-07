@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft, Ban, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -470,7 +471,7 @@ function Page() {
       toast.error(`Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`);
       return;
     }
-    if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
+    if (!await confirmDialog(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
     try {
       const medicoById = new Map(medicos.map((m) => [m.id, m]));

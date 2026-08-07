@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Building2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -99,7 +100,7 @@ function FinEmpresasPage() {
 
   const handleDelete = async (e: Empresa) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm(`Excluir empresa "${e.nome}"?`)) return;
+    if (!await confirmDialog(`Excluir empresa "${e.nome}"?`)) return;
     const { error } = await supabase.from("fin_empresas").update({ ativo: false }).eq("id", e.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Empresa removida");

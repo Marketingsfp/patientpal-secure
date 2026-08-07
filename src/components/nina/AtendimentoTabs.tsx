@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -136,7 +137,7 @@ export function AtendDepartamentos() {
             <div className="flex gap-1">
               <Button size="icon" variant="ghost" onClick={() => { setEdit(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={async () => {
-                if (!confirm("Excluir departamento?")) return;
+                if (!await confirmDialog("Excluir departamento?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
                 catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -236,7 +237,7 @@ export function AtendMacros() {
             <div className="flex gap-1 shrink-0">
               <Button size="icon" variant="ghost" onClick={() => { setEdit(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={async () => {
-                if (!confirm("Excluir macro?")) return;
+                if (!await confirmDialog("Excluir macro?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluída"); }
                 catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -331,7 +332,7 @@ export function AtendKb() {
             <div className="flex gap-1 shrink-0">
               <Button size="icon" variant="ghost" onClick={() => { setEdit(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={async () => {
-                if (!confirm("Excluir artigo?")) return;
+                if (!await confirmDialog("Excluir artigo?")) return;
                 try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
                 catch (e: any) { mostrarErro(e); }
               }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -468,7 +469,7 @@ export function AtendPausas() {
               <div className="flex gap-1">
                 <Button size="icon" variant="ghost" onClick={() => { setEdit(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                 <Button size="icon" variant="ghost" onClick={async () => {
-                  if (!confirm("Excluir motivo?")) return;
+                  if (!await confirmDialog("Excluir motivo?")) return;
                   try { await excluir({ data: { clinicaId: clinicaId!, id: r.id } }); await carregar(); toast.success("Excluído"); }
                   catch (e: any) { mostrarErro(e); }
                 }}><Trash2 className="h-4 w-4 text-destructive" /></Button>

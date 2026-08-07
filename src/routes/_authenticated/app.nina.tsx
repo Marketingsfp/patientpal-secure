@@ -1,4 +1,5 @@
 import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X, Paperclip, Smile, Search, PanelRightClose, PanelRightOpen, MoreVertical, User, Tag, ArrowLeft } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -1262,7 +1263,7 @@ function TemplatesWhatsapp() {
   const remover = async (n: TplRow) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaId) return;
-    if (!confirm(`Excluir o template "${n.name}"? Esta ação não pode ser desfeita.`)) return;
+    if (!await confirmDialog(`Excluir o template "${n.name}"? Esta ação não pode ser desfeita.`)) return;
     try {
       await excluir({ data: { clinicaId, name: n.name } });
       toast.success("Template excluído");

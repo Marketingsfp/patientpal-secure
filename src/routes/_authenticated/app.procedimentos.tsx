@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Search, Pencil, Trash2, ClipboardList, Sparkles, CreditCard, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
@@ -851,7 +852,7 @@ function ProcedimentosPage() {
 
   const onDelete = async (p: Procedimento) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm(`Excluir ${p.nome}?`)) return;
+    if (!await confirmDialog(`Excluir ${p.nome}?`)) return;
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");
@@ -941,7 +942,7 @@ function ProcedimentosPage() {
     void loadCartoes();
   };
   const onDeleteCartao = async (c: Cartao) => {
-    if (!confirm(`Excluir ${c.nome}?`)) return;
+    if (!await confirmDialog(`Excluir ${c.nome}?`)) return;
     const { error } = await supabase.from("cartoes_convenio").delete().eq("id", c.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Excluído.");

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -679,7 +680,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     const procedimentosPreenchidos = form.procedimentos.filter((x) => !!x).length;
     const totalAnterior = initialProcedimentosCountRef.current;
     if (editId && totalAnterior > 0 && procedimentosPreenchidos === 0) {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         `Este médico tem ${totalAnterior} procedimento(s) cadastrado(s), mas a lista está vazia neste formulário.\n\nSe você salvar agora, TODOS os procedimentos vinculados serão apagados.\n\nDeseja continuar mesmo assim?`,
       );
       if (!ok) return;

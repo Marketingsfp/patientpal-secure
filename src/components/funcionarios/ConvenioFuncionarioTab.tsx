@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,7 +90,7 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, pacienteId, pa
   }
 
   async function desabilitar() {
-    if (!confirm("Deseja realmente desligar o Convênio Funcionário deste funcionário? Os dependentes também serão desativados.")) return;
+    if (!await confirmDialog("Deseja realmente desligar o Convênio Funcionário deste funcionário? Os dependentes também serão desativados.")) return;
     setBusy(true);
     const { error } = await supabase.rpc("hr_toggle_convenio_funcionario", {
       _hr_contrato_id: hrContratoId,
@@ -120,7 +121,7 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, pacienteId, pa
   }
 
   async function removerDependente(depId: string) {
-    if (!confirm("Remover este dependente do convênio?")) return;
+    if (!await confirmDialog("Remover este dependente do convênio?")) return;
     setBusy(true);
     const { error } = await supabase.rpc("hr_convenio_remove_dependente", { _dependente_id: depId });
     setBusy(false);

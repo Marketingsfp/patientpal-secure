@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -668,7 +669,7 @@ export function AgendaV2Shell() {
             .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
             .map((x) => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
             .join("\n");
-          cascatear = confirm(
+          cascatear = await confirmDialog(
             `Este agendamento faz parte de um pacote do orçamento, com mais ${irmaos.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`,
           );
         }

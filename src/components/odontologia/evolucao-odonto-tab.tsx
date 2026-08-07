@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { toast } from "sonner";
 import { Plus, Trash2, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,7 +78,7 @@ export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId
   }
 
   async function excluir(id: string) {
-    if (!confirm("Excluir esta evolução?")) return;
+    if (!await confirmDialog("Excluir esta evolução?")) return;
     const { error } = await supabase.from("odonto_evolucoes").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Evolução excluída");

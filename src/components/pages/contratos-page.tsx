@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import {
   FileSignature,
   Plus,
@@ -2522,7 +2523,7 @@ function DetalheContrato({
   const adicionarParcela = async () => {
     // Alerta se houver rascunhos pendentes — evita perder edições ao recarregar.
     if (totalRascunhos > 0) {
-      if (!confirm("Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?")) return;
+      if (!await confirmDialog("Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?")) return;
       setRascunhos({});
     }
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
@@ -2542,7 +2543,7 @@ function DetalheContrato({
   };
   const excluirParcela = async (id: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
+    if (!await confirmDialog("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
     const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Parcela removida.");
@@ -2636,9 +2637,9 @@ function DetalheContrato({
     }
   };
 
-  const descartarRascunhos = () => {
+  const descartarRascunhos = async () => {
     if (totalRascunhos === 0) return;
-    if (!confirm("Descartar todas as alterações não salvas?")) return;
+    if (!(await confirmDialog("Descartar todas as alterações não salvas?"))) return;
     setRascunhos({});
   };
 
@@ -2712,7 +2713,7 @@ function DetalheContrato({
       return;
     }
     if (!cancelado) return;
-    const ok = window.confirm(
+    const ok = await confirmDialog(
       "Reverter o cancelamento deste contrato?\n\nO status voltará para ATIVO e o plano/benefícios serão reativados. As mensalidades canceladas NÃO serão reabertas automaticamente — reabra manualmente se necessário.",
     );
     if (!ok) return;
@@ -3081,7 +3082,7 @@ function DetalheContrato({
   const marcarPagaHistorica = async (m: Mens) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (m.status === "pago") return;
-    const ok = confirm(
+    const ok = await confirmDialog(
       `Marcar a parcela ${isAdesao(m) ? "de adesão" : m.numero_parcela} como paga historicamente?\n\n` +
       `Ela ficará como PAGA no contrato, mas NÃO gerará movimento no caixa nem lançamento financeiro. ` +
       `Use apenas para regularizar pagamentos feitos fora do sistema.`
@@ -3112,7 +3113,7 @@ function DetalheContrato({
     const nums = alvos
       .map((m) => (isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa" : `#${m.numero_parcela}`))
       .join(", ");
-    const ok = confirm(
+    const ok = await confirmDialog(
       `Marcar ${alvos.length} parcela(s) como paga (histórica)?\n\n` +
       `Parcelas: ${nums}\n` +
       `Total: R$ ${total.toFixed(2).replace(".", ",")}\n\n` +

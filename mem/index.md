@@ -8,6 +8,7 @@ Independência de features/layout entre clínicas via feature flags por `clinica
 
 ## Memories
 - [Testes só com dados fictícios](mem://constraints/testes-dados-ficticios) — proibido tocar registros reais em qualquer simulação
+- [Sem confirm nativo](mem://constraints/sem-confirm-nativo) — toda confirmação usa confirmDialog de @/lib/confirm, nunca window.confirm/alert
 - [URL de publicação imutável](mem://constraints/url-publicacao-imutavel) — nunca alterar slug ou URL Lovable
 - [Config independente por clínica](mem://preferences/config-por-clinica) — parametrização sempre escopada por clinica_id
 - [Feature flags por clínica](mem://preferences/feature-flags-por-clinica) — Opção B: mudanças divergíveis via flag por clinica_id, sem fork

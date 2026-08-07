@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Download, Undo2, Search, Filter } from "lucide-react";
 import { toast } from "sonner";
@@ -250,7 +251,7 @@ function Page() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!confirm("Aprovar e estornar esta solicitação?")) return;
+    if (!await confirmDialog("Aprovar e estornar esta solicitação?")) return;
     setBusy(s.id);
     try {
       const r = await executarEstorno(s);

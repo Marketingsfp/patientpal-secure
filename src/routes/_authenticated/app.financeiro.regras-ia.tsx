@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Sparkles, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -82,7 +83,7 @@ function Page() {
   };
   const remove = async (r: Regra) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm(`Excluir "${r.nome}"?`)) return;
+    if (!await confirmDialog(`Excluir "${r.nome}"?`)) return;
     const { error } = await supabase.from("fin_regras_ia").delete().eq("id", r.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };

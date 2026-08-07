@@ -11,6 +11,7 @@ import {
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
+import { ConfirmDialogHost } from "@/lib/confirm";
 // ThemeSwitcher removido a pedido do usuário
 
 function NotFoundComponent() {
@@ -167,6 +168,7 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <Toaster richColors position="top-right" />
+        <ConfirmDialogHost />
       </AuthProvider>
     </QueryClientProvider>
   );

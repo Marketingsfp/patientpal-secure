@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Trash2, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -70,7 +71,7 @@ export function VisualizarImagemDialog({ open, onClose, imagem, onChanged, readO
 
   async function excluir() {
     if (!imagem) return;
-    if (!confirm("Confirmar exclusão desta imagem? Ela ficará arquivada no histórico.")) return;
+    if (!await confirmDialog("Confirmar exclusão desta imagem? Ela ficará arquivada no histórico.")) return;
     setExcluindo(true);
     try {
       await softDeleteOdontoImagem(imagem.id);

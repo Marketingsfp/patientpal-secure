@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Bell, Trash2, Pencil, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,7 +76,7 @@ function Page() {
   };
   const remove = async (l: Lemb) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm(`Excluir "${l.titulo}"?`)) return;
+    if (!await confirmDialog(`Excluir "${l.titulo}"?`)) return;
     const { error } = await supabase.from("fin_lembretes").delete().eq("id", l.id);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
   };

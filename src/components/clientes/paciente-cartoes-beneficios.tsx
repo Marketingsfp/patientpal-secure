@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmDialog } from "@/lib/confirm";
 import { Link } from "@tanstack/react-router";
 import { CreditCard, Plus, AlertTriangle, ExternalLink, Trash2, ChevronDown, ChevronRight, History } from "lucide-react";
 import { toast } from "sonner";
@@ -152,7 +153,7 @@ export function PacienteCartoesBeneficios({
   };
 
   const remover = async (depId: string) => {
-    if (!confirm("Excluir este dependente do contrato?")) return;
+    if (!await confirmDialog("Excluir este dependente do contrato?")) return;
     const { error } = await supabase
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: new Date().toISOString().slice(0,10) })

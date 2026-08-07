@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,7 +128,7 @@ function LMSAdminPage() {
 
   async function removerLicao(id: string) {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!confirm("Excluir lição?")) return;
+    if (!await confirmDialog("Excluir lição?")) return;
     const { error } = await supabase.from("lms_licoes").delete().eq("id", id);
     if (error) { mostrarErro(error); return; }
     setLicoes((p) => p.filter((x) => x.id !== id));
