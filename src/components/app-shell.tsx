@@ -523,8 +523,9 @@ export function AppShell() {
   // usePermissoes, então não faz sentido esconder grupos inteiros porque ele
   // clicou uma vez em "Gestor Clínico" / "Gestão de Pessoas" no seletor /app.
   // (O filtro de subsystem segue valendo para papéis operacionais.)
-  const isAdminFullMenu = clinicaAtual?.role === "admin";
-  const bypassSubsystem = isRodrigoFullAccess || isAdminFullMenu;
+  // O portal escolhido no hub (/app) define o contexto do menu para todos os
+  // perfis — inclusive admin. Sem portal escolhido, mostra tudo.
+  const bypassSubsystem = !subsystem;
 
   const filteredByGroup = bypassSubsystem
     ? navRows
@@ -1063,6 +1064,16 @@ export function AppShell() {
           <Link to="/app" className="lg:hidden flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
             <Activity className="h-5 w-5 shrink-0 text-white" />
           </Link>
+          {!isChooser && (
+            <Link
+              to="/app"
+              className="hidden lg:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
+              title="Trocar de portal"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="truncate max-w-[140px]">{subsystemLabel ?? "Portais"}</span>
+            </Link>
+          )}
           </div>
 
           <div className="flex items-center justify-center gap-3 min-w-0">
