@@ -570,11 +570,20 @@ export function AppShell() {
           const items = row.items
             .map((item) => {
               if (isParent(item)) {
-                // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
-                // dos filhos. Atualmente Nina compartilha o módulo "nina".
-                const baseTo = item.children[0]?.to;
-                if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
-                return item;
+                // Grupos com filhos de módulos diferentes (ex.: Financeiro)
+                // filtram aba por aba; submódulos ainda não configurados
+                // herdam o acesso do módulo-pai.
+                if (allowedModules === null) return item;
+                const children = item.children.filter((c) => {
+                  const mod = ROUTE_TO_MODULE[c.to];
+                  if (mod === null) return true;
+                  if (mod === undefined) return false;
+                  if (allowedModules.has(mod)) return true;
+                  const pai = SUBMODULE_PARENT[mod];
+                  return Boolean(pai && !configuredModules?.has(mod) && allowedModules.has(pai));
+                });
+                if (children.length === 0) return null;
+                return { ...item, children };
               }
               return leafAllowed(item.to, allowedModules) ? item : null;
             })
