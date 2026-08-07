@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -232,6 +233,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   // Voz
   const [recording, setRecording] = useState(false);
   const [voiceField, setVoiceField] = useState<keyof FormState | null>(null);
+  // Erros inline dos campos de nome
+  const [errosNome, setErrosNome] = useState<Record<string, string | null>>({});
   const recogRef = useRef<any>(null);
   const speechSupported = typeof window !== "undefined" &&
     ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
@@ -691,16 +694,20 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
-    // Campos que devem aceitar apenas letras (com acentos), espaço, hífen e apóstrofo.
+    // Campos que devem aceitar apenas letras (com acentos) e espaço.
     const somenteLetras = field === "nome" || field === "responsavel_nome";
-    const sanitize = (v: string) =>
-      somenteLetras
-        ? v.replace(/[^\p{L}\s'’\-\.]/gu, "").replace(/\s{2,}/g, " ")
-        : v;
     return {
       field: field as string,
       value: form[field] as string,
-      onChange: (v: string) => setForm(f => ({ ...f, [field]: sanitize(v) } as FormState)),
+      onChange: (v: string) => {
+        if (somenteLetras) {
+          const erro = erroCaractereNome(v);
+          setErrosNome((e) => ({ ...e, [field as string]: erro }));
+          setForm(f => ({ ...f, [field]: sanitizarNomePessoa(v) } as FormState));
+          return;
+        }
+        setForm(f => ({ ...f, [field]: v } as FormState));
+      },
       onVoice: () => active ? stopVoice() : startVoice(field),
       voiceActive: active,
       speechSupported,
@@ -709,13 +716,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const nomeTrim = form.nome.trim();
-    if (!nomeTrim) { toast.error("Informe o nome."); return; }
-    if (nomeTrim.length > 200) { toast.error("Nome muito longo (máx. 200 caracteres)."); return; }
-    // Exige pelo menos uma letra (aceita acentos) — bloqueia nomes só com números/símbolos
-    if (!/\p{L}/u.test(nomeTrim)) { toast.error("Nome deve conter letras."); return; }
-    // Bloqueia HTML/script embutido
-    if (/[<>]/.test(nomeTrim)) { toast.error("Nome contém caracteres inválidos."); return; }
+    const vNome = validarNomePessoa(form.nome);
+    if (!vNome.valido) {
+      setErrosNome((er) => ({ ...er, nome: vNome.mensagem }));
+      toast.error(vNome.mensagem ?? "Nome inválido.");
+      return;
+    }
+    const nomeTrim = vNome.valor;
+    const vResp = validarNomePessoa(form.responsavel_nome, { obrigatorio: false });
+    if (!vResp.valido) {
+      setErrosNome((er) => ({ ...er, responsavel_nome: vResp.mensagem }));
+      toast.error(vResp.mensagem ?? "Nome do responsável inválido.");
+      return;
+    }
     if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
     if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
     // Faixa plausível da data de nascimento
@@ -891,7 +904,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={200} /></div>
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <InputVoz {...fieldProps("nome")} required maxLength={200} />
+              {errosNome["nome"] && (
+                <p className="text-xs text-destructive">{errosNome["nome"]}</p>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>
@@ -999,7 +1018,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <p className="text-sm text-muted-foreground">
               Para menores de idade ou pacientes que precisam de acompanhante.
             </p>
-            <div className="space-y-1"><Label>Nome do responsável</Label><InputVoz {...fieldProps("responsavel_nome")} /></div>
+            <div className="space-y-1">
+              <Label>Nome do responsável</Label>
+              <InputVoz {...fieldProps("responsavel_nome")} maxLength={200} />
+              {errosNome["responsavel_nome"] && (
+                <p className="text-xs text-destructive">{errosNome["responsavel_nome"]}</p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("responsavel_cpf")} /></div>
               <div className="space-y-1"><Label>Telefone</Label><InputVoz {...fieldProps("responsavel_telefone")} /></div>
