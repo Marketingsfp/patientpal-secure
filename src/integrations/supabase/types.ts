@@ -7325,7 +7325,7 @@ export type Database = {
       planos_assinatura_arquivo: {
         Row: {
           ativo: boolean | null
-          clinica_id: string | null
+          clinica_id: string
           created_at: string | null
           descricao_beneficios: string | null
           fidelidade_meses: number | null
@@ -7343,7 +7343,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
-          clinica_id?: string | null
+          clinica_id: string
           created_at?: string | null
           descricao_beneficios?: string | null
           fidelidade_meses?: number | null
@@ -7361,7 +7361,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
-          clinica_id?: string | null
+          clinica_id?: string
           created_at?: string | null
           descricao_beneficios?: string | null
           fidelidade_meses?: number | null
