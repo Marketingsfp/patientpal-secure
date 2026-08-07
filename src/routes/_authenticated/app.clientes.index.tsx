@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
@@ -297,6 +298,8 @@ function ClientesPage() {
   const filtrados = items;
 
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [excluindoLote, setExcluindoLote] = useState(false);
   const excluirCliente = async (p: Paciente) => {
     const ok = await confirmDialog({
       title: "Excluir cliente",
@@ -317,7 +320,41 @@ function ClientesPage() {
       return;
     }
     setItemsManual((cur) => cur.filter((x) => x.id !== p.id));
+    setSelecionados((cur) => cur.filter((id) => id !== p.id));
     toast.success("Cliente excluído.");
+    refrescar();
+  };
+
+  const excluirSelecionados = async () => {
+    if (selecionados.length === 0) return;
+    const ok = await confirmDialog({
+      title: `Excluir ${selecionados.length} cliente(s)`,
+      description: `Tem certeza que deseja excluir ${selecionados.length} cliente(s) selecionado(s)? Esta ação não pode ser desfeita.`,
+      tone: "danger",
+      confirmText: "Excluir selecionados",
+    });
+    if (!ok) return;
+    setExcluindoLote(true);
+    const excluidos: string[] = [];
+    let bloqueados = 0;
+    for (const id of selecionados) {
+      const { error } = await supabase.from("pacientes").delete().eq("id", id);
+      if (error) {
+        if ((error as { code?: string }).code === "23503") bloqueados++;
+        else { mostrarErro(error); break; }
+      } else {
+        excluidos.push(id);
+      }
+    }
+    setExcluindoLote(false);
+    if (excluidos.length > 0) {
+      setItemsManual((cur) => cur.filter((x) => !excluidos.includes(x.id)));
+      toast.success(`${excluidos.length} cliente(s) excluído(s).`);
+    }
+    if (bloqueados > 0) {
+      toast.error(`${bloqueados} cliente(s) possuem registros vinculados e não puderam ser excluídos.`);
+    }
+    setSelecionados([]);
     refrescar();
   };
 
@@ -495,6 +532,15 @@ function ClientesPage() {
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
             <TableRow className="bg-muted">
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Selecionar todos"
+                  checked={filtrados.length > 0 && selecionados.length === filtrados.length
+                    ? true
+                    : selecionados.length > 0 ? "indeterminate" : false}
+                  onCheckedChange={(v: boolean | "indeterminate") => setSelecionados(v ? filtrados.map((p) => p.id) : [])}
+                />
+              </TableHead>
               <TableHead className="w-28">Prontuário</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead className="w-36">CPF</TableHead>
@@ -508,14 +554,14 @@ function ClientesPage() {
           <TableBody>
             {loading ? (
               <TableSkeletonRows
-                cols={8}
-                fallback={<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
+                cols={9}
+                fallback={<TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
               />
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="p-0">
+                <TableCell colSpan={9} className="p-0">
                   <EmptyState
                     icon={<Users className="h-10 w-10" />}
                     titulo="Nenhum cliente encontrado."
@@ -530,7 +576,14 @@ function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : filtrados.map(p => (
-              <TableRow key={p.id} className="h-12">
+              <TableRow key={p.id} className="h-12" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
+                <TableCell className="w-10">
+                  <Checkbox
+                    aria-label={`Selecionar ${p.nome}`}
+                    checked={selecionados.includes(p.id)}
+                    onCheckedChange={(v: boolean | "indeterminate") => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
+                  />
+                </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
                 <TableCell className="max-w-[320px] font-medium">
                   <div className="flex min-w-0 items-center gap-2">
@@ -593,6 +646,31 @@ function ClientesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {selecionados.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur">
+            <span className="text-sm font-medium whitespace-nowrap">
+              {selecionados.length} selecionado{selecionados.length > 1 ? "s" : ""}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setSelecionados([])} disabled={excluindoLote}>
+              Limpar
+            </Button>
+            {podeEscrever && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-full"
+                disabled={excluindoLote}
+                onClick={() => void excluirSelecionados()}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                {excluindoLote ? "Excluindo…" : "Excluir selecionados"}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
