@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -232,6 +233,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   // Voz
   const [recording, setRecording] = useState(false);
   const [voiceField, setVoiceField] = useState<keyof FormState | null>(null);
+  // Erros inline dos campos de nome
+  const [errosNome, setErrosNome] = useState<Record<string, string | null>>({});
   const recogRef = useRef<any>(null);
   const speechSupported = typeof window !== "undefined" &&
     ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
