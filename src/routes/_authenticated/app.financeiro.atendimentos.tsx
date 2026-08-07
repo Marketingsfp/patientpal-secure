@@ -2440,7 +2440,7 @@ function AtendimentosPage() {
       </div>
 
       {/* Filtros */}
-      <Card>
+      <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
             <div className="space-y-1.5">
@@ -2536,13 +2536,13 @@ function AtendimentosPage() {
             {/* Cards de valores - mais compactos e próximos */}
             {isMedicoOnly ? (
               <div className="flex gap-1.5 min-w-[140px]">
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
+                <div className="flex-1 rounded-lg border-0 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
                   <div>
                     <div className="text-[8px] text-muted-foreground uppercase leading-tight">A receber</div>
                     <div className="text-xs font-bold text-primary leading-tight">{fmt(totais.aReceber)}</div>
                   </div>
                 </div>
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
+                <div className="flex-1 rounded-lg border-0 bg-muted/60 px-2 py-1 text-center h-9 flex items-center justify-center">
                   <div>
                     <div className="text-[8px] text-muted-foreground uppercase leading-tight">Recebido</div>
                     <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
@@ -2551,13 +2551,13 @@ function AtendimentosPage() {
               </div>
             ) : (
               <div className="flex gap-1.5 min-w-[140px]">
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
+                <div className="flex-1 rounded-lg border-0 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
                   <div>
                     <div className="text-[8px] text-muted-foreground uppercase leading-tight">A pagar</div>
                     <div className="text-xs font-bold text-amber-600 leading-tight">{fmt(totais.aReceber)}</div>
                   </div>
                 </div>
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
+                <div className="flex-1 rounded-lg border-0 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
                   <div>
                     <div className="text-[8px] text-muted-foreground uppercase leading-tight">Pago</div>
                     <div className="text-xs font-bold text-emerald-600 leading-tight">{fmt(totais.pago)}</div>
@@ -2569,7 +2569,7 @@ function AtendimentosPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-0 shadow-sm overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
             <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
@@ -2579,9 +2579,12 @@ function AtendimentosPage() {
               Nenhum atendimento no período/filtro selecionado.
             </div>
           ) : (
-            <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
-              <TableHeader className="sticky top-0 z-20">
-                <TableRow className="bg-muted">
+            <Table
+              containerClassName="max-h-[70vh]"
+              className="max-lg:table max-lg:overflow-visible [&_tbody_tr]:border-0 [&_tbody_tr:nth-child(even)]:bg-muted/25"
+            >
+              <TableHeader className="sticky top-0 z-20 border-b-0 [&_th]:shadow-none [&_th]:bg-background">
+                <TableRow className="bg-transparent">
                   {!isMedicoOnly && (
                     <TableHead className="w-8 px-2">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
