@@ -1008,12 +1008,13 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="center sm">SEM COBRANCA NESTA UNIDADE</div>
     <div class="sep"></div>` : "";
   const externoValoresHtml = ehExterno ? `
-    <div class="sep"></div>
-    <table>
-      <tr><td class="label">VALOR TABELA:</td><td class="v right">${fmtBRL(externoValorTabela)}</td></tr>
-      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(0)}</td></tr>
-      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(externoRepasse)}</td></tr>
-    </table>` : "";
+    <div class="box-total">
+      <div class="row"><div class="label">VALOR TABELA</div><div class="v right">${fmtBRL(externoValorTabela)}</div></div>
+      <div class="divisao">
+        <div class="row"><div class="label">CLÍNICA</div><div class="v right">${fmtBRL(0)}</div></div>
+        <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(externoRepasse)}</div></div>
+      </div>
+    </div>` : "";
 
   const ticketHtml = `
   <div class="ticket">
@@ -1021,77 +1022,74 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
-
-    <div class="sep"></div>
-    <div class="center lg">${ehExterno ? "GUIA DE ATENDIMENTO EXTERNO" : "GUIA DE ATENDIMENTO"}</div>
-    <div class="sep"></div>
+    <div class="titulo-guia">${ehExterno ? "Guia de Atendimento Externo" : "Guia de Atendimento"}</div>
     ${externoSeloHtml}
-    <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
-    ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
-    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
-    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
-    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-    ${convLabel ? `<div class="center sm">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    <div class="card">
+      <div class="nome-paciente">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+      <div class="grid2">
+        ${prontuario ? `<div class="campo"><span class="k">Prontuário</span><span class="v2">${esc(prontuario)}</span></div>` : ""}
+        ${paciente?.cpf ? `<div class="campo"><span class="k">CPF</span><span class="v2">${esc(paciente.cpf)}</span></div>` : ""}
+        ${paciente?.telefone ? `<div class="campo"><span class="k">Telefone</span><span class="v2">${esc(paciente.telefone)}</span></div>` : ""}
+        ${paciente?.data_nascimento ? `<div class="campo"><span class="k">Nascimento</span><span class="v2">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+        ${convLabel ? `<div class="campo full"><span class="k">Convênio</span><span class="v2">${esc(convLabel)}</span></div>` : ""}
+      </div>
+    </div>
 
-    <div class="sep"></div>
+    <div class="card">
+      <div class="grid2">
+        <div class="campo"><span class="k">Ficha</span><span class="v2">${ficha}</span></div>
+        <div class="campo"><span class="k">Horário</span><span class="v2">${fmtData(a.inicio)}</span></div>
+        <div class="campo full"><span class="k">Profissional</span><span class="v2">${esc(medicoNome)}</span></div>
+        ${usuarioFinalNome ? `<div class="campo full"><span class="k">Atendente</span><span class="v2">${esc(usuarioFinalNome)}</span></div>` : ""}
+      </div>
+    </div>
 
-    <table>
-      <tr><td class="label" colspan="2">FICHA: <span class="v">${ficha}</span></td></tr>
-      <tr><td class="label" colspan="2">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
-      <tr><td class="label" colspan="2">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
-    </table>
-
-    <div class="sep"></div>
-
-    <table>
-      <tr class="bold">
-        <td class="qtd">QTD</td>
-        <td>SERVIÇO</td>
-      </tr>
-      <tr>
-        <td class="qtd">1</td>
-        <td>${esc(procNome)}</td>
-      </tr>
+    <table class="tbl-serv">
+      <thead>
+        <tr><th class="qtd">Qtd</th><th>Serviço</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="qtd">1</td><td>${esc(procNome)}</td></tr>
+      </tbody>
     </table>
     ${sinalHtml}
 
     ${ehExterno ? externoValoresHtml : valor > 0 ? `
-    <div class="row" style="margin-top:8px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
-      <div class="bold lg">${fmtBRL(valor)}</div>
+    <div class="box-total">
+      <div class="linha-principal">
+        <div>
+          <span class="k label">Valor recebido</span>
+          <div class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</div>
+        </div>
+        <div class="valor-grande">${fmtBRL(valor)}</div>
+      </div>
+
+      ${isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
+
+      ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
+      <table style="margin-top:2px">
+        ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+        <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
+      </table>
+      ` : ""}
+
+      <div class="divisao">
+        <div class="row"><div class="label">CLÍNICA</div><div class="v right">${fmtBRL(clinica)}</div></div>
+        <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(prestador)}</div></div>
+      </div>
     </div>
-
-    ${isMisto ? `
-    <table style="margin-top:4px">
-      ${detalheRows}
-    </table>
-    ` : ""}
-
-    ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
-    <table>
-      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
-      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
-    </table>
-    ` : ""}
-
-    <div class="sep"></div>
-    <table>
-      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
-      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
-    </table>
     ` : (isGratuidade && (clinica > 0 || prestador > 0) ? `
-    <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
-    <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
-    <div class="sep"></div>
-    <table>
-      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
-      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
-    </table>
+    <div class="box-total">
+      <div class="center bold lg" style="letter-spacing:2px">GRATUIDADE</div>
+      <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+      <div class="divisao">
+        <div class="row"><div class="label">CLÍNICA</div><div class="v right">${fmtBRL(clinica)}</div></div>
+        <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(prestador)}</div></div>
+      </div>
+    </div>
     ` : "")}
 
-    <div class="sep"></div>
-    <div class="row sm">
+    <div class="rodape-guia">
       <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
