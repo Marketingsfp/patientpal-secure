@@ -2630,7 +2630,13 @@ function AtendimentosPage() {
                           : "bg-slate-50 dark:bg-slate-900/40";
 
                   return (
-                    <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
+                    <TableRow
+                      key={`${a.origem}:${a.id}`}
+                      className={cn(
+                        "border-0 transition-colors duration-150 hover:bg-muted/40 [&>td]:border-b [&>td]:border-border/40 [&>td]:py-2.5",
+                        rowBg,
+                      )}
+                    >
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
                           {(a.valor_medico ?? 0) > 0 ? (
