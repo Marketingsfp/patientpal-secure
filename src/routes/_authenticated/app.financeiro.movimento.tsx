@@ -667,9 +667,13 @@ function Page() {
           });
         } catch { /* auditoria best-effort */ }
       }
-      toast.success("Lançamento estornado");
-      // Registra o estorno na fila da aba "Estorno" para acompanhamento.
-      await registrarNaFilaEstorno(l, lanc?.agendamento_id ?? null, Number(lanc?.valor ?? l.valor));
+      // Registra o estorno como solicitação PENDENTE na aba "Estorno".
+      const ok = await registrarNaFilaEstorno(l, lanc?.agendamento_id ?? null, Number(lanc?.valor ?? l.valor));
+      toast.success(
+        ok
+          ? "Lançamento estornado — solicitação enviada para a aba Estorno (pendente)."
+          : "Lançamento estornado",
+      );
       await load();
       await loadResumo();
     } finally {
@@ -679,21 +683,20 @@ function Page() {
 
   /**
    * Garante que todo estorno feito direto no Mov. Caixa apareça na aba
-   * "Estorno": cria (ou reaproveita) a solicitação e já a marca como aprovada.
+   * "Estorno" com status PENDENTE, alimentando o contador "Pendentes".
    * Best-effort — se falhar, o estorno em si continua válido.
    */
   const registrarNaFilaEstorno = async (
     l: Lanc,
     agendamentoId: string | null,
     valor: number,
-  ) => {
-    if (!clinicaAtual) return;
+  ): Promise<boolean> => {
+    if (!clinicaAtual) return false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return false;
       const agora = new Date().toISOString();
       const hoje = agora.slice(0, 10);
-      const resposta = "Estorno executado diretamente no Movimento de Caixa.";
 
       // Reaproveita solicitação pendente já existente para este lançamento.
       const { data: existente } = await supabase
@@ -703,9 +706,9 @@ function Page() {
         .eq("status", "pendente")
         .maybeSingle();
 
-      let solicitacaoId = existente?.id ?? null;
-      if (!solicitacaoId) {
-        const { data: nova, error: eIns } = await supabase
+      if (existente?.id) return true;
+
+      const { data: nova, error: eIns } = await supabase
           .from("estorno_solicitacoes")
           .insert({
             clinica_id: clinicaAtual.clinica_id,
@@ -723,23 +726,11 @@ function Page() {
           })
           .select("id")
           .maybeSingle();
-        if (eIns) return;
-        solicitacaoId = nova?.id ?? null;
-      }
-      if (!solicitacaoId) return;
-
-      await supabase
-        .from("estorno_solicitacoes")
-        .update({
-          status: "aprovado",
-          resolvido_por: user.id,
-          resolvido_em: agora,
-          resposta,
-          data_estorno: hoje,
-        })
-        .eq("id", solicitacaoId);
+      if (eIns || !nova?.id) return false;
+      return true;
     } catch {
       /* registro na fila é best-effort */
+      return false;
     }
   };
 
