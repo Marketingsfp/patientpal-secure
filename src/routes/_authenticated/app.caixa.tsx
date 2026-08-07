@@ -278,6 +278,12 @@ const TIPO_CLASS: Record<MovTipo, string> = {
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
 const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
+/** "YYYY-MM-DD" no fuso local a partir de um ISO. */
+function localYMDStr(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Extrai o nome do serviço da descrição de um movimento como fallback, quando
  *  não há enriquecimento via fin_lancamentos/agendamento. */
 function servicoFromDescricao(desc: string | null): string | null {
