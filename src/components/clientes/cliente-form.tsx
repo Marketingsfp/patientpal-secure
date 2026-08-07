@@ -904,7 +904,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={200} /></div>
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <InputVoz {...fieldProps("nome")} required maxLength={200} />
+              {errosNome["nome"] && (
+                <p className="text-xs text-destructive">{errosNome["nome"]}</p>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>
@@ -1012,7 +1018,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <p className="text-sm text-muted-foreground">
               Para menores de idade ou pacientes que precisam de acompanhante.
             </p>
-            <div className="space-y-1"><Label>Nome do responsável</Label><InputVoz {...fieldProps("responsavel_nome")} /></div>
+            <div className="space-y-1">
+              <Label>Nome do responsável</Label>
+              <InputVoz {...fieldProps("responsavel_nome")} maxLength={200} />
+              {errosNome["responsavel_nome"] && (
+                <p className="text-xs text-destructive">{errosNome["responsavel_nome"]}</p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("responsavel_cpf")} /></div>
               <div className="space-y-1"><Label>Telefone</Label><InputVoz {...fieldProps("responsavel_telefone")} /></div>
