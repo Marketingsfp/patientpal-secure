@@ -3001,8 +3001,8 @@ function AtendimentosPage() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Barra de ações do rodapé: repete botões quando houver seleção */}
       {!isMedicoOnly && selectedItems.length > 0 && (
