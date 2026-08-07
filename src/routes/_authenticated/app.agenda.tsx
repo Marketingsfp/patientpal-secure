@@ -5266,6 +5266,34 @@ function AgendaPage() {
     }
   };
 
+  // Confirmação da autorização do convênio (libera a execução do atendimento).
+  const alternarAutorizacaoConvenio = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const novo = !a.convenio_autorizado;
+    if (!novo) {
+      const ok = await confirmDialog(
+        "Remover a autorização do convênio deste atendimento? Ele voltará a ficar bloqueado para execução.",
+      );
+      if (!ok) return;
+    }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        convenio_autorizado: novo,
+        convenio_autorizado_em: novo ? new Date().toISOString() : null,
+        convenio_autorizado_por: novo ? (userId ?? null) : null,
+      } as never)
+      .eq("id", a.id);
+    if (error) mostrarErro(error);
+    else {
+      toast.success(novo ? "Autorização do convênio confirmada." : "Autorização do convênio removida.");
+      await load();
+    }
+  };
+
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
