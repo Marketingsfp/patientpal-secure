@@ -1039,6 +1039,7 @@ export function AppShell() {
               showName
               onChangePassword={() => setPwOpen(true)}
               onSignOut={() => void handleSignOut()}
+              onSwitchPortal={() => navigate({ to: "/app" })}
             />
           </div>
         </aside>
@@ -1263,6 +1264,7 @@ export function AppShell() {
                 showName
                 onChangePassword={() => setPwOpen(true)}
                 onSignOut={() => void handleSignOut()}
+                onSwitchPortal={() => navigate({ to: "/app" })}
               />
             </div>
           </SheetContent>
