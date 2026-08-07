@@ -726,7 +726,6 @@ function Page() {
           })
           .select("id")
           .maybeSingle();
-      void agora;
       if (eIns || !nova?.id) return false;
       return true;
     } catch {
