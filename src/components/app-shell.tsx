@@ -50,8 +50,6 @@ import {
   ArrowRightLeft,
   Inbox,
   FileBarChart2,
-  Moon,
-  Sun,
   Menu as MenuIcon,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
@@ -70,7 +68,6 @@ import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
-import { useTheme } from "@/hooks/use-theme";
 import { useMenuOrdem } from "@/hooks/use-menu-ordem";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
@@ -294,7 +291,6 @@ export function AppShell() {
   // Pacote de melhorias de UX (navegação SPA, transição de rota, dark mode) —
   // flag `ux_melhorias`, ligada só para a São Francisco de Paula.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const theme = useTheme(uxMelhorias);
   // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
   const { ordem: menuOrdem, salvar: salvarMenuOrdem } = useMenuOrdem(uxMelhorias);
   const [dragMenu, setDragMenu] = useState<{ row: string; key: string } | null>(null);
@@ -1108,18 +1104,6 @@ export function AppShell() {
             <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
               <UniversalSearchBar />
             </div>
-            {uxMelhorias && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0 rounded-full text-white hover:bg-white/10 hover:text-white"
-                title={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
-                aria-label={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
-                onClick={() => theme.set(theme.isDark ? "light" : "dark")}
-              >
-                {theme.isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="sm"

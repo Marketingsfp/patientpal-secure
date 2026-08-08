@@ -169,19 +169,10 @@ export function TotemPage() {
     return () => stopCamera();
   }, []);
 
-  // Modo automático (claro das 06h–17h, escuro caso contrário). Aplica a
-  // classe `dark` no <html> enquanto o totem estiver aberto e limpa ao sair.
+  // Modo escuro desativado globalmente: o totem sempre usa o tema claro.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const html = document.documentElement;
-    const apply = () => {
-      const h = new Date().getHours();
-      const isDark = h < 6 || h >= 17;
-      html.classList.toggle("dark", isDark);
-    };
-    apply();
-    const id = setInterval(apply, 60_000);
-    return () => { clearInterval(id); html.classList.remove("dark"); };
+    document.documentElement.classList.remove("dark");
   }, []);
 
   // Telas de conclusão voltam sozinhas para o menu inicial — a senha já saiu
