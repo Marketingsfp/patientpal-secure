@@ -1026,6 +1026,7 @@ export function AppShell() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
+        {!isChooser && (
         <header
           className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
           style={{ backgroundColor: corSidebar }}
@@ -1136,6 +1137,7 @@ export function AppShell() {
             </div>
           </div>
         </header>
+        )}
         <main
           key={uxMelhorias ? location.pathname : "static"}
           className={cn(
