@@ -6537,7 +6537,7 @@ function AgendaPage() {
                 </Button>
               </DialogTrigger>
             )}
-            <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] overflow-y-auto scroll-hidden p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
               <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
                   {editing

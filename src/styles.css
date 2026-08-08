@@ -660,6 +660,15 @@ html.theme-emerald {
 }
 .sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
+/* Rolagem sem barra visível (modais em mobile) */
+.scroll-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.scroll-hidden::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
 /* Menu lateral — tipografia monoespaçada (JetBrains Mono) */
 .sidebar-mono,
 .sidebar-mono button,
