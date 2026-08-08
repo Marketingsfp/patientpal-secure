@@ -776,7 +776,9 @@ function AppShellInner() {
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [location.pathname, collapsed, openGroups]);
+    // Não incluir `openGroups`: abrir/fechar um submenu não deve rolar a
+    // sidebar de volta para o item ativo.
+  }, [location.pathname, collapsed]);
 
   if (loading || !user) {
     return (
