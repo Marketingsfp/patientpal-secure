@@ -8799,13 +8799,16 @@ function AgendaPage() {
                 <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[18%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[16%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
                 <TableHead className="w-[13%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-[9%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+                <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                  Observações
+                </TableHead>
                 <TableHead className="w-[13%] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
@@ -8814,10 +8817,10 @@ function AgendaPage() {
             <TableBody>
               {loading ? (
                 <TableSkeletonRows
-                  cols={10}
+                  cols={11}
                   fallback={
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
@@ -8825,13 +8828,13 @@ function AgendaPage() {
                 />
               ) : !clinicaAtual ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     Selecione uma clínica.
                   </TableCell>
                 </TableRow>
               ) : paginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     <AgendaEmptyState
                       apenasData={apenasData}
                       dataRef={dataRef}
@@ -9007,6 +9010,23 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
+                      <TableCell className="py-1.5 px-2 align-middle">
+                        {(() => {
+                          const obs = (a.observacoes ?? "").trim();
+                          if (ehLivre || ocultarPaciente || !obs) {
+                            return <span className="text-xs text-muted-foreground">—</span>;
+                          }
+                          return (
+                            <span
+                              title={obs}
+                              className="block truncate max-w-[180px] text-xs text-foreground/90"
+                            >
+                              {obs}
+                            </span>
+                          );
+                        })()}
+                      </TableCell>
+
                       <TableCell className="py-1.5 px-3 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
