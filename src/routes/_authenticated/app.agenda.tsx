@@ -8602,7 +8602,7 @@ function AgendaPage() {
         <div className="h-4 xl:h-8"></div>
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
-          {loading ? (
+          {loading && items.length === 0 ? (
             <ListSkeleton rows={6} fallback={<div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>} />
           ) : !clinicaAtual ? (
             <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
@@ -8849,7 +8849,7 @@ function AgendaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {loading && items.length === 0 ? (
                 <TableSkeletonRows
                   cols={11}
                   fallback={
