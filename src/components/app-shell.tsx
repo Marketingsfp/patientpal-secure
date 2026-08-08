@@ -281,6 +281,58 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 ];
 
 export function AppShell() {
+  return <AppShellInner />;
+}
+
+function MobileNavParent({
+  item,
+  onNavigate,
+}: {
+  item: NavParent;
+  onNavigate: (href: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white rounded-full hover:bg-white/10"
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
+      </button>
+      <div
+        className={`grid transition-all duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+      >
+        <div className="overflow-hidden space-y-0.5">
+          {item.children.map((child) => {
+            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+            return (
+              <a
+                key={`${child.to}#${child.hash ?? ""}`}
+                href={href}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                  e.preventDefault();
+                  onNavigate(href);
+                }}
+                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
+              >
+                <child.icon className="h-4 w-4 shrink-0" />
+                <span className="leading-snug break-words">{child.label}</span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppShellInner() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { allowed: allowedModules, configured: configuredModules, loading: permsLoading } = usePermissoes();
@@ -1172,31 +1224,14 @@ export function AppShell() {
                   {row.items.map((item) => {
                     if (isParent(item)) {
                       return (
-                        <div key={item.label} className="space-y-0.5">
-                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white/70">
-                            <item.icon className="h-4 w-4 shrink-0" />
-                            <span className="leading-snug break-words">{item.label}</span>
-                          </div>
-                          {item.children.map((child) => {
-                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
-                            return (
-                              <a
-                                key={`${child.to}#${child.hash ?? ""}`}
-                                href={href}
-                                onClick={(e) => {
-                                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                                  e.preventDefault();
-                                  setMobileNavOpen(false);
-                                  irPara(href);
-                                }}
-                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
-                              >
-                                <child.icon className="h-4 w-4 shrink-0" />
-                                <span className="leading-snug break-words">{child.label}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
+                        <MobileNavParent
+                          key={item.label}
+                          item={item}
+                          onNavigate={(href) => {
+                            setMobileNavOpen(false);
+                            irPara(href);
+                          }}
+                        />
                       );
                     }
                     const active =
