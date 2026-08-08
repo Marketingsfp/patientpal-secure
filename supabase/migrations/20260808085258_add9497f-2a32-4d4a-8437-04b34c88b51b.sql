@@ -1,0 +1,1 @@
+REVOKE ALL ON public.integration_secrets FROM anon;
