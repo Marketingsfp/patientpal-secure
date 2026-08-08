@@ -7033,7 +7033,7 @@ function AgendaPage() {
                           ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                           : "Desconto"}
                       </Button>
-                      <div className="flex flex-nowrap gap-2 sm:justify-end">
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:flex-nowrap sm:justify-end">
                         <Button type="button" variant="outline" onClick={fecharDialogoAgenda} disabled={saving}>
                           Cancelar
                         </Button>
