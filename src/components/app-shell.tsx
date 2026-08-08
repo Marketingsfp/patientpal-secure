@@ -792,7 +792,7 @@ export function AppShell() {
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
             "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            "w-56 2xl:w-64",
+            collapsed ? "w-16" : "w-72 2xl:w-80",
           )}
           style={{ backgroundColor: corSidebar }}
         >
@@ -906,7 +906,7 @@ export function AppShell() {
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-4 w-4 shrink-0" />
-                                <span className="truncate flex-1 text-left">{item.label}</span>
+                                <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
                                 <ChevronDown
                                   className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
                                 />
@@ -930,7 +930,7 @@ export function AppShell() {
                                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-semibold tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-4 w-4 shrink-0" />
-                                      {!collapsed && <span className="truncate">{child.label}</span>}
+                                      {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
                                     </a>
                                   );
                                 }
@@ -962,7 +962,7 @@ export function AppShell() {
                                     }${hoverScaleCls}`}
                                   >
                                     <child.icon className="h-4 w-4 shrink-0" />
-                                    {!collapsed && <span className="truncate">{child.label}</span>}
+                                    {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
                                   </a>
                                 );
                               })}
@@ -1001,7 +1001,7 @@ export function AppShell() {
                           )}
                         >
                           <item.icon className="h-4 w-4 shrink-0" />
-                          {!collapsed && <span className="truncate">{item.label}</span>}
+                          {!collapsed && <span className="leading-snug break-words">{item.label}</span>}
                         </a>
                       );
                     })}
@@ -1166,7 +1166,7 @@ export function AppShell() {
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] p-0 border-0 text-white lg:hidden flex flex-col h-full max-h-[100dvh] overflow-hidden"
+            className="w-[300px] p-0 border-0 text-white lg:hidden flex flex-col h-full max-h-[100dvh] overflow-hidden"
             style={{ backgroundColor: corSidebar }}
             onPointerDownOutside={() => setMobileNavOpen(false)}
             onInteractOutside={() => setMobileNavOpen(false)}
@@ -1191,7 +1191,7 @@ export function AppShell() {
                         <div key={item.label} className="space-y-0.5">
                           <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white/70">
                             <item.icon className="h-4 w-4 shrink-0" />
-                            <span className="truncate">{item.label}</span>
+                            <span className="leading-snug break-words">{item.label}</span>
                           </div>
                           {item.children.map((child) => {
                             const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
@@ -1208,7 +1208,7 @@ export function AppShell() {
                                 className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
-                                <span className="truncate">{child.label}</span>
+                                <span className="leading-snug break-words">{child.label}</span>
                               </a>
                             );
                           })}
@@ -1234,7 +1234,7 @@ export function AppShell() {
                         }`}
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
+                        <span className="leading-snug break-words">{item.label}</span>
                       </a>
                     );
                   })}
