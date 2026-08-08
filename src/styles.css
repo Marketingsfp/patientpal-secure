@@ -669,29 +669,20 @@ html.theme-emerald {
 }
 .scroll-hidden::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
-/* Mobile: nenhuma barra de rolagem visível em diálogos, popovers, selects e listas aninhadas */
-@media (max-width: 767px) {
-  [role="dialog"],
-  [role="dialog"] *,
-  [data-radix-popper-content-wrapper],
-  [data-radix-popper-content-wrapper] *,
-  [data-radix-select-viewport],
-  [role="listbox"],
-  [role="listbox"] * {
-    scrollbar-width: none !important;
+/* Mobile: nenhuma barra de rolagem visível em todo o app (rolagem por toque mantida) */
+@media (max-width: 768px) {
+  html, body, #root, * {
     -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
     -webkit-overflow-scrolling: touch;
   }
-  [role="dialog"]::-webkit-scrollbar,
-  [role="dialog"] *::-webkit-scrollbar,
-  [data-radix-popper-content-wrapper]::-webkit-scrollbar,
-  [data-radix-popper-content-wrapper] *::-webkit-scrollbar,
-  [data-radix-select-viewport]::-webkit-scrollbar,
-  [role="listbox"]::-webkit-scrollbar,
-  [role="listbox"] *::-webkit-scrollbar {
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  #root::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    display: none !important;
     width: 0 !important;
     height: 0 !important;
-    display: none !important;
   }
 }
 
