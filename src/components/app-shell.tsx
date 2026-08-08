@@ -1172,31 +1172,14 @@ export function AppShell() {
                   {row.items.map((item) => {
                     if (isParent(item)) {
                       return (
-                        <div key={item.label} className="space-y-0.5">
-                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white/70">
-                            <item.icon className="h-4 w-4 shrink-0" />
-                            <span className="leading-snug break-words">{item.label}</span>
-                          </div>
-                          {item.children.map((child) => {
-                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
-                            return (
-                              <a
-                                key={`${child.to}#${child.hash ?? ""}`}
-                                href={href}
-                                onClick={(e) => {
-                                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                                  e.preventDefault();
-                                  setMobileNavOpen(false);
-                                  irPara(href);
-                                }}
-                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
-                              >
-                                <child.icon className="h-4 w-4 shrink-0" />
-                                <span className="leading-snug break-words">{child.label}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
+                        <MobileNavParent
+                          key={item.label}
+                          item={item}
+                          onNavigate={(href) => {
+                            setMobileNavOpen(false);
+                            irPara(href);
+                          }}
+                        />
                       );
                     }
                     const active =
