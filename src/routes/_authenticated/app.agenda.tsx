@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DateTimeField } from "@/components/agenda/datetime-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
@@ -6840,14 +6841,13 @@ function AgendaPage() {
                         <Label className="text-xs font-semibold text-slate-700">
                           Data consulta/exame <span className="text-rose-500">*</span>
                         </Label>
-                        <Input
-                          type="datetime-local"
+                        <DateTimeField
                           value={form.inicio}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setForm((f) => ({
                               ...f,
-                              inicio: e.target.value,
-                              fim: calcFimAuto(e.target.value, f.medico_id),
+                              inicio: v,
+                              fim: calcFimAuto(v, f.medico_id),
                             }))
                           }
                           required
