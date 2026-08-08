@@ -296,7 +296,11 @@ function MobileNavParent({
     <div className="space-y-0.5">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white rounded-full hover:bg-white/10"
       >
@@ -776,7 +780,9 @@ function AppShellInner() {
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [location.pathname, collapsed, openGroups]);
+    // Não incluir `openGroups`: abrir/fechar um submenu não deve rolar a
+    // sidebar de volta para o item ativo.
+  }, [location.pathname, collapsed]);
 
   if (loading || !user) {
     return (
@@ -920,7 +926,11 @@ function AppShellInner() {
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
-                      onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }))}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }));
+                      }}
                       className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
                       aria-expanded={open}
                     >
@@ -947,9 +957,11 @@ function AppShellInner() {
                             ) : (
                               <button
                                 type="button"
-                                onClick={() =>
-                                  setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))
-                                }
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }));
+                                }}
                                 className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-semibold tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
