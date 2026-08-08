@@ -8799,13 +8799,16 @@ function AgendaPage() {
                 <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[18%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[16%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
                 <TableHead className="w-[13%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-[9%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+                <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                  Observações
+                </TableHead>
                 <TableHead className="w-[13%] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
@@ -8814,10 +8817,10 @@ function AgendaPage() {
             <TableBody>
               {loading ? (
                 <TableSkeletonRows
-                  cols={10}
+                  cols={11}
                   fallback={
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
@@ -8825,13 +8828,13 @@ function AgendaPage() {
                 />
               ) : !clinicaAtual ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     Selecione uma clínica.
                   </TableCell>
                 </TableRow>
               ) : paginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     <AgendaEmptyState
                       apenasData={apenasData}
                       dataRef={dataRef}
