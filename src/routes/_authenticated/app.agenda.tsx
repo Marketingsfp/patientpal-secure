@@ -2259,6 +2259,7 @@ function AgendaPage() {
     dados_depois: Record<string, unknown> | null;
   };
   const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
+  const [obsAg, setObsAg] = useState<Agendamento | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   type NotaHist = {
