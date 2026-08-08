@@ -6537,7 +6537,7 @@ function AgendaPage() {
                 </Button>
               </DialogTrigger>
             )}
-            <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
               <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
                   {editing
@@ -6552,7 +6552,7 @@ function AgendaPage() {
                     : "Preencha os dados abaixo. Campos com * são obrigatórios."}
                 </p>
               </DialogHeader>
-              <form onSubmit={submit} className="space-y-1.5 px-6 py-2">
+              <form onSubmit={submit} className="space-y-1.5 px-4 sm:px-6 py-2">
                 {editing && open && <FichaEmUsoAlert agendamentoId={editing.id} />}
                 {editing && pagosSet.has(editing.id) && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
@@ -6565,7 +6565,7 @@ function AgendaPage() {
                   className="space-y-2 contents disabled:opacity-90"
                 >
                   <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:flex-wrap">
                       <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">
                         Nº do orçamento
                       </Label>
@@ -6585,7 +6585,7 @@ function AgendaPage() {
                           }
                         }}
                         disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                        className="max-w-[170px] h-8 bg-white"
+                        className="w-full sm:max-w-[170px] h-8 bg-white"
                       />
                       {form.orcamento_id ? (
                         <Button
@@ -6609,7 +6609,7 @@ function AgendaPage() {
                         </Button>
                       )}
                       {!form.orcamento_id && (
-                        <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
+                        <span className="hidden sm:block text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
                           Opcional — vincula qualquer orçamento (exames, consultas, procedimentos, odontologia) em uma
                           única ficha. Aceita o nº simples ou o código completo (ex.: D-2026-00001).
                         </span>
@@ -6770,7 +6770,7 @@ function AgendaPage() {
                         <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="hidden sm:block text-[11px] text-slate-500">
                       Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
                     </p>
                   </div>
@@ -6835,7 +6835,7 @@ function AgendaPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold text-slate-700">
                           Data consulta/exame <span className="text-rose-500">*</span>
@@ -6869,7 +6869,7 @@ function AgendaPage() {
                         />
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 pt-0.5">
+                    <p className="hidden sm:block text-[11px] text-slate-500 pt-0.5">
                       Preenchida automaticamente pelo sistema quando o pagamento for registrado.
                     </p>
                   </div>
@@ -6879,11 +6879,11 @@ function AgendaPage() {
                       procOpcoesPorMedico.get(form.medico_id)?.length ||
                         procPorMedico.get(form.medico_id)?.size ||
                         procNomesPorMedico.get(form.medico_id)?.size ? (
-                        <p className="text-[11px] text-slate-500">
+                        <p className="hidden sm:block text-[11px] text-slate-500">
                           Mostrando apenas serviços configurados para este médico.
                         </p>
                       ) : procedimentoPadraoDoMedico(form.medico_id) ? (
-                        <p className="text-[11px] text-slate-500">
+                        <p className="hidden sm:block text-[11px] text-slate-500">
                           Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se
                           necessário.
                         </p>
@@ -6893,7 +6893,7 @@ function AgendaPage() {
                         </p>
                       )
                     ) : (
-                      <p className="text-[11px] text-slate-500">
+                      <p className="hidden sm:block text-[11px] text-slate-500">
                         Selecione um médico para ver os serviços disponíveis.
                       </p>
                     )}
@@ -6925,7 +6925,7 @@ function AgendaPage() {
                             searchPlaceholder="Buscar serviço..."
                             options={optsMulti}
                           />
-                          <p className="text-[11px] text-slate-500">
+                          <p className="hidden sm:block text-[11px] text-slate-500">
                             {optsMulti.length} serviço{optsMulti.length === 1 ? "" : "s"} disponíve
                             {optsMulti.length === 1 ? "l" : "is"} — role para ver todos.
                             {form.procedimentos.length > 1 && (
@@ -6977,7 +6977,7 @@ function AgendaPage() {
                       />
                     )}
                     {(!editing || isSlotLivre(editing.paciente_nome)) && (
-                      <p className="text-[11px] text-slate-500">
+                      <p className="hidden sm:block text-[11px] text-slate-500">
                         Status definido automaticamente. Pode ser alterado depois pelo menu de ações.
                       </p>
                     )}
@@ -7001,7 +7001,7 @@ function AgendaPage() {
                     />
                   </div>
                 </fieldset>
-                <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
                     <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
@@ -7033,7 +7033,7 @@ function AgendaPage() {
                           ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                           : "Desconto"}
                       </Button>
-                      <div className="flex flex-nowrap gap-2 sm:justify-end">
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:flex-nowrap sm:justify-end">
                         <Button type="button" variant="outline" onClick={fecharDialogoAgenda} disabled={saving}>
                           Cancelar
                         </Button>
