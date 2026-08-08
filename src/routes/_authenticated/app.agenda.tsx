@@ -9018,12 +9018,14 @@ function AgendaPage() {
                             return <span className="text-xs text-muted-foreground">—</span>;
                           }
                           return (
-                            <span
-                              title={obs}
-                              className="block truncate max-w-[180px] text-xs text-foreground/90"
+                            <button
+                              type="button"
+                              title="Ver observação completa"
+                              onClick={() => setObsAg(a)}
+                              className="block w-full truncate max-w-[180px] text-left text-xs font-medium text-primary cursor-pointer hover:underline"
                             >
                               {obs}
-                            </span>
+                            </button>
                           );
                         })()}
                       </TableCell>
