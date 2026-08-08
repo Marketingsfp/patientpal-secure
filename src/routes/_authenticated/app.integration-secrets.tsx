@@ -8,6 +8,14 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/integration-secrets")({
   component: SecretsPageWithTabs,
+  errorComponent: () => (
+    <div className="p-6">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+        Não foi possível carregar os segredos de integração agora. Recarregue a página; se
+        persistir, avise a equipe técnica.
+      </div>
+    </div>
+  ),
   head: () => ({ meta: [{ title: "Segredos de Integração — ClinicaOS" }] }),
 });
 
