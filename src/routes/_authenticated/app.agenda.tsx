@@ -9552,7 +9552,7 @@ function AgendaPage() {
                 <div className="min-w-0 sm:col-span-2">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Profissional</p>
                   <p className="text-sm font-medium break-words">
-                    {obsAg.medico?.nome ?? medicoNome(obsAg.medico_id) ?? "—"}
+                    {obsAg.medico_nome || medicoNome(obsAg.medico_id) || "—"}
                   </p>
                 </div>
               </div>
