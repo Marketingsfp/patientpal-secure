@@ -50,8 +50,6 @@ import {
   ArrowRightLeft,
   Inbox,
   FileBarChart2,
-  Moon,
-  Sun,
   Menu as MenuIcon,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
