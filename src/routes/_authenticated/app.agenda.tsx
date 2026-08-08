@@ -158,6 +158,16 @@ type Medico = {
   especialidade_nome?: string | null;
 };
 type Especialidade = { id: string; nome: string };
+/**
+ * Snapshot em memória da última lista carregada por combinação de filtros.
+ * Sobrevive à desmontagem da rota (troca de portal / navegação entre telas),
+ * então ao voltar para a Agenda a tabela aparece preenchida na hora e a
+ * revalidação roda em segundo plano, sem skeleton nem salto de layout.
+ */
+const agendaSnapshotCache = new Map<
+  string,
+  { items: Agendamento[]; ficha: Agendamento[] }
+>();
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = {
   id: string;
