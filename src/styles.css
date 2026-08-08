@@ -669,6 +669,32 @@ html.theme-emerald {
 }
 .scroll-hidden::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
+/* Mobile: nenhuma barra de rolagem visível em diálogos, popovers, selects e listas aninhadas */
+@media (max-width: 767px) {
+  [role="dialog"],
+  [role="dialog"] *,
+  [data-radix-popper-content-wrapper],
+  [data-radix-popper-content-wrapper] *,
+  [data-radix-select-viewport],
+  [role="listbox"],
+  [role="listbox"] * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  [role="dialog"]::-webkit-scrollbar,
+  [role="dialog"] *::-webkit-scrollbar,
+  [data-radix-popper-content-wrapper]::-webkit-scrollbar,
+  [data-radix-popper-content-wrapper] *::-webkit-scrollbar,
+  [data-radix-select-viewport]::-webkit-scrollbar,
+  [role="listbox"]::-webkit-scrollbar,
+  [role="listbox"] *::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+  }
+}
+
 /* Menu lateral — tipografia monoespaçada (JetBrains Mono) */
 .sidebar-mono,
 .sidebar-mono button,
