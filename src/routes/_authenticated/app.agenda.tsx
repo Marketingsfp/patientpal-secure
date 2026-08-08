@@ -158,6 +158,16 @@ type Medico = {
   especialidade_nome?: string | null;
 };
 type Especialidade = { id: string; nome: string };
+/**
+ * Snapshot em memória da última lista carregada por combinação de filtros.
+ * Sobrevive à desmontagem da rota (troca de portal / navegação entre telas),
+ * então ao voltar para a Agenda a tabela aparece preenchida na hora e a
+ * revalidação roda em segundo plano, sem skeleton nem salto de layout.
+ */
+const agendaSnapshotCache = new Map<
+  string,
+  { items: Agendamento[]; ficha: Agendamento[] }
+>();
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = {
   id: string;
@@ -2486,7 +2496,26 @@ function AgendaPage() {
   const load = async () => {
     if (!clinicaAtual) return;
     const reqId = ++loadReqId.current;
-    setLoading(true);
+    // Cache em memória por combinação de filtros: ao voltar para a Agenda
+    // (troca de portal/aba) a lista anterior aparece na hora e a revalidação
+    // acontece em segundo plano, sem piscar o skeleton.
+    const cacheKey = [
+      clinicaAtual.clinica_id,
+      dataRef,
+      dataFim ?? "",
+      apenasData ? "1" : "0",
+      filtroMedico,
+      filtroStatus,
+      filtroCliente.trim(),
+    ].join("|");
+    const cached = agendaSnapshotCache.get(cacheKey);
+    if (cached) {
+      setItems(cached.items);
+      setFichaBaseItems(cached.ficha);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const agendaSelect =
       "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
@@ -2656,7 +2685,11 @@ function AgendaPage() {
 
     setItems(mapped as Agendamento[]);
     setFichaBaseItems(fichaBaseMapped as Agendamento[]);
-    setPage(1);
+    agendaSnapshotCache.set(cacheKey, {
+      items: mapped as Agendamento[],
+      ficha: fichaBaseMapped as Agendamento[],
+    });
+    if (!cached) setPage(1);
     setSelecionados(new Set());
     // Diagnóstico do estado vazio: só quando o usuário está com "apenas a
     // data selecionada" e nada apareceu — assim distinguimos "sem slots
@@ -8569,7 +8602,7 @@ function AgendaPage() {
         <div className="h-4 xl:h-8"></div>
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
-          {loading ? (
+          {loading && items.length === 0 ? (
             <ListSkeleton rows={6} fallback={<div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>} />
           ) : !clinicaAtual ? (
             <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
@@ -8816,7 +8849,7 @@ function AgendaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {loading && items.length === 0 ? (
                 <TableSkeletonRows
                   cols={11}
                   fallback={
