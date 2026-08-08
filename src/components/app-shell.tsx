@@ -902,7 +902,7 @@ export function AppShell() {
                                 onClick={() =>
                                   setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))
                                 }
-                                className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-semibold tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-4 w-4 shrink-0" />
@@ -927,7 +927,7 @@ export function AppShell() {
                                       rel="noopener noreferrer"
                                       title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
-                                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-semibold tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-4 w-4 shrink-0" />
                                       {!collapsed && <span className="truncate">{child.label}</span>}
@@ -955,10 +955,10 @@ export function AppShell() {
                                       event.preventDefault();
                                       irPara(href);
                                     }}
-                                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
+                                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-semibold tracking-tight transition-all ${
                                       active
                                         ? "bg-white text-slate-900 shadow-sm"
-                                        : "text-white/85 hover:bg-white/10 hover:text-white"
+                                        : "text-white hover:bg-white/10 hover:text-white"
                                     }${hoverScaleCls}`}
                                   >
                                     <child.icon className="h-4 w-4 shrink-0" />
@@ -992,10 +992,10 @@ export function AppShell() {
                           }}
                           {...dragProps(row.label, navItemKey(item))}
                           className={cn(
-                            `relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                            `relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-semibold tracking-tight transition-all ${
                               active
                                 ? "bg-white text-slate-900 shadow-sm"
-                                : "text-white/85 hover:bg-white/10 hover:text-white"
+                                : "text-white hover:bg-white/10 hover:text-white"
                             }${hoverScaleCls}`,
                             dragCls(navItemKey(item)),
                           )}
@@ -1189,7 +1189,7 @@ export function AppShell() {
                     if (isParent(item)) {
                       return (
                         <div key={item.label} className="space-y-0.5">
-                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/70">
+                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white/70">
                             <item.icon className="h-4 w-4 shrink-0" />
                             <span className="truncate">{item.label}</span>
                           </div>
@@ -1205,7 +1205,7 @@ export function AppShell() {
                                   setMobileNavOpen(false);
                                   irPara(href);
                                 }}
-                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white/85 hover:bg-white/10 hover:text-white"
+                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
                                 <span className="truncate">{child.label}</span>
@@ -1227,10 +1227,10 @@ export function AppShell() {
                           setMobileNavOpen(false);
                           irPara(item.to);
                         }}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-medium ${
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-semibold tracking-tight ${
                           active
                             ? "bg-white text-slate-900 shadow-sm"
-                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                            : "text-white hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
