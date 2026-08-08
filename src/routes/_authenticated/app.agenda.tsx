@@ -9531,6 +9531,59 @@ function AgendaPage() {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog open={!!obsAg} onOpenChange={(v) => { if (!v) setObsAg(null); }}>
+        <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[85vh] overflow-y-auto scroll-hidden">
+          <DialogHeader>
+            <DialogTitle>Observações do Agendamento</DialogTitle>
+          </DialogHeader>
+          {obsAg && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Paciente</p>
+                  <p className="text-sm font-medium break-words">{obsAg.paciente_nome || "—"}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Data / Hora</p>
+                  <p className="text-sm font-medium break-words">
+                    {new Date(obsAg.inicio).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                </div>
+                <div className="min-w-0 sm:col-span-2">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Profissional</p>
+                  <p className="text-sm font-medium break-words">
+                    {obsAg.medico?.nome ?? medicoNome(obsAg.medico_id) ?? "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Observação</p>
+                <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                  {(obsAg.observacoes ?? "").trim() || "—"}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setObsAg(null)} className="w-full sm:w-auto">
+              Fechar
+            </Button>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText((obsAg?.observacoes ?? "").trim());
+                  toast.success("Texto copiado");
+                } catch {
+                  toast.error("Não foi possível copiar");
+                }
+              }}
+            >
+              Copiar texto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {dividirCtx && (
         <DividirOrcamentoDialog
           open={dividirOpen}
