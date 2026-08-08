@@ -1137,6 +1137,7 @@ export function AppShell() {
             </div>
           </div>
         </header>
+        )}
         <main
           key={uxMelhorias ? location.pathname : "static"}
           className={cn(
