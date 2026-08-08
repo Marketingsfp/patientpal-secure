@@ -9010,6 +9010,23 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
+                      <TableCell className="py-1.5 px-2 align-middle">
+                        {(() => {
+                          const obs = (a.observacoes ?? "").trim();
+                          if (ehLivre || ocultarPaciente || !obs) {
+                            return <span className="text-xs text-muted-foreground">—</span>;
+                          }
+                          return (
+                            <span
+                              title={obs}
+                              className="block truncate max-w-[180px] text-xs text-foreground/90"
+                            >
+                              {obs}
+                            </span>
+                          );
+                        })()}
+                      </TableCell>
+
                       <TableCell className="py-1.5 px-3 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
