@@ -371,13 +371,7 @@ function PatientCard({
         </kbd>
       )}
 
-      {item.paciente?.foto_url ? (
-        <img src={item.paciente.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
-      ) : (
-        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
-          {item.paciente_nome.slice(0, 1).toUpperCase()}
-        </div>
-      )}
+      <AvatarPaciente nome={item.paciente_nome} url={item.paciente?.foto_url ?? null} />
 
       <div className="flex-1 min-w-[200px]">
         <div className="font-semibold flex items-center gap-2 flex-wrap">
@@ -548,6 +542,19 @@ function CheckinPage() {
               foto_url: p.foto_url,
             });
           });
+
+          // foto_url guarda o caminho no bucket privado; gerar URL assinada para exibir
+          const comFoto = (pacientes ?? []).filter((p) => !!p.foto_url);
+          if (comFoto.length > 0) {
+            const { data: signed } = await supabase.storage
+              .from("pacientes-fotos")
+              .createSignedUrls(comFoto.map((p) => p.foto_url as string), 3600);
+            (signed ?? []).forEach((s, i) => {
+              const alvo = comFoto[i];
+              const atual = pacMap.get(alvo.id);
+              if (atual) pacMap.set(alvo.id, { ...atual, foto_url: s.signedUrl ?? null });
+            });
+          }
         }
       }
 
