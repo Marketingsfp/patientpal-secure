@@ -6366,6 +6366,139 @@ function AgendaPage() {
   };
   const fmtDiaSemana = (iso: string) => DIAS_SEMANA[new Date(iso).getDay()];
 
+  const [filtrosMobileOpen, setFiltrosMobileOpen] = useState(false);
+  const filtrosAtivosCount =
+    (filtroMedico !== "todos" ? 1 : 0) +
+    (filtroAgenda !== "todos" ? 1 : 0) +
+    (filtroStatus !== "todos" ? 1 : 0) +
+    (filtroEspecialidade !== "todos" ? 1 : 0) +
+    (filtroCliente.trim() ? 1 : 0) +
+    (apenasData ? 1 : 0);
+  const filtrosGrid = (
+    <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
+
+          {/* Profissional */}
+          <div className="space-y-0 lg:col-span-2">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
+            <MedicoFiltroInput
+              medicos={medicos}
+              value={filtroMedico}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
+              disabled={isMedicoOnly}
+              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
+              compact
+            />
+          </div>
+
+          {/* Tipo de Agenda */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
+            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODAS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODAS</SelectItem>
+                {(() => {
+                  // Quando um médico específico está selecionado, listamos
+                  // as agendas dele por id (permite distinguir turnos/salas).
+                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                  // "CONSULTAS") para não repetir a mesma opção uma vez
+                  // por médico.
+                  const agendasFiltro =
+                    filtroMedico !== "todos"
+                      ? (agendasPorMedico.get(filtroMedico) ?? [])
+                      : Array.from(agendasPorMedico.values()).flat();
+                  const seen = new Set<string>();
+                  const out: { key: string; nome: string }[] = [];
+                  for (const a of agendasFiltro) {
+                    const k = chaveNomeAgenda(a.nome ?? "");
+                    if (!k || seen.has(k)) continue;
+                    seen.add(k);
+                    out.push({ key: k, nome: (a.nome ?? "").trim() });
+                  }
+                  return out.map((o) => (
+                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
+                  ));
+                })()}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Situação */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                <SelectItem value="livres">Livres</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Data */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
+            <DataRefField
+              dataRef={dataRef}
+              dataFim={dataFim}
+              setDataRef={setDataRef}
+              setDataFim={setDataFim}
+              compact
+            />
+            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              />
+              Exibir apenas a data selecionada
+            </label>
+          </div>
+
+          {/* Especialidade */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
+            <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cliente + Ações rápidas juntos */}
+          <div className="space-y-0 lg:col-span-2">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                value={filtroCliente}
+                onChange={(e) => setFiltroCliente(e.target.value)}
+                placeholder="Nome ou CPF..."
+                className="h-8 text-xs flex-1 min-w-0"
+              />
+              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
+                <Search className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+  );
+
   return (
     <div className="space-y-3">
       {emitenteNfseDialog}
@@ -8475,128 +8608,7 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
-
-          {/* Profissional */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
-            <MedicoFiltroInput
-              medicos={medicos}
-              value={filtroMedico}
-              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
-              disabled={isMedicoOnly}
-              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
-              compact
-            />
-          </div>
-
-          {/* Tipo de Agenda */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
-            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODAS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODAS</SelectItem>
-                {(() => {
-                  // Quando um médico específico está selecionado, listamos
-                  // as agendas dele por id (permite distinguir turnos/salas).
-                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
-                  // "CONSULTAS") para não repetir a mesma opção uma vez
-                  // por médico.
-                  const agendasFiltro =
-                    filtroMedico !== "todos"
-                      ? (agendasPorMedico.get(filtroMedico) ?? [])
-                      : Array.from(agendasPorMedico.values()).flat();
-                  const seen = new Set<string>();
-                  const out: { key: string; nome: string }[] = [];
-                  for (const a of agendasFiltro) {
-                    const k = chaveNomeAgenda(a.nome ?? "");
-                    if (!k || seen.has(k)) continue;
-                    seen.add(k);
-                    out.push({ key: k, nome: (a.nome ?? "").trim() });
-                  }
-                  return out.map((o) => (
-                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
-                  ));
-                })()}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Situação */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODOS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                <SelectItem value="livres">Livres</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Data */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
-            <DataRefField
-              dataRef={dataRef}
-              dataFim={dataFim}
-              setDataRef={setDataRef}
-              setDataFim={setDataFim}
-              compact
-            />
-            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
-              <Checkbox
-                checked={apenasData}
-                onCheckedChange={(v) => setApenasData(v === true)}
-                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-              />
-              Exibir apenas a data selecionada
-            </label>
-          </div>
-
-          {/* Especialidade */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
-            <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODOS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cliente + Ações rápidas juntos */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF..."
-                className="h-8 text-xs flex-1 min-w-0"
-              />
-              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
-                <Search className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        {filtrosGrid}
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
