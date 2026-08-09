@@ -21,6 +21,10 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Stethoscope,
+  IdCard,
+  Phone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
@@ -336,14 +340,9 @@ function SearchBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-4 pt-3 border-t">
-        <p className="text-xs text-muted-foreground">
-          📋 Mostrando todos os pacientes agendados para o dia (pagos e pendentes)
-        </p>
-        <Badge variant="outline" className="text-xs">
-          {formatarDataBr(data)}
-        </Badge>
-      </div>
+      <p className="text-xs text-muted-foreground mt-4 pt-3 border-t">
+        Mostrando todos os pacientes agendados para o dia (pagos e pendentes)
+      </p>
     </Card>
   );
 }
@@ -365,62 +364,78 @@ function PatientCard({
   const pendente = estaPendenteCheckin(item.fluxo_etapa);
 
   return (
-    <Card className="p-3 flex items-center gap-3 flex-wrap hover:shadow-md transition-shadow">
+    <Card className="relative p-4 sm:p-5 border-border/80 shadow-sm hover:shadow-md transition-shadow">
       {index < 9 && (
-        <kbd className="hidden md:inline-flex h-7 min-w-7 items-center justify-center rounded border bg-muted px-1.5 text-xs font-mono">
+        <kbd className="hidden md:inline-flex absolute top-2 right-3 items-center rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/80">
           Alt+{index + 1}
         </kbd>
       )}
 
-      <AvatarPaciente
-        nome={item.paciente_nome}
-        cpf={item.paciente?.cpf ?? null}
-        url={item.paciente?.foto_url ?? null}
-      />
+      <div className="flex items-start gap-4 flex-wrap sm:flex-nowrap">
+        <AvatarPaciente
+          nome={item.paciente_nome}
+          cpf={item.paciente?.cpf ?? null}
+          url={item.paciente?.foto_url ?? null}
+        />
 
-      <div className="flex-1 min-w-[200px]">
-        <div className="font-semibold flex items-center gap-2 flex-wrap">
-          {item.paciente_nome}
-          <Badge className="bg-emerald-600 text-white">PAGO</Badge>
-          {!pendente && <Badge variant="outline">{etapaLabel(item.fluxo_etapa)}</Badge>}
+        <div className="flex-1 min-w-[220px] space-y-2">
+          <div className="flex items-center gap-2 flex-wrap pr-16">
+            <h3 className="text-lg font-bold leading-tight text-foreground">{item.paciente_nome}</h3>
+            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
+            {!pendente && <Badge variant="outline">{etapaLabel(item.fluxo_etapa)}</Badge>}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              {formatarHora(item.inicio)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Stethoscope className="h-3.5 w-3.5 shrink-0" />
+              {item.medicos?.nome ?? "—"}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <BadgeCheck className="h-3.5 w-3.5 shrink-0" />
+              {item.procedimento ?? "CONSULTA"}
+            </span>
+            {item.paciente?.cpf && (
+              <span className="inline-flex items-center gap-1.5">
+                <IdCard className="h-3.5 w-3.5 shrink-0" />
+                {item.paciente.cpf}
+              </span>
+            )}
+            {item.paciente?.telefone && (
+              <span className="inline-flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 shrink-0" />
+                {item.paciente.telefone}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground space-x-2">
-          <span>{formatarHora(item.inicio)}</span>
-          <span>•</span>
-          <span>{item.medicos?.nome ?? "—"}</span>
-          <span>•</span>
-          <span>{item.procedimento ?? "CONSULTA"}</span>
-          {item.paciente?.cpf && (
-            <>
-              <span>•</span>
-              <span>CPF {item.paciente.cpf}</span>
-            </>
-          )}
-          {item.paciente?.telefone && (
-            <>
-              <span>•</span>
-              <span>{item.paciente.telefone}</span>
-            </>
+
+        <div className="w-full sm:w-auto sm:self-center">
+          {pendente ? (
+            podeEscrever && (
+              <Button
+                onClick={() => onConfirm(item)}
+                disabled={isConfirming}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+              >
+                {isConfirming ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <BadgeCheck className="h-4 w-4 mr-2" />
+                )}
+                Confirmar presença
+              </Button>
+            )
+          ) : (
+            <Button variant="outline" disabled className="w-full sm:w-auto h-10">
+              {etapaLabel(item.fluxo_etapa)}
+            </Button>
           )}
         </div>
       </div>
-
-      {pendente ? (
-        podeEscrever && (
-          <Button
-            onClick={() => onConfirm(item)}
-            disabled={isConfirming}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[180px] h-9"
-          >
-            {isConfirming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BadgeCheck className="h-4 w-4 mr-2" />}
-            Confirmar presença
-          </Button>
-        )
-      ) : (
-        <Button variant="outline" disabled className="h-9">
-          {etapaLabel(item.fluxo_etapa)}
-        </Button>
-      )}
     </Card>
   );
 }
