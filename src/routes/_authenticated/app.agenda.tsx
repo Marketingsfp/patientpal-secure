@@ -8748,7 +8748,7 @@ function AgendaPage() {
                       )}
                     </div>
                     {ehLivre ? (
-                      <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 shrink-0">Livre</Badge>
+                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50">Livre</Badge>
                     ) : estornoPend ? (
                       <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] shrink-0">Estorno</Badge>
                     ) : (
