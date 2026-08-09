@@ -755,3 +755,31 @@ function CheckinPage() {
     </div>
   );
 }
+
+function iniciaisDoNome(nome: string) {
+  const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "?";
+  const primeira = partes[0][0] ?? "";
+  const ultima = partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "";
+  return (primeira + ultima).toUpperCase();
+}
+
+function AvatarPaciente({ nome, url }: { nome: string; url: string | null }) {
+  const [erro, setErro] = useState(false);
+  const mostrarFoto = !!url && !erro;
+
+  return (
+    <div className="h-12 w-12 shrink-0 rounded-full border bg-slate-200 text-slate-700 flex items-center justify-center overflow-hidden">
+      {mostrarFoto ? (
+        <img
+          src={url as string}
+          alt={`Foto de ${nome}`}
+          className="h-full w-full object-cover"
+          onError={() => setErro(true)}
+        />
+      ) : (
+        <span className="text-sm font-semibold">{iniciaisDoNome(nome)}</span>
+      )}
+    </div>
+  );
+}
