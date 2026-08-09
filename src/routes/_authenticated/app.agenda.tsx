@@ -8608,7 +8608,45 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        {filtrosGrid}
+        {/* Mobile: filtros colapsados em um Sheet */}
+        <div className="lg:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFiltrosMobileOpen(true)}
+            className="h-10 w-full justify-between rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-700"
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+              Filtros
+              {filtrosAtivosCount > 0 && (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                  {filtrosAtivosCount}
+                </span>
+              )}
+            </span>
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </Button>
+        </div>
+        <Sheet open={filtrosMobileOpen} onOpenChange={setFiltrosMobileOpen}>
+          <SheetContent side="bottom" className="lg:hidden max-h-[85vh] overflow-y-auto rounded-t-2xl">
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-base">Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="mt-3 space-y-3 [&_.hidden.lg\\:grid]:!grid [&_.hidden.lg\\:grid]:grid-cols-1 [&_input]:h-9 [&_button[role=combobox]]:h-9">
+              {filtrosGrid}
+            </div>
+            <div className="mt-4 flex gap-2 pb-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { limparFiltros(); }}>
+                Limpar
+              </Button>
+              <Button className="flex-1 rounded-xl" onClick={() => { void load(); setFiltrosMobileOpen(false); }}>
+                Aplicar
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+        <div className="hidden lg:block">{filtrosGrid}</div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
