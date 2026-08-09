@@ -431,7 +431,7 @@ function MobileNavParent({
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-tight text-white rounded-full hover:bg-white/10"
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium tracking-tight text-white rounded-lg hover:bg-white/10"
       >
         <item.icon className="h-4 w-4 shrink-0" />
         <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
