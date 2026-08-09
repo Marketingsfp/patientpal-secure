@@ -180,66 +180,74 @@ function LiquidBottomNav({
   const mask = `radial-gradient(circle ${R}px at ${R}px 2px, transparent 0 ${R - 1}px, #000 ${R}px)`;
 
   return (
-    <nav
-      ref={navRef}
-      className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
-      aria-label="Navegação principal"
-      style={
-        navW > 0 && activeIdx >= 0
-          ? ({
-              WebkitMaskImage: mask,
-              maskImage: mask,
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-              WebkitMaskSize: "100% 100%",
-              maskSize: "100% 100%",
-              WebkitMaskPosition: `${cx - R}px 0px`,
-              maskPosition: `${cx - R}px 0px`,
-              transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
-            } as React.CSSProperties)
-          : undefined
-      }
-    >
-      {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
-        const active = idx === activeIdx;
-        return (
-          <a
-            key={to}
-            href={to}
-            aria-current={active ? "page" : undefined}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-              e.preventDefault();
-              onNavigate(to);
-            }}
-            className={cn(
-              "relative flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-500",
-              active ? "text-slate-900 -translate-y-5" : "text-white/70 hover:text-white",
-            )}
-            style={active ? { transitionTimingFunction: EASE } : undefined}
-          >
-            {active && (
-              <span
-                aria-hidden
-                className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1 h-12 w-12 rounded-full bg-white shadow-lg"
-              />
-            )}
-            <Icon className={cn("h-5 w-5 shrink-0", active && "relative z-10 translate-y-0.5")} />
-            <span className={cn("leading-none", active ? "relative z-10 mt-3 text-white" : undefined)}>
-              {label}
-            </span>
-          </a>
-        );
-      })}
-      <button
-        type="button"
-        onClick={onMais}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
+    <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
+      <nav
+        ref={navRef}
+        className="relative w-full rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch"
+        aria-label="Navegação principal"
+        style={
+          navW > 0 && activeIdx >= 0
+            ? ({
+                WebkitMaskImage: mask,
+                maskImage: mask,
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskSize: "100% 100%",
+                maskSize: "100% 100%",
+                WebkitMaskPosition: `${cx - R}px 0px`,
+                maskPosition: `${cx - R}px 0px`,
+                transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
+              } as React.CSSProperties)
+            : undefined
+        }
       >
-        <MenuIcon className="h-5 w-5 shrink-0" />
-        <span className="leading-none">Mais</span>
-      </button>
-    </nav>
+        {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
+          const active = idx === activeIdx;
+          return (
+            <a
+              key={to}
+              href={to}
+              aria-current={active ? "page" : undefined}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                e.preventDefault();
+                onNavigate(to);
+              }}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium transition-colors duration-300",
+                active ? "text-white" : "text-white/70 hover:text-white",
+              )}
+            >
+              <Icon className={cn("h-5 w-5 shrink-0", active && "opacity-0")} />
+              <span className="leading-none">{label}</span>
+            </a>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onMais}
+          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium text-white/70 transition-colors duration-300 hover:text-white"
+        >
+          <MenuIcon className="h-5 w-5 shrink-0" />
+          <span className="leading-none">Mais</span>
+        </button>
+      </nav>
+      {navW > 0 && activeIdx >= 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg"
+          style={{
+            transform: `translateX(${cx - 24}px)`,
+            transition: `transform 0.5s ${EASE}`,
+          }}
+        >
+          {(() => {
+            const Ativo = BOTTOM_NAV_ITENS[activeIdx].Icon;
+            return <Ativo className="h-5 w-5" />;
+          })()}
+        </div>
+      )}
+    </div>
   );
 }
 
