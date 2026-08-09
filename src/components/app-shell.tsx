@@ -141,10 +141,10 @@ const navItemKey = (it: NavItem): string =>
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
 const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
+  { to: "/app/painel", label: "Início", Icon: LayoutDashboard },
   { to: "/app/agenda", label: "Agenda", Icon: CalendarDays },
-  { to: "/app/clientes", label: "Clientes", Icon: Users },
+  { to: "/app/checkin", label: "Fila", Icon: ConciergeBell },
   { to: "/app/caixa", label: "Caixa", Icon: Wallet },
-  { to: "/app/recepcao", label: "Recepção", Icon: ConciergeBell },
 ];
 
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
