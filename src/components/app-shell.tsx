@@ -194,7 +194,7 @@ function LiquidBottomNav({
     <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
       <nav
         ref={navRef}
-        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch"
+        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch transform-gpu will-change-transform"
         aria-label="Navegação principal"
         style={
           navW > 0 && activeIdx >= 0
