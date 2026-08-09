@@ -44,6 +44,7 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
@@ -61,6 +62,8 @@ import {
   Search,
   X,
   MoreHorizontal,
+  SlidersHorizontal,
+  ChevronDown,
   Star,
   Flag,
   Printer,
@@ -6366,6 +6369,177 @@ function AgendaPage() {
   };
   const fmtDiaSemana = (iso: string) => DIAS_SEMANA[new Date(iso).getDay()];
 
+  const [filtrosMobileOpen, setFiltrosMobileOpen] = useState(false);
+  const filtrosAtivosCount =
+    (filtroMedico !== "todos" ? 1 : 0) +
+    (filtroAgenda !== "todos" ? 1 : 0) +
+    (filtroStatus !== "todos" ? 1 : 0) +
+    (filtroEspecialidade !== "todos" ? 1 : 0) +
+    (filtroCliente.trim() ? 1 : 0) +
+    (apenasData ? 1 : 0);
+  const renderFiltros = (variante: "desktop" | "sheet" = "desktop") => (
+    <div
+      className={
+        variante === "sheet"
+          ? "grid grid-cols-1 gap-3"
+          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5"
+      }
+    >
+
+          {/* Profissional */}
+          <div className="space-y-0 lg:col-span-2">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
+            <MedicoFiltroInput
+              medicos={medicos}
+              value={filtroMedico}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
+              disabled={isMedicoOnly}
+              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
+              compact
+            />
+          </div>
+
+          {/* Tipo de Agenda */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
+            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODAS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODAS</SelectItem>
+                {(() => {
+                  // Quando um médico específico está selecionado, listamos
+                  // as agendas dele por id (permite distinguir turnos/salas).
+                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                  // "CONSULTAS") para não repetir a mesma opção uma vez
+                  // por médico.
+                  const agendasFiltro =
+                    filtroMedico !== "todos"
+                      ? (agendasPorMedico.get(filtroMedico) ?? [])
+                      : Array.from(agendasPorMedico.values()).flat();
+                  const seen = new Set<string>();
+                  const out: { key: string; nome: string }[] = [];
+                  for (const a of agendasFiltro) {
+                    const k = chaveNomeAgenda(a.nome ?? "");
+                    if (!k || seen.has(k)) continue;
+                    seen.add(k);
+                    out.push({ key: k, nome: (a.nome ?? "").trim() });
+                  }
+                  return out.map((o) => (
+                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
+                  ));
+                })()}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Situação */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                <SelectItem value="livres">Livres</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Data */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
+            <DataRefField
+              dataRef={dataRef}
+              dataFim={dataFim}
+              setDataRef={setDataRef}
+              setDataFim={setDataFim}
+              compact
+            />
+            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              />
+              Exibir apenas a data selecionada
+            </label>
+          </div>
+
+          {/* Especialidade */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
+            <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cliente + Ações rápidas juntos */}
+          <div className="space-y-0 lg:col-span-2">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                value={filtroCliente}
+                onChange={(e) => setFiltroCliente(e.target.value)}
+                placeholder="Nome ou CPF..."
+                className="h-8 text-xs flex-1 min-w-0"
+              />
+              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
+                <Search className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+  );
+
+  const exportarAgendaExcel = () => {
+    if (!filtrados.length) {
+      toast.info("Sem dados para exportar.");
+      return;
+    }
+    exportToExcel(
+      filtrados.map((a) => ({
+        data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+        dia: fmtDiaSemana(a.inicio),
+        inicio: fmtHora(a.inicio),
+        fim: fmtHora(a.fim),
+        profissional: medicoNomeAgendamento(a),
+        paciente: a.paciente_nome,
+        procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
+        status: a.status,
+        observacoes: a.observacoes ?? "",
+      })),
+      `agenda-${dataRef}`,
+      [
+        { key: "data", label: "Data" },
+        { key: "dia", label: "Dia" },
+        { key: "inicio", label: "Início" },
+        { key: "fim", label: "Fim" },
+        { key: "profissional", label: "Profissional" },
+        { key: "paciente", label: "Cliente" },
+        { key: "procedimento", label: "Serviço" },
+        { key: "status", label: "Status" },
+        { key: "observacoes", label: "Observações" },
+      ],
+    );
+  };
+
   return (
     <div className="space-y-3">
       {emitenteNfseDialog}
@@ -6454,28 +6628,34 @@ function AgendaPage() {
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
-          {!turboDisabled && <TurboModeToggle />}
-          <div className="inline-flex rounded-full border bg-card p-0.5">
+          {!turboDisabled && (
+            <span className="hidden lg:contents">
+              <TurboModeToggle />
+            </span>
+          )}
+          <div className="inline-flex rounded-xl bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "dia" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "medico" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
             >
               Por médico
             </button>
           </div>
-          <EncerrarExpedienteButton />
+          <span className="hidden lg:contents">
+            <EncerrarExpedienteButton />
+          </span>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
             title="Receber mensalidade do Cartão Benefícios"
             onClick={() => setFatRapidoOpen(true)}
           >
@@ -6485,7 +6665,7 @@ function AgendaPage() {
             asChild
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
             title="Cadastrar horários semanais e gerar slots da agenda"
           >
             <Link to="/app/disponibilidades">
@@ -6495,7 +6675,7 @@ function AgendaPage() {
           {podeEscrever && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
+                <Button variant="outline" size="sm" className="hidden lg:inline-flex h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
                   Opções ({selecionados.size})
                 </Button>
               </DropdownMenuTrigger>
@@ -6523,41 +6703,32 @@ function AgendaPage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
-            onClick={() => {
-              if (!filtrados.length) {
-                toast.info("Sem dados para exportar.");
-                return;
-              }
-              exportToExcel(
-                filtrados.map((a) => ({
-                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
-                  dia: fmtDiaSemana(a.inicio),
-                  inicio: fmtHora(a.inicio),
-                  fim: fmtHora(a.fim),
-                  profissional: medicoNomeAgendamento(a),
-                  paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
-                  status: a.status,
-                  observacoes: a.observacoes ?? "",
-                })),
-                `agenda-${dataRef}`,
-                [
-                  { key: "data", label: "Data" },
-                  { key: "dia", label: "Dia" },
-                  { key: "inicio", label: "Início" },
-                  { key: "fim", label: "Fim" },
-                  { key: "profissional", label: "Profissional" },
-                  { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Serviço" },
-                  { key: "status", label: "Status" },
-                  { key: "observacoes", label: "Observações" },
-                ],
-              );
-            }}
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
+            onClick={exportarAgendaExcel}
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
+          {/* Mobile: ações secundárias agrupadas */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="lg:hidden h-9 w-9 p-0 rounded-xl">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={exportarAgendaExcel}>
+                <Download className="h-4 w-4 mr-2" /> Exportar Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFatRapidoOpen(true)}>
+                💳 Mensalidade do cartão
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/app/disponibilidades">
+                  <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={open} onOpenChange={(o) => { if (!o) fecharDialogoAgenda(); else setOpen(true); }}>
             {podeEscrever && (
               <DialogTrigger asChild>
@@ -6566,9 +6737,9 @@ function AgendaPage() {
                   data-turbo-novo
                   onClick={openNew}
                   disabled={!clinicaAtual}
-                  className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[11px] px-3 lg:px-2 font-semibold shadow-md lg:shadow-none bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+                  <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" /> Adicionar Encaixe
                 </Button>
               </DialogTrigger>
             )}
@@ -8475,128 +8646,45 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
-
-          {/* Profissional */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
-            <MedicoFiltroInput
-              medicos={medicos}
-              value={filtroMedico}
-              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
-              disabled={isMedicoOnly}
-              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
-              compact
-            />
-          </div>
-
-          {/* Tipo de Agenda */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
-            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODAS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODAS</SelectItem>
-                {(() => {
-                  // Quando um médico específico está selecionado, listamos
-                  // as agendas dele por id (permite distinguir turnos/salas).
-                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
-                  // "CONSULTAS") para não repetir a mesma opção uma vez
-                  // por médico.
-                  const agendasFiltro =
-                    filtroMedico !== "todos"
-                      ? (agendasPorMedico.get(filtroMedico) ?? [])
-                      : Array.from(agendasPorMedico.values()).flat();
-                  const seen = new Set<string>();
-                  const out: { key: string; nome: string }[] = [];
-                  for (const a of agendasFiltro) {
-                    const k = chaveNomeAgenda(a.nome ?? "");
-                    if (!k || seen.has(k)) continue;
-                    seen.add(k);
-                    out.push({ key: k, nome: (a.nome ?? "").trim() });
-                  }
-                  return out.map((o) => (
-                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
-                  ));
-                })()}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Situação */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODOS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                <SelectItem value="livres">Livres</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Data */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
-            <DataRefField
-              dataRef={dataRef}
-              dataFim={dataFim}
-              setDataRef={setDataRef}
-              setDataFim={setDataFim}
-              compact
-            />
-            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
-              <Checkbox
-                checked={apenasData}
-                onCheckedChange={(v) => setApenasData(v === true)}
-                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-              />
-              Exibir apenas a data selecionada
-            </label>
-          </div>
-
-          {/* Especialidade */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
-            <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs w-full">
-                <SelectValue placeholder="TODOS" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cliente + Ações rápidas juntos */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF..."
-                className="h-8 text-xs flex-1 min-w-0"
-              />
-              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
-                <Search className="h-3.5 w-3.5" />
+        {/* Mobile: filtros colapsados em um Sheet */}
+        <div className="lg:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFiltrosMobileOpen(true)}
+            className="h-10 w-full justify-between rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-700"
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+              Filtros
+              {filtrosAtivosCount > 0 && (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                  {filtrosAtivosCount}
+                </span>
+              )}
+            </span>
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </Button>
+        </div>
+        <Sheet open={filtrosMobileOpen} onOpenChange={setFiltrosMobileOpen}>
+          <SheetContent side="bottom" className="lg:hidden max-h-[85vh] overflow-y-auto rounded-t-2xl">
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-base">Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="mt-3 space-y-3 [&_input]:h-9 [&_button[role=combobox]]:h-9">
+              {renderFiltros("sheet")}
+            </div>
+            <div className="mt-4 flex gap-2 pb-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { limparFiltros(); }}>
+                Limpar
               </Button>
-              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
-                <X className="h-3.5 w-3.5" />
+              <Button className="flex-1 rounded-xl" onClick={() => { void load(); setFiltrosMobileOpen(false); }}>
+                Aplicar
               </Button>
             </div>
-          </div>
-        </div>
+          </SheetContent>
+        </Sheet>
+        <div className="hidden lg:block">{renderFiltros("desktop")}</div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
@@ -8648,7 +8736,7 @@ function AgendaPage() {
               return (
                 <div
                   key={a.id}
-                  className={`rounded-lg border ${bgClass} ${borderLeft} p-3 shadow-sm`}
+                  className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
                 >
                   {/* Linha 1: horário + ficha + situação */}
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -8666,7 +8754,7 @@ function AgendaPage() {
                       )}
                     </div>
                     {ehLivre ? (
-                      <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 shrink-0">Livre</Badge>
+                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50">Livre</Badge>
                     ) : estornoPend ? (
                       <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] shrink-0">Estorno</Badge>
                     ) : (
