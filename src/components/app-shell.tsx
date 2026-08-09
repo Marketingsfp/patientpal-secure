@@ -233,7 +233,7 @@ function LiquidBottomNav({
               }}
               className={cn(
                 "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium transition-colors duration-300",
-                active ? "text-white" : "text-white/70 hover:text-white",
+                active ? "text-white" : "text-blue-200/70 hover:text-white",
               )}
             >
               <Icon className={cn("h-5 w-5 shrink-0", active && "opacity-0")} />
@@ -244,7 +244,7 @@ function LiquidBottomNav({
         <button
           type="button"
           onClick={onMais}
-          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium text-white/70 transition-colors duration-300 hover:text-white"
+          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium text-blue-200/70 transition-colors duration-300 hover:text-white"
         >
           <MenuIcon className="h-5 w-5 shrink-0" />
           <span className="leading-none">Mais</span>
@@ -253,8 +253,9 @@ function LiquidBottomNav({
       {navW > 0 && activeIdx >= 0 && (
         <div
           aria-hidden
-          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg transform-gpu will-change-transform"
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white shadow-lg transform-gpu will-change-transform"
           style={{
+            color: cor,
             transform: `translate3d(${cx - 24}px, 0, 0)`,
             transition: `transform ${DUR} ${EASE}`,
           }}
@@ -1445,6 +1446,7 @@ function AppShellInner() {
         <LiquidBottomNav
           pathname={location.pathname}
           onNavigate={irPara}
+          cor={corSidebar}
           onMais={() => setMobileNavOpen(true)}
         />
       )}
