@@ -174,13 +174,13 @@ function DashboardOperacional() {
           </HhpKpiRow>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* Fila ao vivo */}
           <Painel
             title="Fila ao vivo"
             subtitle="Pacientes dentro da clínica agora"
             action={<LinkMais to="/app/fluxo" />}
-            className="xl:col-span-2"
+            className="xl:col-span-7"
           >
             {carregando ? <Linhas /> : filaAtual.length === 0 ? (
               <HhpEmptyState
@@ -211,7 +211,7 @@ function DashboardOperacional() {
           </Painel>
 
           {/* Senhas */}
-          <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />}>
+          <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />} className="xl:col-span-5">
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
@@ -233,9 +233,18 @@ function DashboardOperacional() {
           </Painel>
 
           {/* Próximos atendimentos */}
-          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />} className="xl:col-span-2">
+          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />} className="xl:col-span-7">
             {carregando ? <Linhas /> : proximos.length === 0 ? (
-              <HhpEmptyState icon={CalendarPlus} title="Nada mais agendado hoje" description="Use os atalhos acima para criar um novo agendamento." />
+              <div className="min-h-[260px] rounded-xl bg-white p-6 flex flex-col items-center justify-center text-center gap-3">
+                <CalendarPlus className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
+                <div className="text-sm font-semibold text-slate-700">Nada mais agendado hoje</div>
+                <p className="text-xs text-slate-500 max-w-xs">Use os atalhos acima para criar um novo agendamento.</p>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/app/agenda">
+                    <CalendarPlus className="h-4 w-4 mr-1.5" /> Novo agendamento
+                  </Link>
+                </Button>
+              </div>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {proximos.map((a) => (
@@ -253,7 +262,7 @@ function DashboardOperacional() {
           </Painel>
 
           {/* Alertas + caixa */}
-          <div className="space-y-4">
+          <div className="space-y-4 xl:col-span-5">
             <Painel title="Alertas imediatos" subtitle="Enfermagem e faltas" action={<LinkMais to="/app/alertas-enfermagem" />}>
               <div className="p-4 space-y-2">
                 {k.faltas > 0 && (
