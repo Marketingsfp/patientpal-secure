@@ -8730,7 +8730,7 @@ function AgendaPage() {
               return (
                 <div
                   key={a.id}
-                  className={`rounded-lg border ${bgClass} ${borderLeft} p-3 shadow-sm`}
+                  className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
                 >
                   {/* Linha 1: horário + ficha + situação */}
                   <div className="flex items-center justify-between gap-2 mb-2">
