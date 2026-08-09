@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import {
   Activity,
   Building2,
@@ -169,9 +169,16 @@ function LiquidBottomNav({
     return () => ro.disconnect();
   }, []);
 
-  const activeIdx = BOTTOM_NAV_ITENS.findIndex(
+  const rotaIdx = BOTTOM_NAV_ITENS.findIndex(
     (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
   );
+  // Índice "otimista": move o indicador no toque, sem esperar a rota montar.
+  const [idxOtimista, setIdxOtimista] = useState<number | null>(null);
+  const [, startNav] = useTransition();
+  useEffect(() => {
+    setIdxOtimista(null);
+  }, [rotaIdx]);
+  const activeIdx = idxOtimista ?? rotaIdx;
   const slots = BOTTOM_NAV_ITENS.length + 1;
   const cell = navW / slots;
   const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
@@ -200,6 +207,7 @@ function LiquidBottomNav({
                 maskPosition: maskPos,
                 WebkitMaskComposite: "xor",
                 maskComposite: "exclude",
+                willChange: "mask-position",
                 transition: `-webkit-mask-position ${DUR} ${EASE}, mask-position ${DUR} ${EASE}`,
               } as React.CSSProperties)
             : undefined
@@ -215,7 +223,10 @@ function LiquidBottomNav({
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                 e.preventDefault();
-                onNavigate(to);
+                setIdxOtimista(idx);
+                // Navegação em transição: a renderização da nova página não
+                // bloqueia o deslize da barra.
+                startNav(() => onNavigate(to));
               }}
               className={cn(
                 "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium transition-colors duration-300",
@@ -239,9 +250,9 @@ function LiquidBottomNav({
       {navW > 0 && activeIdx >= 0 && (
         <div
           aria-hidden
-          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg"
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg transform-gpu will-change-transform"
           style={{
-            transform: `translateX(${cx - 24}px)`,
+            transform: `translate3d(${cx - 24}px, 0, 0)`,
             transition: `transform ${DUR} ${EASE}`,
           }}
         >
