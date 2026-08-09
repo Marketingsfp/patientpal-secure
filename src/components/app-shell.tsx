@@ -67,6 +67,7 @@ import {
   fecharSeletorPortais,
   useSeletorPortaisAberto,
 } from "@/components/portal-launcher";
+import { LiquidNav } from "@/components/liquid-nav";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
@@ -1320,57 +1321,31 @@ function AppShellInner() {
         </Sheet>
       )}
       {!isChooser && uxMelhorias && (
-        <nav
-          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl px-2 pt-2 pb-2 flex items-end mb-[env(safe-area-inset-bottom)]"
-          aria-label="Navegação principal"
-        >
-          {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
-            const active = location.pathname === to || location.pathname.startsWith(`${to}/`);
-            return (
-              <a
-                key={to}
-                href={to}
-                aria-current={active ? "page" : undefined}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                  e.preventDefault();
-                  irPara(to);
-                }}
-                className="relative flex-1 flex flex-col items-center justify-end gap-1 p-2 text-xs font-medium transition-colors"
-              >
-                {active && (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-5 h-16 w-16 rounded-full bg-slate-900"
-                  />
-                )}
-                {active ? (
-                  <>
-                    <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-xl -translate-y-6 transition-all duration-300 ease-out">
-                      <Icon className="h-6 w-6 shrink-0" />
-                    </span>
-                    <span className="relative z-10 -mt-5 leading-none tracking-wide text-white">
-                      {label}
-                    </span>
-                  </>
-                ) : (
-                  <span className="flex flex-col items-center gap-1 text-slate-400 transition-colors hover:text-white">
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <span className="leading-none">{label}</span>
-                  </span>
-                )}
-              </a>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="flex-1 flex flex-col items-center justify-end gap-1 p-2 text-xs font-medium text-slate-400 transition-colors hover:text-white"
-          >
-            <MenuIcon className="h-5 w-5 shrink-0" />
-            <span className="leading-none">Mais</span>
-          </button>
-        </nav>
+        <LiquidNav
+          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)] text-white"
+          activeIndex={Math.max(
+            0,
+            BOTTOM_NAV_ITENS.findIndex(
+              ({ to }) =>
+                location.pathname === to || location.pathname.startsWith(`${to}/`),
+            ),
+          )}
+          items={[
+            ...BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => ({
+              key: to,
+              href: to,
+              label,
+              Icon,
+              onSelect: () => irPara(to),
+            })),
+            {
+              key: "mais",
+              label: "Mais",
+              Icon: MenuIcon,
+              onSelect: () => setMobileNavOpen(true),
+            },
+          ]}
+        />
       )}
       {seletorPortaisAberto && !isChooser && (
         <div
