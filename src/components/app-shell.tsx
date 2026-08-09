@@ -177,7 +177,8 @@ function LiquidBottomNav({
   const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
   const R = 30;
   const EASE = "cubic-bezier(0.68, -0.55, 0.265, 1.55)";
-  const mask = `radial-gradient(circle ${R}px at ${R}px 2px, transparent 0 ${R - 1}px, #000 ${R}px)`;
+  const mask = `radial-gradient(circle ${R}px at ${R}px 2px, #000 0 ${R - 1}px, transparent ${R}px), linear-gradient(#000, #000)`;
+  const maskPos = `${cx - R}px 0px, 0px 0px`;
 
   return (
     <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
@@ -190,12 +191,14 @@ function LiquidBottomNav({
             ? ({
                 WebkitMaskImage: mask,
                 maskImage: mask,
-                WebkitMaskRepeat: "no-repeat",
-                maskRepeat: "no-repeat",
-                WebkitMaskSize: "100% 100%",
-                maskSize: "100% 100%",
-                WebkitMaskPosition: `${cx - R}px 0px`,
-                maskPosition: `${cx - R}px 0px`,
+                WebkitMaskRepeat: "no-repeat, no-repeat",
+                maskRepeat: "no-repeat, no-repeat",
+                WebkitMaskSize: `${R * 2}px ${R * 2}px, 100% 100%`,
+                maskSize: `${R * 2}px ${R * 2}px, 100% 100%`,
+                WebkitMaskPosition: maskPos,
+                maskPosition: maskPos,
+                WebkitMaskComposite: "xor",
+                maskComposite: "exclude",
                 transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
               } as React.CSSProperties)
             : undefined
