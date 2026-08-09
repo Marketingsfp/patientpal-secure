@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   BadgeCheck,
   Search,
@@ -371,7 +372,11 @@ function PatientCard({
         </kbd>
       )}
 
-      <AvatarPaciente nome={item.paciente_nome} url={item.paciente?.foto_url ?? null} />
+      <AvatarPaciente
+        nome={item.paciente_nome}
+        cpf={item.paciente?.cpf ?? null}
+        url={item.paciente?.foto_url ?? null}
+      />
 
       <div className="flex-1 min-w-[200px]">
         <div className="font-semibold flex items-center gap-2 flex-wrap">
@@ -764,22 +769,57 @@ function iniciaisDoNome(nome: string) {
   return (primeira + ultima).toUpperCase();
 }
 
-function AvatarPaciente({ nome, url }: { nome: string; url: string | null }) {
+function AvatarPaciente({ nome, cpf, url }: { nome: string; cpf?: string | null; url: string | null }) {
   const [erro, setErro] = useState(false);
+  const [aberto, setAberto] = useState(false);
   const mostrarFoto = !!url && !erro;
 
   return (
-    <div className="h-12 w-12 shrink-0 rounded-full border bg-slate-200 text-slate-700 flex items-center justify-center overflow-hidden">
-      {mostrarFoto ? (
-        <img
-          src={url as string}
-          alt={`Foto de ${nome}`}
-          className="h-full w-full object-cover"
-          onError={() => setErro(true)}
-        />
-      ) : (
-        <span className="text-sm font-semibold">{iniciaisDoNome(nome)}</span>
-      )}
-    </div>
+    <>
+      <button
+        type="button"
+        title={mostrarFoto ? "Ver foto do paciente" : "Nenhuma foto cadastrada para este paciente"}
+        onClick={() => {
+          if (mostrarFoto) setAberto(true);
+          else toast.info("Nenhuma foto cadastrada para este paciente");
+        }}
+        className={`h-12 w-12 shrink-0 rounded-full border bg-slate-200 text-slate-700 flex items-center justify-center overflow-hidden transition-opacity ${
+          mostrarFoto ? "cursor-pointer hover:opacity-80" : "cursor-default"
+        }`}
+      >
+        {mostrarFoto ? (
+          <img
+            src={url as string}
+            alt={`Foto de ${nome}`}
+            className="h-full w-full object-cover"
+            onError={() => setErro(true)}
+          />
+        ) : (
+          <span className="text-sm font-semibold">{iniciaisDoNome(nome)}</span>
+        )}
+      </button>
+
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{nome}</DialogTitle>
+            <DialogDescription>{cpf ? `CPF ${cpf}` : "CPF não informado"}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center">
+            {url && (
+              <img
+                src={url}
+                alt={`Foto de ${nome}`}
+                className="max-h-[80vh] w-auto object-contain rounded-lg shadow-md"
+                onError={() => { setErro(true); setAberto(false); }}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAberto(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
