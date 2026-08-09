@@ -44,6 +44,7 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
@@ -61,6 +62,8 @@ import {
   Search,
   X,
   MoreHorizontal,
+  SlidersHorizontal,
+  ChevronDown,
   Star,
   Flag,
   Printer,
