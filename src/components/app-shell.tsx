@@ -253,7 +253,7 @@ function LiquidBottomNav({
       {navW > 0 && activeIdx >= 0 && (
         <div
           aria-hidden
-          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white shadow-lg transform-gpu will-change-transform"
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-6 flex items-center justify-center rounded-full bg-white shadow-lg transform-gpu will-change-transform"
           style={{
             color: cor,
             transform: `translate3d(${cx - 24}px, 0, 0)`,
