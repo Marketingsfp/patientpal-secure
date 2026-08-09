@@ -6622,28 +6622,34 @@ function AgendaPage() {
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
-          {!turboDisabled && <TurboModeToggle />}
-          <div className="inline-flex rounded-full border bg-card p-0.5">
+          {!turboDisabled && (
+            <span className="hidden lg:contents">
+              <TurboModeToggle />
+            </span>
+          )}
+          <div className="inline-flex rounded-xl bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "dia" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "medico" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
             >
               Por médico
             </button>
           </div>
-          <EncerrarExpedienteButton />
+          <span className="hidden lg:contents">
+            <EncerrarExpedienteButton />
+          </span>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
             title="Receber mensalidade do Cartão Benefícios"
             onClick={() => setFatRapidoOpen(true)}
           >
@@ -6653,7 +6659,7 @@ function AgendaPage() {
             asChild
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
             title="Cadastrar horários semanais e gerar slots da agenda"
           >
             <Link to="/app/disponibilidades">
@@ -6663,7 +6669,7 @@ function AgendaPage() {
           {podeEscrever && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
+                <Button variant="outline" size="sm" className="hidden lg:inline-flex h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
                   Opções ({selecionados.size})
                 </Button>
               </DropdownMenuTrigger>
@@ -6691,41 +6697,32 @@ function AgendaPage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-[11px] px-2"
-            onClick={() => {
-              if (!filtrados.length) {
-                toast.info("Sem dados para exportar.");
-                return;
-              }
-              exportToExcel(
-                filtrados.map((a) => ({
-                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
-                  dia: fmtDiaSemana(a.inicio),
-                  inicio: fmtHora(a.inicio),
-                  fim: fmtHora(a.fim),
-                  profissional: medicoNomeAgendamento(a),
-                  paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
-                  status: a.status,
-                  observacoes: a.observacoes ?? "",
-                })),
-                `agenda-${dataRef}`,
-                [
-                  { key: "data", label: "Data" },
-                  { key: "dia", label: "Dia" },
-                  { key: "inicio", label: "Início" },
-                  { key: "fim", label: "Fim" },
-                  { key: "profissional", label: "Profissional" },
-                  { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Serviço" },
-                  { key: "status", label: "Status" },
-                  { key: "observacoes", label: "Observações" },
-                ],
-              );
-            }}
+            className="hidden lg:inline-flex h-7 text-[11px] px-2"
+            onClick={exportarAgendaExcel}
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
+          {/* Mobile: ações secundárias agrupadas */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="lg:hidden h-9 w-9 p-0 rounded-xl">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={exportarAgendaExcel}>
+                <Download className="h-4 w-4 mr-2" /> Exportar Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFatRapidoOpen(true)}>
+                💳 Mensalidade do cartão
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/app/disponibilidades">
+                  <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={open} onOpenChange={(o) => { if (!o) fecharDialogoAgenda(); else setOpen(true); }}>
             {podeEscrever && (
               <DialogTrigger asChild>
@@ -6734,9 +6731,9 @@ function AgendaPage() {
                   data-turbo-novo
                   onClick={openNew}
                   disabled={!clinicaAtual}
-                  className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[11px] px-3 lg:px-2 font-semibold shadow-md lg:shadow-none bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+                  <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" /> Adicionar Encaixe
                 </Button>
               </DialogTrigger>
             )}
