@@ -141,10 +141,10 @@ const navItemKey = (it: NavItem): string =>
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
 const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
+  { to: "/app/painel", label: "Início", Icon: LayoutDashboard },
   { to: "/app/agenda", label: "Agenda", Icon: CalendarDays },
-  { to: "/app/clientes", label: "Clientes", Icon: Users },
+  { to: "/app/checkin", label: "Fila", Icon: ConciergeBell },
   { to: "/app/caixa", label: "Caixa", Icon: Wallet },
-  { to: "/app/recepcao", label: "Recepção", Icon: ConciergeBell },
 ];
 
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
@@ -1120,10 +1120,10 @@ function AppShellInner() {
       <div className="flex-1 flex flex-col min-w-0">
         {!isChooser && (
         <header
-          className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
+          className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] flex items-center justify-between gap-2 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6 sm:py-0"
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
           {!isChooser && (
             <button
               type="button"
@@ -1142,16 +1142,16 @@ function AppShellInner() {
             <button
               type="button"
               onClick={() => abrirSeletorPortais()}
-              className="lg:hidden inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
+              className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
               title="Trocar de portal"
             >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="truncate max-w-[140px]">{subsystemLabel ?? "Portais"}</span>
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline truncate max-w-[140px]">{subsystemLabel ?? "Portais"}</span>
             </button>
           )}
           </div>
 
-          <div className="flex items-center justify-center gap-3 min-w-0">
+          <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
           {clinicaAtual && (
             <img
               src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
@@ -1167,7 +1167,7 @@ function AppShellInner() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="max-w-xs sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+              <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -1226,7 +1226,7 @@ function AppShellInner() {
               : cn(
                   "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
                   // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
-                  uxMelhorias ? "pb-20 sm:pb-20 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
+                  uxMelhorias ? "pb-28 sm:pb-28 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
                 ),
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
@@ -1321,7 +1321,7 @@ function AppShellInner() {
       )}
       {!isChooser && uxMelhorias && (
         <nav
-          className="md:hidden fixed bottom-0 inset-x-0 z-40 h-16 pb-[env(safe-area-inset-bottom)] bg-card border-t flex items-stretch"
+          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
           aria-label="Navegação principal"
         >
           {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
@@ -1337,22 +1337,24 @@ function AppShellInner() {
                   irPara(to);
                 }}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-                  active ? "text-primary" : "text-muted-foreground",
+                  "flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-300 ease-out",
+                  active
+                    ? "bg-white text-slate-900 shadow-lg -translate-y-4"
+                    : "text-white/70 hover:text-white",
                 )}
               >
-                <Icon className="h-5 w-5" />
-                {label}
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="leading-none">{label}</span>
               </a>
             );
           })}
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
           >
-            <MenuIcon className="h-5 w-5" />
-            Mais
+            <MenuIcon className="h-5 w-5 shrink-0" />
+            <span className="leading-none">Mais</span>
           </button>
         </nav>
       )}
