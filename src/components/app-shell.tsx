@@ -147,6 +147,102 @@ const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof 
   { to: "/app/caixa", label: "Caixa", Icon: Wallet },
 ];
 
+function LiquidBottomNav({
+  pathname,
+  onNavigate,
+  onMais,
+}: {
+  pathname: string;
+  onNavigate: (to: string) => void;
+  onMais: () => void;
+}) {
+  const navRef = useRef<HTMLElement | null>(null);
+  const [navW, setNavW] = useState(0);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const medir = () => setNavW(el.getBoundingClientRect().width);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const activeIdx = BOTTOM_NAV_ITENS.findIndex(
+    (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
+  );
+  const slots = BOTTOM_NAV_ITENS.length + 1;
+  const cell = navW / slots;
+  const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
+  const R = 30;
+  const EASE = "cubic-bezier(0.68, -0.55, 0.265, 1.55)";
+  const mask = `radial-gradient(circle ${R}px at ${R}px 2px, transparent 0 ${R - 1}px, #000 ${R}px)`;
+
+  return (
+    <nav
+      ref={navRef}
+      className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
+      aria-label="Navegação principal"
+      style={
+        navW > 0 && activeIdx >= 0
+          ? ({
+              WebkitMaskImage: mask,
+              maskImage: mask,
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskSize: "100% 100%",
+              maskSize: "100% 100%",
+              WebkitMaskPosition: `${cx - R}px 0px`,
+              maskPosition: `${cx - R}px 0px`,
+              transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
+        const active = idx === activeIdx;
+        return (
+          <a
+            key={to}
+            href={to}
+            aria-current={active ? "page" : undefined}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+              e.preventDefault();
+              onNavigate(to);
+            }}
+            className={cn(
+              "relative flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-500",
+              active ? "text-slate-900 -translate-y-5" : "text-white/70 hover:text-white",
+            )}
+            style={active ? { transitionTimingFunction: EASE } : undefined}
+          >
+            {active && (
+              <span
+                aria-hidden
+                className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1 h-12 w-12 rounded-full bg-white shadow-lg"
+              />
+            )}
+            <Icon className={cn("h-5 w-5 shrink-0", active && "relative z-10 translate-y-0.5")} />
+            <span className={cn("leading-none", active ? "relative z-10 mt-3 text-white" : undefined)}>
+              {label}
+            </span>
+          </a>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onMais}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
+      >
+        <MenuIcon className="h-5 w-5 shrink-0" />
+        <span className="leading-none">Mais</span>
+      </button>
+    </nav>
+  );
+}
+
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
 // O mapa vive em src/lib/permissoes-rotas.ts (compartilhado com o guard
 // de rota) — aqui apenas reexportamos para uso local.
