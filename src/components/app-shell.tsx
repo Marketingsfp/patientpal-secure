@@ -151,10 +151,12 @@ function LiquidBottomNav({
   pathname,
   onNavigate,
   onMais,
+  cor,
 }: {
   pathname: string;
   onNavigate: (to: string) => void;
   onMais: () => void;
+  cor: string;
 }) {
   const navRef = useRef<HTMLElement | null>(null);
   const [navW, setNavW] = useState(0);
@@ -192,11 +194,12 @@ function LiquidBottomNav({
     <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
       <nav
         ref={navRef}
-        className="relative w-full rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch"
+        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch"
         aria-label="Navegação principal"
         style={
           navW > 0 && activeIdx >= 0
             ? ({
+                backgroundColor: cor,
                 WebkitMaskImage: mask,
                 maskImage: mask,
                 WebkitMaskRepeat: "no-repeat, no-repeat",
@@ -210,7 +213,7 @@ function LiquidBottomNav({
                 willChange: "mask-position",
                 transition: `-webkit-mask-position ${DUR} ${EASE}, mask-position ${DUR} ${EASE}`,
               } as React.CSSProperties)
-            : undefined
+            : ({ backgroundColor: cor } as React.CSSProperties)
         }
       >
         {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
