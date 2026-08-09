@@ -868,10 +868,10 @@ function AppShellInner() {
         >
           <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
             <div className="flex w-full items-center justify-between gap-2">
-              <Link to="/app" className="flex items-center gap-2 min-w-0" title="ClinicaOS">
+              <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
                 <Activity className="h-5 w-5 shrink-0 text-white" />
                 <span className="font-semibold tracking-tight truncate text-white">ClinicaOS</span>
-              </Link>
+              </div>
               <button
                 type="button"
                 onClick={() => {
