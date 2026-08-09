@@ -1226,7 +1226,7 @@ function AppShellInner() {
               : cn(
                   "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
                   // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
-                  uxMelhorias ? "pb-20 sm:pb-20 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
+                  uxMelhorias ? "pb-28 sm:pb-28 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
                 ),
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
