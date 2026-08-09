@@ -1321,7 +1321,7 @@ function AppShellInner() {
       )}
       {!isChooser && uxMelhorias && (
         <nav
-          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
+          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl px-2 pt-2 pb-2 flex items-end mb-[env(safe-area-inset-bottom)]"
           aria-label="Navegação principal"
         >
           {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
@@ -1336,22 +1336,36 @@ function AppShellInner() {
                   e.preventDefault();
                   irPara(to);
                 }}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-300 ease-out",
-                  active
-                    ? "bg-white text-slate-900 shadow-lg -translate-y-4"
-                    : "text-white/70 hover:text-white",
-                )}
+                className="relative flex-1 flex flex-col items-center justify-end gap-1 p-2 text-xs font-medium transition-colors"
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="leading-none">{label}</span>
+                {active && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-5 h-16 w-16 rounded-full bg-slate-900"
+                  />
+                )}
+                {active ? (
+                  <>
+                    <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-xl -translate-y-6 transition-all duration-300 ease-out">
+                      <Icon className="h-6 w-6 shrink-0" />
+                    </span>
+                    <span className="relative z-10 -mt-5 leading-none tracking-wide text-white">
+                      {label}
+                    </span>
+                  </>
+                ) : (
+                  <span className="flex flex-col items-center gap-1 text-slate-400 transition-colors hover:text-white">
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="leading-none">{label}</span>
+                  </span>
+                )}
               </a>
             );
           })}
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
+            className="flex-1 flex flex-col items-center justify-end gap-1 p-2 text-xs font-medium text-slate-400 transition-colors hover:text-white"
           >
             <MenuIcon className="h-5 w-5 shrink-0" />
             <span className="leading-none">Mais</span>
