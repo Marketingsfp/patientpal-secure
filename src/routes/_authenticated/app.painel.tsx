@@ -183,7 +183,12 @@ function DashboardOperacional() {
             className="xl:col-span-2"
           >
             {carregando ? <Linhas /> : filaAtual.length === 0 ? (
-              <HhpEmptyState icon={Users} title="Ninguém na fila" description="Assim que um paciente fizer check-in ele aparece aqui em tempo real." />
+              <HhpEmptyState
+                icon={Users}
+                title="Ninguém na fila"
+                description="Assim que um paciente fizer check-in ele aparece aqui em tempo real."
+                className="min-h-[220px]"
+              />
             ) : (
               <ul className="divide-y divide-slate-100">
                 {filaAtual.map((a) => (
