@@ -8671,8 +8671,8 @@ function AgendaPage() {
             <SheetHeader className="text-left">
               <SheetTitle className="text-base">Filtros</SheetTitle>
             </SheetHeader>
-            <div className="mt-3 space-y-3 [&_.hidden.lg\\:grid]:!grid [&_.hidden.lg\\:grid]:grid-cols-1 [&_input]:h-9 [&_button[role=combobox]]:h-9">
-              {filtrosGrid}
+            <div className="mt-3 space-y-3 [&_input]:h-9 [&_button[role=combobox]]:h-9">
+              {renderFiltros("sheet")}
             </div>
             <div className="mt-4 flex gap-2 pb-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { limparFiltros(); }}>
@@ -8684,7 +8684,7 @@ function AgendaPage() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="hidden lg:block">{filtrosGrid}</div>
+        <div className="hidden lg:block">{renderFiltros("desktop")}</div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
