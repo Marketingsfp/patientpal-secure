@@ -35,6 +35,20 @@ const hojeISO = () => {
 };
 const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--");
 
+/** "Hoje às 13:46" ou "08/08 às 18:27". */
+const dataHoraCurta = (iso: string | null) => {
+  if (!iso) return "--:--";
+  const d = new Date(iso);
+  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const hoje = new Date();
+  const mesmoDia =
+    d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth() && d.getDate() === hoje.getDate();
+  if (mesmoDia) return `Hoje às ${hora}`;
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dia}/${mes} às ${hora}`;
+};
+
 type Ag = {
   id: string; paciente_nome: string | null; inicio: string | null; status: string;
   fluxo_etapa: string | null; procedimento: string | null; prioridade: string | null;
@@ -303,7 +317,7 @@ function DashboardOperacional() {
                       .map((c) => (
                         <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
                           <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
-                          <span className="text-[11px] text-slate-600 dark:text-slate-400">desde {hhmm(c.aberto_em)}</span>
+                          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">{dataHoraCurta(c.aberto_em)}</span>
                         </div>
                       ))}
                     {(d?.caixas ?? []).length > 5 && (
