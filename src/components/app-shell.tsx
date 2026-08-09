@@ -1320,43 +1320,11 @@ function AppShellInner() {
         </Sheet>
       )}
       {!isChooser && uxMelhorias && (
-        <nav
-          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
-          aria-label="Navegação principal"
-        >
-          {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
-            const active = location.pathname === to || location.pathname.startsWith(`${to}/`);
-            return (
-              <a
-                key={to}
-                href={to}
-                aria-current={active ? "page" : undefined}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                  e.preventDefault();
-                  irPara(to);
-                }}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-300 ease-out",
-                  active
-                    ? "bg-white text-slate-900 shadow-lg -translate-y-4"
-                    : "text-white/70 hover:text-white",
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="leading-none">{label}</span>
-              </a>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
-          >
-            <MenuIcon className="h-5 w-5 shrink-0" />
-            <span className="leading-none">Mais</span>
-          </button>
-        </nav>
+        <LiquidBottomNav
+          pathname={location.pathname}
+          onNavigate={irPara}
+          onMais={() => setMobileNavOpen(true)}
+        />
       )}
       {seletorPortaisAberto && !isChooser && (
         <div
