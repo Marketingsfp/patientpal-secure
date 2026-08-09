@@ -97,7 +97,7 @@ export function LiquidNav({
     <nav
       ref={ref}
       aria-label="Navegação principal"
-      className={className}
+      className={"relative " + (className ?? "")}
       style={{ height: BAR_H }}
     >
       {width > 0 && (
