@@ -80,7 +80,7 @@ function DashboardOperacional() {
           .in("clinica_id", ids).eq("status", "aberto").order("created_at", { ascending: false }).limit(8),
         supabase.from("caixa_sessoes")
           .select("id,user_nome,aberto_em,valor_abertura")
-          .in("clinica_id", ids).eq("status", "aberto").order("aberto_em"),
+          .in("clinica_id", ids).eq("status", "aberto").order("aberto_em", { ascending: false }),
       ]);
       return {
         ags: (ags.data ?? []) as Ag[],
@@ -295,12 +295,23 @@ function DashboardOperacional() {
                     <Wallet className="h-4 w-4" /> Nenhum caixa aberto no momento.
                   </div>
                 ) : (
-                  (d?.caixas ?? []).map((c) => (
-                    <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                      <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
-                      <span className="text-[11px] text-slate-600 dark:text-slate-400">desde {hhmm(c.aberto_em)}</span>
-                    </div>
-                  ))
+                  <>
+                    {(d?.caixas ?? [])
+                      .slice()
+                      .sort((a, b) => new Date(b.aberto_em).getTime() - new Date(a.aberto_em).getTime())
+                      .slice(0, 5)
+                      .map((c) => (
+                        <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                          <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
+                          <span className="text-[11px] text-slate-600 dark:text-slate-400">desde {hhmm(c.aberto_em)}</span>
+                        </div>
+                      ))}
+                    {(d?.caixas ?? []).length > 5 && (
+                      <Link to="/app/caixa" className="block pt-1 text-[11px] font-medium text-slate-500 hover:text-slate-800">
+                        +{(d?.caixas ?? []).length - 5} caixa(s) aberto(s) — ver todos
+                      </Link>
+                    )}
+                  </>
                 )}
               </div>
             </Painel>
