@@ -60,7 +60,7 @@ import { usePermissoes } from "@/hooks/use-permissoes";
 import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
-import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
+import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
 import {
   PortalLauncher,
   abrirSeletorPortais,
@@ -1341,6 +1341,25 @@ function AppShellInner() {
             Mais
           </button>
         </nav>
+      )}
+      {seletorPortaisAberto && !isChooser && (
+        <div
+          className="fixed inset-0 z-[60] overflow-y-auto bg-background"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Escolha o seu portal"
+        >
+          <button
+            type="button"
+            onClick={() => fecharSeletorPortais()}
+            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-white"
+            aria-label="Fechar seleção de portais"
+            title="Voltar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <PortalLauncher onPick={escolherPortal} className="min-h-[100dvh]" />
+        </div>
       )}
     </div>
   );
