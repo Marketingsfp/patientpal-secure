@@ -131,7 +131,7 @@ function DashboardOperacional() {
   const carregando = loading || q.isLoading;
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-y-auto bg-slate-50/60">
+    <div className="flex flex-col w-full bg-slate-50/60">
       <HhpPageHeader
         title="Dashboard operacional"
         eyebrow={`${clinicaAtual?.clinica.nome ?? "Clínica"} · ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}`}
