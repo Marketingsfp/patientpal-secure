@@ -365,12 +365,6 @@ function PatientCard({
 
   return (
     <Card className="relative p-4 sm:p-5 border-border/80 shadow-sm hover:shadow-md transition-shadow">
-      {index < 9 && (
-        <kbd className="hidden md:inline-flex absolute top-2 right-3 items-center rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/80">
-          Alt+{index + 1}
-        </kbd>
-      )}
-
       <div className="flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <AvatarPaciente
           nome={item.paciente_nome}
