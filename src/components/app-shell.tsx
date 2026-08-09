@@ -176,7 +176,8 @@ function LiquidBottomNav({
   const cell = navW / slots;
   const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
   const R = 30;
-  const EASE = "cubic-bezier(0.68, -0.55, 0.265, 1.55)";
+  const EASE = "cubic-bezier(0.5, 1.25, 0.3, 1.1)";
+  const DUR = "0.75s";
   const mask = `radial-gradient(circle ${R}px at ${R}px 2px, #000 0 ${R - 1}px, transparent ${R}px), linear-gradient(#000, #000)`;
   const maskPos = `${cx - R}px 0px, 0px 0px`;
 
@@ -199,7 +200,7 @@ function LiquidBottomNav({
                 maskPosition: maskPos,
                 WebkitMaskComposite: "xor",
                 maskComposite: "exclude",
-                transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
+                transition: `-webkit-mask-position ${DUR} ${EASE}, mask-position ${DUR} ${EASE}`,
               } as React.CSSProperties)
             : undefined
         }
@@ -241,7 +242,7 @@ function LiquidBottomNav({
           className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg"
           style={{
             transform: `translateX(${cx - 24}px)`,
-            transition: `transform 0.5s ${EASE}`,
+            transition: `transform ${DUR} ${EASE}`,
           }}
         >
           {(() => {
