@@ -1152,14 +1152,12 @@ function AppShellInner() {
           </div>
 
           <div className="flex items-center justify-center gap-3 min-w-0">
-          {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="hidden sm:flex items-center justify-center shrink-0 rounded-lg bg-white/95 px-2 py-1 shadow-sm ring-1 ring-white/20">
-              <img
-                src={logoDaClinica(clinicaAtual.clinica.nome)!}
-                alt={clinicaAtual.clinica.nome}
-                className="h-7 w-auto object-contain"
-              />
-            </div>
+          {clinicaAtual && (
+            <img
+              src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
+              alt={clinicaAtual.clinica.nome}
+              className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-white/20 shadow-sm"
+            />
           )}
           {memberships.length > 0 && (
             <Select
@@ -1169,7 +1167,7 @@ function AppShellInner() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[130px] sm:w-[200px] md:w-[260px] max-w-full min-w-0 h-9 px-2.5 text-xs font-medium shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15">
+              <SelectTrigger className="max-w-xs sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
