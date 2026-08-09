@@ -6377,8 +6377,14 @@ function AgendaPage() {
     (filtroEspecialidade !== "todos" ? 1 : 0) +
     (filtroCliente.trim() ? 1 : 0) +
     (apenasData ? 1 : 0);
-  const filtrosGrid = (
-    <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
+  const renderFiltros = (variante: "desktop" | "sheet" = "desktop") => (
+    <div
+      className={
+        variante === "sheet"
+          ? "grid grid-cols-1 gap-3"
+          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5"
+      }
+    >
 
           {/* Profissional */}
           <div className="space-y-0 lg:col-span-2">
