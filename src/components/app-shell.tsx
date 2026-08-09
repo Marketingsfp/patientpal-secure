@@ -147,6 +147,113 @@ const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof 
   { to: "/app/caixa", label: "Caixa", Icon: Wallet },
 ];
 
+function LiquidBottomNav({
+  pathname,
+  onNavigate,
+  onMais,
+}: {
+  pathname: string;
+  onNavigate: (to: string) => void;
+  onMais: () => void;
+}) {
+  const navRef = useRef<HTMLElement | null>(null);
+  const [navW, setNavW] = useState(0);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const medir = () => setNavW(el.getBoundingClientRect().width);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const activeIdx = BOTTOM_NAV_ITENS.findIndex(
+    (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
+  );
+  const slots = BOTTOM_NAV_ITENS.length + 1;
+  const cell = navW / slots;
+  const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
+  const R = 30;
+  const EASE = "cubic-bezier(0.68, -0.55, 0.265, 1.55)";
+  const mask = `radial-gradient(circle ${R}px at ${R}px 2px, #000 0 ${R - 1}px, transparent ${R}px), linear-gradient(#000, #000)`;
+  const maskPos = `${cx - R}px 0px, 0px 0px`;
+
+  return (
+    <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
+      <nav
+        ref={navRef}
+        className="relative w-full rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch"
+        aria-label="Navegação principal"
+        style={
+          navW > 0 && activeIdx >= 0
+            ? ({
+                WebkitMaskImage: mask,
+                maskImage: mask,
+                WebkitMaskRepeat: "no-repeat, no-repeat",
+                maskRepeat: "no-repeat, no-repeat",
+                WebkitMaskSize: `${R * 2}px ${R * 2}px, 100% 100%`,
+                maskSize: `${R * 2}px ${R * 2}px, 100% 100%`,
+                WebkitMaskPosition: maskPos,
+                maskPosition: maskPos,
+                WebkitMaskComposite: "xor",
+                maskComposite: "exclude",
+                transition: `-webkit-mask-position 0.5s ${EASE}, mask-position 0.5s ${EASE}`,
+              } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {BOTTOM_NAV_ITENS.map(({ to, label, Icon }, idx) => {
+          const active = idx === activeIdx;
+          return (
+            <a
+              key={to}
+              href={to}
+              aria-current={active ? "page" : undefined}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                e.preventDefault();
+                onNavigate(to);
+              }}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium transition-colors duration-300",
+                active ? "text-white" : "text-white/70 hover:text-white",
+              )}
+            >
+              <Icon className={cn("h-5 w-5 shrink-0", active && "opacity-0")} />
+              <span className="leading-none">{label}</span>
+            </a>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onMais}
+          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium text-white/70 transition-colors duration-300 hover:text-white"
+        >
+          <MenuIcon className="h-5 w-5 shrink-0" />
+          <span className="leading-none">Mais</span>
+        </button>
+      </nav>
+      {navW > 0 && activeIdx >= 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-0 h-12 w-12 -mt-5 flex items-center justify-center rounded-full bg-white text-slate-900 shadow-lg"
+          style={{
+            transform: `translateX(${cx - 24}px)`,
+            transition: `transform 0.5s ${EASE}`,
+          }}
+        >
+          {(() => {
+            const Ativo = BOTTOM_NAV_ITENS[activeIdx].Icon;
+            return <Ativo className="h-5 w-5" />;
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
 // O mapa vive em src/lib/permissoes-rotas.ts (compartilhado com o guard
 // de rota) — aqui apenas reexportamos para uso local.
@@ -1320,43 +1427,11 @@ function AppShellInner() {
         </Sheet>
       )}
       {!isChooser && uxMelhorias && (
-        <nav
-          className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 rounded-2xl bg-slate-900 text-white shadow-2xl p-2 flex items-stretch mb-[env(safe-area-inset-bottom)]"
-          aria-label="Navegação principal"
-        >
-          {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
-            const active = location.pathname === to || location.pathname.startsWith(`${to}/`);
-            return (
-              <a
-                key={to}
-                href={to}
-                aria-current={active ? "page" : undefined}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                  e.preventDefault();
-                  irPara(to);
-                }}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium transition-all duration-300 ease-out",
-                  active
-                    ? "bg-white text-slate-900 shadow-lg -translate-y-4"
-                    : "text-white/70 hover:text-white",
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="leading-none">{label}</span>
-              </a>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-full p-3 text-[11px] font-medium text-white/70 transition-all duration-300 ease-out hover:text-white"
-          >
-            <MenuIcon className="h-5 w-5 shrink-0" />
-            <span className="leading-none">Mais</span>
-          </button>
-        </nav>
+        <LiquidBottomNav
+          pathname={location.pathname}
+          onNavigate={irPara}
+          onMais={() => setMobileNavOpen(true)}
+        />
       )}
       {seletorPortaisAberto && !isChooser && (
         <div
