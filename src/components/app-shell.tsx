@@ -868,9 +868,25 @@ function AppShellInner() {
         >
           <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
             <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
-                <Activity className="h-5 w-5 shrink-0 text-white" />
-                <span className="font-semibold tracking-tight truncate text-white">ClinicaOS</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
+                  <Activity className="h-5 w-5 shrink-0 text-white" />
+                  <span className="font-semibold tracking-tight truncate text-white">ClinicaOS</span>
+                </div>
+                {!isChooser && (
+                  <>
+                    <span className="h-5 my-auto border-r border-white/20 shrink-0" aria-hidden />
+                    <button
+                      type="button"
+                      onClick={() => abrirSeletorPortais()}
+                      className="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
+                      title="Trocar de portal"
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      <span className="truncate max-w-[110px]">{subsystemLabel ?? "Portais"}</span>
+                    </button>
+                  </>
+                )}
               </div>
               <button
                 type="button"
@@ -1126,7 +1142,7 @@ function AppShellInner() {
             <button
               type="button"
               onClick={() => abrirSeletorPortais()}
-              className="hidden lg:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
+              className="lg:hidden inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
               title="Trocar de portal"
             >
               <LayoutGrid className="h-4 w-4" />
