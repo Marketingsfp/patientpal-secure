@@ -60,7 +60,13 @@ import { usePermissoes } from "@/hooks/use-permissoes";
 import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
-import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
+import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
+import {
+  PortalLauncher,
+  abrirSeletorPortais,
+  fecharSeletorPortais,
+  useSeletorPortaisAberto,
+} from "@/components/portal-launcher";
 import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
@@ -553,6 +559,16 @@ function AppShellInner() {
   }, [clinicColor]);
 
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
+  const seletorPortaisAberto = useSeletorPortaisAberto();
+  // Trocar de portal não desmonta a tela atual: o seletor entra como camada
+  // por cima. Ao voltar para o mesmo portal, apenas escondemos a camada — a
+  // Agenda reaparece instantaneamente, sem spinner nem skeleton.
+  const escolherPortal = (id: SubsystemId) => {
+    const mudou = id !== subsystem;
+    setSubsystem(id);
+    fecharSeletorPortais();
+    if (mudou) navigate({ to: SUBSYSTEMS[id].home });
+  };
   const isChooser = location.pathname === "/app" || location.pathname === "/app/";
   const isEmbed = (() => {
     const s = (location as unknown as { search?: unknown }).search;
@@ -1079,7 +1095,7 @@ function AppShellInner() {
               showName
               onChangePassword={() => setPwOpen(true)}
               onSignOut={() => void handleSignOut()}
-              onSwitchPortal={() => navigate({ to: "/app" })}
+              onSwitchPortal={() => abrirSeletorPortais()}
             />
           </div>
         </aside>
@@ -1107,14 +1123,15 @@ function AppShellInner() {
             <Activity className="h-5 w-5 shrink-0 text-white" />
           </Link>
           {!isChooser && (
-            <Link
-              to="/app"
+            <button
+              type="button"
+              onClick={() => abrirSeletorPortais()}
               className="hidden lg:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
               title="Trocar de portal"
             >
               <LayoutGrid className="h-4 w-4" />
               <span className="truncate max-w-[140px]">{subsystemLabel ?? "Portais"}</span>
-            </Link>
+            </button>
           )}
           </div>
 
@@ -1282,7 +1299,7 @@ function AppShellInner() {
                 showName
                 onChangePassword={() => setPwOpen(true)}
                 onSignOut={() => void handleSignOut()}
-                onSwitchPortal={() => navigate({ to: "/app" })}
+                onSwitchPortal={() => abrirSeletorPortais()}
               />
             </div>
           </SheetContent>
@@ -1324,6 +1341,25 @@ function AppShellInner() {
             Mais
           </button>
         </nav>
+      )}
+      {seletorPortaisAberto && !isChooser && (
+        <div
+          className="fixed inset-0 z-[60] overflow-y-auto bg-background"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Escolha o seu portal"
+        >
+          <button
+            type="button"
+            onClick={() => fecharSeletorPortais()}
+            className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/80 text-slate-600 shadow-md ring-1 ring-slate-200 flex items-center justify-center hover:bg-white"
+            aria-label="Fechar seleção de portais"
+            title="Voltar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <PortalLauncher onPick={escolherPortal} className="min-h-[100dvh]" />
+        </div>
       )}
     </div>
   );
