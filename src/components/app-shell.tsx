@@ -191,10 +191,10 @@ function LiquidBottomNav({
   const maskPos = `${cx - R}px 0px, 0px 0px`;
 
   return (
-    <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 w-full z-50">
       <nav
         ref={navRef}
-        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch transform-gpu will-change-transform"
+        className="relative w-full rounded-t-2xl text-white shadow-2xl px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex items-stretch transform-gpu will-change-transform"
         aria-label="Navegação principal"
         style={
           navW > 0 && activeIdx >= 0
