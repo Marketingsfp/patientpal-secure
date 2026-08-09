@@ -859,10 +859,10 @@ function AppShellInner() {
       {!isChooser && (
         <aside
           className={cn(
-            "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
-            "relative z-40",
+            "text-white overflow-hidden hidden lg:flex flex-col",
+            "fixed top-0 left-0 bottom-0 z-40 rounded-none border-r border-slate-200",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-72 2xl:w-80",
+            collapsed ? "w-16" : "w-60",
           )}
           style={{ backgroundColor: corSidebar }}
         >
@@ -1101,7 +1101,12 @@ function AppShellInner() {
         </aside>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className={cn(
+          "flex-1 flex flex-col min-w-0",
+          !isChooser && (collapsed ? "lg:pl-16" : "lg:pl-60"),
+        )}
+      >
         {!isChooser && (
         <header
           className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
