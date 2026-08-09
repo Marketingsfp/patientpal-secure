@@ -6502,6 +6502,38 @@ function AgendaPage() {
         </div>
   );
 
+  const exportarAgendaExcel = () => {
+    if (!filtrados.length) {
+      toast.info("Sem dados para exportar.");
+      return;
+    }
+    exportToExcel(
+      filtrados.map((a) => ({
+        data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+        dia: fmtDiaSemana(a.inicio),
+        inicio: fmtHora(a.inicio),
+        fim: fmtHora(a.fim),
+        profissional: medicoNomeAgendamento(a),
+        paciente: a.paciente_nome,
+        procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
+        status: a.status,
+        observacoes: a.observacoes ?? "",
+      })),
+      `agenda-${dataRef}`,
+      [
+        { key: "data", label: "Data" },
+        { key: "dia", label: "Dia" },
+        { key: "inicio", label: "Início" },
+        { key: "fim", label: "Fim" },
+        { key: "profissional", label: "Profissional" },
+        { key: "paciente", label: "Cliente" },
+        { key: "procedimento", label: "Serviço" },
+        { key: "status", label: "Status" },
+        { key: "observacoes", label: "Observações" },
+      ],
+    );
+  };
+
   return (
     <div className="space-y-3">
       {emitenteNfseDialog}
