@@ -165,10 +165,12 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
   };
 
   const textoData = (() => {
-    if (isHoje) return "Hoje";
-    if (isOntem) return "Ontem";
-    if (isAmanha) return "Amanhã";
-    return formatarDataExtenso(data);
+    const [ano, mes, dia] = data.split("-");
+    const curto = `${dia}/${mes}/${ano}`;
+    if (isHoje) return `Hoje, ${dia}/${mes}`;
+    if (isOntem) return `Ontem, ${dia}/${mes}`;
+    if (isAmanha) return `Amanhã, ${dia}/${mes}`;
+    return curto;
   })();
 
   const corData = (() => {
@@ -192,15 +194,14 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        <div className="relative flex-1 min-w-[220px]">
-          {/* Aqui removemos o 'truncate' e a data redundante para o texto respirar */}
+        <div className="relative w-full max-w-[200px]">
           <Button
             variant="outline"
-            className={`w-full justify-center h-9 font-normal text-sm px-3 ${corData}`}
+            className={`w-full max-w-[200px] truncate justify-center h-9 text-sm font-medium px-3 ${corData}`}
             onClick={() => setIsOpen(!isOpen)}
           >
             <CalendarDays className="h-4 w-4 shrink-0 mr-2" />
-            <span>{textoData}</span>
+            <span className="truncate">{textoData}</span>
           </Button>
 
           {isOpen && (
