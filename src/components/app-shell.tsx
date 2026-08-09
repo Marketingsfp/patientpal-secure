@@ -185,8 +185,8 @@ function LiquidBottomNav({
   const cell = navW / slots;
   const cx = activeIdx >= 0 ? (activeIdx + 0.5) * cell : -999;
   const R = 30;
-  const EASE = "cubic-bezier(0.5, 1.25, 0.3, 1.1)";
-  const DUR = "0.75s";
+  const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+  const DUR = "0.35s";
   const mask = `radial-gradient(circle ${R}px at ${R}px 2px, #000 0 ${R - 1}px, transparent ${R}px), linear-gradient(#000, #000)`;
   const maskPos = `${cx - R}px 0px, 0px 0px`;
 
@@ -194,7 +194,7 @@ function LiquidBottomNav({
     <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 mb-[env(safe-area-inset-bottom)]">
       <nav
         ref={navRef}
-        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch"
+        className="relative w-full rounded-2xl text-white shadow-2xl p-2 flex items-stretch transform-gpu will-change-transform"
         aria-label="Navegação principal"
         style={
           navW > 0 && activeIdx >= 0
