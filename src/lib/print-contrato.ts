@@ -361,11 +361,21 @@ export async function printContrato(contratoId: string) {
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
   // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
   const printCss = `<style id="print-fix">
+  @page { size: A4 portrait; margin: 12mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  table, tr, td, th, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
+  tr, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
   h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
   img { display: block !important; visibility: visible !important; max-width: 100%; }
+  table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+  td, th {
+    vertical-align: middle;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    position: static !important;
+    float: none !important;
+  }
+  td[rowspan], th[rowspan] { vertical-align: middle !important; }
   .contract-table { width: 100%; border-collapse: collapse; }
   .contract-table th,
   .contract-table .header-row,
@@ -375,9 +385,12 @@ export async function printContrato(contratoId: string) {
     font-weight: bold !important;
   }
   @media print {
+    @page { size: A4 portrait; margin: 12mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { margin: 0 auto !important; max-width: 186mm !important; background: #fff !important; }
     img { display: block !important; visibility: visible !important; }
-    table, tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+    tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+    table { table-layout: fixed !important; width: 100% !important; }
     h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
     .contract-table th,
     .contract-table .header-row,
