@@ -683,6 +683,11 @@ function CheckinPage() {
       return;
     }
     if (confirmandoId === item.id) return;
+    // Pagamento é exigido antes de liberar o paciente para o médico.
+    if (!item.pago) {
+      setCobrancaAlvo(item);
+      return;
+    }
     setConfirmandoId(item.id);
 
     try {
