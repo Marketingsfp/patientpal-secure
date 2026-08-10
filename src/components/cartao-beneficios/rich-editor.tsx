@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -22,6 +23,7 @@ import {
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
   Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
+  Code2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -33,6 +35,44 @@ import { ImageCropDialog } from "./image-crop-dialog";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
 const ColoredTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+    };
+  },
+});
+
+/**
+ * Mantém o CSS inline (style/class/largura/alinhamento) do HTML colado
+ * — sem isso, um contrato convertido de .docx perde bordas, padding e fontes.
+ */
+const PreservarEstiloInline = Extension.create({
+  name: "preservarEstiloInline",
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          "paragraph", "heading", "table", "tableRow", "tableCell",
+          "tableHeader", "bulletList", "orderedList", "listItem", "image",
+        ],
+        attributes: {
+          style: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).getAttribute("style"),
+            renderHTML: (attrs) => (attrs.style ? { style: attrs.style } : {}),
+          },
+          class: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).getAttribute("class"),
+            renderHTML: (attrs) => (attrs.class ? { class: attrs.class } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
+const ColoredTableCellBase = TableCell.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
