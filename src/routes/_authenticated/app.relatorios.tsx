@@ -392,7 +392,7 @@ function RelatoriosPage() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Relatórios</h1>
+        <h1 className="text-3xl font-bold">Relatórios</h1>
         <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 

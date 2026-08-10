@@ -53,7 +53,7 @@ function ResetPasswordPage() {
           <span className="text-xl font-semibold">ClinicaOS</span>
         </Link>
         <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Redefinir senha</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Redefinir senha</h1>
           <p className="text-sm text-muted-foreground mt-1.5 mb-6">
             {ready ? "Defina sua nova senha abaixo." : "Aguarde a validação do link de recuperação..."}
           </p>

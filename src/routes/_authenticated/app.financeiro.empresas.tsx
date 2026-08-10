@@ -111,8 +111,8 @@ function FinEmpresasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Empresas</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-2xl font-semibold">Empresas</h1>
+          <p className="text-sm text-muted-foreground">
             Fornecedores, prestadores e parceiros {clinicaAtual ? `de ${clinicaAtual.clinica.nome}` : ""}
           </p>
         </div>

@@ -99,8 +99,8 @@ function Page() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><PieIcon className="h-6 w-6 text-primary" />Estatísticas</h1>
-          <p className="text-xs font-medium text-slate-500">Período: {periodoLabel}</p>
+          <h1 className="text-2xl font-semibold flex items-center gap-2"><PieIcon className="h-6 w-6 text-primary" />Estatísticas</h1>
+          <p className="text-sm text-muted-foreground">Período: {periodoLabel}</p>
         </div>
         <DateRangeFilter value={range} preset={preset} onChange={(r, p) => { setRange(r); setPreset(p); }} />
       </div>

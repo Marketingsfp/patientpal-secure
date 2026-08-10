@@ -112,10 +112,10 @@ function LgpdPage() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></span>
+        <ShieldCheck className="h-6 w-6 text-primary" />
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-900 leading-none">LGPD — Lei Geral de Proteção de Dados</h1>
-          <p className="text-xs font-medium text-slate-500">Gerencie consentimentos e solicitações dos titulares de dados.</p>
+          <h1 className="text-xl font-bold">LGPD — Lei Geral de Proteção de Dados</h1>
+          <p className="text-sm text-muted-foreground">Gerencie consentimentos e solicitações dos titulares de dados.</p>
         </div>
         {podeEscrever && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>}
       </div>

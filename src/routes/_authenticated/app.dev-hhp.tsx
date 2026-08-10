@@ -34,8 +34,8 @@ function HhpShowcase() {
       <div className="h-[calc(100vh-56px)] flex items-center justify-center p-6">
         <div className="max-w-md text-center space-y-3">
           <Shield className="h-10 w-10 mx-auto text-muted-foreground" />
-          <h1 className="text-xl font-bold text-slate-900 leading-none">HHP Showcase — restrito</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-lg font-semibold">HHP Showcase — restrito</h1>
+          <p className="text-sm text-muted-foreground">
             Disponível para <b>admin</b> e <b>gestor</b>.
           </p>
         </div>

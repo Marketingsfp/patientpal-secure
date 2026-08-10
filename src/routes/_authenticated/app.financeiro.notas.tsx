@@ -217,8 +217,8 @@ function Page() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-xl font-bold text-slate-900 leading-none">Notas dos pacientes</h1>
-          <p className="text-xs font-medium text-slate-500">Registro e controle de NFs emitidas</p></div>
+        <div><h1 className="text-2xl font-semibold">Notas dos pacientes</h1>
+          <p className="text-sm text-muted-foreground">Registro e controle de NFs emitidas</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
           {podeEscrever && (
             <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova nota</Button></DialogTrigger>

@@ -355,8 +355,8 @@ function PainelExecutivoPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Painel Executivo</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight">Painel Executivo</h1>
+          <p className="text-sm text-muted-foreground">
             Produção, financeiro, comercial e qualidade — comparado com o período anterior.
           </p>
         </div>

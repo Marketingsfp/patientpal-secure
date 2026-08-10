@@ -224,7 +224,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
       <ListShell<TabV>
         title={
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 leading-none">Orçamentos</h1>
+            <h1 className="text-lg font-semibold">Orçamentos</h1>
             <span className="text-xs text-muted-foreground">v2 (preview)</span>
           </div>
         }

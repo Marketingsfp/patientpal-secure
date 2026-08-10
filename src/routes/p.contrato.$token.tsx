@@ -81,7 +81,7 @@ function AssinarContrato() {
       <div className="max-w-3xl mx-auto bg-card rounded-lg border shadow-sm p-6 space-y-4">
         <div>
           <div className="text-xs text-muted-foreground">{c.clinica_nome}</div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Contrato Nº {c.numero} — {c.plano_nome}</h1>
+          <h1 className="text-xl font-bold">Contrato Nº {c.numero} — {c.plano_nome}</h1>
           <div className="text-sm text-muted-foreground">Titular: <strong>{c.paciente_nome}</strong></div>
         </div>
         <div className="rounded-md border bg-muted/30 p-3 max-h-80 overflow-auto whitespace-pre-wrap text-sm">

@@ -103,8 +103,8 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" />BI Financeiro</h1>
-        <p className="text-xs font-medium text-slate-500">Comparativo dos últimos 6 meses</p></div>
+      <div><h1 className="text-2xl font-semibold flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" />BI Financeiro</h1>
+        <p className="text-sm text-muted-foreground">Comparativo dos últimos 6 meses</p></div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("receitas")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Receitas (6m)</p><p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("despesas")}><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Despesas (6m)</p><p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p><p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p></CardContent></Card>

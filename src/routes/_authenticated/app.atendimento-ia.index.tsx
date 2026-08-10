@@ -239,10 +239,10 @@ function AtendimentoIaPage() {
   return (
     <div className="space-y-4 p-1">
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Brain className="h-5 w-5" /></span>
+        <Brain className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Atendimento médico</h1>
-          <p className="text-xs font-medium text-slate-500">Selecione um paciente na fila para iniciar o atendimento.</p>
+          <h1 className="text-xl font-semibold">Atendimento médico</h1>
+          <p className="text-sm text-muted-foreground">Selecione um paciente na fila para iniciar o atendimento.</p>
         </div>
       </div>
 

@@ -23,8 +23,8 @@ function CartaoBeneficiosLayout() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><CreditCard className="h-5 w-5" /></span>
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Cartão Benefícios</h1>
+        <CreditCard className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">Cartão Benefícios</h1>
       </div>
       <nav className="flex gap-1 border-b">
         {tabs.map((t) => {

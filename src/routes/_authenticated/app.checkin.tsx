@@ -707,7 +707,7 @@ function CheckinPage() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
             <ConciergeBell className="h-6 w-6" />
             Check-in de pacientes
           </h1>

@@ -364,8 +364,8 @@ function Page() {
         <div className="flex items-center gap-2">
           <Undo2 className="h-5 w-5 text-rose-700" />
           <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-none">Estorno</h1>
-            <p className="text-xs font-medium text-slate-500">
+            <h1 className="text-lg font-semibold leading-tight">Estorno</h1>
+            <p className="text-xs text-muted-foreground">
               Solicitações enviadas pelo caixa/recepção — aprove para estornar o atendimento ou recuse
               com uma justificativa.
             </p>

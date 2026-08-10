@@ -25,10 +25,10 @@ function UnidadesPage() {
   return (
     <div className="space-y-4 max-w-full">
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span>
+        <MapPin className="h-6 w-6 text-primary" />
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Unidades</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-xl font-bold">Unidades</h1>
+          <p className="text-sm text-muted-foreground">
             Cadastre suas unidades com endereço e geolocalização para bater ponto.
           </p>
         </div>

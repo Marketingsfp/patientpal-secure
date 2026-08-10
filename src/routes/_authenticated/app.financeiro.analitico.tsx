@@ -53,8 +53,8 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><LineIcon className="h-6 w-6 text-primary" />Analítico</h1>
-        <p className="text-xs font-medium text-slate-500">Últimos 30 dias</p></div>
+      <div><h1 className="text-2xl font-semibold flex items-center gap-2"><LineIcon className="h-6 w-6 text-primary" />Analítico</h1>
+        <p className="text-sm text-muted-foreground">Últimos 30 dias</p></div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card><CardHeader><CardTitle>Despesas por categoria</CardTitle></CardHeader>
           <CardContent>

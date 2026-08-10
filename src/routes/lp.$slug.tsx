@@ -59,7 +59,7 @@ export const Route = createFileRoute("/lp/$slug")({
   notFoundComponent: () => (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-2">
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Página não encontrada</h1>
+        <h1 className="text-2xl font-semibold">Página não encontrada</h1>
         <p className="text-muted-foreground text-sm">Esta landing page não está publicada.</p>
       </div>
     </div>
@@ -99,7 +99,7 @@ function LandingPageView() {
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-center">
         <div className="space-y-6">
-          <h1 className="text-xl font-bold text-slate-900 leading-none" style={{ color: cor }}>{page.titulo}</h1>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight" style={{ color: cor }}>{page.titulo}</h1>
           {page.subtitulo && <p className="text-lg text-muted-foreground">{page.subtitulo}</p>}
           {page.hero_imagem_url && (
             <img src={page.hero_imagem_url} alt={page.titulo} className="w-full rounded-2xl shadow-lg" />

@@ -50,7 +50,7 @@ export function PortalLauncher({
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur-sm">
             Bem-vindo de volta
           </span>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">
+          <h1 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
             Escolha o seu{" "}
             <span className="bg-linear-to-r from-indigo-600 via-violet-600 to-sky-600 bg-clip-text text-transparent">
               portal

@@ -315,8 +315,8 @@ function AtendimentoMultiploPage() {
     <div className="p-3 sm:p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Atendimento Múltiplo</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-2xl font-bold tracking-tight">Atendimento Múltiplo</h1>
+          <p className="text-sm text-muted-foreground">
             Marque em uma única ficha vários serviços diferentes para o mesmo paciente
             — consulta, exame de laboratório, RX, ultrassom, tomografia, ressonância.
             Cada serviço vai para a agenda do profissional/recurso correto e mantém

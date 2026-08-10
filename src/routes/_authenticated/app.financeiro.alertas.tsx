@@ -53,8 +53,8 @@ function Page() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Alertas</h1>
-        <p className="text-xs font-medium text-slate-500">Notificações automáticas do sistema financeiro</p>
+        <h1 className="text-2xl font-semibold">Alertas</h1>
+        <p className="text-sm text-muted-foreground">Notificações automáticas do sistema financeiro</p>
       </div>
       {loading ? <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando...</CardContent></Card>
         : items.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum alerta no momento.</CardContent></Card>

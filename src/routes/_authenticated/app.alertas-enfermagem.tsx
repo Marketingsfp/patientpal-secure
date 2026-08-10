@@ -103,7 +103,7 @@ function AlertasEnfermagemPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center gap-2 flex-wrap">
         <BellRing className="h-6 w-6 text-red-500" />
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Enfermeira IA — Alertas</h1>
+        <h1 className="text-2xl font-bold">Enfermeira IA — Alertas</h1>
         <Badge variant="destructive" className="ml-2">{criticos} críticos</Badge>
         <Badge variant="secondary">{abertos} abertos</Badge>
         <div className="ml-auto">

@@ -58,7 +58,7 @@ function LandingPage() {
           <Activity className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Abrindo ClinicaOS…</h1>
+          <h1 className="text-xl font-semibold text-foreground">Abrindo ClinicaOS…</h1>
           <p className="mt-1 text-sm text-muted-foreground">Aguarde enquanto direcionamos para o sistema.</p>
         </div>
       </div>

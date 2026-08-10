@@ -508,7 +508,7 @@ body.resumo-only .rows-full { display: none !important; }
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2">
+          <h1 className="text-xl font-semibold flex items-center gap-2">
             <ReceiptText className="h-5 w-5" /> Comprovantes de repasse
           </h1>
           <p className="text-sm text-muted-foreground">

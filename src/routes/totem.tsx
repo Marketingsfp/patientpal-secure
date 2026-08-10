@@ -459,7 +459,7 @@ export function TotemPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-8 cursor-none [&_*]:cursor-none">
         <div className="text-center space-y-4 max-w-md">
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Nenhuma clínica selecionada</h1>
+          <h1 className="text-2xl font-semibold">Nenhuma clínica selecionada</h1>
           <p className="text-muted-foreground">Faça login no painel administrativo e selecione a clínica antes de abrir o totem.</p>
           <Button onClick={() => navigate({ to: "/app" })}>Ir para o painel</Button>
         </div>
@@ -508,7 +508,7 @@ export function TotemPage() {
       <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">{formatarNomeClinica(clinicaAtual.clinica.nome)}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{formatarNomeClinica(clinicaAtual.clinica.nome)}</h1>
         </div>
         <div className="text-right text-sm text-muted-foreground">
           <div className="capitalize">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>

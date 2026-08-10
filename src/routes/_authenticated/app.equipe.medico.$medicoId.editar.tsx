@@ -33,7 +33,7 @@ function EditarMedicoPage() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Link>
         </Button>
-        <h1 className="text-xl font-bold text-slate-900 leading-none">Editar médico</h1>
+        <h1 className="text-2xl font-bold text-foreground">Editar médico</h1>
       </div>
       <Card>
         <CardContent className="p-6">

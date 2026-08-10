@@ -175,8 +175,8 @@ function EquipePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Médicos</h1>
-          <p className="text-xs font-medium text-slate-500">
+          <h1 className="text-2xl font-semibold">Médicos</h1>
+          <p className="text-sm text-muted-foreground">
             Médicos da clínica. Cadastre e gerencie os profissionais de saúde.
           </p>
         </div>

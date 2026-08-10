@@ -129,7 +129,7 @@ function DiagnosticoPage() {
     <div className="min-h-screen bg-background py-10 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-slate-900 leading-none">Diagnóstico do Sistema</h1>
+          <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Sistema</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Verifica frontend, autenticação Supabase e acesso RLS.
           </p>
