@@ -859,6 +859,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
+            const ehPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+            if (ehPdf) {
+              // PDF: abre o visualizador nativo e deixa o usuário escolher
+              // entre manter só leitura ou extrair o texto para edição.
+              setPdfFile(file);
+              setPdfUrl(URL.createObjectURL(file));
+              return;
+            }
             setImportando(true);
             try {
               const { extrairHtmlDeArquivo } = await import("@/lib/importar-documento");
