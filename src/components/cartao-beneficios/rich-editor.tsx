@@ -21,7 +21,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
-  Table as TableIcon, Rows3, Columns3, Trash2, Crop,
+  Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
