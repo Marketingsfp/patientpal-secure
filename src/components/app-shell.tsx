@@ -51,6 +51,7 @@ import {
   Inbox,
   FileBarChart2,
   Menu as MenuIcon,
+  Columns3,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
