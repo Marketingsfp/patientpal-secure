@@ -992,16 +992,16 @@ function AppShellInner() {
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
             "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-60 2xl:w-64",
+            collapsed ? "w-16" : "w-64 2xl:w-[272px]",
           )}
           style={{ backgroundColor: corSidebar }}
         >
           <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
             <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 shrink-0 cursor-default select-none" title="ClinicaOS">
                   <Activity className="h-5 w-5 shrink-0 text-white" />
-                  <span className="font-semibold tracking-tight truncate text-white">ClinicaOS</span>
+                  <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
                 </div>
                 {!isChooser && (
                   <>
@@ -1013,7 +1013,7 @@ function AppShellInner() {
                       title="Trocar de portal"
                     >
                       <LayoutGrid className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[110px]">{subsystemLabel ?? "Portais"}</span>
+                      <span className="truncate max-w-[90px]">{subsystemLabel ?? "Portais"}</span>
                     </button>
                   </>
                 )}
