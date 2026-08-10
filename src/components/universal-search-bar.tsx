@@ -18,9 +18,6 @@ import {
 export function UniversalSearchBar() {
   const { clinicaAtual } = useClinica();
   const { enabled: ubEnabled } = useUBFlag();
-  const role = clinicaAtual?.role ?? "";
-  const allowed = role === "admin" || role === "gestor";
-
   const navigate = useNavigate();
   const entries = useDefaultScreenEntries();
   const [open, setOpen] = useCommandPaletteToggle();
@@ -33,7 +30,7 @@ export function UniversalSearchBar() {
     navigate: (to) => { void navigate({ to: to as never }); },
   });
 
-  if (!ubEnabled || !allowed) return null;
+  if (!ubEnabled) return null;
 
   return (
     <>

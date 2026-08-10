@@ -116,7 +116,9 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
 
 /** Lê feature flag ub_v1 de profiles.preferencias_ui (default false). */
 export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (v: boolean) => Promise<void> } {
-  const [enabled, setEnabled] = useState(false);
+  // Liberada por padrão para todos os perfis/clínicas. Só fica oculta quando
+  // o usuário desliga explicitamente a flag (ub_v1 === false).
+  const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const uidRef = useRef<string | null>(null);
 
@@ -129,7 +131,7 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
       const { data } = await supabase.from("profiles")
         .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
       const prefs = (data?.preferencias_ui ?? {}) as { flags?: { ub_v1?: boolean } };
-      if (alive) { setEnabled(Boolean(prefs.flags?.ub_v1)); setLoading(false); }
+      if (alive) { setEnabled(prefs.flags?.ub_v1 !== false); setLoading(false); }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ ub_v1: boolean }>;
