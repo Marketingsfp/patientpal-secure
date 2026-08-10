@@ -6621,10 +6621,22 @@ function AgendaPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">Agendas</h1>
-            <p className="hidden truncate text-xs text-muted-foreground lg:block">
-              Filtre e gerencie os agendamentos da clínica.
-            </p>
+            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {(() => {
+                  const label = new Intl.DateTimeFormat("pt-BR", {
+                    timeZone: "UTC",
+                    day: "numeric",
+                    month: "long",
+                  }).format(new Date(`${dataRef}T00:00:00Z`));
+                  return `${dataRef === hojeBR() ? "Hoje, " : ""}${label}`;
+                })()}
+              </span>
+              <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                Visão Geral
+              </span>
+            </div>
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
