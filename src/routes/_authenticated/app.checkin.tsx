@@ -5,6 +5,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -601,6 +602,23 @@ function CheckinPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Atualiza a lista assim que um pagamento é registrado em outra tela
+  // (Agendas / Financeiro / Caixa) ou quando o agendamento muda de etapa.
+  useRealtimeRefresh(
+    ["fin_lancamentos", "agendamento_orcamento_itens", "agendamentos"],
+    () => {
+      void load();
+    },
+    !!clinicaAtual,
+  );
+
+  // Ao voltar para a aba, revalida o status de pagamento.
+  useEffect(() => {
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [load]);
 
   useEffect(() => {
