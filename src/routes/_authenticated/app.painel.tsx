@@ -161,9 +161,9 @@ function DashboardOperacional() {
         }
       />
 
-      <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6 space-y-4 md:space-y-6">
         {/* Atalhos rápidos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
           <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
           <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
@@ -174,7 +174,7 @@ function DashboardOperacional() {
 
         {/* KPIs operacionais do dia */}
         {carregando ? (
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
           </div>
         ) : (
