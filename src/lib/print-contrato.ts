@@ -366,11 +366,25 @@ export async function printContrato(contratoId: string) {
   table, tr, td, th, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
   h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
   img { display: block !important; visibility: visible !important; max-width: 100%; }
+  .contract-table { width: 100%; border-collapse: collapse; }
+  .contract-table th,
+  .contract-table .header-row,
+  .contract-table [data-header-row] {
+    background-color: #1b365d !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+  }
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     img { display: block !important; visibility: visible !important; }
     table, tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
     h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
+    .contract-table th,
+    .contract-table .header-row,
+    .contract-table [data-header-row] {
+      background-color: #1b365d !important;
+      color: #ffffff !important;
+    }
   }
 </style>`;
 

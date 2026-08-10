@@ -21,6 +21,7 @@ function textoParaHtml(texto: string) {
 }
 
 const BORDA = "1px solid #111827";
+const AZUL_CABECALHO = "#1b365d";
 
 /**
  * Normaliza o HTML gerado pelo mammoth aplicando CSS inline nas tabelas,
@@ -39,26 +40,33 @@ function normalizarHtmlDocx(html: string): string {
       "style",
       `width:100%;border-collapse:collapse;table-layout:fixed;border:${BORDA};margin:8px 0;`,
     );
-    tabela.removeAttribute("class");
+    tabela.setAttribute("class", "contract-table");
     tabela.querySelectorAll("td,th").forEach((celula) => {
       const el = celula as HTMLElement;
       const ehCabecalho = el.tagName === "TH";
       const alinhamento = el.getAttribute("align") || (ehCabecalho ? "left" : "left");
       // Preserva o fundo/cor vindos do Word (sombreamento de cabeçalho de seção)
-      const fundo =
-        el.style.backgroundColor ||
-        el.getAttribute("bgcolor") ||
-        (ehCabecalho ? "#f3f4f6" : "");
-      const cor = el.style.color || "";
+      // Só linhas de cabeçalho de seção (célula que ocupa a largura toda da
+      // tabela) ficam azuis. Células estreitas — como a coluna de números
+      // 1/2/3 — nunca herdam fundo, para não virar tarja azul vertical.
+      const colspan = Number(el.getAttribute("colspan") || "1");
+      const linha = el.parentElement as HTMLElement | null;
+      const celulasDaLinha = linha ? linha.querySelectorAll("td,th").length : 1;
+      const ehFaixaCabecalho = celulasDaLinha === 1 || colspan > 1;
+      const fundo = ehFaixaCabecalho ? AZUL_CABECALHO : "";
+      const cor = ehFaixaCabecalho ? "#ffffff" : "";
       el.removeAttribute("bgcolor");
+      el.style.removeProperty("background-color");
       el.setAttribute(
         "style",
         `border:${BORDA};padding:6px 8px;vertical-align:top;text-align:${alinhamento};` +
           (fundo ? `background-color:${fundo};` : "") +
           (cor ? `color:${cor};` : "") +
-          (ehCabecalho ? "font-weight:700;" : ""),
+          (ehCabecalho || ehFaixaCabecalho ? "font-weight:700;" : ""),
       );
       if (fundo) el.setAttribute("data-bg", fundo);
+      else el.removeAttribute("data-bg");
+      if (ehFaixaCabecalho) el.setAttribute("data-header-row", "1");
       el.removeAttribute("class");
       // Parágrafos dentro da célula sem margem, para não "inflar" a linha
       el.querySelectorAll("p").forEach((p) => {

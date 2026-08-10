@@ -268,6 +268,13 @@
 .rt-editor table th:not([data-bg]):not([style*="background"]) {
   background: #f3f4f6;
 }
+/* Faixas de cabeçalho de seção do contrato (largura total da tabela) */
+.rt-editor .contract-table [data-header-row],
+.rt-editor .contract-table .header-row {
+  background-color: #1b365d !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
 /* Column resize handle (ProseMirror) */
 .rt-editor .column-resize-handle {
   position: absolute;
