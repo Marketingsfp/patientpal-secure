@@ -404,46 +404,55 @@ function FluxoPage() {
                   const isUltimaEtapa = a.fluxo_etapa === "atendimento" || a.fluxo_etapa === "exame";
 
                   return (
-                    <Card key={a.id} className={`p-2.5 space-y-1.5 hover:shadow-sm transition-shadow ${prioridadeInfo.border} text-xs`}>
+                    <Card
+                      key={a.id}
+                      className={cn(
+                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md",
+                        prioridadeInfo.border,
+                      )}
+                    >
                       {/* Nome e horário */}
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <div className={`h-2 w-2 rounded-full ${prioridadeInfo.cor} flex-shrink-0`} />
-                          <span className="font-medium text-xs truncate">{a.paciente_nome}</span>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0">{h}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-slate-800">{a.paciente_nome}</span>
+                        <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
                       </div>
 
                       {/* Prioridade */}
                       {a.prioridade && a.prioridade !== "normal" && (
-                        <Badge className={`border text-[9px] gap-0.5 px-1.5 py-0 ${prioridadeInfo.badge}`}>
+                        <Badge className={cn("mt-2 w-fit gap-0.5 border px-1.5 py-0 text-[9px]", prioridadeInfo.badge)}>
                           <PrioridadeIcon className="h-3 w-3" />
                           {prioridadeInfo.label}
                         </Badge>
                       )}
 
                       {/* Procedimento */}
-                      <div className="text-[10px] text-muted-foreground truncate">
+                      <div className="mt-1 truncate text-xs font-medium text-slate-500">
                         {a.procedimento ?? "—"}
                         {a.medicos?.nome && <span className="ml-1">· {a.medicos.nome}</span>}
                       </div>
 
                       {/* Ações */}
-                      <div className="flex items-center gap-0.5 pt-1 flex-wrap">
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} disabled={!prev} onClick={() => prev && setEtapa(a.id, prev)} title="Voltar">
-                          <ChevronLeft className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => ciclarPrioridade(a)} title="Prioridade">
-                          <PrioridadeIcon className={`h-3.5 w-3.5 ${prioridadeInfo.cor}`} />
-                        </Button>
+                      <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5">
+                        <button
+                          type="button"
+                          className={cn(acaoIconCls, "disabled:opacity-40 disabled:hover:bg-transparent")}
+                          disabled={!prev}
+                          onClick={() => prev && setEtapa(a.id, prev)}
+                          title="Voltar"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button type="button" className={acaoIconCls} onClick={() => ciclarPrioridade(a)} title="Prioridade">
+                          <PrioridadeIcon className={cn("h-4 w-4", prioridadeInfo.cor)} />
+                        </button>
 
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className={cn(acaoBtnCls, acaoTxtCls, "gap-1 bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[40px]")} onClick={() => chamarPaciente(a)}>
+                            <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "ml-auto gap-1 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800")} onClick={() => chamarPaciente(a)}>
                               <Bell className="h-3 w-3" /> Chamar
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-400 text-violet-700 hover:bg-violet-50 flex-1 min-w-[35px]")} onClick={() => setEtapa(a.id, "exame")}>
+                              <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")} onClick={() => setEtapa(a.id, "exame")}>
                                 Exame
                               </Button>
                             )}
@@ -453,23 +462,29 @@ function FluxoPage() {
                         {col.id !== "triagem" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => chamarPaciente(a)} title="Rechamar">
-                                <Bell className="h-3.5 w-3.5" />
-                              </Button>
+                              <button type="button" className={acaoIconCls} onClick={() => chamarPaciente(a)} title="Rechamar">
+                                <Bell className="h-4 w-4" />
+                              </button>
                             )}
-                            <Button
-                              size="sm"
-                              className={cn(acaoBtnCls, "flex-1 min-w-[30px] bg-emerald-600 hover:bg-emerald-700 text-white")}
+                            <button
+                              type="button"
+                              className={cn(
+                                acaoIconCls,
+                                "ml-auto gap-1 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40",
+                                isUltimaEtapa && "flex items-center px-2 text-xs font-semibold",
+                              )}
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
                               title={isUltimaEtapa ? "Finalizar" : "Avançar"}
                             >
                               {isUltimaEtapa ? (
-                                <span className={cn("flex items-center gap-1", acaoTxtCls)}><CheckCircle2 className="h-3 w-3" /> Fim</span>
+                                <>
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Fim
+                                </>
                               ) : (
-                                <ChevronRight className="h-3.5 w-3.5" />
+                                <ChevronRight className="h-4 w-4" />
                               )}
-                            </Button>
+                            </button>
                           </>
                         )}
                       </div>
