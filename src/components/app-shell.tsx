@@ -996,27 +996,11 @@ function AppShellInner() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="h-14 shrink-0 px-4 py-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="flex w-full items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0 shrink">
-                <div className="flex items-center gap-2 min-w-0 shrink-0 cursor-default select-none" title="ClinicaOS">
-                  <Activity className="h-5 w-5 shrink-0 text-white" />
-                  <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
-                </div>
-                {!isChooser && (
-                  <>
-                    <span className="h-5 my-auto border-r border-white/20 shrink-0" aria-hidden />
-                    <button
-                      type="button"
-                      onClick={() => abrirSeletorPortais()}
-                      className="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
-                      title="Trocar de portal"
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[84px]">{subsystemLabel ?? "Portais"}</span>
-                    </button>
-                  </>
-                )}
+          <div className="shrink-0 flex flex-col gap-2 p-3 border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
+                <Activity className="h-5 w-5 shrink-0 text-white" />
+                <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
               </div>
               <button
                 type="button"
@@ -1026,7 +1010,7 @@ function AppShellInner() {
                     return !v;
                   });
                 }}
-                className="ml-auto shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
                 aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
                 aria-expanded={buscaMenuAberta}
                 title="Buscar no menu"
@@ -1034,6 +1018,20 @@ function AppShellInner() {
                 {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
               </button>
             </div>
+            {!isChooser && (
+              <button
+                type="button"
+                onClick={() => abrirSeletorPortais()}
+                className="w-full flex items-center justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                title="Trocar de portal"
+              >
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{subsystemLabel ?? "Portais"}</span>
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              </button>
+            )}
           </div>
           <div className="px-3 border-r border-white/20">
             <div
