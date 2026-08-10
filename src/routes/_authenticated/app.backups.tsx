@@ -111,10 +111,10 @@ function Page() {
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <header className="flex items-center gap-3">
-        <HardDrive className="h-6 w-6 text-primary" />
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><HardDrive className="h-5 w-5" /></span>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Backups Diários</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Backups Diários</h1>
+          <p className="text-xs font-medium text-slate-500">
             Dump automático de todas as tabelas às 03:00. Retenção: 30 dias. Baixe os CSVs para restaurar num Postgres local.
           </p>
         </div>

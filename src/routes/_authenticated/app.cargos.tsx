@@ -104,10 +104,10 @@ function CargosPage() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <Briefcase className="h-6 w-6 text-primary" />
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Briefcase className="h-5 w-5" /></span>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Cargos</h1>
-          <p className="text-sm text-muted-foreground">Cargos e funções da clínica.</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Cargos</h1>
+          <p className="text-xs font-medium text-slate-500">Cargos e funções da clínica.</p>
         </div>
         {podeEscrever && <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       </div>
