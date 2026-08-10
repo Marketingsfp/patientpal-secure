@@ -924,6 +924,36 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <Upload className="h-3.5 w-3.5" />
           {importando ? "Importando…" : "Importar documento"}
         </Button>
+        <Button
+          type="button"
+          variant={htmlMode ? "default" : "outline"}
+          size="sm"
+          className="h-8 gap-1.5"
+          title="Editar código HTML"
+          onClick={() => {
+            if (htmlMode) {
+              // Salva o HTML digitado preservando o CSS inline.
+              editor.commands.setContent(htmlDraft || "<p></p>", { emitUpdate: true });
+              onChange(editor.getHTML());
+              setHtmlMode(false);
+              toast.success("HTML aplicado ao documento.");
+            } else {
+              setHtmlDraft(editor.getHTML());
+              setHtmlMode(true);
+            }
+          }}
+        >
+          <Code2 className="h-3.5 w-3.5" />
+          {htmlMode ? "Aplicar HTML" : "HTML"}
+        </Button>
+        {htmlMode && (
+          <Button
+            type="button" variant="ghost" size="sm" className="h-8"
+            onClick={() => setHtmlMode(false)}
+          >
+            Cancelar
+          </Button>
+        )}
         <div className="ml-auto" />
         {variables && variables.length > 0 && (
           <Select
@@ -957,6 +987,20 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       </div>
 
       <div className="rt-scroll bg-muted/40 overflow-auto" style={{ maxHeight: "70vh" }}>
+        {htmlMode ? (
+          <div className="p-4">
+            <p className="text-xs text-muted-foreground mb-2">
+              Cole aqui o HTML do contrato (ex.: .docx convertido em .html). O CSS inline de
+              tabelas, bordas, padding e fontes é preservado ao aplicar.
+            </p>
+            <textarea
+              value={htmlDraft}
+              onChange={(e) => setHtmlDraft(e.target.value)}
+              spellCheck={false}
+              className="w-full h-[60vh] rounded-md border bg-background p-3 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        ) : (
         <div className="mx-auto my-4" style={{ width: "210mm" }}>
           {showRuler && (
             <HorizontalRuler
@@ -982,6 +1026,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             <EditorContent editor={editor} />
           </div>
         </div>
+        )}
       </div>
 
       {/* Barra de margens */}
