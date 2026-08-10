@@ -1003,16 +1003,10 @@ function AppShellInner() {
                 <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
               </div>
               {!isChooser && (
-                <button
-                  type="button"
-                  onClick={() => abrirSeletorPortais()}
-                  className="flex-1 flex items-center gap-1.5 min-w-0 bg-white/10 hover:bg-white/15 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white transition-colors"
-                  title="Trocar de portal"
-                >
+                <div className="flex-1 flex items-center gap-1.5 min-w-0 bg-white/10 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white select-none">
                   <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate min-w-0">{subsystemLabel ?? "Portais"}</span>
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70 ml-auto" />
-                </button>
+                </div>
               )}
               <button
                 type="button"
