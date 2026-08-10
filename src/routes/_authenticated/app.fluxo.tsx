@@ -553,6 +553,12 @@ function FluxoPage() {
           );
         })}
       </div>
+
+      <PacienteDetalheDrawer
+        ag={detalhe}
+        pago={detalhe ? pagos.has(detalhe.id) : false}
+        onClose={() => setDetalhe(null)}
+      />
     </div>
   );
 }
