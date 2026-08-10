@@ -254,17 +254,19 @@
   vertical-align: top;
   position: relative;
   min-width: 40px;
-  /* Allows the user to drag the bottom-right corner of a cell to grow the row height */
-  resize: vertical;
-  overflow: auto;
+  /* Sem `resize` aqui: o handle nativo fazia a célula parecer um campo de
+     formulário (triângulo no canto) depois de importar o documento. */
 }
 .rt-editor table td[data-valign="middle"],
 .rt-editor table th[data-valign="middle"] { vertical-align: middle; }
 .rt-editor table td[data-valign="bottom"],
 .rt-editor table th[data-valign="bottom"] { vertical-align: bottom; }
 .rt-editor table th {
-  background: #f3f4f6;
   font-weight: 600;
+}
+/* Só aplica o cinza padrão quando o cabeçalho não trouxe cor do documento */
+.rt-editor table th:not([data-bg]):not([style*="background"]) {
+  background: #f3f4f6;
 }
 /* Column resize handle (ProseMirror) */
 .rt-editor .column-resize-handle {

@@ -44,11 +44,21 @@ function normalizarHtmlDocx(html: string): string {
       const el = celula as HTMLElement;
       const ehCabecalho = el.tagName === "TH";
       const alinhamento = el.getAttribute("align") || (ehCabecalho ? "left" : "left");
+      // Preserva o fundo/cor vindos do Word (sombreamento de cabeçalho de seção)
+      const fundo =
+        el.style.backgroundColor ||
+        el.getAttribute("bgcolor") ||
+        (ehCabecalho ? "#f3f4f6" : "");
+      const cor = el.style.color || "";
+      el.removeAttribute("bgcolor");
       el.setAttribute(
         "style",
         `border:${BORDA};padding:6px 8px;vertical-align:top;text-align:${alinhamento};` +
-          (ehCabecalho ? "font-weight:700;background:#f3f4f6;" : ""),
+          (fundo ? `background-color:${fundo};` : "") +
+          (cor ? `color:${cor};` : "") +
+          (ehCabecalho ? "font-weight:700;" : ""),
       );
+      if (fundo) el.setAttribute("data-bg", fundo);
       el.removeAttribute("class");
       // Parágrafos dentro da célula sem margem, para não "inflar" a linha
       el.querySelectorAll("p").forEach((p) => {
