@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Link } from "@tanstack/react-router";
 import { Info, Plus, Rows3, LayoutList, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +68,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const [chips, setChips] = useState<ChipV[]>([]);
   const [resumoMode, setResumoMode] = useState<ResumoMode>("none");
   const [drawer, setDrawer] = useState<PacienteV2 | null>(null);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(25);
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
 
@@ -75,7 +76,9 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const { total: totalLive, refetch: refetchTotal } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const modoBusca = q.trim().length >= 2;
+  // Busca com atraso de 300ms: evita uma consulta por tecla digitada.
+  const qDebounced = useDebouncedValue(q, 300);
+  const modoBusca = qDebounced.trim().length >= 2;
   const scope = useMemo(
     () => (clinicaIds.length ? clinicaIds : clinicaAtual ? [clinicaAtual.clinica_id] : []),
     [clinicaIds, clinicaAtual],
@@ -151,9 +154,9 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   }, [scope]);
 
   useEffect(() => {
-    if (modoBusca) void loadBusca(q.trim());
+    if (modoBusca) void loadBusca(qDebounced.trim());
     else void loadRecentes();
-  }, [modoBusca, q, loadBusca, loadRecentes]);
+  }, [modoBusca, qDebounced, loadBusca, loadRecentes]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -161,12 +164,12 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       await Promise.all([
         refetchTotal(),
         Promise.resolve(kpis.refresh()),
-        modoBusca ? loadBusca(q.trim()) : loadRecentes(),
+        modoBusca ? loadBusca(qDebounced.trim()) : loadRecentes(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchTotal, kpis, modoBusca, q, loadBusca, loadRecentes]);
+  }, [refetchTotal, kpis, modoBusca, qDebounced, loadBusca, loadRecentes]);
 
   const filtrados = useMemo(() => {
     let r = rows;
