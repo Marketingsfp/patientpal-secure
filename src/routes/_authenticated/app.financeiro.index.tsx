@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PageHeader } from "@/components/page/page-header";
 import { useEffect, useState } from "react";
 import { Plus, Minus, TrendingUp, TrendingDown, Wallet, Users, Calendar, Stethoscope, CreditCard, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
