@@ -112,6 +112,7 @@ function FluxoPage() {
     uxMelhorias && "p-2 sm:p-1.5",
   );
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
   const tzOffset = new Date().getTimezoneOffset() * 60000;
@@ -149,6 +150,25 @@ function FluxoPage() {
     const rows = (data ?? []) as unknown as Ag[];
     const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
     setAgs(reais);
+
+    // Pula o Caixa quando o paciente já pagou (check-in/pagamento na recepção):
+    // quem está pago não precisa passar pela coluna Caixa.
+    if (reais.length) {
+      const status = await agendamentosStatusPagamento(reais.map((a) => a.id));
+      const idsPagos = new Set<string>();
+      status.forEach((s, id) => { if (s.pago) idsPagos.add(id); });
+      setPagos(idsPagos);
+      const presosNoCaixa = reais.filter((a) => a.fluxo_etapa === "caixa" && idsPagos.has(a.id));
+      if (presosNoCaixa.length) {
+        await supabase
+          .from("agendamentos")
+          .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+          .in("id", presosNoCaixa.map((a) => a.id));
+        setAgs(reais.map((a) => (idsPagos.has(a.id) && a.fluxo_etapa === "caixa" ? { ...a, fluxo_etapa: "triagem" as Etapa } : a)));
+      }
+    } else {
+      setPagos(new Set());
+    }
     if (reais.length === 0 && !fallbackAplicado && dataRef === new Date().toISOString().slice(0, 10)) {
       const { data: ult } = await supabase
         .from("agendamentos")
