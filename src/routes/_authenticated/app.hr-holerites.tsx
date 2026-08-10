@@ -116,10 +116,10 @@ function HoleritesPage() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <FileText className="h-6 w-6 text-primary" />
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><FileText className="h-5 w-5" /></span>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Holerites</h1>
-          <p className="text-sm text-muted-foreground">Folha de pagamento mensal.</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Holerites</h1>
+          <p className="text-xs font-medium text-slate-500">Folha de pagamento mensal.</p>
         </div>
         {podeEscrever && (
           <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>

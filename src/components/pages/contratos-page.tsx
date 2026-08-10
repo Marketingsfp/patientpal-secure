@@ -642,7 +642,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2">
           <FileSignature className="h-6 w-6 text-primary" />
           Contratos
         </h1>
@@ -1473,7 +1473,7 @@ function NovoContratoForm({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2">
           <FileSignature className="h-6 w-6 text-primary" />
           Novo contrato
         </h1>
@@ -3936,7 +3936,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
-        <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap justify-center">
+        <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2 flex-wrap justify-center">
           <span>Contrato #{contrato.numero} — {contrato.paciente_nome}</span>
           <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
         </h1>

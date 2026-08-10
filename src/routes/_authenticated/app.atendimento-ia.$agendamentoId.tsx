@@ -445,8 +445,8 @@ function AtendimentoEditorPage() {
       <div className="space-y-4 p-1 max-w-2xl mx-auto">
         <Card className="p-8 text-center space-y-4">
           <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto" />
-          <h1 className="text-xl font-semibold">Prontuário salvo</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Prontuário salvo</h1>
+          <p className="text-xs font-medium text-slate-500">
             O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi registrado.
             {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
           </p>
@@ -486,9 +486,9 @@ function AtendimentoEditorPage() {
       )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Brain className="h-6 w-6 text-primary" />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Brain className="h-5 w-5" /></span>
           <div>
-            <h1 className="text-xl font-semibold">
+            <h1 className="text-xl font-bold text-slate-900 leading-none">
               Atendimento — <span className="uppercase">{pacienteNome || "…"}</span>
             </h1>
             <p className="text-sm text-muted-foreground">

@@ -6621,7 +6621,7 @@ function AgendaPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">Agendas</h1>
+            <h1 className="text-xl font-bold text-slate-900 leading-none truncate">Agendas</h1>
             <p className="hidden truncate text-xs text-muted-foreground lg:block">
               Filtre e gerencie os agendamentos da clínica.
             </p>

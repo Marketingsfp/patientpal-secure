@@ -2210,8 +2210,8 @@ function AtendimentosPage() {
         <TabsContent value="atendimentos" className="space-y-3 mt-0">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Atendimentos</h1>
+          <p className="text-xs font-medium text-slate-500">
             {isMedicoOnly
               ? "Seus atendimentos e o repasse devido por serviço"
               : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}

@@ -86,8 +86,8 @@ function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Categorias</h1>
-          <p className="text-sm text-muted-foreground">Classifique receitas e despesas</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Categorias</h1>
+          <p className="text-xs font-medium text-slate-500">Classifique receitas e despesas</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           {podeEscrever && (

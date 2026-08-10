@@ -118,8 +118,8 @@ function TreinamentosPage() {
     return (
       <div className="space-y-4">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight">Treinamentos</h1>
-          <p className="text-sm text-muted-foreground">Cursos disponíveis para sua equipe</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Treinamentos</h1>
+          <p className="text-xs font-medium text-slate-500">Cursos disponíveis para sua equipe</p>
         </header>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {cursos.length === 0 && (
@@ -146,7 +146,7 @@ function TreinamentosPage() {
       <header className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={() => setCursoSel(null)}>← Voltar</Button>
-          <h1 className="text-2xl font-bold tracking-tight mt-1">{cursoObj?.titulo}</h1>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">{cursoObj?.titulo}</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-48"><Progress value={progresso} /></div>

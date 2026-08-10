@@ -151,8 +151,8 @@ function DevListShellPreview() {
       <ListShell<Status>
         title={
           <div>
-            <h1 className="text-xl font-semibold">Demo — Lista virtualizada</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="text-xl font-bold text-slate-900 leading-none">Demo — Lista virtualizada</h1>
+            <p className="text-xs font-medium text-slate-500">
               {filtered.length.toLocaleString("pt-BR")} registros filtrados · exibindo {Math.min(limit, filtered.length)}
             </p>
           </div>

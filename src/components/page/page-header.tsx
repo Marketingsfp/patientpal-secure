@@ -40,21 +40,21 @@ export function PageHeader({
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
         {icon && (
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary [&_svg]:h-5 [&_svg]:w-5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:h-5 [&_svg]:w-5">
             {icon}
           </div>
         )}
-        <div className="min-w-0">
-          <h1 className="flex min-w-0 items-baseline gap-2 truncate text-xl font-semibold tracking-tight">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-slate-900 leading-none flex min-w-0 items-baseline gap-2 truncate">
             <span className="truncate">{title}</span>
             {meta && (
               <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{meta}</span>
             )}
           </h1>
           {description && (
-            <p className="hidden truncate text-xs text-muted-foreground lg:block">{description}</p>
+            <p className="hidden truncate text-xs font-medium text-slate-500 lg:block">{description}</p>
           )}
         </div>
       </div>

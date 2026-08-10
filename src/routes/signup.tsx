@@ -104,7 +104,7 @@ function SignupPage() {
           </Link>
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
             <div className="mb-6">
-              <h1 className="text-3xl font-semibold tracking-tight">Criar conta</h1>
+              <h1 className="text-xl font-bold text-slate-900 leading-none">Criar conta</h1>
               <p className="text-sm text-muted-foreground mt-1.5">Comece a gerir sua clínica em poucos passos</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">

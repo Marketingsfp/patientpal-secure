@@ -97,7 +97,7 @@ function PortalFinanceiroPage() {
         </nav>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-4 space-y-4">
-        <h1 className="text-xl font-bold">Financeiro</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Financeiro</h1>
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>

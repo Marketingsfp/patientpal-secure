@@ -164,8 +164,8 @@ function VozConfigPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Voz & Áudio (TTS)</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Voz & Áudio (TTS)</h1>
+        <p className="text-xs font-medium text-slate-500">
           Configure a síntese de voz usada no painel de senhas, alertas sonoros
           e leitura de anamnese. As preferências são salvas neste navegador.
         </p>

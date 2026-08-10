@@ -160,8 +160,8 @@ function MedicoHome() {
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         <div className="mb-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Meus pacientes</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Meus pacientes</h1>
+          <p className="text-xs font-medium text-slate-500">
             Pacientes que já tiveram agendamento com você.
           </p>
         </div>

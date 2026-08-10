@@ -76,7 +76,7 @@ function Page() {
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Building2 className="h-5 w-5 text-orange-600" />
-        <h1 className="text-xl font-semibold">Atendimentos externos</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Atendimentos externos</h1>
       </div>
       <p className="text-sm text-slate-600">
         Pacientes atendidos aqui mas faturados em outra clínica. Não geram caixa —

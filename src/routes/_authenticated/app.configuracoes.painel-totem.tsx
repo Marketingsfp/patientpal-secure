@@ -100,8 +100,8 @@ function PainelTotemConfigPage() {
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-5xl">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Painel & Totem públicos</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Painel & Totem públicos</h1>
+        <p className="text-xs font-medium text-slate-500">
           Cada clínica tem um token secreto que dá acesso ao painel de senhas e ao totem
           sem exigir login. Compartilhe apenas com os dispositivos de recepção. Se
           suspeitar que um link vazou, rotacione o token — o link antigo para de funcionar.

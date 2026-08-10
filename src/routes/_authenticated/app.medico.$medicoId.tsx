@@ -114,7 +114,7 @@ function PerfilMedicoPage() {
             <div className="rounded-full bg-primary/10 p-4"><Stethoscope className="h-8 w-8 text-primary" /></div>
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold">{medico.nome}</h1>
+                <h1 className="text-xl font-bold text-slate-900 leading-none">{medico.nome}</h1>
                 <Badge variant={medico.ativo ? "default" : "secondary"}>{medico.ativo ? "Ativo" : "Inativo"}</Badge>
               </div>
               <p className="text-muted-foreground">CRM {medico.crm}/{medico.crm_uf} • {especialidades}</p>

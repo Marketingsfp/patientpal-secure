@@ -112,7 +112,7 @@ export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary"/>Planos de Assinatura</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary"/>Planos de Assinatura</h1>
         {podeEscrever && <Button onClick={novo}><Plus className="h-4 w-4 mr-2"/>Novo plano</Button>}
       </div>
       <Card>
