@@ -183,13 +183,15 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
 
   return (
     <div className="space-y-1.5">
-      <Label>Data do atendimento</Label>
+      <Label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        Data do atendimento
+      </Label>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
           onClick={() => navegarDia(-1)}
-          className="h-9 w-9 flex-shrink-0"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
           title="Dia anterior"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -198,7 +200,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
         <div className="relative w-full max-w-[200px]">
           <Button
             variant="outline"
-            className={`w-full max-w-[200px] truncate justify-center h-9 text-sm font-medium px-3 ${corData}`}
+            className={`w-full max-w-[200px] truncate justify-center h-10 rounded-lg border-slate-200 bg-white text-sm font-semibold px-3 ${corData}`}
             onClick={() => setIsOpen(!isOpen)}
           >
             <CalendarDays className="h-4 w-4 shrink-0 mr-2" />
@@ -275,7 +277,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
           variant="outline"
           size="icon"
           onClick={() => navegarDia(1)}
-          className="h-9 w-9 flex-shrink-0"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
           title="Próximo dia"
         >
           <ChevronRight className="h-4 w-4" />
