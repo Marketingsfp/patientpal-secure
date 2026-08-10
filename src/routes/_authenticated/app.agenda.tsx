@@ -10310,38 +10310,20 @@ function DataRefField({
 
   if (compact) {
     return (
-      <div className="flex h-9 w-full items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <button
-          type="button"
-          aria-label="Dia anterior"
-          onClick={() => shiftDia(-1)}
-          className="flex w-8 shrink-0 items-center justify-center border-r border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-            >
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <span className="truncate">{label}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            {renderConteudo()}
-          </PopoverContent>
-        </Popover>
-        <button
-          type="button"
-          aria-label="Próximo dia"
-          onClick={() => shiftDia(1)}
-          className="flex w-8 shrink-0 items-center justify-center border-l border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+          >
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          {renderConteudo()}
+        </PopoverContent>
+      </Popover>
     );
   }
 
