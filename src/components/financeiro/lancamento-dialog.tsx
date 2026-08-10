@@ -50,6 +50,8 @@ export interface LancamentoSavedData {
    *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
   data: string;
   pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+  /** false quando o usuário clicou apenas em "Salvar" (sem imprimir a guia). */
+  imprimir?: boolean;
 }
 
 interface Props {
