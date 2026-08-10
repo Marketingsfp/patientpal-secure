@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -22,6 +23,7 @@ import {
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
   Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
+  Code2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -32,6 +34,36 @@ import {
 import { ImageCropDialog } from "./image-crop-dialog";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
+/**
+ * Mantém o CSS inline (style/class/largura/alinhamento) do HTML colado
+ * — sem isso, um contrato convertido de .docx perde bordas, padding e fontes.
+ */
+const PreservarEstiloInline = Extension.create({
+  name: "preservarEstiloInline",
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          "paragraph", "heading", "table", "tableRow", "tableCell",
+          "tableHeader", "bulletList", "orderedList", "listItem", "image",
+        ],
+        attributes: {
+          style: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).getAttribute("style"),
+            renderHTML: (attrs) => (attrs.style ? { style: attrs.style } : {}),
+          },
+          class: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).getAttribute("class"),
+            renderHTML: (attrs) => (attrs.class ? { class: attrs.class } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
 const ColoredTableCell = TableCell.extend({
   addAttributes() {
     return {
@@ -359,6 +391,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
+  const [htmlMode, setHtmlMode] = useState(false);
+  const [htmlDraft, setHtmlDraft] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [cropOpen, setCropOpen] = useState(false);
@@ -403,6 +437,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       ResizableTable.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
       ResizableTableRow, ColoredTableHeader, ColoredTableCell,
       ResizableImage.configure({ inline: true, allowBase64: true }),
+      PreservarEstiloInline,
     ],
     content: value || "<p></p>",
     editorProps: {
@@ -889,6 +924,36 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <Upload className="h-3.5 w-3.5" />
           {importando ? "Importando…" : "Importar documento"}
         </Button>
+        <Button
+          type="button"
+          variant={htmlMode ? "default" : "outline"}
+          size="sm"
+          className="h-8 gap-1.5"
+          title="Editar código HTML"
+          onClick={() => {
+            if (htmlMode) {
+              // Salva o HTML digitado preservando o CSS inline.
+              editor.commands.setContent(htmlDraft || "<p></p>", { emitUpdate: true });
+              onChange(editor.getHTML());
+              setHtmlMode(false);
+              toast.success("HTML aplicado ao documento.");
+            } else {
+              setHtmlDraft(editor.getHTML());
+              setHtmlMode(true);
+            }
+          }}
+        >
+          <Code2 className="h-3.5 w-3.5" />
+          {htmlMode ? "Aplicar HTML" : "HTML"}
+        </Button>
+        {htmlMode && (
+          <Button
+            type="button" variant="ghost" size="sm" className="h-8"
+            onClick={() => setHtmlMode(false)}
+          >
+            Cancelar
+          </Button>
+        )}
         <div className="ml-auto" />
         {variables && variables.length > 0 && (
           <Select
@@ -922,6 +987,20 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       </div>
 
       <div className="rt-scroll bg-muted/40 overflow-auto" style={{ maxHeight: "70vh" }}>
+        {htmlMode ? (
+          <div className="p-4">
+            <p className="text-xs text-muted-foreground mb-2">
+              Cole aqui o HTML do contrato (ex.: .docx convertido em .html). O CSS inline de
+              tabelas, bordas, padding e fontes é preservado ao aplicar.
+            </p>
+            <textarea
+              value={htmlDraft}
+              onChange={(e) => setHtmlDraft(e.target.value)}
+              spellCheck={false}
+              className="w-full h-[60vh] rounded-md border bg-background p-3 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        ) : (
         <div className="mx-auto my-4" style={{ width: "210mm" }}>
           {showRuler && (
             <HorizontalRuler
@@ -947,6 +1026,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             <EditorContent editor={editor} />
           </div>
         </div>
+        )}
       </div>
 
       {/* Barra de margens */}
