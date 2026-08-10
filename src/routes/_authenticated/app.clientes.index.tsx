@@ -531,10 +531,10 @@ function ClientesPage() {
           Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
         </div>
       )}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
-            <TableRow className="bg-muted">
+            <TableRow className="bg-slate-50/80 border-b border-slate-200/80 [&>th]:text-[11px] [&>th]:font-bold [&>th]:text-slate-500 [&>th]:uppercase [&>th]:tracking-wider">
               <TableHead className="w-10">
                 <Checkbox
                   aria-label="Selecionar todos"
@@ -579,7 +579,7 @@ function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : filtrados.map(p => (
-              <TableRow key={p.id} className="h-12" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
+              <TableRow key={p.id} className="h-12 hover:bg-slate-50/60 transition-colors border-b border-slate-100" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
                 <TableCell className="w-10">
                   <Checkbox
                     aria-label={`Selecionar ${p.nome}`}
@@ -587,8 +587,12 @@ function ClientesPage() {
                     onCheckedChange={(v: boolean | "indeterminate") => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
                   />
                 </TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
-                <TableCell className="max-w-[320px] font-medium">
+                <TableCell>
+                  <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
+                    {p.numero_pasta || p.codigo_prontuario || "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="max-w-[320px] text-sm font-semibold text-slate-800">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
@@ -608,39 +612,45 @@ function ClientesPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.cpf ?? "—"}</TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
-                <TableCell className="text-sm whitespace-nowrap text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.telefone ?? "—"}</TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{p.cpf ?? "—"}</TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{fmtNasc(p.data_nascimento)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap text-slate-600 font-medium"><span className="flex items-center gap-1"><IdadeCell nascimento={p.data_nascimento} /></span></TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{p.telefone ?? "—"}</TableCell>
                 <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.ativo ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                     {p.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button asChild variant="ghost" size="icon" title="Visualizar cliente">
-                      <Link to="/app/clientes/$pacienteId/visualizar" params={{ pacienteId: p.id }}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <Link
+                      to="/app/clientes/$pacienteId/visualizar"
+                      params={{ pacienteId: p.id }}
+                      title="Visualizar cliente"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
                     {podeEscrever && (
-                      <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                        <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      <Link
+                        to="/app/clientes/$pacienteId/editar"
+                        params={{ pacienteId: p.id }}
+                        title="Editar cliente"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
                     )}
                     {podeEscrever && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <button
+                        type="button"
                         title="Excluir cliente"
                         disabled={excluindoId === p.id}
                         onClick={() => void excluirCliente(p)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     )}
                   </div>
                 </TableCell>
