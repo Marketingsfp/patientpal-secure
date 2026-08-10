@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { janelaDiaClinica } from "@/lib/date-utils";
+import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
