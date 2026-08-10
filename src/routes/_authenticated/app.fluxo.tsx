@@ -449,9 +449,21 @@ function FluxoPage() {
                     <Card
                       key={a.id}
                       className={cn(
-                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md",
+                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
                         prioridadeInfo.border,
                       )}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() =>
+                        setDetalhe({
+                          id: a.id,
+                          paciente_id: a.paciente_id,
+                          paciente_nome: a.paciente_nome,
+                          procedimento: a.procedimento,
+                          inicio: a.inicio,
+                          medicoNome: a.medicos?.nome ?? null,
+                        })
+                      }
                     >
                       {/* Nome e horário */}
                       <div className="flex items-start justify-between gap-2">
@@ -474,7 +486,10 @@ function FluxoPage() {
                       </div>
 
                       {/* Ações */}
-                      <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5">
+                      <div
+                        className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           className={cn(acaoIconCls, "disabled:opacity-40 disabled:hover:bg-transparent")}
