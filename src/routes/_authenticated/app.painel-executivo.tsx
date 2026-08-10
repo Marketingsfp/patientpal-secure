@@ -385,6 +385,108 @@ function PainelExecutivoPage() {
         Comparando com {periodoAnterior.de} → {periodoAnterior.ate}.
       </p>
 
+      {/* Visão geral — cards resumo (número grande + 2 métricas de apoio + variação) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <BigCard
+          title="Agendamentos"
+          icon={CalendarDays}
+          value={int(p.agendados)}
+          delta={delta(p.agendados, pa.agendados)}
+          subs={[
+            { label: "Confirmados", value: int(p.confirmados) },
+            { label: "Cancelados", value: int(p.cancelaram) },
+          ]}
+        />
+        <BigCard
+          title="Clientes atendidos"
+          icon={UserCheck}
+          value={int(p.compareceram)}
+          delta={delta(p.compareceram, pa.compareceram)}
+          subs={[
+            { label: "Faltas", value: int(p.faltaram) },
+            { label: "Ocupação", value: pctFmt(p.ocupacaoPct) },
+          ]}
+        />
+        <BigCard
+          title="Clientes"
+          icon={Users}
+          value={int(c.novos + c.recorrentes)}
+          delta={delta(c.novos + c.recorrentes, ca.novos + ca.recorrentes)}
+          subs={[
+            { label: "Novos", value: int(c.novos) },
+            { label: "Recorrentes", value: int(c.recorrentes) },
+          ]}
+        />
+        {podeFin ? (
+          <BigCard
+            title="Recebimentos"
+            icon={Wallet}
+            value={money(f.receitaRealizada)}
+            delta={delta(f.receitaRealizada, fa.receitaRealizada)}
+            subs={[
+              { label: "Previsto", value: money(f.receitaPrevista) },
+              { label: "Ticket médio", value: money(f.ticketMedio) },
+            ]}
+          />
+        ) : (
+          <BigCard
+            title="Qualidade"
+            icon={AlertTriangle}
+            value={pctFmt(q.noShowPct)}
+            delta={delta(q.noShowPct, qa.noShowPct)}
+            subs={[
+              { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
+              { label: "Faltas", value: int(p.faltaram) },
+            ]}
+          />
+        )}
+        {podeFin && (
+          <>
+            <BigCard
+              title="Pagamentos"
+              icon={Receipt}
+              value={money(f.despesaRealizada)}
+              delta={delta(f.despesaRealizada, fa.despesaRealizada)}
+              subs={[
+                { label: "Previsto", value: money(f.despesaPrevista) },
+                { label: "Resultado", value: money(f.resultado) },
+              ]}
+            />
+            <BigCard
+              title="Convênios e particular"
+              icon={Handshake}
+              value={money(f.receitaConvenio)}
+              delta={delta(f.receitaConvenio, fa.receitaConvenio)}
+              subs={[
+                { label: "Particular", value: money(f.receitaParticular) },
+                { label: "Convênio", value: money(f.receitaConvenio) },
+              ]}
+            />
+          </>
+        )}
+        <BigCard
+          title="Orçamentos"
+          icon={BadgeDollarSign}
+          value={int(c.orcamentosNoPeriodo)}
+          delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
+          subs={[
+            { label: "Conversão", value: pctFmt(c.conversaoOrcamento) },
+            { label: "Novos pacientes", value: int(c.novos) },
+          ]}
+        />
+        <BigCard
+          title="Qualidade"
+          icon={Percent}
+          value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
+          delta={delta(q.noShowPct, qa.noShowPct)}
+          deltaInvertido
+          subs={[
+            { label: "No-show", value: pctFmt(q.noShowPct) },
+            { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
+          ]}
+        />
+      </div>
+
       <Tabs defaultValue="producao" className="space-y-4">
         <TabsList>
           <TabsTrigger value="producao">Produção</TabsTrigger>
@@ -544,6 +646,52 @@ function PainelExecutivoPage() {
 }
 
 // ---------- Ranking card ----------
+function BigCard({
+  title,
+  icon: Icon,
+  value,
+  delta: d,
+  deltaInvertido,
+  subs,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  delta?: number;
+  deltaInvertido?: boolean;
+  subs: { label: string; value: string }[];
+}) {
+  const positivo = deltaInvertido ? (d ?? 0) <= 0 : (d ?? 0) >= 0;
+  return (
+    <Card className="overflow-hidden border-slate-200/70 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+          {title}
+        </CardTitle>
+        <Icon className="h-4 w-4 text-slate-400" />
+      </CardHeader>
+      <CardContent className="px-4 py-3">
+        <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-slate-900">
+          {value}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {subs.map((s) => (
+            <div key={s.label} className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">{s.label}</p>
+              <p className="text-sm font-medium tabular-nums text-slate-800">{s.value}</p>
+            </div>
+          ))}
+        </div>
+        {typeof d === "number" && (
+          <p className={`mt-2.5 text-xs font-medium ${positivo ? "text-emerald-600" : "text-rose-600"}`}>
+            {d > 0 ? "+" : ""}{d.toFixed(1)}% <span className="text-slate-400 font-normal">vs. período anterior</span>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function RankCard({
   title,
   rows,
