@@ -21,6 +21,7 @@ function textoParaHtml(texto: string) {
 }
 
 const BORDA = "1px solid #111827";
+const AZUL_CABECALHO = "#1b365d";
 
 /**
  * Normaliza o HTML gerado pelo mammoth aplicando CSS inline nas tabelas,
