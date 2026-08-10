@@ -852,6 +852,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
       data,
+      imprimir,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({
