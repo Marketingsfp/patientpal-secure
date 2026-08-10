@@ -989,15 +989,15 @@ function AppShellInner() {
       {!isChooser && (
         <aside
           className={cn(
-            "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
+            "shrink-0 text-white overflow-hidden hidden lg:flex flex-col border-r border-white/10",
             "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
             collapsed ? "w-16" : "w-60 2xl:w-64",
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="shrink-0 border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="relative flex w-full items-center gap-1.5 px-3 py-2.5 min-w-0">
+          <div className="shrink-0 w-full border-b border-white/10">
+            <div className="flex w-full items-center gap-1.5 px-4 py-3 min-w-0">
               <div className="flex min-w-0 items-center gap-1.5 cursor-default select-none" title="ClinicaOS">
                 <Activity className="h-4 w-4 shrink-0 text-white" />
                 <span className="truncate text-sm font-bold tracking-tight text-white">ClinicaOS</span>
@@ -1030,7 +1030,7 @@ function AppShellInner() {
               </button>
             </div>
           </div>
-          <div className="px-3 border-r border-white/20">
+          <div className="px-3">
             <div
               className={cn(
                 "grid transition-all duration-200 ease-out motion-reduce:transition-none",
@@ -1067,7 +1067,7 @@ function AppShellInner() {
             onMouseLeave={() => {
               navHoverRef.current = false;
             }}
-            className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]"
+            className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
           >
             {buscandoMenu && searchedNavRows.length === 0 && (
               <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
