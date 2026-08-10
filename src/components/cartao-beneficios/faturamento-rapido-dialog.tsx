@@ -407,7 +407,7 @@ export function FaturamentoRapidoMensalidadeDialog({
             return;
           }
           try {
-            await printGuiaMensalidade({
+            if (dados.imprimir !== false) await printGuiaMensalidade({
               mensalidadeId: m.id,
               clinicaId,
               usuarioNome: usuario?.nome ?? undefined,
