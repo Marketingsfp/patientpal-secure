@@ -503,6 +503,7 @@ function CheckinPage() {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [cobrancaAlvo, setCobrancaAlvo] = useState<Item | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     if (!clinicaAtual) {
@@ -829,6 +830,44 @@ function CheckinPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!cobrancaAlvo} onOpenChange={(o) => { if (!o) setCobrancaAlvo(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pagamento pendente</DialogTitle>
+            <DialogDescription>
+              Paciente com pagamento pendente. Deseja realizar a cobrança agora antes de liberar
+              para o médico?
+            </DialogDescription>
+          </DialogHeader>
+          {cobrancaAlvo && (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-semibold text-foreground">{cobrancaAlvo.paciente_nome}</p>
+              <p className="text-muted-foreground">
+                {formatarHora(cobrancaAlvo.inicio)} · {cobrancaAlvo.procedimento ?? "CONSULTA"}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCobrancaAlvo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => {
+                const alvo = cobrancaAlvo;
+                setCobrancaAlvo(null);
+                if (alvo) {
+                  toast.info(`Registre a cobrança de ${alvo.paciente_nome} na Agenda.`);
+                }
+                void navigate({ to: "/app/agenda" });
+              }}
+            >
+              Pagar e Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
