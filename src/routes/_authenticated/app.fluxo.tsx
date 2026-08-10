@@ -364,8 +364,7 @@ function FluxoPage() {
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
-          const isFinalizado = col.id === "finalizado";
-          
+
           return (
             <div key={col.id} className="space-y-2 min-w-0">
               {/* Cabeçalho da coluna */}
