@@ -497,15 +497,14 @@ function CheckinPage() {
     setError(null);
 
     try {
-      const inicio = new Date(`${data}T00:00:00`).toISOString();
-      const fim = new Date(`${data}T23:59:59`).toISOString();
+      const { inicio, fimExclusivo } = janelaDiaClinica(data);
 
       let query = supabase
         .from("agendamentos")
         .select("id, paciente_nome, paciente_id, inicio, procedimento, fluxo_etapa, medicos(nome)")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("inicio", inicio)
-        .lte("inicio", fim)
+        .lt("inicio", fimExclusivo)
         .neq("status", "cancelado")
         .not("paciente_id", "is", null)
         .in("fluxo_etapa", ETAPAS_CHECKIN)
@@ -525,29 +524,17 @@ function CheckinPage() {
         return;
       }
 
+      // Lista TODOS os agendados do dia (pagos e pendentes). O pagamento vira
+      // apenas um indicador visual, não um filtro que esconde o paciente.
       const ids = ags.map((a) => a.id);
-      let pagos = new Set<string>();
-
-      const { data: lancamentos, error: lancamentosError } = await supabase
-        .from("fin_lancamentos")
-        .select("agendamento_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("tipo", "receita")
-        .in("agendamento_id", ids);
-
-      if (lancamentosError) {
-        console.error("Erro ao buscar pagamentos:", lancamentosError);
-      } else {
-        pagos = new Set((lancamentos ?? []).map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      let statusPag = new Map<string, { pago: boolean }>();
+      try {
+        statusPag = await agendamentosStatusPagamento(ids);
+      } catch (e) {
+        console.error("Erro ao buscar pagamentos:", e);
       }
 
-      const candidatos = ags.filter((a) => pagos.has(a.id));
-
-      if (candidatos.length === 0) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
+      const candidatos = ags;
 
       const pacIds = Array.from(new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
 
@@ -589,7 +576,7 @@ function CheckinPage() {
       const resultado: Item[] = candidatos.map((a) => ({
         ...a,
         paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? null) : null,
-        pago: true,
+        pago: statusPag.get(a.id)?.pago ?? false,
       }));
 
       const termoAplicado = buscaAplicada.trim();
