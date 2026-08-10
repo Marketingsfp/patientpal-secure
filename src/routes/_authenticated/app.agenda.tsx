@@ -10245,14 +10245,6 @@ function DataRefField({
 
   const label = dataFim ? `${fmt(dataRef)} → ${fmt(dataFim)}` : fmt(dataRef);
 
-  const shiftDia = (delta: number) => {
-    const d = new Date(`${dataRef}T12:00:00`);
-    d.setDate(d.getDate() + delta);
-    setDataRef(toIso(d));
-    setDataFim(null);
-    setMode("single");
-  };
-
   const renderConteudo = () => (
     <>
       <div className="flex items-center gap-1 p-2 border-b">
