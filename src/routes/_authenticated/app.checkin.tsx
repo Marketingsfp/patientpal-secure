@@ -718,19 +718,31 @@ function CheckinPage() {
     <div className="space-y-4 max-w-5xl mx-auto">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ConciergeBell className="h-6 w-6" />
-            Check-in de pacientes
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {clinicaAtual.clinica.nome && `Clínica: ${clinicaAtual.clinica.nome}`}
-            {data && ` • ${formatarDataExtenso(data)}`}
-          </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <ConciergeBell className="h-5 w-5" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Check-in de pacientes
+            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              {clinicaAtual.clinica.nome && (
+                <span className="bg-slate-100 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md">
+                  {clinicaAtual.clinica.nome}
+                </span>
+              )}
+              {data && (
+                <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2.5 py-1 rounded-md capitalize">
+                  {formatarDataExtenso(data)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <Badge variant="outline" className="text-base px-3 py-1">
+        <span className="bg-amber-50 text-amber-700 border border-amber-200/80 px-3 py-1 text-xs font-semibold rounded-full">
           {filtrados.length} {filtrados.length === 1 ? "paciente" : "pacientes"} aguardando
-        </Badge>
+        </span>
       </div>
 
       {/* Busca com seletor de data melhorado */}
