@@ -5507,7 +5507,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 }
 
                 // 4) Imprime UMA GR única com mensalidade + taxa de adesão.
-                await printGuiaMensalidadeComTaxa({
+                if (dados.imprimir !== false) await printGuiaMensalidadeComTaxa({
                   mensalidadeId: mensId,
                   clinicaId: clinicaAtual.clinica_id,
                   valorTaxa: taxaAdesao,
@@ -5526,7 +5526,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 mostrarErro(err);
               }
             } else {
-              await printGuiaMensalidade({
+              if (dados.imprimir !== false) await printGuiaMensalidade({
                 mensalidadeId: mensId,
                 clinicaId: clinicaAtual.clinica_id,
                 usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
