@@ -646,6 +646,52 @@ function PainelExecutivoPage() {
 }
 
 // ---------- Ranking card ----------
+function BigCard({
+  title,
+  icon: Icon,
+  value,
+  delta: d,
+  deltaInvertido,
+  subs,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  delta?: number;
+  deltaInvertido?: boolean;
+  subs: { label: string; value: string }[];
+}) {
+  const positivo = deltaInvertido ? (d ?? 0) <= 0 : (d ?? 0) >= 0;
+  return (
+    <Card className="overflow-hidden border-slate-200/70 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+          {title}
+        </CardTitle>
+        <Icon className="h-4 w-4 text-slate-400" />
+      </CardHeader>
+      <CardContent className="px-4 py-3">
+        <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-slate-900">
+          {value}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {subs.map((s) => (
+            <div key={s.label} className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">{s.label}</p>
+              <p className="text-sm font-medium tabular-nums text-slate-800">{s.value}</p>
+            </div>
+          ))}
+        </div>
+        {typeof d === "number" && (
+          <p className={`mt-2.5 text-xs font-medium ${positivo ? "text-emerald-600" : "text-rose-600"}`}>
+            {d > 0 ? "+" : ""}{d.toFixed(1)}% <span className="text-slate-400 font-normal">vs. período anterior</span>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function RankCard({
   title,
   rows,
