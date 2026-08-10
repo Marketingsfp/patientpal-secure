@@ -1005,7 +1005,7 @@ function AppShellInner() {
               {!isChooser && (
                 <div className="flex-1 flex items-center gap-1.5 min-w-0 bg-white/10 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white select-none">
                   <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate min-w-0">Portal</span>
+                  <span className="truncate min-w-0">{subsystemLabel ?? "Portais"}</span>
                 </div>
               )}
               <button
