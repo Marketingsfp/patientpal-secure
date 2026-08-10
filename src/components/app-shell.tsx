@@ -1064,7 +1064,16 @@ function AppShellInner() {
               </div>
             </div>
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]">
+          <nav
+            ref={navScrollRef}
+            onMouseEnter={() => {
+              navHoverRef.current = true;
+            }}
+            onMouseLeave={() => {
+              navHoverRef.current = false;
+            }}
+            className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]"
+          >
             {buscandoMenu && searchedNavRows.length === 0 && (
               <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
             )}
