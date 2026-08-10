@@ -9896,7 +9896,7 @@ function MedicoFiltroInput({
     <div className="relative">
       <div className="flex gap-1">
         <Input
-          className={compact ? "h-8 text-xs" : undefined}
+          className={compact ? "h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800" : undefined}
           data-agenda-filtro-prof
           disabled={disabled}
           placeholder="TODOS — digite para buscar"
