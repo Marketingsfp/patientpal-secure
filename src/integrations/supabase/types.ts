@@ -371,6 +371,7 @@ export type Database = {
           forma_pagamento_prevista: string | null
           id: string
           inicio: string
+          is_mock_data: boolean
           link_teleconsulta: string | null
           medico_id: string | null
           observacoes: string | null
@@ -416,6 +417,7 @@ export type Database = {
           forma_pagamento_prevista?: string | null
           id?: string
           inicio: string
+          is_mock_data?: boolean
           link_teleconsulta?: string | null
           medico_id?: string | null
           observacoes?: string | null
@@ -461,6 +463,7 @@ export type Database = {
           forma_pagamento_prevista?: string | null
           id?: string
           inicio?: string
+          is_mock_data?: boolean
           link_teleconsulta?: string | null
           medico_id?: string | null
           observacoes?: string | null
@@ -6981,6 +6984,7 @@ export type Database = {
           foto_atualizado_em: string | null
           foto_url: string | null
           id: string
+          is_mock_data: boolean
           legacy_id: number | null
           logradouro: string | null
           nome: string
@@ -7018,6 +7022,7 @@ export type Database = {
           foto_atualizado_em?: string | null
           foto_url?: string | null
           id?: string
+          is_mock_data?: boolean
           legacy_id?: number | null
           logradouro?: string | null
           nome: string
@@ -7055,6 +7060,7 @@ export type Database = {
           foto_atualizado_em?: string | null
           foto_url?: string | null
           id?: string
+          is_mock_data?: boolean
           legacy_id?: number | null
           logradouro?: string | null
           nome?: string
@@ -8885,6 +8891,7 @@ export type Database = {
           foto_atualizado_em: string | null
           foto_url: string | null
           id: string
+          is_mock_data: boolean
           legacy_id: number | null
           logradouro: string | null
           nome: string
@@ -9632,6 +9639,7 @@ export type Database = {
           foto_atualizado_em: string | null
           foto_url: string | null
           id: string
+          is_mock_data: boolean
           legacy_id: number | null
           logradouro: string | null
           nome: string
