@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
+import { PageHeader } from "@/components/page/page-header";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
