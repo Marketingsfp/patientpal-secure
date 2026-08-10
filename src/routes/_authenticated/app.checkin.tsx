@@ -514,7 +514,6 @@ function CheckinPage() {
         .lt("inicio", fimExclusivo)
         .neq("status", "cancelado")
         .not("paciente_id", "is", null)
-        .in("fluxo_etapa", ETAPAS_CHECKIN)
         .order("inicio", { ascending: true });
 
       const { data: agendamentos, error: agendamentosError } = await query;
