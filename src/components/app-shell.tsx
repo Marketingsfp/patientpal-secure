@@ -992,16 +992,28 @@ function AppShellInner() {
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
             "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-64 2xl:w-[272px]",
+            collapsed ? "w-16" : "w-72 2xl:w-80",
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="shrink-0 flex flex-col border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="flex w-full items-center justify-between px-4 pt-4 pb-2">
-              <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
+          <div className="shrink-0 border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <div className="relative flex w-full items-center justify-between gap-2 px-4 py-3">
+              <div className="flex shrink-0 items-center gap-2 cursor-default select-none" title="ClinicaOS">
                 <Activity className="h-5 w-5 shrink-0 text-white" />
                 <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
               </div>
+              {!isChooser && (
+                <button
+                  type="button"
+                  onClick={() => abrirSeletorPortais()}
+                  className="flex-1 flex items-center gap-1.5 min-w-0 bg-white/10 hover:bg-white/15 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white transition-colors"
+                  title="Trocar de portal"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate min-w-0">{subsystemLabel ?? "Portais"}</span>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70 ml-auto" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1018,20 +1030,6 @@ function AppShellInner() {
                 {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
               </button>
             </div>
-            {!isChooser && (
-              <button
-                type="button"
-                onClick={() => abrirSeletorPortais()}
-                className="mx-4 mb-4 w-[calc(100%-2rem)] flex items-center justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-2 rounded-xl text-xs font-medium text-white transition-colors shadow-sm"
-                title="Trocar de portal"
-              >
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{subsystemLabel ?? "Portais"}</span>
-                </span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
-              </button>
-            )}
           </div>
           <div className="px-3 border-r border-white/20">
             <div
