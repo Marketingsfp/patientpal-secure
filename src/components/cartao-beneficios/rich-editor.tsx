@@ -64,7 +64,7 @@ const PreservarEstiloInline = Extension.create({
   },
 });
 
-const ColoredTableCellBase = TableCell.extend({
+const ColoredTableCell = TableCell.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
