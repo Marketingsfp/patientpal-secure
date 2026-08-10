@@ -7285,8 +7285,9 @@ function AgendaPage() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <PatientQuickCompleteSheet
         pacienteId={form.paciente_id || null}
