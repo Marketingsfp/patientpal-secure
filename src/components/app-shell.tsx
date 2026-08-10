@@ -992,22 +992,22 @@ function AppShellInner() {
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
             "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-72 2xl:w-80",
+            collapsed ? "w-16" : "w-60 2xl:w-64",
           )}
           style={{ backgroundColor: corSidebar }}
         >
           <div className="shrink-0 border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="relative flex w-full items-center justify-between gap-2 px-4 py-3">
-              <div className="flex shrink-0 items-center gap-2 cursor-default select-none" title="ClinicaOS">
-                <Activity className="h-5 w-5 shrink-0 text-white" />
-                <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
+            <div className="relative flex w-full items-center gap-1.5 px-3 py-2.5 min-w-0">
+              <div className="flex min-w-0 items-center gap-1.5 cursor-default select-none" title="ClinicaOS">
+                <Activity className="h-4 w-4 shrink-0 text-white" />
+                <span className="truncate text-sm font-bold tracking-tight text-white">ClinicaOS</span>
               </div>
               {!isChooser && (
                 <button
                   type="button"
                   onClick={() => abrirSeletorPortais()}
                   title="Trocar de portal"
-                  className="inline-flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
                 >
                   <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
                   <span className="whitespace-nowrap">
@@ -1023,7 +1023,7 @@ function AppShellInner() {
                     return !v;
                   });
                 }}
-                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                 aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
                 aria-expanded={buscaMenuAberta}
                 title="Buscar no menu"
