@@ -358,8 +358,26 @@ export async function printContrato(contratoId: string) {
 
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 
+  // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
+  // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
+  const printCss = `<style id="print-fix">
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  table, tr, td, th, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
+  h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
+  img { display: block !important; visibility: visible !important; max-width: 100%; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    img { display: block !important; visibility: visible !important; }
+    table, tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+    h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
+  }
+</style>`;
+
   const bodyHtml = isFullHtml
-    ? corpo
+    ? (/<\/head>/i.test(corpo)
+        ? corpo.replace(/<\/head>/i, `${printCss}</head>`)
+        : `${printCss}${corpo}`)
     : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
@@ -373,6 +391,7 @@ export async function printContrato(contratoId: string) {
   th { background: #e8e8e8; }
   ul { margin-left: 4em; text-align: justify; }
 </style>
+${printCss}
 </head><body>
 ${corpo}
 </body></html>`;
