@@ -369,23 +369,29 @@ function FluxoPage() {
           return (
             <div key={col.id} className="space-y-2 min-w-0">
               {/* Cabeçalho da coluna */}
-              <div className={`flex items-center justify-between p-2 rounded ${col.corFundo}`}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Icon className={`h-4 w-4 ${col.cor} flex-shrink-0`} />
-                  <span className={`text-xs font-medium ${col.cor} truncate`}>{col.label}</span>
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-slate-100/80 px-2.5 py-1.5 border-l-[3px]",
+                  col.accent,
+                )}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", col.ponto)} />
+                  <Icon className="h-3.5 w-3.5 flex-shrink-0 text-slate-500" />
+                  <span className="truncate text-xs font-semibold text-slate-700">{col.label}</span>
                 </div>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
                   {items.length}
-                </Badge>
+                </span>
               </div>
 
               {/* Cards */}
-              <div className="space-y-1.5">
-                {items.length === 0 && !isFinalizado && (
-                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
-                )}
-                {items.length === 0 && isFinalizado && (
-                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
+              <div className="space-y-2">
+                {items.length === 0 && (
+                  <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200/70 bg-slate-50/50 p-6 text-center text-xs font-medium text-slate-400">
+                    <Icon className="h-4 w-4 text-slate-300" />
+                    Nenhum paciente
+                  </div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
