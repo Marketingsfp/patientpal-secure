@@ -684,13 +684,13 @@ html.theme-emerald {
   }
 }
 
-/* Menu lateral — tipografia monoespaçada (JetBrains Mono) */
+/* Menu lateral — tipografia sans-serif do sistema */
 .sidebar-mono,
 .sidebar-mono button,
 .sidebar-mono a,
 .sidebar-mono input {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: -0.01em;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0;
 }
 
 /* Valores preenchidos em controles nativos: alto contraste; placeholders suaves. */

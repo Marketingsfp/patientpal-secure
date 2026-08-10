@@ -1097,7 +1097,7 @@ function AppShellInner() {
                         e.stopPropagation();
                         setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }));
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
+                      className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
                       aria-expanded={open}
                     >
                       <span>{row.label}</span>
@@ -1392,7 +1392,7 @@ function AppShellInner() {
             <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-4 sidebar-mono sidebar-scroll">
               {visibleNavRows.map((row) => (
                 <div key={row.label} className="space-y-1">
-                  <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
+                  <div className="px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200">
                     {row.label}
                   </div>
                   {row.items.map((item) => {
