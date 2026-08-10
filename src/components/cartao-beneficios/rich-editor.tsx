@@ -435,6 +435,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       ResizableTable.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
       ResizableTableRow, ColoredTableHeader, ColoredTableCell,
       ResizableImage.configure({ inline: true, allowBase64: true }),
+      PreservarEstiloInline,
     ],
     content: value || "<p></p>",
     editorProps: {
