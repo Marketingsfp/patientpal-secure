@@ -45,7 +45,6 @@ export function UniversalSearchBar() {
         <span className="truncate flex-1 text-left">
           Buscar pacientes, orçamentos, agenda, NFS-e…
         </span>
-        <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-background border">Ctrl K</kbd>
       </button>
       <button
         type="button"
