@@ -112,6 +112,18 @@ const STYLE_MAP = [
 export async function extrairHtmlDeArquivo(file: File): Promise<string> {
   const nome = file.name.toLowerCase();
 
+  if (nome.endsWith(".html") || nome.endsWith(".htm") || file.type === "text/html") {
+    // HTML nativo: injeta o código exatamente como veio, preservando
+    // estilos inline, tabelas e classes. Só extrai o conteúdo do <body>
+    // quando o arquivo for um documento completo.
+    const bruto = await file.text();
+    const corpo = bruto.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const html = (corpo ? corpo[1] : bruto)
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .trim();
+    return html || "<p></p>";
+  }
+
   if (nome.endsWith(".txt") || file.type.startsWith("text/")) {
     return textoParaHtml(await file.text());
   }
