@@ -6384,13 +6384,13 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "mt-3 flex items-end gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs"
+          : "mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
       }
     >
 
           {/* Profissional */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-[2]">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Profissional</Label>
+          <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -6402,10 +6402,10 @@ function AgendaPage() {
           </div>
 
           {/* Tipo de Agenda */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tipo de agenda</Label>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo de agenda</Label>
             <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+              <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
                 <SelectValue placeholder="TODAS" />
               </SelectTrigger>
               <SelectContent>
