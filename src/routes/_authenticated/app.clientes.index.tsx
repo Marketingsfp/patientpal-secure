@@ -24,7 +24,6 @@ import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/page/page-header";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
