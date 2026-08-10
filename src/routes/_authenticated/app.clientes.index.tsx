@@ -414,37 +414,32 @@ function ClientesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Users />}
-        title="Clientes"
-        meta={
-          totalPacientes !== null
-            ? `${totalPacientes.toLocaleString("pt-BR")} ${totalPacientes === 1 ? "paciente" : "pacientes"}`
-            : undefined
-        }
-        description="Cadastre e gerencie os pacientes da clínica."
-        primaryAction={
-          podeEscrever ? (
-            <Button size="sm" onClick={() => setOpenNovo(true)}>
-              <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
-            </Button>
-          ) : undefined
-        }
-        actions={
-          <>
-          <Button
-            variant="ghost"
-            size="icon"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <Users className="h-4.5 w-4.5" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Clientes</h1>
+          {totalPacientes !== null && (
+            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap">
+              {totalPacientes.toLocaleString("pt-BR")} {totalPacientes === 1 ? "paciente" : "pacientes"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
             aria-label="Atualizar lista de clientes"
             title="Atualizar contagem e lista"
             onClick={refrescar}
             disabled={loading}
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-lg text-xs font-semibold px-3.5 py-2 shadow-xs transition-colors"
             onClick={async () => {
               if (!clinicaAtual) return;
               const PAGE = 1000;
@@ -506,19 +501,27 @@ function ClientesPage() {
             }}
           >
             <Download className="h-4 w-4 mr-1.5" /> Exportar Excel
-          </Button>
-          </>
-        }
-      />
+          </button>
+          {podeEscrever && (
+            <button
+              type="button"
+              onClick={() => setOpenNovo(true)}
+              className="inline-flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4 flex items-center justify-between gap-3">
+        <div className="relative w-full max-w-xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nº serviço, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
-            className="pl-9"
+            className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-indigo-500"
           />
         </div>
       </div>
