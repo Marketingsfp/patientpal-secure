@@ -27,16 +27,21 @@ export async function extrairHtmlDeArquivo(file: File): Promise<string> {
   }
 
   if (nome.endsWith(".docx")) {
-    const mammoth = await import("mammoth/mammoth.browser.js");
+    const mammoth: any = await import(
+      /* @vite-ignore */ "https://esm.sh/mammoth@1.12.1/mammoth.browser.js"
+    );
+    const lib = mammoth.default ?? mammoth;
     const arrayBuffer = await file.arrayBuffer();
-    const res = await (mammoth as any).convertToHtml({ arrayBuffer });
+    const res = await lib.convertToHtml({ arrayBuffer });
     return (res?.value as string) || "<p></p>";
   }
 
   if (nome.endsWith(".pdf") || file.type === "application/pdf") {
-    const pdfjs: any = await import("pdfjs-dist");
-    const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
-    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    const pdfjs: any = await import(
+      /* @vite-ignore */ "https://esm.sh/pdfjs-dist@4.7.76/build/pdf.min.mjs"
+    );
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      "https://esm.sh/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs";
     const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
     const partes: string[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
