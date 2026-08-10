@@ -4,6 +4,7 @@ import {
   CalendarDays, CheckCircle2, UserCheck, UserX, Ban, Percent, Clock, Timer,
   Stethoscope, Building2, Wallet, TrendingUp, Receipt, BadgeDollarSign,
   Users, UserPlus, Repeat, Handshake, AlertTriangle, Activity, RefreshCw, Undo2,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -492,13 +493,18 @@ function PainelExecutivoPage() {
             <HhpKpiCard label="Orçamentos" value={int(c.orcamentosNoPeriodo)} icon={Receipt} tone="default" delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)} />
             <HhpKpiCard label="Conversão orçam." value={pctFmt(c.conversaoOrcamento)} icon={TrendingUp} tone="info" />
           </HhpKpiRow>
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              Coortes de retenção (30/60/90 dias) e retorno médio entre consultas exigem materialized
-              view dedicada — item pendente na especificação (Frente 1 §7.3, aguardando aprovação da
-              migration).
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-6 text-center text-sm text-slate-500">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70">
+              <BarChart3 className="h-5 w-5 text-slate-400" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-700">
+              Análise de Retenção e Retorno de Pacientes
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-xl leading-relaxed">
+              Os dados de coorte de retenção (30, 60 e 90 dias) e tempo médio entre consultas estão
+              sendo processados para esta unidade.
+            </p>
+          </div>
         </TabsContent>
 
         {/* Qualidade */}
