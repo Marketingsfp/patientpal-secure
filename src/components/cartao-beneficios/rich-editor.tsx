@@ -24,6 +24,9 @@ import {
   Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
 } from "lucide-react";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ImageCropDialog } from "./image-crop-dialog";
