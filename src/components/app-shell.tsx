@@ -860,6 +860,9 @@ function AppShellInner() {
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
+  // Sidebar sob o mouse: habilita as setas mesmo sem foco dentro do menu.
+  const navHoverRef = useRef(false);
+
   // Navegação do menu lateral por setas ↑/↓ (Home/End vão ao primeiro/último).
   // Só move o foco; o Enter do próprio link é quem abre a página.
   useEffect(() => {
@@ -873,12 +876,14 @@ function AppShellInner() {
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
         if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
       }
-      // Só age quando o foco (ou o clique atual) está dentro de um menu lateral.
+      // Só age quando o foco (ou o clique atual) está dentro de um menu lateral,
+      // ou quando o mouse está sobre a sidebar (hover).
       const activeElement = typeof document !== "undefined" ? document.activeElement : null;
       const focused = activeElement instanceof HTMLElement ? activeElement : null;
       const navRoot =
         (focused?.closest("nav") as HTMLElement | null) ??
         (tgt?.closest("nav") as HTMLElement | null) ??
+        (navHoverRef.current ? navScrollRef.current : null) ??
         null;
       if (!navRoot) return;
       const items = Array.from(navRoot.querySelectorAll<HTMLElement>("[data-nav-to]")).filter(
@@ -898,7 +903,9 @@ function AppShellInner() {
 
       e.preventDefault();
       // Apenas move o foco — o Enter (padrão do link) é que abre a página.
-      items[next]?.focus({ preventScroll: false });
+      const alvo = items[next];
+      alvo?.focus({ preventScroll: true });
+      alvo?.scrollIntoView({ block: "nearest" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1057,7 +1064,16 @@ function AppShellInner() {
               </div>
             </div>
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]">
+          <nav
+            ref={navScrollRef}
+            onMouseEnter={() => {
+              navHoverRef.current = true;
+            }}
+            onMouseLeave={() => {
+              navHoverRef.current = false;
+            }}
+            className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]"
+          >
             {buscandoMenu && searchedNavRows.length === 0 && (
               <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
             )}
