@@ -393,7 +393,11 @@ function PatientCard({
         <div className="flex-1 min-w-[220px] space-y-2">
           <div className="flex items-center gap-2 flex-wrap pr-16">
             <h3 className="text-lg font-bold leading-tight text-foreground">{item.paciente_nome}</h3>
-            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
+            {item.pago ? (
+              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
+            ) : (
+              <Badge className="bg-amber-500 text-white hover:bg-amber-500">PENDENTE</Badge>
+            )}
             {!pendente && <Badge variant="outline">{etapaLabel(item.fluxo_etapa)}</Badge>}
           </div>
 
@@ -460,7 +464,7 @@ function EmptyState() {
         <UserCheck className="h-6 w-6" />
       </div>
       <p className="text-base font-semibold text-slate-700">
-        Nenhum paciente com pagamento confirmado aguardando check-in
+        Nenhum paciente agendado para o dia aguardando check-in
       </p>
       <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
         Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
