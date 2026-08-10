@@ -1,6 +1,7 @@
 /**
  * Extrai conteúdo de arquivos .docx, .pdf e .txt no navegador
- * e devolve HTML pronto para injetar no editor.
+ * e devolve HTML limpo (tabelas, títulos, negrito, alinhamento)
+ * pronto para injetar no editor.
  */
 
 function escapeHtml(s: string) {
@@ -19,6 +20,77 @@ function textoParaHtml(texto: string) {
     .join("");
 }
 
+const BORDA = "1px solid #111827";
+
+/**
+ * Normaliza o HTML gerado pelo mammoth aplicando CSS inline nas tabelas,
+ * células e títulos, para que o documento importado fique visualmente
+ * igual ao original (bordas, padding, negrito e alinhamento).
+ */
+function normalizarHtmlDocx(html: string): string {
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") return html;
+  const doc = new DOMParser().parseFromString(`<div id="raiz">${html}</div>`, "text/html");
+  const raiz = doc.getElementById("raiz");
+  if (!raiz) return html;
+
+  // Tabelas
+  raiz.querySelectorAll("table").forEach((tabela) => {
+    tabela.setAttribute(
+      "style",
+      `width:100%;border-collapse:collapse;table-layout:fixed;border:${BORDA};margin:8px 0;`,
+    );
+    tabela.removeAttribute("class");
+    tabela.querySelectorAll("td,th").forEach((celula) => {
+      const el = celula as HTMLElement;
+      const ehCabecalho = el.tagName === "TH";
+      const alinhamento = el.getAttribute("align") || (ehCabecalho ? "left" : "left");
+      el.setAttribute(
+        "style",
+        `border:${BORDA};padding:6px 8px;vertical-align:top;text-align:${alinhamento};` +
+          (ehCabecalho ? "font-weight:700;background:#f3f4f6;" : ""),
+      );
+      el.removeAttribute("class");
+      // Parágrafos dentro da célula sem margem, para não "inflar" a linha
+      el.querySelectorAll("p").forEach((p) => {
+        (p as HTMLElement).style.margin = "0";
+      });
+    });
+  });
+
+  // Alinhamento preservado pelo mammoth via classes/estilos do Word
+  raiz.querySelectorAll("p,h1,h2,h3,h4,li").forEach((no) => {
+    const el = no as HTMLElement;
+    const classe = el.getAttribute("class") || "";
+    if (/center/i.test(classe)) el.style.textAlign = "center";
+    else if (/right/i.test(classe)) el.style.textAlign = "right";
+    else if (/justif/i.test(classe)) el.style.textAlign = "justify";
+    el.removeAttribute("class");
+  });
+
+  // Remove parágrafos totalmente vazios em sequência
+  raiz.querySelectorAll("p").forEach((p) => {
+    if (!p.textContent?.trim() && !p.querySelector("img")) p.remove();
+  });
+
+  return raiz.innerHTML || "<p></p>";
+}
+
+const STYLE_MAP = [
+  "p[style-name='Title'] => h1:fresh",
+  "p[style-name='Subtitle'] => h2:fresh",
+  "p[style-name='Heading 1'] => h1:fresh",
+  "p[style-name='Heading 2'] => h2:fresh",
+  "p[style-name='Heading 3'] => h3:fresh",
+  "p[style-name='Título'] => h1:fresh",
+  "p[style-name='Título 1'] => h1:fresh",
+  "p[style-name='Título 2'] => h2:fresh",
+  "p[style-name='Título 3'] => h3:fresh",
+  "b => strong",
+  "i => em",
+  "u => u",
+  "strike => s",
+].join("\n");
+
 export async function extrairHtmlDeArquivo(file: File): Promise<string> {
   const nome = file.name.toLowerCase();
 
@@ -31,8 +103,21 @@ export async function extrairHtmlDeArquivo(file: File): Promise<string> {
     const mammoth: any = await import(/* @vite-ignore */ mammothUrl);
     const lib = mammoth.default ?? mammoth;
     const arrayBuffer = await file.arrayBuffer();
-    const res = await lib.convertToHtml({ arrayBuffer });
-    return (res?.value as string) || "<p></p>";
+    const res = await lib.convertToHtml(
+      { arrayBuffer },
+      {
+        styleMap: STYLE_MAP,
+        includeDefaultStyleMap: true,
+        ignoreEmptyParagraphs: true,
+        convertImage: lib.images?.imgElement
+          ? lib.images.imgElement(async (image: any) => {
+              const base64 = await image.read("base64");
+              return { src: `data:${image.contentType};base64,${base64}` };
+            })
+          : undefined,
+      },
+    );
+    return normalizarHtmlDocx((res?.value as string) || "") || "<p></p>";
   }
 
   if (nome.endsWith(".pdf") || file.type === "application/pdf") {
