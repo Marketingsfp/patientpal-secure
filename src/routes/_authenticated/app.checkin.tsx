@@ -642,6 +642,11 @@ function CheckinPage() {
     return items;
   }, [items]);
 
+  const aguardando = useMemo(
+    () => filtrados.filter((i) => estaPendenteCheckin(i.fluxo_etapa)).length,
+    [filtrados],
+  );
+
   const filtradosRef = useRef<Item[]>([]);
   useEffect(() => {
     filtradosRef.current = filtrados;
