@@ -982,6 +982,65 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           replaceCropTarget(dataUrl);
         }}
       />
+      <Dialog
+        open={!!pdfFile}
+        onOpenChange={(aberto) => {
+          if (!aberto) {
+            if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+            setPdfUrl("");
+            setPdfFile(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Documento PDF</DialogTitle>
+            <DialogDescription>
+              {pdfFile?.name} — visualize o PDF original abaixo. Você pode mantê-lo somente
+              para leitura ou importar o texto para edição no editor.
+            </DialogDescription>
+          </DialogHeader>
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title="Pré-visualização do PDF"
+              className="w-full h-[65vh] rounded-md border bg-muted"
+            />
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { if (pdfUrl) window.open(pdfUrl, "_blank"); }}
+            >
+              Abrir em nova aba
+            </Button>
+            <Button
+              type="button"
+              disabled={importando}
+              onClick={async () => {
+                if (!pdfFile) return;
+                setImportando(true);
+                try {
+                  const { extrairHtmlDeArquivo } = await import("@/lib/importar-documento");
+                  const html = await extrairHtmlDeArquivo(pdfFile);
+                  editor.chain().focus().insertContent(html).run();
+                  toast.success("Texto do PDF importado. Você já pode editar o conteúdo.");
+                  if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+                  setPdfUrl("");
+                  setPdfFile(null);
+                } catch (err) {
+                  mostrarErro(err, "Não foi possível ler o PDF");
+                } finally {
+                  setImportando(false);
+                }
+              }}
+            >
+              {importando ? "Importando…" : "Importar texto para edição"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
