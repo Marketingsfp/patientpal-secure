@@ -10245,6 +10245,61 @@ function DataRefField({
     setMode("single");
   };
 
+  const renderConteudo = () => (
+    <>
+      <div className="flex items-center gap-1 p-2 border-b">
+        <Button size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")} className="h-7 text-xs">
+          Dia
+        </Button>
+        <Button size="sm" variant={mode === "range" ? "default" : "outline"} onClick={() => setMode("range")} className="h-7 text-xs">
+          Período
+        </Button>
+        <span className="flex-1" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => {
+            setDataRef(toIso(proxDiaUtil()));
+            setDataFim(null);
+            setMode("single");
+            setOpen(false);
+          }}
+        >
+          Hoje
+        </Button>
+      </div>
+      {mode === "single" ? (
+        <Calendar
+          mode="single"
+          selected={new Date(`${dataRef}T12:00:00`)}
+          onSelect={(d) => {
+            if (!d) return;
+            setDataRef(toIso(d));
+            setDataFim(null);
+            setOpen(false);
+          }}
+          className="pointer-events-auto p-2"
+        />
+      ) : (
+        <Calendar
+          mode="range"
+          selected={{
+            from: new Date(`${dataRef}T12:00:00`),
+            to: dataFim ? new Date(`${dataFim}T12:00:00`) : undefined,
+          }}
+          onSelect={(r) => {
+            if (!r?.from) return;
+            setDataRef(toIso(r.from));
+            setDataFim(r.to ? toIso(r.to) : null);
+          }}
+          numberOfMonths={1}
+          className="pointer-events-auto p-2"
+        />
+      )}
+    </>
+  );
+
   if (compact) {
     return (
       <div className="flex h-9 w-full items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white">
