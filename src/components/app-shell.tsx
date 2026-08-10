@@ -431,9 +431,9 @@ function MobileNavParent({
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium tracking-tight text-white rounded-lg hover:bg-white/10"
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium tracking-tight text-white rounded-lg hover:bg-white/10"
       >
-        <item.icon className="h-4 w-4 shrink-0" />
+        <item.icon className="h-[18px] w-[18px] shrink-0" />
         <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
       </button>
@@ -454,7 +454,7 @@ function MobileNavParent({
                 }}
                 className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
               >
-                <child.icon className="h-4 w-4 shrink-0" />
+                <child.icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="leading-snug break-words">{child.label}</span>
               </a>
             );
@@ -1118,7 +1118,7 @@ function AppShellInner() {
                           >
                             {collapsed ? (
                               <div className="flex justify-center py-2" title={item.label}>
-                                <item.icon className="h-4 w-4 shrink-0 opacity-80" />
+                                <item.icon className="h-[18px] w-[18px] shrink-0 opacity-80" />
                               </div>
                             ) : (
                               <button
@@ -1128,10 +1128,10 @@ function AppShellInner() {
                                   e.stopPropagation();
                                   setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }));
                                 }}
-                                className={`w-full flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
-                                <item.icon className="h-4 w-4 shrink-0" />
+                                <item.icon className="h-[18px] w-[18px] shrink-0" />
                                 <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
                                 <ChevronDown
                                   className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
@@ -1153,9 +1153,9 @@ function AppShellInner() {
                                       rel="noopener noreferrer"
                                       title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
-                                      className={`relative flex items-center gap-2 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-1.5 text-xs font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                      className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                     >
-                                      <child.icon className="h-4 w-4 shrink-0" />
+                                      <child.icon className="h-[18px] w-[18px] shrink-0" />
                                       {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
                                     </a>
                                   );
@@ -1181,13 +1181,13 @@ function AppShellInner() {
                                       event.preventDefault();
                                       irPara(href);
                                     }}
-                                    className={`relative flex items-center gap-2 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-1.5 text-xs font-medium tracking-tight transition-all ${
+                                    className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
                                       active
                                         ? "bg-white text-slate-900 shadow-sm"
                                         : "text-white hover:bg-white/10 hover:text-white"
                                     }${hoverScaleCls}`}
                                   >
-                                    <child.icon className="h-4 w-4 shrink-0" />
+                                    <child.icon className="h-[18px] w-[18px] shrink-0" />
                                     {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
                                   </a>
                                 );
@@ -1218,7 +1218,7 @@ function AppShellInner() {
                           }}
                           {...dragProps(row.label, navItemKey(item))}
                           className={cn(
-                            `relative flex items-center gap-2 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-1.5 text-xs font-medium tracking-tight transition-all ${
+                            `relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
                               active
                                 ? "bg-white text-slate-900 shadow-sm"
                                 : "text-white hover:bg-white/10 hover:text-white"
@@ -1226,7 +1226,7 @@ function AppShellInner() {
                             dragCls(navItemKey(item)),
                           )}
                         >
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <item.icon className="h-[18px] w-[18px] shrink-0" />
                           {!collapsed && <span className="leading-snug break-words">{item.label}</span>}
                         </a>
                       );
