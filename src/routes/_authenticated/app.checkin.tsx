@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -436,7 +436,16 @@ function PatientCard({
               <Button
                 onClick={() => onConfirm(item)}
                 disabled={isConfirming}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+                title={
+                  item.pago
+                    ? "Liberar paciente para a triagem"
+                    : "Pagamento pendente — registre a cobrança antes de liberar"
+                }
+                className={
+                  item.pago
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+                    : "bg-slate-200 text-slate-500 hover:bg-slate-300 shadow-none w-full sm:w-auto sm:min-w-[180px] h-10"
+                }
               >
                 {isConfirming ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -493,6 +502,8 @@ function CheckinPage() {
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
+  const [cobrancaAlvo, setCobrancaAlvo] = useState<Item | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     if (!clinicaAtual) {
@@ -674,6 +685,11 @@ function CheckinPage() {
       return;
     }
     if (confirmandoId === item.id) return;
+    // Pagamento é exigido antes de liberar o paciente para o médico.
+    if (!item.pago) {
+      setCobrancaAlvo(item);
+      return;
+    }
     setConfirmandoId(item.id);
 
     try {
@@ -814,6 +830,44 @@ function CheckinPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!cobrancaAlvo} onOpenChange={(o) => { if (!o) setCobrancaAlvo(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pagamento pendente</DialogTitle>
+            <DialogDescription>
+              Paciente com pagamento pendente. Deseja realizar a cobrança agora antes de liberar
+              para o médico?
+            </DialogDescription>
+          </DialogHeader>
+          {cobrancaAlvo && (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-semibold text-foreground">{cobrancaAlvo.paciente_nome}</p>
+              <p className="text-muted-foreground">
+                {formatarHora(cobrancaAlvo.inicio)} · {cobrancaAlvo.procedimento ?? "CONSULTA"}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCobrancaAlvo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => {
+                const alvo = cobrancaAlvo;
+                setCobrancaAlvo(null);
+                if (alvo) {
+                  toast.info(`Registre a cobrança de ${alvo.paciente_nome} na Agenda.`);
+                }
+                void navigate({ to: "/app/agenda" });
+              }}
+            >
+              Pagar e Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
