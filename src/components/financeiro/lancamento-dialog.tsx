@@ -872,13 +872,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col gap-3 p-4">
+        <DialogHeader className="space-y-1">
           <DialogTitle className={tipo === "receita" ? "text-success" : "text-destructive"}>
             Nova {tipo === "receita" ? "Receita" : "Despesa"}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
+        <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {bloqueioCartao?.bloqueado && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-3 py-2 text-sm">
               <strong>Cartão benefícios em atraso.</strong> Paciente tem{" "}
