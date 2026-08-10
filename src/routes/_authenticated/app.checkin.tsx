@@ -502,6 +502,7 @@ function CheckinPage() {
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
+  const [cobrancaAlvo, setCobrancaAlvo] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
     if (!clinicaAtual) {
