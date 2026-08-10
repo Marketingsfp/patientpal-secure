@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -113,6 +114,7 @@ function FluxoPage() {
     uxMelhorias && "p-2 sm:p-1.5",
   );
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [detalhe, setDetalhe] = useState<FluxoDetalheAg | null>(null);
   const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
