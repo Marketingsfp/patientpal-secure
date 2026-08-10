@@ -86,7 +86,7 @@ export function PublicClinicaProvider({
     return (
       <div className="min-h-screen flex items-center justify-center p-8 bg-background">
         <div className="text-center space-y-2 max-w-md">
-          <h1 className="text-2xl font-semibold">Clínica não encontrada</h1>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Clínica não encontrada</h1>
           <p className="text-muted-foreground">{erro}</p>
           <p className="text-xs text-muted-foreground">Referência: {token ?? clinicaId}</p>
         </div>

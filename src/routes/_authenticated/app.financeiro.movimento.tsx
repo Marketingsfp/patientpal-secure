@@ -812,8 +812,8 @@ function Page() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div><h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
-          <p className="text-sm text-muted-foreground">Receitas e despesas do período</p></div>
+        <div><h1 className="text-xl font-bold text-slate-900 leading-none">Movimento de Caixa</h1>
+          <p className="text-xs font-medium text-slate-500">Receitas e despesas do período</p></div>
         <div className="flex gap-2">
         <Button variant="outline" onClick={imprimirRelatorio} disabled={!displayItems.length}>
           <Printer className="h-4 w-4 mr-2" />Relatório

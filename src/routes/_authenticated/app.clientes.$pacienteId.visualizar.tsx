@@ -53,7 +53,7 @@ function VisualizarClientePage() {
             <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2">
               <Users className="h-6 w-6 text-primary" /> Visualizar cliente
             </h1>
             {paciente && (

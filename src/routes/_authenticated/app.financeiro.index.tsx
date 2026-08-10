@@ -69,8 +69,8 @@ function FinDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Financeiro — {clinicaAtual?.clinica.nome}</h1>
-          <p className="text-sm text-muted-foreground">Visão geral do período</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Financeiro — {clinicaAtual?.clinica.nome}</h1>
+          <p className="text-xs font-medium text-slate-500">Visão geral do período</p>
         </div>
         {podeEscrever && (
           <div className="flex gap-2">

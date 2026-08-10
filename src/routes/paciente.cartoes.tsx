@@ -80,7 +80,7 @@ function MeusCartoesPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-4">
-        <h1 className="text-xl font-bold flex items-center gap-2"><CreditCard className="h-5 w-5" /> Meus cartões</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><CreditCard className="h-5 w-5" /> Meus cartões</h1>
         {email && <p className="text-xs text-muted-foreground">{email}</p>}
 
         {loading ? (

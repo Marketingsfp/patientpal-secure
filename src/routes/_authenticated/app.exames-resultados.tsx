@@ -258,7 +258,7 @@ function ExamesResultadosPage() {
     <div className="space-y-6 max-w-6xl">
       <div className="flex items-center gap-2">
         <Stethoscope className="h-6 w-6 text-amber-600" />
-        <h1 className="text-2xl font-bold">Resultados de Exames</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Resultados de Exames</h1>
         <Badge variant="secondary" className="ml-2">IA classifica e dispara alerta para enfermagem</Badge>
       </div>
 

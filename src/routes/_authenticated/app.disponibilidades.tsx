@@ -654,8 +654,8 @@ function Page() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Horários médicos</h1>
-        <p className="text-sm text-muted-foreground">Disponibilidade semanal por médico — {clinicaAtual.clinica.nome}</p>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Horários médicos</h1>
+        <p className="text-xs font-medium text-slate-500">Disponibilidade semanal por médico — {clinicaAtual.clinica.nome}</p>
         <p className="text-xs text-muted-foreground mt-1">
           Total de médicos: <strong>{medicos.length}</strong> · 
           Total de agendas: <strong>{agendas.length}</strong> · 

@@ -224,7 +224,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
         <ListShell<TabV>
           title={
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <h1 className="text-lg font-semibold">Clientes</h1>
+              <h1 className="text-xl font-bold text-slate-900 leading-none">Clientes</h1>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground"
                 title="Total de pacientes na clínica — atualiza a cada 15s"

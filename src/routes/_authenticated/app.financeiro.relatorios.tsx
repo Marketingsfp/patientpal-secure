@@ -84,8 +84,8 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-semibold flex items-center gap-2"><FileBarChart className="h-6 w-6 text-primary" />Relatórios</h1>
-        <p className="text-sm text-muted-foreground">Exporte dados em CSV para análise externa</p></div>
+      <div><h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><FileBarChart className="h-6 w-6 text-primary" />Relatórios</h1>
+        <p className="text-xs font-medium text-slate-500">Exporte dados em CSV para análise externa</p></div>
       <Card>
         <CardHeader><CardTitle>Gerar relatório</CardTitle></CardHeader>
         <CardContent className="space-y-4">

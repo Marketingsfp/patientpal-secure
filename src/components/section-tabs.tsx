@@ -28,8 +28,8 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
   return (
     <div className="space-y-3 mb-4">
       <div className="flex items-center gap-2">
-        <TitleIcon className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">{title}</h1>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><TitleIcon className="h-5 w-5" /></span>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">{title}</h1>
       </div>
       <nav className="flex flex-wrap gap-1 border-b">
         {visiveis.map((t) => {

@@ -145,8 +145,8 @@ function DuplicadosPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Possíveis pacientes duplicados</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Possíveis pacientes duplicados</h1>
+          <p className="text-xs font-medium text-slate-500">
             Somente alerta. O sistema não faz merge automático — abra cada cadastro
             para conferir e ajustar manualmente.
           </p>

@@ -130,10 +130,10 @@ function PontoPage() {
   return (
     <div className="p-6 space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
-        <Clock className="h-6 w-6 text-primary" />
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Clock className="h-5 w-5" /></span>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">Bater ponto</h1>
-          <p className="text-sm text-muted-foreground">Registre sua entrada, intervalos e saída.</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Bater ponto</h1>
+          <p className="text-xs font-medium text-slate-500">Registre sua entrada, intervalos e saída.</p>
         </div>
       </div>
 

@@ -59,7 +59,7 @@ function PortalHomePage() {
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <h1 className="text-2xl font-bold">Portal do Paciente</h1>
+        <h1 className="text-xl font-bold text-slate-900 leading-none">Portal do Paciente</h1>
         {email && <p className="text-sm text-muted-foreground">{email}</p>}
         {loading ? (
           <p className="mt-6 text-sm text-muted-foreground">Carregando…</p>

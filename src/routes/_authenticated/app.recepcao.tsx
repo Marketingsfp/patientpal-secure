@@ -172,8 +172,8 @@ function RecepcaoPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Recepção · Filas</h1>
-          <p className="text-sm text-muted-foreground">Chame a próxima senha e acompanhe a fila em tempo real.</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Recepção · Filas</h1>
+          <p className="text-xs font-medium text-slate-500">Chame a próxima senha e acompanhe a fila em tempo real.</p>
         </div>
         <div className="flex items-end gap-3">
           <div className="space-y-1">

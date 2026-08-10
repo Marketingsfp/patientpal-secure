@@ -249,8 +249,8 @@ function NfsePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
-          <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
+          <p className="text-xs font-medium text-slate-500">Emissão e controle de notas fiscais de serviço.</p>
         </div>
         {!ehSaoFrancisco && (
           <div className="flex gap-2">

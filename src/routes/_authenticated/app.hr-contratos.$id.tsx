@@ -326,7 +326,7 @@ function EditarFuncionarioPage() {
       </div>
 
       <div>
-        <h1 className="text-xl font-bold">
+        <h1 className="text-xl font-bold text-slate-900 leading-none">
           {isNovo ? "Novo funcionário" : `Editar funcionário${form.funcionario_nome ? ` — ${form.funcionario_nome}` : ""}`}
         </h1>
         <p className="text-sm text-muted-foreground">Contrato de trabalho da clínica.</p>

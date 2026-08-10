@@ -47,7 +47,7 @@ export function PageHeader({
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="flex min-w-0 items-baseline gap-2 truncate text-xl font-semibold tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 leading-none flex min-w-0 items-baseline gap-2 truncate">
             <span className="truncate">{title}</span>
             {meta && (
               <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{meta}</span>

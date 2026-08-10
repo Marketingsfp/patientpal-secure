@@ -138,8 +138,8 @@ function LMSAdminPage() {
     <div className="space-y-4">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cursos (LMS)</h1>
-          <p className="text-sm text-muted-foreground">Crie cursos, módulos e lições para sua equipe</p>
+          <h1 className="text-xl font-bold text-slate-900 leading-none">Cursos (LMS)</h1>
+          <p className="text-xs font-medium text-slate-500">Crie cursos, módulos e lições para sua equipe</p>
         </div>
         {podeEscrever && (
         <Dialog open={openCurso} onOpenChange={setOpenCurso}>
