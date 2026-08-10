@@ -385,6 +385,108 @@ function PainelExecutivoPage() {
         Comparando com {periodoAnterior.de} → {periodoAnterior.ate}.
       </p>
 
+      {/* Visão geral — cards resumo (número grande + 2 métricas de apoio + variação) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <BigCard
+          title="Agendamentos"
+          icon={CalendarDays}
+          value={int(p.agendados)}
+          delta={delta(p.agendados, pa.agendados)}
+          subs={[
+            { label: "Confirmados", value: int(p.confirmados) },
+            { label: "Cancelados", value: int(p.cancelaram) },
+          ]}
+        />
+        <BigCard
+          title="Clientes atendidos"
+          icon={UserCheck}
+          value={int(p.compareceram)}
+          delta={delta(p.compareceram, pa.compareceram)}
+          subs={[
+            { label: "Faltas", value: int(p.faltaram) },
+            { label: "Ocupação", value: pctFmt(p.ocupacaoPct) },
+          ]}
+        />
+        <BigCard
+          title="Clientes"
+          icon={Users}
+          value={int(c.novos + c.recorrentes)}
+          delta={delta(c.novos + c.recorrentes, ca.novos + ca.recorrentes)}
+          subs={[
+            { label: "Novos", value: int(c.novos) },
+            { label: "Recorrentes", value: int(c.recorrentes) },
+          ]}
+        />
+        {podeFin ? (
+          <BigCard
+            title="Recebimentos"
+            icon={Wallet}
+            value={money(f.receitaRealizada)}
+            delta={delta(f.receitaRealizada, fa.receitaRealizada)}
+            subs={[
+              { label: "Previsto", value: money(f.receitaPrevista) },
+              { label: "Ticket médio", value: money(f.ticketMedio) },
+            ]}
+          />
+        ) : (
+          <BigCard
+            title="Qualidade"
+            icon={AlertTriangle}
+            value={pctFmt(q.noShowPct)}
+            delta={delta(q.noShowPct, qa.noShowPct)}
+            subs={[
+              { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
+              { label: "Faltas", value: int(p.faltaram) },
+            ]}
+          />
+        )}
+        {podeFin && (
+          <>
+            <BigCard
+              title="Pagamentos"
+              icon={Receipt}
+              value={money(f.despesaRealizada)}
+              delta={delta(f.despesaRealizada, fa.despesaRealizada)}
+              subs={[
+                { label: "Previsto", value: money(f.despesaPrevista) },
+                { label: "Resultado", value: money(f.resultado) },
+              ]}
+            />
+            <BigCard
+              title="Convênios e particular"
+              icon={Handshake}
+              value={money(f.receitaConvenio)}
+              delta={delta(f.receitaConvenio, fa.receitaConvenio)}
+              subs={[
+                { label: "Particular", value: money(f.receitaParticular) },
+                { label: "Convênio", value: money(f.receitaConvenio) },
+              ]}
+            />
+          </>
+        )}
+        <BigCard
+          title="Orçamentos"
+          icon={BadgeDollarSign}
+          value={int(c.orcamentosNoPeriodo)}
+          delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
+          subs={[
+            { label: "Conversão", value: pctFmt(c.conversaoOrcamento) },
+            { label: "Novos pacientes", value: int(c.novos) },
+          ]}
+        />
+        <BigCard
+          title="Qualidade"
+          icon={Percent}
+          value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
+          delta={delta(q.noShowPct, qa.noShowPct)}
+          deltaInvertido
+          subs={[
+            { label: "No-show", value: pctFmt(q.noShowPct) },
+            { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
+          ]}
+        />
+      </div>
+
       <Tabs defaultValue="producao" className="space-y-4">
         <TabsList>
           <TabsTrigger value="producao">Produção</TabsTrigger>
