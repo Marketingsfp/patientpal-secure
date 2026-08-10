@@ -21,7 +21,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Heading1, Heading2, Heading3,
   Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
-  Table as TableIcon, Rows3, Columns3, Trash2, Crop,
+  Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -354,6 +354,8 @@ interface Props {
 
 export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
+  const [importando, setImportando] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string>("");
   const [cropTargetPos, setCropTargetPos] = useState<number | null>(null);
@@ -843,6 +845,37 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             e.target.value = "";
           }}
         />
+        <input
+          ref={docRef}
+          type="file"
+          accept=".docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setImportando(true);
+            try {
+              const { extrairHtmlDeArquivo } = await import("@/lib/importar-documento");
+              const html = await extrairHtmlDeArquivo(file);
+              editor.chain().focus().insertContent(html).run();
+              toast.success("Documento importado. Você já pode editar o conteúdo.");
+            } catch (err) {
+              mostrarErro(err, "Não foi possível ler o documento");
+            } finally {
+              setImportando(false);
+            }
+          }}
+        />
+        <Button
+          type="button" variant="outline" size="sm" className="h-8 gap-1.5"
+          disabled={importando}
+          onClick={() => docRef.current?.click()}
+          title="Importar documento (.docx, .pdf, .txt)"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          {importando ? "Importando…" : "Importar documento"}
+        </Button>
         <div className="ml-auto" />
         {variables && variables.length > 0 && (
           <Select
