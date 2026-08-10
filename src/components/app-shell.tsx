@@ -1253,16 +1253,13 @@ function AppShellInner() {
 
       <div className="flex-1 flex flex-col min-w-0">
         {!isChooser && (
-        <header
-          className="sticky top-0 z-30 h-14 text-white border-b border-white/10 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6"
-          style={{ backgroundColor: corSidebar }}
-        >
+        <header className="sticky top-0 z-30 h-14 bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
           {!isChooser && (
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-white/10 shrink-0"
+              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
               aria-label="Abrir menu"
               title="Menu"
             >
@@ -1270,13 +1267,13 @@ function AppShellInner() {
             </button>
           )}
           <Link to="/app" className="lg:hidden flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
-            <Activity className="h-5 w-5 shrink-0 text-white" />
+            <Activity className="h-5 w-5 shrink-0 text-slate-800" />
           </Link>
           {!isChooser && (
             <button
               type="button"
               onClick={() => abrirSeletorPortais()}
-              className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-medium text-white shrink-0"
+              className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
               title="Trocar de portal"
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
@@ -1290,7 +1287,7 @@ function AppShellInner() {
             <img
               src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
               alt={clinicaAtual.clinica.nome}
-              className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-white/20 shadow-sm"
+              className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
             />
           )}
           {memberships.length > 0 && (
@@ -1301,7 +1298,7 @@ function AppShellInner() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+              <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -1336,7 +1333,7 @@ function AppShellInner() {
             <Button
               variant="ghost"
               size="sm"
-              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-white hover:bg-white/10 hover:text-white"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
               title="Atalhos de teclado (?)"
               onClick={() => {
                 window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
@@ -1344,7 +1341,7 @@ function AppShellInner() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
-            <div className="flex items-center gap-1.5 [&_button]:text-white [&_button:hover]:bg-white/10 [&_button:hover]:text-white">
+            <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
               <EstornosBell />
               <TTSToggle />
             </div>
