@@ -375,8 +375,9 @@ function PainelExecutivoPage() {
           <Button size="sm" variant="ghost" onClick={load} disabled={carregando}>
             <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Comparativo período */}
       <p className="text-xs text-muted-foreground">
