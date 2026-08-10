@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DateTimeField } from "@/components/agenda/datetime-field";
+import { AgendaPorMedicoDia } from "@/components/agenda/agenda-por-medico-dia";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
@@ -9433,22 +9434,40 @@ function AgendaPage() {
       </div>
 
       {viewMode === "medico" && (
-        <AgendaPorMedicoGrid
-          medicoId={filtroMedico === "todos" ? "" : filtroMedico}
-          dias={(() => {
-            if (!dataFim) return 1;
-            const a = new Date(`${dataRef}T12:00:00`).getTime();
-            const b = new Date(`${dataFim}T12:00:00`).getTime();
-            return Math.min(31, Math.max(1, Math.round((b - a) / 86400000) + 1));
-          })()}
+        <AgendaPorMedicoDia
           dataRef={dataRef}
-          items={items.filter((a) => filtroMedico === "todos" || a.medico_id === filtroMedico)}
-          onSlotClick={(a) => openSlot(a)}
-          onAgClick={(a) => openEdit(a)}
+          medicos={(filtroMedico === "todos" ? medicos : medicos.filter((m) => m.id === filtroMedico)).map((m) => ({
+            id: m.id,
+            nome: m.nome,
+            especialidade_nome: m.especialidade_nome ?? null,
+          }))}
+          items={items
+            .filter(
+              (a) =>
+                a.inicio.slice(0, 10) === dataRef &&
+                (filtroMedico === "todos" || a.medico_id === filtroMedico),
+            )
+            .map((a) => ({
+              id: a.id,
+              paciente_nome: a.paciente_nome,
+              medico_id: a.medico_id,
+              inicio: a.inicio,
+              fim: a.fim,
+              procedimento:
+                a.procedimento ?? (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : null),
+              status: a.status,
+              livre: isSlotLivre(a.paciente_nome),
+            }))}
           fmtHora={fmtHora}
-          estornoPendAgs={estornoPendAgs}
-          ocultarPacienteMedico={isMedicoOnly}
-          ehLaboratorio={medicoEhLaboratorioFormulario}
+          onAgClick={(a) => {
+            const orig = items.find((i) => i.id === a.id);
+            if (orig) openEdit(orig);
+          }}
+          onSlotClick={(a) => {
+            const orig = items.find((i) => i.id === a.id);
+            if (orig) openSlot(orig);
+          }}
+          ocultarPaciente={isMedicoOnly}
         />
       )}
 
