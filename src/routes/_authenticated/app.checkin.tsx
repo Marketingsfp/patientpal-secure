@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { janelaDiaClinica } from "@/lib/date-utils";
+import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -391,7 +393,11 @@ function PatientCard({
         <div className="flex-1 min-w-[220px] space-y-2">
           <div className="flex items-center gap-2 flex-wrap pr-16">
             <h3 className="text-lg font-bold leading-tight text-foreground">{item.paciente_nome}</h3>
-            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
+            {item.pago ? (
+              <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
+            ) : (
+              <Badge className="bg-amber-500 text-white hover:bg-amber-500">PENDENTE</Badge>
+            )}
             {!pendente && <Badge variant="outline">{etapaLabel(item.fluxo_etapa)}</Badge>}
           </div>
 
@@ -458,7 +464,7 @@ function EmptyState() {
         <UserCheck className="h-6 w-6" />
       </div>
       <p className="text-base font-semibold text-slate-700">
-        Nenhum paciente com pagamento confirmado aguardando check-in
+        Nenhum paciente agendado para o dia aguardando check-in
       </p>
       <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
         Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
@@ -497,15 +503,14 @@ function CheckinPage() {
     setError(null);
 
     try {
-      const inicio = new Date(`${data}T00:00:00`).toISOString();
-      const fim = new Date(`${data}T23:59:59`).toISOString();
+      const { inicio, fimExclusivo } = janelaDiaClinica(data);
 
       let query = supabase
         .from("agendamentos")
         .select("id, paciente_nome, paciente_id, inicio, procedimento, fluxo_etapa, medicos(nome)")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("inicio", inicio)
-        .lte("inicio", fim)
+        .lt("inicio", fimExclusivo)
         .neq("status", "cancelado")
         .not("paciente_id", "is", null)
         .in("fluxo_etapa", ETAPAS_CHECKIN)
@@ -525,29 +530,17 @@ function CheckinPage() {
         return;
       }
 
+      // Lista TODOS os agendados do dia (pagos e pendentes). O pagamento vira
+      // apenas um indicador visual, não um filtro que esconde o paciente.
       const ids = ags.map((a) => a.id);
-      let pagos = new Set<string>();
-
-      const { data: lancamentos, error: lancamentosError } = await supabase
-        .from("fin_lancamentos")
-        .select("agendamento_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("tipo", "receita")
-        .in("agendamento_id", ids);
-
-      if (lancamentosError) {
-        console.error("Erro ao buscar pagamentos:", lancamentosError);
-      } else {
-        pagos = new Set((lancamentos ?? []).map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      let statusPag = new Map<string, { pago: boolean }>();
+      try {
+        statusPag = await agendamentosStatusPagamento(ids);
+      } catch (e) {
+        console.error("Erro ao buscar pagamentos:", e);
       }
 
-      const candidatos = ags.filter((a) => pagos.has(a.id));
-
-      if (candidatos.length === 0) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
+      const candidatos = ags;
 
       const pacIds = Array.from(new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
 
@@ -589,7 +582,7 @@ function CheckinPage() {
       const resultado: Item[] = candidatos.map((a) => ({
         ...a,
         paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? null) : null,
-        pago: true,
+        pago: statusPag.get(a.id)?.pago ?? false,
       }));
 
       const termoAplicado = buscaAplicada.trim();
