@@ -284,7 +284,7 @@ function FluxoPage() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap bg-background sticky top-0 z-10 py-2.5 border-b">
         <div className="flex items-start gap-2.5 min-w-0">
-          <Workflow className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Workflow className="h-5 w-5" /></span>
           <div className="min-w-0 space-y-1.5">
             <h1 className="text-xl font-bold text-slate-900 leading-none">Fluxo do paciente</h1>
             <div className="hidden sm:flex flex-wrap items-center gap-1">
