@@ -84,6 +84,7 @@ import {
   CheckCircle2,
   User,
   Camera,
+  CreditCard,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
