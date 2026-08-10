@@ -860,6 +860,9 @@ function AppShellInner() {
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
+  // Sidebar sob o mouse: habilita as setas mesmo sem foco dentro do menu.
+  const navHoverRef = useRef(false);
+
   // Navegação do menu lateral por setas ↑/↓ (Home/End vão ao primeiro/último).
   // Só move o foco; o Enter do próprio link é quem abre a página.
   useEffect(() => {
