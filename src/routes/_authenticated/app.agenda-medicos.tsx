@@ -177,65 +177,71 @@ function AgendaMedicosPage() {
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto w-full max-w-[1600px] space-y-4 p-4 sm:p-6">
-        <header className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
-                <Columns3 className="h-5 w-5" />
-              </span>
-              <div>
-                <h1 className="text-lg font-semibold text-slate-900">Agenda Multimédico</h1>
-                <p className="text-sm text-slate-500">
-                  Visão em colunas paralelas: cada profissional e seus horários do dia.
-                </p>
-              </div>
-            </div>
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+        <header>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <Columns3 className="h-5 w-5" />
+            </span>
+            <h1 className="text-xl font-bold text-slate-900">Agenda Multimédico</h1>
+            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {totalAgendados} agendamento{totalAgendados === 1 ? "" : "s"}
+            </span>
+            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {medicosFiltrados.length} profissiona{medicosFiltrados.length === 1 ? "l" : "is"}
             </span>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
+          <div className="mt-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-semibold">
+              <button
+                type="button"
                 aria-label="Dia anterior"
+                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-white"
                 onClick={() => setDataRef((d) => somaDias(d, -1))}
               >
                 <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-9" onClick={() => setDataRef(hojeBR())}>
+              </button>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white"
+                onClick={() => setDataRef(hojeBR())}
+              >
                 Hoje
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
+              </button>
+              <button
+                type="button"
                 aria-label="Próximo dia"
+                className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-white"
                 onClick={() => setDataRef((d) => somaDias(d, 1))}
               >
                 <ChevronRight className="h-4 w-4" />
-              </Button>
+              </button>
+              <DateInputBR
+                value={dataRef}
+                onChange={(e) => { const v = e.target.value; if (v) setDataRef(v); }}
+                className="h-7 w-[130px] border-0 bg-transparent px-1 text-xs font-semibold shadow-none focus-visible:ring-0"
+              />
             </div>
 
-            <DateInputBR value={dataRef} onChange={(e) => { const v = e.target.value; if (v) setDataRef(v); }} className="h-9 w-[150px]" />
-
-            <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
+            <div className="relative w-full max-w-sm flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Buscar médico ou especialidade"
-                className="h-9 pl-9"
+                className="h-9 w-full rounded-lg border-slate-200 bg-white pl-9 text-xs"
               />
             </div>
 
-            <Button variant="outline" size="sm" className="h-9" onClick={() => void carregar()} disabled={loading}>
+            <button
+              type="button"
+              onClick={() => void carregar()}
+              disabled={loading}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-60"
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-2">Atualizar</span>
-            </Button>
+              Atualizar
+            </button>
           </div>
         </header>
 
@@ -249,6 +255,7 @@ function AgendaMedicosPage() {
             medicos={medicosFiltrados}
             items={items}
             fmtHora={fmtHora}
+            mostrarResumo={false}
             onAgClick={(a) => {
               const orig = ags.find((x) => x.id === a.id);
               if (orig) setDetalhe(orig);
