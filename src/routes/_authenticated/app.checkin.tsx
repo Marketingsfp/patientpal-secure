@@ -514,7 +514,6 @@ function CheckinPage() {
         .lt("inicio", fimExclusivo)
         .neq("status", "cancelado")
         .not("paciente_id", "is", null)
-        .in("fluxo_etapa", ETAPAS_CHECKIN)
         .order("inicio", { ascending: true });
 
       const { data: agendamentos, error: agendamentosError } = await query;
@@ -643,6 +642,11 @@ function CheckinPage() {
     return items;
   }, [items]);
 
+  const aguardando = useMemo(
+    () => filtrados.filter((i) => estaPendenteCheckin(i.fluxo_etapa)).length,
+    [filtrados],
+  );
+
   const filtradosRef = useRef<Item[]>([]);
   useEffect(() => {
     filtradosRef.current = filtrados;
@@ -760,7 +764,7 @@ function CheckinPage() {
           </div>
         </div>
         <span className="bg-amber-50 text-amber-700 border border-amber-200/80 px-3 py-1 text-xs font-semibold rounded-full">
-          {filtrados.length} {filtrados.length === 1 ? "paciente" : "pacientes"} aguardando
+          {aguardando} {aguardando === 1 ? "paciente" : "pacientes"} aguardando
         </span>
       </div>
 
