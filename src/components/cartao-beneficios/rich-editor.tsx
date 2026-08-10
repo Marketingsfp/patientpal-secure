@@ -391,6 +391,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
+  const [htmlMode, setHtmlMode] = useState(false);
+  const [htmlDraft, setHtmlDraft] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [cropOpen, setCropOpen] = useState(false);
