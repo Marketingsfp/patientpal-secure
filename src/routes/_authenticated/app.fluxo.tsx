@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -113,6 +114,7 @@ function FluxoPage() {
     uxMelhorias && "p-2 sm:p-1.5",
   );
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [detalhe, setDetalhe] = useState<FluxoDetalheAg | null>(null);
   const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
@@ -447,9 +449,21 @@ function FluxoPage() {
                     <Card
                       key={a.id}
                       className={cn(
-                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md",
+                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
                         prioridadeInfo.border,
                       )}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() =>
+                        setDetalhe({
+                          id: a.id,
+                          paciente_id: a.paciente_id,
+                          paciente_nome: a.paciente_nome,
+                          procedimento: a.procedimento,
+                          inicio: a.inicio,
+                          medicoNome: a.medicos?.nome ?? null,
+                        })
+                      }
                     >
                       {/* Nome e horário */}
                       <div className="flex items-start justify-between gap-2">
@@ -472,7 +486,10 @@ function FluxoPage() {
                       </div>
 
                       {/* Ações */}
-                      <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5">
+                      <div
+                        className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           className={cn(acaoIconCls, "disabled:opacity-40 disabled:hover:bg-transparent")}
@@ -536,6 +553,12 @@ function FluxoPage() {
           );
         })}
       </div>
+
+      <PacienteDetalheDrawer
+        ag={detalhe}
+        pago={detalhe ? pagos.has(detalhe.id) : false}
+        onClose={() => setDetalhe(null)}
+      />
     </div>
   );
 }
