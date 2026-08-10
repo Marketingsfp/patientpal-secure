@@ -305,18 +305,22 @@ function SearchBar({
   buscaAplicada: string;
 }) {
   return (
-    <Card className="p-4">
-      {/* Aqui a grid md:grid-cols passou de 220px para 320px */}
+    <div className="bg-white border border-slate-200/80 p-4 rounded-xl shadow-xs">
       <div className="grid grid-cols-1 md:grid-cols-[320px_1fr_auto] gap-4 items-end">
         <DateSelector data={data} onDataChange={onDataChange} />
 
         <div className="space-y-1.5">
-          <Label htmlFor="busca-paciente">Buscar paciente (nome ou CPF)</Label>
+          <Label
+            htmlFor="busca-paciente"
+            className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Buscar paciente (nome ou CPF)
+          </Label>
           <div className="relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               id="busca-paciente"
-              className="pl-9 h-9"
+              className="pl-9 h-10 w-full bg-white border border-slate-200 rounded-lg text-sm"
               value={busca}
               onChange={(e) => onBuscaChange(e.target.value)}
               onKeyDown={(e) => {
@@ -331,12 +335,19 @@ function SearchBar({
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={onSearch} className="bg-primary text-primary-foreground h-9 whitespace-nowrap">
+          <Button
+            onClick={onSearch}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 h-10 rounded-lg shadow-sm transition-colors whitespace-nowrap"
+          >
             <Search className="h-4 w-4 mr-2" />
             Buscar
           </Button>
           {buscaAplicada && (
-            <Button variant="outline" onClick={onClear} className="h-9 whitespace-nowrap">
+            <Button
+              variant="outline"
+              onClick={onClear}
+              className="h-10 rounded-lg border-slate-200 text-xs font-semibold whitespace-nowrap"
+            >
               <X className="h-4 w-4 mr-2" />
               Limpar
             </Button>
@@ -344,10 +355,10 @@ function SearchBar({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground mt-4 pt-3 border-t">
+      <p className="text-xs text-slate-400 font-medium mt-3 pt-2 border-t border-slate-100">
         Mostrando todos os pacientes agendados para o dia (pagos e pendentes)
       </p>
-    </Card>
+    </div>
   );
 }
 
