@@ -296,6 +296,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
       { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+      { to: "/app/agenda-medicos", label: "Agenda Multimédico", icon: Columns3 },
       { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
       { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
       { to: "/app/caixa", label: "Caixa", icon: Wallet },
