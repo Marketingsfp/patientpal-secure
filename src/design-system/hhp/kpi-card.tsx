@@ -34,8 +34,8 @@ export function HhpKpiCard({
       title={hint ?? label}
       aria-pressed={onClick ? !!active : undefined}
       className={cn(
-        "group relative text-left rounded-2xl border bg-white transition-all shrink-0 overflow-hidden",
-        "min-w-[8.5rem] md:min-w-0",
+        "group relative text-left rounded-2xl border bg-white transition-all shrink-0",
+        "min-w-0",
         onClick && "hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)] hover:-translate-y-[1px] hover:border-slate-200 cursor-pointer",
         compact ? "p-3" : "p-4",
         active
@@ -61,14 +61,18 @@ export function HhpKpiCard({
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
-      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim min-w-0">
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 hhp-kpi-anim min-w-0">
         <span
           className={cn(
-            "tabular-nums font-bold text-slate-900 truncate max-w-full",
-            compact ? "text-xl" : "text-2xl xl:text-3xl",
+            "tabular-nums font-bold text-slate-900 max-w-full whitespace-nowrap",
+            compact ? "text-lg sm:text-xl" : "text-xl lg:text-2xl",
           )}
           title={typeof value === "number" ? value.toLocaleString("pt-BR") : String(value)}
-          style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.02em" }}
+          style={{
+            fontFamily: "var(--hhp-font-display)",
+            letterSpacing: "-0.02em",
+            fontSize: compact ? undefined : "clamp(1.05rem, 1.55vw, 1.5rem)",
+          }}
         >
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>
@@ -89,9 +93,8 @@ export function HhpKpiRow({
   return (
     <div
       className={cn(
-        "flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-3 px-3 pb-1 md:mx-0 md:px-0 md:pb-0",
-        "md:grid",
-        compact ? "md:grid-cols-6" : "md:grid-cols-3 lg:grid-cols-6",
+        "grid w-full gap-4 grid-cols-2 sm:grid-cols-3",
+        compact ? "lg:grid-cols-6" : "lg:grid-cols-5",
         className,
       )}
     >
