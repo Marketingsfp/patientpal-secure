@@ -1021,7 +1021,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             />
           )}
           <div
-            className="rt-page bg-white shadow-md"
+            className="rt-page print-document bg-white shadow-md"
             style={{
               width: "210mm",
               minHeight: "297mm",
