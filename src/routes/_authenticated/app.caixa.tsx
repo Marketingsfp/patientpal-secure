@@ -1,4 +1,5 @@
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { PageHeader } from "@/components/page/page-header";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -2432,16 +2433,11 @@ function Page() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Wallet className="h-6 w-6 text-primary" /> Caixa
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Abertura, sangria, suprimento, recebimentos e fechamento.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<Wallet />}
+        title="Caixa"
+        description="Abertura, sangria, suprimento, recebimentos e fechamento."
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>

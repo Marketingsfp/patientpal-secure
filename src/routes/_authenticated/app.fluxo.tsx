@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PageHeader, PageBreadcrumb } from "@/components/page/page-header";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -283,22 +284,14 @@ function FluxoPage() {
     <div className="space-y-3 max-w-full">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap bg-background sticky top-0 z-10 py-2.5 border-b">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <Workflow className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-          <div className="min-w-0 space-y-1.5">
-            <h1 className="text-xl font-bold text-slate-900 leading-none">Fluxo do paciente</h1>
-            <div className="hidden sm:flex flex-wrap items-center gap-1">
-              {["Recepção", "Caixa", "Triagem", "Atendimento ou Exame", "Finalizado"].map((etapa, i, arr) => (
-                <span key={etapa} className="inline-flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                    {etapa}
-                  </span>
-                  {i < arr.length - 1 && <ChevronRight className="h-3 w-3 text-slate-300" />}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          className="min-w-0 flex-1"
+          icon={<Workflow />}
+          title="Fluxo do paciente"
+          breadcrumb={
+            <PageBreadcrumb items={["Recepção", "Caixa", "Triagem", "Atendimento ou Exame", "Finalizado"]} />
+          }
+        />
         <div className="flex items-center gap-2 flex-wrap">
           {/* Navegação de data unificada */}
           <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-xs">
