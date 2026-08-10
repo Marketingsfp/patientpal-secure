@@ -107,6 +107,10 @@ function FluxoPage() {
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const acaoBtnCls = uxMelhorias ? "h-9 sm:h-6 px-2.5 sm:px-1.5" : "h-6 px-1.5";
   const acaoTxtCls = uxMelhorias ? "text-xs sm:text-[9px]" : "text-[9px]";
+  const acaoIconCls = cn(
+    "inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer disabled:cursor-not-allowed",
+    uxMelhorias && "p-2 sm:p-1.5",
+  );
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
