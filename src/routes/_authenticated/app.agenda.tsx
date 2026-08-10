@@ -84,6 +84,7 @@ import {
   CheckCircle2,
   User,
   Camera,
+  CreditCard,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -6383,13 +6384,13 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5"
+          : "mt-3 flex items-end gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs"
       }
     >
 
           {/* Profissional */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Profissional</Label>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-[2]">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -6401,10 +6402,10 @@ function AgendaPage() {
           </div>
 
           {/* Tipo de Agenda */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Tipo de agenda</Label>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tipo de agenda</Label>
             <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-              <SelectTrigger className="h-8 text-xs w-full">
+              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
                 <SelectValue placeholder="TODAS" />
               </SelectTrigger>
               <SelectContent>
@@ -6436,10 +6437,10 @@ function AgendaPage() {
           </div>
 
           {/* Situação */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Situação</Label>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs w-full">
+              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
                 <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
@@ -6454,8 +6455,8 @@ function AgendaPage() {
           </div>
 
           {/* Data */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Data</Label>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -6464,7 +6465,7 @@ function AgendaPage() {
               compact
             />
             {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+            <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
               <Checkbox
                 checked={apenasData}
                 onCheckedChange={(v) => setApenasData(v === true)}
@@ -6475,10 +6476,10 @@ function AgendaPage() {
           </div>
 
           {/* Especialidade */}
-          <div className="space-y-0 lg:col-span-1">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Especialidade</Label>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs w-full">
+              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
                 <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
@@ -6489,22 +6490,33 @@ function AgendaPage() {
           </div>
 
           {/* Cliente + Ações rápidas juntos */}
-          <div className="space-y-0 lg:col-span-2">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-600 dark:text-slate-400 font-semibold">Cliente</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF..."
-                className="h-8 text-xs flex-1 min-w-0"
-              />
-              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
-                <Search className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-[2]">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cliente</Label>
+            <Input
+              value={filtroCliente}
+              onChange={(e) => setFiltroCliente(e.target.value)}
+              placeholder="Nome ou CPF..."
+              className="h-9 w-full rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-900"
+            />
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={load}
+              aria-label="Buscar"
+              className="flex items-center justify-center rounded-lg bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-100"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={limparFiltros}
+              aria-label="Limpar filtros"
+              className="flex items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
   );
@@ -6623,7 +6635,7 @@ function AgendaPage() {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {(() => {
                   const label = new Intl.DateTimeFormat("pt-BR", {
@@ -6640,55 +6652,52 @@ function AgendaPage() {
             </div>
           </div>
         </div>
-        <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1">
           {!turboDisabled && (
             <span className="hidden lg:contents">
               <TurboModeToggle />
             </span>
           )}
-          <div className="inline-flex rounded-xl bg-slate-100 p-1">
+          <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold text-slate-600">
             <button
               type="button"
               onClick={() => setViewMode("dia")}
-              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "dia" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              className={`rounded-md px-3 py-1.5 transition-colors ${viewMode === "dia" ? "bg-white text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
             >
               Lista
             </button>
             <button
               type="button"
               onClick={() => setViewMode("medico")}
-              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${viewMode === "medico" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              className={`rounded-md px-3 py-1.5 transition-colors ${viewMode === "medico" ? "bg-white text-slate-900 shadow-sm" : "hover:text-slate-900"}`}
             >
               Por médico
             </button>
           </div>
-          <span className="hidden lg:contents">
+          <div className="hidden lg:inline-flex items-center gap-1">
             <EncerrarExpedienteButton />
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden lg:inline-flex h-7 text-[11px] px-2"
-            title="Receber mensalidade do Cartão Benefícios"
-            onClick={() => setFatRapidoOpen(true)}
-          >
-            💳 Mensalidade do cartão
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="hidden lg:inline-flex h-7 text-[11px] px-2"
-            title="Cadastrar horários semanais e gerar slots da agenda"
-          >
-            <Link to="/app/disponibilidades">
-              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
+            <button
+              type="button"
+              title="Receber mensalidade do Cartão Benefícios"
+              aria-label="Receber mensalidade do Cartão Benefícios"
+              className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => setFatRapidoOpen(true)}
+            >
+              <CreditCard className="h-4 w-4" />
+            </button>
+            <Link
+              to="/app/disponibilidades"
+              title="Cadastrar horários semanais e gerar slots da agenda"
+              aria-label="Criar/gerar horários"
+              className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            >
+              <Clock className="h-4 w-4" />
             </Link>
-          </Button>
+          </div>
           {podeEscrever && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="hidden lg:inline-flex h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
+                <Button variant="outline" size="sm" className="hidden lg:inline-flex h-8 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50" disabled={selecionados.size === 0}>
                   Opções ({selecionados.size})
                 </Button>
               </DropdownMenuTrigger>
@@ -6713,14 +6722,13 @@ function AgendaPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden lg:inline-flex h-7 text-[11px] px-2"
+          <button
+            type="button"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
             onClick={exportarAgendaExcel}
           >
-            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
-          </Button>
+            <Download className="h-3.5 w-3.5" /> Exportar Excel
+          </button>
           {/* Mobile: ações secundárias agrupadas */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
