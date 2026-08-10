@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   BadgeCheck,
   Search,
@@ -30,6 +31,7 @@ import {
   IdCard,
   Phone,
   UserCheck,
+  DollarSign,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
@@ -371,12 +373,14 @@ function PatientCard({
   item,
   index,
   onConfirm,
+  onPagar,
   isConfirming,
   podeEscrever,
 }: {
   item: Item;
   index: number;
   onConfirm: (item: Item) => void;
+  onPagar: (item: Item) => void;
   isConfirming: boolean;
   podeEscrever: boolean;
 }) {
@@ -432,20 +436,12 @@ function PatientCard({
 
         <div className="w-full sm:w-auto sm:self-center">
           {pendente ? (
-            podeEscrever && (
+            podeEscrever && (item.pago ? (
               <Button
                 onClick={() => onConfirm(item)}
                 disabled={isConfirming}
-                title={
-                  item.pago
-                    ? "Liberar paciente para a triagem"
-                    : "Pagamento pendente — registre a cobrança antes de liberar"
-                }
-                className={
-                  item.pago
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
-                    : "bg-slate-200 text-slate-500 hover:bg-slate-300 shadow-none w-full sm:w-auto sm:min-w-[180px] h-10"
-                }
+                title="Liberar paciente para a triagem"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
               >
                 {isConfirming ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -454,7 +450,21 @@ function PatientCard({
                 )}
                 Confirmar presença
               </Button>
-            )
+            ) : (
+              <Button
+                onClick={() => onPagar(item)}
+                disabled={isConfirming}
+                title="Registrar o pagamento e liberar o paciente para a triagem"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+              >
+                {isConfirming ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <DollarSign className="h-4 w-4 mr-2" />
+                )}
+                Pagar e liberar
+              </Button>
+            ))
           ) : (
             <Button variant="outline" disabled className="w-full sm:w-auto h-10">
               {etapaLabel(item.fluxo_etapa)}
