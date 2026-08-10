@@ -5,6 +5,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { cn } from "@/lib/utils";
+import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -112,6 +113,7 @@ function FluxoPage() {
     uxMelhorias && "p-2 sm:p-1.5",
   );
   const [ags, setAgs] = useState<Ag[]>([]);
+  const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
   const tzOffset = new Date().getTimezoneOffset() * 60000;
@@ -149,6 +151,25 @@ function FluxoPage() {
     const rows = (data ?? []) as unknown as Ag[];
     const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
     setAgs(reais);
+
+    // Pula o Caixa quando o paciente já pagou (check-in/pagamento na recepção):
+    // quem está pago não precisa passar pela coluna Caixa.
+    if (reais.length) {
+      const status = await agendamentosStatusPagamento(reais.map((a) => a.id));
+      const idsPagos = new Set<string>();
+      status.forEach((s: StatusPagamento, id: string) => { if (s.pago) idsPagos.add(id); });
+      setPagos(idsPagos);
+      const presosNoCaixa = reais.filter((a) => a.fluxo_etapa === "caixa" && idsPagos.has(a.id));
+      if (presosNoCaixa.length) {
+        await supabase
+          .from("agendamentos")
+          .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+          .in("id", presosNoCaixa.map((a) => a.id));
+        setAgs(reais.map((a) => (idsPagos.has(a.id) && a.fluxo_etapa === "caixa" ? { ...a, fluxo_etapa: "triagem" as Etapa } : a)));
+      }
+    } else {
+      setPagos(new Set());
+    }
     if (reais.length === 0 && !fallbackAplicado && dataRef === new Date().toISOString().slice(0, 10)) {
       const { data: ult } = await supabase
         .from("agendamentos")
@@ -412,7 +433,9 @@ function FluxoPage() {
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(a.procedimento ?? "");
-                  const next = proxima(a.fluxo_etapa);
+                  const nextBruto = proxima(a.fluxo_etapa);
+                  // Pagou na recepção → pula a coluna Caixa
+                  const next = nextBruto === "caixa" && pagos.has(a.id) ? ("triagem" as Etapa) : nextBruto;
                   const prev = anterior(a.fluxo_etapa, isExame);
                   const prioridadeInfo = a.prioridade ? PRIORIDADES[a.prioridade] : PRIORIDADES.normal;
                   const PrioridadeIcon = prioridadeInfo.Icon;
@@ -463,12 +486,12 @@ function FluxoPage() {
                           <PrioridadeIcon className={cn("h-4 w-4", prioridadeInfo.cor)} />
                         </button>
 
-                        {col.id === "triagem" && (
+                        {(col.id === "triagem" || col.id === "aguardando_recepcao") && (
                           <>
                             <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "ml-auto gap-1 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800")} onClick={() => chamarPaciente(a)}>
                               <Bell className="h-3 w-3" /> Chamar
                             </Button>
-                            {isExame && (
+                            {isExame && col.id === "triagem" && (
                               <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")} onClick={() => setEtapa(a.id, "exame")}>
                                 Exame
                               </Button>
