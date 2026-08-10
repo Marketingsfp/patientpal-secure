@@ -759,7 +759,7 @@ function CheckinPage() {
           </div>
         </div>
         <span className="bg-amber-50 text-amber-700 border border-amber-200/80 px-3 py-1 text-xs font-semibold rounded-full">
-          {filtrados.length} {filtrados.length === 1 ? "paciente" : "pacientes"} aguardando
+          {aguardando} {aguardando === 1 ? "paciente" : "pacientes"} aguardando
         </span>
       </div>
 
