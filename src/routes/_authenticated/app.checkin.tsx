@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   BadgeCheck,
   Search,
@@ -30,6 +31,7 @@ import {
   IdCard,
   Phone,
   UserCheck,
+  DollarSign,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
@@ -371,12 +373,14 @@ function PatientCard({
   item,
   index,
   onConfirm,
+  onPagar,
   isConfirming,
   podeEscrever,
 }: {
   item: Item;
   index: number;
   onConfirm: (item: Item) => void;
+  onPagar: (item: Item) => void;
   isConfirming: boolean;
   podeEscrever: boolean;
 }) {
@@ -432,20 +436,12 @@ function PatientCard({
 
         <div className="w-full sm:w-auto sm:self-center">
           {pendente ? (
-            podeEscrever && (
+            podeEscrever && (item.pago ? (
               <Button
                 onClick={() => onConfirm(item)}
                 disabled={isConfirming}
-                title={
-                  item.pago
-                    ? "Liberar paciente para a triagem"
-                    : "Pagamento pendente — registre a cobrança antes de liberar"
-                }
-                className={
-                  item.pago
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
-                    : "bg-slate-200 text-slate-500 hover:bg-slate-300 shadow-none w-full sm:w-auto sm:min-w-[180px] h-10"
-                }
+                title="Liberar paciente para a triagem"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
               >
                 {isConfirming ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -454,7 +450,21 @@ function PatientCard({
                 )}
                 Confirmar presença
               </Button>
-            )
+            ) : (
+              <Button
+                onClick={() => onPagar(item)}
+                disabled={isConfirming}
+                title="Registrar o pagamento e liberar o paciente para a triagem"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto sm:min-w-[180px] h-10"
+              >
+                {isConfirming ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <DollarSign className="h-4 w-4 mr-2" />
+                )}
+                Pagar e liberar
+              </Button>
+            ))
           ) : (
             <Button variant="outline" disabled className="w-full sm:w-auto h-10">
               {etapaLabel(item.fluxo_etapa)}
@@ -503,7 +513,8 @@ function CheckinPage() {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [cobrancaAlvo, setCobrancaAlvo] = useState<Item | null>(null);
-  const navigate = useNavigate();
+  const [pagamentoAlvo, setPagamentoAlvo] = useState<Item | null>(null);
+  const [pagamentoValor, setPagamentoValor] = useState<string>("");
 
   const load = useCallback(async () => {
     if (!clinicaAtual) {
@@ -679,14 +690,40 @@ function CheckinPage() {
     setBuscaAplicada("");
   };
 
-  const confirmarCheckin = async (item: Item) => {
+  /** Abre a cobrança (Nova Receita) já preenchida, direto no Check-in. */
+  const abrirPagamento = async (item: Item) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setCobrancaAlvo(null);
+    let valor = "";
+    try {
+      if (clinicaAtual && item.procedimento) {
+        const { data: proc } = await supabase
+          .from("procedimentos")
+          .select("valor_padrao")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("nome", item.procedimento)
+          .maybeSingle();
+        const v = (proc as { valor_padrao: number } | null)?.valor_padrao;
+        if (v && Number(v) > 0) valor = String(v);
+      }
+    } catch (e) {
+      console.error("Erro ao buscar valor do procedimento:", e);
+    }
+    setPagamentoValor(valor);
+    setPagamentoAlvo(item);
+  };
+
+  const confirmarCheckin = async (item: Item, opcoes?: { ignorarPagamento?: boolean }) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     if (confirmandoId === item.id) return;
     // Pagamento é exigido antes de liberar o paciente para o médico.
-    if (!item.pago) {
+    if (!item.pago && !opcoes?.ignorarPagamento) {
       setCobrancaAlvo(item);
       return;
     }
@@ -824,6 +861,7 @@ function CheckinPage() {
               item={item}
               index={index}
               onConfirm={confirmarCheckin}
+              onPagar={(i) => void abrirPagamento(i)}
               isConfirming={confirmandoId === item.id}
               podeEscrever={podeEscrever}
             />
@@ -857,10 +895,7 @@ function CheckinPage() {
               onClick={() => {
                 const alvo = cobrancaAlvo;
                 setCobrancaAlvo(null);
-                if (alvo) {
-                  toast.info(`Registre a cobrança de ${alvo.paciente_nome} na Agenda.`);
-                }
-                void navigate({ to: "/app/agenda" });
+                if (alvo) void abrirPagamento(alvo);
               }}
             >
               Pagar e Confirmar
@@ -868,6 +903,28 @@ function CheckinPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cobrança (Nova Receita) direto no Check-in — ao concluir, faz o check-in */}
+      <LancamentoDialog
+        open={!!pagamentoAlvo}
+        onOpenChange={(o) => { if (!o) setPagamentoAlvo(null); }}
+        tipo="receita"
+        agendamentoId={pagamentoAlvo?.id ?? null}
+        pacienteIdFixo={pagamentoAlvo?.paciente_id ?? null}
+        initialDescricao={
+          pagamentoAlvo
+            ? `${pagamentoAlvo.procedimento ?? "CONSULTA"} — ${pagamentoAlvo.paciente_nome}${pagamentoAlvo.medicos?.nome ? ` (${pagamentoAlvo.medicos.nome})` : ""}`
+            : ""
+        }
+        initialValor={pagamentoValor}
+        onSaved={() => {
+          const alvo = pagamentoAlvo;
+          setPagamentoAlvo(null);
+          if (!alvo) return;
+          setItems((xs) => xs.map((x) => (x.id === alvo.id ? { ...x, pago: true } : x)));
+          void confirmarCheckin({ ...alvo, pago: true }, { ignorarPagamento: true });
+        }}
+      />
     </div>
   );
 }
