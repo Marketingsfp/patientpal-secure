@@ -50,6 +50,8 @@ export interface LancamentoSavedData {
    *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
   data: string;
   pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+  /** false quando o usuário clicou apenas em "Salvar" (sem imprimir a guia). */
+  imprimir?: boolean;
 }
 
 interface Props {
@@ -321,7 +323,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     manual: "Manual",
   };
 
-  const handleSave = async () => {
+  const handleSave = async (imprimir = true) => {
     if (!clinicaAtual) return;
     if (!descricao.trim() || !valor) {
       toast.error("Descrição e valor são obrigatórios");
@@ -850,6 +852,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
       data,
+      imprimir,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({
@@ -1298,13 +1301,21 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            {saving ? "Salvando..." : (
-              <>
-                <Printer className="h-4 w-4" />
-                Salvar e imprimir
-              </>
-            )}
+          <Button
+            variant="outline"
+            onClick={() => void handleSave(true)}
+            disabled={saving}
+            className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4" />
+            Salvar e imprimir
+          </Button>
+          <Button
+            onClick={() => void handleSave(false)}
+            disabled={saving}
+            className="bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            {saving ? "Salvando..." : "Salvar"}
           </Button>
         </DialogFooter>
       </DialogContent>

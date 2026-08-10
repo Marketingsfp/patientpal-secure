@@ -7613,7 +7613,7 @@ function AgendaPage() {
           try {
             // Imprime a guia só do que foi de fato confirmado — se o rateio
             // falhou, isso é [agId] (só o principal), não o grupo inteiro.
-            await printGuiaAtendimentoAgrupada({
+            if (dados.imprimir !== false) await printGuiaAtendimentoAgrupada({
               agendamentoIds: idsConfirmados,
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
