@@ -996,8 +996,8 @@ function AppShellInner() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="shrink-0 flex flex-col gap-2 p-3 border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="flex w-full items-center justify-between gap-2">
+          <div className="shrink-0 flex flex-col border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <div className="flex w-full items-center justify-between px-4 pt-4 pb-2">
               <div className="flex items-center gap-2 min-w-0 cursor-default select-none" title="ClinicaOS">
                 <Activity className="h-5 w-5 shrink-0 text-white" />
                 <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
@@ -1010,7 +1010,7 @@ function AppShellInner() {
                     return !v;
                   });
                 }}
-                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                 aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
                 aria-expanded={buscaMenuAberta}
                 title="Buscar no menu"
@@ -1022,7 +1022,7 @@ function AppShellInner() {
               <button
                 type="button"
                 onClick={() => abrirSeletorPortais()}
-                className="w-full flex items-center justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                className="mx-4 mb-4 w-[calc(100%-2rem)] flex items-center justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-2 rounded-xl text-xs font-medium text-white transition-colors shadow-sm"
                 title="Trocar de portal"
               >
                 <span className="flex items-center gap-1.5 min-w-0">
