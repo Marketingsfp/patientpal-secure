@@ -5,6 +5,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { cn } from "@/lib/utils";
+import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -156,7 +157,7 @@ function FluxoPage() {
     if (reais.length) {
       const status = await agendamentosStatusPagamento(reais.map((a) => a.id));
       const idsPagos = new Set<string>();
-      status.forEach((s, id) => { if (s.pago) idsPagos.add(id); });
+      status.forEach((s: StatusPagamento, id: string) => { if (s.pago) idsPagos.add(id); });
       setPagos(idsPagos);
       const presosNoCaixa = reais.filter((a) => a.fluxo_etapa === "caixa" && idsPagos.has(a.id));
       if (presosNoCaixa.length) {
