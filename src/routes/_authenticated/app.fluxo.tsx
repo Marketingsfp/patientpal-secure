@@ -433,7 +433,9 @@ function FluxoPage() {
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   const isExame = /exame|raio|usg|ultra|tomo|ressona/i.test(a.procedimento ?? "");
-                  const next = proxima(a.fluxo_etapa);
+                  const nextBruto = proxima(a.fluxo_etapa);
+                  // Pagou na recepção → pula a coluna Caixa
+                  const next = nextBruto === "caixa" && pagos.has(a.id) ? ("triagem" as Etapa) : nextBruto;
                   const prev = anterior(a.fluxo_etapa, isExame);
                   const prioridadeInfo = a.prioridade ? PRIORIDADES[a.prioridade] : PRIORIDADES.normal;
                   const PrioridadeIcon = prioridadeInfo.Icon;
@@ -484,12 +486,12 @@ function FluxoPage() {
                           <PrioridadeIcon className={cn("h-4 w-4", prioridadeInfo.cor)} />
                         </button>
 
-                        {col.id === "triagem" && (
+                        {(col.id === "triagem" || col.id === "aguardando_recepcao") && (
                           <>
                             <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "ml-auto gap-1 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800")} onClick={() => chamarPaciente(a)}>
                               <Bell className="h-3 w-3" /> Chamar
                             </Button>
-                            {isExame && (
+                            {isExame && col.id === "triagem" && (
                               <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")} onClick={() => setEtapa(a.id, "exame")}>
                                 Exame
                               </Button>
@@ -497,7 +499,7 @@ function FluxoPage() {
                           </>
                         )}
 
-                        {col.id !== "triagem" && col.id !== "finalizado" && (
+                        {col.id !== "triagem" && col.id !== "aguardando_recepcao" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
                               <button type="button" className={acaoIconCls} onClick={() => chamarPaciente(a)} title="Rechamar">
