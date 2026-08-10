@@ -499,7 +499,7 @@ function FluxoPage() {
                           </>
                         )}
 
-                        {col.id !== "triagem" && col.id !== "aguardando_recepcao" && col.id !== "finalizado" && (
+                        {col.id !== "triagem" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
                               <button type="button" className={acaoIconCls} onClick={() => chamarPaciente(a)} title="Rechamar">
