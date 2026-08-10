@@ -996,8 +996,8 @@ function AppShellInner() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="shrink-0 w-full border-b border-white/10">
-            <div className="flex w-full items-center gap-1.5 px-4 py-3 min-w-0">
+          <div className="shrink-0 w-full h-14 border-b border-white/10">
+            <div className="flex h-full w-full items-center gap-1.5 px-4 min-w-0">
               <div className="flex min-w-0 items-center gap-1.5 cursor-default select-none" title="ClinicaOS">
                 <Activity className="h-4 w-4 shrink-0 text-white" />
                 <span className="truncate text-sm font-bold tracking-tight text-white">ClinicaOS</span>
@@ -1254,7 +1254,7 @@ function AppShellInner() {
       <div className="flex-1 flex flex-col min-w-0">
         {!isChooser && (
         <header
-          className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] flex items-center justify-between gap-2 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6 sm:py-0"
+          className="sticky top-0 z-30 h-14 text-white border-b border-white/10 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6"
           style={{ backgroundColor: corSidebar }}
         >
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
