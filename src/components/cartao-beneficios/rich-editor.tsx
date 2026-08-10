@@ -888,7 +888,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <input
           ref={docRef}
           type="file"
-          accept=".docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept=".docx,.pdf,.txt,.html,.htm,application/pdf,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="hidden"
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -906,7 +906,16 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             try {
               const { extrairHtmlDeArquivo } = await import("@/lib/importar-documento");
               const html = await extrairHtmlDeArquivo(file);
-              editor.chain().focus().insertContent(html).run();
+              const ehHtml =
+                /\.html?$/.test(file.name.toLowerCase()) || file.type === "text/html";
+              if (ehHtml) {
+                // Injeta o código bruto direto no editor, sem transformar tags.
+                editor.commands.setContent(html, { emitUpdate: true });
+                onChange(editor.getHTML());
+                setHtmlDraft(html);
+              } else {
+                editor.chain().focus().insertContent(html).run();
+              }
               toast.success("Documento importado. Você já pode editar o conteúdo.");
             } catch (err) {
               mostrarErro(err, "Não foi possível ler o documento");
@@ -919,7 +928,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           type="button" variant="outline" size="sm" className="h-8 gap-1.5"
           disabled={importando}
           onClick={() => docRef.current?.click()}
-          title="Importar documento (.docx, .pdf, .txt)"
+          title="Importar documento (.docx, .pdf, .txt, .html)"
         >
           <Upload className="h-3.5 w-3.5" />
           {importando ? "Importando…" : "Importar documento"}
