@@ -452,19 +452,17 @@ function PatientCard({
 // 4. EmptyState - Componente de estado vazio
 function EmptyState() {
   return (
-    <Card className="p-12 text-center">
-      <div className="flex flex-col items-center gap-4">
-        <AlertCircle className="h-12 w-12 text-muted-foreground" />
-        <div>
-          <p className="text-lg font-medium text-muted-foreground">
-            Nenhum paciente com pagamento confirmado aguardando check-in
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
-          </p>
-        </div>
+    <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center shadow-xs">
+      <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+        <UserCheck className="h-6 w-6" />
       </div>
-    </Card>
+      <p className="text-base font-semibold text-slate-700">
+        Nenhum paciente com pagamento confirmado aguardando check-in
+      </p>
+      <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+        Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
+      </p>
+    </div>
   );
 }
 
