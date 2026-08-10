@@ -15,11 +15,11 @@ export type AgendaMedicoItem = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  agendado: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
-  confirmado: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-  realizado: "bg-green-50 text-green-700 ring-1 ring-green-200",
-  cancelado: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
-  faltou: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+  agendado: "bg-indigo-50 text-indigo-700",
+  confirmado: "bg-emerald-50 text-emerald-700",
+  realizado: "bg-green-50 text-green-700",
+  cancelado: "bg-rose-50 text-rose-700",
+  faltou: "bg-amber-50 text-amber-700",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -52,6 +52,7 @@ export function AgendaPorMedicoDia({
   onAgClick,
   onSlotClick,
   ocultarPaciente = false,
+  mostrarResumo = true,
 }: {
   dataRef: string;
   medicos: AgendaMedicoColuna[];
@@ -60,6 +61,7 @@ export function AgendaPorMedicoDia({
   onAgClick: (a: AgendaMedicoItem) => void;
   onSlotClick: (a: AgendaMedicoItem) => void;
   ocultarPaciente?: boolean;
+  mostrarResumo?: boolean;
 }) {
   const porMedico = useMemo(() => {
     const map = new Map<string, AgendaMedicoItem[]>();
@@ -101,6 +103,7 @@ export function AgendaPorMedicoDia({
 
   return (
     <div className="space-y-3">
+      {mostrarResumo && (
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
           {dataLabel}
@@ -109,6 +112,7 @@ export function AgendaPorMedicoDia({
           {colunas.length} profissiona{colunas.length === 1 ? "l" : "is"}
         </span>
       </div>
+      )}
 
       <div className="overflow-x-auto pb-2">
         <div className="flex min-w-full gap-3">
@@ -119,19 +123,19 @@ export function AgendaPorMedicoDia({
             return (
               <section
                 key={m.id}
-                className="flex w-[264px] shrink-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-xs"
+                className="flex w-[264px] shrink-0 flex-col rounded-xl border border-slate-200/80 bg-white shadow-xs"
               >
-                <header className="flex items-center gap-2.5 border-b border-slate-100 px-3 py-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-50 text-[11px] font-bold text-indigo-700">
+                <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-indigo-500 bg-white p-3">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
                     {iniciais(m.nome)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-slate-900">{m.nome}</p>
-                    <p className="truncate text-[11px] text-slate-500">
+                    <p className="truncate text-xs font-bold text-slate-900">{m.nome}</p>
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       {m.especialidade_nome || "Profissional"}
                     </p>
                   </div>
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
                     {ocupados.length}
                   </span>
                 </header>
@@ -147,50 +151,51 @@ export function AgendaPorMedicoDia({
                         key={a.id}
                         type="button"
                         onClick={() => (livre ? onSlotClick(a) : onAgClick(a))}
-                        className={`w-full rounded-xl border px-2.5 py-2 text-left transition-colors ${
+                        className={
                           livre
-                            ? "border-dashed border-slate-200 bg-slate-50/60 hover:border-emerald-300 hover:bg-emerald-50"
-                            : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
+                            ? "w-full cursor-pointer rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
+                            : "w-full rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
+                        }
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-700">
-                            <Clock className="h-3 w-3 text-slate-400" />
-                            {fmtHora(a.inicio)}
-                            <span className="text-slate-300">–</span>
-                            {fmtHora(a.fim)}
-                          </span>
-                          {!livre && (
-                            <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-                                STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-                              }`}
-                            >
-                              {STATUS_LABEL[a.status] ?? a.status}
-                            </span>
-                          )}
-                        </div>
-                        <p
-                          className={`mt-1 truncate text-[12px] font-semibold ${
-                            livre ? "text-emerald-700" : "text-slate-900"
-                          }`}
-                        >
-                          {livre ? (
-                            "Disponível"
-                          ) : ocultarPaciente ? (
-                            "—"
-                          ) : (
-                            <span className="inline-flex items-center gap-1">
-                              <UserRound className="h-3 w-3 text-slate-400" />
-                              {a.paciente_nome}
-                            </span>
-                          )}
-                        </p>
-                        {!livre && (
-                          <p className="mt-0.5 inline-flex items-center gap-1 truncate text-[11px] text-slate-500">
-                            <Stethoscope className="h-3 w-3 text-slate-400" />
-                            {a.procedimento || "Consulta"}
-                          </p>
+                        {livre ? (
+                          <>
+                            <p className="text-[11px] font-medium text-slate-400">
+                              {fmtHora(a.inicio)} – {fmtHora(a.fim)}
+                            </p>
+                            <p className="text-[10px] font-semibold text-slate-400">+ Agendar</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800">
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-slate-400" />
+                                {fmtHora(a.inicio)}
+                                <span className="text-slate-300">–</span>
+                                {fmtHora(a.fim)}
+                              </span>
+                              <span
+                                className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                  STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {STATUS_LABEL[a.status] ?? a.status}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-xs font-bold uppercase tracking-tight text-slate-900">
+                              {ocultarPaciente ? (
+                                "—"
+                              ) : (
+                                <span className="inline-flex items-center gap-1">
+                                  <UserRound className="h-3 w-3 text-slate-400" />
+                                  {a.paciente_nome}
+                                </span>
+                              )}
+                            </p>
+                            <p className="mt-0.5 inline-flex items-center gap-1 truncate text-[11px] font-medium text-slate-500">
+                              <Stethoscope className="h-3 w-3 text-slate-400" />
+                              {a.procedimento || "Consulta"}
+                            </p>
+                          </>
                         )}
                       </button>
                     );
