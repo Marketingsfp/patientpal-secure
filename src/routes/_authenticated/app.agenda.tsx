@@ -6465,7 +6465,7 @@ function AgendaPage() {
               compact
             />
             {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+            <label className="mt-1.5 flex w-fit cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-500 transition-colors hover:text-slate-900">
               <Checkbox
                 checked={apenasData}
                 onCheckedChange={(v) => setApenasData(v === true)}
