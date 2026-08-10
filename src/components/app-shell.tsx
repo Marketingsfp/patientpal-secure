@@ -1054,6 +1054,7 @@ function AppShellInner() {
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
                   <input
+                    ref={buscaMenuInputRef}
                     value={buscaMenu}
                     onChange={(e) => setBuscaMenu(e.target.value)}
                     onKeyDown={(e) => {
@@ -1062,7 +1063,6 @@ function AppShellInner() {
                         setBuscaMenuAberta(false);
                       }
                     }}
-                    autoFocus={buscaMenuAberta}
                     tabIndex={buscaMenuAberta ? 0 : -1}
                     placeholder="Buscar no menu..."
                     aria-label="Buscar no menu"
