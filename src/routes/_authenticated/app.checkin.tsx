@@ -25,6 +25,7 @@ import {
   Stethoscope,
   IdCard,
   Phone,
+  UserCheck,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
