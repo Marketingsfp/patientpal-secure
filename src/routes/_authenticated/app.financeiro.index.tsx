@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "@/components/page/page-header";
 import { useEffect, useState } from "react";
 import { Plus, Minus, TrendingUp, TrendingDown, Wallet, Users, Calendar, Stethoscope, CreditCard, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,23 +67,22 @@ function FinDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Wallet />}
-        title={`Financeiro — ${clinicaAtual?.clinica.nome ?? ""}`}
-        description="Visão geral do período"
-        actions={
-          podeEscrever ? (
-            <div className="flex gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Financeiro — {clinicaAtual?.clinica.nome}</h1>
+          <p className="text-sm text-muted-foreground">Visão geral do período</p>
+        </div>
+        {podeEscrever && (
+          <div className="flex gap-2">
             <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-1" /> Receita
             </Button>
             <Button onClick={() => setOpen("despesa")} variant="destructive">
               <Minus className="h-4 w-4 mr-1" /> Despesa
             </Button>
-            </div>
-          ) : undefined
-        }
-      />
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-2">
         {(["hoje","semana","mes"] as Periodo[]).map((p) => (

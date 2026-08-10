@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
-import { PageHeader } from "@/components/page/page-header";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6616,12 +6615,19 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <PageHeader
-        icon={<CalendarDays />}
-        title="Agendas"
-        description="Filtre e gerencie os agendamentos da clínica."
-        actions={
-          <>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <CalendarDays className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight">Agendas</h1>
+            <p className="hidden truncate text-xs text-muted-foreground lg:block">
+              Filtre e gerencie os agendamentos da clínica.
+            </p>
+          </div>
+        </div>
+        <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
           {!turboDisabled && (
             <span className="hidden lg:contents">
               <TurboModeToggle />
@@ -7286,9 +7292,8 @@ function AgendaPage() {
               </form>
             </DialogContent>
           </Dialog>
-          </>
-        }
-      />
+        </div>
+      </div>
 
       <PatientQuickCompleteSheet
         pacienteId={form.paciente_id || null}

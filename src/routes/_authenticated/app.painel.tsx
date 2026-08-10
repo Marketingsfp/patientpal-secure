@@ -1,6 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader } from "@/components/page/page-header";
-import { LayoutDashboard } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -148,11 +146,9 @@ function DashboardOperacional() {
 
   return (
     <div className="flex flex-col w-full bg-slate-50/60">
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur-sm px-4 sm:px-6 py-3 md:py-4 shrink-0">
-      <PageHeader
-        icon={<LayoutDashboard />}
+      <HhpPageHeader
         title="Dashboard operacional"
-        description={`${clinicaAtual?.clinica.nome ?? "Clínica"} · ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}`}
+        eyebrow={`${clinicaAtual?.clinica.nome ?? "Clínica"} · ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}`}
         actions={
           <>
             <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
@@ -164,7 +160,6 @@ function DashboardOperacional() {
           </>
         }
       />
-      </div>
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6 space-y-4 md:space-y-6">
         {/* Atalhos rápidos */}

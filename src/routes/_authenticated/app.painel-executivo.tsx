@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "@/components/page/page-header";
 import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, CheckCircle2, UserCheck, UserX, Ban, Percent, Clock, Timer,
@@ -354,12 +353,14 @@ function PainelExecutivoPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader
-        icon={<BarChart3 />}
-        title="Painel Executivo"
-        description="Produção, financeiro, comercial e qualidade — comparado com o período anterior."
-        actions={
-          <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Painel Executivo</h1>
+          <p className="text-sm text-muted-foreground">
+            Produção, financeiro, comercial e qualidade — comparado com o período anterior.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">De</Label>
             <DateInputBR value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9 w-40" />
@@ -376,9 +377,8 @@ function PainelExecutivoPage() {
           <Button size="sm" variant="ghost" onClick={load} disabled={carregando}>
             <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
           </Button>
-          </div>
-        }
-      />
+        </div>
+      </div>
 
       {/* Comparativo período */}
       <p className="text-xs text-muted-foreground">
