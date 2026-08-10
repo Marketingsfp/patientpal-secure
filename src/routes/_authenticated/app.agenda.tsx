@@ -6465,7 +6465,7 @@ function AgendaPage() {
               compact
             />
             {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+            <label className="mt-1.5 flex w-fit cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-500 transition-colors hover:text-slate-900">
               <Checkbox
                 checked={apenasData}
                 onCheckedChange={(v) => setApenasData(v === true)}
@@ -10236,6 +10236,106 @@ function DataRefField({
   };
 
   const label = dataFim ? `${fmt(dataRef)} → ${fmt(dataFim)}` : fmt(dataRef);
+
+  const shiftDia = (delta: number) => {
+    const d = new Date(`${dataRef}T12:00:00`);
+    d.setDate(d.getDate() + delta);
+    setDataRef(toIso(d));
+    setDataFim(null);
+    setMode("single");
+  };
+
+  const renderConteudo = () => (
+    <>
+      <div className="flex items-center gap-1 p-2 border-b">
+        <Button size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")} className="h-7 text-xs">
+          Dia
+        </Button>
+        <Button size="sm" variant={mode === "range" ? "default" : "outline"} onClick={() => setMode("range")} className="h-7 text-xs">
+          Período
+        </Button>
+        <span className="flex-1" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => {
+            setDataRef(toIso(proxDiaUtil()));
+            setDataFim(null);
+            setMode("single");
+            setOpen(false);
+          }}
+        >
+          Hoje
+        </Button>
+      </div>
+      {mode === "single" ? (
+        <Calendar
+          mode="single"
+          selected={new Date(`${dataRef}T12:00:00`)}
+          onSelect={(d) => {
+            if (!d) return;
+            setDataRef(toIso(d));
+            setDataFim(null);
+            setOpen(false);
+          }}
+          className="pointer-events-auto p-2"
+        />
+      ) : (
+        <Calendar
+          mode="range"
+          selected={{
+            from: new Date(`${dataRef}T12:00:00`),
+            to: dataFim ? new Date(`${dataFim}T12:00:00`) : undefined,
+          }}
+          onSelect={(r) => {
+            if (!r?.from) return;
+            setDataRef(toIso(r.from));
+            setDataFim(r.to ? toIso(r.to) : null);
+          }}
+          numberOfMonths={1}
+          className="pointer-events-auto p-2"
+        />
+      )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className="flex h-9 w-full items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <button
+          type="button"
+          aria-label="Dia anterior"
+          onClick={() => shiftDia(-1)}
+          className="flex w-8 shrink-0 items-center justify-center border-r border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <span className="truncate">{label}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            {renderConteudo()}
+          </PopoverContent>
+        </Popover>
+        <button
+          type="button"
+          aria-label="Próximo dia"
+          onClick={() => shiftDia(1)}
+          className="flex w-8 shrink-0 items-center justify-center border-l border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-1">
