@@ -996,9 +996,9 @@ function AppShellInner() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
-            <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+          <div className="h-14 shrink-0 px-4 py-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <div className="flex w-full items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0 shrink">
                 <div className="flex items-center gap-2 min-w-0 shrink-0 cursor-default select-none" title="ClinicaOS">
                   <Activity className="h-5 w-5 shrink-0 text-white" />
                   <span className="text-base font-bold tracking-tight whitespace-nowrap text-white">ClinicaOS</span>
@@ -1013,7 +1013,7 @@ function AppShellInner() {
                       title="Trocar de portal"
                     >
                       <LayoutGrid className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[90px]">{subsystemLabel ?? "Portais"}</span>
+                      <span className="truncate max-w-[84px]">{subsystemLabel ?? "Portais"}</span>
                     </button>
                   </>
                 )}
@@ -1026,7 +1026,7 @@ function AppShellInner() {
                     return !v;
                   });
                 }}
-                className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                className="ml-auto shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
                 aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
                 aria-expanded={buscaMenuAberta}
                 title="Buscar no menu"
