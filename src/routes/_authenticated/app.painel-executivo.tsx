@@ -514,13 +514,19 @@ function PainelExecutivoPage() {
             <HhpKpiCard label="Atraso médio" value={`${q.atrasoMedioMin.toFixed(0)} min`} icon={Clock} tone="warn" delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)} />
             <HhpKpiCard label="Confirmação" value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)} icon={CheckCircle2} tone="ok" />
           </HhpKpiRow>
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              Tempo de espera e permanência dependem de <code>fluxo_checkpoints</code> em
-              <code> agendamentos</code> (proposta pendente). Até lá, exibimos apenas atraso via
-              <code> executado_em</code>.
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-6 text-center text-sm text-slate-500">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70">
+              <Timer className="h-5 w-5 text-slate-400" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-700">
+              Métricas de Tempo de Espera e Permanência
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-xl leading-relaxed">
+              O acompanhamento detalhado dos tempos de espera e permanência dos pacientes é
+              atualizado automaticamente conforme os horários de atendimento registrados pela
+              recepção.
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
 
