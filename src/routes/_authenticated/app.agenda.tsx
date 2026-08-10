@@ -6384,13 +6384,13 @@ function AgendaPage() {
       className={
         variante === "sheet"
           ? "grid grid-cols-1 gap-3"
-          : "mt-3 flex items-end gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs"
+          : "mt-3 flex w-full items-end gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
       }
     >
 
           {/* Profissional */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-[2]">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Profissional</Label>
+          <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -6402,10 +6402,10 @@ function AgendaPage() {
           </div>
 
           {/* Tipo de Agenda */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tipo de agenda</Label>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo de agenda</Label>
             <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
-              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+              <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
                 <SelectValue placeholder="TODAS" />
               </SelectTrigger>
               <SelectContent>
@@ -6437,10 +6437,10 @@ function AgendaPage() {
           </div>
 
           {/* Situação */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Situação</Label>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+              <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
                 <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
@@ -6455,8 +6455,25 @@ function AgendaPage() {
           </div>
 
           {/* Data */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</Label>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <Label className="flex h-4 items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Data
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={() => setApenasData(!apenasData)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setApenasData(!apenasData); } }}
+                className={cn(
+                  "ml-1 cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-normal normal-case tracking-normal transition-colors",
+                  apenasData
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-400 hover:text-slate-600",
+                )}
+                title="Exibir apenas a data selecionada"
+              >
+                só este dia
+              </span>
+            </Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -6464,22 +6481,13 @@ function AgendaPage() {
               setDataFim={setDataFim}
               compact
             />
-            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
-            <label className="mt-1.5 flex w-fit cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-500 transition-colors hover:text-slate-900">
-              <Checkbox
-                checked={apenasData}
-                onCheckedChange={(v) => setApenasData(v === true)}
-                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-              />
-              Exibir apenas a data selecionada
-            </label>
           </div>
 
           {/* Especialidade */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Especialidade</Label>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-9 w-full rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+              <SelectTrigger className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800">
                 <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
@@ -6490,22 +6498,22 @@ function AgendaPage() {
           </div>
 
           {/* Cliente + Ações rápidas juntos */}
-          <div className="flex flex-col gap-1.5 min-w-0 flex-[2]">
-            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cliente</Label>
+          <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
+            <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Cliente</Label>
             <Input
               value={filtroCliente}
               onChange={(e) => setFiltroCliente(e.target.value)}
               placeholder="Nome ou CPF..."
-              className="h-9 w-full rounded-lg border-slate-200 bg-white px-3 text-sm text-slate-900"
+              className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800"
             />
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-end gap-1.5">
             <button
               type="button"
               onClick={load}
               aria-label="Buscar"
-              className="flex items-center justify-center rounded-lg bg-indigo-50 p-2 text-indigo-700 transition-colors hover:bg-indigo-100"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 transition-colors hover:bg-indigo-100"
             >
               <Search className="h-4 w-4" />
             </button>
@@ -6513,7 +6521,7 @@ function AgendaPage() {
               type="button"
               onClick={limparFiltros}
               aria-label="Limpar filtros"
-              className="flex items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
             >
               <X className="h-4 w-4" />
             </button>
@@ -9896,7 +9904,7 @@ function MedicoFiltroInput({
     <div className="relative">
       <div className="flex gap-1">
         <Input
-          className={compact ? "h-8 text-xs" : undefined}
+          className={compact ? "h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800" : undefined}
           data-agenda-filtro-prof
           disabled={disabled}
           placeholder="TODOS — digite para buscar"
@@ -10237,14 +10245,6 @@ function DataRefField({
 
   const label = dataFim ? `${fmt(dataRef)} → ${fmt(dataFim)}` : fmt(dataRef);
 
-  const shiftDia = (delta: number) => {
-    const d = new Date(`${dataRef}T12:00:00`);
-    d.setDate(d.getDate() + delta);
-    setDataRef(toIso(d));
-    setDataFim(null);
-    setMode("single");
-  };
-
   const renderConteudo = () => (
     <>
       <div className="flex items-center gap-1 p-2 border-b">
@@ -10302,38 +10302,20 @@ function DataRefField({
 
   if (compact) {
     return (
-      <div className="flex h-9 w-full items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <button
-          type="button"
-          aria-label="Dia anterior"
-          onClick={() => shiftDia(-1)}
-          className="flex w-8 shrink-0 items-center justify-center border-r border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-            >
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <span className="truncate">{label}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            {renderConteudo()}
-          </PopoverContent>
-        </Popover>
-        <button
-          type="button"
-          aria-label="Próximo dia"
-          onClick={() => shiftDia(1)}
-          className="flex w-8 shrink-0 items-center justify-center border-l border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+          >
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          {renderConteudo()}
+        </PopoverContent>
+      </Popover>
     );
   }
 
