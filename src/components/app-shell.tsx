@@ -1251,7 +1251,7 @@ function AppShellInner() {
         </aside>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
         {!isChooser && (
         <header className="sticky top-0 z-30 h-14 bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
@@ -1351,7 +1351,7 @@ function AppShellInner() {
         <main
           key={uxMelhorias ? location.pathname : "static"}
           className={cn(
-            "flex-1 overflow-auto min-w-0",
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
             isChooser
               ? "p-0 w-full"
               : cn(

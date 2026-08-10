@@ -166,7 +166,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden">
+          <Outlet />
+        </div>
         <Toaster richColors position="top-right" />
         <ConfirmDialogHost />
       </AuthProvider>
