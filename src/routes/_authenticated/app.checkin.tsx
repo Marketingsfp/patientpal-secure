@@ -25,6 +25,7 @@ import {
   Stethoscope,
   IdCard,
   Phone,
+  UserCheck,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/checkin")({
@@ -182,13 +183,15 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
 
   return (
     <div className="space-y-1.5">
-      <Label>Data do atendimento</Label>
+      <Label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        Data do atendimento
+      </Label>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
           onClick={() => navegarDia(-1)}
-          className="h-9 w-9 flex-shrink-0"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
           title="Dia anterior"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -197,7 +200,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
         <div className="relative w-full max-w-[200px]">
           <Button
             variant="outline"
-            className={`w-full max-w-[200px] truncate justify-center h-9 text-sm font-medium px-3 ${corData}`}
+            className={`w-full max-w-[200px] truncate justify-center h-10 rounded-lg border-slate-200 bg-white text-sm font-semibold px-3 ${corData}`}
             onClick={() => setIsOpen(!isOpen)}
           >
             <CalendarDays className="h-4 w-4 shrink-0 mr-2" />
@@ -274,7 +277,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
           variant="outline"
           size="icon"
           onClick={() => navegarDia(1)}
-          className="h-9 w-9 flex-shrink-0"
+          className="h-10 w-10 flex-shrink-0 rounded-lg border-slate-200 bg-white"
           title="Próximo dia"
         >
           <ChevronRight className="h-4 w-4" />
@@ -302,18 +305,22 @@ function SearchBar({
   buscaAplicada: string;
 }) {
   return (
-    <Card className="p-4">
-      {/* Aqui a grid md:grid-cols passou de 220px para 320px */}
+    <div className="bg-white border border-slate-200/80 p-4 rounded-xl shadow-xs">
       <div className="grid grid-cols-1 md:grid-cols-[320px_1fr_auto] gap-4 items-end">
         <DateSelector data={data} onDataChange={onDataChange} />
 
         <div className="space-y-1.5">
-          <Label htmlFor="busca-paciente">Buscar paciente (nome ou CPF)</Label>
+          <Label
+            htmlFor="busca-paciente"
+            className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Buscar paciente (nome ou CPF)
+          </Label>
           <div className="relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               id="busca-paciente"
-              className="pl-9 h-9"
+              className="pl-9 h-10 w-full bg-white border border-slate-200 rounded-lg text-sm"
               value={busca}
               onChange={(e) => onBuscaChange(e.target.value)}
               onKeyDown={(e) => {
@@ -328,12 +335,19 @@ function SearchBar({
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={onSearch} className="bg-primary text-primary-foreground h-9 whitespace-nowrap">
+          <Button
+            onClick={onSearch}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 h-10 rounded-lg shadow-sm transition-colors whitespace-nowrap"
+          >
             <Search className="h-4 w-4 mr-2" />
             Buscar
           </Button>
           {buscaAplicada && (
-            <Button variant="outline" onClick={onClear} className="h-9 whitespace-nowrap">
+            <Button
+              variant="outline"
+              onClick={onClear}
+              className="h-10 rounded-lg border-slate-200 text-xs font-semibold whitespace-nowrap"
+            >
               <X className="h-4 w-4 mr-2" />
               Limpar
             </Button>
@@ -341,10 +355,10 @@ function SearchBar({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground mt-4 pt-3 border-t">
+      <p className="text-xs text-slate-400 font-medium mt-3 pt-2 border-t border-slate-100">
         Mostrando todos os pacientes agendados para o dia (pagos e pendentes)
       </p>
-    </Card>
+    </div>
   );
 }
 
@@ -438,19 +452,17 @@ function PatientCard({
 // 4. EmptyState - Componente de estado vazio
 function EmptyState() {
   return (
-    <Card className="p-12 text-center">
-      <div className="flex flex-col items-center gap-4">
-        <AlertCircle className="h-12 w-12 text-muted-foreground" />
-        <div>
-          <p className="text-lg font-medium text-muted-foreground">
-            Nenhum paciente com pagamento confirmado aguardando check-in
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
-          </p>
-        </div>
+    <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center shadow-xs">
+      <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+        <UserCheck className="h-6 w-6" />
       </div>
-    </Card>
+      <p className="text-base font-semibold text-slate-700">
+        Nenhum paciente com pagamento confirmado aguardando check-in
+      </p>
+      <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+        Verifique os agendamentos ou confira se os pacientes já realizaram o check-in
+      </p>
+    </div>
   );
 }
 
@@ -706,19 +718,31 @@ function CheckinPage() {
     <div className="space-y-4 max-w-5xl mx-auto">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ConciergeBell className="h-6 w-6" />
-            Check-in de pacientes
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {clinicaAtual.clinica.nome && `Clínica: ${clinicaAtual.clinica.nome}`}
-            {data && ` • ${formatarDataExtenso(data)}`}
-          </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <ConciergeBell className="h-5 w-5" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Check-in de pacientes
+            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              {clinicaAtual.clinica.nome && (
+                <span className="bg-slate-100 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-md">
+                  {clinicaAtual.clinica.nome}
+                </span>
+              )}
+              {data && (
+                <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2.5 py-1 rounded-md capitalize">
+                  {formatarDataExtenso(data)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <Badge variant="outline" className="text-base px-3 py-1">
+        <span className="bg-amber-50 text-amber-700 border border-amber-200/80 px-3 py-1 text-xs font-semibold rounded-full">
           {filtrados.length} {filtrados.length === 1 ? "paciente" : "pacientes"} aguardando
-        </Badge>
+        </span>
       </div>
 
       {/* Busca com seletor de data melhorado */}
