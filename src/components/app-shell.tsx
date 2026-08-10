@@ -1007,12 +1007,10 @@ function AppShellInner() {
                   type="button"
                   onClick={() => abrirSeletorPortais()}
                   title="Trocar de portal"
-                  className="inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
                 >
                   <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">
-                    {subsystem === "gestao-pessoas" ? "RH" : subsystem ? "Clínica" : "Portais"}
-                  </span>
+                  <span className="whitespace-nowrap">Portal</span>
                 </button>
               )}
               <button
