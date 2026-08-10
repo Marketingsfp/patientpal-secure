@@ -661,7 +661,39 @@ html.theme-emerald {
  * e @page interno, portanto não são afetadas por esta regra. */
 @page { size: A4 portrait; margin: 12mm; }
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 15mm 12mm; }
+
+  /* Nada pode limitar altura/rolagem: o texto precisa fluir para a página 2. */
+  html, body {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  body:has(.print-document) *,
+  .print-document,
+  .print-document * {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .print-document p,
+  .print-document li,
+  .print-document div,
+  .print-document td,
+  .print-document th { orphans: 3; widows: 3; }
+  .print-document p,
+  .print-document li,
+  .clausula,
+  .contract-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .print-document h1, .print-document h2,
+  .print-document h3, .print-document h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
 
   /* Cores/fundos de tabela e cabeçalhos precisam sair no PDF. */
   html, body, * {
@@ -675,8 +707,9 @@ html.theme-emerald {
   body:has(.print-document) .print-document,
   body:has(.print-document) .print-document * { visibility: visible !important; }
   body:has(.print-document) .print-document {
-    position: absolute !important;
-    inset: 0 auto auto 0;
+    position: static !important;
+    display: block !important;
+    float: none !important;
     width: 100% !important;
     max-width: 186mm !important;
     margin: 0 auto !important;
@@ -684,6 +717,8 @@ html.theme-emerald {
     box-shadow: none !important;
     background: #fff !important;
   }
+  /* Ancestrais não podem recortar o documento durante a impressão. */
+  body:has(.print-document) { display: block !important; }
   .print\:hidden,
   aside, nav, [data-sidebar], [role="toolbar"], .no-print {
     display: none !important;
@@ -713,6 +748,7 @@ html.theme-emerald {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+  .print-document table { page-break-inside: auto; break-inside: auto; }
 }
 
 /* Menu lateral — barra de rolagem oculta (rolagem continua funcional) */
