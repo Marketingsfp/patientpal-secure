@@ -22,14 +22,14 @@ export const Route = createFileRoute("/_authenticated/app/fluxo")({
 
 type Etapa = "aguardando_recepcao" | "recepcao" | "caixa" | "triagem" | "atendimento" | "exame" | "finalizado";
 
-const ETAPAS: { id: Etapa; label: string; cor: string; corFundo: string; icon: any }[] = [
-  { id: "aguardando_recepcao", label: "Aguardando", cor: "text-slate-700", corFundo: "bg-slate-100", icon: CircleDot },
-  { id: "recepcao", label: "Recepção", cor: "text-rose-700", corFundo: "bg-rose-100", icon: User },
-  { id: "caixa", label: "Caixa", cor: "text-amber-700", corFundo: "bg-amber-100", icon: CircleDot },
-  { id: "triagem", label: "Triagem", cor: "text-emerald-700", corFundo: "bg-emerald-100", icon: Stethoscope },
-  { id: "atendimento", label: "Atendimento", cor: "text-blue-700", corFundo: "bg-blue-100", icon: User },
-  { id: "exame", label: "Exame", cor: "text-violet-700", corFundo: "bg-violet-100", icon: Stethoscope },
-  { id: "finalizado", label: "Finalizado", cor: "text-zinc-700", corFundo: "bg-zinc-100", icon: CheckCircle2 },
+const ETAPAS: { id: Etapa; label: string; cor: string; corFundo: string; ponto: string; accent: string; icon: any }[] = [
+  { id: "aguardando_recepcao", label: "Aguardando", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-slate-400", accent: "border-l-slate-300", icon: CircleDot },
+  { id: "recepcao", label: "Recepção", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-rose-500", accent: "border-l-rose-400", icon: User },
+  { id: "caixa", label: "Caixa", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-amber-500", accent: "border-l-amber-400", icon: CircleDot },
+  { id: "triagem", label: "Triagem", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-emerald-500", accent: "border-l-emerald-400", icon: Stethoscope },
+  { id: "atendimento", label: "Atendimento", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-blue-500", accent: "border-l-blue-400", icon: User },
+  { id: "exame", label: "Exame", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-violet-500", accent: "border-l-violet-400", icon: Stethoscope },
+  { id: "finalizado", label: "Finalizado", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-zinc-400", accent: "border-l-zinc-300", icon: CheckCircle2 },
 ];
 
 const PRIORIDADES = {
