@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -515,7 +515,6 @@ function CheckinPage() {
   const [cobrancaAlvo, setCobrancaAlvo] = useState<Item | null>(null);
   const [pagamentoAlvo, setPagamentoAlvo] = useState<Item | null>(null);
   const [pagamentoValor, setPagamentoValor] = useState<string>("");
-  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     if (!clinicaAtual) {
