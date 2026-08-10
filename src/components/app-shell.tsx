@@ -549,6 +549,19 @@ function AppShellInner() {
   // os itens (e sub-itens) conforme o usuário digita.
   const [buscaMenuAberta, setBuscaMenuAberta] = useState(false);
   const [buscaMenu, setBuscaMenu] = useState("");
+  const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Foca (e seleciona) o campo assim que a busca do menu fica visível.
+  useEffect(() => {
+    if (!buscaMenuAberta) return;
+    const id = requestAnimationFrame(() => {
+      const el = buscaMenuInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.select();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [buscaMenuAberta]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -1041,6 +1054,7 @@ function AppShellInner() {
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
                   <input
+                    ref={buscaMenuInputRef}
                     value={buscaMenu}
                     onChange={(e) => setBuscaMenu(e.target.value)}
                     onKeyDown={(e) => {
@@ -1049,7 +1063,6 @@ function AppShellInner() {
                         setBuscaMenuAberta(false);
                       }
                     }}
-                    autoFocus={buscaMenuAberta}
                     tabIndex={buscaMenuAberta ? 0 : -1}
                     placeholder="Buscar no menu..."
                     aria-label="Buscar no menu"
