@@ -323,7 +323,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     manual: "Manual",
   };
 
-  const handleSave = async () => {
+  const handleSave = async (imprimir = true) => {
     if (!clinicaAtual) return;
     if (!descricao.trim() || !valor) {
       toast.error("Descrição e valor são obrigatórios");
