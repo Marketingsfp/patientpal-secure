@@ -24,7 +24,6 @@ import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/page/page-header";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
@@ -414,37 +413,32 @@ function ClientesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Users />}
-        title="Clientes"
-        meta={
-          totalPacientes !== null
-            ? `${totalPacientes.toLocaleString("pt-BR")} ${totalPacientes === 1 ? "paciente" : "pacientes"}`
-            : undefined
-        }
-        description="Cadastre e gerencie os pacientes da clínica."
-        primaryAction={
-          podeEscrever ? (
-            <Button size="sm" onClick={() => setOpenNovo(true)}>
-              <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
-            </Button>
-          ) : undefined
-        }
-        actions={
-          <>
-          <Button
-            variant="ghost"
-            size="icon"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <Users className="h-4.5 w-4.5" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Clientes</h1>
+          {totalPacientes !== null && (
+            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap">
+              {totalPacientes.toLocaleString("pt-BR")} {totalPacientes === 1 ? "paciente" : "pacientes"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
             aria-label="Atualizar lista de clientes"
             title="Atualizar contagem e lista"
             onClick={refrescar}
             disabled={loading}
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-lg text-xs font-semibold px-3.5 py-2 shadow-xs transition-colors"
             onClick={async () => {
               if (!clinicaAtual) return;
               const PAGE = 1000;
@@ -506,19 +500,27 @@ function ClientesPage() {
             }}
           >
             <Download className="h-4 w-4 mr-1.5" /> Exportar Excel
-          </Button>
-          </>
-        }
-      />
+          </button>
+          {podeEscrever && (
+            <button
+              type="button"
+              onClick={() => setOpenNovo(true)}
+              className="inline-flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Novo cliente
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4 flex items-center justify-between gap-3">
+        <div className="relative w-full max-w-xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nº serviço, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
-            className="pl-9"
+            className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-indigo-500"
           />
         </div>
       </div>
@@ -528,10 +530,10 @@ function ClientesPage() {
           Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
         </div>
       )}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
-            <TableRow className="bg-muted">
+            <TableRow className="bg-slate-50/80 border-b border-slate-200/80 [&>th]:text-[11px] [&>th]:font-bold [&>th]:text-slate-500 [&>th]:uppercase [&>th]:tracking-wider">
               <TableHead className="w-10">
                 <Checkbox
                   aria-label="Selecionar todos"
@@ -576,7 +578,7 @@ function ClientesPage() {
                 </TableCell>
               </TableRow>
             ) : filtrados.map(p => (
-              <TableRow key={p.id} className="h-12" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
+              <TableRow key={p.id} className="h-12 hover:bg-slate-50/60 transition-colors border-b border-slate-100" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
                 <TableCell className="w-10">
                   <Checkbox
                     aria-label={`Selecionar ${p.nome}`}
@@ -584,8 +586,12 @@ function ClientesPage() {
                     onCheckedChange={(v: boolean | "indeterminate") => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
                   />
                 </TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
-                <TableCell className="max-w-[320px] font-medium">
+                <TableCell>
+                  <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
+                    {p.numero_pasta || p.codigo_prontuario || "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="max-w-[320px] text-sm font-semibold text-slate-800">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
@@ -605,39 +611,45 @@ function ClientesPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.cpf ?? "—"}</TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{fmtNasc(p.data_nascimento)}</TableCell>
-                <TableCell className="text-sm whitespace-nowrap text-muted-foreground"><IdadeCell nascimento={p.data_nascimento} /></TableCell>
-                <TableCell className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{p.telefone ?? "—"}</TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{p.cpf ?? "—"}</TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{fmtNasc(p.data_nascimento)}</TableCell>
+                <TableCell className="text-xs whitespace-nowrap text-slate-600 font-medium"><span className="flex items-center gap-1"><IdadeCell nascimento={p.data_nascimento} /></span></TableCell>
+                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{p.telefone ?? "—"}</TableCell>
                 <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.ativo ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                     {p.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button asChild variant="ghost" size="icon" title="Visualizar cliente">
-                      <Link to="/app/clientes/$pacienteId/visualizar" params={{ pacienteId: p.id }}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <Link
+                      to="/app/clientes/$pacienteId/visualizar"
+                      params={{ pacienteId: p.id }}
+                      title="Visualizar cliente"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
                     {podeEscrever && (
-                      <Button asChild variant="ghost" size="icon" title="Editar cliente">
-                        <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: p.id }}>
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      <Link
+                        to="/app/clientes/$pacienteId/editar"
+                        params={{ pacienteId: p.id }}
+                        title="Editar cliente"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
                     )}
                     {podeEscrever && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <button
+                        type="button"
                         title="Excluir cliente"
                         disabled={excluindoId === p.id}
                         onClick={() => void excluirCliente(p)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     )}
                   </div>
                 </TableCell>
