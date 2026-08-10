@@ -640,6 +640,13 @@ function CheckinPage() {
     setBuscaAplicada(busca.trim());
   };
 
+  // Busca automática com atraso de 300ms — a digitação continua fluida
+  // mesmo com muitos registros; o botão "Buscar" segue funcionando.
+  const buscaDebounced = useDebouncedValue(busca, 300);
+  useEffect(() => {
+    setBuscaAplicada(buscaDebounced.trim());
+  }, [buscaDebounced]);
+
   const limparBusca = () => {
     setBusca("");
     setBuscaAplicada("");
