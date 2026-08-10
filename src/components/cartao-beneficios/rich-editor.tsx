@@ -34,14 +34,6 @@ import {
 import { ImageCropDialog } from "./image-crop-dialog";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
-const ColoredTableCell = TableCell.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-    };
-  },
-});
-
 /**
  * Mantém o CSS inline (style/class/largura/alinhamento) do HTML colado
  * — sem isso, um contrato convertido de .docx perde bordas, padding e fontes.
