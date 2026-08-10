@@ -99,6 +99,7 @@ import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
+import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
@@ -634,6 +635,12 @@ const AuthenticatedAppAgendaV2Route =
     path: '/agenda-v2',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppAgendaMedicosRoute =
+  AuthenticatedAppAgendaMedicosRouteImport.update({
+    id: '/agenda-medicos',
+    path: '/agenda-medicos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -917,6 +924,7 @@ export interface FileRoutesByFullPath {
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -1050,6 +1058,7 @@ export interface FileRoutesByTo {
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -1183,6 +1192,7 @@ export interface FileRoutesById {
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/_authenticated/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -1319,6 +1329,7 @@ export interface FileRouteTypes {
     | '/verificar/$codigo'
     | '/paciente/'
     | '/app/agenda'
+    | '/app/agenda-medicos'
     | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -1452,6 +1463,7 @@ export interface FileRouteTypes {
     | '/verificar/$codigo'
     | '/paciente'
     | '/app/agenda'
+    | '/app/agenda-medicos'
     | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
@@ -1584,6 +1596,7 @@ export interface FileRouteTypes {
     | '/verificar/$codigo'
     | '/paciente/'
     | '/_authenticated/app/agenda'
+    | '/_authenticated/app/agenda-medicos'
     | '/_authenticated/app/agenda-v2'
     | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
@@ -2358,6 +2371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAgendaV2RouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/agenda-medicos': {
+      id: '/_authenticated/app/agenda-medicos'
+      path: '/agenda-medicos'
+      fullPath: '/app/agenda-medicos'
+      preLoaderRoute: typeof AuthenticatedAppAgendaMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/agenda': {
       id: '/_authenticated/app/agenda'
       path: '/agenda'
@@ -2786,6 +2806,7 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
 
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
+  AuthenticatedAppAgendaMedicosRoute: typeof AuthenticatedAppAgendaMedicosRoute
   AuthenticatedAppAgendaV2Route: typeof AuthenticatedAppAgendaV2Route
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
@@ -2865,6 +2886,7 @@ interface AuthenticatedAppRouteChildren {
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
+  AuthenticatedAppAgendaMedicosRoute: AuthenticatedAppAgendaMedicosRoute,
   AuthenticatedAppAgendaV2Route: AuthenticatedAppAgendaV2Route,
   AuthenticatedAppAlertasEnfermagemRoute:
     AuthenticatedAppAlertasEnfermagemRoute,
@@ -3017,13 +3039,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
