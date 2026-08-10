@@ -22,14 +22,14 @@ export const Route = createFileRoute("/_authenticated/app/fluxo")({
 
 type Etapa = "aguardando_recepcao" | "recepcao" | "caixa" | "triagem" | "atendimento" | "exame" | "finalizado";
 
-const ETAPAS: { id: Etapa; label: string; cor: string; corFundo: string; icon: any }[] = [
-  { id: "aguardando_recepcao", label: "Aguardando", cor: "text-slate-700", corFundo: "bg-slate-100", icon: CircleDot },
-  { id: "recepcao", label: "Recepção", cor: "text-rose-700", corFundo: "bg-rose-100", icon: User },
-  { id: "caixa", label: "Caixa", cor: "text-amber-700", corFundo: "bg-amber-100", icon: CircleDot },
-  { id: "triagem", label: "Triagem", cor: "text-emerald-700", corFundo: "bg-emerald-100", icon: Stethoscope },
-  { id: "atendimento", label: "Atendimento", cor: "text-blue-700", corFundo: "bg-blue-100", icon: User },
-  { id: "exame", label: "Exame", cor: "text-violet-700", corFundo: "bg-violet-100", icon: Stethoscope },
-  { id: "finalizado", label: "Finalizado", cor: "text-zinc-700", corFundo: "bg-zinc-100", icon: CheckCircle2 },
+const ETAPAS: { id: Etapa; label: string; cor: string; corFundo: string; ponto: string; accent: string; icon: any }[] = [
+  { id: "aguardando_recepcao", label: "Aguardando", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-slate-400", accent: "border-l-slate-300", icon: CircleDot },
+  { id: "recepcao", label: "Recepção", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-rose-500", accent: "border-l-rose-400", icon: User },
+  { id: "caixa", label: "Caixa", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-amber-500", accent: "border-l-amber-400", icon: CircleDot },
+  { id: "triagem", label: "Triagem", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-emerald-500", accent: "border-l-emerald-400", icon: Stethoscope },
+  { id: "atendimento", label: "Atendimento", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-blue-500", accent: "border-l-blue-400", icon: User },
+  { id: "exame", label: "Exame", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-violet-500", accent: "border-l-violet-400", icon: Stethoscope },
+  { id: "finalizado", label: "Finalizado", cor: "text-slate-700", corFundo: "bg-slate-100", ponto: "bg-zinc-400", accent: "border-l-zinc-300", icon: CheckCircle2 },
 ];
 
 const PRIORIDADES = {
@@ -107,6 +107,10 @@ function FluxoPage() {
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const acaoBtnCls = uxMelhorias ? "h-9 sm:h-6 px-2.5 sm:px-1.5" : "h-6 px-1.5";
   const acaoTxtCls = uxMelhorias ? "text-xs sm:text-[9px]" : "text-[9px]";
+  const acaoIconCls = cn(
+    "inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer disabled:cursor-not-allowed",
+    uxMelhorias && "p-2 sm:p-1.5",
+  );
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
@@ -364,28 +368,33 @@ function FluxoPage() {
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
-          const isFinalizado = col.id === "finalizado";
-          
+
           return (
             <div key={col.id} className="space-y-2 min-w-0">
               {/* Cabeçalho da coluna */}
-              <div className={`flex items-center justify-between p-2 rounded ${col.corFundo}`}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Icon className={`h-4 w-4 ${col.cor} flex-shrink-0`} />
-                  <span className={`text-xs font-medium ${col.cor} truncate`}>{col.label}</span>
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-slate-100/80 px-2.5 py-1.5 border-l-[3px]",
+                  col.accent,
+                )}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", col.ponto)} />
+                  <Icon className="h-3.5 w-3.5 flex-shrink-0 text-slate-500" />
+                  <span className="truncate text-xs font-semibold text-slate-700">{col.label}</span>
                 </div>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
                   {items.length}
-                </Badge>
+                </span>
               </div>
 
               {/* Cards */}
-              <div className="space-y-1.5">
-                {items.length === 0 && !isFinalizado && (
-                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
-                )}
-                {items.length === 0 && isFinalizado && (
-                  <div className="text-[10px] text-muted-foreground text-center py-2 border border-dashed rounded">vazio</div>
+              <div className="space-y-2">
+                {items.length === 0 && (
+                  <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200/70 bg-slate-50/50 p-6 text-center text-xs font-medium text-slate-400">
+                    <Icon className="h-4 w-4 text-slate-300" />
+                    Nenhum paciente
+                  </div>
                 )}
                 {items.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -399,46 +408,55 @@ function FluxoPage() {
                   const isUltimaEtapa = a.fluxo_etapa === "atendimento" || a.fluxo_etapa === "exame";
 
                   return (
-                    <Card key={a.id} className={`p-2.5 space-y-1.5 hover:shadow-sm transition-shadow ${prioridadeInfo.border} text-xs`}>
+                    <Card
+                      key={a.id}
+                      className={cn(
+                        "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md",
+                        prioridadeInfo.border,
+                      )}
+                    >
                       {/* Nome e horário */}
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <div className={`h-2 w-2 rounded-full ${prioridadeInfo.cor} flex-shrink-0`} />
-                          <span className="font-medium text-xs truncate">{a.paciente_nome}</span>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0">{h}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-slate-800">{a.paciente_nome}</span>
+                        <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
                       </div>
 
                       {/* Prioridade */}
                       {a.prioridade && a.prioridade !== "normal" && (
-                        <Badge className={`border text-[9px] gap-0.5 px-1.5 py-0 ${prioridadeInfo.badge}`}>
+                        <Badge className={cn("mt-2 w-fit gap-0.5 border px-1.5 py-0 text-[9px]", prioridadeInfo.badge)}>
                           <PrioridadeIcon className="h-3 w-3" />
                           {prioridadeInfo.label}
                         </Badge>
                       )}
 
                       {/* Procedimento */}
-                      <div className="text-[10px] text-muted-foreground truncate">
+                      <div className="mt-1 truncate text-xs font-medium text-slate-500">
                         {a.procedimento ?? "—"}
                         {a.medicos?.nome && <span className="ml-1">· {a.medicos.nome}</span>}
                       </div>
 
                       {/* Ações */}
-                      <div className="flex items-center gap-0.5 pt-1 flex-wrap">
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} disabled={!prev} onClick={() => prev && setEtapa(a.id, prev)} title="Voltar">
-                          <ChevronLeft className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => ciclarPrioridade(a)} title="Prioridade">
-                          <PrioridadeIcon className={`h-3.5 w-3.5 ${prioridadeInfo.cor}`} />
-                        </Button>
+                      <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-2.5">
+                        <button
+                          type="button"
+                          className={cn(acaoIconCls, "disabled:opacity-40 disabled:hover:bg-transparent")}
+                          disabled={!prev}
+                          onClick={() => prev && setEtapa(a.id, prev)}
+                          title="Voltar"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button type="button" className={acaoIconCls} onClick={() => ciclarPrioridade(a)} title="Prioridade">
+                          <PrioridadeIcon className={cn("h-4 w-4", prioridadeInfo.cor)} />
+                        </button>
 
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className={cn(acaoBtnCls, acaoTxtCls, "gap-1 bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[40px]")} onClick={() => chamarPaciente(a)}>
+                            <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "ml-auto gap-1 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800")} onClick={() => chamarPaciente(a)}>
                               <Bell className="h-3 w-3" /> Chamar
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-400 text-violet-700 hover:bg-violet-50 flex-1 min-w-[35px]")} onClick={() => setEtapa(a.id, "exame")}>
+                              <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")} onClick={() => setEtapa(a.id, "exame")}>
                                 Exame
                               </Button>
                             )}
@@ -448,23 +466,29 @@ function FluxoPage() {
                         {col.id !== "triagem" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => chamarPaciente(a)} title="Rechamar">
-                                <Bell className="h-3.5 w-3.5" />
-                              </Button>
+                              <button type="button" className={acaoIconCls} onClick={() => chamarPaciente(a)} title="Rechamar">
+                                <Bell className="h-4 w-4" />
+                              </button>
                             )}
-                            <Button
-                              size="sm"
-                              className={cn(acaoBtnCls, "flex-1 min-w-[30px] bg-emerald-600 hover:bg-emerald-700 text-white")}
+                            <button
+                              type="button"
+                              className={cn(
+                                acaoIconCls,
+                                "ml-auto gap-1 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-40",
+                                isUltimaEtapa && "flex items-center px-2 text-xs font-semibold",
+                              )}
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
                               title={isUltimaEtapa ? "Finalizar" : "Avançar"}
                             >
                               {isUltimaEtapa ? (
-                                <span className={cn("flex items-center gap-1", acaoTxtCls)}><CheckCircle2 className="h-3 w-3" /> Fim</span>
+                                <>
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Fim
+                                </>
                               ) : (
-                                <ChevronRight className="h-3.5 w-3.5" />
+                                <ChevronRight className="h-4 w-4" />
                               )}
-                            </Button>
+                            </button>
                           </>
                         )}
                       </div>
