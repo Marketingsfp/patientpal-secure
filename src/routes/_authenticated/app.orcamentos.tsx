@@ -24,7 +24,7 @@ import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
-import { Tooltip, TooltipContent, TooltipTrigger, n as TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ReactNode } from "react";
 
 const ICON_BTN =
