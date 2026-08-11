@@ -932,10 +932,10 @@ function NovoOrcamentoDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-3xl max-h-[95vh] overflow-y-auto"
+        className="max-w-3xl max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
         overlayClassName="bg-transparent backdrop-blur-none pointer-events-none"
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>
             Novo orçamento
             {categoria && (
@@ -951,6 +951,7 @@ function NovoOrcamentoDialog({
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto p-6">
         {!categoria ? (
           <div className="py-8 space-y-4">
             <p className="text-center text-sm text-muted-foreground">
