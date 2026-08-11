@@ -6,6 +6,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -21,7 +22,7 @@ type Senha = {
   chamada_em: string | null;
   identificado_por_facial: boolean;
   paciente_id: string | null;
-  pacientes?: { nome: string } | null;
+  pacientes?: { nome: string; cidade: string | null } | null;
 };
 
 const TIPO_COR: Record<string, string> = {
@@ -90,7 +91,7 @@ function RecepcaoPage() {
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
-    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
+    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome, cidade)";
     const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
       // Fila da recepção: apenas senhas emitidas pelo totem/recepção
       // (exclui as senhas geradas pela Triagem, que já nascem com status="chamada").
@@ -240,6 +241,7 @@ function RecepcaoPage() {
                   <span className="text-sm text-muted-foreground">
                     {s.pacientes?.nome ?? "Anônimo"}{s.identificado_por_facial ? " · 📷" : ""}
                   </span>
+                  <BadgePacienteDistante cidade={s.pacientes?.cidade} compact />
                 </div>
                 <button
                   type="button"
