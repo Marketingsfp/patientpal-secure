@@ -9646,7 +9646,10 @@ function AgendaPage() {
       <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Informações do cliente</DialogTitle>
+            <div className="flex items-center gap-2.5 pr-6">
+              <DialogTitle>Informações do cliente</DialogTitle>
+              <BadgePacienteDistante cidade={pacInfoForm.cidade || pacInfo?.cidade} />
+            </div>
           </DialogHeader>
           {pacInfoLoading ? (
             <p className="text-sm text-muted-foreground py-4">Carregando…</p>
