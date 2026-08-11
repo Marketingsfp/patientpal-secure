@@ -396,6 +396,39 @@ export async function printContrato(contratoId: string) {
     color: #ffffff !important;
     font-weight: bold !important;
   }
+  /* Caixas de título de cláusula: faixa azul ocupando 100% da largura */
+  .clausula-header,
+  .clausula-header td,
+  .clausula-header th,
+  td.clausula-header-cell,
+  th.clausula-header-cell,
+  p.clausula-header,
+  h1.clausula-header, h2.clausula-header, h3.clausula-header, h4.clausula-header {
+    background-color: #1b365d !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  td.clausula-header-cell, th.clausula-header-cell {
+    width: 100% !important;
+    padding: 6px 10px !important;
+    border-color: #1b365d !important;
+    text-align: left !important;
+  }
+  p.clausula-header, h1.clausula-header, h2.clausula-header,
+  h3.clausula-header, h4.clausula-header {
+    display: block !important;
+    width: 100% !important;
+    padding: 6px 10px !important;
+    margin: 14px 0 8px !important;
+    border: none !important;
+  }
+  .clausula-header *, td.clausula-header-cell *, th.clausula-header-cell * {
+    color: #ffffff !important;
+    background: transparent !important;
+  }
   @media print {
     @page { size: A4 portrait; margin: 12mm 14mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -439,10 +472,51 @@ export async function printContrato(contratoId: string) {
       background-color: #1b365d !important;
       color: #ffffff !important;
     }
+    .clausula-header, .clausula-header td, .clausula-header th,
+    td.clausula-header-cell, th.clausula-header-cell, p.clausula-header,
+    h1.clausula-header, h2.clausula-header, h3.clausula-header, h4.clausula-header {
+      background-color: #1b365d !important;
+      color: #ffffff !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    td.clausula-header-cell, th.clausula-header-cell { width: 100% !important; }
   }
 </style>
 <script id="print-fix-tables">
 (function () {
+  var CLAUSULA_RE = /^\\s*(CL[ÁA]USULA|PAR[ÁA]GRAFO [ÚU]NICO|ANEXO)\\b/i;
+  function fixClausulas() {
+  try {
+    // 1) Títulos dentro de tabelas: a linha inteira vira faixa azul.
+    document.querySelectorAll("tr").forEach(function (r) {
+      var cells = Array.prototype.slice.call(r.cells);
+      if (!cells.length) return;
+      var texts = cells.map(function (c) { return (c.textContent || "").trim(); });
+      var filled = texts.filter(function (t) { return t.length > 0; });
+      if (filled.length !== 1 || !CLAUSULA_RE.test(filled[0])) return;
+      var main = cells[texts.indexOf(filled[0])];
+      // remove células vazias e expande a célula do título por toda a linha
+      cells.forEach(function (c) { if (c !== main) c.parentNode.removeChild(c); });
+      main.colSpan = cells.length;
+      main.classList.add("clausula-header-cell");
+      r.classList.add("clausula-header");
+      var t = r.closest("table");
+      if (t) { t.style.width = "100%"; t.style.tableLayout = "fixed"; }
+    });
+    // 2) Títulos em parágrafos/headings com span colorido inline.
+    document.querySelectorAll("p, h1, h2, h3, h4, div").forEach(function (el) {
+      var txt = (el.textContent || "").trim();
+      if (!txt || txt.length > 120 || !CLAUSULA_RE.test(txt)) return;
+      if (el.querySelector("table") || el.closest("td, th")) return;
+      var inner = el.querySelector("span[style*='background'], font[style*='background']");
+      var hasBg = inner || /background/i.test(el.getAttribute("style") || "");
+      if (!hasBg) return;
+      if (inner) inner.style.background = "transparent";
+      el.classList.add("clausula-header");
+    });
+  } catch (e) {}
+  }
   function fixTables() {
   try {
     document.querySelectorAll("table").forEach(function (t) {
@@ -469,9 +543,9 @@ export async function printContrato(contratoId: string) {
   } catch (e) {}
   }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", fixTables);
+    document.addEventListener("DOMContentLoaded", function () { fixTables(); fixClausulas(); });
   } else {
-    fixTables();
+    fixTables(); fixClausulas();
   }
 })();
 </script>`;
