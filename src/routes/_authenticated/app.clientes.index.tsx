@@ -123,6 +123,29 @@ interface Paciente {
   foto_url?: string | null;
 }
 
+/** Formatação de exibição do CPF — não altera o dado armazenado. */
+function formatCPF(valor: string | null | undefined): string {
+  const digitos = (valor ?? "").replace(/\D/g, "");
+  if (!digitos) return "—";
+  if (digitos.length === 11) {
+    return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+  }
+  return valor ?? "—";
+}
+
+/** Formatação de exibição do telefone — não altera o dado armazenado. */
+function formatPhone(valor: string | null | undefined): string {
+  const digitos = (valor ?? "").replace(/\D/g, "");
+  if (!digitos) return "—";
+  if (digitos.length === 11) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  }
+  if (digitos.length === 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return valor ?? "—";
+}
+
 
 
 function ClientesPage() {
