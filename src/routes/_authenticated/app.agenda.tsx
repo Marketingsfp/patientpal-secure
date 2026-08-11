@@ -9130,20 +9130,20 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ficha */}
-                      <TableCell className="text-center font-mono text-sm font-medium py-1.5 px-1.5 align-middle text-xs">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
                         {fichaNum || "—"}
                       </TableCell>
 
                       {/* Dia da semana */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-center text-sm font-medium tabular-nums text-muted-foreground">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
                         {fmtDiaSemana(a.inicio)}
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-sm">{fmtData(a.inicio)}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
@@ -9155,7 +9155,7 @@ function AgendaPage() {
                           const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
                           return (
                             <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                              <span className="block truncate text-sm" title={label}>
+                              <span className="block truncate text-xs" title={label}>
                                 {label}
                               </span>
                               {manual && (
@@ -9173,12 +9173,12 @@ function AgendaPage() {
                         {ocultarPaciente ? (
                           <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
-                          <span className="block truncate text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
+                          <span className="block truncate text-xs font-medium text-primary/60">Nenhum paciente agendado</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="block w-full max-w-full overflow-hidden text-left text-sm text-foreground hover:text-primary"
+                            className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
                             title={a.paciente_nome}
                           >
                             <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
