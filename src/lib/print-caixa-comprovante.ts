@@ -121,16 +121,16 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
   .sig .nome { font-size: 10px; text-align: center; font-weight: 700; min-height: 12px; }
   .rodape { font-size: 9px; margin-top: 8px; text-align: center; }
-  @media print {
-    @page { size: 80mm auto; margin: 0; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none; }
-    .receipt { width: 72mm; }
-  }
   .toolbar { position: fixed; top: 8px; right: 8px; display: flex; gap: 8px; }
   .toolbar button { background: #1d4ed8; color: #fff; border: 0; padding: 8px 14px;
     border-radius: 6px; cursor: pointer; font-weight: 600; }
   .toolbar button.sec { background: #e2e8f0; color: #0f172a; }
+  @media print {
+    @page { size: 80mm auto; margin: 0; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print, .toolbar { display: none !important; visibility: hidden !important; }
+    .receipt { width: 72mm; margin: 0; padding: 3mm 3mm 6mm; }
+  }
 </style></head>
 <body>
   <div class="toolbar no-print">
