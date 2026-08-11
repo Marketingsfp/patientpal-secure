@@ -19,7 +19,7 @@ import {
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
   HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
-  CloudRain, Sun, BarChart3,
+  CloudRain, Sun,
 } from "lucide-react";
 import { getClimaPeriodo, type ClimaDia } from "@/lib/clima";
 import { CuboBI } from "@/components/relatorios/CuboBI";
@@ -391,44 +391,35 @@ function RelatoriosPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/15 shrink-0">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">Relatórios</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Visualize um dashboard ou baixe planilhas Excel.</p>
-          </div>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Relatórios</h1>
+        <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
       <Tabs defaultValue="dashboard">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TabsList className="bg-muted/50 p-1 rounded-full border border-border/40 inline-flex items-center gap-1 h-auto">
-            {[
-              { v: "dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" />, label: "Dashboard" },
-              { v: "cubo", icon: <Boxes className="h-3.5 w-3.5" />, label: "Cubo BI" },
-              { v: "agendamentos-diario", icon: <PhoneCall className="h-3.5 w-3.5" />, label: "Agendamentos do Dia" },
-              { v: "downloads", icon: <Download className="h-3.5 w-3.5" />, label: "Baixar planilhas" },
-            ].map((t) => (
-              <TabsTrigger
-                key={t.v}
-                value={t.v}
-                className="gap-2 rounded-full px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-2xs data-[state=active]:font-semibold"
-              >
-                {t.icon} {t.label}
-              </TabsTrigger>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
+          <TabsList>
+            <TabsTrigger value="dashboard" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="cubo" className="gap-2">
+              <Boxes className="h-4 w-4" /> Cubo BI
+            </TabsTrigger>
+            <TabsTrigger value="agendamentos-diario" className="gap-2">
+              <PhoneCall className="h-4 w-4" /> Agendamentos do Dia
+            </TabsTrigger>
+            <TabsTrigger value="downloads" className="gap-2">
+              <Download className="h-4 w-4" /> Baixar planilhas
+            </TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-end gap-2">
+            <div>
               <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
-              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36 rounded-xl" />
+              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
             </div>
-            <div className="flex items-center gap-1.5">
+            <div>
               <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
-              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36 rounded-xl" />
+              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
             </div>
           </div>
         </div>
@@ -793,15 +784,12 @@ function DashboardView({
   return (
     <div className="space-y-6">
       {/* Barra de configuração */}
-      <div className="flex justify-end -mt-2">
+      <div className="flex justify-end">
         <Popover>
           <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="border border-border/60 hover:bg-muted font-medium text-xs rounded-xl px-3.5 py-2 flex items-center gap-2 transition-colors"
-            >
+            <Button variant="outline" size="sm" className="gap-2">
               <Settings2 className="h-4 w-4" /> Personalizar dashboard
-            </button>
+            </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80">
             <div className="flex items-center justify-between mb-3">
@@ -831,26 +819,21 @@ function DashboardView({
 
       {/* KPIs */}
       {kpiVisible > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 my-6">
-          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-4 w-4" />} label="Agendamentos" value={data.totalAgend.toString()} badge="bg-blue-500/10 text-blue-600 border-blue-500/15" onClick={() => setDrill("agend")} />}
-          {on("kpi_novos") && <Kpi icon={<Users className="h-4 w-4" />} label="Novos pacientes" value={data.novosPacientes.toString()} badge="bg-violet-500/10 text-violet-600 border-violet-500/15" onClick={() => setDrill("novos")} />}
-          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-4 w-4" />} label="Prontuários" value={data.prontuariosCount.toString()} badge="bg-rose-500/10 text-rose-600 border-rose-500/15" onClick={() => setDrill("pront")} />}
-          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-4 w-4" />} label="Saldo" value={fmtBRL(saldo)} badge={saldo >= 0 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/15" : "bg-red-500/10 text-red-600 border-red-500/15"} onClick={() => setDrill("saldo")} />}
-          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Receitas" value={fmtBRL(data.receitas)} badge="bg-teal-500/10 text-teal-600 border-teal-500/15" onClick={() => setDrill("receitas")} />}
-          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-4 w-4" />} label="Despesas" value={fmtBRL(data.despesas)} badge="bg-red-500/10 text-red-600 border-red-500/15" onClick={() => setDrill("despesas")} />}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" onClick={() => setDrill("agend")} />}
+          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" onClick={() => setDrill("novos")} />}
+          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" onClick={() => setDrill("pront")} />}
+          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} onClick={() => setDrill("saldo")} />}
+          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" onClick={() => setDrill("receitas")} />}
+          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" onClick={() => setDrill("despesas")} />}
         </div>
       )}
 
       {/* Financeiro por dia */}
       {on("ch_fin_dia") && (
-        <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-2xs space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-bold text-foreground">Receitas vs Despesas (por dia)</h3>
-            <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 border border-border/40 rounded-full px-2.5 py-1">
-              {ini.split("-").reverse().join("/")} — {fim.split("-").reverse().join("/")}
-            </span>
-          </div>
-          <div>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle></CardHeader>
+          <CardContent>
             {data.finPorDia.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
             ) : (
@@ -863,8 +846,8 @@ function DashboardView({
                 formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
               />
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Movimento × Clima — chuva por dia vs agendamentos/receita */}
@@ -1040,20 +1023,15 @@ function DashboardView({
 }
 
 function Kpi({
-  icon, label, value, badge, onClick,
-}: { icon: React.ReactNode; label: string; value: string; badge: string; onClick?: () => void }) {
+  icon, label, value, tint, onClick,
+}: { icon: React.ReactNode; label: string; value: string; tint: string; onClick?: () => void }) {
   return (
-    <div
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      className={`bg-card border border-border/50 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-3 relative overflow-hidden${onClick ? " cursor-pointer" : ""}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className={`p-2 rounded-xl border shrink-0 ${badge}`}>{icon}</span>
-      </div>
-      <p className="text-2xl font-bold tracking-tight text-foreground font-mono truncate">{value}</p>
-    </div>
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}>
+      <CardContent className="pt-6">
+        <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
+        <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 
