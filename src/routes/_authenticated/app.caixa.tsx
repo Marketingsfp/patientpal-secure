@@ -771,6 +771,7 @@ function Page() {
   const [obsAbertura, setObsAbertura] = useState("");
   const [movValor, setMovValor] = useState("");
   const [movDesc, setMovDesc] = useState("");
+  const [movDescTouched, setMovDescTouched] = useState(false);
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
