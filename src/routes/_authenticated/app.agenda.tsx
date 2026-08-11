@@ -3705,6 +3705,54 @@ function AgendaPage() {
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // ---- "Agora": destaque + rolagem automática para o horário atual (só hoje)
+  const ehHojeAgenda = dataRef === hojeBR();
+  const [agoraTs, setAgoraTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!ehHojeAgenda) return;
+    const t = window.setInterval(() => setAgoraTs(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, [ehHojeAgenda]);
+
+  /** Id do agendamento cuja janela contém o horário atual; senão, o próximo do dia. */
+  const agoraAgId = useMemo(() => {
+    if (!ehHojeAgenda) return null;
+    const agora = agoraTs;
+    let proximo: { id: string; ini: number } | null = null;
+    for (const a of filtradosOrdenados) {
+      const ini = new Date(a.inicio).getTime();
+      const fim = new Date(a.fim).getTime();
+      if (agora >= ini && agora < fim) return a.id;
+      if (ini > agora && (!proximo || ini < proximo.ini)) proximo = { id: a.id, ini };
+    }
+    return proximo?.id ?? null;
+  }, [ehHojeAgenda, agoraTs, filtradosOrdenados]);
+
+  const irParaAgora = useCallback(() => {
+    if (!agoraAgId) return;
+    const idx = filtradosOrdenados.findIndex((a) => a.id === agoraAgId);
+    if (idx >= 0) {
+      const paginaAlvo = Math.floor(idx / PAGE_SIZE) + 1;
+      if (paginaAlvo !== page) setPage(paginaAlvo);
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-ag-id="${agoraAgId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }, [agoraAgId, filtradosOrdenados, page]);
+
+  const autoScrollFeitoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ehHojeAgenda || !agoraAgId) return;
+    if (autoScrollFeitoRef.current === dataRef) return;
+    autoScrollFeitoRef.current = dataRef;
+    irParaAgora();
+  }, [ehHojeAgenda, agoraAgId, dataRef, irParaAgora]);
+  useEffect(() => {
+    autoScrollFeitoRef.current = null;
+  }, [dataRef]);
+
   const limparFiltros = () => {
     setFiltroMedico("todos");
     setFiltroEspecialidade("todos");
