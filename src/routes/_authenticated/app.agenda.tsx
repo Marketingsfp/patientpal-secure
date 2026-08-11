@@ -2060,6 +2060,8 @@ function AgendaPage() {
   };
   const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
   const [pacEditSaving, setPacEditSaving] = useState(false);
+  // Pré-visualização ampliada da foto do paciente
+  const [fotoPreviewOpen, setFotoPreviewOpen] = useState(false);
   // Aplica a máscara 00000-000 ao valor vindo do banco (armazenado só com dígitos)
   const maskCep = (v: string | null | undefined) => {
     const raw = String(v ?? "").replace(/\D/g, "").slice(0, 8);
@@ -9586,6 +9588,40 @@ function AgendaPage() {
         />
       )}
 
+      {fotoPreviewOpen && pacInfoFoto && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setFotoPreviewOpen(false)}
+        >
+          <button
+            type="button"
+            aria-label="Fechar"
+            onClick={() => setFotoPreviewOpen(false)}
+            className="absolute right-5 top-5 rounded-full p-2 text-white/90 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={pacInfoFoto}
+            alt={`Foto de ${pacInfo?.nome ?? "paciente"}`}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[70vh] max-w-[min(90vw,520px)] rounded-xl object-contain shadow-2xl ring-1 ring-white/20"
+          />
+          <p className="text-center text-sm text-white/80">Visualização Ampliada da Foto do Paciente</p>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              setFotoPreviewOpen(false);
+            }}
+            className="bg-violet-600 px-6 text-white hover:bg-violet-700"
+          >
+            Fechar Pré-visualização
+          </Button>
+        </div>
+      )}
+
       <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -9596,7 +9632,15 @@ function AgendaPage() {
           ) : pacInfo ? (
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-muted">
+                <button
+                  type="button"
+                  onClick={() => pacInfoFoto && setFotoPreviewOpen(true)}
+                  disabled={!pacInfoFoto}
+                  title={pacInfoFoto ? "Ampliar foto" : undefined}
+                  className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-muted ${
+                    pacInfoFoto ? "cursor-zoom-in transition hover:ring-2 hover:ring-primary/40" : ""
+                  }`}
+                >
                   <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground">
                     {(pacInfo.nome ?? "")
                       .trim()
@@ -9615,7 +9659,7 @@ function AgendaPage() {
                       onError={() => setPacInfoFoto(null)}
                     />
                   ) : null}
-                </div>
+                </button>
                 <div className="min-w-0">
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
