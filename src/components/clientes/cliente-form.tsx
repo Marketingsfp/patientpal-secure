@@ -356,7 +356,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         const sep = cur && field !== "email" && field !== "cpf" && field !== "telefone" && field !== "telefone2" &&
                     field !== "cep" && field !== "numero" &&
                     field !== "responsavel_cpf" && field !== "responsavel_telefone" ? " " : "";
-        return { ...f, [field]: cur + sep + text } as FormState;
+        const juntos = cur + sep + text;
+        if (field === "cpf" || field === "responsavel_cpf")
+          return { ...f, [field]: mascaraCPF(juntos) } as FormState;
+        if (field === "telefone" || field === "telefone2" || field === "responsavel_telefone")
+          return { ...f, [field]: mascaraTelefone(juntos) } as FormState;
+        return { ...f, [field]: juntos } as FormState;
       });
     };
     r.onerror = () => { toast.error("Erro no reconhecimento de voz."); setRecording(false); setVoiceField(null); };
