@@ -9092,8 +9092,16 @@ function AgendaPage() {
                     borderLeft = "border-l-4 border-blue-400";
                   }
 
+                  const ehAgora = a.id === agoraAgId;
+                  if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
+                  if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
+
                   return (
-                    <TableRow key={a.id} className={`${bgClass} ${borderLeft} transition-colors`}>
+                    <TableRow
+                      key={a.id}
+                      data-ag-id={a.id}
+                      className={`${bgClass} ${borderLeft} transition-colors`}
+                    >
                       {/* Checkbox */}
                       <TableCell className="py-1.5">
                         <Checkbox
