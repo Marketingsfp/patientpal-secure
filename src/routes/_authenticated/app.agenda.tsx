@@ -9008,38 +9008,38 @@ function AgendaPage() {
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="hidden lg:block w-full overflow-x-auto scrollbar-thin rounded-lg border border-border bg-card">
-          <Table className="w-full min-w-[1200px] table-fixed">
+        <div className="hidden lg:block w-full max-w-full overflow-x-hidden rounded-lg border border-border bg-card">
+          <Table className="w-full max-w-full table-auto">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
-                <TableHead className="w-[44px] rounded-tl-lg px-2" title="Selecione para ações em lote">
+                <TableHead className="w-8 rounded-tl-lg px-1.5" title="Selecione para ações em lote">
                   <Checkbox
                     checked={paginados.length > 0 && selecionados.size === paginados.length}
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-[60px] px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Ficha
                 </TableHead>
-                <TableHead className="w-[50px] px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Dia</TableHead>
-                <TableHead className="w-[85px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</TableHead>
-                <TableHead className="w-[100px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Horário</TableHead>
-                <TableHead className="w-[180px] truncate px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Dia</TableHead>
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</TableHead>
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Horário</TableHead>
+                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[260px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="w-[180px] px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[130px] px-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Situação
                 </TableHead>
-                <TableHead className="w-[90px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Observações
+                <TableHead className="w-8 px-1 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Obs
                 </TableHead>
-                <TableHead className="w-[70px] px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-8 px-1 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
