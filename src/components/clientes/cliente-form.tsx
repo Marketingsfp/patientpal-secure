@@ -5,7 +5,6 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
-import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { pacienteSchema, primeiroErro } from "@/lib/schemas/paciente";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { Button } from "@/components/ui/button";
