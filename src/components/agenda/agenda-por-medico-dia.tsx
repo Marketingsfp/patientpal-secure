@@ -170,10 +170,10 @@ export function AgendaPorMedicoDia({
                       >
                         {livre ? (
                           <>
-                            <p className="text-[11px] font-medium text-slate-400">
+                            <p className={somenteLeitura ? "text-[11px] font-semibold text-slate-900" : "text-[11px] font-medium text-slate-400"}>
                               {fmtHora(a.inicio)} – {fmtHora(a.fim)}
                             </p>
-                            <p className="text-[10px] font-semibold text-slate-400">
+                            <p className={somenteLeitura ? "text-[10px] font-semibold text-slate-900" : "text-[10px] font-semibold text-slate-400"}>
                               {somenteLeitura ? "Livre" : "+ Agendar"}
                             </p>
                           </>
