@@ -84,7 +84,7 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
       <Badge
         variant="secondary"
         title={textoAtual}
-        className="max-w-full whitespace-normal break-words rounded-md border-0 bg-muted/70 px-2 py-0.5 text-left text-xs font-medium text-muted-foreground"
+        className="inline-block max-w-[150px] truncate whitespace-nowrap align-middle rounded-md border-0 bg-muted/70 px-2 py-0.5 text-left text-xs font-medium text-muted-foreground"
       >
         {textoAtual}
       </Badge>
@@ -97,10 +97,15 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
         <button
           type="button"
           title={`${textoAtual} — clique para trocar o serviço`}
-          className="group flex w-full items-start gap-1 rounded-md border-0 bg-muted/60 px-2 py-1 text-left text-xs font-medium uppercase leading-snug text-foreground/80 transition-colors hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-[170px] items-center gap-1 rounded-md border-0 bg-muted/60 px-2 py-1 text-left text-xs font-medium uppercase leading-snug text-foreground/80 transition-colors hover:bg-primary/10 hover:text-primary"
         >
-          <span className="min-w-0 flex-1 whitespace-normal break-words">{textoAtual}</span>
-          <Pencil className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          <span
+            title={textoAtual}
+            className="inline-block min-w-0 max-w-[150px] flex-1 truncate whitespace-nowrap align-middle"
+          >
+            {textoAtual}
+          </span>
+          <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[340px] p-0" align="start">
