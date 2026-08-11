@@ -28,7 +28,7 @@ export const zTexto = (max: number = LIMITES.observacao) =>
 export const zOpcional = <T extends z.ZodTypeAny>(schema: T) =>
   z
     .union([schema, z.literal(""), z.null(), z.undefined()])
-    .transform((v) => (v === "" || v === undefined ? null : v));
+    .transform((v): z.infer<T> | null => (v === "" || v == null ? null : (v as z.infer<T>)));
 
 export const zNome = zLinhaObrigatoria(LIMITES.nome, 2);
 
