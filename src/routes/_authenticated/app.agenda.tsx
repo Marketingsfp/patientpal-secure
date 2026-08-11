@@ -9169,7 +9169,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Cliente */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[260px] max-w-[260px] overflow-hidden">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                         {ocultarPaciente ? (
                           <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
@@ -9211,7 +9211,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[180px]">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -9226,7 +9226,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[130px] whitespace-nowrap">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
@@ -9255,7 +9255,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="py-1.5 px-2 align-middle">
+                      <TableCell className="py-1.5 px-1 align-middle">
                         {(() => {
                           const obs = (a.observacoes ?? "").trim();
                           if (ehLivre || ocultarPaciente || !obs) {
