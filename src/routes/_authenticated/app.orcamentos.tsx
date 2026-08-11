@@ -24,6 +24,28 @@ import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import type { ReactNode } from "react";
+
+const ICON_BTN =
+  "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
+
+function IconAction({
+  label, onClick, children,
+}: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label={label} onClick={onClick} className={ICON_BTN}>
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+    </TooltipProvider>
+  );
+}
 type AuditRow = {
   id: string;
   user_email: string | null;
@@ -381,12 +403,12 @@ function OrcamentosPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input className="pl-9 rounded-xl" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+        <div className="bg-muted/50 p-1 rounded-full border border-border/40 inline-flex gap-1">
           {([
             ["hoje", "Dia"],
             ["semana", "Semana"],
@@ -398,7 +420,7 @@ function OrcamentosPage() {
             <button
               key={k}
               onClick={() => setPeriodo(k)}
-              className={`px-3 py-1.5 rounded ${periodo === k ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              className={`px-3 py-1 text-xs rounded-full transition-all ${periodo === k ? "bg-background text-foreground shadow-xs font-medium" : "text-muted-foreground hover:text-foreground"}`}
               title={label}
             >
               {label}
@@ -412,42 +434,53 @@ function OrcamentosPage() {
             <DateInputBR value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
           </div>
         )}
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
+        <div className="inline-flex items-center gap-1.5">
           {([
             ["todos", "Todos"],
             ["realizados", "Realizados"],
             ["nao_realizados", "Não realizados"],
-          ] as const).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => setFiltroRealizacao(k)}
-              className={`px-3 py-1.5 rounded ${filtroRealizacao === k ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-            >
-              {label}
-              {k !== "todos" && (
-                <span className="ml-1 opacity-70">
-                  ({k === "realizados"
-                    ? list.filter((o) => (o.agendamentos_total ?? 0) > 0).length
-                    : list.filter((o) => (o.agendamentos_total ?? 0) === 0).length})
-                </span>
-              )}
-            </button>
-          ))}
+          ] as const).map(([k, label]) => {
+            const active = filtroRealizacao === k;
+            const count = k === "realizados"
+              ? list.filter((o) => (o.agendamentos_total ?? 0) > 0).length
+              : k === "nao_realizados"
+              ? list.filter((o) => (o.agendamentos_total ?? 0) === 0).length
+              : null;
+            return (
+              <button
+                key={k}
+                onClick={() => setFiltroRealizacao(k)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                  active
+                    ? "border-primary/30 bg-primary/10 text-primary font-medium"
+                    : "border-border/50 bg-background text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                }`}
+              >
+                {label}
+                {count !== null && (
+                  <span className={`rounded-full px-1.5 py-0 text-[10px] tabular-nums ${active ? "bg-primary/15" : "bg-muted"}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="rounded-md border bg-card overflow-hidden flex-1 min-h-0 flex flex-col">
+      <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
-          <thead className="bg-muted sticky top-0 z-20">
-            <tr className="text-left">
-              <th className="px-3 py-2 w-20">Nº</th>
-              <th className="px-3 py-2 w-32">Data</th>
-              <th className="px-3 py-2">Paciente</th>
-              <th className="px-3 py-2">Médico</th>
-              <th className="px-3 py-2">Pagamento</th>
-              <th className="px-3 py-2 text-right w-32">Total</th>
-              <th className="px-3 py-2 w-32"></th>
+          <thead className="bg-muted/30 sticky top-0 z-20 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <tr className="text-left h-11 border-b border-border/50">
+              <th className="px-3 w-24">Nº</th>
+              <th className="px-3 w-32">Data</th>
+              <th className="px-3">Paciente</th>
+              <th className="px-3">Médico</th>
+              <th className="px-3">Pagamento</th>
+              <th className="px-3 text-right w-32 pr-4">Total</th>
+              <th className="px-3 w-36 text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -456,8 +489,8 @@ function OrcamentosPage() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Nenhum orçamento</td></tr>
             ) : filtered.map((o) => (
-              <tr key={o.id} className="border-t hover:bg-muted/30">
-                <td className="px-3 py-2 font-mono">
+              <tr key={o.id} className="h-14 border-b border-border/40 hover:bg-muted/30 transition-colors">
+                <td className="px-3 font-mono">
                   <div className="flex items-center gap-1.5">
                     <span>#{String(o.numero).padStart(5, "0")}</span>
                      {(o.agendamentos_total ?? 0) > 0 && (() => {
@@ -485,20 +518,20 @@ function OrcamentosPage() {
                      })()}
                   </div>
                 </td>
-                <td className="px-3 py-2">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
-                <td className="px-3 py-2 font-medium">
+                <td className="px-3 tabular-nums">{new Date(o.created_at).toLocaleDateString("pt-BR")}</td>
+                <td className="px-3 font-medium">
                   <div className="flex items-center gap-2">
                     <span>{o.paciente_nome}</span>
                     {o.categoria === "laboratorio" ? (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 uppercase">Laboratório</span>
+                      <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 font-medium px-2.5 py-0.5 rounded-full text-[11px] uppercase">Laboratório</span>
                     ) : o.categoria === "demais" ? (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">Serviços</span>
+                      <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium px-2.5 py-0.5 rounded-full text-[11px] uppercase">Serviços</span>
                     ) : null}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">{o.medico_nome ?? "—"}</td>
-                <td className="px-3 py-2 text-muted-foreground">{o.forma_pagamento ?? "—"}</td>
-                <td className="px-3 py-2 text-right font-semibold">
+                <td className="px-3 text-muted-foreground">{o.medico_nome?.trim() ? o.medico_nome : <span className="text-muted-foreground/60">—</span>}</td>
+                <td className="px-3 text-muted-foreground">{o.forma_pagamento?.trim() ? o.forma_pagamento : <span className="text-muted-foreground/60">—</span>}</td>
+                <td className="px-3 text-right pr-4 font-semibold text-foreground tabular-nums">
                   {BRL(Number(o.valor_total))}
                   {o.valores_pagamento && Object.keys(o.valores_pagamento).length > 1 && (
                     <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
@@ -510,11 +543,10 @@ function OrcamentosPage() {
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-2">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                <td className="px-3">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <IconAction
+                      label="Agendar este orçamento"
                       onClick={() => {
                         const numero = o.numero;
                         const isEmbed = typeof window !== "undefined" &&
@@ -525,28 +557,24 @@ function OrcamentosPage() {
                           navigate({ to: "/app/orcamentos-agenda", search: { orc: numero } as never });
                         }
                       }}
-                      title="Agendar este orçamento"
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
-                    </Button>
+                    </IconAction>
                     {podeEscrever && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConversaoId(o.id)}
-                        title="Converter itens (vender, agendar, cancelar, NFS-e)"
-                      >
+                      <IconAction label="Converter itens (vender, agendar, cancelar, NFS-e)" onClick={() => setConversaoId(o.id)}>
                         <Workflow className="h-4 w-4 text-primary" />
-                      </Button>
+                      </IconAction>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
+                    <IconAction label="Imprimir" onClick={() => void imprimir(o.id)}><Printer className="h-4 w-4" /></IconAction>
                     {podeVerHistorico && (
-                      <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
-                        <History className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                      <IconAction label="Histórico" onClick={() => setHistoricoId(o.id)}>
+                        <History className="h-4 w-4" />
+                      </IconAction>
                     )}
                     {podeEscrever && (
-                      <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <IconAction label="Excluir" onClick={() => void remover(o.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </IconAction>
                     )}
                   </div>
                 </td>
