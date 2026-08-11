@@ -827,3 +827,9 @@ html.theme-emerald {
     color: var(--muted-foreground);
   }
 }
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  &::-webkit-scrollbar { height: 8px; width: 8px; }
+  &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+}
