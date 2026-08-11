@@ -139,6 +139,17 @@ const isParent = (it: NavItem): it is NavParent => "children" in it;
 const navItemKey = (it: NavItem): string =>
   isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
 
+// Rotas que só ficam ativas em correspondência exata. "/app/clientes" tem
+// sub-rotas com item próprio no menu (ex.: "/app/clientes/duplicados"), então
+// o item pai não deve acender quando o usuário está numa sub-rota.
+const ROTAS_MATCH_EXATO: ReadonlySet<string> = new Set(["/app", "/app/clientes"]);
+
+/** True quando o item do menu (`to`) corresponde à rota atual. */
+export function itemDeMenuAtivo(pathname: string, to: string): boolean {
+  if (ROTAS_MATCH_EXATO.has(to)) return pathname === to;
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
 const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
