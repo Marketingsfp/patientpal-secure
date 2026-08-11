@@ -6774,7 +6774,7 @@ function AgendaPage() {
                 </Button>
               </DialogTrigger>
             )}
-            <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] overflow-y-auto scroll-hidden p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogContent className="w-[95vw] max-w-md sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
               <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
                   {editing
@@ -6789,7 +6789,7 @@ function AgendaPage() {
                     : "Preencha os dados abaixo. Campos com * são obrigatórios."}
                 </p>
               </DialogHeader>
-              <form onSubmit={submit} className="space-y-1.5 px-4 sm:px-6 py-2">
+              <form onSubmit={submit} className="flex-1 min-h-0 overflow-y-auto scroll-hidden space-y-1.5 px-4 sm:px-6 py-2">
                 {editing && open && <FichaEmUsoAlert agendamentoId={editing.id} />}
                 {editing && pagosSet.has(editing.id) && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
@@ -7237,7 +7237,7 @@ function AgendaPage() {
                     />
                   </div>
                 </fieldset>
-                <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                <DialogFooter className="sticky bottom-0 z-10 shrink-0 bg-background pt-3 pb-3 -mx-4 px-4 sm:-mx-6 sm:px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 rounded-b-2xl flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
                     <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
