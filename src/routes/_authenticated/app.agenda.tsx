@@ -9588,6 +9588,40 @@ function AgendaPage() {
         />
       )}
 
+      {fotoPreviewOpen && pacInfoFoto && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setFotoPreviewOpen(false)}
+        >
+          <button
+            type="button"
+            aria-label="Fechar"
+            onClick={() => setFotoPreviewOpen(false)}
+            className="absolute right-5 top-5 rounded-full p-2 text-white/90 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={pacInfoFoto}
+            alt={`Foto de ${pacInfo?.nome ?? "paciente"}`}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[70vh] max-w-[min(90vw,520px)] rounded-xl object-contain shadow-2xl ring-1 ring-white/20"
+          />
+          <p className="text-center text-sm text-white/80">Visualização Ampliada da Foto do Paciente</p>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              setFotoPreviewOpen(false);
+            }}
+            className="bg-violet-600 px-6 text-white hover:bg-violet-700"
+          >
+            Fechar Pré-visualização
+          </Button>
+        </div>
+      )}
+
       <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
