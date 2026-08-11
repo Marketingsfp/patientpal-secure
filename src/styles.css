@@ -734,25 +734,27 @@ html.theme-emerald {
     border-collapse: collapse !important;
   }
   .print-document table,
-  .print-document tr,
-  .print-document td,
-  .print-document th {
+  .print-document table * {
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
   .print-document td,
   .print-document th {
     vertical-align: middle;
     max-width: 100% !important;
-    word-break: break-word;
+    word-break: break-word !important;
     word-wrap: break-word;
-    overflow-wrap: anywhere;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
     position: static !important;
     float: none !important;
   }
-  .print-document table.lgpd-consent td:first-child { width: 85% !important; }
+  .print-document td[style*="width"],
+  .print-document th[style*="width"] { width: auto !important; }
+  .print-document table.lgpd-consent td:first-child { width: 82% !important; }
   .print-document table.lgpd-consent td:last-child {
-    width: 15% !important;
-    text-align: center;
+    width: 18% !important;
+    text-align: center !important;
   }
   .print-document tr,
   .print-document thead,
