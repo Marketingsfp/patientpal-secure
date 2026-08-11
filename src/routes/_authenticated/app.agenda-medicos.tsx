@@ -256,11 +256,12 @@ function AgendaMedicosPage() {
             items={items}
             fmtHora={fmtHora}
             mostrarResumo={false}
+            somenteLeitura
             onAgClick={(a) => {
               const orig = ags.find((x) => x.id === a.id);
               if (orig) setDetalhe(orig);
             }}
-            onSlotClick={() => navigate({ to: "/app/agenda" })}
+            onSlotClick={() => {}}
           />
         )}
       </div>
