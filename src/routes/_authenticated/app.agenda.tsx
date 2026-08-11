@@ -3705,6 +3705,54 @@ function AgendaPage() {
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // ---- "Agora": destaque + rolagem automática para o horário atual (só hoje)
+  const ehHojeAgenda = dataRef === hojeBR();
+  const [agoraTs, setAgoraTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!ehHojeAgenda) return;
+    const t = window.setInterval(() => setAgoraTs(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, [ehHojeAgenda]);
+
+  /** Id do agendamento cuja janela contém o horário atual; senão, o próximo do dia. */
+  const agoraAgId = useMemo(() => {
+    if (!ehHojeAgenda) return null;
+    const agora = agoraTs;
+    let proximo: { id: string; ini: number } | null = null;
+    for (const a of filtradosOrdenados) {
+      const ini = new Date(a.inicio).getTime();
+      const fim = new Date(a.fim).getTime();
+      if (agora >= ini && agora < fim) return a.id;
+      if (ini > agora && (!proximo || ini < proximo.ini)) proximo = { id: a.id, ini };
+    }
+    return proximo?.id ?? null;
+  }, [ehHojeAgenda, agoraTs, filtradosOrdenados]);
+
+  const irParaAgora = useCallback(() => {
+    if (!agoraAgId) return;
+    const idx = filtradosOrdenados.findIndex((a) => a.id === agoraAgId);
+    if (idx >= 0) {
+      const paginaAlvo = Math.floor(idx / PAGE_SIZE) + 1;
+      if (paginaAlvo !== page) setPage(paginaAlvo);
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-ag-id="${agoraAgId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }, [agoraAgId, filtradosOrdenados, page]);
+
+  const autoScrollFeitoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ehHojeAgenda || !agoraAgId) return;
+    if (autoScrollFeitoRef.current === dataRef) return;
+    autoScrollFeitoRef.current = dataRef;
+    irParaAgora();
+  }, [ehHojeAgenda, agoraAgId, dataRef, irParaAgora]);
+  useEffect(() => {
+    autoScrollFeitoRef.current = null;
+  }, [dataRef]);
+
   const limparFiltros = () => {
     setFiltroMedico("todos");
     setFiltroEspecialidade("todos");
@@ -6668,6 +6716,16 @@ function AgendaPage() {
               <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
                 Visão Geral
               </span>
+              {ehHojeAgenda && agoraAgId && (
+                <button
+                  type="button"
+                  onClick={irParaAgora}
+                  title="Rolar até o horário atual"
+                  className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                >
+                  Ir para agora
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -9044,8 +9102,16 @@ function AgendaPage() {
                     borderLeft = "border-l-4 border-blue-400";
                   }
 
+                  const ehAgora = a.id === agoraAgId;
+                  if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
+                  if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
+
                   return (
-                    <TableRow key={a.id} className={`${bgClass} ${borderLeft} transition-colors`}>
+                    <TableRow
+                      key={a.id}
+                      data-ag-id={a.id}
+                      className={`${bgClass} ${borderLeft} transition-colors`}
+                    >
                       {/* Checkbox */}
                       <TableCell className="py-1.5">
                         <Checkbox
