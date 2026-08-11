@@ -361,20 +361,32 @@ export async function printContrato(contratoId: string) {
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
   // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
   const printCss = `<style id="print-fix">
-  @page { size: A4 portrait; margin: 15mm 12mm; }
+  @page { size: A4 portrait; margin: 12mm 14mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   tr, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
   h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
   img { display: block !important; visibility: visible !important; max-width: 100%; }
-  table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+  table, tr, td, th { box-sizing: border-box !important; }
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+  col { max-width: 100% !important; }
   td, th {
     vertical-align: middle;
+    max-width: 100% !important;
+    word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: anywhere;
     position: static !important;
     float: none !important;
   }
+  /* Tabela de consentimento (Anexo I – LGPD): texto 85% / opções "S N" 15% */
+  table.lgpd-consent td:first-child { width: 85% !important; }
+  table.lgpd-consent td:last-child { width: 15% !important; text-align: center; }
   td[rowspan], th[rowspan] { vertical-align: middle !important; }
   .contract-table { width: 100%; border-collapse: collapse; }
   .contract-table th,
@@ -385,7 +397,7 @@ export async function printContrato(contratoId: string) {
     font-weight: bold !important;
   }
   @media print {
-    @page { size: A4 portrait; margin: 15mm 12mm; }
+    @page { size: A4 portrait; margin: 12mm 14mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body {
       height: auto !important;
@@ -393,7 +405,7 @@ export async function printContrato(contratoId: string) {
       overflow: visible !important;
       display: block !important;
     }
-    body { margin: 0 auto !important; max-width: 186mm !important; background: #fff !important; }
+    body { margin: 0 auto !important; max-width: 182mm !important; background: #fff !important; }
     body * { max-height: none !important; overflow: visible !important; }
     p, li, div, td, th { orphans: 3; widows: 3; }
     p, .clausula, .contract-section, li { page-break-inside: avoid; break-inside: avoid; }
@@ -401,7 +413,11 @@ export async function printContrato(contratoId: string) {
     img { display: block !important; visibility: visible !important; }
     tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
     table { page-break-inside: auto; break-inside: auto; }
-    table { table-layout: fixed !important; width: 100% !important; }
+    table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; }
+    table, tr, td, th { box-sizing: border-box !important; }
+    td, th { max-width: 100% !important; word-break: break-word; overflow-wrap: anywhere; }
+    table.lgpd-consent td:first-child { width: 85% !important; }
+    table.lgpd-consent td:last-child { width: 15% !important; text-align: center; }
     h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
     .contract-table th,
     .contract-table .header-row,
@@ -410,7 +426,41 @@ export async function printContrato(contratoId: string) {
       color: #ffffff !important;
     }
   }
-</style>`;
+</style>
+<script id="print-fix-tables">
+(function () {
+  function fixTables() {
+  try {
+    document.querySelectorAll("table").forEach(function (t) {
+      t.removeAttribute("width");
+      t.style.width = "100%";
+      t.style.maxWidth = "100%";
+      var rows = Array.prototype.slice.call(t.rows);
+      var consent = rows.length > 1 && rows.every(function (r) { return r.cells.length <= 2; }) &&
+        rows.some(function (r) {
+          return r.cells.length === 2 && /^\\s*s\\s*[\\/|-]?\\s*n\\s*$/i.test((r.cells[1].textContent || ""));
+        });
+      if (consent) t.classList.add("lgpd-consent");
+      rows.forEach(function (r) {
+        Array.prototype.slice.call(r.cells).forEach(function (c) {
+          c.removeAttribute("width");
+          if (consent && r.cells.length === 2) {
+            c.style.width = c.cellIndex === 0 ? "85%" : "15%";
+          } else if (c.style.width && c.style.width.indexOf("px") > -1) {
+            c.style.width = "";
+          }
+        });
+      });
+    });
+  } catch (e) {}
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fixTables);
+  } else {
+    fixTables();
+  }
+})();
+</script>`;
 
   const bodyHtml = isFullHtml
     ? (/<\/head>/i.test(corpo)
