@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, FileStack } from "lucide-react";
+import { Building2, Check, FileStack, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -98,30 +98,51 @@ function NfseConfigPage() {
       selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional"
       title="Emitentes NFS-e"
       subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
-      icon={<Building2 className="h-6 w-6 text-primary" />}
+      icon={<Building2 className="h-5 w-5" />}
+      premium
+      addLabel="Novo Emitente"
       orderBy={{ column: "created_at", ascending: false }}
       dialogClassName="max-w-5xl w-[95vw]"
       readOnly={!podeEscrever}
       columns={[
-        { key: "nome", header: "Nome", render: (r) => <span className="font-medium">{r.nome}</span> },
-        { key: "cnpj", header: "CNPJ", className: "w-44", render: (r) => r.cnpj },
-        { key: "mun", header: "Município", render: (r) => `${r.municipio}/${r.uf}` },
-        { key: "iss", header: "ISS", className: "w-20 text-right", render: (r) => `${(Number(r.aliquota_iss) * 100).toFixed(2)}%` },
+        { key: "nome", header: "Nome", render: (r) => <span className="font-semibold text-sm">{r.nome}</span> },
+        { key: "cnpj", header: "CNPJ", className: "w-44", render: (r) => <span className="font-mono text-xs text-foreground">{r.cnpj}</span> },
+        { key: "mun", header: "Município", render: (r) => <span className="text-sm text-muted-foreground">{`${r.municipio}/${r.uf}`}</span> },
+        {
+          key: "iss",
+          header: "ISS",
+          className: "w-20 text-right",
+          render: (r) => <span className="font-mono text-xs text-foreground">{`${(Number(r.aliquota_iss) * 100).toFixed(2)}%`}</span>,
+        },
         {
           key: "amb",
           header: "Ambiente",
-          className: "w-28",
+          className: "w-32",
           render: (r) => (
             <span
-              className={`text-xs px-2 py-0.5 rounded-full capitalize ${
-                r.focus_ambiente === "producao" ? "bg-green-500/10 text-green-700" : "bg-amber-500/10 text-amber-700"
+              className={`font-medium px-2.5 py-0.5 rounded-full text-[11px] border ${
+                r.focus_ambiente === "producao"
+                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                  : "bg-amber-500/10 text-amber-600 border-amber-500/20"
               }`}
             >
-              {r.focus_ambiente}
+              {r.focus_ambiente === "producao" ? "Produção" : "Homologação"}
             </span>
           ),
         },
-        { key: "padrao", header: "Padrão", className: "w-20", render: (r) => (r.padrao ? "★" : "") },
+        {
+          key: "padrao",
+          header: "Padrão",
+          className: "w-24",
+          render: (r) =>
+            r.padrao ? (
+              <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 border border-amber-500/20 font-semibold px-2 py-0.5 rounded-full text-[10px]">
+                <Star className="h-3 w-3 fill-current" /> Padrão
+              </span>
+            ) : (
+              <span className="block text-center text-muted-foreground/50">—</span>
+            ),
+        },
       ]}
       emptyForm={{
         nome: "", cnpj: "", razao_social: "", nome_fantasia: "",
@@ -358,44 +379,61 @@ function ClinicaNfseModoCard() {
     );
   };
 
+  const opcoes = [
+    {
+      v: "por_item" as const,
+      titulo: "Por item",
+      desc: "Uma NFS-e para cada procedimento pago. Comportamento padrão.",
+    },
+    {
+      v: "agrupada" as const,
+      titulo: "Agrupada por orçamento",
+      desc: "Uma única NFS-e contendo todos os itens pagos do orçamento (ex.: Menino Jesus).",
+    },
+  ];
+
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-2xs space-y-4">
       <div className="flex items-start gap-3">
-        <FileStack className="h-5 w-5 text-primary mt-0.5" />
+        <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/15">
+          <FileStack className="h-5 w-5" />
+        </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold">Modo de emissão de NFS-e</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-sm font-semibold tracking-tight">Modo de emissão de NFS-e</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Vale para toda a clínica. A regra é aplicada na emissão a partir do orçamento — comissão, repasse e financeiro continuam por atendimento.
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <button
-          type="button"
-          disabled={loading || saving || !podeEscrever}
-          onClick={() => salvar("por_item")}
-          className={`text-left rounded-md border p-3 transition ${
-            modo === "por_item" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
-          }`}
-        >
-          <div className="text-sm font-medium">Por item</div>
-          <div className="text-xs text-muted-foreground">
-            Uma NFS-e para cada procedimento pago. Comportamento padrão.
-          </div>
-        </button>
-        <button
-          type="button"
-          disabled={loading || saving || !podeEscrever}
-          onClick={() => salvar("agrupada")}
-          className={`text-left rounded-md border p-3 transition ${
-            modo === "agrupada" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
-          }`}
-        >
-          <div className="text-sm font-medium">Agrupada por orçamento</div>
-          <div className="text-xs text-muted-foreground">
-            Uma única NFS-e contendo todos os itens pagos do orçamento (ex.: Menino Jesus).
-          </div>
-        </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {opcoes.map((o) => {
+          const ativo = modo === o.v;
+          return (
+            <button
+              key={o.v}
+              type="button"
+              disabled={loading || saving || !podeEscrever}
+              onClick={() => salvar(o.v)}
+              className={`text-left rounded-2xl p-4 cursor-pointer transition-all flex items-start gap-3 relative disabled:opacity-60 disabled:cursor-not-allowed ${
+                ativo
+                  ? "border-2 border-primary bg-primary/5 shadow-2xs"
+                  : "border border-border/60 hover:border-primary/40 bg-card"
+              }`}
+            >
+              <span
+                className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${
+                  ativo ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                }`}
+              >
+                {ativo && <Check className="h-3 w-3" />}
+              </span>
+              <span className="flex-1">
+                <span className="block text-sm font-semibold">{o.titulo}</span>
+                <span className="block text-xs text-muted-foreground mt-0.5">{o.desc}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

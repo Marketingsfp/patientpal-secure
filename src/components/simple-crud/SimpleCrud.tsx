@@ -55,12 +55,16 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   editLabel?: string;
   /** When true, hides create/edit/delete actions (read-only permission level). */
   readOnly?: boolean;
+  /** Optional custom label for the create button (default: "Novo"). */
+  addLabel?: string;
+  /** Opt-in premium visual style for the header/table (does not affect other pages). */
+  premium?: boolean;
 }
 
 export function SimpleCrud<T extends { id: string }, F>({
   table, selectColumns, title, subtitle, icon, columns,
   emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy, dialogClassName,
-  newLabel, editLabel, readOnly,
+  newLabel, editLabel, readOnly, addLabel, premium,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<T[]>([]);
@@ -143,13 +147,36 @@ export function SimpleCrud<T extends { id: string }, F>({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">{icon} {title}</h1>
-          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      {premium ? (
+        <div className="flex items-center justify-between gap-3 mt-8 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center">
+              {icon}
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+              {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+            </div>
+          </div>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={openNew}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2.5 rounded-xl shadow-2xs hover:shadow-xs transition-all flex items-center gap-2 text-xs"
+            >
+              <Plus className="h-4 w-4" /> {addLabel ?? "Novo"}
+            </button>
+          )}
         </div>
-        {!readOnly && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>}
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold flex items-center gap-2">{icon} {title}</h1>
+            {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+          </div>
+          {!readOnly && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> {addLabel ?? "Novo"}</Button>}
+        </div>
+      )}
 
       {searchFields && searchFields.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
@@ -160,12 +187,19 @@ export function SimpleCrud<T extends { id: string }, F>({
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className={premium ? "rounded-2xl border border-border/50 bg-card shadow-2xs overflow-hidden" : "rounded-lg border border-border bg-card overflow-hidden"}>
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/40">
-              {columns.map(c => <TableHead key={c.key} className={c.className}>{c.header}</TableHead>)}
-              <TableHead className="w-28 text-right">Ações</TableHead>
+            <TableRow className={premium ? "bg-muted/30 border-b border-border/50 h-11 hover:bg-muted/30" : "bg-muted/40"}>
+              {columns.map(c => (
+                <TableHead
+                  key={c.key}
+                  className={`${premium ? "text-[11px] font-semibold uppercase tracking-wider text-muted-foreground " : ""}${c.className ?? ""}`}
+                >
+                  {c.header}
+                </TableHead>
+              ))}
+              <TableHead className={`w-28 text-right${premium ? " text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" : ""}`}>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -176,14 +210,37 @@ export function SimpleCrud<T extends { id: string }, F>({
             ) : filtrados.length === 0 ? (
               <TableRow><TableCell colSpan={columns.length + 1} className="text-center py-8 text-muted-foreground">Nenhum registro.</TableCell></TableRow>
             ) : filtrados.map(r => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} className={premium ? "hover:bg-muted/30 transition-colors h-14 border-b border-border/40" : undefined}>
                 {columns.map(c => <TableCell key={c.key} className={c.className}>{c.render(r)}</TableCell>)}
                 <TableCell className="text-right">
                   {!readOnly && (
+                    premium ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          title="Editar"
+                          aria-label="Editar"
+                          onClick={() => openEdit(r)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Excluir"
+                          aria-label="Excluir"
+                          onClick={() => setToDelete(r)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
                     <>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setToDelete(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </>
+                    )
                   )}
                 </TableCell>
               </TableRow>
