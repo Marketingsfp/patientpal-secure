@@ -1277,9 +1277,10 @@ function NovoOrcamentoDialog({
           </div>
         </div>
         )}
+        </div>
 
         {categoria && (
-          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
+          <DialogFooter className="shrink-0 border-t bg-background p-4 flex justify-end gap-2 rounded-b-xl">
             <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
             <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
           </DialogFooter>
