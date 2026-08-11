@@ -18,6 +18,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -105,6 +106,7 @@ function TriagemEnfermagemPage() {
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
+  const [cidadeMap, setCidadeMap] = useState<Map<string, string | null>>(new Map());
   const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
@@ -139,6 +141,14 @@ function TriagemEnfermagemPage() {
     if (error) { mostrarErro(error); return; }
     const lista = (data ?? []) as unknown as Ag[];
     setAgs(lista);
+    // Cidade dos pacientes — usada para o alerta de município distante.
+    const pacIds = Array.from(new Set(lista.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+    if (pacIds.length) {
+      const { data: pacs } = await supabase.from("pacientes").select("id,cidade").in("id", pacIds);
+      setCidadeMap(new Map((pacs ?? []).map((p) => [p.id as string, (p.cidade as string | null) ?? null])));
+    } else {
+      setCidadeMap(new Map());
+    }
     const status = await agendamentosStatusPagamento(lista.map((a) => a.id));
     const pagos = new Set<string>();
     status.forEach((s, id) => { if (s.pago) pagos.add(id); });
@@ -373,6 +383,7 @@ function TriagemEnfermagemPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5 justify-end">
+                  <BadgePacienteDistante cidade={g.paciente_id ? cidadeMap.get(g.paciente_id) : null} compact />
                   {!pago && (
                     <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-medium px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1">
                       <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE

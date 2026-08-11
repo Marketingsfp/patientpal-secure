@@ -41,6 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
@@ -1681,6 +1682,7 @@ function AgendaPage() {
   useEffect(() => { setNfseSel(new Set()); }, [dataRef]);
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
+  const [cidadeMap, setCidadeMap] = useState<Map<string, string | null>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [recursoIds, setRecursoIds] = useState<Set<string>>(new Set());
@@ -2757,7 +2759,7 @@ function AgendaPage() {
     );
     if (pacIds.length) {
       const [{ data: nasc }, { data: contratos }, { data: deps }] = await Promise.all([
-        supabase.from("pacientes").select("id,data_nascimento").in("id", pacIds),
+        supabase.from("pacientes").select("id,data_nascimento,cidade").in("id", pacIds),
         supabase
           .from("contratos_assinatura")
           .select("paciente_id,status,cb_convenios(nome)")
@@ -2775,6 +2777,9 @@ function AgendaPage() {
       const map = new Map<string, string | null>();
       (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
       setNascMap(map);
+      const cidMap = new Map<string, string | null>();
+      (nasc ?? []).forEach((p: any) => cidMap.set(p.id, p.cidade ?? null));
+      setCidadeMap(cidMap);
       const cmap = new Map<string, string>();
       ((contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>).forEach((c) => {
         if (c.paciente_id && !cmap.has(c.paciente_id)) {
@@ -2795,6 +2800,7 @@ function AgendaPage() {
     } else {
       setNascMap(new Map());
       setConvenioMap(new Map());
+      setCidadeMap(new Map());
     }
     // Marca agendamentos pagos (receita vinculada em fin_lancamentos)
     const ids = agendaRows.map((a) => a.id);
@@ -9188,6 +9194,9 @@ function AgendaPage() {
                               </span>
                             )}
                             <span className="truncate">{a.paciente_nome}</span>
+                            {a.paciente_id && (
+                              <BadgePacienteDistante cidade={cidadeMap.get(a.paciente_id)} compact />
+                            )}
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
                                 ORÇ
