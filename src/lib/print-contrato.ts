@@ -465,7 +465,7 @@ export async function printContrato(contratoId: string) {
     background: transparent !important;
   }
   @media print {
-    @page { size: A4 portrait; margin: 12mm 14mm; }
+    @page { size: A4 portrait; margin: 10mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body {
       height: auto !important;
@@ -473,14 +473,20 @@ export async function printContrato(contratoId: string) {
       overflow: visible !important;
       display: block !important;
     }
-    body { margin: 0 auto !important; max-width: 182mm !important; background: #fff !important; }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      background: #fff !important;
+    }
     body * { max-height: none !important; overflow: visible !important; }
     p, li, div, td, th { orphans: 3; widows: 3; }
-    p, .clausula, .contract-section, li { page-break-inside: avoid; break-inside: avoid; }
+    p, .clausula, .contract-section, li, table, tbody, thead
+      { page-break-inside: avoid; break-inside: avoid; }
     h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
     img { display: block !important; visibility: visible !important; }
     tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
-    table { page-break-inside: auto; break-inside: auto; }
     /* Sobrescreve larguras inline geradas pelo editor e contém cada tabela
        estritamente dentro da área útil da página A4. */
     table, table * {
@@ -491,11 +497,17 @@ export async function printContrato(contratoId: string) {
       width: 100% !important;
       table-layout: fixed !important;
       border-collapse: collapse !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
     }
     td, th {
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
       white-space: normal !important;
+      border: 1px solid #9ca3af !important;
+      padding: 4px 8px !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
     }
     td[style*="width"], th[style*="width"] { width: auto !important; }
     table.lgpd-consent td:first-child { width: 82% !important; }
