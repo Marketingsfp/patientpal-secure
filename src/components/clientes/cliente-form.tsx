@@ -729,28 +729,39 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       toast.error(vResp.mensagem ?? "Nome do responsável inválido.");
       return;
     }
-    if (!form.telefone.trim()) { toast.error("Informe o telefone."); return; }
-    if (!form.data_nascimento) { toast.error("Informe a data de nascimento."); return; }
-    // Faixa plausível da data de nascimento
-    const dn = new Date(form.data_nascimento + "T00:00:00");
-    if (isNaN(dn.getTime())) { toast.error("Data de nascimento inválida."); return; }
-    const hoje = new Date();
-    if (dn > hoje) { toast.error("Data de nascimento não pode ser futura."); return; }
-    const anosDiff = hoje.getFullYear() - dn.getFullYear();
-    if (anosDiff > 120) { toast.error("Data de nascimento inválida (idade acima de 120 anos)."); return; }
-    if (dn.getFullYear() < 1900) { toast.error("Data de nascimento inválida (ano anterior a 1900)."); return; }
-    // Valida e-mail sem depender do tooltip nativo do HTML5
-    if (form.email.trim()) {
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
-      if (!emailOk) { toast.error("E-mail inválido."); return; }
+    // Validação e sanitização centralizadas (Zod): remove caracteres de
+    // controle/invisíveis, aplica limites de tamanho e valida formatos.
+    const parsed = pacienteSchema.safeParse({
+      nome: nomeTrim,
+      cpf: form.cpf,
+      telefone: form.telefone,
+      telefone2: form.telefone2,
+      email: form.email,
+      data_nascimento: form.data_nascimento,
+      sexo: form.sexo,
+      ativo: form.ativo,
+      cep: form.cep,
+      logradouro: form.logradouro,
+      numero: form.numero,
+      complemento: form.complemento,
+      bairro: form.bairro,
+      cidade: form.cidade,
+      estado: form.estado,
+      responsavel_nome: vResp.valor ?? form.responsavel_nome,
+      responsavel_cpf: form.responsavel_cpf,
+      responsavel_telefone: form.responsavel_telefone,
+      responsavel_parentesco: form.responsavel_parentesco,
+      numero_pasta: form.numero_pasta,
+      codigo_prontuario: form.codigo_prontuario,
+    });
+    if (!parsed.success) {
+      toast.error(primeiroErro(parsed.error));
+      return;
     }
-    if (form.cpf.trim() && !isCPFValido(form.cpf)) { toast.error("CPF inválido."); return; }
-    if (form.responsavel_cpf.trim() && !isCPFValido(form.responsavel_cpf)) {
-      toast.error("CPF do responsável inválido."); return;
-    }
+    const dados = parsed.data;
     // Impede CPF duplicado na mesma clínica
-    if (form.cpf.trim()) {
-      const cpfDigits = somenteDigitos(form.cpf);
+    if (dados.cpf) {
+      const cpfDigits = dados.cpf;
       const { data: dup } = await supabase
         .from("pacientes")
         .select("id, nome")
@@ -765,33 +776,31 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
     setSaving(true);
     const payload = {
-      nome: form.nome.trim(),
-      cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
-      telefone: form.telefone.trim() || null,
-      telefone2: form.telefone2.trim() || null,
-      email: form.email.trim() || null,
-      data_nascimento: form.data_nascimento || null,
-      sexo: (["masculino","feminino","outro","nao_informar"].includes(form.sexo)
-        ? form.sexo
-        : "nao_informar"),
-      ativo: form.ativo,
-      cep: form.cep.trim() || null,
-      logradouro: form.logradouro.trim() || null,
-      numero: form.numero.trim() || null,
-      complemento: form.complemento.trim() || null,
-      bairro: form.bairro.trim() || null,
-      cidade: form.cidade.trim() || null,
-      estado: form.estado.trim() || null,
-      responsavel_nome: form.responsavel_nome.trim() || null,
-      responsavel_cpf: form.responsavel_cpf.trim() ? somenteDigitos(form.responsavel_cpf) : null,
-      responsavel_telefone: form.responsavel_telefone.trim() || null,
-      responsavel_parentesco: form.responsavel_parentesco.trim() || null,
+      nome: dados.nome,
+      cpf: dados.cpf,
+      telefone: dados.telefone,
+      telefone2: dados.telefone2,
+      email: dados.email,
+      data_nascimento: dados.data_nascimento,
+      sexo: dados.sexo,
+      ativo: dados.ativo,
+      cep: dados.cep,
+      logradouro: dados.logradouro,
+      numero: dados.numero,
+      complemento: dados.complemento,
+      bairro: dados.bairro,
+      cidade: dados.cidade,
+      estado: dados.estado,
+      responsavel_nome: dados.responsavel_nome,
+      responsavel_cpf: dados.responsavel_cpf,
+      responsavel_telefone: dados.responsavel_telefone,
+      responsavel_parentesco: dados.responsavel_parentesco,
       clinica_id: clinicaId,
     } as Record<string, unknown>;
     // Número de prontuário / pasta: só admin pode alterar.
     if (isAdmin) {
-      payload.numero_pasta = form.numero_pasta.trim() || null;
-      payload.codigo_prontuario = form.codigo_prontuario.trim() || null;
+      payload.numero_pasta = dados.numero_pasta;
+      payload.codigo_prontuario = dados.codigo_prontuario;
     }
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
