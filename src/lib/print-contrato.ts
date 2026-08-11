@@ -61,9 +61,15 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
   out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
     vars[key] && String(vars[key]).trim() ? "" : body,
   );
-  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+  return out.replace(/\{\{(\w+)\}\}/g, (match, k, offset: number) => {
     const raw = vars[k] ?? "";
     const safe = esc(raw);
+    // Se a variável estiver dentro de uma tag (ex.: style="..."/alt="..."),
+    // nunca injetamos HTML — isso quebraria o CSS inline do modelo salvo.
+    const antes = out.slice(Math.max(0, offset - 400), offset);
+    const abre = antes.lastIndexOf("<");
+    const fecha = antes.lastIndexOf(">");
+    if (abre > fecha) return safe;
     // Reduz o tamanho real da fonte (não só o transform visual) para os
     // valores longos caberem na coluna dos templates absolutos.
     const len = raw.length;
