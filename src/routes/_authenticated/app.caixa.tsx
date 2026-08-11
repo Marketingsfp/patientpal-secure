@@ -3251,7 +3251,7 @@ function Page() {
       </Dialog>
 
       {/* === Modal Movimento === */}
-      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) setOpenMov(null); }}>
+      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) { setOpenMov(null); setMovDescTouched(false); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
             <DialogDescription>
@@ -3268,8 +3268,18 @@ function Page() {
               <CurrencyInput value={movValor} onChange={setMovValor} />
             </div>
             <div>
-              <Label>Descrição</Label>
-              <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
+              <Label>Descrição <span className="text-destructive">*</span></Label>
+              <Input
+                value={movDesc}
+                onChange={(e) => setMovDesc(e.target.value)}
+                onBlur={() => setMovDescTouched(true)}
+                placeholder="Motivo / referência"
+                aria-invalid={movDescTouched && movDesc.trim().length < 3}
+                aria-required="true"
+              />
+              {movDescTouched && movDesc.trim().length < 3 && (
+                <p className="mt-1 text-xs text-destructive">Descrição é obrigatória (mínimo 3 caracteres).</p>
+              )}
             </div>
             {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
               <div>
@@ -3332,8 +3342,8 @@ function Page() {
               </div>
             )}
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Lançar</Button>
+              <Button type="button" variant="ghost" onClick={() => { setOpenMov(null); setMovDescTouched(false); }}>Cancelar</Button>
+              <Button type="submit" disabled={saving || movDesc.trim().length < 3 || !(Number(movValor) > 0)} data-primary>Lançar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
