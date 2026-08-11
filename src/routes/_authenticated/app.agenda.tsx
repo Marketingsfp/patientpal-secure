@@ -9140,15 +9140,15 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs">{fmtData(a.inicio)}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[11px] text-muted-foreground">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-[11px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Profissional */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[180px] max-w-[180px] overflow-hidden">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                         {(() => {
                           const label = medicoNomeAgendamento(a);
                           const m = medicos.find((x) => x.id === a.medico_id);
