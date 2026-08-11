@@ -661,7 +661,7 @@ html.theme-emerald {
  * e @page interno, portanto não são afetadas por esta regra. */
 @page { size: A4 portrait; margin: 12mm; }
 @media print {
-  @page { size: A4 portrait; margin: 15mm 12mm; }
+  @page { size: A4 portrait; margin: 12mm 14mm; }
 
   /* Nada pode limitar altura/rolagem: o texto precisa fluir para a página 2. */
   html, body {
@@ -711,7 +711,7 @@ html.theme-emerald {
     display: block !important;
     float: none !important;
     width: 100% !important;
-    max-width: 186mm !important;
+    max-width: 182mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
     box-shadow: none !important;

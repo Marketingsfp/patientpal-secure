@@ -361,7 +361,7 @@ export async function printContrato(contratoId: string) {
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
   // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
   const printCss = `<style id="print-fix">
-  @page { size: A4 portrait; margin: 15mm 12mm; }
+  @page { size: A4 portrait; margin: 12mm 14mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   tr, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
@@ -397,7 +397,7 @@ export async function printContrato(contratoId: string) {
     font-weight: bold !important;
   }
   @media print {
-    @page { size: A4 portrait; margin: 15mm 12mm; }
+    @page { size: A4 portrait; margin: 12mm 14mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body {
       height: auto !important;
@@ -405,7 +405,7 @@ export async function printContrato(contratoId: string) {
       overflow: visible !important;
       display: block !important;
     }
-    body { margin: 0 auto !important; max-width: 186mm !important; background: #fff !important; }
+    body { margin: 0 auto !important; max-width: 182mm !important; background: #fff !important; }
     body * { max-height: none !important; overflow: visible !important; }
     p, li, div, td, th { orphans: 3; widows: 3; }
     p, .clausula, .contract-section, li { page-break-inside: avoid; break-inside: avoid; }
