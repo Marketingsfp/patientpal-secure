@@ -84,7 +84,7 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
       <Badge
         variant="secondary"
         title={textoAtual}
-        className="inline-block max-w-[150px] truncate whitespace-nowrap align-middle rounded-md border-0 bg-muted/70 px-2 py-0.5 text-left text-xs font-medium text-muted-foreground"
+        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[11px] font-medium leading-snug text-muted-foreground"
       >
         {textoAtual}
       </Badge>
@@ -97,11 +97,11 @@ export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled,
         <button
           type="button"
           title={`${textoAtual} — clique para trocar o serviço`}
-          className="group flex w-full max-w-[170px] items-center gap-1 rounded-md border-0 bg-muted/60 px-2 py-1 text-left text-xs font-medium uppercase leading-snug text-foreground/80 transition-colors hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[11px] font-medium uppercase leading-snug text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
         >
           <span
             title={textoAtual}
-            className="inline-block min-w-0 max-w-[150px] flex-1 truncate whitespace-nowrap align-middle"
+            className="inline-block min-w-0 flex-1 whitespace-normal break-words align-middle"
           >
             {textoAtual}
           </span>
