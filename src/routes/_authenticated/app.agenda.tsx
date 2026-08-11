@@ -13,6 +13,7 @@ import { hojeBR } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8961,7 +8962,7 @@ function AgendaPage() {
                 <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Observações
                 </TableHead>
-                <TableHead className="w-[13%] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[140px] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -9181,8 +9182,9 @@ function AgendaPage() {
                         })()}
                       </TableCell>
 
-                      <TableCell className="py-1.5 px-3 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+                      <TableCell className="w-[140px] py-1.5 px-3 text-right">
+                        <TooltipProvider delayDuration={200}>
+                        <div className="flex items-center justify-end gap-1.5">
                           {/* Check-in (✅) - aparece apenas para pacientes presentes */}
                           {!ehLivre &&
                             !realizado &&
@@ -9191,28 +9193,40 @@ function AgendaPage() {
                               const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
                               if (pagosSet.has(a.id) && pendenteCheckin && podeEscrever) {
                                 return (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title="Confirmar presença (check-in)"
-                                    onClick={() => confirmarPresenca(a)}
-                                    className="h-7 w-7 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
-                                  >
-                                    <BadgeCheck className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Confirmar presença (check-in)"
+                                        onClick={() => confirmarPresenca(a)}
+                                        className="h-7 w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                                      >
+                                        <BadgeCheck className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Confirmar presença (check-in)</TooltipContent>
+                                  </Tooltip>
                                 );
                               }
                               if (!pendenteCheckin && !ehLivre) {
                                 return (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled
-                                    title="Check-in já realizado"
-                                    className="h-7 w-7 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
-                                  >
-                                    <BadgeCheck className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          disabled
+                                          aria-label="Check-in já realizado"
+                                          className="h-7 w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
+                                        >
+                                          <BadgeCheck className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Check-in já realizado</TooltipContent>
+                                  </Tooltip>
                                 );
                               }
                               return null;
@@ -9220,68 +9234,35 @@ function AgendaPage() {
 
                           {/* Pagar (💰) */}
                           {!ehLivre && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title={(() => {
-                                if (a.origem_externa) return "Atendimento externo — sem lançamento em caixa";
-                                if (!pagosSet.has(a.id)) return "Registrar pagamento";
-                                const info = pagoInfoMap.get(a.id);
-                                if (!info) return "Pago";
-                                const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                                return `Pago • ${v}`;
-                              })()}
-                              onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${a.origem_externa
-                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                : pagosSet.has(a.id)
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                                }`}
-                            >
-                              <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Pagamento"
+                                  onClick={() => cobrarAgendamento(a)}
+                                  className={`h-7 w-7 shrink-0 rounded-md border-2 ${a.origem_externa
+                                    ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                    : pagosSet.has(a.id)
+                                      ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                      : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                    }`}
+                                >
+                                  <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {(() => {
+                                  if (a.origem_externa) return "Atendimento externo — sem lançamento em caixa";
+                                  if (!pagosSet.has(a.id)) return "Registrar pagamento";
+                                  const info = pagoInfoMap.get(a.id);
+                                  if (!info) return "Pago";
+                                  const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                                  return `Pago • ${v}`;
+                                })()}
+                              </TooltipContent>
+                            </Tooltip>
                           )}
-
-                          {/* NFS-e (📄) */}
-                          {!ehLivre &&
-                            (() => {
-                              const nf = nfseMap.get(a.id);
-                              const emitida = !!nf;
-                              const podeEmitir = pagosSet.has(a.id);
-                              if (!emitida && !podeEmitir) return null;
-                              return (
-                                <div className="flex items-center gap-1">
-                                  {!emitida && podeEmitir && a.paciente_id && (
-                                    <input
-                                      type="checkbox"
-                                      title="Selecionar para NFS-e agrupada"
-                                      className="h-3.5 w-3.5 cursor-pointer accent-sky-500"
-                                      checked={nfseSel.has(a.id)}
-                                      onChange={(e) => {
-                                        setNfseSel((prev) => {
-                                          const n = new Set(prev);
-                                          if (e.target.checked) n.add(a.id); else n.delete(a.id);
-                                          return n;
-                                        });
-                                      }}
-                                    />
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                                    onClick={() => verOuEmitirNota(a)}
-                                    className={`h-7 w-7 rounded-md border-2 ${emitida
-                                      ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
-                                      : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                      }`}
-                                  >
-                                    <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
-                                  </Button>
-                                </div>
-                              );
-                            })()}
 
                           {/* Menu (⋮) */}
                           <DropdownMenu>
@@ -9289,12 +9270,48 @@ function AgendaPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
+                                aria-label="Mais ações"
+                                className="h-7 w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
+                              {/* NFS-e */}
+                              {!ehLivre &&
+                                (() => {
+                                  const nf = nfseMap.get(a.id);
+                                  const emitida = !!nf;
+                                  const podeEmitir = pagosSet.has(a.id);
+                                  if (!emitida && !podeEmitir) return null;
+                                  return (
+                                    <>
+                                      <DropdownMenuItem onClick={() => verOuEmitirNota(a)}>
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        {emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
+                                      </DropdownMenuItem>
+                                      {!emitida && podeEmitir && a.paciente_id && (
+                                        <DropdownMenuItem
+                                          onSelect={(e) => {
+                                            e.preventDefault();
+                                            setNfseSel((prev) => {
+                                              const n = new Set(prev);
+                                              if (n.has(a.id)) n.delete(a.id); else n.add(a.id);
+                                              return n;
+                                            });
+                                          }}
+                                        >
+                                          <FileText className="h-4 w-4 mr-2" />
+                                          {nfseSel.has(a.id)
+                                            ? "Remover da NFS-e agrupada"
+                                            : "Selecionar para NFS-e agrupada"}
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  );
+                                })()}
+
                               {/* Editar */}
                               {podeEscrever && (
                                 <DropdownMenuItem onClick={() => openEdit(a)}>
@@ -9395,6 +9412,7 @@ function AgendaPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   );
