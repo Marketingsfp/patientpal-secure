@@ -5920,6 +5920,53 @@ export type Database = {
           },
         ]
       }
+      mkt_envios: {
+        Row: {
+          campanha_id: string | null
+          canal: string
+          clinica_id: string
+          created_at: string
+          destinatario: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          campanha_id?: string | null
+          canal?: string
+          clinica_id: string
+          created_at?: string
+          destinatario: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          campanha_id?: string | null
+          canal?: string
+          clinica_id?: string
+          created_at?: string
+          destinatario?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_envios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mkt_landing_pages: {
         Row: {
           campos: Json
