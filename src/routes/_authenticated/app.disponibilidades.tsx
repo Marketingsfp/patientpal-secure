@@ -128,10 +128,7 @@ function Page() {
 
       type RawMedico = { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; cidade: string | null; estado: string | null; bairro: string | null; procedimento?: { nome: string | null } | null; especialidade?: { nome: string | null } | null };
       const rawList = ((m.data as unknown) as RawMedico[]) ?? [];
-      
-      console.log(`✅ Médicos carregados: ${rawList.length}`);
-      console.log("📋 Nomes:", rawList.map(r => r.nome).join(", "));
-      
+
       setMedicos(rawList.map((r) => ({
         id: r.id,
         nome: r.nome,
