@@ -9,6 +9,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -56,6 +57,7 @@ type PacienteRow = {
   cpf: string | null;
   telefone: string | null;
   foto_url: string | null;
+  cidade: string | null;
 };
 
 type Item = AgendamentoRow & {
@@ -398,6 +400,7 @@ function PatientCard({
         <div className="flex-1 min-w-[220px] space-y-2">
           <div className="flex items-center gap-2 flex-wrap pr-16">
             <h3 className="text-lg font-bold leading-tight text-foreground">{item.paciente_nome}</h3>
+            <BadgePacienteDistante cidade={item.paciente?.cidade ?? null} compact />
             {item.pago ? (
               <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
             ) : (
@@ -571,7 +574,7 @@ function CheckinPage() {
       if (pacIds.length > 0) {
         const { data: pacientes, error: pacientesError } = await supabase
           .from("pacientes")
-          .select("id, cpf, telefone, foto_url")
+          .select("id, cpf, telefone, foto_url, cidade")
           .in("id", pacIds);
 
         if (pacientesError) {
@@ -583,6 +586,7 @@ function CheckinPage() {
               cpf: p.cpf,
               telefone: p.telefone,
               foto_url: p.foto_url,
+              cidade: (p as { cidade?: string | null }).cidade ?? null,
             });
           });
 
