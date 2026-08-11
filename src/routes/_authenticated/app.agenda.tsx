@@ -9644,11 +9644,14 @@ function AgendaPage() {
       )}
 
       <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-2.5 pr-6">
-              <DialogTitle>Informações do cliente</DialogTitle>
-              <BadgePacienteDistante cidade={pacEdit.cidade || pacInfo?.cidade} />
+        <DialogContent className="w-full max-w-lg overflow-x-hidden">
+          <DialogHeader className="overflow-x-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
+              <DialogTitle className="min-w-0">Informações do cliente</DialogTitle>
+              <BadgePacienteDistante
+                cidade={pacEdit.cidade || pacInfo?.cidade}
+                className="whitespace-nowrap text-[11px] shrink-0"
+              />
             </div>
           </DialogHeader>
           {pacInfoLoading ? (
