@@ -9196,7 +9196,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5 px-2 align-middle">
+                      <TableCell className="py-1.5 px-2 align-middle whitespace-nowrap overflow-hidden">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -9211,7 +9211,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-2.5 px-2 max-w-0">
+                      <TableCell className="py-2.5 px-3 align-middle whitespace-nowrap shrink-0 min-w-[120px]">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
