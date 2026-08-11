@@ -482,8 +482,11 @@ export async function printContrato(contratoId: string) {
     }
     body * { max-height: none !important; overflow: visible !important; }
     p, li, div, td, th { orphans: 3; widows: 3; }
-    p, .clausula, .contract-section, li, table, tbody, thead
-      { page-break-inside: avoid; break-inside: avoid; }
+    p, .clausula, .contract-section, li { page-break-inside: avoid; break-inside: avoid; }
+    /* Blocos de tabela curtos (cabeçalho do contrato, dependentes) não quebram;
+       tabelas longas continuam podendo fluir para a página seguinte. */
+    table { page-break-inside: auto; break-inside: auto; }
+    thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
     h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
     img { display: block !important; visibility: visible !important; }
     tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
