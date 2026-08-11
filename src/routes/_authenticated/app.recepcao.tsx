@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
