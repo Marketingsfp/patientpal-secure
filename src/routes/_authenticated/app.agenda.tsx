@@ -9178,30 +9178,34 @@ function AgendaPage() {
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="flex min-w-0 max-w-full items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline"
+                            className="flex min-w-[200px] max-w-full flex-col items-start justify-center gap-1 text-left text-sm text-foreground hover:text-primary"
                             title={a.paciente_nome}
                           >
-                            {a.status === "confirmado" && (
-                              <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                            )}
-                            {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={25} />}
-                            {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                              <span
-                                title={`Cartão ${convenioMap.get(a.paciente_id)}`}
-                                className="shrink-0 inline-flex"
-                              >
-                                <IdCard className="h-3.5 w-3.5 text-emerald-600" />
-                              </span>
-                            )}
-                            <span className="truncate">{a.paciente_nome}</span>
-                            {a.paciente_id && (
-                              <BadgePacienteDistante cidade={cidadeMap.get(a.paciente_id)} compact />
-                            )}
-                            {a.orcamento_numero && (
-                              <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
-                                ORÇ
-                              </span>
-                            )}
+                            <span className="flex max-w-[220px] items-center gap-1.5 truncate font-medium text-foreground hover:underline">
+                              {a.status === "confirmado" && (
+                                <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                              )}
+                              <span className="truncate">{a.paciente_nome}</span>
+                            </span>
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={22} />}
+                              {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                                <span
+                                  title={`Cartão ${convenioMap.get(a.paciente_id)}`}
+                                  className="shrink-0 inline-flex"
+                                >
+                                  <IdCard className="h-3.5 w-3.5 text-emerald-600" />
+                                </span>
+                              )}
+                              {a.paciente_id && (
+                                <BadgePacienteDistante cidade={cidadeMap.get(a.paciente_id)} compact />
+                              )}
+                              {a.orcamento_numero && (
+                                <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                                  ORÇ
+                                </span>
+                              )}
+                            </span>
                           </button>
                         )}
                       </TableCell>
