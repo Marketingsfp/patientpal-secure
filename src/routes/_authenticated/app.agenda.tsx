@@ -9121,7 +9121,7 @@ function AgendaPage() {
                       className={`${bgClass} ${borderLeft} transition-colors`}
                     >
                       {/* Checkbox */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-3 px-2 align-middle">
                         <Checkbox
                           checked={selecionados.has(a.id)}
                           onCheckedChange={() => toggleSel(a.id)}
@@ -9130,20 +9130,20 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ficha */}
-                      <TableCell className="text-center font-mono text-sm font-medium py-1.5">
+                      <TableCell className="text-center font-mono text-sm font-medium py-3 px-2 align-middle">
                         {fichaNum || "—"}
                       </TableCell>
 
                       {/* Dia da semana */}
-                      <TableCell className="py-1.5 text-center text-sm font-medium tabular-nums text-muted-foreground">
+                      <TableCell className="py-3 px-2 align-middle text-center text-sm font-medium tabular-nums text-muted-foreground">
                         {fmtDiaSemana(a.inicio)}
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
+                      <TableCell className="py-3 px-2 align-middle text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 px-2 text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-3 px-2 align-middle text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
