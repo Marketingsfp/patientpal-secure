@@ -1883,7 +1883,7 @@ function AgendaPage() {
         fim: toLocalInput(end.toISOString()),
         paciente_id: pacienteId,
         paciente_nome: pacienteNome,
-        observacoes: !pacienteId && telParam ? `Contato WhatsApp: ${telParam}` : "",
+        observacoes: "",
       });
       setOpen(true);
     })();
@@ -7234,7 +7234,7 @@ function AgendaPage() {
                       onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
                       rows={2}
                       className="resize-none"
-                      placeholder="Anotações internas (opcional)…"
+                      placeholder=""
                     />
                   </div>
                 </fieldset>
