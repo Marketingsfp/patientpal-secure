@@ -32,6 +32,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ImageCropDialog } from "./image-crop-dialog";
+import { TableInsertMenu } from "./table-insert-menu";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
 /**
@@ -652,13 +653,17 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
-        <ToolbarButton title="Inserir tabela 3×3" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-          <TableIcon className="h-4 w-4" />
+        <TableInsertMenu editor={editor} />
+        <ToolbarButton title="Adicionar linha acima" onClick={() => editor.chain().focus().addRowBefore().run()} disabled={!editor.can().addRowBefore()}>
+          <span className="text-[10px] font-bold">↑L</span>
         </ToolbarButton>
-        <ToolbarButton title="Adicionar linha" onClick={() => editor.chain().focus().addRowAfter().run()} disabled={!editor.can().addRowAfter()}>
+        <ToolbarButton title="Adicionar linha abaixo" onClick={() => editor.chain().focus().addRowAfter().run()} disabled={!editor.can().addRowAfter()}>
           <Rows3 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Adicionar coluna" onClick={() => editor.chain().focus().addColumnAfter().run()} disabled={!editor.can().addColumnAfter()}>
+        <ToolbarButton title="Adicionar coluna à esquerda" onClick={() => editor.chain().focus().addColumnBefore().run()} disabled={!editor.can().addColumnBefore()}>
+          <span className="text-[10px] font-bold">←C</span>
+        </ToolbarButton>
+        <ToolbarButton title="Adicionar coluna à direita" onClick={() => editor.chain().focus().addColumnAfter().run()} disabled={!editor.can().addColumnAfter()}>
           <Columns3 className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton title="Excluir linha" onClick={() => editor.chain().focus().deleteRow().run()} disabled={!editor.can().deleteRow()}>
@@ -669,6 +674,12 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </ToolbarButton>
         <ToolbarButton title="Excluir tabela" onClick={() => editor.chain().focus().deleteTable().run()} disabled={!editor.can().deleteTable()}>
           <Trash2 className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton title="Alternar linha de cabeçalho" onClick={() => editor.chain().focus().toggleHeaderRow().run()} disabled={!editor.can().toggleHeaderRow()}>
+          <span className="text-[10px] font-bold">↥H</span>
+        </ToolbarButton>
+        <ToolbarButton title="Alternar coluna de cabeçalho" onClick={() => editor.chain().focus().toggleHeaderColumn().run()} disabled={!editor.can().toggleHeaderColumn()}>
+          <span className="text-[10px] font-bold">↤H</span>
         </ToolbarButton>
         <ToolbarButton
           title="Mesclar células selecionadas"
