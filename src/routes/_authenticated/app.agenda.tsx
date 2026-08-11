@@ -9644,17 +9644,20 @@ function AgendaPage() {
       )}
 
       <Dialog open={pacInfoOpen} onOpenChange={setPacInfoOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-2.5 pr-6">
-              <DialogTitle>Informações do cliente</DialogTitle>
-              <BadgePacienteDistante cidade={pacEdit.cidade || pacInfo?.cidade} />
+        <DialogContent className="w-full max-w-lg overflow-x-hidden">
+          <DialogHeader className="overflow-x-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
+              <DialogTitle className="min-w-0">Informações do cliente</DialogTitle>
+              <BadgePacienteDistante
+                cidade={pacEdit.cidade || pacInfo?.cidade}
+                className="whitespace-nowrap text-[11px] shrink-0"
+              />
             </div>
           </DialogHeader>
           {pacInfoLoading ? (
             <p className="text-sm text-muted-foreground py-4">Carregando…</p>
           ) : pacInfo ? (
-            <div className="rounded-lg border p-4 space-y-2 text-sm">
+            <div className="w-full overflow-x-hidden rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -9693,7 +9696,7 @@ function AgendaPage() {
               </div>
               <fieldset
                 disabled={!podeEditarCliente || pacEditSaving}
-                className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t disabled:opacity-70"
+                className="w-full min-w-0 overflow-hidden grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t disabled:opacity-70"
               >
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CPF</Label>
@@ -9768,7 +9771,7 @@ function AgendaPage() {
                   </div>
                   <div />
                 </div>
-                <div className="col-span-2 grid grid-cols-[1fr_90px] gap-2">
+                <div className="col-span-2 w-full min-w-0 overflow-hidden grid grid-cols-[minmax(0,1fr)_90px] gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Logradouro</Label>
                     <Input
@@ -9794,7 +9797,7 @@ function AgendaPage() {
                     className="h-8"
                   />
                 </div>
-                <div className="grid grid-cols-[1fr_60px] gap-2">
+                <div className="w-full min-w-0 overflow-hidden grid grid-cols-[minmax(0,1fr)_60px] gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Cidade</Label>
                     <Input
