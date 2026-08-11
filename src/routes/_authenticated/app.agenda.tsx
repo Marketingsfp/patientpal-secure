@@ -9018,28 +9018,28 @@ function AgendaPage() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-[60px] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[60px] px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Ficha
                 </TableHead>
-                <TableHead className="w-[50px] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
-                <TableHead className="w-[85px] px-2 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-[100px] px-2 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="w-[180px] truncate px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[50px] px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Dia</TableHead>
+                <TableHead className="w-[85px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</TableHead>
+                <TableHead className="w-[100px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Horário</TableHead>
+                <TableHead className="w-[180px] truncate px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[260px] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[260px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="w-[180px] px-3 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[180px] px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[130px] px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[130px] px-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Situação
                 </TableHead>
-                <TableHead className="w-[90px] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[90px] px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Observações
                 </TableHead>
-                <TableHead className="w-[70px] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[70px] px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -9121,7 +9121,7 @@ function AgendaPage() {
                       className={`${bgClass} ${borderLeft} transition-colors`}
                     >
                       {/* Checkbox */}
-                      <TableCell className="py-3 px-2 align-middle">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs">
                         <Checkbox
                           checked={selecionados.has(a.id)}
                           onCheckedChange={() => toggleSel(a.id)}
@@ -9130,25 +9130,25 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Ficha */}
-                      <TableCell className="text-center font-mono text-sm font-medium py-3 px-2 align-middle">
+                      <TableCell className="text-center font-mono text-sm font-medium py-1.5 px-1.5 align-middle text-xs">
                         {fichaNum || "—"}
                       </TableCell>
 
                       {/* Dia da semana */}
-                      <TableCell className="py-3 px-2 align-middle text-center text-sm font-medium tabular-nums text-muted-foreground">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-center text-sm font-medium tabular-nums text-muted-foreground">
                         {fmtDiaSemana(a.inicio)}
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell className="py-3 px-2 align-middle text-sm">{fmtData(a.inicio)}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-3 px-2 align-middle text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs text-xs font-medium tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Profissional */}
-                      <TableCell className="py-3 px-2 align-middle w-[180px] max-w-[180px] overflow-hidden">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[180px] max-w-[180px] overflow-hidden">
                         {(() => {
                           const label = medicoNomeAgendamento(a);
                           const m = medicos.find((x) => x.id === a.medico_id);
@@ -9169,7 +9169,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Cliente */}
-                      <TableCell className="py-3 px-2 align-middle w-[260px] max-w-[260px] overflow-hidden">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[260px] max-w-[260px] overflow-hidden">
                         {ocultarPaciente ? (
                           <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
@@ -9185,7 +9185,7 @@ function AgendaPage() {
                               {a.status === "confirmado" && (
                                 <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                               )}
-                              <span className="block max-w-full truncate font-medium">{a.paciente_nome}</span>
+                              <span className="block max-w-full truncate text-xs font-bold text-foreground">{a.paciente_nome}</span>
                             </span>
                             <span className="mt-0.5 flex max-w-full items-center gap-1 overflow-hidden">
                               {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={22} />}
@@ -9211,7 +9211,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-3 px-3 align-middle w-[180px] max-w-[180px] whitespace-nowrap overflow-hidden">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[180px]">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -9226,7 +9226,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-3 px-3 align-middle w-[130px] whitespace-nowrap">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[130px] whitespace-nowrap">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
