@@ -696,14 +696,26 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     const active = recording && voiceField === field;
     // Campos que devem aceitar apenas letras (com acentos) e espaço.
     const somenteLetras = field === "nome" || field === "responsavel_nome";
+    const ehCPF = field === "cpf" || field === "responsavel_cpf";
+    const ehTelefone = field === "telefone" || field === "telefone2" || field === "responsavel_telefone";
     return {
       field: field as string,
       value: form[field] as string,
+      ...(ehCPF ? { inputMode: "numeric" as const, maxLength: 14, placeholder: "000.000.000-00" } : {}),
+      ...(ehTelefone ? { inputMode: "numeric" as const, maxLength: 15, placeholder: "(00) 00000-0000" } : {}),
       onChange: (v: string) => {
         if (somenteLetras) {
           const erro = erroCaractereNome(v);
           setErrosNome((e) => ({ ...e, [field as string]: erro }));
           setForm(f => ({ ...f, [field]: sanitizarNomePessoa(v) } as FormState));
+          return;
+        }
+        if (ehCPF) {
+          setForm(f => ({ ...f, [field]: mascaraCPF(v) } as FormState));
+          return;
+        }
+        if (ehTelefone) {
+          setForm(f => ({ ...f, [field]: mascaraTelefone(v) } as FormState));
           return;
         }
         setForm(f => ({ ...f, [field]: v } as FormState));
