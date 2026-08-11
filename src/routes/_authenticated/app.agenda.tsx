@@ -9008,8 +9008,8 @@ function AgendaPage() {
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="hidden lg:block rounded-lg border border-border bg-card">
-          <Table className="w-full table-fixed">
+        <div className="hidden lg:block w-full overflow-x-auto scrollbar-thin rounded-lg border border-border bg-card">
+          <Table className="w-full min-w-[1100px] table-fixed">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-[3%] rounded-tl-lg px-2" title="Selecione para ações em lote">
@@ -9024,16 +9024,16 @@ function AgendaPage() {
                 <TableHead className="w-[5%] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
                 <TableHead className="w-[8%] px-2 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-[11%] px-2 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="w-[15%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[15%] min-w-[180px] max-w-[200px] truncate px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[16%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[16%] min-w-[240px] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="w-[13%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[13%] min-w-[180px] px-3 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[9%] min-w-[120px] px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[9%] min-w-[120px] shrink-0 px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
                   Situação
                 </TableHead>
                 <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
@@ -9148,7 +9148,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Profissional */}
-                      <TableCell className="py-1.5 px-2">
+                      <TableCell className="py-3 px-2 align-middle min-w-[180px] max-w-[200px]">
                         {(() => {
                           const label = medicoNomeAgendamento(a);
                           const m = medicos.find((x) => x.id === a.medico_id);
@@ -9169,7 +9169,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Cliente */}
-                      <TableCell className="py-1.5 px-2">
+                      <TableCell className="py-3 px-2 align-middle min-w-[240px]">
                         {ocultarPaciente ? (
                           <span className="block truncate text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
@@ -9178,7 +9178,7 @@ function AgendaPage() {
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="flex min-w-[200px] max-w-full flex-col items-start justify-center gap-1 text-left text-sm text-foreground hover:text-primary"
+                            className="flex w-full max-w-full flex-col items-start justify-center gap-1 text-left text-sm text-foreground hover:text-primary"
                             title={a.paciente_nome}
                           >
                             <span className="flex max-w-[220px] items-center gap-1.5 truncate font-medium text-foreground hover:underline">
@@ -9211,7 +9211,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5 px-2 align-middle whitespace-nowrap overflow-hidden">
+                      <TableCell className="py-3 px-3 align-middle min-w-[180px] whitespace-nowrap overflow-hidden">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -9226,7 +9226,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-2.5 px-3 align-middle whitespace-nowrap shrink-0 min-w-[120px]">
+                      <TableCell className="py-3 px-3 align-middle whitespace-nowrap shrink-0 min-w-[120px]">
                         {ehLivre ? (
                           (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
