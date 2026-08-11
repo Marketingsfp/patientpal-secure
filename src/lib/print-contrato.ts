@@ -620,9 +620,9 @@ export async function printContrato(contratoId: string) {
   } catch (e) {}
   }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { fixTables(); fixClausulas(); });
+    document.addEventListener("DOMContentLoaded", function () { wrapPrintArea(); fixTables(); fixClausulas(); });
   } else {
-    fixTables(); fixClausulas();
+    wrapPrintArea(); fixTables(); fixClausulas();
   }
 })();
 </script>`;
