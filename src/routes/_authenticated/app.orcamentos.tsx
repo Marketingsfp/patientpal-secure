@@ -476,8 +476,8 @@ function OrcamentosPage() {
       <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
-          <thead className="bg-muted/30 sticky top-0 z-20 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <tr className="text-left h-11 border-b border-border/50">
+          <thead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:border-b [&_th]:border-border/60">
+            <tr className="text-left h-11">
               <th className="px-3 w-24">Nº</th>
               <th className="px-3 w-32">Data</th>
               <th className="px-3">Paciente</th>
@@ -487,7 +487,7 @@ function OrcamentosPage() {
               <th className="px-3 w-36 text-right">Ações</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="[&>tr:first-child>td]:pt-3">
             {loading ? (
               <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Carregando…</td></tr>
             ) : filtered.length === 0 ? (
