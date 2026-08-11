@@ -123,6 +123,24 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
 };
 
 /**
+ * Rotas restritas a administradores da clínica, independentemente do que
+ * estiver salvo em `perfil_permissoes`. Nenhum perfil não-admin entra aqui,
+ * nem digitando a URL na barra de endereços.
+ */
+export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = [
+  "/app/configuracoes/voz",
+  "/app/planos",
+];
+
+/** True quando a rota atual só pode ser aberta por administrador. */
+export function rotaSomenteAdmin(pathname: string): boolean {
+  const p = pathname.length > 1 && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
+  return ADMIN_ONLY_ROUTES.some((r) => p === r || p.startsWith(r + "/"));
+}
+
+/**
  * Submódulos que herdam de um módulo pai quando não há configuração
  * explícita no perfil. Se o perfil não tem linha para o submódulo em
  * `perfil_permissoes`, o guard cai no acesso do pai. Assim clínicas que
