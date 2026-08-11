@@ -53,6 +53,7 @@ export function AgendaPorMedicoDia({
   onSlotClick,
   ocultarPaciente = false,
   mostrarResumo = true,
+  somenteLeitura = false,
 }: {
   dataRef: string;
   medicos: AgendaMedicoColuna[];
@@ -62,6 +63,8 @@ export function AgendaPorMedicoDia({
   onSlotClick: (a: AgendaMedicoItem) => void;
   ocultarPaciente?: boolean;
   mostrarResumo?: boolean;
+  /** Modo leitura: sem "+ Agendar" e sem clique em horários livres. */
+  somenteLeitura?: boolean;
 }) {
   const porMedico = useMemo(() => {
     const map = new Map<string, AgendaMedicoItem[]>();
@@ -146,14 +149,22 @@ export function AgendaPorMedicoDia({
                   )}
                   {ags.map((a) => {
                     const livre = !!a.livre;
+                    const leituraLivre = livre && somenteLeitura;
                     return (
                       <button
                         key={a.id}
                         type="button"
-                        onClick={() => (livre ? onSlotClick(a) : onAgClick(a))}
+                        disabled={leituraLivre}
+                        onClick={() => {
+                          if (leituraLivre) return;
+                          if (livre) onSlotClick(a);
+                          else onAgClick(a);
+                        }}
                         className={
                           livre
-                            ? "w-full cursor-pointer rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
+                            ? leituraLivre
+                              ? "w-full cursor-default rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center"
+                              : "w-full cursor-pointer rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
                             : "w-full rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
                         }
                       >
@@ -162,7 +173,9 @@ export function AgendaPorMedicoDia({
                             <p className="text-[11px] font-medium text-slate-400">
                               {fmtHora(a.inicio)} – {fmtHora(a.fim)}
                             </p>
-                            <p className="text-[10px] font-semibold text-slate-400">+ Agendar</p>
+                            <p className="text-[10px] font-semibold text-slate-400">
+                              {somenteLeitura ? "Livre" : "+ Agendar"}
+                            </p>
                           </>
                         ) : (
                           <>
