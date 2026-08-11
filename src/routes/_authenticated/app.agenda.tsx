@@ -1571,6 +1571,15 @@ const toLocalInput = (iso: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+/** Remove o texto automático "SLOT GERADO AUTOMATICAMENTE" das observações. */
+function limparObsAuto(obs?: string | null): string {
+  return (obs ?? "")
+    .split("\n")
+    .filter((l) => !/^\s*slot\s+gerado\s+automaticamente\s*$/i.test(l))
+    .join("\n")
+    .trim();
+}
+
 const EMPTY = {
   paciente_nome: "",
   paciente_id: "",
@@ -4704,7 +4713,7 @@ function AgendaPage() {
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: "agendado",
-      observacoes: a.observacoes ?? "",
+      observacoes: limparObsAuto(a.observacoes),
       data_pagamento: a.data_pagamento ?? "",
       orcamento_id: "",
       orcamento_numero: "",
@@ -4807,7 +4816,7 @@ function AgendaPage() {
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
       procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: a.status,
-      observacoes: a.observacoes ?? "",
+      observacoes: limparObsAuto(a.observacoes),
       data_pagamento: a.data_pagamento ?? "",
       orcamento_id: a.orcamento_id ?? "",
       orcamento_numero: a.orcamento_numero ? String(a.orcamento_numero) : "",
@@ -6546,7 +6555,7 @@ function AgendaPage() {
         paciente: a.paciente_nome,
         procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
         status: a.status,
-        observacoes: a.observacoes ?? "",
+        observacoes: limparObsAuto(a.observacoes),
       })),
       `agenda-${dataRef}`,
       [
