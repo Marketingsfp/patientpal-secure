@@ -2150,7 +2150,7 @@ function AgendaPage() {
     setPacInfoLoading(true);
     const { data } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
+      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cep,cidade,estado,bairro,logradouro,numero,foto_url")
       .eq("id", pacienteId)
       .maybeSingle();
     if (data) {
