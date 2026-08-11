@@ -793,12 +793,15 @@ function DashboardView({
   return (
     <div className="space-y-6">
       {/* Barra de configuração */}
-      <div className="flex justify-end">
+      <div className="flex justify-end -mt-2">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
+            <button
+              type="button"
+              className="border border-border/60 hover:bg-muted font-medium text-xs rounded-xl px-3.5 py-2 flex items-center gap-2 transition-colors"
+            >
               <Settings2 className="h-4 w-4" /> Personalizar dashboard
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80">
             <div className="flex items-center justify-between mb-3">
@@ -828,21 +831,26 @@ function DashboardView({
 
       {/* KPIs */}
       {kpiVisible > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" onClick={() => setDrill("agend")} />}
-          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" onClick={() => setDrill("novos")} />}
-          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" onClick={() => setDrill("pront")} />}
-          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} onClick={() => setDrill("saldo")} />}
-          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" onClick={() => setDrill("receitas")} />}
-          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" onClick={() => setDrill("despesas")} />}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 my-6">
+          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-4 w-4" />} label="Agendamentos" value={data.totalAgend.toString()} badge="bg-blue-500/10 text-blue-600 border-blue-500/15" onClick={() => setDrill("agend")} />}
+          {on("kpi_novos") && <Kpi icon={<Users className="h-4 w-4" />} label="Novos pacientes" value={data.novosPacientes.toString()} badge="bg-violet-500/10 text-violet-600 border-violet-500/15" onClick={() => setDrill("novos")} />}
+          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-4 w-4" />} label="Prontuários" value={data.prontuariosCount.toString()} badge="bg-rose-500/10 text-rose-600 border-rose-500/15" onClick={() => setDrill("pront")} />}
+          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-4 w-4" />} label="Saldo" value={fmtBRL(saldo)} badge={saldo >= 0 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/15" : "bg-red-500/10 text-red-600 border-red-500/15"} onClick={() => setDrill("saldo")} />}
+          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-4 w-4" />} label="Receitas" value={fmtBRL(data.receitas)} badge="bg-teal-500/10 text-teal-600 border-teal-500/15" onClick={() => setDrill("receitas")} />}
+          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-4 w-4" />} label="Despesas" value={fmtBRL(data.despesas)} badge="bg-red-500/10 text-red-600 border-red-500/15" onClick={() => setDrill("despesas")} />}
         </div>
       )}
 
       {/* Financeiro por dia */}
       {on("ch_fin_dia") && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle></CardHeader>
-          <CardContent>
+        <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-2xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-foreground">Receitas vs Despesas (por dia)</h3>
+            <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 border border-border/40 rounded-full px-2.5 py-1">
+              {ini.split("-").reverse().join("/")} — {fim.split("-").reverse().join("/")}
+            </span>
+          </div>
+          <div>
             {data.finPorDia.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
             ) : (
@@ -855,8 +863,8 @@ function DashboardView({
                 formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
               />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Movimento × Clima — chuva por dia vs agendamentos/receita */}
@@ -1032,15 +1040,20 @@ function DashboardView({
 }
 
 function Kpi({
-  icon, label, value, tint, onClick,
-}: { icon: React.ReactNode; label: string; value: string; tint: string; onClick?: () => void }) {
+  icon, label, value, badge, onClick,
+}: { icon: React.ReactNode; label: string; value: string; badge: string; onClick?: () => void }) {
   return (
-    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}>
-      <CardContent className="pt-6">
-        <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
-        <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
-      </CardContent>
-    </Card>
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      className={`bg-card border border-border/50 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-3 relative overflow-hidden${onClick ? " cursor-pointer" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className={`p-2 rounded-xl border shrink-0 ${badge}`}>{icon}</span>
+      </div>
+      <p className="text-2xl font-bold tracking-tight text-foreground font-mono truncate">{value}</p>
+    </div>
   );
 }
 
