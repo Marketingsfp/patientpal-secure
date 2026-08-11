@@ -931,7 +931,10 @@ function NovoOrcamentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-3xl max-h-[95vh] overflow-y-auto"
+        overlayClassName="bg-transparent backdrop-blur-none pointer-events-none"
+      >
         <DialogHeader>
           <DialogTitle>
             Novo orçamento
