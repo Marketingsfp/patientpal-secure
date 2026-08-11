@@ -9648,7 +9648,7 @@ function AgendaPage() {
           <DialogHeader>
             <div className="flex items-center gap-2.5 pr-6">
               <DialogTitle>Informações do cliente</DialogTitle>
-              <BadgePacienteDistante cidade={pacInfoForm.cidade || pacInfo?.cidade} />
+              <BadgePacienteDistante cidade={pacEdit.cidade || pacInfo?.cidade} />
             </div>
           </DialogHeader>
           {pacInfoLoading ? (
