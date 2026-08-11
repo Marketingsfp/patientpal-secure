@@ -384,9 +384,9 @@ export async function printContrato(contratoId: string) {
     position: static !important;
     float: none !important;
   }
-  /* Tabela de consentimento (Anexo I – LGPD): texto 85% / opções "S N" 15% */
-  table.lgpd-consent td:first-child { width: 85% !important; }
-  table.lgpd-consent td:last-child { width: 15% !important; text-align: center; }
+  /* Tabela de consentimento (Anexo I – LGPD): texto 82% / opções "S N" 18% */
+  table.lgpd-consent td:first-child { width: 82% !important; }
+  table.lgpd-consent td:last-child { width: 18% !important; text-align: center !important; }
   td[rowspan], th[rowspan] { vertical-align: middle !important; }
   .contract-table { width: 100%; border-collapse: collapse; }
   .contract-table th,
@@ -459,7 +459,7 @@ export async function printContrato(contratoId: string) {
         Array.prototype.slice.call(r.cells).forEach(function (c) {
           c.removeAttribute("width");
           if (consent && r.cells.length === 2) {
-            c.style.width = c.cellIndex === 0 ? "85%" : "15%";
+            c.style.width = c.cellIndex === 0 ? "82%" : "18%";
           } else if (c.style.width && c.style.width.indexOf("px") > -1) {
             c.style.width = "";
           }
