@@ -2062,6 +2062,19 @@ function AgendaPage() {
   const [pacEditSaving, setPacEditSaving] = useState(false);
   // Pré-visualização ampliada da foto do paciente
   const [fotoPreviewOpen, setFotoPreviewOpen] = useState(false);
+  // Fecha a pré-visualização com Esc (captura antes do Dialog de trás)
+  useEffect(() => {
+    if (!fotoPreviewOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setFotoPreviewOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [fotoPreviewOpen]);
   // Aplica a máscara 00000-000 ao valor vindo do banco (armazenado só com dígitos)
   const maskCep = (v: string | null | undefined) => {
     const raw = String(v ?? "").replace(/\D/g, "").slice(0, 8);
