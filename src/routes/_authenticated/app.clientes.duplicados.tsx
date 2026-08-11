@@ -200,47 +200,59 @@ function DuplicadosPage() {
       )}
       <div className="grid gap-3">
         {gruposFiltrados.map((g, i) => (
-          <Card key={groupKey(g, i)}>
-            <CardHeader className="pb-2">
+          <Card key={groupKey(g, i)} className="rounded-2xl border-border/50 shadow-2xs">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline">{TIPO_LABEL[g.tipo]}</Badge>
-                <CardTitle className="text-base font-mono">{g.chave}</CardTitle>
+                <span className="bg-primary/10 text-primary font-medium px-3 py-1 rounded-full text-xs">
+                  {TIPO_LABEL[g.tipo]}
+                </span>
+                <CardTitle className="text-base font-semibold tracking-tight">
+                  {formatChave(g)}
+                </CardTitle>
                 <span className="text-xs text-muted-foreground">{g.qtd} cadastros</span>
               </div>
-              <Button
-                size="sm"
-                variant="default"
+              <button
+                type="button"
                 disabled={(sel[groupKey(g, i)]?.size ?? 0) < 2}
                 onClick={() => setConfirmKey(groupKey(g, i))}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Mesclar selecionados ({sel[groupKey(g, i)]?.size ?? 0})
-              </Button>
+                <Merge className="h-3.5 w-3.5" />
+                Mesclar selecionados
+                <span className="bg-primary-foreground/20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                  {sel[groupKey(g, i)]?.size ?? 0}
+                </span>
+              </button>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="divide-y">
+              <div>
                 {g.pacientes.map((p) => (
-                  <div key={p.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    key={p.id}
+                    className="bg-card border border-border/50 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-4 mb-3"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
                     <Checkbox
                       checked={sel[groupKey(g, i)]?.has(p.id) ?? false}
                       onCheckedChange={() => toggle(groupKey(g, i), p.id)}
                     />
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{p.nome}</div>
-                      <div className="text-xs text-muted-foreground">
-                        CPF: {p.cpf ?? "—"} • Tel: {p.telefone ?? "—"} • Nasc.:{" "}
+                      <div className="text-base font-bold text-foreground truncate">{p.nome}</div>
+                      <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                        CPF: {formatCPF(p.cpf)} · Tel: {formatPhone(p.telefone)} · Nasc.:{" "}
                         {p.data_nascimento?.split("-").reverse().join("/") ?? "—"}
-                        {p.codigo_prontuario ? ` • Prontuário ${p.codigo_prontuario}` : ""}
+                        {p.codigo_prontuario ? ` · Prontuário: ${p.codigo_prontuario}` : ""}
                       </div>
                     </div>
                     </div>
                     <Link
                       to="/app/clientes/$pacienteId/editar"
                       params={{ pacienteId: p.id }}
-                      className="text-xs underline whitespace-nowrap"
+                      className="border border-border/60 hover:bg-muted font-medium text-xs rounded-xl px-3 py-1.5 flex items-center gap-1.5 text-foreground transition-colors whitespace-nowrap"
                     >
+                      <ExternalLink className="h-3.5 w-3.5" />
                       Abrir cadastro
                     </Link>
                   </div>
