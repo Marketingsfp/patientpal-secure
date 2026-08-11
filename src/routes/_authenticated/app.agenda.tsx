@@ -9027,7 +9027,9 @@ function AgendaPage() {
                 <TableHead className="w-[13%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[9%] px-2 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+                <TableHead className="w-[9%] min-w-[120px] px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
+                  Situação
+                </TableHead>
                 <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Observações
                 </TableHead>
