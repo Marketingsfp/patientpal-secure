@@ -1963,6 +1963,7 @@ function Page() {
     }
     setSaving(false);
     setOpenMov(null);
+    setMovDescTouched(false);
     const tipoLancado = openMov.tipo;
     const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
