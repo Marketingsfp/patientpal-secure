@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { ImageCropDialog } from "./image-crop-dialog";
 import { TableInsertMenu } from "./table-insert-menu";
+import { limparHtmlColado } from "@/lib/limpar-html-colado";
 import { TableCellBgMenu } from "./table-cell-bg-menu";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
@@ -447,6 +448,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         class:
           "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
+      // Colagem vinda de MS Word / Google Docs: preserva tabelas, mesclagens
+      // e sombreamento das células, limpando o markup proprietário.
+      transformPastedHTML: (html) => limparHtmlColado(html),
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
