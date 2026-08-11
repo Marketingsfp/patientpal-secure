@@ -771,6 +771,7 @@ function Page() {
   const [obsAbertura, setObsAbertura] = useState("");
   const [movValor, setMovValor] = useState("");
   const [movDesc, setMovDesc] = useState("");
+  const [movDescTouched, setMovDescTouched] = useState(false);
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
@@ -1911,11 +1912,13 @@ function Page() {
         : "Selecione de quem o dinheiro está sendo recebido");
       return;
     }
-    // Estorno avulso não tem seletor de destino (não é transferência entre
-    // membros da equipe) — a descrição é o único registro de quem/o que
-    // está sendo estornado, então é obrigatória aqui.
-    if (openMov.tipo === "estorno" && !movDesc.trim()) {
-      toast.error("Descreva o motivo/paciente do estorno");
+    // A descrição é o registro do motivo/referência do lançamento manual e é
+    // obrigatória em todos os tipos (mínimo de 3 caracteres).
+    if (movDesc.trim().length < 3) {
+      setMovDescTouched(true);
+      toast.error(openMov.tipo === "estorno"
+        ? "Descreva o motivo/paciente do estorno"
+        : "Descrição é obrigatória (mínimo 3 caracteres)");
       return;
     }
     const destinoNome = ehTransfer
@@ -1960,6 +1963,7 @@ function Page() {
     }
     setSaving(false);
     setOpenMov(null);
+    setMovDescTouched(false);
     const tipoLancado = openMov.tipo;
     const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
@@ -3248,7 +3252,7 @@ function Page() {
       </Dialog>
 
       {/* === Modal Movimento === */}
-      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) setOpenMov(null); }}>
+      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) { setOpenMov(null); setMovDescTouched(false); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
             <DialogDescription>
@@ -3265,8 +3269,18 @@ function Page() {
               <CurrencyInput value={movValor} onChange={setMovValor} />
             </div>
             <div>
-              <Label>Descrição</Label>
-              <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
+              <Label>Descrição <span className="text-destructive">*</span></Label>
+              <Input
+                value={movDesc}
+                onChange={(e) => setMovDesc(e.target.value)}
+                onBlur={() => setMovDescTouched(true)}
+                placeholder="Motivo / referência"
+                aria-invalid={movDescTouched && movDesc.trim().length < 3}
+                aria-required="true"
+              />
+              {movDescTouched && movDesc.trim().length < 3 && (
+                <p className="mt-1 text-xs text-destructive">Descrição é obrigatória (mínimo 3 caracteres).</p>
+              )}
             </div>
             {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
               <div>
@@ -3329,8 +3343,8 @@ function Page() {
               </div>
             )}
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Lançar</Button>
+              <Button type="button" variant="ghost" onClick={() => { setOpenMov(null); setMovDescTouched(false); }}>Cancelar</Button>
+              <Button type="submit" disabled={saving || movDesc.trim().length < 3 || !(Number(movValor) > 0)} data-primary>Lançar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
