@@ -19,7 +19,7 @@ import {
   Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
   CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
   HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
-  CloudRain, Sun,
+  CloudRain, Sun, BarChart3,
 } from "lucide-react";
 import { getClimaPeriodo, type ClimaDia } from "@/lib/clima";
 import { CuboBI } from "@/components/relatorios/CuboBI";
@@ -391,35 +391,44 @@ function RelatoriosPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Relatórios</h1>
-        <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/15 shrink-0">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight">Relatórios</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Visualize um dashboard ou baixe planilhas Excel.</p>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="dashboard">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
-          <TabsList>
-            <TabsTrigger value="dashboard" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" /> Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="cubo" className="gap-2">
-              <Boxes className="h-4 w-4" /> Cubo BI
-            </TabsTrigger>
-            <TabsTrigger value="agendamentos-diario" className="gap-2">
-              <PhoneCall className="h-4 w-4" /> Agendamentos do Dia
-            </TabsTrigger>
-            <TabsTrigger value="downloads" className="gap-2">
-              <Download className="h-4 w-4" /> Baixar planilhas
-            </TabsTrigger>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList className="bg-muted/50 p-1 rounded-full border border-border/40 inline-flex items-center gap-1 h-auto">
+            {[
+              { v: "dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" />, label: "Dashboard" },
+              { v: "cubo", icon: <Boxes className="h-3.5 w-3.5" />, label: "Cubo BI" },
+              { v: "agendamentos-diario", icon: <PhoneCall className="h-3.5 w-3.5" />, label: "Agendamentos do Dia" },
+              { v: "downloads", icon: <Download className="h-3.5 w-3.5" />, label: "Baixar planilhas" },
+            ].map((t) => (
+              <TabsTrigger
+                key={t.v}
+                value={t.v}
+                className="gap-2 rounded-full px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-2xs data-[state=active]:font-semibold"
+              >
+                {t.icon} {t.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
-          <div className="flex items-end gap-2">
-            <div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
               <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
-              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36 rounded-xl" />
             </div>
-            <div>
+            <div className="flex items-center gap-1.5">
               <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
-              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36 rounded-xl" />
             </div>
           </div>
         </div>
