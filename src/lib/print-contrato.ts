@@ -349,7 +349,7 @@ export async function printContrato(contratoId: string) {
   const templateBody = pick(cvTpl) ?? overrideTpl ?? TEXTO_CONTRATO_HTML;
 
   const dependentesTxt = deps.length
-    ? deps.map((d: any, i: number) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"}`).join("<br/>")
+    ? deps.map((d: any, i: number) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"}`).join(" • ")
     : "";
 
   const varsBase: Record<string, string> = {
@@ -657,8 +657,7 @@ ${corpo}
   iframe.onload = () => {
     const win = iframe.contentWindow;
     if (!win) { cleanup(); return; }
-    // Aguarda o layout/imagens antes de imprimir.
-    setTimeout(() => {
+    const doPrint = () => {
       try {
         win.onafterprint = () => setTimeout(cleanup, 100);
         win.focus();
@@ -668,7 +667,25 @@ ${corpo}
       }
       // Fallback: remove o iframe mesmo se onafterprint não disparar.
       setTimeout(cleanup, 60_000);
-    }, 350);
+    };
+    // Aguarda o carregamento das imagens (logos) antes de imprimir, para que
+    // o PDF saia idêntico à pré-visualização do editor.
+    const imgs = Array.from(iframe.contentDocument?.images ?? []);
+    const pendentes = imgs.filter((im) => !im.complete);
+    if (pendentes.length === 0) { setTimeout(doPrint, 300); return; }
+    let restantes = pendentes.length;
+    let disparado = false;
+    const pronto = () => {
+      if (disparado) return;
+      disparado = true;
+      setTimeout(doPrint, 200);
+    };
+    pendentes.forEach((im) => {
+      const fim = () => { if (--restantes <= 0) pronto(); };
+      im.addEventListener("load", fim, { once: true });
+      im.addEventListener("error", fim, { once: true });
+    });
+    setTimeout(pronto, 5000);
   };
 
   const doc = iframe.contentDocument;
