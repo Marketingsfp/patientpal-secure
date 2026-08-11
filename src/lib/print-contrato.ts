@@ -371,21 +371,9 @@ export async function printContrato(contratoId: string) {
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
   // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
   const printCss = `<style id="print-fix">
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 12mm 14mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    background: #fff !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  /* Cabeçalho (logos) e faixa de título centralizados simetricamente */
-  body > p:first-of-type:has(img), .contract-logos { text-align: center !important; }
-  p:has(> img), div:has(> img:only-child) { text-align: center !important; }
-  p > img, div > img { display: inline-block !important; margin-left: auto !important; margin-right: auto !important; }
+  html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   tr, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
   h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
   img { display: block !important; visibility: visible !important; max-width: 100%; }
@@ -395,9 +383,6 @@ export async function printContrato(contratoId: string) {
     max-width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 11px !important;
-    line-height: 1.25 !important;
-    margin: 0 0 6px 0 !important;
   }
   col { max-width: 100% !important; }
   td, th {
@@ -408,10 +393,6 @@ export async function printContrato(contratoId: string) {
     overflow-wrap: anywhere;
     position: static !important;
     float: none !important;
-    border: 1px solid #9ca3af !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    line-height: 1.25 !important;
   }
   /* Tabela de consentimento (Anexo I – LGPD): texto 82% / opções "S N" 18% */
   table.lgpd-consent td:first-child { width: 82% !important; }
@@ -465,7 +446,7 @@ export async function printContrato(contratoId: string) {
     background: transparent !important;
   }
   @media print {
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A4 portrait; margin: 12mm 14mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body {
       height: auto !important;
@@ -473,23 +454,14 @@ export async function printContrato(contratoId: string) {
       overflow: visible !important;
       display: block !important;
     }
-    body {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      max-width: none !important;
-      background: #fff !important;
-    }
+    body { margin: 0 auto !important; max-width: 182mm !important; background: #fff !important; }
     body * { max-height: none !important; overflow: visible !important; }
     p, li, div, td, th { orphans: 3; widows: 3; }
     p, .clausula, .contract-section, li { page-break-inside: avoid; break-inside: avoid; }
-    /* Blocos de tabela curtos (cabeçalho do contrato, dependentes) não quebram;
-       tabelas longas continuam podendo fluir para a página seguinte. */
-    table { page-break-inside: auto; break-inside: auto; }
-    thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
     h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
     img { display: block !important; visibility: visible !important; }
     tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+    table { page-break-inside: auto; break-inside: auto; }
     /* Sobrescreve larguras inline geradas pelo editor e contém cada tabela
        estritamente dentro da área útil da página A4. */
     table, table * {
@@ -500,37 +472,13 @@ export async function printContrato(contratoId: string) {
       width: 100% !important;
       table-layout: fixed !important;
       border-collapse: collapse !important;
-      font-size: 11px !important;
-      line-height: 1.25 !important;
     }
     td, th {
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
       white-space: normal !important;
-      border: 1px solid #9ca3af !important;
-      padding: 4px 8px !important;
-      font-size: 11px !important;
-      line-height: 1.25 !important;
     }
     td[style*="width"], th[style*="width"] { width: auto !important; }
-    /* Isola a área do contrato: nada além dela é impresso, e ela é ancorada
-       no canto superior esquerdo da folha (elimina o deslocamento à direita
-       e o corte lateral causados por margens/posicionamentos herdados). */
-    body * { visibility: hidden !important; }
-    #contract-print-area, #contract-print-area * { visibility: visible !important; }
-    #contract-print-area {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      right: auto !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      transform: none !important;
-      float: none !important;
-      box-sizing: border-box !important;
-    }
     table.lgpd-consent td:first-child { width: 82% !important; }
     table.lgpd-consent td:last-child { width: 18% !important; text-align: center !important; }
     h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
@@ -554,15 +502,6 @@ export async function printContrato(contratoId: string) {
 <script id="print-fix-tables">
 (function () {
   var CLAUSULA_RE = /^\\s*(CL[ÁA]USULA|PAR[ÁA]GRAFO [ÚU]NICO|ANEXO)\\b/i;
-  function wrapPrintArea() {
-    try {
-      if (document.getElementById("contract-print-area")) return;
-      var wrap = document.createElement("div");
-      wrap.id = "contract-print-area";
-      while (document.body.firstChild) wrap.appendChild(document.body.firstChild);
-      document.body.appendChild(wrap);
-    } catch (e) {}
-  }
   function fixClausulas() {
   try {
     // 1) Títulos dentro de tabelas: a linha inteira vira faixa azul.
@@ -620,9 +559,9 @@ export async function printContrato(contratoId: string) {
   } catch (e) {}
   }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { wrapPrintArea(); fixTables(); fixClausulas(); });
+    document.addEventListener("DOMContentLoaded", function () { fixTables(); fixClausulas(); });
   } else {
-    wrapPrintArea(); fixTables(); fixClausulas();
+    fixTables(); fixClausulas();
   }
 })();
 </script>`;
