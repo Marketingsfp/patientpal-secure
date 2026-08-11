@@ -9,6 +9,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
