@@ -937,24 +937,8 @@ function AppShellInner() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const navRoot = navScrollRef.current;
-      const el = navRoot?.querySelector<HTMLElement>('[data-nav-active="true"]');
-      if (!navRoot || !el) return;
-      const rootRect = navRoot.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const gap = 12;
-      if (elRect.top < rootRect.top + gap) {
-        navRoot.scrollTop -= rootRect.top + gap - elRect.top;
-      } else if (elRect.bottom > rootRect.bottom - gap) {
-        navRoot.scrollTop += elRect.bottom - (rootRect.bottom - gap);
-      }
-    });
-    return () => window.cancelAnimationFrame(frame);
-    // Não incluir `openGroups`: abrir/fechar um submenu não deve rolar a
-    // sidebar de volta para o item ativo.
-  }, [location.pathname, collapsed]);
+  // A sidebar não é mais rolada automaticamente ao trocar de rota: a posição
+  // de scroll escolhida pelo usuário é preservada durante a navegação.
 
   if (loading || !user) {
     return (
@@ -1102,7 +1086,7 @@ function AppShellInner() {
             )}
             {searchedNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
-                const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(`${to}/`));
+                const pathOk = itemDeMenuAtivo(location.pathname, to);
                 if (!pathOk) return false;
                 if (!hash) return true;
                 return (location.hash ?? "").replace(/^#/, "") === hash;
@@ -1225,9 +1209,8 @@ function AppShellInner() {
                       }
                       const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
                       const active =
-                        location.pathname === item.to ||
-                        (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`)) ||
-                        aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
+                        itemDeMenuAtivo(location.pathname, item.to) ||
+                        aliases.some((a) => itemDeMenuAtivo(location.pathname, a));
                       const href = item.to;
                       return (
                         <a
@@ -1436,8 +1419,7 @@ function AppShellInner() {
                         />
                       );
                     }
-                    const active =
-                      location.pathname === item.to || (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`));
+                    const active = itemDeMenuAtivo(location.pathname, item.to);
                     return (
                       <a
                         key={item.to}
