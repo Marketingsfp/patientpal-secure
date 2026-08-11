@@ -2060,6 +2060,11 @@ function AgendaPage() {
   };
   const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
   const [pacEditSaving, setPacEditSaving] = useState(false);
+  // Aplica a máscara 00000-000 ao valor vindo do banco (armazenado só com dígitos)
+  const maskCep = (v: string | null | undefined) => {
+    const raw = String(v ?? "").replace(/\D/g, "").slice(0, 8);
+    return raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw;
+  };
   useEffect(() => {
     if (pacInfo) {
       setPacEdit({
@@ -2067,7 +2072,7 @@ function AgendaPage() {
         data_nascimento: pacInfo.data_nascimento ?? "",
         telefone: pacInfo.telefone ?? "",
         email: pacInfo.email ?? "",
-        cep: pacInfo.cep ?? "",
+        cep: maskCep(pacInfo.cep),
         logradouro: pacInfo.logradouro ?? "",
         numero: pacInfo.numero ?? "",
         bairro: pacInfo.bairro ?? "",
@@ -2086,7 +2091,7 @@ function AgendaPage() {
       data_nascimento: pacInfo.data_nascimento ?? "",
       telefone: pacInfo.telefone ?? "",
       email: pacInfo.email ?? "",
-      cep: pacInfo.cep ?? "",
+      cep: maskCep(pacInfo.cep),
       logradouro: pacInfo.logradouro ?? "",
       numero: pacInfo.numero ?? "",
       bairro: pacInfo.bairro ?? "",
@@ -2150,7 +2155,7 @@ function AgendaPage() {
     setPacInfoLoading(true);
     const { data } = await supabase
       .from("pacientes")
-      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
+      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cep,cidade,estado,bairro,logradouro,numero,foto_url")
       .eq("id", pacienteId)
       .maybeSingle();
     if (data) {
