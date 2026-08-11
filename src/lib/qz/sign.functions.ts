@@ -9,6 +9,11 @@ export const assinarQzMessage = createServerFn({ method: "POST" })
     if (!input || typeof input.toSign !== "string") {
       throw new Error("Payload inválido para assinatura QZ.");
     }
+    // Limite defensivo: a assinatura QZ recebe apenas o payload de comando,
+    // nunca documentos inteiros. Evita abuso do endpoint público.
+    if (input.toSign.length === 0 || input.toSign.length > 8000) {
+      throw new Error("Payload de assinatura QZ fora do tamanho permitido.");
+    }
     return input;
   })
   .handler(async ({ data }) => {
