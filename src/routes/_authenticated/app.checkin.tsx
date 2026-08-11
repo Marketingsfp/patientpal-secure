@@ -972,7 +972,12 @@ function AvatarPaciente({ nome, cpf, url }: { nome: string; cpf?: string | null;
       </button>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent
+          className="max-w-2xl"
+          onPointerDownOutside={() => setAberto(false)}
+          onInteractOutside={() => setAberto(false)}
+          onEscapeKeyDown={() => setAberto(false)}
+        >
           <DialogHeader>
             <DialogTitle>{nome}</DialogTitle>
             <DialogDescription>{cpf ? `CPF ${cpf}` : "CPF não informado"}</DialogDescription>
