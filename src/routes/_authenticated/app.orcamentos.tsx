@@ -378,11 +378,15 @@ function OrcamentosPage() {
   return (
     <div className="space-y-4 flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-md bg-primary/10"><FileText className="h-6 w-6 text-primary" /></div>
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/15 shadow-2xs shrink-0 flex items-center justify-center">
+            <FileText className="h-6 w-6" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold">Orçamentos</h1>
-            <p className="text-sm text-muted-foreground">Orçamentos rápidos com impressão térmica 80mm</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground/90">Orçamentos</h1>
+            <p className="text-sm font-normal text-muted-foreground/80 leading-relaxed mt-0.5">
+              Orçamentos rápidos com impressão térmica 80mm
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
