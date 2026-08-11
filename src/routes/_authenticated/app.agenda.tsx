@@ -41,6 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
