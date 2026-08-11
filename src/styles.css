@@ -729,16 +729,30 @@ html.theme-emerald {
   .print-document table,
   .contract-table {
     width: 100% !important;
+    max-width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
+  }
+  .print-document table,
+  .print-document tr,
+  .print-document td,
+  .print-document th {
+    box-sizing: border-box !important;
   }
   .print-document td,
   .print-document th {
     vertical-align: middle;
+    max-width: 100% !important;
+    word-break: break-word;
     word-wrap: break-word;
     overflow-wrap: anywhere;
     position: static !important;
     float: none !important;
+  }
+  .print-document table.lgpd-consent td:first-child { width: 85% !important; }
+  .print-document table.lgpd-consent td:last-child {
+    width: 15% !important;
+    text-align: center;
   }
   .print-document tr,
   .print-document thead,
