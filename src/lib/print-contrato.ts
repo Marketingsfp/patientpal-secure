@@ -61,9 +61,15 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
   out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
     vars[key] && String(vars[key]).trim() ? "" : body,
   );
-  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+  return out.replace(/\{\{(\w+)\}\}/g, (match, k, offset: number) => {
     const raw = vars[k] ?? "";
     const safe = esc(raw);
+    // Se a variável estiver dentro de uma tag (ex.: style="..."/alt="..."),
+    // nunca injetamos HTML — isso quebraria o CSS inline do modelo salvo.
+    const antes = out.slice(Math.max(0, offset - 400), offset);
+    const abre = antes.lastIndexOf("<");
+    const fecha = antes.lastIndexOf(">");
+    if (abre > fecha) return safe;
     // Reduz o tamanho real da fonte (não só o transform visual) para os
     // valores longos caberem na coluna dos templates absolutos.
     const len = raw.length;
@@ -279,7 +285,7 @@ export async function printContrato(contratoId: string) {
   const { data: cv } = (c as any).convenio_id
     ? await supabase
         .from("cb_convenios")
-        .select("modelo_contrato")
+        .select("nome, modelo_contrato, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, num_parcelas")
         .eq("id", (c as any).convenio_id)
         .maybeSingle()
     : { data: null as any };
@@ -321,7 +327,8 @@ export async function printContrato(contratoId: string) {
   }
 
   const depSlotVars: Record<string, string> = {};
-  for (let i = 0; i < 5; i++) {
+  const totalSlots = Math.max(5, deps.length, Number((cv as any)?.max_dependentes ?? 0) || 0);
+  for (let i = 0; i < totalSlots; i++) {
     const d: any = deps[i];
     const pac: any = d ? pacsMap[d.paciente_id] : null;
     const idx = i + 1;
@@ -337,9 +344,28 @@ export async function printContrato(contratoId: string) {
   const overrideTpl = (c as any).convenio_id
     ? CONVENIO_TEMPLATE_OVERRIDES[(c as any).convenio_id]
     : null;
-  const templateBody = overrideTpl ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
+  // O modelo salvo no editor tem prioridade: é ele que carrega logos,
+  // cabeçalhos coloridos e as tabelas mescladas de dependentes.
+  const templateBody = pick(cvTpl) ?? overrideTpl ?? TEXTO_CONTRATO_HTML;
 
-  const corpo = applyTemplate(templateBody, {
+  const dependentesTxt = deps.length
+    ? deps.map((d: any, i: number) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"}`).join(" • ")
+    : "";
+
+  const varsBase: Record<string, string> = {
+    CLINICA_NOME: _cl.nome ?? "",
+    CLINICA_CNPJ: _cl.cnpj ?? "",
+    CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
+    CLINICA_TELEFONE: fmtTelefone(_cl.telefone),
+    CIDADE: _cl.cidade ?? "",
+    CONVENIO_NOME: (cv as any)?.nome ?? "",
+    CONTRATO_NUMERO: String((c as any).numero ?? ""),
+    VALOR_MENSAL: fmtBRL(Number((c as any).valor_mensal ?? 0)),
+    TAXA_ADESAO: fmtBRL(Number((c as any).taxa_adesao ?? (cv as any)?.taxa_adesao ?? 0)),
+    NUM_PARCELAS: String((c as any).num_parcelas ?? (cv as any)?.num_parcelas ?? ""),
+    VIGENCIA_MESES: String((cv as any)?.vigencia_meses ?? 12),
+    FIDELIDADE_MESES: String((cv as any)?.fidelidade_meses ?? 0),
+    DEPENDENTES: dependentesTxt,
     PACIENTE_NOME: c.paciente_nome ?? "",
     PACIENTE_CPF: fmtCPF(_pa.cpf),
     PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
@@ -353,8 +379,36 @@ export async function printContrato(contratoId: string) {
     PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
     PACIENTE_EMAIL: _pa.email ?? "",
     DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
+    DATA_INICIO: fmtData((c as any).data_inicio),
     ...depSlotVars,
-  });
+  };
+
+  // Apelidos aceitos nos modelos escritos no editor.
+  const alias: Record<string, string> = {
+    CONTRATANTE_NOME: "PACIENTE_NOME",
+    CONTRATANTE_CPF: "PACIENTE_CPF",
+    CONTRATANTE_ENDERECO: "PACIENTE_ENDERECO",
+    CONTRATANTE_TELEFONE: "PACIENTE_TELEFONE",
+    CONTRATANTE_EMAIL: "PACIENTE_EMAIL",
+    CONTRATANTE_NASCIMENTO: "PACIENTE_NASCIMENTO",
+    NOME: "PACIENTE_NOME",
+    CPF: "PACIENTE_CPF",
+    ENDERECO: "PACIENTE_ENDERECO",
+    TELEFONE: "PACIENTE_TELEFONE",
+    EMAIL: "PACIENTE_EMAIL",
+    NASCIMENTO: "PACIENTE_NASCIMENTO",
+    BAIRRO: "PACIENTE_BAIRRO",
+    CEP: "PACIENTE_CEP",
+    ESTADO: "PACIENTE_ESTADO",
+    CONTRATADA_NOME: "CLINICA_NOME",
+    CONTRATADA_CNPJ: "CLINICA_CNPJ",
+    CONTRATADA_ENDERECO: "CLINICA_ENDERECO",
+  };
+  for (const [de, para] of Object.entries(alias)) {
+    if (varsBase[de] === undefined) varsBase[de] = varsBase[para] ?? "";
+  }
+
+  const corpo = applyTemplate(templateBody, varsBase);
 
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 
@@ -603,8 +657,7 @@ ${corpo}
   iframe.onload = () => {
     const win = iframe.contentWindow;
     if (!win) { cleanup(); return; }
-    // Aguarda o layout/imagens antes de imprimir.
-    setTimeout(() => {
+    const doPrint = () => {
       try {
         win.onafterprint = () => setTimeout(cleanup, 100);
         win.focus();
@@ -614,7 +667,25 @@ ${corpo}
       }
       // Fallback: remove o iframe mesmo se onafterprint não disparar.
       setTimeout(cleanup, 60_000);
-    }, 350);
+    };
+    // Aguarda o carregamento das imagens (logos) antes de imprimir, para que
+    // o PDF saia idêntico à pré-visualização do editor.
+    const imgs = Array.from(iframe.contentDocument?.images ?? []);
+    const pendentes = imgs.filter((im) => !im.complete);
+    if (pendentes.length === 0) { setTimeout(doPrint, 300); return; }
+    let restantes = pendentes.length;
+    let disparado = false;
+    const pronto = () => {
+      if (disparado) return;
+      disparado = true;
+      setTimeout(doPrint, 200);
+    };
+    pendentes.forEach((im) => {
+      const fim = () => { if (--restantes <= 0) pronto(); };
+      im.addEventListener("load", fim, { once: true });
+      im.addEventListener("error", fim, { once: true });
+    });
+    setTimeout(pronto, 5000);
   };
 
   const doc = iframe.contentDocument;
