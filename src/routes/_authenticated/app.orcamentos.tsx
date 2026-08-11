@@ -932,10 +932,10 @@ function NovoOrcamentoDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-3xl max-h-[95vh] overflow-y-auto"
+        className="max-w-3xl max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
         overlayClassName="bg-transparent backdrop-blur-none pointer-events-none"
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>
             Novo orçamento
             {categoria && (
@@ -951,6 +951,7 @@ function NovoOrcamentoDialog({
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto p-6">
         {!categoria ? (
           <div className="py-8 space-y-4">
             <p className="text-center text-sm text-muted-foreground">
@@ -1276,9 +1277,10 @@ function NovoOrcamentoDialog({
           </div>
         </div>
         )}
+        </div>
 
         {categoria && (
-          <DialogFooter className="sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-5 z-10">
+          <DialogFooter className="shrink-0 border-t bg-background p-4 flex justify-end gap-2 rounded-b-xl">
             <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
             <Button onClick={salvar} disabled={saving} className="gap-2"><Printer className="h-4 w-4" /> Salvar e imprimir</Button>
           </DialogFooter>
