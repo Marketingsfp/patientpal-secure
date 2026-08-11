@@ -7,6 +7,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { pacienteSchema, primeiroErro } from "@/lib/schemas/paciente";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
+import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -247,9 +248,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
     setForm({
       nome: editing.nome,
-      cpf: editing.cpf ?? "", numero_pasta: editing.numero_pasta ?? "",
+      cpf: mascaraCPF(editing.cpf ?? ""), numero_pasta: editing.numero_pasta ?? "",
       codigo_prontuario: (editing as any).codigo_prontuario ?? "",
-      telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
+      telefone: mascaraTelefone(editing.telefone ?? ""),
+      telefone2: mascaraTelefone(editing.telefone2 ?? ""),
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
       sexo: (["masculino","feminino","outro","nao_informar"].includes((editing.sexo ?? "") as string)
@@ -261,8 +263,8 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       bairro: editing.bairro ?? "", cidade: editing.cidade ?? "",
       estado: editing.estado ?? "",
       responsavel_nome: editing.responsavel_nome ?? "",
-      responsavel_cpf: editing.responsavel_cpf ?? "",
-      responsavel_telefone: editing.responsavel_telefone ?? "",
+      responsavel_cpf: mascaraCPF(editing.responsavel_cpf ?? ""),
+      responsavel_telefone: mascaraTelefone(editing.responsavel_telefone ?? ""),
       responsavel_parentesco: editing.responsavel_parentesco ?? "",
     });
     setTab("dados");
