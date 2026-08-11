@@ -513,6 +513,24 @@ export async function printContrato(contratoId: string) {
       line-height: 1.25 !important;
     }
     td[style*="width"], th[style*="width"] { width: auto !important; }
+    /* Isola a área do contrato: nada além dela é impresso, e ela é ancorada
+       no canto superior esquerdo da folha (elimina o deslocamento à direita
+       e o corte lateral causados por margens/posicionamentos herdados). */
+    body * { visibility: hidden !important; }
+    #contract-print-area, #contract-print-area * { visibility: visible !important; }
+    #contract-print-area {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      right: auto !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: none !important;
+      float: none !important;
+      box-sizing: border-box !important;
+    }
     table.lgpd-consent td:first-child { width: 82% !important; }
     table.lgpd-consent td:last-child { width: 18% !important; text-align: center !important; }
     h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; }
@@ -536,6 +554,15 @@ export async function printContrato(contratoId: string) {
 <script id="print-fix-tables">
 (function () {
   var CLAUSULA_RE = /^\\s*(CL[ÁA]USULA|PAR[ÁA]GRAFO [ÚU]NICO|ANEXO)\\b/i;
+  function wrapPrintArea() {
+    try {
+      if (document.getElementById("contract-print-area")) return;
+      var wrap = document.createElement("div");
+      wrap.id = "contract-print-area";
+      while (document.body.firstChild) wrap.appendChild(document.body.firstChild);
+      document.body.appendChild(wrap);
+    } catch (e) {}
+  }
   function fixClausulas() {
   try {
     // 1) Títulos dentro de tabelas: a linha inteira vira faixa azul.
@@ -593,9 +620,9 @@ export async function printContrato(contratoId: string) {
   } catch (e) {}
   }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { fixTables(); fixClausulas(); });
+    document.addEventListener("DOMContentLoaded", function () { wrapPrintArea(); fixTables(); fixClausulas(); });
   } else {
-    fixTables(); fixClausulas();
+    wrapPrintArea(); fixTables(); fixClausulas();
   }
 })();
 </script>`;
