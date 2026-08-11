@@ -396,6 +396,12 @@ export async function printContrato(contratoId: string) {
     color: #ffffff !important;
     font-weight: bold !important;
   }
+  /* Cor de fundo aplicada em células pelo editor deve sobreviver à impressão */
+  td[data-bg], th[data-bg] {
+    background-image: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   /* Caixas de título de cláusula: faixa azul ocupando 100% da largura */
   .clausula-header,
   .clausula-header td,

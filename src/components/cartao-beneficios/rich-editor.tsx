@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { ImageCropDialog } from "./image-crop-dialog";
 import { TableInsertMenu } from "./table-insert-menu";
+import { TableCellBgMenu } from "./table-cell-bg-menu";
 
 // Extend table cells with a backgroundColor attribute so users can paint cells/rows/columns.
 /**
