@@ -161,6 +161,11 @@ export const SUBMODULE_PARENT: Record<string, string> = {
  */
 const PREFIX_ENTRIES: ReadonlyArray<readonly [string, string | null]> = Object
   .entries(ROUTE_TO_MODULE)
+  // "/app" é raiz de TODAS as rotas do sistema. Se ele participasse do
+  // casamento por prefixo, qualquer rota ainda não cadastrada no mapa
+  // herdaria "livre" (null) e passaria pela guarda sem checagem de
+  // permissão. Ele só vale por match exato.
+  .filter(([rota]) => rota !== "/app")
   .sort((a, b) => b[0].length - a[0].length);
 
 /**
