@@ -2062,6 +2062,19 @@ function AgendaPage() {
   const [pacEditSaving, setPacEditSaving] = useState(false);
   // Pré-visualização ampliada da foto do paciente
   const [fotoPreviewOpen, setFotoPreviewOpen] = useState(false);
+  // Fecha a pré-visualização com Esc (captura antes do Dialog de trás)
+  useEffect(() => {
+    if (!fotoPreviewOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setFotoPreviewOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [fotoPreviewOpen]);
   // Aplica a máscara 00000-000 ao valor vindo do banco (armazenado só com dígitos)
   const maskCep = (v: string | null | undefined) => {
     const raw = String(v ?? "").replace(/\D/g, "").slice(0, 8);
@@ -9590,16 +9603,24 @@ function AgendaPage() {
 
       {fotoPreviewOpen && pacInfoFoto && (
         <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm pointer-events-auto"
           role="dialog"
           aria-modal="true"
-          onClick={() => setFotoPreviewOpen(false)}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setFotoPreviewOpen(false);
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFotoPreviewOpen(false);
+          }}
         >
           <button
             type="button"
             aria-label="Fechar"
-            onClick={() => setFotoPreviewOpen(false)}
-            className="absolute right-5 top-5 rounded-full p-2 text-white/90 transition hover:bg-white/10 hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              setFotoPreviewOpen(false);
+            }}
+            className="absolute right-5 top-5 rounded-full p-2 text-white/90 transition hover:bg-white/10 hover:text-white pointer-events-auto"
           >
             <X className="h-6 w-6" />
           </button>
@@ -9607,7 +9628,7 @@ function AgendaPage() {
             src={pacInfoFoto}
             alt={`Foto de ${pacInfo?.nome ?? "paciente"}`}
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[70vh] max-w-[min(90vw,520px)] rounded-xl object-contain shadow-2xl ring-1 ring-white/20"
+            className="max-h-[70vh] max-w-[min(90vw,520px)] rounded-xl object-contain shadow-2xl ring-1 ring-white/20 pointer-events-auto"
           />
           <p className="text-center text-sm text-white/80">Visualização Ampliada da Foto do Paciente</p>
           <Button
@@ -9615,7 +9636,7 @@ function AgendaPage() {
               e.stopPropagation();
               setFotoPreviewOpen(false);
             }}
-            className="bg-violet-600 px-6 text-white hover:bg-violet-700"
+            className="bg-violet-600 px-6 text-white hover:bg-violet-700 pointer-events-auto"
           >
             Fechar Pré-visualização
           </Button>
