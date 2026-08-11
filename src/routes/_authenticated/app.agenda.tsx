@@ -9009,37 +9009,37 @@ function AgendaPage() {
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
         <div className="hidden lg:block w-full overflow-x-auto scrollbar-thin rounded-lg border border-border bg-card">
-          <Table className="w-full min-w-[1100px] table-fixed">
+          <Table className="w-full min-w-[1200px] table-fixed">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
-                <TableHead className="w-[3%] rounded-tl-lg px-2" title="Selecione para ações em lote">
+                <TableHead className="w-[44px] rounded-tl-lg px-2" title="Selecione para ações em lote">
                   <Checkbox
                     checked={paginados.length > 0 && selecionados.size === paginados.length}
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-[5%] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[60px] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
-                <TableHead className="w-[5%] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
-                <TableHead className="w-[8%] px-2 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-[11%] px-2 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="w-[15%] min-w-[180px] max-w-[200px] truncate px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[50px] px-2 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
+                <TableHead className="w-[85px] px-2 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="w-[100px] px-2 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
+                <TableHead className="w-[180px] truncate px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="w-[16%] min-w-[240px] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[260px] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="w-[13%] min-w-[180px] px-3 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[180px] px-3 font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[9%] min-w-[120px] shrink-0 px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[130px] px-3 whitespace-nowrap font-semibold text-xs uppercase text-muted-foreground">
                   Situação
                 </TableHead>
-                <TableHead className="w-[10%] px-2 font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[90px] px-2 font-semibold text-xs uppercase text-muted-foreground">
                   Observações
                 </TableHead>
-                <TableHead className="w-[140px] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[70px] px-3 text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
