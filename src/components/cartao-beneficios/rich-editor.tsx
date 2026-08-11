@@ -447,6 +447,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         class:
           "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
+      // Colagem vinda de MS Word / Google Docs: preserva tabelas, mesclagens
+      // e sombreamento das células, limpando o markup proprietário.
+      transformPastedHTML: (html) => limparHtmlColado(html),
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
