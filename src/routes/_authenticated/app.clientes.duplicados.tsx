@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ExternalLink, Merge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,29 @@ const TIPO_LABEL: Record<Grupo["tipo"], string> = {
   telefone: "Mesmo telefone",
   nome_dn: "Mesmo nome + nascimento",
 };
+
+/** Formata CPF apenas para exibição (000.000.000-00). */
+function formatCPF(v?: string | null): string {
+  const d = (v ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return v ?? "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+/** Formata telefone apenas para exibição ((21) 99532-4717). */
+function formatPhone(v?: string | null): string {
+  const d = (v ?? "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return v ?? "—";
+}
+
+/** Chave do grupo formatada conforme o tipo de duplicidade. */
+function formatChave(g: Grupo): string {
+  if (g.tipo === "cpf") return formatCPF(g.chave);
+  if (g.tipo === "telefone") return formatPhone(g.chave);
+  const [nome, dn] = g.chave.split("|");
+  return `${nome}${dn ? ` · ${dn.split("-").reverse().join("/")}` : ""}`;
+}
 
 function DuplicadosPage() {
   const { clinicaIds } = useClinica();
