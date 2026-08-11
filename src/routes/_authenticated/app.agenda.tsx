@@ -7239,7 +7239,7 @@ function AgendaPage() {
                   </div>
                 </fieldset>
                 </div>
-                <DialogFooter className="shrink-0 z-20 bg-background pt-3 pb-3 -mx-4 px-4 sm:-mx-6 sm:px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 rounded-b-2xl flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                <DialogFooter className="shrink-0 z-20 bg-background px-4 sm:px-6 py-3 border-t border-slate-200 rounded-b-2xl flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
                     <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
