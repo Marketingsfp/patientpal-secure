@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
+import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -116,6 +117,7 @@ function FluxoPage() {
   const [ags, setAgs] = useState<Ag[]>([]);
   const [detalhe, setDetalhe] = useState<FluxoDetalheAg | null>(null);
   const [pagos, setPagos] = useState<Set<string>>(new Set());
+  const [cidades, setCidades] = useState<Map<string, string | null>>(new Map());
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
   const tzOffset = new Date().getTimezoneOffset() * 60000;
@@ -153,6 +155,17 @@ function FluxoPage() {
     const rows = (data ?? []) as unknown as Ag[];
     const reais = rows.filter((a) => !!a.paciente_id && (a.paciente_nome ?? "").trim().toUpperCase() !== "DISPONÍVEL");
     setAgs(reais);
+
+    // Cidade do paciente (alerta "paciente de longe")
+    const pacIds = Array.from(new Set(reais.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+    if (pacIds.length) {
+      const { data: pacs } = await supabase.from("pacientes").select("id, cidade").in("id", pacIds);
+      const mapa = new Map<string, string | null>();
+      ((pacs ?? []) as { id: string; cidade: string | null }[]).forEach((p) => mapa.set(p.id, p.cidade));
+      setCidades(mapa);
+    } else {
+      setCidades(new Map());
+    }
 
     // Pula o Caixa quando o paciente já pagou (check-in/pagamento na recepção):
     // quem está pago não precisa passar pela coluna Caixa.
@@ -470,6 +483,10 @@ function FluxoPage() {
                         <span className="truncate text-sm font-semibold text-slate-800">{a.paciente_nome}</span>
                         <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
                       </div>
+
+                      {a.paciente_id && (
+                        <BadgePacienteDistante cidade={cidades.get(a.paciente_id) ?? null} compact className="mt-1.5" />
+                      )}
 
                       {/* Prioridade */}
                       {a.prioridade && a.prioridade !== "normal" && (
