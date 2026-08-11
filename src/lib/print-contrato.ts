@@ -32,9 +32,19 @@ export const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
 
+/** Datas "puras" (YYYY-MM-DD) não podem sofrer shift de fuso: parseamos ao
+ *  meio-dia local para nunca voltar um dia (13/09 virando 12/09). */
+const parseDataSemFuso = (iso: string): Date => {
+  const soData = iso.split("T")[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(soData)
+    ? new Date(`${soData}T12:00:00`)
+    : new Date(iso);
+};
+
 const fmtData = (iso?: string | null) => {
   if (!iso) return "—";
-  const d = new Date(iso);
+  const d = parseDataSemFuso(iso);
+  if (isNaN(d.getTime())) return "—";
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
@@ -46,7 +56,7 @@ const MESES_PT = [
 
 export const fmtDataExtenso = (iso?: string | null) => {
   if (!iso) return "";
-  const d = new Date(iso);
+  const d = parseDataSemFuso(iso);
   if (isNaN(d.getTime())) return "";
   return `${d.getDate()} de ${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
 };
