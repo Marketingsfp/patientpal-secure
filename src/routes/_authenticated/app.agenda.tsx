@@ -9412,6 +9412,7 @@ function AgendaPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   );
