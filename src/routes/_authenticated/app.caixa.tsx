@@ -1912,11 +1912,13 @@ function Page() {
         : "Selecione de quem o dinheiro está sendo recebido");
       return;
     }
-    // Estorno avulso não tem seletor de destino (não é transferência entre
-    // membros da equipe) — a descrição é o único registro de quem/o que
-    // está sendo estornado, então é obrigatória aqui.
-    if (openMov.tipo === "estorno" && !movDesc.trim()) {
-      toast.error("Descreva o motivo/paciente do estorno");
+    // A descrição é o registro do motivo/referência do lançamento manual e é
+    // obrigatória em todos os tipos (mínimo de 3 caracteres).
+    if (movDesc.trim().length < 3) {
+      setMovDescTouched(true);
+      toast.error(openMov.tipo === "estorno"
+        ? "Descreva o motivo/paciente do estorno"
+        : "Descrição é obrigatória (mínimo 3 caracteres)");
       return;
     }
     const destinoNome = ehTransfer
