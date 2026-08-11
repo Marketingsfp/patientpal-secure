@@ -58,7 +58,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
+import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, rotaSomenteAdmin, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
@@ -959,6 +959,8 @@ function AppShellInner() {
   // para evitar flash de "Acesso negado".
   const currentModulo = moduloDaRota(location.pathname);
   const rotaPermitida = (() => {
+    // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
+    if (rotaSomenteAdmin(location.pathname)) return allowedModules === null;
     if (allowedModules === null) return true;
     if (currentModulo === null) return true;
     if (typeof currentModulo !== "string") return false;
