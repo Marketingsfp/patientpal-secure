@@ -2060,6 +2060,8 @@ function AgendaPage() {
   };
   const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
   const [pacEditSaving, setPacEditSaving] = useState(false);
+  // Pré-visualização ampliada da foto do paciente
+  const [fotoPreviewOpen, setFotoPreviewOpen] = useState(false);
   // Aplica a máscara 00000-000 ao valor vindo do banco (armazenado só com dígitos)
   const maskCep = (v: string | null | undefined) => {
     const raw = String(v ?? "").replace(/\D/g, "").slice(0, 8);
