@@ -554,6 +554,15 @@ export async function printContrato(contratoId: string) {
 <script id="print-fix-tables">
 (function () {
   var CLAUSULA_RE = /^\\s*(CL[ÁA]USULA|PAR[ÁA]GRAFO [ÚU]NICO|ANEXO)\\b/i;
+  function wrapPrintArea() {
+    try {
+      if (document.getElementById("contract-print-area")) return;
+      var wrap = document.createElement("div");
+      wrap.id = "contract-print-area";
+      while (document.body.firstChild) wrap.appendChild(document.body.firstChild);
+      document.body.appendChild(wrap);
+    } catch (e) {}
+  }
   function fixClausulas() {
   try {
     // 1) Títulos dentro de tabelas: a linha inteira vira faixa azul.
