@@ -139,6 +139,17 @@ const isParent = (it: NavItem): it is NavParent => "children" in it;
 const navItemKey = (it: NavItem): string =>
   isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
 
+// Rotas que só ficam ativas em correspondência exata. "/app/clientes" tem
+// sub-rotas com item próprio no menu (ex.: "/app/clientes/duplicados"), então
+// o item pai não deve acender quando o usuário está numa sub-rota.
+const ROTAS_MATCH_EXATO: ReadonlySet<string> = new Set(["/app", "/app/clientes"]);
+
+/** True quando o item do menu (`to`) corresponde à rota atual. */
+export function itemDeMenuAtivo(pathname: string, to: string): boolean {
+  if (ROTAS_MATCH_EXATO.has(to)) return pathname === to;
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
 const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
@@ -926,24 +937,8 @@ function AppShellInner() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const navRoot = navScrollRef.current;
-      const el = navRoot?.querySelector<HTMLElement>('[data-nav-active="true"]');
-      if (!navRoot || !el) return;
-      const rootRect = navRoot.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const gap = 12;
-      if (elRect.top < rootRect.top + gap) {
-        navRoot.scrollTop -= rootRect.top + gap - elRect.top;
-      } else if (elRect.bottom > rootRect.bottom - gap) {
-        navRoot.scrollTop += elRect.bottom - (rootRect.bottom - gap);
-      }
-    });
-    return () => window.cancelAnimationFrame(frame);
-    // Não incluir `openGroups`: abrir/fechar um submenu não deve rolar a
-    // sidebar de volta para o item ativo.
-  }, [location.pathname, collapsed]);
+  // A sidebar não é mais rolada automaticamente ao trocar de rota: a posição
+  // de scroll escolhida pelo usuário é preservada durante a navegação.
 
   if (loading || !user) {
     return (
@@ -1091,7 +1086,7 @@ function AppShellInner() {
             )}
             {searchedNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
-                const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(`${to}/`));
+                const pathOk = itemDeMenuAtivo(location.pathname, to);
                 if (!pathOk) return false;
                 if (!hash) return true;
                 return (location.hash ?? "").replace(/^#/, "") === hash;
@@ -1214,9 +1209,8 @@ function AppShellInner() {
                       }
                       const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
                       const active =
-                        location.pathname === item.to ||
-                        (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`)) ||
-                        aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
+                        itemDeMenuAtivo(location.pathname, item.to) ||
+                        aliases.some((a) => itemDeMenuAtivo(location.pathname, a));
                       const href = item.to;
                       return (
                         <a
@@ -1425,8 +1419,7 @@ function AppShellInner() {
                         />
                       );
                     }
-                    const active =
-                      location.pathname === item.to || (item.to !== "/app" && location.pathname.startsWith(`${item.to}/`));
+                    const active = itemDeMenuAtivo(location.pathname, item.to);
                     return (
                       <a
                         key={item.to}
