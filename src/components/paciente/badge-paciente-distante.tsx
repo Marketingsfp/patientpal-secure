@@ -19,14 +19,14 @@ export function BadgePacienteDistante({
   return (
     <span
       title={`Paciente de outro município: ${nome}`}
-      className={`shrink-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 tracking-wide flex items-center gap-1.5 animate-pulse ${
+      className={`shrink-0 max-w-full overflow-hidden bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 tracking-wide flex items-center gap-1 animate-pulse ${
         compact
-          ? "px-1.5 py-0.5 text-[10px] font-semibold rounded-md"
+          ? "px-1 py-0.5 text-[9px] font-semibold rounded"
           : "px-3 py-1 text-xs font-bold rounded-full"
       } ${className}`}
     >
-      <AlertTriangle className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
-      {compact ? nome.toUpperCase() : `PACIENTE DE LONGE: ${nome}`}
+      <AlertTriangle className={compact ? "h-2.5 w-2.5 shrink-0" : "h-3.5 w-3.5"} />
+      <span className="truncate">{compact ? nome.toUpperCase() : `PACIENTE DE LONGE: ${nome}`}</span>
     </span>
   );
 }
