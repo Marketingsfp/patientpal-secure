@@ -6,7 +6,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet } from "lucide-react";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 
@@ -316,94 +315,120 @@ function TriagemEnfermagemPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <HeartPulse className="h-6 w-6 text-rose-500" /> Triagem - Enfermagem
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Pacientes na etapa <b>Triagem</b> do fluxo. Chame, registre a anamnese e libere para o atendimento.
-          </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/15 flex items-center justify-center">
+            <HeartPulse className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Triagem - Enfermagem</h1>
+            <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
+              Pacientes na etapa <b>Triagem</b> do fluxo. Chame, registre a anamnese e libere para o atendimento.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-xs">Sala/Consultório</Label>
+        <div className="flex items-center gap-2.5 bg-card border border-border/50 p-1.5 rounded-2xl shadow-2xs">
+          <Label className="text-xs text-muted-foreground pl-2 whitespace-nowrap">Sala/Consultório</Label>
           <Input value={consultorio} onChange={(e) => setConsultorio(e.target.value.slice(0, 10))}
-                 placeholder="Ex.: 1, 2, A" className="h-9 w-24" />
-          <Button variant="outline" onClick={carregar} disabled={loading}>
+                 placeholder="Ex.: 1, 2, A" className="h-9 w-24 rounded-xl" />
+          <button
+            type="button"
+            onClick={carregar}
+            disabled={loading}
+            className="group border border-border/60 hover:bg-muted font-medium text-xs rounded-xl px-3.5 py-2 flex items-center gap-2 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 transition-transform ${loading ? "animate-spin" : "group-hover:rotate-180 duration-500"}`} />
             {loading ? "Atualizando…" : "Atualizar"}
-          </Button>
+          </button>
         </div>
       </div>
 
       {grupos.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
+        <Card className="p-8 text-center text-sm text-muted-foreground rounded-2xl">
           Nenhum paciente na fila de triagem.
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {grupos.map((g) => {
             const pago = grupoPago(g);
+            const accent =
+              g.prioridade === "urgente"
+                ? "before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-rose-500"
+                : g.prioridade === "prioritario"
+                ? "before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-amber-500"
+                : "";
             return (
-            <Card key={g.chave} className={`p-3 space-y-2 ${pago ? "" : "border-amber-400/70 bg-amber-50/40 dark:bg-amber-950/10"}`}>
+            <div
+              key={g.chave}
+              className={`bg-card border border-border/50 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-4 relative overflow-hidden ${accent}`}
+            >
+              <div className="space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{g.paciente_nome}</div>
+                  <div className="text-base font-bold tracking-tight text-foreground truncate">{g.paciente_nome}</div>
                   {g.agendamentos.length > 1 && (
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       {g.agendamentos.length} atendimentos no dia
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-wrap gap-1.5 justify-end">
                   {!pago && (
-                    <Badge className="border-0 text-[10px] gap-1 bg-amber-500 text-white">
+                    <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-medium px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1">
                       <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE
-                    </Badge>
+                    </span>
                   )}
                   {g.prioridade !== "normal" && (
-                    <Badge className={`border-0 text-[10px] gap-1 ${g.prioridade === "urgente" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span className={`font-semibold px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 ${g.prioridade === "urgente" ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"}`}>
                       <AlertTriangle className="h-3 w-3" />
                       {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                    </Badge>
+                    </span>
                   )}
                 </div>
               </div>
-              <ul className="text-xs text-muted-foreground space-y-0.5">
+              <ul className="space-y-0.5">
                 {g.agendamentos.map((a) => {
                   const h = new Date(a.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                   return (
-                    <li key={a.id}>
-                      {h} · {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
+                    <li key={a.id} className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {h} · {a.procedimento ?? "—"}{a.medicos?.nome ? ` · ${a.medicos.nome}` : ""}
+                      </span>
                     </li>
                   );
                 })}
               </ul>
-              <div className="flex items-center gap-2 pt-1">
-                <Button
-                  size="sm" className="flex-1"
+              </div>
+              <div className="pt-3 border-t border-border/40 flex items-center gap-2">
+                <button
+                  type="button"
                   onClick={() => chamarPaciente(g)}
                   disabled={!pago || !!chamandoId}
                   title={!pago ? "Pagamento pendente" : undefined}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Bell className="h-4 w-4 mr-1" /> Chamar
-                </Button>
-                <Button
-                  size="sm" variant="outline"
+                  <Bell className="h-3.5 w-3.5" /> Chamar
+                </button>
+                <button
+                  type="button"
                   onClick={() => abrir(g)}
                   disabled={!pago}
                   title={!pago ? "Pagamento pendente" : undefined}
+                  className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/20 font-medium py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Stethoscope className="h-4 w-4 mr-1" /> Atender
-                </Button>
+                  <Stethoscope className="h-3.5 w-3.5" /> Atender
+                </button>
                 {!pago && (
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link to="/app/caixa">
-                      <Wallet className="h-4 w-4 mr-1" /> Caixa
-                    </Link>
-                  </Button>
+                  <Link
+                    to="/app/caixa"
+                    className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/20 font-medium py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Wallet className="h-3.5 w-3.5" /> Caixa
+                  </Link>
                 )}
               </div>
-            </Card>
+            </div>
             );
           })}
         </div>
