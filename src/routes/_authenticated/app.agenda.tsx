@@ -9598,7 +9598,15 @@ function AgendaPage() {
           ) : pacInfo ? (
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-muted">
+                <button
+                  type="button"
+                  onClick={() => pacInfoFoto && setFotoPreviewOpen(true)}
+                  disabled={!pacInfoFoto}
+                  title={pacInfoFoto ? "Ampliar foto" : undefined}
+                  className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-muted ${
+                    pacInfoFoto ? "cursor-zoom-in transition hover:ring-2 hover:ring-primary/40" : ""
+                  }`}
+                >
                   <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground">
                     {(pacInfo.nome ?? "")
                       .trim()
@@ -9617,7 +9625,7 @@ function AgendaPage() {
                       onError={() => setPacInfoFoto(null)}
                     />
                   ) : null}
-                </div>
+                </button>
                 <div className="min-w-0">
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
