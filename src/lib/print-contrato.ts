@@ -429,6 +429,7 @@ export async function printContrato(contratoId: string) {
 </style>
 <script id="print-fix-tables">
 (function () {
+  function fixTables() {
   try {
     document.querySelectorAll("table").forEach(function (t) {
       t.removeAttribute("width");
@@ -452,6 +453,12 @@ export async function printContrato(contratoId: string) {
       });
     });
   } catch (e) {}
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fixTables);
+  } else {
+    fixTables();
+  }
 })();
 </script>`;
 
