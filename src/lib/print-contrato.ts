@@ -371,9 +371,21 @@ export async function printContrato(contratoId: string) {
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
   // para que fundos coloridos, logos e quebras de página saiam corretos no PDF.
   const printCss = `<style id="print-fix">
-  @page { size: A4 portrait; margin: 12mm 14mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: #fff !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* Cabeçalho (logos) e faixa de título centralizados simetricamente */
+  body > p:first-of-type:has(img), .contract-logos { text-align: center !important; }
+  p:has(> img), div:has(> img:only-child) { text-align: center !important; }
+  p > img, div > img { display: inline-block !important; margin-left: auto !important; margin-right: auto !important; }
   tr, thead, tfoot { page-break-inside: avoid !important; break-inside: avoid !important; }
   h1, h2, h3, h4 { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: avoid; break-after: avoid; }
   img { display: block !important; visibility: visible !important; max-width: 100%; }
@@ -383,6 +395,9 @@ export async function printContrato(contratoId: string) {
     max-width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    margin: 0 0 6px 0 !important;
   }
   col { max-width: 100% !important; }
   td, th {
@@ -393,6 +408,10 @@ export async function printContrato(contratoId: string) {
     overflow-wrap: anywhere;
     position: static !important;
     float: none !important;
+    border: 1px solid #9ca3af !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
   }
   /* Tabela de consentimento (Anexo I – LGPD): texto 82% / opções "S N" 18% */
   table.lgpd-consent td:first-child { width: 82% !important; }
