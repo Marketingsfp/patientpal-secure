@@ -151,6 +151,29 @@ function DashboardOperacional() {
   const senhasAguardando = (d?.senhas ?? []).filter((s) => s.status === "emitida");
   const ultimaChamada = (d?.senhas ?? []).find((s) => s.status === "chamada");
 
+  const medicosDoDia = useMemo(() => {
+    const ags = (d?.ags ?? []).filter((a) => a.medico_id && a.status !== "cancelado");
+    const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
+    const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
+    const novos = d?.pacientesNovos ?? new Set<string>();
+    const mapa = new Map<string, { id: string; nome: string; especialidade: string | null; total: number; pagos: number; novos: number }>();
+    for (const a of ags) {
+      const id = a.medico_id as string;
+      const info = medInfo.get(id);
+      const item = mapa.get(id) ?? {
+        id,
+        nome: info?.nome ?? "Médico",
+        especialidade: info?.especialidade_id ? (espNome.get(info.especialidade_id) ?? null) : null,
+        total: 0, pagos: 0, novos: 0,
+      };
+      item.total += 1;
+      if (a.data_pagamento) item.pagos += 1;
+      if (a.paciente_id && novos.has(a.paciente_id)) item.novos += 1;
+      mapa.set(id, item);
+    }
+    return [...mapa.values()].sort((a, b) => b.total - a.total);
+  }, [d]);
+
   const carregando = loading || q.isLoading;
 
   return (
