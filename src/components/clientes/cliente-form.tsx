@@ -1500,7 +1500,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
         {!readOnly && (
           <div className={footerClass}>
             <Button type="button" variant="outline" onClick={() => { stopVoice(); onCancel(); }}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Salvando…" : paciente ? "Salvar alterações" : "Salvar"}
+            </Button>
           </div>
         )}
       </form>

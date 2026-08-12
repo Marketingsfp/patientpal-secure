@@ -19,6 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
+import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
@@ -280,6 +281,7 @@ function ClientesPage() {
   const loading = uxMelhorias ? listaQuery.isLoading : loadingManual;
 
   const queryClient = useQueryClient();
+  const [editarId, setEditarId] = useState<string | null>(null);
   const refrescar = () => {
     if (uxMelhorias) {
       void queryClient.invalidateQueries({ queryKey: ["clientes-lista", clinicaId] });
@@ -654,14 +656,14 @@ function ClientesPage() {
                       <Eye className="h-4 w-4" />
                     </Link>
                     {podeEscrever && (
-                      <Link
-                        to="/app/clientes/$pacienteId/editar"
-                        params={{ pacienteId: p.id }}
+                      <button
+                        type="button"
+                        onClick={() => setEditarId(p.id)}
                         title="Editar cliente"
                         className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                       >
                         <Pencil className="h-4 w-4" />
-                      </Link>
+                      </button>
                     )}
                     {podeEscrever && (
                       <button
@@ -774,6 +776,16 @@ function ClientesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Editar cliente (modal centralizado) */}
+      {clinicaAtual && (
+        <EditarClienteDialog
+          pacienteId={editarId}
+          clinicaId={clinicaAtual.clinica_id}
+          onClose={() => setEditarId(null)}
+          onSaved={refrescar}
+        />
+      )}
     </div>
   );
 }
