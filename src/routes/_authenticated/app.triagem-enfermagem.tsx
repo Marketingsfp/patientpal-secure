@@ -15,10 +15,15 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock } from "lucide-react";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock, Activity, Scale, ClipboardList, ShieldAlert } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import {
+  MANCHESTER, type ManchesterCor, calcularImc, classificarImc,
+  alertaPressao, alertaTemperatura, alertaSaturacao, alertaFc, alertaGlicemia,
+  classeInput, classeBadge, type Alerta,
+} from "@/lib/triagem/sinais-vitais";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -91,12 +96,13 @@ type Form = {
   observacoes: string;
   prioridade: "normal" | "prioritario" | "urgente";
   motivo_prioridade: string;
+  classificacao_risco: ManchesterCor | "";
 };
 
 const formVazio: Form = {
   peso: "", altura: "", pa_sis: "", pa_dia: "", fc: "", temp: "", sat: "", glicemia: "",
   queixa: "", doencas: [], outras_doencas: "", medicamentos: "", alergias: "", observacoes: "",
-  prioridade: "normal", motivo_prioridade: "",
+  prioridade: "normal", motivo_prioridade: "", classificacao_risco: "",
 };
 
 function TriagemEnfermagemPage() {
