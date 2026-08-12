@@ -776,7 +776,6 @@ function AtendimentoEditorPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">Sem triagem registrada para este atendimento.</p>
               )}
-              <CampoClinico rotulo="Observações do histórico" valor={soap.queixa_principal ? "" : ""} rows={0} oculto />
             </TabsContent>
 
             <TabsContent value="ef" className="space-y-3 mt-3">
