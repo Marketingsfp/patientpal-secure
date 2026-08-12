@@ -223,6 +223,88 @@ function AtendimentoEditorPage() {
     Boolean(agendamentoId && clinicaAtual?.clinica_id),
   );
 
+  // Dados do paciente (CPF/idade) para os documentos A4.
+  useEffect(() => {
+    const pid = agendamento?.paciente_id;
+    if (!pid) return;
+    (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select("cpf, data_nascimento")
+        .eq("id", pid)
+        .maybeSingle();
+      setPaciente((data as never) ?? null);
+    })();
+  }, [agendamento?.paciente_id]);
+
+  // Dados da clínica (cabeçalho dos documentos A4).
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    (async () => {
+      const { data } = await supabase
+        .from("clinicas")
+        .select("nome, cnpj, endereco, cidade, estado, cep, telefone, email, branding")
+        .eq("id", clinicaAtual.clinica_id)
+        .maybeSingle();
+      if (!data) return;
+      const branding = (data.branding ?? {}) as Record<string, unknown>;
+      setClinicaDados({
+        nome: data.nome,
+        cnpj: data.cnpj,
+        endereco: data.endereco,
+        cidade: data.cidade,
+        estado: data.estado,
+        cep: data.cep,
+        telefone: data.telefone,
+        email: data.email,
+        logoUrl: (branding.logo_url as string) ?? (branding.logoUrl as string) ?? null,
+      });
+    })();
+  }, [clinicaAtual?.clinica_id]);
+
+  // Auto-save do rascunho no navegador — nada se perde se a aba fechar.
+  useEffect(() => {
+    if (!agendamentoId || rascunhoRestaurado.current) return;
+    rascunhoRestaurado.current = true;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const d = JSON.parse(raw) as { soap?: Soap; transcricao?: string; cids?: Cid10[]; presc?: ItemPrescricao[]; exames?: string; em?: string };
+      if (d.soap) setSoap((s) => ({ ...s, ...d.soap }));
+      if (d.transcricao) setTranscricao(d.transcricao);
+      if (d.cids) setCids(d.cids);
+      if (d.presc) setPrescItens(d.presc);
+      if (d.exames) setExamesTexto(d.exames);
+      if (d.em) setRascunhoEm(new Date(d.em));
+      toast.info("Rascunho recuperado deste atendimento");
+    } catch { /* rascunho inválido — ignora */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendamentoId]);
+
+  useEffect(() => {
+    if (!agendamentoId || !rascunhoRestaurado.current) return;
+    const vazio = !transcricao && !examesTexto && cids.length === 0 && prescItens.length === 0 &&
+      Object.values(soap).every((v) => !v);
+    if (vazio) return;
+    const t = setTimeout(() => {
+      const em = new Date();
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ soap, transcricao, cids, presc: prescItens, exames: examesTexto, em: em.toISOString() }));
+        setRascunhoEm(em);
+      } catch { /* storage cheio */ }
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [soap, transcricao, cids, prescItens, examesTexto, agendamentoId, draftKey]);
+
+  // Prescrição estruturada -> texto do prontuário.
+  useEffect(() => {
+    const texto = prescricaoParaTexto(prescItens);
+    setSoap((s) => (s.prescricao === texto ? s : { ...s, prescricao: texto }));
+  }, [prescItens]);
+
+  // CIDs selecionados -> hipótese diagnóstica.
+  const cidsTexto = useMemo(() => cids.map((c) => `[CID ${c.codigo} — ${c.descricao}]`).join(" "), [cids]);
+
   function aplicarTriagemNoSoap(t: Triagem) {
     const linhas: string[] = [];
     if (t.queixa_principal) linhas.push(`Queixa (triagem): ${t.queixa_principal}`);
