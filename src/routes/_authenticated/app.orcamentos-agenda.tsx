@@ -1,18 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  RefreshCw,
-  ExternalLink,
   FileText,
   CalendarDays,
   GripVertical,
-  Maximize2,
-  Minimize2,
   Columns2,
   Plus,
-  Search,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -159,20 +154,21 @@ function OrcamentosAgendaPage() {
   return (
     <TooltipProvider>
       <div className="h-[calc(100vh-3.5rem)] w-full flex flex-col bg-background">
-        {/* Barra superior única: busca + modo de visualização + ações */}
+        {/* Cabeçalho único: título + modo de visualização + ações */}
         <div className="px-4 py-2.5 border-b bg-card flex items-center gap-3 shrink-0 flex-wrap">
-          <div className="relative flex-1 min-w-[220px] max-w-lg">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por paciente, número ou médico…"
-              className="pl-9 h-9 rounded-xl"
-              aria-label="Buscar orçamentos"
-            />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/15 shrink-0">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight text-foreground/90 leading-tight">Orçamentos</h1>
+              <p className="text-xs text-muted-foreground/80 truncate">
+                Orçamentos rápidos com impressão térmica 80mm
+              </p>
+            </div>
           </div>
 
-          <div className="bg-muted/60 p-1 rounded-full border border-border/40 inline-flex gap-1">
+          <div className="bg-muted/60 p-1 rounded-full border border-border/40 inline-flex gap-1 ml-auto">
             {([
               ["orcamentos", "Apenas orçamentos", FileText],
               ["split", "Dividido 50/50", Columns2],
@@ -194,41 +190,10 @@ function OrcamentosAgendaPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1 ml-auto">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-9 w-9 p-0">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Recarregar orçamentos</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={() => abrirEmNovaAba("/app/orcamentos")} className="h-9 w-9 p-0">
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Abrir em nova aba</TooltipContent>
-            </Tooltip>
-            {modo !== "orcamentos" && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-9 w-9 p-0">
-                    <CalendarDays className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Recarregar agenda</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-9 w-9 p-0">
-                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isFullscreen ? "Sair da tela cheia" : "Tela cheia"}</TooltipContent>
-            </Tooltip>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => enviarAosOrcamentos({ type: "orc-exportar" })}>
+              <Download className="h-4 w-4" /> Exportar
+            </Button>
             <Button size="sm" className="h-9 gap-1.5" onClick={() => enviarAosOrcamentos({ type: "orc-novo" })}>
               <Plus className="h-4 w-4" /> Novo orçamento
             </Button>
