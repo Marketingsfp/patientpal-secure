@@ -590,6 +590,8 @@ function Page() {
   const [openAbrir, setOpenAbrir] = useState(false);
   const [openMov, setOpenMov] = useState<{ tipo: MovTipo } | null>(null);
   const [openFechar, setOpenFechar] = useState(false);
+  /** Papel do comprovante de fechamento: bobina 80mm ou A4. */
+  const [formatoFechamento, setFormatoFechamento] = useState<"80mm" | "a4">("80mm");
   const [openDetalhe, setOpenDetalhe] = useState<Sessao | null>(null);
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
