@@ -364,6 +364,55 @@ function DashboardOperacional() {
           </div>
         </div>
 
+        {/* Médicos do dia */}
+        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />}>
+          {carregando ? (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+            </div>
+          ) : medicosDoDia.length === 0 ? (
+            <HhpEmptyState
+              icon={Stethoscope}
+              title="Nenhum médico com atendimentos hoje"
+              description="Assim que houver agendamentos vinculados a profissionais, eles aparecem aqui."
+              className="min-h-[180px]"
+            />
+          ) : (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {medicosDoDia.map((m) => {
+                const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
+                return (
+                  <div key={m.id} className="rounded-xl border border-slate-100 bg-white p-3 transition-shadow hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate" title={m.nome}>{m.nome}</div>
+                        <Badge variant="secondary" className="mt-1 text-[10px]">{m.especialidade ?? "Sem especialidade"}</Badge>
+                      </div>
+                      <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Abrir agenda deste médico">
+                        <Link to="/app/agenda" search={{ orcmed: m.id } as never}>
+                          <CalendarPlus className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">{m.total}</div>
+                    <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Atendimentos</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
+                        <div className="text-[10px] font-semibold text-emerald-700">Pagos</div>
+                        <div className="text-sm font-bold tabular-nums text-emerald-800">{pct}%</div>
+                      </div>
+                      <div className="rounded-lg bg-sky-50 px-2 py-1.5">
+                        <div className="text-[10px] font-semibold text-sky-700">Clientes novos</div>
+                        <div className="text-sm font-bold tabular-nums text-sky-800">{m.novos}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Painel>
+
         <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
           <Megaphone className="h-3.5 w-3.5" />
           Indicadores estratégicos, financeiros e comparativos estão no{" "}
