@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer, AlertTriangle, Zap, Pill, FlaskConical, FileText, Cloud, CloudOff } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer, AlertTriangle, Zap, Pill, FlaskConical, FileText, Cloud, CloudOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -14,7 +14,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { VoiceInput } from "@/components/voice-input";
-import { Cid10Picker } from "@/components/cid10-picker";
 import { Cid10Autocomplete } from "@/components/prontuario/cid10-autocomplete";
 import { PrescricaoBuilder } from "@/components/prontuario/prescricao-builder";
 import { prescricaoParaTexto, textoParaPrescricao, type ItemPrescricao } from "@/lib/prontuario/prescricao";
