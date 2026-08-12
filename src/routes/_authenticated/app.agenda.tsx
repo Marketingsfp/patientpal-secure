@@ -9900,12 +9900,12 @@ function AgendaPage() {
           if (!v) setEditarPacienteData(null);
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+          <DialogHeader className="flex-shrink-0 border-b border-border p-6 pb-4">
             <DialogTitle>Editar cliente</DialogTitle>
           </DialogHeader>
           {editarPacienteLoading || !editarPacienteData ? (
-            <p className="text-sm text-muted-foreground py-6">Carregando…</p>
+            <p className="text-sm text-muted-foreground p-6">Carregando…</p>
           ) : clinicaAtual ? (
             <ClienteForm
               clinicaId={clinicaAtual.clinica_id}
