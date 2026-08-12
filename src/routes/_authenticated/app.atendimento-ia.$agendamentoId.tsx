@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer } from "lucide-react";
+import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer, AlertTriangle, Zap, Pill, FlaskConical, FileText, Cloud, CloudOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -11,8 +11,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Picker } from "@/components/cid10-picker";
+import { Cid10Autocomplete } from "@/components/prontuario/cid10-autocomplete";
+import { PrescricaoBuilder } from "@/components/prontuario/prescricao-builder";
+import { prescricaoParaTexto, textoParaPrescricao, type ItemPrescricao } from "@/lib/prontuario/prescricao";
+import { macrosPorCampo, type Macro } from "@/lib/prontuario/macros";
+import { imprimirDocumentoA4, type DadosClinicaA4 } from "@/lib/print-a4-medico";
+import type { Cid10 } from "@/data/cid10";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
