@@ -869,12 +869,15 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   };
 
   const footerClass = stickyFooter
-    ? "sticky bottom-0 bg-background border-t -mx-6 -mb-6 px-6 py-3 z-10 flex justify-end gap-2"
+    ? "flex-shrink-0 border-t border-border bg-background p-4 flex items-center justify-end gap-3 rounded-b-lg"
     : "flex justify-end gap-2 pt-4 border-t";
+  const formClass = stickyFooter ? "flex flex-1 min-h-0 flex-col" : "space-y-4";
+  const bodyClass = stickyFooter ? "flex-1 overflow-y-auto p-6 pb-6 space-y-4" : "space-y-4";
 
   return (
     <>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className={formClass}>
+        <div className={bodyClass}>
         {!editing && baseImportada === false && (
           <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
             <strong>Atenção:</strong> a base de pacientes desta unidade ainda não foi importada.
@@ -1496,6 +1499,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </TabsContent>
           </fieldset>
         </Tabs>
+        </div>
 
         {!readOnly && (
           <div className={footerClass}>

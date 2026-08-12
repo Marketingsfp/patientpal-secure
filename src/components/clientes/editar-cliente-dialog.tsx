@@ -48,8 +48,8 @@ export function EditarClienteDialog({ pacienteId, clinicaId, readOnly = false, o
 
   return (
     <Dialog open={!!pacienteId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl w-full max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogHeader className="flex-shrink-0 border-b border-border p-6 pb-4">
           <DialogTitle className="flex items-center gap-2 pr-8">
             <Users className="h-5 w-5 text-primary shrink-0" />
             <span className="truncate">{paciente?.nome ?? "Editar cliente"}</span>
@@ -67,11 +67,11 @@ export function EditarClienteDialog({ pacienteId, clinicaId, readOnly = false, o
         </DialogHeader>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground flex items-center gap-2 py-6">
+          <p className="text-sm text-muted-foreground flex items-center gap-2 p-6">
             <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
           </p>
         ) : erro || !paciente ? (
-          <p className="text-sm text-muted-foreground py-6">Paciente não encontrado.</p>
+          <p className="text-sm text-muted-foreground p-6">Paciente não encontrado.</p>
         ) : (
           <ClienteForm
             clinicaId={clinicaId}

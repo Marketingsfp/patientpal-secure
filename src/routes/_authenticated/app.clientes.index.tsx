@@ -758,8 +758,8 @@ function ClientesPage() {
 
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
-        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+          <DialogHeader className="flex-shrink-0 border-b border-border p-6 pb-4">
             <DialogTitle>Novo cliente</DialogTitle>
             <DialogDescription>
               Preencha os dados do paciente. Use o microfone ao lado de cada campo para ditar por voz (quando disponível).
