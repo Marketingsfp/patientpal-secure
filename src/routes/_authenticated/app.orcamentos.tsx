@@ -172,7 +172,12 @@ function OrcamentosRouteDispatcher() {
   const { enabled, loading } = useOrcamentosV2Flag();
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!loading && enabled && v2Allowed) return <OrcamentosV2Mount />;
+  // No modo embutido (split "Orçamentos + Agenda") sempre usamos a tela
+  // clássica: é a única que conversa com o painel pai por postMessage.
+  const isEmbed =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("embed") === "1";
+  if (!isEmbed && !loading && enabled && v2Allowed) return <OrcamentosV2Mount />;
   return <OrcamentosPage />;
 }
 
