@@ -19,6 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
+import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
@@ -654,14 +655,14 @@ function ClientesPage() {
                       <Eye className="h-4 w-4" />
                     </Link>
                     {podeEscrever && (
-                      <Link
-                        to="/app/clientes/$pacienteId/editar"
-                        params={{ pacienteId: p.id }}
+                      <button
+                        type="button"
+                        onClick={() => setEditarId(p.id)}
                         title="Editar cliente"
                         className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                       >
                         <Pencil className="h-4 w-4" />
-                      </Link>
+                      </button>
                     )}
                     {podeEscrever && (
                       <button
