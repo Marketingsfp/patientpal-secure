@@ -46,6 +46,8 @@ type Medico = {
   email: string | null;
   user_id: string | null;
   especialidade_id: string | null;
+  crm?: string | null;
+  crm_uf?: string | null;
   tipo_repasse?: string | null;
   percentual_repasse_padrao?: number | null;
   valor_repasse_padrao?: number | null;
@@ -109,6 +111,17 @@ function AtendimentoEditorPage() {
   const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
+  // PEP estruturado
+  const [cids, setCids] = useState<Cid10[]>([]);
+  const [prescItens, setPrescItens] = useState<ItemPrescricao[]>([]);
+  const [atestadoDias, setAtestadoDias] = useState("1");
+  const [examesTexto, setExamesTexto] = useState("");
+  const [paciente, setPaciente] = useState<{ cpf: string | null; data_nascimento: string | null } | null>(null);
+  const [clinicaDados, setClinicaDados] = useState<DadosClinicaA4 | null>(null);
+  const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
+  const rascunhoRestaurado = useRef(false);
+  const draftKey = `pep:rascunho:${agendamentoId}`;
+
   // Carrega agendamento + médico + pagamento (usado no mount e no realtime).
   const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
@@ -139,7 +152,7 @@ function AtendimentoEditorPage() {
       if (ag.medico_id) {
         const { data: med } = await supabase
           .from("medicos")
-          .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .select("id, nome, email, user_id, especialidade_id, crm, crm_uf, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
           .eq("id", ag.medico_id)
           .maybeSingle();
         if (med) {
