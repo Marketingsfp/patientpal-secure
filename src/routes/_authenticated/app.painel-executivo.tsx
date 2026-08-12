@@ -27,6 +27,9 @@ import { laboratorioMedicoIdsFrom, contarAtendimentos } from "@/lib/agenda/conta
 import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDatePura } from "@/lib/date-utils";
+import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
   head: () => ({ meta: [{ title: "Painel Executivo — ClinicaOS" }] }),
