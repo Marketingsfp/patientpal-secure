@@ -233,6 +233,100 @@ type MedicoOpt = {
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/**
+ * Lista compacta (cards) usada apenas quando a tela roda embutida no split
+ * "Orçamentos + Agenda". Mostra só o essencial — paciente, valor, situação e
+ * o botão Agendar — evitando truncamento e rolagem horizontal em telas
+ * estreitas. Virtualizada para manter a rolagem fluida em listas longas.
+ */
+function OrcamentosCompactList({
+  itens, loading, selecionado, podeEscrever, onAgendar, onImprimir, onConverter,
+}: {
+  itens: Orc[];
+  loading: boolean;
+  selecionado: number | null;
+  podeEscrever: boolean;
+  onAgendar: (o: Orc) => void;
+  onImprimir: (id: string) => void;
+  onConverter: (id: string) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="flex-1 min-h-0 p-3 space-y-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-[86px] rounded-xl bg-muted/50 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+  if (itens.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-sm text-muted-foreground">
+        Nenhum orçamento encontrado.
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 min-h-0">
+      <VirtualList<Orc>
+        items={itens}
+        estimateSize={94}
+        getKey={(o) => o.id}
+        className="px-3 py-2"
+        renderItem={(o) => {
+          const realizado = (o.agendamentos_total ?? 0) > 0;
+          const ativo = selecionado === o.numero;
+          return (
+            <div className="pb-2">
+              <div
+                className={`rounded-xl border p-3 bg-card transition-colors ${
+                  ativo ? "border-primary ring-1 ring-primary/30" : "border-border/60 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{o.paciente_nome}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {new Date(o.created_at).toLocaleDateString("pt-BR")}
+                      {o.medico_nome?.trim() ? ` · ${o.medico_nome}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums shrink-0">{BRL(Number(o.valor_total))}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      realizado
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
+                    {realizado ? <CheckCircle2 className="h-3 w-3" /> : <CircleDashed className="h-3 w-3" />}
+                    {realizado ? "Realizado" : "Não realizado"}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <IconAction label="Imprimir" onClick={() => onImprimir(o.id)}>
+                      <Printer className="h-4 w-4" />
+                    </IconAction>
+                    {podeEscrever && (
+                      <IconAction label="Converter itens" onClick={() => onConverter(o.id)}>
+                        <Workflow className="h-4 w-4 text-primary" />
+                      </IconAction>
+                    )}
+                    <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
+                      <Calendar className="h-3.5 w-3.5" /> Agendar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
