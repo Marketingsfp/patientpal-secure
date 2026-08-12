@@ -3033,7 +3033,7 @@ function Page() {
                   </Card>
                 ) : (
             <Card>
-              <CardHeader><CardTitle className="text-base">Meu histórico</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Caixas anteriores</CardTitle></CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -3051,13 +3051,16 @@ function Page() {
                   <TableBody>
                     {linhasMinhasPorDia.map((l) => {
                       const sPrincipal = l.sessoes[0];
+                      const st = statusCaixa(l.statusDia === "aberto" ? "aberto" : "fechado", l.diferenca);
                       return (
                         <TableRow key={l.key}>
                           <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
                           <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
                           <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
                           <TableCell>
-                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
+                            <Badge variant="outline" className={`text-[11px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}>
+                              {STATUS_CAIXA_LABEL[st]}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
                           <TableCell className="text-right">{fmt(l.informado)}</TableCell>
