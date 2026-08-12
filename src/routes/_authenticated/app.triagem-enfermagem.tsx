@@ -668,7 +668,8 @@ function TriagemEnfermagemConteudo() {
               Salvar
             </Button>
             <Button onClick={() => salvarEAvancar(true)} disabled={salvando}>
-              Salvar e liberar <ChevronRight className="h-4 w-4 ml-1" />
+              <Stethoscope className="h-4 w-4 mr-1.5" />
+              Salvar triagem e liberar para o médico <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </DialogFooter>
         </DialogContent>
