@@ -211,6 +211,16 @@ function OrcamentosAgendaPage() {
               </TooltipTrigger>
               <TooltipContent>Abrir em nova aba</TooltipContent>
             </Tooltip>
+            {modo !== "orcamentos" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-9 w-9 p-0">
+                    <CalendarDays className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Recarregar agenda</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-9 w-9 p-0">
