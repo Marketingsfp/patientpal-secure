@@ -15,10 +15,15 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock } from "lucide-react";
+import { HeartPulse, Bell, ChevronRight, AlertTriangle, Stethoscope, Wallet, RefreshCw, Clock, Activity, Scale, ClipboardList, ShieldAlert } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { agendamentosStatusPagamento } from "@/lib/pagamento-status";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import {
+  MANCHESTER, type ManchesterCor, calcularImc, classificarImc,
+  alertaPressao, alertaTemperatura, alertaSaturacao, alertaFc, alertaGlicemia,
+  classeInput, classeBadge, type Alerta,
+} from "@/lib/triagem/sinais-vitais";
 
 export const Route = createFileRoute("/_authenticated/app/triagem-enfermagem")({
   component: TriagemEnfermagemPage,
@@ -91,15 +96,30 @@ type Form = {
   observacoes: string;
   prioridade: "normal" | "prioritario" | "urgente";
   motivo_prioridade: string;
+  classificacao_risco: ManchesterCor | "";
 };
 
 const formVazio: Form = {
   peso: "", altura: "", pa_sis: "", pa_dia: "", fc: "", temp: "", sat: "", glicemia: "",
   queixa: "", doencas: [], outras_doencas: "", medicamentos: "", alergias: "", observacoes: "",
-  prioridade: "normal", motivo_prioridade: "",
+  prioridade: "normal", motivo_prioridade: "", classificacao_risco: "",
 };
 
 function TriagemEnfermagemPage() {
+  return <TriagemEnfermagemConteudo />;
+}
+
+function AlertaBadge({ alerta, rotulo }: { alerta: Alerta; rotulo: string }) {
+  if (!alerta) return null;
+  return (
+    <span className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${classeBadge(alerta)}`}>
+      {alerta.nivel !== "ok" && <AlertTriangle className="h-3 w-3" />}
+      {rotulo}: {alerta.texto}
+    </span>
+  );
+}
+
+function TriagemEnfermagemConteudo() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("triagem-enfermagem");
@@ -167,15 +187,14 @@ function TriagemEnfermagemPage() {
     return () => { void supabase.removeChannel(ch); };
   }, [clinicaAtual, carregar]);
 
-  const imc = useMemo(() => {
-    const p = parseFloat(form.peso.replace(",", "."));
-    const a = parseFloat(form.altura.replace(",", "."));
-    if (!p || !a) return "";
-    const aM = a > 3 ? a / 100 : a; // aceita cm ou m
-    const v = p / (aM * aM);
-    if (!isFinite(v)) return "";
-    return v.toFixed(2);
-  }, [form.peso, form.altura]);
+  const imcNum = useMemo(() => calcularImc(form.peso, form.altura), [form.peso, form.altura]);
+  const imc = imcNum == null ? "" : imcNum.toFixed(2);
+  const imcClasse = useMemo(() => classificarImc(imcNum), [imcNum]);
+  const alPa = useMemo(() => alertaPressao(form.pa_sis, form.pa_dia), [form.pa_sis, form.pa_dia]);
+  const alTemp = useMemo(() => alertaTemperatura(form.temp), [form.temp]);
+  const alSat = useMemo(() => alertaSaturacao(form.sat), [form.sat]);
+  const alFc = useMemo(() => alertaFc(form.fc), [form.fc]);
+  const alGli = useMemo(() => alertaGlicemia(form.glicemia), [form.glicemia]);
 
   const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
   function grupoPago(g: Grupo) {
@@ -284,6 +303,7 @@ function TriagemEnfermagemPage() {
       observacoes: form.observacoes || null,
       prioridade: form.prioridade,
       motivo_prioridade: form.prioridade !== "normal" ? (form.motivo_prioridade || null) : null,
+      classificacao_risco: form.classificacao_risco || null,
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
@@ -464,39 +484,118 @@ function TriagemEnfermagemPage() {
             </div>
           )}
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div><Label className="text-xs">Peso (kg)</Label>
-                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.peso}
-                  onChange={(e) => setForm({ ...form, peso: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="70" /></div>
-              <div><Label className="text-xs">Altura (cm ou m)</Label>
-                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.altura}
-                  onChange={(e) => setForm({ ...form, altura: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="170" /></div>
-              <div><Label className="text-xs">IMC</Label>
-                <Input value={imc} readOnly placeholder="—" /></div>
-              <div><Label className="text-xs">Temperatura (°C)</Label>
-                <Input inputMode="decimal" pattern="[0-9.,]*" value={form.temp}
-                  onChange={(e) => setForm({ ...form, temp: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="36.5" /></div>
-              <div><Label className="text-xs">PA Sistólica</Label>
-                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_sis}
-                  onChange={(e) => setForm({ ...form, pa_sis: e.target.value.replace(/\D/g, "") })} placeholder="120" /></div>
-              <div><Label className="text-xs">PA Diastólica</Label>
-                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_dia}
-                  onChange={(e) => setForm({ ...form, pa_dia: e.target.value.replace(/\D/g, "") })} placeholder="80" /></div>
-              <div><Label className="text-xs">Freq. Cardíaca</Label>
-                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.fc}
-                  onChange={(e) => setForm({ ...form, fc: e.target.value.replace(/\D/g, "") })} placeholder="75" /></div>
-              <div><Label className="text-xs">Saturação O₂ (%)</Label>
-                <Input inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.sat}
-                  onChange={(e) => setForm({ ...form, sat: e.target.value.replace(/\D/g, "") })} placeholder="98" /></div>
-              <div><Label className="text-xs">Glicemia (mg/dL)</Label>
-                <Input inputMode="numeric" pattern="[0-9]*" maxLength={4} value={form.glicemia}
-                  onChange={(e) => setForm({ ...form, glicemia: e.target.value.replace(/\D/g, "") })} placeholder="90" /></div>
+            {/* Classificação de risco — Protocolo de Manchester */}
+            <div className="rounded-xl border border-border/60 p-3 space-y-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-600" /> Classificação de risco (Manchester)
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {MANCHESTER.map((m) => {
+                  const ativo = form.classificacao_risco === m.v;
+                  return (
+                    <button
+                      key={m.v}
+                      type="button"
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        classificacao_risco: ativo ? "" : m.v,
+                        prioridade: ativo ? "normal" : m.prioridade,
+                      }))}
+                      className={`rounded-xl border px-3 py-1.5 text-xs text-left transition-all ${ativo ? `${m.classe} ring-2 ring-offset-1 ring-current/40` : "border-border/60 hover:bg-muted text-foreground"}`}
+                    >
+                      <span className="font-semibold">{m.emoji} {m.label}</span>
+                      <span className="block text-[10px] opacity-75">{m.tempo}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div>
-              <Label className="text-xs">Queixa principal</Label>
-              <Textarea rows={2} value={form.queixa} onChange={(e) => setForm({ ...form, queixa: e.target.value })}
-                placeholder="O que trouxe o paciente hoje?" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+              {/* Sinais vitais */}
+              <div className="rounded-xl border border-border/60 p-3 space-y-2.5">
+                <div className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground uppercase tracking-wide">
+                  <Activity className="h-3.5 w-3.5" /> Sinais vitais
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label className="text-xs">PA Sistólica</Label>
+                    <Input className={classeInput(alPa)} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_sis}
+                      onChange={(e) => setForm({ ...form, pa_sis: e.target.value.replace(/\D/g, "") })} placeholder="120" /></div>
+                  <div><Label className="text-xs">PA Diastólica</Label>
+                    <Input className={classeInput(alPa)} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.pa_dia}
+                      onChange={(e) => setForm({ ...form, pa_dia: e.target.value.replace(/\D/g, "") })} placeholder="80" /></div>
+                </div>
+                <AlertaBadge alerta={alPa} rotulo="PA" />
+                <div><Label className="text-xs">Temperatura (°C)</Label>
+                  <Input className={classeInput(alTemp)} inputMode="decimal" pattern="[0-9.,]*" value={form.temp}
+                    onChange={(e) => setForm({ ...form, temp: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="36.5" />
+                  <AlertaBadge alerta={alTemp} rotulo="Temp." /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label className="text-xs">Freq. Cardíaca</Label>
+                    <Input className={classeInput(alFc)} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.fc}
+                      onChange={(e) => setForm({ ...form, fc: e.target.value.replace(/\D/g, "") })} placeholder="75" />
+                    <AlertaBadge alerta={alFc} rotulo="FC" /></div>
+                  <div><Label className="text-xs">Saturação O₂ (%)</Label>
+                    <Input className={classeInput(alSat)} inputMode="numeric" pattern="[0-9]*" maxLength={3} value={form.sat}
+                      onChange={(e) => setForm({ ...form, sat: e.target.value.replace(/\D/g, "") })} placeholder="98" />
+                    <AlertaBadge alerta={alSat} rotulo="SpO₂" /></div>
+                </div>
+                <div><Label className="text-xs">Glicemia (mg/dL)</Label>
+                  <Input className={classeInput(alGli)} inputMode="numeric" pattern="[0-9]*" maxLength={4} value={form.glicemia}
+                    onChange={(e) => setForm({ ...form, glicemia: e.target.value.replace(/\D/g, "") })} placeholder="90" />
+                  <AlertaBadge alerta={alGli} rotulo="Glicemia" /></div>
+              </div>
+
+              {/* Antropometria */}
+              <div className="rounded-xl border border-border/60 p-3 space-y-2.5">
+                <div className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground uppercase tracking-wide">
+                  <Scale className="h-3.5 w-3.5" /> Antropometria
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label className="text-xs">Peso (kg)</Label>
+                    <Input inputMode="decimal" pattern="[0-9.,]*" value={form.peso}
+                      onChange={(e) => setForm({ ...form, peso: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="70" /></div>
+                  <div><Label className="text-xs">Altura (cm ou m)</Label>
+                    <Input inputMode="decimal" pattern="[0-9.,]*" value={form.altura}
+                      onChange={(e) => setForm({ ...form, altura: e.target.value.replace(/[^0-9.,]/g, "") })} placeholder="170" /></div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-center">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">IMC</div>
+                  <div className="text-2xl font-bold tabular-nums">{imc || "—"}</div>
+                  {imcClasse && (
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] ${imcClasse.classe}`}>
+                      {imcClasse.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Queixa e alergias */}
+              <div className="rounded-xl border border-border/60 p-3 space-y-2.5">
+                <div className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground uppercase tracking-wide">
+                  <ClipboardList className="h-3.5 w-3.5" /> Queixa e alergias
+                </div>
+                <div>
+                  <Label className="text-xs">Queixa principal</Label>
+                  <Textarea rows={3} value={form.queixa} onChange={(e) => setForm({ ...form, queixa: e.target.value })}
+                    placeholder="O que trouxe o paciente hoje?" />
+                </div>
+                <div>
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Alergias conhecidas
+                    {form.alergias.trim() && (
+                      <span className="bg-rose-600 text-white font-bold px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> ALERGIA
+                      </span>
+                    )}
+                  </Label>
+                  <Textarea rows={3}
+                    className={form.alergias.trim() ? "border-rose-500 bg-rose-500/5 focus-visible:ring-rose-500/40" : ""}
+                    value={form.alergias}
+                    onChange={(e) => setForm({ ...form, alergias: e.target.value })}
+                    placeholder="Medicamentos, alimentos, etc." />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -522,17 +621,10 @@ function TriagemEnfermagemPage() {
                   placeholder="Nome, dose e frequência" />
               </div>
               <div>
-                <Label className="text-xs">Alergias</Label>
-                <Textarea rows={2} value={form.alergias}
-                  onChange={(e) => setForm({ ...form, alergias: e.target.value })}
-                  placeholder="Medicamentos, alimentos, etc." />
-              </div>
-            </div>
-
-            <div>
               <Label className="text-xs">Observações da enfermagem</Label>
               <Textarea rows={2} value={form.observacoes}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+              </div>
             </div>
 
             <div className="rounded-md border p-3 space-y-2 bg-muted/30">
@@ -576,7 +668,8 @@ function TriagemEnfermagemPage() {
               Salvar
             </Button>
             <Button onClick={() => salvarEAvancar(true)} disabled={salvando}>
-              Salvar e liberar <ChevronRight className="h-4 w-4 ml-1" />
+              <Stethoscope className="h-4 w-4 mr-1.5" />
+              Salvar triagem e liberar para o médico <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </DialogFooter>
         </DialogContent>
