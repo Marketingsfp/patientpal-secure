@@ -22,6 +22,7 @@ import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orca
 import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
+import { VirtualList } from "@/components/list-shell";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -249,6 +250,32 @@ function OrcamentosPage() {
   const hojeIso = new Date().toISOString().slice(0, 10);
   const [dataIni, setDataIni] = useState<string>(hojeIso);
   const [dataFim, setDataFim] = useState<string>(hojeIso);
+  // Modo compacto: usado quando a tela roda embutida no split
+  // "Orçamentos + Agenda". Só muda apresentação — nenhuma regra de negócio.
+  const [embedCompact] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get("embed") === "1" && sp.get("compact") === "1";
+  });
+  const [orcSelecionado, setOrcSelecionado] = useState<number | null>(null);
+
+  // Recebe busca e filtro da barra unificada do painel pai (split view).
+  useEffect(() => {
+    if (!embedCompact) return;
+    const onMsg = (ev: MessageEvent) => {
+      const d = ev.data as { type?: string; q?: string; value?: string } | null;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "orc-busca" && typeof d.q === "string") setQuery(d.q);
+      if (d.type === "orc-filtro" && typeof d.value === "string") {
+        setFiltroRealizacao(d.value as "todos" | "realizados" | "nao_realizados");
+      }
+      if (d.type === "orc-novo") setOpen(true);
+      if (d.type === "orc-recarregar") void load();
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedCompact]);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -380,8 +407,31 @@ function OrcamentosPage() {
     catch (e) { toast.error((e as Error).message); }
   };
 
+  /**
+   * Envia o orçamento para a agenda. Embutido: avisa o painel pai (que faz o
+   * relay para o iframe da agenda, já filtrando pelo médico). Fora do split:
+   * navega para a tela integrada.
+   */
+  const enviarParaAgenda = (o: Orc) => {
+    const isEmbed = typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("embed") === "1";
+    setOrcSelecionado(o.numero);
+    if (isEmbed && window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: "agendar-orcamento",
+        numero: o.numero,
+        medico_nome: o.medico_nome ?? null,
+        paciente_nome: o.paciente_nome ?? null,
+        categoria: o.categoria ?? null,
+      }, "*");
+    } else {
+      navigate({ to: "/app/orcamentos-agenda", search: { orc: o.numero } as never });
+    }
+  };
+
   return (
-    <div className="space-y-4 flex flex-col h-full min-h-0">
+    <div className={embedCompact ? "flex flex-col h-full min-h-0" : "space-y-4 flex flex-col h-full min-h-0"}>
+      {!embedCompact && (
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/15 shadow-2xs shrink-0 flex items-center justify-center">
@@ -411,7 +461,9 @@ function OrcamentosPage() {
           )}
         </div>
       </div>
+      )}
 
+      {!embedCompact && (
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -477,7 +529,19 @@ function OrcamentosPage() {
           })}
         </div>
       </div>
+      )}
 
+      {embedCompact ? (
+        <OrcamentosCompactList
+          itens={filtered}
+          loading={loading}
+          selecionado={orcSelecionado}
+          podeEscrever={podeEscrever}
+          onAgendar={enviarParaAgenda}
+          onImprimir={(id) => void imprimir(id)}
+          onConverter={(id) => setConversaoId(id)}
+        />
+      ) : (
       <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
@@ -556,16 +620,7 @@ function OrcamentosPage() {
                   <div className="flex items-center justify-end gap-1.5">
                     <IconAction
                       label="Agendar este orçamento"
-                      onClick={() => {
-                        const numero = o.numero;
-                        const isEmbed = typeof window !== "undefined" &&
-                          new URLSearchParams(window.location.search).get("embed") === "1";
-                        if (isEmbed && window.parent && window.parent !== window) {
-                          window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
-                        } else {
-                          navigate({ to: "/app/orcamentos-agenda", search: { orc: numero } as never });
-                        }
-                      }}
+                      onClick={() => enviarParaAgenda(o)}
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </IconAction>
@@ -593,6 +648,7 @@ function OrcamentosPage() {
         </table>
         </div>
       </div>
+      )}
 
       {open && clinicaAtual && (
         <NovoOrcamentoDialog
