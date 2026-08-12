@@ -20,6 +20,17 @@ export function faixaEspera(min: number): FaixaEspera {
   return "normal";
 }
 
+/**
+ * Duração legível: `45 min` abaixo de 1h; `6h 08min` a partir de 1h.
+ */
+export function formatDuracao(min: number): string {
+  const total = Math.max(0, Math.round(min));
+  if (total < 60) return `${total} min`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h}h ${String(m).padStart(2, "0")}min`;
+}
+
 export const CLASSE_ESPERA: Record<FaixaEspera, string> = {
   normal: "bg-emerald-500/15 text-emerald-700",
   atencao: "bg-amber-500/15 text-amber-700 font-semibold",
