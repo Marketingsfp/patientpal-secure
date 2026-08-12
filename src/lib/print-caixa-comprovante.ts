@@ -77,7 +77,7 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     linhas.push({ label: "Valor conferido em caixa", valor: fmtBRL(input.valorInformado ?? input.valor) });
     const dif = Number(input.diferenca ?? 0);
     linhas.push({
-      label: "Diferença",
+      label: Math.abs(dif) < 0.005 ? "Diferença (confere)" : dif > 0 ? "Diferença (SOBRA)" : "Diferença (FALTA)",
       valor: (dif >= 0 ? "" : "") + fmtBRL(dif),
       destaque: Math.abs(dif) > 0.009,
     });
