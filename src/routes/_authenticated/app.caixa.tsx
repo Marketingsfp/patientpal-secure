@@ -3550,13 +3550,56 @@ function Page() {
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
             </div>
+            {(() => {
+              const contadoDinheiro = Number(conferidoOwn.dinheiro ?? 0) || 0;
+              const difGaveta = classificarDiferenca(contadoDinheiro, esperadoGaveta);
+              const difTotal = classificarDiferenca(Number(valorInformado) || 0, saldoDoDiaFechamento);
+              return (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className={`rounded-lg border p-3 ${difGaveta.cls}`}>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                      Dinheiro na gaveta
+                    </div>
+                    <div className="text-xs mt-0.5">
+                      Esperado {fmt(esperadoGaveta)} · Contado {fmt(contadoDinheiro)}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums mt-1">
+                      {difGaveta.label}{difGaveta.tipo !== "exato" ? `: ${fmt(Math.abs(difGaveta.valor))}` : ""}
+                    </div>
+                  </div>
+                  <div className={`rounded-lg border p-3 ${difTotal.cls}`}>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                      Total do dia (todas as formas)
+                    </div>
+                    <div className="text-xs mt-0.5">
+                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido {fmt(Number(valorInformado) || 0)}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums mt-1">
+                      {difTotal.label}{difTotal.tipo !== "exato" ? `: ${fmt(Math.abs(difTotal.valor))}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <div>
-              <Label>Observações</Label>
+              <Label>Observações (justifique sobras ou faltas)</Label>
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
+            </div>
+            <div>
+              <Label>Comprovante</Label>
+              <Select value={formatoFechamento} onValueChange={(v) => setFormatoFechamento(v as "80mm" | "a4")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="80mm">Bobina térmica 80mm</SelectItem>
+                  <SelectItem value="a4">Folha A4</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+                <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
