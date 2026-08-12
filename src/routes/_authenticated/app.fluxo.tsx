@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw, MoreVertical, FileText, Pencil, Search, GripVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw, MoreVertical, FileText, Pencil, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -577,8 +577,8 @@ function FluxoPage() {
                   <Icon className="h-3.5 w-3.5 flex-shrink-0 text-slate-500" />
                   <div className="min-w-0">
                     <span className="block truncate text-xs font-semibold text-slate-700">{col.label}</span>
-                    {media !== null && col.id !== "finalizado" && (
-                      <span className="block truncate text-[10px] font-medium text-slate-500">
+                    {media !== null && ehHoje && col.id !== "finalizado" && (
+                      <span className="block whitespace-nowrap text-[10px] font-medium text-slate-500">
                         Média: {media} min
                       </span>
                     )}
