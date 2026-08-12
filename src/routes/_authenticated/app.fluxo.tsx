@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { minutosEspera, faixaEspera, CLASSE_ESPERA, mediaEspera } from "@/lib/fluxo/espera";
+import { minutosEspera, faixaEspera, CLASSE_ESPERA, mediaEspera, formatDuracao } from "@/lib/fluxo/espera";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
@@ -585,7 +585,7 @@ function FluxoPage() {
                     <span className="block truncate text-xs font-semibold text-slate-700">{col.label}</span>
                     {media !== null && ehHoje && col.id !== "finalizado" && (
                       <span className="block whitespace-nowrap text-[10px] font-medium text-slate-500">
-                        Média: {media} min
+                        Média: {formatDuracao(media)}
                       </span>
                     )}
                   </div>
@@ -697,7 +697,7 @@ function FluxoPage() {
                           )}
                           title="Tempo desde a última movimentação no fluxo"
                         >
-                          <Clock className="h-3 w-3" /> {espera} min de espera
+                          <Clock className="h-3 w-3" /> {formatDuracao(espera)} de espera
                         </span>
                       )}
 
