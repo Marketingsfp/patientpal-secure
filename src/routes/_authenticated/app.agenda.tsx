@@ -8978,6 +8978,8 @@ function AgendaPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => openSlot(a)}
+                        disabled={!podeEscrever}
+                        title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
                         className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1.5" />
@@ -9297,6 +9299,8 @@ function AgendaPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => openSlot(a)}
+                            disabled={!podeEscrever}
+                            title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
                             className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
                           >
                             <UserPlus className="h-3 w-3 mr-1.5" />
