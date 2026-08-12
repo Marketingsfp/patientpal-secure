@@ -356,37 +356,59 @@ function PainelExecutivoPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Painel Executivo</h1>
-          <p className="text-sm text-muted-foreground">
-            Produção, financeiro, comercial e qualidade — comparado com o período anterior.
-          </p>
+      <TooltipProvider delayDuration={200}>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Painel Executivo</h1>
+            <p className="text-sm text-muted-foreground">
+              Indicadores estratégicos de produção, financeiro, comercial e qualidade
+            </p>
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-800">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Comparando com o período anterior ({formatDatePura(periodoAnterior.de)} a {formatDatePura(periodoAnterior.ate)})
+            </span>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">De</Label>
+              <DateInputBR value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9 w-40 focus-visible:ring-2 focus-visible:ring-primary/30" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Até</Label>
+              <DateInputBR value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9 w-40 focus-visible:ring-2 focus-visible:ring-primary/30" />
+            </div>
+            <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/60 p-1">
+              {presets.map(pr => {
+                const alvo = pr.make();
+                const ativo = alvo.de === periodo.de && alvo.ate === periodo.ate;
+                return (
+                  <Tooltip key={pr.label}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setPeriodo(pr.make())}
+                        aria-pressed={ativo}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                          ativo
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:bg-background hover:text-foreground",
+                        )}
+                      >
+                        {pr.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{pr.hint}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+            <Button size="sm" variant="ghost" onClick={load} disabled={carregando}>
+              <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">De</Label>
-            <DateInputBR value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9 w-40" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Até</Label>
-            <DateInputBR value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9 w-40" />
-          </div>
-          <div className="flex gap-1">
-            {presets.map(pr => (
-              <Button key={pr.label} size="sm" variant="outline" onClick={() => setPeriodo(pr.make())}>{pr.label}</Button>
-            ))}
-          </div>
-          <Button size="sm" variant="ghost" onClick={load} disabled={carregando}>
-            <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Comparativo período */}
-      <p className="text-xs text-muted-foreground">
-        Comparando com {periodoAnterior.de} → {periodoAnterior.ate}.
-      </p>
+      </TooltipProvider>
 
       {/* Visão geral — cards resumo (número grande + 2 métricas de apoio + variação) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
