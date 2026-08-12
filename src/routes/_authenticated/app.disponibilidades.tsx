@@ -494,11 +494,24 @@ function Page() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
+    if (duracaoInvalida) {
+      toast.error("A duração mínima deve ser de 5 minutos.");
+      return;
+    }
     if (duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
       toast.error(`Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`);
       return;
     }
-    if (!await confirmDialog(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
+    const emLote = gerar.medico_id === "all" || slotsPreview.length > 1000;
+    const ok = await confirmDialog({
+      title: emLote ? "Geração em massa" : "Confirmar geração",
+      tone: emLote ? "warning" : "default",
+      confirmText: "Gerar horários",
+      description: emLote
+        ? `Você vai criar ${slotsPreview.length} horários para ${resumoGeracao.medicosSelecionados} médico(s), em ${resumoGeracao.diasNoPeriodo} dia(s) do período.\n\nEssa operação é grande e afeta a agenda de todos esses profissionais. Deseja continuar?`
+        : `Confirmar criação de ${slotsPreview.length} horários disponíveis?`,
+    });
+    if (!ok) return;
     setGerando(true);
     try {
       const medicoById = new Map(medicos.map((m) => [m.id, m]));
