@@ -639,22 +639,18 @@ function FluxoPage() {
                       }
                     >
                       {/* Nome, prontuário e menu */}
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            {podeEscrever && (
-                              <GripVertical className="h-3.5 w-3.5 flex-shrink-0 text-slate-300" aria-hidden />
-                            )}
-                            <span className="truncate text-sm font-bold text-slate-800">{a.paciente_nome}</span>
-                          </div>
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-slate-800" title={a.paciente_nome}>
+                          {a.paciente_nome}
+                        </span>
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">{h}</span>
                           {prontuario && (
-                            <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                              Prontuário {prontuario}
+                            <span className="truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" title={`Prontuário ${prontuario}`}>
+                              #{prontuario}
                             </span>
                           )}
-                        </div>
-                        <div className="flex flex-shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
+                          <div className="ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button type="button" className={acaoIconCls} title="Ações">
@@ -679,11 +675,12 @@ function FluxoPage() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Tempo de espera */}
-                      {col.id !== "finalizado" && (
+                      {/* Tempo de espera (só faz sentido no dia corrente) */}
+                      {col.id !== "finalizado" && ehHoje && (
                         <span
                           className={cn(
                             "mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px]",
