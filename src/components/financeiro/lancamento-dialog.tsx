@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
