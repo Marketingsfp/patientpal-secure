@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus, Pencil, Stethoscope, Download, CalendarDays, MessageCircle,
   Power, PowerOff, Users, Filter, Check, Search,
