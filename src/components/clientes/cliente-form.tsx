@@ -1499,6 +1499,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
           </TabsContent>
           </fieldset>
         </Tabs>
+        </div>
 
         {!readOnly && (
           <div className={footerClass}>
