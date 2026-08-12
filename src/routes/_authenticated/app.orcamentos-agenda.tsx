@@ -10,8 +10,7 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
-import { mostrarErro } from "@/lib/traduzir-erro";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
@@ -26,16 +25,14 @@ const LARGURA_KEY = "orcamentos-agenda:leftPct";
 // ===== COMPONENTE PRINCIPAL =====
 function OrcamentosAgendaPage() {
   const search = Route.useSearch();
-  const [leftKey, setLeftKey] = useState(0);
+  const [leftKey] = useState(0);
   const [rightKey, setRightKey] = useState(0);
   const [leftPct, setLeftPct] = useState(() => {
     if (typeof window === "undefined") return 45;
     const v = Number(window.localStorage.getItem(LARGURA_KEY));
     return v >= 20 && v <= 80 ? v : 45;
   });
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [modo, setModo] = useState<Modo>("split");
-  const [busca, setBusca] = useState("");
   const [agendaSrc, setAgendaSrc] = useState(
     search.orc ? `/app/agenda?embed=1&orc=${search.orc}` : "/app/agenda?embed=1",
   );
@@ -79,38 +76,6 @@ function OrcamentosAgendaPage() {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        mostrarErro(err, "erro ao entrar em tela cheia");
-      });
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  }, []);
-
-  const recarregarOrcamentos = useCallback(() => {
-    enviarAosOrcamentos({ type: "orc-recarregar" });
-    setLeftKey((k) => k + 1);
-  }, [enviarAosOrcamentos]);
-
-  const recarregarAgenda = useCallback(() => {
-    setAgendaSrc(`/app/agenda?embed=1&t=${Date.now()}`);
-    setRightKey((k) => k + 1);
-  }, []);
-
-  const abrirEmNovaAba = useCallback((url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, []);
-
-  // Busca da barra unificada → repassada ao painel de orçamentos (debounce).
-  useEffect(() => {
-    const t = setTimeout(() => enviarAosOrcamentos({ type: "orc-busca", q: busca }), 250);
-    return () => clearTimeout(t);
-  }, [busca, enviarAosOrcamentos]);
 
   // Relay: o painel de orçamentos pede para agendar → abre a agenda já
   // filtrada pelo médico do orçamento e com o modal pré-preenchido.
