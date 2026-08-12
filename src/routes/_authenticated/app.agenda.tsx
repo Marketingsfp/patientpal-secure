@@ -88,6 +88,7 @@ import {
   User,
   Camera,
   CreditCard,
+  Eye,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
