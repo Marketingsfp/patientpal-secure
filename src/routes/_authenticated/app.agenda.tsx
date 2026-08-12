@@ -1866,7 +1866,7 @@ function AgendaPage() {
     if (sp.get("novo") !== "1") return;
     novoFromUrlConsumido.current = true;
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const pacIdParam = sp.get("novoPacId") || "";
@@ -1915,7 +1915,7 @@ function AgendaPage() {
 
   const iniciarReagendamento = (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (a.status === "realizado") {
@@ -1929,7 +1929,7 @@ function AgendaPage() {
 
   const confirmarReagendamentoNoSlot = async (slot: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const origem = reagendandoAg;
@@ -2468,7 +2468,7 @@ function AgendaPage() {
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -3583,7 +3583,7 @@ function AgendaPage() {
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const nomeFinal = novoNome.trim();
@@ -3804,7 +3804,7 @@ function AgendaPage() {
 
   const cobrarSelecionados = async () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -3956,7 +3956,7 @@ function AgendaPage() {
 
   const baixarLoteRealizado = async () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4019,7 +4019,7 @@ function AgendaPage() {
 
   const reabrirAtendimento = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4084,7 +4084,7 @@ function AgendaPage() {
 
   const excluirSelecionados = async () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4139,7 +4139,7 @@ function AgendaPage() {
   // === Reagendamento em lote: move vários agendamentos para outra agenda já aberta ===
   const abrirReagLote = () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4181,7 +4181,7 @@ function AgendaPage() {
   // Confirma o reagendamento em lote ao clicar num slot DISPONÍVEL (a partir desse slot, ocupa os próximos N livres)
   const confirmarReagLoteNoSlot = async (slot: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4299,7 +4299,7 @@ function AgendaPage() {
 
   const copiarPacienteSelecionado = () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (selecionados.size !== 1) {
@@ -4319,7 +4319,7 @@ function AgendaPage() {
 
   const openNew = () => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     setEditing(null);
@@ -4677,7 +4677,7 @@ function AgendaPage() {
   //  - postMessage: { type: 'agendar-orcamento', numero: 123 } (split view)
   const abrirNovoComOrcamento = (numero: number) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -4781,7 +4781,7 @@ function AgendaPage() {
       return;
     }
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     // Tenta travar o slot. Se outro usuário já travou nos últimos 3 min,
@@ -4828,7 +4828,7 @@ function AgendaPage() {
 
   const openEdit = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (reagendandoAg) {
@@ -4931,7 +4931,7 @@ function AgendaPage() {
   const submit = async (e: FormEvent, irParaPagamento = false) => {
     e.preventDefault();
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -5272,7 +5272,7 @@ function AgendaPage() {
 
   const remove = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     // "Excluir" no menu (...) da linha NÃO apaga a ficha — apenas libera o horário
@@ -5342,7 +5342,7 @@ function AgendaPage() {
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (status === "realizado" && !usuarioEhMedico) {
@@ -5421,7 +5421,7 @@ function AgendaPage() {
   // Confirmação da autorização do convênio (libera a execução do atendimento).
   const alternarAutorizacaoConvenio = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const novo = !a.convenio_autorizado;
@@ -5448,7 +5448,7 @@ function AgendaPage() {
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const inicio = new Date(a.inicio);
@@ -5486,7 +5486,7 @@ function AgendaPage() {
 
   const concluirAtendimentoManual = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (a.status === "realizado") {
@@ -5684,7 +5684,7 @@ function AgendaPage() {
 
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!clinicaAtual) return;
@@ -5992,7 +5992,7 @@ function AgendaPage() {
 
   const confirmarPresenca = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     const { error } = await supabase
@@ -6013,7 +6013,7 @@ function AgendaPage() {
 
   const estornarCheckin = async (a: Agendamento) => {
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!await confirmDialog("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
@@ -6147,7 +6147,7 @@ function AgendaPage() {
       return;
     }
     if (!podeEscrever) {
-      toast.error("Você não tem permissão de edição neste módulo.");
+      avisoSemPermissaoAgenda();
       return;
     }
     if (!pagosSet.has(a.id)) {
@@ -6247,7 +6247,7 @@ function AgendaPage() {
    */
   const emitirNfseAgrupada = async () => {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) { avisoSemPermissaoAgenda(); return; }
     const ids = Array.from(nfseSel);
     if (ids.length < 2) { toast.error("Selecione ao menos 2 agendamentos."); return; }
     const selAgs = items.filter((a) => ids.includes(a.id));
