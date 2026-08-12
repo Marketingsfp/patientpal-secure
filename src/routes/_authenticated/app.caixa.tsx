@@ -2535,6 +2535,45 @@ function Page() {
                   </Card>
                 ) : (
                   <>
+              {/* Barra de ações — sangria/suprimento em destaque no topo */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "suprimento" })}>
+                    <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
+                  </button>
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "sangria" })}>
+                    <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
+                  </button>
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "estorno" })}>
+                    <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
+                  </button>
+                  {podeLancarRecebDespesa && (
+                    <>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "recebimento" })}>
+                        <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
+                      </button>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "despesa" })}>
+                        <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
+                      </button>
+                    </>
+                  )}
+                </div>
+                <button type="button" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer" onClick={() => {
+                  setValorInformado(esperadoGaveta.toFixed(2));
+                  if (minhaSessao) {
+                    const inicial: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
+                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                    }
+                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                    setConferidoOwn(inicial);
+                  }
+                  setOpenFechar(true);
+                }}>
+                  <Lock className="h-4 w-4" /> Conferir e fechar caixa
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { key: "saldo", label: "Saldo atual", value: saldoAtual, cls: "text-indigo-950" },
@@ -2553,6 +2592,16 @@ function Page() {
                   </button>
                 ))}
               </div>
+
+              {/* Quebra por forma de pagamento + memória de cálculo da gaveta */}
+              <ResumoFormas porForma={porFormaSessaoAtual} gaveta={gavetaSessaoAtual} />
+
+              {/* Linha do tempo de sangrias e suprimentos do turno */}
+              <TimelineGaveta
+                movimentos={movsGaveta}
+                onNovaSangria={() => setOpenMov({ tipo: "sangria" })}
+                onNovoSuprimento={() => setOpenMov({ tipo: "suprimento" })}
+              />
 
               <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs mt-4 space-y-3">
                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Movimentação por dia</div>
