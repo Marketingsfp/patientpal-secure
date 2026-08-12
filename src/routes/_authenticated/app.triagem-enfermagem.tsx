@@ -106,6 +106,20 @@ const formVazio: Form = {
 };
 
 function TriagemEnfermagemPage() {
+  return <TriagemEnfermagemConteudo />;
+}
+
+function AlertaBadge({ alerta, rotulo }: { alerta: Alerta; rotulo: string }) {
+  if (!alerta) return null;
+  return (
+    <span className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${classeBadge(alerta)}`}>
+      {alerta.nivel !== "ok" && <AlertTriangle className="h-3 w-3" />}
+      {rotulo}: {alerta.texto}
+    </span>
+  );
+}
+
+function TriagemEnfermagemConteudo() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("triagem-enfermagem");
