@@ -718,29 +718,126 @@ function AtendimentoEditorPage() {
         </Card>
 
         <Card className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <FileHeart className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Prontuário ({especialidade})</h2>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <FileHeart className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold">Prontuário ({especialidade})</h2>
+            </div>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+              {rascunhoEm ? (<><Cloud className="h-3.5 w-3.5 text-emerald-500" /> Rascunho salvo {rascunhoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</>)
+                : (<><CloudOff className="h-3.5 w-3.5" /> Auto-save ativo</>)}
+            </span>
           </div>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {SOAP_KEYS.map(([k, label, rows]) => (
-              <div key={k} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label>{label}</Label>
-                  <div className="flex items-center gap-1">
-                    {k === "hipotese_diagnostica" && (
-                      <Cid10Picker onPick={(t) => addToHipotese(t)} />
-                    )}
-                  </div>
-                </div>
-                <Textarea
-                  rows={rows}
-                  value={soap[k]}
-                  onChange={(e) => setSoap((s) => ({ ...s, [k]: e.target.value }))}
-                />
+
+          {triagem?.alergias && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <span className="font-semibold text-destructive uppercase text-[11px] tracking-wide">Alergias (triagem)</span>
+                <div className="text-foreground">{triagem.alergias}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          <Tabs defaultValue="qp">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="qp">QP & HMA</TabsTrigger>
+              <TabsTrigger value="hist">Histórico / Alergias</TabsTrigger>
+              <TabsTrigger value="ef">Exame físico</TabsTrigger>
+              <TabsTrigger value="hd">Hipótese (CID-10)</TabsTrigger>
+              <TabsTrigger value="cond">Conduta</TabsTrigger>
+              <TabsTrigger value="presc">Prescrição</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="qp" className="space-y-3 mt-3">
+              <CampoClinico rotulo="Queixa principal" valor={soap.queixa_principal} rows={3}
+                onChange={(v) => setSoap((s) => ({ ...s, queixa_principal: v }))} />
+              <CampoClinico rotulo="História da doença atual (HMA)" valor={soap.historia_doenca} rows={6}
+                macros={macrosPorCampo("historia_doenca")} onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, historia_doenca: v }))} />
+            </TabsContent>
+
+            <TabsContent value="hist" className="space-y-3 mt-3">
+              {triagem ? (
+                <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                  {triagem.medicamentos && (
+                    <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Medicamentos em uso</div><div>{triagem.medicamentos}</div></div>
+                  )}
+                  {triagem.doencas && triagem.doencas.length > 0 && (
+                    <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Comorbidades</div><div className="flex flex-wrap gap-1 mt-1">{triagem.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}</div></div>
+                  )}
+                  {triagem.alergias && (
+                    <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 sm:col-span-2">
+                      <div className="text-[10px] uppercase text-destructive font-semibold">Alergias</div>
+                      <div>{triagem.alergias}</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sem triagem registrada para este atendimento.</p>
+              )}
+              <CampoClinico rotulo="Observações do histórico" valor={soap.queixa_principal ? "" : ""} rows={0} oculto />
+            </TabsContent>
+
+            <TabsContent value="ef" className="space-y-3 mt-3">
+              <CampoClinico rotulo="Exame físico" valor={soap.exame_fisico} rows={10}
+                macros={macrosPorCampo("exame_fisico")} onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, exame_fisico: v }))} />
+            </TabsContent>
+
+            <TabsContent value="hd" className="space-y-3 mt-3">
+              <Label className="text-xs uppercase text-muted-foreground">Busca CID-10</Label>
+              <Cid10Autocomplete
+                selecionados={cids}
+                onAdd={(c) => {
+                  if (cids.some((x) => x.codigo === c.codigo)) return;
+                  setCids([...cids, c]);
+                  addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`);
+                }}
+                onRemove={(codigo) => setCids(cids.filter((c) => c.codigo !== codigo))}
+              />
+              <CampoClinico rotulo="Hipótese diagnóstica" valor={soap.hipotese_diagnostica} rows={5}
+                onChange={(v) => setSoap((s) => ({ ...s, hipotese_diagnostica: v }))} />
+            </TabsContent>
+
+            <TabsContent value="cond" className="space-y-3 mt-3">
+              <CampoClinico rotulo="Conduta / plano terapêutico" valor={soap.conduta} rows={8}
+                macros={macrosPorCampo("conduta")} onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, conduta: v }))} />
+              <div className="space-y-1">
+                <Label className="text-xs uppercase text-muted-foreground">Exames solicitados (documento A4)</Label>
+                <Textarea rows={4} value={examesTexto} onChange={(e) => setExamesTexto(e.target.value)}
+                  placeholder="Um exame por linha — ex.: Hemograma completo" />
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs uppercase text-muted-foreground">Dias de atestado</Label>
+                  <Input type="number" min={1} className="h-9 w-24" value={atestadoDias} onChange={(e) => setAtestadoDias(e.target.value)} />
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("atestado")} className="gap-1">
+                  <FileText className="h-3.5 w-3.5" /> Imprimir atestado (A4)
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("exames")} className="gap-1">
+                  <FlaskConical className="h-3.5 w-3.5" /> Imprimir exames (A4)
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="presc" className="space-y-3 mt-3">
+              <div className="flex flex-wrap gap-1">
+                {macrosPorCampo("prescricao").map((m) => (
+                  <button key={m.rotulo} type="button" onClick={() => aplicarMacro(m)}
+                    className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1">
+                    <Zap className="h-3 w-3" /> {m.rotulo}
+                  </button>
+                ))}
+              </div>
+              <PrescricaoBuilder itens={prescItens} onChange={setPrescItens} />
+              <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("receita")} className="gap-1">
+                <Pill className="h-3.5 w-3.5" /> Imprimir receita (A4)
+              </Button>
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
 
@@ -796,11 +893,17 @@ function AtendimentoEditorPage() {
       </Card>
 
       <div className="flex justify-end gap-2 flex-wrap">
-        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Conduta")} disabled={!soap.conduta.trim()}>
-          <Printer className="h-4 w-4" /> Imprimir conduta
+        <Button variant="outline" size="lg" onClick={() => imprimirA4("receita")} disabled={!prescItens.length && !soap.prescricao.trim()}>
+          <Pill className="h-4 w-4" /> Imprimir receita (A4)
         </Button>
-        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
-          <Printer className="h-4 w-4" /> Imprimir prescrição
+        <Button variant="outline" size="lg" onClick={() => imprimirA4("exames")} disabled={!examesTexto.trim() && !soap.conduta.trim()}>
+          <FlaskConical className="h-4 w-4" /> Imprimir exames (A4)
+        </Button>
+        <Button variant="outline" size="lg" onClick={() => imprimirA4("atestado")}>
+          <FileText className="h-4 w-4" /> Imprimir atestado (A4)
+        </Button>
+        <Button variant="outline" size="lg" onClick={() => imprimirA4("conduta")} disabled={!soap.conduta.trim()}>
+          <Printer className="h-4 w-4" /> Imprimir conduta
         </Button>
         {podeEscrever && (
           <Button
@@ -809,11 +912,47 @@ function AtendimentoEditorPage() {
             disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
             title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
           >
-            {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar prontuário
+            {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Finalizar atendimento
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function CampoClinico({
+  rotulo, valor, rows, onChange, macros, onMacro, oculto,
+}: {
+  rotulo: string;
+  valor: string;
+  rows: number;
+  onChange?: (v: string) => void;
+  macros?: Macro[];
+  onMacro?: (m: Macro) => void;
+  oculto?: boolean;
+}) {
+  if (oculto) return null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <Label>{rotulo}</Label>
+        {macros && macros.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {macros.map((m) => (
+              <button
+                key={m.rotulo}
+                type="button"
+                onClick={() => onMacro?.(m)}
+                className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
+              >
+                <Zap className="h-3 w-3" /> {m.rotulo}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <Textarea rows={rows} value={valor} onChange={(e) => onChange?.(e.target.value)} />
     </div>
   );
 }
