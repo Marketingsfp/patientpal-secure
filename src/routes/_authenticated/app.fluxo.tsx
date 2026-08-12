@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -10,10 +10,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw, MoreVertical, FileText, Pencil, Search, GripVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { minutosEspera, faixaEspera, CLASSE_ESPERA, mediaEspera } from "@/lib/fluxo/espera";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
@@ -69,9 +76,15 @@ type Ag = {
   procedimento: string | null;
   inicio: string;
   fluxo_etapa: Etapa;
+  fluxo_atualizado_em?: string | null;
   prioridade?: "normal" | "prioritario" | "urgente";
   medicos?: { nome: string } | null;
 };
+
+/** Instante de referência para o cronômetro de espera do card. */
+function refEspera(a: Ag): string {
+  return a.fluxo_atualizado_em ?? a.inicio;
+}
 
 // CORREÇÃO: Função proxima com ordem correta
 function proxima(e: Etapa): Etapa | null {
