@@ -259,17 +259,34 @@ function FluxoPage() {
     };
   }, [carregar, clinicaAtual]);
 
-  async function setEtapa(id: string, etapa: Etapa) {
+  async function setEtapa(id: string, etapa: Etapa, opts?: { silencioso?: boolean }) {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const { error } = await supabase
-      .from("agendamentos")
-      .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
-      .eq("id", id);
-    if (error) toast.error(error.message);
-    else {
-      // Recarregar para atualizar a lista
-      await carregar();
+    const anteriorLista = ags;
+    const agoraISO = new Date().toISOString();
+    // Atualização otimista: o card muda de coluna na hora.
+    setAgs((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, fluxo_etapa: etapa, fluxo_atualizado_em: agoraISO } : a)),
+    );
+
+    const payload: Record<string, unknown> = { fluxo_etapa: etapa, fluxo_atualizado_em: agoraISO };
+    // Ao entrar em Atendimento, o agendamento também passa a "em_atendimento"
+    // na Agenda e registra o horário de início.
+    if (etapa === "atendimento" || etapa === "exame") {
+      payload.status = "em_atendimento";
+      payload.executado_em = agoraISO;
     }
+
+    const { error } = await supabase.from("agendamentos").update(payload as never).eq("id", id);
+    if (error) {
+      setAgs(anteriorLista); // desfaz a atualização otimista
+      toast.error(error.message);
+      return;
+    }
+    if (!opts?.silencioso) {
+      const rotulo = ETAPAS.find((e) => e.id === etapa)?.label ?? etapa;
+      toast.success(`Paciente encaminhado para ${rotulo}`);
+    }
+    await carregar();
   }
 
   async function ciclarPrioridade(a: Ag) {
