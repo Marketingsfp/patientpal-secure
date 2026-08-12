@@ -42,6 +42,12 @@ import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
 import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
+import { ResumoFormas } from "@/components/caixa/resumo-formas";
+import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
+import {
+  saldoEsperadoGaveta, classificarDiferenca, statusCaixa,
+  STATUS_CAIXA_LABEL, STATUS_CAIXA_CLASS,
+} from "@/lib/caixa/fechamento";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
