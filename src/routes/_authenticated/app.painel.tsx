@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -219,6 +220,8 @@ function DashboardOperacional() {
             <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
           </HhpKpiRow>
         )}
+
+        <InformacoesRapidasCard />
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* Fila ao vivo */}
