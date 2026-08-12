@@ -451,6 +451,33 @@ function Page() {
     );
   }, [slotsPreview]);
 
+  // Resumo do cálculo exibido antes de gerar
+  const resumoGeracao = useMemo(() => {
+    const medicosSelecionados = gerar.medico_id === "all"
+      ? medicos.length
+      : (gerar.medico_id ? 1 : 0);
+    let diasNoPeriodo = 0;
+    if (gerar.data_inicio && gerar.data_fim) {
+      const ini = new Date(`${gerar.data_inicio}T00:00:00`);
+      const fimD = new Date(`${gerar.data_fim}T00:00:00`);
+      if (fimD >= ini) {
+        const total = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
+        for (let i = 0; i < total; i++) {
+          const d = new Date(ini); d.setDate(d.getDate() + i);
+          if (isFeriadoOuDomingo(d)) continue;
+          if (gerarDias.includes(d.getDay())) diasNoPeriodo += 1;
+        }
+      }
+    }
+    const porMedico = medicosSelecionados > 0
+      ? Math.round(slotsPreview.length / medicosSelecionados)
+      : 0;
+    return { medicosSelecionados, diasNoPeriodo, porMedico };
+  }, [gerar.medico_id, gerar.data_inicio, gerar.data_fim, gerarDias, medicos.length, slotsPreview.length]);
+
+  const duracaoInformada = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : null;
+  const duracaoInvalida = duracaoInformada !== null && (Number.isNaN(duracaoInformada) || duracaoInformada < 5);
+
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
   const cidadesDisponiveis = Array.from(
