@@ -8409,6 +8409,7 @@ export type Database = {
           agendamento_id: string | null
           alergias: string | null
           altura_cm: number | null
+          classificacao_risco: string | null
           clinica_id: string
           created_at: string
           doencas: string[] | null
@@ -8435,6 +8436,7 @@ export type Database = {
           agendamento_id?: string | null
           alergias?: string | null
           altura_cm?: number | null
+          classificacao_risco?: string | null
           clinica_id: string
           created_at?: string
           doencas?: string[] | null
@@ -8461,6 +8463,7 @@ export type Database = {
           agendamento_id?: string | null
           alergias?: string | null
           altura_cm?: number | null
+          classificacao_risco?: string | null
           clinica_id?: string
           created_at?: string
           doencas?: string[] | null
