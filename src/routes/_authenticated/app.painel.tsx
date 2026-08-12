@@ -83,9 +83,9 @@ function DashboardOperacional() {
     queryFn: async () => {
       const de = `${dia}T00:00:00`;
       const ate = `${dia}T23:59:59`;
-      const [ags, senhas, alertas, caixas] = await Promise.all([
+      const [ags, senhas, alertas, caixas, meds, esps, novos] = await Promise.all([
         supabase.from("agendamentos")
-          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade")
+          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento")
           .in("clinica_id", ids).gte("inicio", de).lte("inicio", ate).order("inicio"),
         supabase.from("senhas")
           .select("id,codigo,tipo,numero,status,emitida_em,guiche")
@@ -96,12 +96,20 @@ function DashboardOperacional() {
         supabase.from("caixa_sessoes")
           .select("id,user_nome,aberto_em,valor_abertura")
           .in("clinica_id", ids).eq("status", "aberto").order("aberto_em", { ascending: false }),
+        supabase.from("medicos")
+          .select("id,nome,especialidade_id").in("clinica_id", ids),
+        supabase.from("especialidades").select("id,nome"),
+        supabase.from("pacientes")
+          .select("id").in("clinica_id", ids).gte("created_at", `${dia}T00:00:00`).lte("created_at", `${dia}T23:59:59`),
       ]);
       return {
         ags: (ags.data ?? []) as Ag[],
         senhas: (senhas.data ?? []) as Senha[],
         alertas: (alertas.data ?? []) as Alerta[],
         caixas: (caixas.data ?? []) as CaixaSessao[],
+        medicos: (meds.data ?? []) as Array<{ id: string; nome: string; especialidade_id: string | null }>,
+        especialidades: (esps.data ?? []) as Array<{ id: string; nome: string }>,
+        pacientesNovos: new Set(((novos.data ?? []) as Array<{ id: string }>).map((p) => p.id)),
       };
     },
   });
