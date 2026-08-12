@@ -259,30 +259,8 @@ function DashboardOperacional() {
             )}
           </Painel>
 
-          {/* Senhas */}
-          <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />} className="xl:col-span-5">
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
-                <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
-              </div>
-              {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {senhasAguardando.slice(0, 6).map((s) => (
-                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                      <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
-                      <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Painel>
-
           {/* Próximos atendimentos */}
-          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />} className="xl:col-span-7">
+          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />}>
             {carregando ? <Linhas /> : proximos.length === 0 ? (
               <div className="min-h-[260px] rounded-xl bg-white p-6 flex flex-col items-center justify-center text-center gap-3">
                 <CalendarPlus className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
@@ -309,9 +287,31 @@ function DashboardOperacional() {
               </ul>
             )}
           </Painel>
+          </div>
 
-          {/* Alertas + caixa */}
-          <div className="space-y-4 xl:col-span-5">
+          {/* Senhas + Alertas + caixa */}
+          <div className="flex flex-col gap-6">
+            <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />}>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
+                  <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
+                </div>
+                {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {senhasAguardando.slice(0, 6).map((s) => (
+                      <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                        <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Painel>
+
             <Painel title="Alertas imediatos" subtitle="Enfermagem e faltas" action={<LinkMais to="/app/alertas-enfermagem" />}>
               <div className="p-4 space-y-2">
                 {k.faltas > 0 && (
