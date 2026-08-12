@@ -33,6 +33,23 @@ export interface ComprovanteCaixaInput {
   porForma?: Record<string, number>;
   /** Data/hora do movimento (default: agora). */
   quando?: Date;
+  /** Formato do papel. `80mm` (bobina térmica, padrão) ou `a4`. */
+  formato?: "80mm" | "a4";
+  /** Abertura do turno (ISO) — impresso no fechamento. */
+  aberturaEm?: string | null;
+  /** Encerramento do turno (ISO) — impresso no fechamento. */
+  fechamentoEm?: string | null;
+  /** Troco/fundo de abertura (fechamento). */
+  saldoInicial?: number;
+  /** Esperado em espécie na gaveta (fechamento). */
+  esperadoGaveta?: number;
+  /** Sangrias e suprimentos do turno (fechamento). */
+  movimentos?: Array<{
+    tipo: "sangria" | "suprimento";
+    valor: number;
+    descricao?: string | null;
+    created_at: string;
+  }>;
 }
 
 const TITULOS: Record<ComprovanteCaixaTipo, string> = {
