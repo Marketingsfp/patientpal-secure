@@ -1708,6 +1708,8 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Médico sugerido pelo orçamento recebido do split view (filtra a agenda).
+  const [orcMedicoAlvo, setOrcMedicoAlvo] = useState<string | null>(null);
   // Orçamento vinculado ao form atual pertence à especialidade Odontologia?
   // Quando true, só é permitido agendar com médicos da especialidade Odontologia.
   const [orcamentoOdonto, setOrcamentoOdonto] = useState(false);
