@@ -4693,11 +4693,14 @@ function AgendaPage() {
     try {
       const sp = new URLSearchParams(window.location.search);
       const orcParam = sp.get("orc");
+      const orcMed = sp.get("orcmed");
+      if (orcMed) setOrcMedicoAlvo(orcMed);
       if (orcParam) {
         const n = parseInt(orcParam.replace(/\D/g, ""), 10);
         if (n > 0) {
           abrirNovoComOrcamento(n);
           sp.delete("orc");
+          sp.delete("orcmed");
           const novo = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash}`;
           window.history.replaceState(null, "", novo);
         }
@@ -4709,6 +4712,11 @@ function AgendaPage() {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "agendar-orcamento" && typeof d.numero === "number") {
+        // Split view: já deixa a agenda filtrada pelo médico do orçamento e
+        // mostrando apenas horários livres, para o usuário só escolher o slot.
+        if (typeof d.medico_nome === "string" && d.medico_nome.trim()) {
+          setOrcMedicoAlvo(d.medico_nome);
+        }
         abrirNovoComOrcamento(d.numero);
       }
     };
@@ -4716,6 +4724,23 @@ function AgendaPage() {
     return () => window.removeEventListener("message", onMsg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
+
+  // Aplica o filtro de médico assim que a lista de médicos estiver carregada.
+  useEffect(() => {
+    if (!orcMedicoAlvo || medicos.length === 0) return;
+    const norm = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const alvo = norm(orcMedicoAlvo);
+    const m = medicos.find((x) => norm(x.nome ?? "") === alvo);
+    if (m && !isMedicoOnly) {
+      setFiltroMedico(m.id);
+      setFiltroAgenda("todos");
+      setFiltroStatus("livres");
+      toast.info(`Agenda filtrada: ${m.nome} · horários livres`);
+    }
+    setOrcMedicoAlvo(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orcMedicoAlvo, medicos]);
 
   // Trava de edição do slot: quando o usuário abre o diálogo de agendar em um
   // slot DISPONÍVEL, marcamos edit_lock_by/edit_lock_at no banco para impedir
