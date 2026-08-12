@@ -1,0 +1,3 @@
+CREATE POLICY "chat_anexos_select_auth" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'chat-anexos');
+CREATE POLICY "chat_anexos_insert_auth" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'chat-anexos' AND owner = auth.uid());
+CREATE POLICY "chat_anexos_delete_own" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'chat-anexos' AND owner = auth.uid());
