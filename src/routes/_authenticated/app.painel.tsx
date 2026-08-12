@@ -368,7 +368,7 @@ function DashboardOperacional() {
         </div>
 
         {/* Médicos do dia */}
-        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />}>
+        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />} className="mb-6">
           {carregando ? (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
@@ -430,12 +430,12 @@ function Atalho({ to, icon: Icon, label }: { to: string; icon: typeof Users; lab
   return (
     <Link
       to={to as never}
-      className="group flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-slate-200 hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
+      className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-100 bg-white px-3 py-2 transition-all hover:-translate-y-[1px] hover:border-slate-200 hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
     >
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
         <Icon className="h-4 w-4" />
       </span>
-      <span className="text-xs font-medium text-slate-700 leading-tight">{label}</span>
+      <span className="text-xs font-medium text-slate-700 leading-tight whitespace-nowrap">{label}</span>
     </Link>
   );
 }
