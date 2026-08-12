@@ -606,13 +606,24 @@ function FluxoPage() {
                   
                   // Verifica se é a última etapa (atendimento ou exame)
                   const isUltimaEtapa = a.fluxo_etapa === "atendimento" || a.fluxo_etapa === "exame";
+                  const espera = minutosEspera(refEspera(a), agora);
+                  const faixa = faixaEspera(espera);
+                  const prontuario = a.paciente_id ? prontuarios.get(a.paciente_id) : null;
 
                   return (
                     <Card
                       key={a.id}
+                      draggable={podeEscrever}
+                      onDragStart={(e) => {
+                        setArrastando(a.id);
+                        e.dataTransfer.setData("text/plain", a.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => { setArrastando(null); setAlvoColuna(null); }}
                       className={cn(
                         "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
                         prioridadeInfo.border,
+                        arrastando === a.id && "opacity-50",
                       )}
                       role="button"
                       tabIndex={0}
@@ -627,11 +638,62 @@ function FluxoPage() {
                         })
                       }
                     >
-                      {/* Nome e horário */}
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="truncate text-sm font-semibold text-slate-800">{a.paciente_nome}</span>
-                        <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
+                      {/* Nome, prontuário e menu */}
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {podeEscrever && (
+                              <GripVertical className="h-3.5 w-3.5 flex-shrink-0 text-slate-300" aria-hidden />
+                            )}
+                            <span className="truncate text-sm font-bold text-slate-800">{a.paciente_nome}</span>
+                          </div>
+                          {prontuario && (
+                            <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                              Prontuário {prontuario}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className={acaoIconCls} title="Ações">
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem onClick={() => chamarPaciente(a)}>
+                                <Bell className="mr-2 h-4 w-4" /> Chamar senha no painel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link to="/app/prontuarios">
+                                  <FileText className="mr-2 h-4 w-4" /> Abrir prontuário/anamnese
+                                </Link>
+                              </DropdownMenuItem>
+                              {a.paciente_id && (
+                                <DropdownMenuItem asChild>
+                                  <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: a.paciente_id }}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Editar ficha
+                                  </Link>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
+
+                      {/* Tempo de espera */}
+                      {col.id !== "finalizado" && (
+                        <span
+                          className={cn(
+                            "mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px]",
+                            CLASSE_ESPERA[faixa],
+                          )}
+                          title="Tempo desde a última movimentação no fluxo"
+                        >
+                          <Clock className="h-3 w-3" /> {espera} min de espera
+                        </span>
+                      )}
 
                       {a.paciente_id && (
                         <BadgePacienteDistante cidade={cidades.get(a.paciente_id) ?? null} compact className="mt-1.5" />
