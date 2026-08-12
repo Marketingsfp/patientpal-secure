@@ -1846,6 +1846,77 @@ function Page() {
     return r;
   }, [todosMovs, partesDoMov, residualBucket]);
 
+  // ===== Resumo do turno atual (cartões por forma + gaveta física) =====
+  // Base: movimentos reais da minha sessão (exclui despesas virtuais do
+  // Financeiro, que não passam pela gaveta).
+  const movsSessaoAtual = useMemo(
+    () => minhasMovs.filter((m) => !m.id.startsWith("fin:")),
+    [minhasMovs],
+  );
+  /** Saldo líquido por forma de pagamento no turno atual. */
+  const porFormaSessaoAtual = useMemo<Record<string, number>>(() => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
+    };
+    movsSessaoAtual.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "estorno") return;
+      const sinal = m.tipo === "estorno" ? -1 : 1;
+      const v = Number(m.valor || 0) * sinal;
+      const bucket = bucketDeMov(m);
+      if (bucket === "misto") {
+        const partes = partesDoMov(m);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+          somado += (val ?? 0) * sinal;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [movsSessaoAtual, partesDoMov, residualBucket]);
+
+  /** Composição do dinheiro físico da gaveta no turno atual. */
+  const gavetaSessaoAtual = useMemo(() => {
+    let suprimentos = 0;
+    let sangrias = 0;
+    let despesas = 0;
+    movsSessaoAtual.forEach((m) => {
+      const v = Number(m.valor || 0);
+      if (m.tipo === "suprimento") suprimentos += v;
+      else if (m.tipo === "sangria") sangrias += v;
+      else if (m.tipo === "despesa" && bucketDeMov(m) === "dinheiro") despesas += v;
+    });
+    return {
+      saldoInicial: Number(minhaSessao?.valor_abertura || 0),
+      recebimentosDinheiro: Number(porFormaSessaoAtual.dinheiro || 0),
+      suprimentos,
+      sangrias,
+      despesas,
+    };
+  }, [movsSessaoAtual, minhaSessao, porFormaSessaoAtual]);
+
+  const esperadoGaveta = useMemo(() => saldoEsperadoGaveta(gavetaSessaoAtual), [gavetaSessaoAtual]);
+
+  /** Linha do tempo de sangrias e suprimentos do turno atual. */
+  const movsGaveta = useMemo(
+    () => movsSessaoAtual
+      .filter((m) => m.tipo === "sangria" || m.tipo === "suprimento")
+      .map((m) => ({
+        id: m.id,
+        tipo: m.tipo as "sangria" | "suprimento",
+        valor: Number(m.valor || 0),
+        descricao: m.descricao ?? null,
+        created_at: m.created_at,
+      }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [movsSessaoAtual],
+  );
+
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
     e.preventDefault();
