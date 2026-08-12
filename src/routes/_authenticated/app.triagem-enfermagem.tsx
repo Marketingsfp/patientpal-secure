@@ -289,6 +289,7 @@ function TriagemEnfermagemPage() {
       observacoes: form.observacoes || null,
       prioridade: form.prioridade,
       motivo_prioridade: form.prioridade !== "normal" ? (form.motivo_prioridade || null) : null,
+      classificacao_risco: form.classificacao_risco || null,
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
