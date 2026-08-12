@@ -485,6 +485,7 @@ function AtendimentoEditorPage() {
       toast.success(valorMedico > 0
         ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
         : "Prontuário salvo");
+      try { localStorage.removeItem(draftKey); } catch { /* ok */ }
       setSalvo({ valorMedico });
     } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
@@ -494,55 +495,54 @@ function AtendimentoEditorPage() {
     setSoap((s) => ({ ...s, hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t }));
   }
 
-  function imprimirDocumento(tipo: "Conduta" | "Prescrição") {
-    const conteudo = tipo === "Conduta" ? soap.conduta : soap.prescricao;
-    if (!conteudo?.trim()) { toast.error(`Preencha o campo ${tipo} antes de imprimir`); return; }
-    const clinicaNome = clinicaAtual?.clinica?.nome ?? "";
-    const dataStr = new Date().toLocaleDateString("pt-BR");
-    const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tipo)} — ${esc(pacienteNome)}</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Helvetica', 'Arial', sans-serif; color: #000; font-size: 12pt; line-height: 1.5; margin: 0; padding: 24px; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 16px; }
-  .header h1 { margin: 0; font-size: 16pt; text-transform: uppercase; }
-  .header .sub { font-size: 10pt; color: #444; }
-  .titulo { text-align: center; text-transform: uppercase; font-weight: 700; font-size: 14pt; margin: 18px 0 14px; letter-spacing: 1px; }
-  .meta { display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 14px; }
-  .meta b { text-transform: uppercase; }
-  .conteudo { white-space: pre-wrap; font-size: 12pt; min-height: 200px; border-top: 1px dashed #888; border-bottom: 1px dashed #888; padding: 14px 0; }
-  .assinatura { margin-top: 80px; text-align: center; }
-  .assinatura .linha { border-top: 1px solid #000; width: 60%; margin: 0 auto 4px; }
-  .assinatura .nome { font-weight: 700; text-transform: uppercase; }
-  .assinatura .esp { font-size: 10pt; color: #333; }
-  .rodape { margin-top: 24px; text-align: center; font-size: 9pt; color: #666; }
-</style></head><body>
-  <div class="header">
-    <h1>${esc(clinicaNome || "Clínica")}</h1>
-    ${clinicaNome ? '<div class="sub">Documento médico</div>' : ""}
-  </div>
-  <div class="titulo">${esc(tipo)}</div>
-  <div class="meta">
-    <div>Paciente: <b>${esc(pacienteNome)}</b></div>
-    <div>Data: <b>${dataStr} ${horaStr}</b></div>
-  </div>
-  <div class="conteudo">${esc(conteudo)}</div>
-  <div class="assinatura">
-    <div class="linha"></div>
-    <div class="nome">${esc(medico?.nome ?? "")}</div>
-    ${especialidadeMedico ? `<div class="esp">${esc(especialidadeMedico)}</div>` : ""}
-  </div>
-  <div class="rodape">Emitido em ${dataStr} ${horaStr}</div>
-  <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
-</body></html>`;
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Permita pop-ups para imprimir"); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+  function aplicarMacro(m: Macro) {
+    setSoap((s) => ({ ...s, [m.campo]: s[m.campo] ? `${s[m.campo]}\n${m.texto}` : m.texto }));
+    if (m.campo === "prescricao") setPrescItens(textoParaPrescricao(m.texto));
+    toast.success(`Macro aplicada: ${m.rotulo}`);
+  }
+
+  const dadosClinicaDoc = clinicaDados ?? {
+    nome: clinicaAtual?.clinica?.nome ?? "Clínica",
+  };
+
+  function imprimirA4(tipo: "receita" | "exames" | "atestado" | "conduta") {
+    let conteudo = "";
+    let rodapeTexto: string | null = null;
+    if (tipo === "receita") {
+      conteudo = prescItens.length ? prescricaoParaTexto(prescItens) : soap.prescricao;
+      rodapeTexto = "Em caso de reação adversa, suspender o uso e procurar atendimento médico.";
+    } else if (tipo === "exames") {
+      conteudo = examesTexto.trim() || soap.conduta;
+      rodapeTexto = cidsTexto || soap.hipotese_diagnostica ? `Hipótese diagnóstica: ${cidsTexto || soap.hipotese_diagnostica}` : null;
+    } else if (tipo === "atestado") {
+      const dias = Math.max(1, Number(atestadoDias) || 1);
+      conteudo =
+        `Atesto, para os devidos fins, que o(a) paciente acima identificado(a) esteve sob meus cuidados ` +
+        `profissionais nesta data, necessitando de ${dias} (${dias === 1 ? "um" : dias}) dia(s) de afastamento ` +
+        `de suas atividades a partir de ${new Date().toLocaleDateString("pt-BR")}.`;
+      rodapeTexto = cidsTexto ? `CID (mediante autorização do paciente): ${cidsTexto}` : null;
+    } else {
+      conteudo = soap.conduta;
+    }
+    if (!conteudo.trim()) { toast.error("Preencha o conteúdo antes de imprimir."); return; }
+    const ok = imprimirDocumentoA4({
+      tipo,
+      clinica: dadosClinicaDoc,
+      medico: {
+        nome: medico?.nome ?? "",
+        crm: medico?.crm ?? null,
+        crmUf: medico?.crm_uf ?? null,
+        especialidade: especialidadeMedico || null,
+      },
+      paciente: {
+        nome: pacienteNome,
+        cpf: paciente?.cpf ?? null,
+        dataNascimento: paciente?.data_nascimento ?? null,
+      },
+      conteudo,
+      rodapeTexto,
+    });
+    if (!ok) toast.error("Permita pop-ups para imprimir.");
   }
 
   if (salvo) {
