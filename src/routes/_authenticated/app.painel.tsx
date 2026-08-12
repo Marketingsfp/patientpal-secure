@@ -194,9 +194,9 @@ function DashboardOperacional() {
         }
       />
 
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6 space-y-4 md:space-y-6">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6">
         {/* Atalhos rápidos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="flex flex-wrap items-center gap-2 mb-6">
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
           <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
           <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
@@ -207,11 +207,11 @@ function DashboardOperacional() {
 
         {/* KPIs operacionais do dia */}
         {carregando ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
           </div>
         ) : (
-          <HhpKpiRow>
+          <HhpKpiRow className="grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
             <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
             <HhpKpiCard label="Check-ins feitos" value={k.checkins} icon={UserCheck} tone="ok" hint="Pacientes que já chegaram" />
             <HhpKpiCard label="Aguardando chegada" value={k.aguardando} icon={Clock} tone="default" />
@@ -221,15 +221,15 @@ function DashboardOperacional() {
           </HhpKpiRow>
         )}
 
-        <InformacoesRapidasCard />
+        <InformacoesRapidasCard className="w-full mb-6" />
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+          <div className="flex flex-col gap-6">
           {/* Fila ao vivo */}
           <Painel
             title="Fila ao vivo"
             subtitle="Pacientes dentro da clínica agora"
             action={<LinkMais to="/app/fluxo" />}
-            className="xl:col-span-7"
           >
             {carregando ? <Linhas /> : filaAtual.length === 0 ? (
               <HhpEmptyState
