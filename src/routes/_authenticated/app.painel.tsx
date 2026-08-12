@@ -52,6 +52,7 @@ const dataHoraCurta = (iso: string | null) => {
 type Ag = {
   id: string; paciente_nome: string | null; inicio: string | null; status: string;
   fluxo_etapa: string | null; procedimento: string | null; prioridade: string | null;
+  medico_id?: string | null; paciente_id?: string | null; data_pagamento?: string | null;
 };
 type Senha = { id: string; codigo: string | null; tipo: string; numero: number; status: string; emitida_em: string | null; guiche: string | null };
 type Alerta = { id: string; titulo: string | null; paciente_nome: string | null; severidade: string | null; created_at: string };
