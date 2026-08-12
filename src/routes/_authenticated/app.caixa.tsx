@@ -2119,6 +2119,14 @@ function Page() {
       diferenca: diff,
       descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
       porForma,
+      formato: formatoFechamento,
+      aberturaEm: minhaSessao.aberto_em,
+      fechamentoEm: fechadoEmISO,
+      saldoInicial: Number(minhaSessao.valor_abertura || 0),
+      esperadoGaveta,
+      movimentos: movsGaveta.map((m) => ({
+        tipo: m.tipo, valor: m.valor, descricao: m.descricao, created_at: m.created_at,
+      })),
     });
     void load();
   };
