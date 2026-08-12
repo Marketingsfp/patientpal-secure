@@ -147,8 +147,34 @@ function DuplicadosPage() {
     return withNum[0]?.p ?? null;
   })();
 
+  // Conflitos: CPFs diferentes (não vazios) ou datas de nascimento diferentes
+  const conflitos = (() => {
+    const cpfs = new Set(
+      pacientesSelecionados
+        .map((p) => (p.cpf ?? "").replace(/\D/g, ""))
+        .filter((v) => v.length === 11),
+    );
+    const dns = new Set(
+      pacientesSelecionados.map((p) => p.data_nascimento).filter(Boolean) as string[],
+    );
+    const lista: string[] = [];
+    if (cpfs.size > 1) lista.push(`CPFs diferentes: ${Array.from(cpfs).map(formatCPF).join(" · ")}`);
+    if (dns.size > 1)
+      lista.push(
+        `Datas de nascimento diferentes: ${Array.from(dns)
+          .map((d) => d.split("-").reverse().join("/"))
+          .join(" · ")}`,
+      );
+    return lista;
+  })();
+  const [cienteConflito, setCienteConflito] = useState(false);
+
   const executarMerge = async () => {
     if (!vencedorPrevisto || selecionadosAtuais.length < 2) return;
+    if (conflitos.length > 0 && !cienteConflito) {
+      toast.error("Confirme que está ciente das diferenças antes de mesclar.");
+      return;
+    }
     setMerging(true);
     const { data, error } = await supabase.rpc("merge_pacientes", {
       _ids: selecionadosAtuais,
@@ -160,6 +186,7 @@ function DuplicadosPage() {
     }
     toast.success(`Pacientes mesclados. Vencedor: ${String(data).slice(0, 8)}…`);
     setConfirmKey(null);
+    setCienteConflito(false);
     setSel({});
     reload();
   };
@@ -262,7 +289,15 @@ function DuplicadosPage() {
         ))}
       </div>
 
-      <AlertDialog open={!!confirmKey} onOpenChange={(o) => !o && setConfirmKey(null)}>
+      <AlertDialog
+        open={!!confirmKey}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirmKey(null);
+            setCienteConflito(false);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar merge de pacientes</AlertDialogTitle>
@@ -274,6 +309,25 @@ function DuplicadosPage() {
                   cartões) dos cadastros perdedores serão movidos para o
                   vencedor, e os cadastros perdedores serão apagados.
                 </p>
+                {conflitos.length > 0 && (
+                  <div className="rounded border border-destructive/40 bg-destructive/10 p-2 space-y-2">
+                    <div className="font-semibold text-destructive">
+                      Atenção: os cadastros selecionados têm dados divergentes
+                    </div>
+                    <ul className="list-disc pl-5 text-xs">
+                      {conflitos.map((c) => (
+                        <li key={c}>{c}</li>
+                      ))}
+                    </ul>
+                    <label className="flex items-center gap-2 text-xs font-medium">
+                      <Checkbox
+                        checked={cienteConflito}
+                        onCheckedChange={(v) => setCienteConflito(v === true)}
+                      />
+                      Confirmo que conferi e são a mesma pessoa
+                    </label>
+                  </div>
+                )}
                 {vencedorPrevisto && (
                   <div className="rounded border bg-muted/40 p-2">
                     <div className="font-medium">Vencedor (menor prontuário):</div>
@@ -306,7 +360,10 @@ function DuplicadosPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={merging}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction disabled={merging} onClick={executarMerge}>
+            <AlertDialogAction
+              disabled={merging || (conflitos.length > 0 && !cienteConflito)}
+              onClick={executarMerge}
+            >
               {merging ? "Mesclando…" : "Confirmar merge"}
             </AlertDialogAction>
           </AlertDialogFooter>
