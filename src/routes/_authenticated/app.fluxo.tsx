@@ -337,14 +337,43 @@ function FluxoPage() {
       chamada_em: now,
     } as never);
     if (insErr) { toast.error(insErr.message); return; }
-    await setEtapa(a.id, "atendimento");
+    await setEtapa(a.id, "atendimento", { silencioso: true });
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
   }
+
+  // Cronômetros vivos: recalcula a cada 30s sem recarregar dados.
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const opcoesMedico = useMemo(
+    () => Array.from(new Set(ags.map((a) => a.medicos?.nome).filter((n): n is string => !!n))).sort(),
+    [ags],
+  );
+  const opcoesEspec = useMemo(
+    () => Array.from(new Set(ags.map((a) => a.procedimento).filter((p): p is string => !!p))).sort(),
+    [ags],
+  );
+
+  const agsFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return ags.filter((a) => {
+      if (filtroMedico && (a.medicos?.nome ?? "") !== filtroMedico) return false;
+      if (filtroEspec && (a.procedimento ?? "") !== filtroEspec) return false;
+      if (!termo) return true;
+      const pront = a.paciente_id ? (prontuarios.get(a.paciente_id) ?? "") : "";
+      return (
+        a.paciente_nome.toLowerCase().includes(termo) ||
+        (pront ?? "").toLowerCase().includes(termo)
+      );
+    });
+  }, [ags, busca, filtroMedico, filtroEspec, prontuarios]);
 
   const colunas = useMemo(() => {
     const m = new Map<Etapa, Ag[]>();
     ETAPAS.forEach((e) => m.set(e.id, []));
-    for (const a of ags) {
+    for (const a of agsFiltrados) {
       const etapa = a.fluxo_etapa;
       const lista = m.get(etapa);
       if (lista) lista.push(a);
@@ -359,7 +388,7 @@ function FluxoPage() {
       });
     }
     return m;
-  }, [ags]);
+  }, [agsFiltrados]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
