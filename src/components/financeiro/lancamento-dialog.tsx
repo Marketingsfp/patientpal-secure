@@ -844,6 +844,45 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     } else {
       toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     }
+    // Impressão do recibo: telas que possuem fluxo próprio de impressão
+    // (guia de atendimento, carnê, etc.) tratam isso via onSavedWithData.
+    // Quando a tela chamadora não tem esse fluxo (ex.: Check-in, Financeiro),
+    // o próprio diálogo imprime o recibo do lançamento.
+    if (imprimir && !onSavedWithData) {
+      try {
+        let pacienteNome: string | null = null;
+        if (pacienteIdFixo) {
+          const { data: pac } = await supabase
+            .from("pacientes")
+            .select("nome")
+            .eq("id", pacienteIdFixo)
+            .maybeSingle();
+          pacienteNome = (pac as { nome?: string } | null)?.nome ?? null;
+        }
+        printReciboLancamento({
+          tipo,
+          clinicaNome: clinicaAtual.clinica?.nome ?? "",
+          operadorNome:
+            (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null,
+          pacienteNome,
+          descricao,
+          valor: Number(valor),
+          data,
+          categoriaNome: categorias.find((c) => c.id === categoriaId)?.nome ?? null,
+          contaNome: contas.find((c) => c.id === contaId)?.nome ?? null,
+          formaPagamentoLabel: pagamentoMisto
+            ? pagamentos
+                .filter((p) => p.forma)
+                .map((p) => FORMAS_LABEL[p.forma] ?? p.forma)
+                .join(" + ")
+            : (FORMAS_LABEL[formaFinal ?? ""] ?? formaFinal ?? null),
+          observacoes,
+        });
+      } catch (e) {
+        console.error("Falha ao imprimir recibo do lançamento:", e);
+        toast.error("Lançamento salvo, mas não foi possível abrir a impressão do recibo.");
+      }
+    }
     onSavedWithData?.({
       lancamento_id: lancInserido.id,
       valor: Number(valor),
