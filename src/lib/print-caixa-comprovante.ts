@@ -33,6 +33,23 @@ export interface ComprovanteCaixaInput {
   porForma?: Record<string, number>;
   /** Data/hora do movimento (default: agora). */
   quando?: Date;
+  /** Formato do papel. `80mm` (bobina térmica, padrão) ou `a4`. */
+  formato?: "80mm" | "a4";
+  /** Abertura do turno (ISO) — impresso no fechamento. */
+  aberturaEm?: string | null;
+  /** Encerramento do turno (ISO) — impresso no fechamento. */
+  fechamentoEm?: string | null;
+  /** Troco/fundo de abertura (fechamento). */
+  saldoInicial?: number;
+  /** Esperado em espécie na gaveta (fechamento). */
+  esperadoGaveta?: number;
+  /** Sangrias e suprimentos do turno (fechamento). */
+  movimentos?: Array<{
+    tipo: "sangria" | "suprimento";
+    valor: number;
+    descricao?: string | null;
+    created_at: string;
+  }>;
 }
 
 const TITULOS: Record<ComprovanteCaixaTipo, string> = {
@@ -60,7 +77,7 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     linhas.push({ label: "Valor conferido em caixa", valor: fmtBRL(input.valorInformado ?? input.valor) });
     const dif = Number(input.diferenca ?? 0);
     linhas.push({
-      label: "Diferença",
+      label: Math.abs(dif) < 0.005 ? "Diferença (confere)" : dif > 0 ? "Diferença (SOBRA)" : "Diferença (FALTA)",
       valor: (dif >= 0 ? "" : "") + fmtBRL(dif),
       destaque: Math.abs(dif) > 0.009,
     });
@@ -96,6 +113,39 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
        <div class="row" style="margin-top:2px;"><span class="k bold">Total recebido</span><span class="v bold">${esc(fmtBRL(totalFormas))}</span></div>`
     : "";
 
+  // Turno + linha do tempo de sangrias/suprimentos (somente fechamento).
+  const movs = isFech ? (input.movimentos ?? []) : [];
+  const totalSup = movs.filter((m) => m.tipo === "suprimento").reduce((s, m) => s + Number(m.valor || 0), 0);
+  const totalSang = movs.filter((m) => m.tipo === "sangria").reduce((s, m) => s + Number(m.valor || 0), 0);
+  const movsBlock = movs.length
+    ? `<div class="sep"></div>
+       <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Sangrias e suprimentos</div>
+       ${movs
+          .map((m) => `<div class="row"><span class="k">${esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }))} ${m.tipo === "sangria" ? "SANGRIA" : "SUPRIMENTO"}${m.descricao ? " — " + esc(m.descricao) : ""}</span><span class="v">${m.tipo === "sangria" ? "-" : "+"} ${esc(fmtBRL(Number(m.valor || 0)))}</span></div>`)
+          .join("")}
+       <div class="row" style="margin-top:2px;"><span class="k bold">Total suprimentos</span><span class="v bold">${esc(fmtBRL(totalSup))}</span></div>
+       <div class="row"><span class="k bold">Total sangrias</span><span class="v bold">${esc(fmtBRL(totalSang))}</span></div>`
+    : "";
+  const turnoBlock = isFech
+    ? `${input.aberturaEm ? `<div class="row"><span class="k">Início do turno</span><span class="v">${esc(fmtDT(new Date(input.aberturaEm)))}</span></div>` : ""}
+       ${input.fechamentoEm ? `<div class="row"><span class="k">Fim do turno</span><span class="v">${esc(fmtDT(new Date(input.fechamentoEm)))}</span></div>` : ""}
+       ${typeof input.saldoInicial === "number" ? `<div class="row"><span class="k">Saldo inicial (troco)</span><span class="v">${esc(fmtBRL(input.saldoInicial))}</span></div>` : ""}
+       ${typeof input.esperadoGaveta === "number" ? `<div class="row"><span class="k">Esperado em espécie</span><span class="v">${esc(fmtBRL(input.esperadoGaveta))}</span></div>` : ""}`
+    : "";
+
+  const isA4 = input.formato === "a4";
+  const paperCss = isA4
+    ? `.receipt { width: 190mm; padding: 12mm 10mm; margin: 0 auto; font-size: 12px; line-height: 1.5;
+         font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+       .clinica { font-size: 20px; }
+       .titulo { font-size: 15px; }
+       .row { padding: 3px 0; border-bottom: 1px dotted #d4d4d8; }
+       .row .k { font-size: 11px; letter-spacing: .04em; color: #3f3f46; }
+       .sig { display: inline-block; width: 45%; margin-right: 4%; }
+       @media print { @page { size: A4 portrait; margin: 0; } .receipt { width: auto; } }`
+    : `@media print { @page { size: 80mm auto; margin: 0; }
+         .receipt { width: 72mm; margin: 0; padding: 3mm 3mm 6mm; } }`;
+
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>${esc(TITULOS[input.tipo])}</title>
@@ -126,11 +176,10 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     border-radius: 6px; cursor: pointer; font-weight: 600; }
   .toolbar button.sec { background: #e2e8f0; color: #0f172a; }
   @media print {
-    @page { size: 80mm auto; margin: 0; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print, .toolbar { display: none !important; visibility: hidden !important; }
-    .receipt { width: 72mm; margin: 0; padding: 3mm 3mm 6mm; }
   }
+  ${paperCss}
 </style></head>
 <body>
   <div class="toolbar no-print">
@@ -144,6 +193,7 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     <div class="sep"></div>
     <div class="row"><span class="k">Data/Hora</span><span class="v">${esc(dtStr)}</span></div>
     <div class="row"><span class="k">Atendente</span><span class="v">${esc(input.operadorNome)}</span></div>
+    ${turnoBlock}
     ${!isFech && input.destinoNome
       ? `<div class="row"><span class="k">${input.tipo === "sangria" ? "Entregue a" : "Recebido de"}</span><span class="v bold">${esc(input.destinoNome)}</span></div>`
       : ""}
@@ -153,6 +203,7 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
       : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
     }
     ${formasBlock}
+    ${movsBlock}
     ${input.descricao ? `<div class="sep"></div><div class="desc"><b>Descrição:</b> ${esc(input.descricao)}</div>` : ""}
     <div class="sep"></div>
     <div class="sig">

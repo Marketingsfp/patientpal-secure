@@ -42,6 +42,12 @@ import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
 import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
+import { ResumoFormas } from "@/components/caixa/resumo-formas";
+import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
+import {
+  saldoEsperadoGaveta, classificarDiferenca, statusCaixa,
+  STATUS_CAIXA_LABEL, STATUS_CAIXA_CLASS,
+} from "@/lib/caixa/fechamento";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
@@ -584,6 +590,8 @@ function Page() {
   const [openAbrir, setOpenAbrir] = useState(false);
   const [openMov, setOpenMov] = useState<{ tipo: MovTipo } | null>(null);
   const [openFechar, setOpenFechar] = useState(false);
+  /** Papel do comprovante de fechamento: bobina 80mm ou A4. */
+  const [formatoFechamento, setFormatoFechamento] = useState<"80mm" | "a4">("80mm");
   const [openDetalhe, setOpenDetalhe] = useState<Sessao | null>(null);
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
@@ -1840,6 +1848,77 @@ function Page() {
     return r;
   }, [todosMovs, partesDoMov, residualBucket]);
 
+  // ===== Resumo do turno atual (cartões por forma + gaveta física) =====
+  // Base: movimentos reais da minha sessão (exclui despesas virtuais do
+  // Financeiro, que não passam pela gaveta).
+  const movsSessaoAtual = useMemo(
+    () => minhasMovs.filter((m) => !m.id.startsWith("fin:")),
+    [minhasMovs],
+  );
+  /** Saldo líquido por forma de pagamento no turno atual. */
+  const porFormaSessaoAtual = useMemo<Record<string, number>>(() => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
+    };
+    movsSessaoAtual.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "estorno") return;
+      const sinal = m.tipo === "estorno" ? -1 : 1;
+      const v = Number(m.valor || 0) * sinal;
+      const bucket = bucketDeMov(m);
+      if (bucket === "misto") {
+        const partes = partesDoMov(m);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+          somado += (val ?? 0) * sinal;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [movsSessaoAtual, partesDoMov, residualBucket]);
+
+  /** Composição do dinheiro físico da gaveta no turno atual. */
+  const gavetaSessaoAtual = useMemo(() => {
+    let suprimentos = 0;
+    let sangrias = 0;
+    let despesas = 0;
+    movsSessaoAtual.forEach((m) => {
+      const v = Number(m.valor || 0);
+      if (m.tipo === "suprimento") suprimentos += v;
+      else if (m.tipo === "sangria") sangrias += v;
+      else if (m.tipo === "despesa" && bucketDeMov(m) === "dinheiro") despesas += v;
+    });
+    return {
+      saldoInicial: Number(minhaSessao?.valor_abertura || 0),
+      recebimentosDinheiro: Number(porFormaSessaoAtual.dinheiro || 0),
+      suprimentos,
+      sangrias,
+      despesas,
+    };
+  }, [movsSessaoAtual, minhaSessao, porFormaSessaoAtual]);
+
+  const esperadoGaveta = useMemo(() => saldoEsperadoGaveta(gavetaSessaoAtual), [gavetaSessaoAtual]);
+
+  /** Linha do tempo de sangrias e suprimentos do turno atual. */
+  const movsGaveta = useMemo(
+    () => movsSessaoAtual
+      .filter((m) => m.tipo === "sangria" || m.tipo === "suprimento")
+      .map((m) => ({
+        id: m.id,
+        tipo: m.tipo as "sangria" | "suprimento",
+        valor: Number(m.valor || 0),
+        descricao: m.descricao ?? null,
+        created_at: m.created_at,
+      }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [movsSessaoAtual],
+  );
+
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
     e.preventDefault();
@@ -2040,6 +2119,14 @@ function Page() {
       diferenca: diff,
       descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
       porForma,
+      formato: formatoFechamento,
+      aberturaEm: minhaSessao.aberto_em,
+      fechamentoEm: fechadoEmISO,
+      saldoInicial: Number(minhaSessao.valor_abertura || 0),
+      esperadoGaveta,
+      movimentos: movsGaveta.map((m) => ({
+        tipo: m.tipo, valor: m.valor, descricao: m.descricao, created_at: m.created_at,
+      })),
     });
     void load();
   };
@@ -2456,6 +2543,45 @@ function Page() {
                   </Card>
                 ) : (
                   <>
+              {/* Barra de ações — sangria/suprimento em destaque no topo */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "suprimento" })}>
+                    <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
+                  </button>
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "sangria" })}>
+                    <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
+                  </button>
+                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "estorno" })}>
+                    <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
+                  </button>
+                  {podeLancarRecebDespesa && (
+                    <>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "recebimento" })}>
+                        <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
+                      </button>
+                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "despesa" })}>
+                        <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
+                      </button>
+                    </>
+                  )}
+                </div>
+                <button type="button" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer" onClick={() => {
+                  setValorInformado(esperadoGaveta.toFixed(2));
+                  if (minhaSessao) {
+                    const inicial: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
+                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                    }
+                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                    setConferidoOwn(inicial);
+                  }
+                  setOpenFechar(true);
+                }}>
+                  <Lock className="h-4 w-4" /> Conferir e fechar caixa
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { key: "saldo", label: "Saldo atual", value: saldoAtual, cls: "text-indigo-950" },
@@ -2474,6 +2600,16 @@ function Page() {
                   </button>
                 ))}
               </div>
+
+              {/* Quebra por forma de pagamento + memória de cálculo da gaveta */}
+              <ResumoFormas porForma={porFormaSessaoAtual} gaveta={gavetaSessaoAtual} />
+
+              {/* Linha do tempo de sangrias e suprimentos do turno */}
+              <TimelineGaveta
+                movimentos={movsGaveta}
+                onNovaSangria={() => setOpenMov({ tipo: "sangria" })}
+                onNovoSuprimento={() => setOpenMov({ tipo: "suprimento" })}
+              />
 
               <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs mt-4 space-y-3">
                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Movimentação por dia</div>
@@ -2525,44 +2661,6 @@ function Page() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "suprimento" })}>
-                    <ArrowDownToLine className="h-4 w-4 text-emerald-600" /> Suprimento
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "sangria" })}>
-                    <ArrowUpFromLine className="h-4 w-4 text-rose-600" /> Sangria
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "estorno" })}>
-                    <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
-                  </button>
-                  {podeLancarRecebDespesa && (
-                    <>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "recebimento" })}>
-                        <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "despesa" })}>
-                        <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
-                      </button>
-                    </>
-                  )}
-                </div>
-                <button type="button" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer" onClick={() => {
-                  setValorInformado(saldoAtual.toFixed(2));
-                  if (minhaSessao) {
-                    const porForma = entradasPorFormaSessao(minhaSessao.id);
-                    const inicial: Record<string, string> = {};
-                    for (const [k, v] of Object.entries(porForma)) {
-                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                    }
-                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                    setConferidoOwn(inicial);
-                  }
-                  setOpenFechar(true);
-                }}>
-                  <Lock className="h-4 w-4" /> Fechar caixa
-                </button>
-              </div>
                   </>
                 )}
               </TabsContent>
@@ -2935,7 +3033,7 @@ function Page() {
                   </Card>
                 ) : (
             <Card>
-              <CardHeader><CardTitle className="text-base">Meu histórico</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Caixas anteriores</CardTitle></CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -2953,13 +3051,16 @@ function Page() {
                   <TableBody>
                     {linhasMinhasPorDia.map((l) => {
                       const sPrincipal = l.sessoes[0];
+                      const st = statusCaixa(l.statusDia === "aberto" ? "aberto" : "fechado", l.diferenca);
                       return (
                         <TableRow key={l.key}>
                           <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
                           <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
                           <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
                           <TableCell>
-                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
+                            <Badge variant="outline" className={`text-[11px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}>
+                              {STATUS_CAIXA_LABEL[st]}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
                           <TableCell className="text-right">{fmt(l.informado)}</TableCell>
@@ -3460,13 +3561,56 @@ function Page() {
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
             </div>
+            {(() => {
+              const contadoDinheiro = Number(conferidoOwn.dinheiro ?? 0) || 0;
+              const difGaveta = classificarDiferenca(contadoDinheiro, esperadoGaveta);
+              const difTotal = classificarDiferenca(Number(valorInformado) || 0, saldoDoDiaFechamento);
+              return (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className={`rounded-lg border p-3 ${difGaveta.cls}`}>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                      Dinheiro na gaveta
+                    </div>
+                    <div className="text-xs mt-0.5">
+                      Esperado {fmt(esperadoGaveta)} · Contado {fmt(contadoDinheiro)}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums mt-1">
+                      {difGaveta.label}{difGaveta.tipo !== "exato" ? `: ${fmt(Math.abs(difGaveta.valor))}` : ""}
+                    </div>
+                  </div>
+                  <div className={`rounded-lg border p-3 ${difTotal.cls}`}>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                      Total do dia (todas as formas)
+                    </div>
+                    <div className="text-xs mt-0.5">
+                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido {fmt(Number(valorInformado) || 0)}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums mt-1">
+                      {difTotal.label}{difTotal.tipo !== "exato" ? `: ${fmt(Math.abs(difTotal.valor))}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <div>
-              <Label>Observações</Label>
+              <Label>Observações (justifique sobras ou faltas)</Label>
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
+            </div>
+            <div>
+              <Label>Comprovante</Label>
+              <Select value={formatoFechamento} onValueChange={(v) => setFormatoFechamento(v as "80mm" | "a4")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="80mm">Bobina térmica 80mm</SelectItem>
+                  <SelectItem value="a4">Folha A4</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+                <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
