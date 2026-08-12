@@ -194,9 +194,9 @@ function DashboardOperacional() {
         }
       />
 
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6 space-y-4 md:space-y-6">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6">
         {/* Atalhos rápidos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="flex flex-wrap items-center gap-2 mb-6">
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
           <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
           <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
@@ -207,11 +207,11 @@ function DashboardOperacional() {
 
         {/* KPIs operacionais do dia */}
         {carregando ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
           </div>
         ) : (
-          <HhpKpiRow>
+          <HhpKpiRow className="grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
             <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
             <HhpKpiCard label="Check-ins feitos" value={k.checkins} icon={UserCheck} tone="ok" hint="Pacientes que já chegaram" />
             <HhpKpiCard label="Aguardando chegada" value={k.aguardando} icon={Clock} tone="default" />
@@ -221,15 +221,15 @@ function DashboardOperacional() {
           </HhpKpiRow>
         )}
 
-        <InformacoesRapidasCard />
+        <InformacoesRapidasCard className="w-full mb-6" />
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+          <div className="flex flex-col gap-6">
           {/* Fila ao vivo */}
           <Painel
             title="Fila ao vivo"
             subtitle="Pacientes dentro da clínica agora"
             action={<LinkMais to="/app/fluxo" />}
-            className="xl:col-span-7"
           >
             {carregando ? <Linhas /> : filaAtual.length === 0 ? (
               <HhpEmptyState
@@ -259,30 +259,8 @@ function DashboardOperacional() {
             )}
           </Painel>
 
-          {/* Senhas */}
-          <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />} className="xl:col-span-5">
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
-                <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
-              </div>
-              {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {senhasAguardando.slice(0, 6).map((s) => (
-                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                      <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
-                      <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Painel>
-
           {/* Próximos atendimentos */}
-          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />} className="xl:col-span-7">
+          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />}>
             {carregando ? <Linhas /> : proximos.length === 0 ? (
               <div className="min-h-[260px] rounded-xl bg-white p-6 flex flex-col items-center justify-center text-center gap-3">
                 <CalendarPlus className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
@@ -309,9 +287,31 @@ function DashboardOperacional() {
               </ul>
             )}
           </Painel>
+          </div>
 
-          {/* Alertas + caixa */}
-          <div className="space-y-4 xl:col-span-5">
+          {/* Senhas + Alertas + caixa */}
+          <div className="flex flex-col gap-6">
+            <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />}>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
+                  <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
+                </div>
+                {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {senhasAguardando.slice(0, 6).map((s) => (
+                      <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                        <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Painel>
+
             <Painel title="Alertas imediatos" subtitle="Enfermagem e faltas" action={<LinkMais to="/app/alertas-enfermagem" />}>
               <div className="p-4 space-y-2">
                 {k.faltas > 0 && (
@@ -368,7 +368,7 @@ function DashboardOperacional() {
         </div>
 
         {/* Médicos do dia */}
-        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />}>
+        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />} className="mb-6">
           {carregando ? (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
@@ -430,12 +430,12 @@ function Atalho({ to, icon: Icon, label }: { to: string; icon: typeof Users; lab
   return (
     <Link
       to={to as never}
-      className="group flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-3 py-3 transition-all hover:-translate-y-[1px] hover:border-slate-200 hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
+      className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-100 bg-white px-3 py-2 transition-all hover:-translate-y-[1px] hover:border-slate-200 hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
     >
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
         <Icon className="h-4 w-4" />
       </span>
-      <span className="text-xs font-medium text-slate-700 leading-tight">{label}</span>
+      <span className="text-xs font-medium text-slate-700 leading-tight whitespace-nowrap">{label}</span>
     </Link>
   );
 }
