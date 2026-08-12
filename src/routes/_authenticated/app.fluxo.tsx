@@ -489,14 +489,79 @@ function FluxoPage() {
         </div>
       </div>
 
+      {/* Barra de busca e filtros */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou prontuário…"
+            className="h-9 pl-8 text-sm"
+          />
+        </div>
+        <select
+          value={filtroMedico}
+          onChange={(e) => setFiltroMedico(e.target.value)}
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+        >
+          <option value="">Todos os médicos</option>
+          {opcoesMedico.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        <select
+          value={filtroEspec}
+          onChange={(e) => setFiltroEspec(e.target.value)}
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+        >
+          <option value="">Todas as especialidades</option>
+          {opcoesEspec.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        {(busca || filtroMedico || filtroEspec) && (
+          <button
+            type="button"
+            onClick={() => { setBusca(""); setFiltroMedico(""); setFiltroEspec(""); }}
+            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
       {/* Colunas do fluxo - grid sem scroll */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
+          const media = mediaEspera(items.map(refEspera), agora);
 
           return (
-            <div key={col.id} className="space-y-2 min-w-0">
+            <div
+              key={col.id}
+              className={cn(
+                "space-y-2 min-w-0 rounded-xl transition-colors",
+                alvoColuna === col.id && "bg-primary/5 ring-2 ring-primary/30",
+              )}
+              onDragOver={(e) => {
+                if (!arrastando) return;
+                e.preventDefault();
+                setAlvoColuna(col.id);
+              }}
+              onDragLeave={() => setAlvoColuna((c) => (c === col.id ? null : c))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = arrastando ?? e.dataTransfer.getData("text/plain");
+                setAlvoColuna(null);
+                setArrastando(null);
+                if (!id) return;
+                const atual = ags.find((x) => x.id === id);
+                if (!atual || atual.fluxo_etapa === col.id) return;
+                void setEtapa(id, col.id);
+              }}
+            >
               {/* Cabeçalho da coluna */}
               <div
                 className={cn(
@@ -507,7 +572,14 @@ function FluxoPage() {
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", col.ponto)} />
                   <Icon className="h-3.5 w-3.5 flex-shrink-0 text-slate-500" />
-                  <span className="truncate text-xs font-semibold text-slate-700">{col.label}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate text-xs font-semibold text-slate-700">{col.label}</span>
+                    {media !== null && col.id !== "finalizado" && (
+                      <span className="block truncate text-[10px] font-medium text-slate-500">
+                        Média: {media} min
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
                   {items.length}
