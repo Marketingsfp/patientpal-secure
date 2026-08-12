@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -10,10 +10,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Workflow, Bell, AlertTriangle, Siren, CircleDot, Clock, User, Stethoscope, CalendarDays, SlidersHorizontal, RefreshCw, MoreVertical, FileText, Pencil, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { minutosEspera, faixaEspera, CLASSE_ESPERA, mediaEspera } from "@/lib/fluxo/espera";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { PacienteDetalheDrawer, type FluxoDetalheAg } from "@/components/fluxo/paciente-detalhe-drawer";
@@ -69,9 +76,21 @@ type Ag = {
   procedimento: string | null;
   inicio: string;
   fluxo_etapa: Etapa;
+  fluxo_atualizado_em?: string | null;
   prioridade?: "normal" | "prioritario" | "urgente";
   medicos?: { nome: string } | null;
 };
+
+/**
+ * Instante de referência para o cronômetro de espera do card: a última
+ * movimentação no fluxo ou, se ela for anterior ao horário previsto (dado
+ * antigo), o próprio horário do agendamento.
+ */
+function refEspera(a: Ag): string {
+  const ini = new Date(a.inicio).getTime();
+  const mov = a.fluxo_atualizado_em ? new Date(a.fluxo_atualizado_em).getTime() : 0;
+  return mov > ini ? (a.fluxo_atualizado_em as string) : a.inicio;
+}
 
 // CORREÇÃO: Função proxima com ordem correta
 function proxima(e: Etapa): Etapa | null {
@@ -118,7 +137,16 @@ function FluxoPage() {
   const [detalhe, setDetalhe] = useState<FluxoDetalheAg | null>(null);
   const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [cidades, setCidades] = useState<Map<string, string | null>>(new Map());
+  const [prontuarios, setProntuarios] = useState<Map<string, string | null>>(new Map());
   const [loading, setLoading] = useState(false);
+  // Filtros da barra superior (somente visualização — não alteram dados).
+  const [busca, setBusca] = useState("");
+  const [filtroMedico, setFiltroMedico] = useState("");
+  const [filtroEspec, setFiltroEspec] = useState("");
+  // Tick de 30s para os cronômetros de espera ficarem "vivos".
+  const [agora, setAgora] = useState(() => Date.now());
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const [alvoColuna, setAlvoColuna] = useState<Etapa | null>(null);
   const [dataRef, setDataRef] = useState(() => {
   const tzOffset = new Date().getTimezoneOffset() * 60000;
   return new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
@@ -145,7 +173,7 @@ function FluxoPage() {
     const fim = `${dataRef}T23:59:59`;
     const { data, error } = await supabase
       .from("agendamentos")
-      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, prioridade, medicos(nome)")
+      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, fluxo_atualizado_em, prioridade, medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", ini)
       .lte("inicio", fim)
@@ -159,12 +187,21 @@ function FluxoPage() {
     // Cidade do paciente (alerta "paciente de longe")
     const pacIds = Array.from(new Set(reais.map((a) => a.paciente_id).filter((x): x is string => !!x)));
     if (pacIds.length) {
-      const { data: pacs } = await supabase.from("pacientes").select("id, cidade").in("id", pacIds);
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cidade, codigo_prontuario")
+        .in("id", pacIds);
       const mapa = new Map<string, string | null>();
-      ((pacs ?? []) as { id: string; cidade: string | null }[]).forEach((p) => mapa.set(p.id, p.cidade));
+      const mapaPr = new Map<string, string | null>();
+      ((pacs ?? []) as { id: string; cidade: string | null; codigo_prontuario: string | null }[]).forEach((p) => {
+        mapa.set(p.id, p.cidade);
+        mapaPr.set(p.id, p.codigo_prontuario);
+      });
       setCidades(mapa);
+      setProntuarios(mapaPr);
     } else {
       setCidades(new Map());
+      setProntuarios(new Map());
     }
 
     // Pula o Caixa quando o paciente já pagou (check-in/pagamento na recepção):
@@ -228,17 +265,34 @@ function FluxoPage() {
     };
   }, [carregar, clinicaAtual]);
 
-  async function setEtapa(id: string, etapa: Etapa) {
+  async function setEtapa(id: string, etapa: Etapa, opts?: { silencioso?: boolean }) {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const { error } = await supabase
-      .from("agendamentos")
-      .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
-      .eq("id", id);
-    if (error) toast.error(error.message);
-    else {
-      // Recarregar para atualizar a lista
-      await carregar();
+    const anteriorLista = ags;
+    const agoraISO = new Date().toISOString();
+    // Atualização otimista: o card muda de coluna na hora.
+    setAgs((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, fluxo_etapa: etapa, fluxo_atualizado_em: agoraISO } : a)),
+    );
+
+    const payload: Record<string, unknown> = { fluxo_etapa: etapa, fluxo_atualizado_em: agoraISO };
+    // Ao entrar em Atendimento, o agendamento também passa a "em_atendimento"
+    // na Agenda e registra o horário de início.
+    if (etapa === "atendimento" || etapa === "exame") {
+      payload.status = "em_atendimento";
+      payload.executado_em = agoraISO;
     }
+
+    const { error } = await supabase.from("agendamentos").update(payload as never).eq("id", id);
+    if (error) {
+      setAgs(anteriorLista); // desfaz a atualização otimista
+      toast.error(error.message);
+      return;
+    }
+    if (!opts?.silencioso) {
+      const rotulo = ETAPAS.find((e) => e.id === etapa)?.label ?? etapa;
+      toast.success(`Paciente encaminhado para ${rotulo}`);
+    }
+    await carregar();
   }
 
   async function ciclarPrioridade(a: Ag) {
@@ -289,14 +343,46 @@ function FluxoPage() {
       chamada_em: now,
     } as never);
     if (insErr) { toast.error(insErr.message); return; }
-    await setEtapa(a.id, "atendimento");
+    await setEtapa(a.id, "atendimento", { silencioso: true });
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
   }
+
+  // Cronômetros vivos: recalcula a cada 30s sem recarregar dados.
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const opcoesMedico = useMemo(
+    () => Array.from(new Set(ags.map((a) => a.medicos?.nome).filter((n): n is string => !!n))).sort(),
+    [ags],
+  );
+  const opcoesEspec = useMemo(
+    () => Array.from(new Set(ags.map((a) => a.procedimento).filter((p): p is string => !!p))).sort(),
+    [ags],
+  );
+
+  const agsFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return ags.filter((a) => {
+      if (filtroMedico && (a.medicos?.nome ?? "") !== filtroMedico) return false;
+      if (filtroEspec && (a.procedimento ?? "") !== filtroEspec) return false;
+      if (!termo) return true;
+      const pront = a.paciente_id ? (prontuarios.get(a.paciente_id) ?? "") : "";
+      return (
+        a.paciente_nome.toLowerCase().includes(termo) ||
+        (pront ?? "").toLowerCase().includes(termo)
+      );
+    });
+  }, [ags, busca, filtroMedico, filtroEspec, prontuarios]);
+
+  // Cronômetro de espera só faz sentido quando estamos vendo o dia de hoje.
+  const ehHoje = dataRef === new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
   const colunas = useMemo(() => {
     const m = new Map<Etapa, Ag[]>();
     ETAPAS.forEach((e) => m.set(e.id, []));
-    for (const a of ags) {
+    for (const a of agsFiltrados) {
       const etapa = a.fluxo_etapa;
       const lista = m.get(etapa);
       if (lista) lista.push(a);
@@ -311,7 +397,7 @@ function FluxoPage() {
       });
     }
     return m;
-  }, [ags]);
+  }, [agsFiltrados]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
@@ -412,14 +498,79 @@ function FluxoPage() {
         </div>
       </div>
 
+      {/* Barra de busca e filtros */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou prontuário…"
+            className="h-9 pl-8 text-sm"
+          />
+        </div>
+        <select
+          value={filtroMedico}
+          onChange={(e) => setFiltroMedico(e.target.value)}
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+        >
+          <option value="">Todos os médicos</option>
+          {opcoesMedico.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        <select
+          value={filtroEspec}
+          onChange={(e) => setFiltroEspec(e.target.value)}
+          className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-xs"
+        >
+          <option value="">Todas as especialidades</option>
+          {opcoesEspec.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        {(busca || filtroMedico || filtroEspec) && (
+          <button
+            type="button"
+            onClick={() => { setBusca(""); setFiltroMedico(""); setFiltroEspec(""); }}
+            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
       {/* Colunas do fluxo - grid sem scroll */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
+          const media = mediaEspera(items.map(refEspera), agora);
 
           return (
-            <div key={col.id} className="space-y-2 min-w-0">
+            <div
+              key={col.id}
+              className={cn(
+                "space-y-2 min-w-0 rounded-xl transition-colors",
+                alvoColuna === col.id && "bg-primary/5 ring-2 ring-primary/30",
+              )}
+              onDragOver={(e) => {
+                if (!arrastando) return;
+                e.preventDefault();
+                setAlvoColuna(col.id);
+              }}
+              onDragLeave={() => setAlvoColuna((c) => (c === col.id ? null : c))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = arrastando ?? e.dataTransfer.getData("text/plain");
+                setAlvoColuna(null);
+                setArrastando(null);
+                if (!id) return;
+                const atual = ags.find((x) => x.id === id);
+                if (!atual || atual.fluxo_etapa === col.id) return;
+                void setEtapa(id, col.id);
+              }}
+            >
               {/* Cabeçalho da coluna */}
               <div
                 className={cn(
@@ -430,7 +581,14 @@ function FluxoPage() {
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", col.ponto)} />
                   <Icon className="h-3.5 w-3.5 flex-shrink-0 text-slate-500" />
-                  <span className="truncate text-xs font-semibold text-slate-700">{col.label}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate text-xs font-semibold text-slate-700">{col.label}</span>
+                    {media !== null && ehHoje && col.id !== "finalizado" && (
+                      <span className="block whitespace-nowrap text-[10px] font-medium text-slate-500">
+                        Média: {media} min
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 shadow-xs">
                   {items.length}
@@ -457,13 +615,24 @@ function FluxoPage() {
                   
                   // Verifica se é a última etapa (atendimento ou exame)
                   const isUltimaEtapa = a.fluxo_etapa === "atendimento" || a.fluxo_etapa === "exame";
+                  const espera = minutosEspera(refEspera(a), agora);
+                  const faixa = faixaEspera(espera);
+                  const prontuario = a.paciente_id ? prontuarios.get(a.paciente_id) : null;
 
                   return (
                     <Card
                       key={a.id}
+                      draggable={podeEscrever}
+                      onDragStart={(e) => {
+                        setArrastando(a.id);
+                        e.dataTransfer.setData("text/plain", a.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => { setArrastando(null); setAlvoColuna(null); }}
                       className={cn(
                         "gap-0 rounded-xl border border-slate-200/70 bg-white p-3.5 shadow-xs transition-all duration-200 hover:shadow-md cursor-pointer",
                         prioridadeInfo.border,
+                        arrastando === a.id && "opacity-50",
                       )}
                       role="button"
                       tabIndex={0}
@@ -478,11 +647,59 @@ function FluxoPage() {
                         })
                       }
                     >
-                      {/* Nome e horário */}
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="truncate text-sm font-semibold text-slate-800">{a.paciente_nome}</span>
-                        <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{h}</span>
+                      {/* Nome, prontuário e menu */}
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-slate-800" title={a.paciente_nome}>
+                          {a.paciente_nome}
+                        </span>
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">{h}</span>
+                          {prontuario && (
+                            <span className="truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" title={`Prontuário ${prontuario}`}>
+                              #{prontuario}
+                            </span>
+                          )}
+                          <div className="ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className={acaoIconCls} title="Ações">
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem onClick={() => chamarPaciente(a)}>
+                                <Bell className="mr-2 h-4 w-4" /> Chamar senha no painel
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link to="/app/prontuarios">
+                                  <FileText className="mr-2 h-4 w-4" /> Abrir prontuário/anamnese
+                                </Link>
+                              </DropdownMenuItem>
+                              {a.paciente_id && (
+                                <DropdownMenuItem asChild>
+                                  <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: a.paciente_id }}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Editar ficha
+                                  </Link>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Tempo de espera (só faz sentido no dia corrente) */}
+                      {col.id !== "finalizado" && ehHoje && (
+                        <span
+                          className={cn(
+                            "mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px]",
+                            CLASSE_ESPERA[faixa],
+                          )}
+                          title="Tempo desde a última movimentação no fluxo"
+                        >
+                          <Clock className="h-3 w-3" /> {espera} min de espera
+                        </span>
+                      )}
 
                       {a.paciente_id && (
                         <BadgePacienteDistante cidade={cidades.get(a.paciente_id) ?? null} compact className="mt-1.5" />
