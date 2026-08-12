@@ -1599,6 +1599,12 @@ const EMPTY = {
   forma_pagamento_prevista: "" as string,
 };
 
+// Aviso não intrusivo quando o usuário está em modo somente leitura na agenda.
+const SEM_PERMISSAO_MSG = "Visão de agenda apenas para leitura (sem permissão de agendamento)";
+function avisoSemPermissaoAgenda() {
+  toast.warning(SEM_PERMISSAO_MSG, { id: "agenda-sem-permissao" });
+}
+
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
   // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
