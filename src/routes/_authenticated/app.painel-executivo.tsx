@@ -80,13 +80,13 @@ const pctFmt = (v: number) => `${v.toFixed(1)}%`;
 
 // ---------- Presets de período ----------
 type Periodo = { de: string; ate: string };
-const presets: { label: string; make: () => Periodo }[] = [
-  { label: "Hoje", make: () => ({ de: hojeISO(), ate: hojeISO() }) },
-  { label: "7d", make: () => ({ de: addDays(hojeISO(), -6), ate: hojeISO() }) },
-  { label: "30d", make: () => ({ de: addDays(hojeISO(), -29), ate: hojeISO() }) },
-  { label: "MTD", make: () => { const d = new Date(); const de = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; return { de, ate: hojeISO() }; } },
-  { label: "YTD", make: () => { const d = new Date(); return { de: `${d.getFullYear()}-01-01`, ate: hojeISO() }; } },
-  { label: "90d", make: () => ({ de: addDays(hojeISO(), -89), ate: hojeISO() }) },
+const presets: { label: string; hint: string; make: () => Periodo }[] = [
+  { label: "Hoje", hint: "Somente o dia de hoje", make: () => ({ de: hojeISO(), ate: hojeISO() }) },
+  { label: "7d", hint: "Últimos 7 dias", make: () => ({ de: addDays(hojeISO(), -6), ate: hojeISO() }) },
+  { label: "30d", hint: "Últimos 30 dias", make: () => ({ de: addDays(hojeISO(), -29), ate: hojeISO() }) },
+  { label: "MTD", hint: "Mês atual (do dia 1 até hoje)", make: () => { const d = new Date(); const de = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; return { de, ate: hojeISO() }; } },
+  { label: "YTD", hint: "Ano atual (de 1º de janeiro até hoje)", make: () => { const d = new Date(); return { de: `${d.getFullYear()}-01-01`, ate: hojeISO() }; } },
+  { label: "90d", hint: "Últimos 90 dias", make: () => ({ de: addDays(hojeISO(), -89), ate: hojeISO() }) },
 ];
 
 // ---------- Carrega bloco ----------
