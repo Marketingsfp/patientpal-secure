@@ -351,6 +351,9 @@ function FluxoPage() {
     () => Array.from(new Set(ags.map((a) => a.medicos?.nome).filter((n): n is string => !!n))).sort(),
     [ags],
   );
+    () => Array.from(new Set(ags.map((a) => a.medicos?.nome).filter((n): n is string => !!n))).sort(),
+    [ags],
+  );
   const opcoesEspec = useMemo(
     () => Array.from(new Set(ags.map((a) => a.procedimento).filter((p): p is string => !!p))).sort(),
     [ags],
