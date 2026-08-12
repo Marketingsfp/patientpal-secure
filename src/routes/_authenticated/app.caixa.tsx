@@ -2653,44 +2653,6 @@ function Page() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs mt-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "suprimento" })}>
-                    <ArrowDownToLine className="h-4 w-4 text-emerald-600" /> Suprimento
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "sangria" })}>
-                    <ArrowUpFromLine className="h-4 w-4 text-rose-600" /> Sangria
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "estorno" })}>
-                    <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
-                  </button>
-                  {podeLancarRecebDespesa && (
-                    <>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "recebimento" })}>
-                        <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "despesa" })}>
-                        <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
-                      </button>
-                    </>
-                  )}
-                </div>
-                <button type="button" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer" onClick={() => {
-                  setValorInformado(saldoAtual.toFixed(2));
-                  if (minhaSessao) {
-                    const porForma = entradasPorFormaSessao(minhaSessao.id);
-                    const inicial: Record<string, string> = {};
-                    for (const [k, v] of Object.entries(porForma)) {
-                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                    }
-                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                    setConferidoOwn(inicial);
-                  }
-                  setOpenFechar(true);
-                }}>
-                  <Lock className="h-4 w-4" /> Fechar caixa
-                </button>
-              </div>
                   </>
                 )}
               </TabsContent>
