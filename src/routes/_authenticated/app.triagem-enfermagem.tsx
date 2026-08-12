@@ -621,17 +621,10 @@ function TriagemEnfermagemConteudo() {
                   placeholder="Nome, dose e frequência" />
               </div>
               <div>
-                <Label className="text-xs">Alergias</Label>
-                <Textarea rows={2} value={form.alergias}
-                  onChange={(e) => setForm({ ...form, alergias: e.target.value })}
-                  placeholder="Medicamentos, alimentos, etc." />
-              </div>
-            </div>
-
-            <div>
               <Label className="text-xs">Observações da enfermagem</Label>
               <Textarea rows={2} value={form.observacoes}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+              </div>
             </div>
 
             <div className="rounded-md border p-3 space-y-2 bg-muted/30">
