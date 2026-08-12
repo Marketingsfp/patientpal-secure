@@ -1,29 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   RefreshCw,
   ExternalLink,
   FileText,
   CalendarDays,
   GripVertical,
-  X,
-  PanelRightOpen,
   Maximize2,
   Minimize2,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  SplitSquareVertical,
-  Info,
+  Columns2,
+  Plus,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
@@ -32,25 +25,42 @@ export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   }),
 });
 
+type Modo = "split" | "orcamentos" | "agenda";
+const LARGURA_KEY = "orcamentos-agenda:leftPct";
+
 // ===== COMPONENTE PRINCIPAL =====
 function OrcamentosAgendaPage() {
   const search = Route.useSearch();
   const [leftKey, setLeftKey] = useState(0);
   const [rightKey, setRightKey] = useState(0);
-  const [leftPct, setLeftPct] = useState(45);
-  const [agendaAberta, setAgendaAberta] = useState(true);
+  const [leftPct, setLeftPct] = useState(() => {
+    if (typeof window === "undefined") return 45;
+    const v = Number(window.localStorage.getItem(LARGURA_KEY));
+    return v >= 20 && v <= 80 ? v : 45;
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [modoVisualizacao, setModoVisualizacao] = useState<"split" | "orcamentos" | "agenda">("split");
+  const [modo, setModo] = useState<Modo>("split");
+  const [busca, setBusca] = useState("");
   const [agendaSrc, setAgendaSrc] = useState(
     search.orc ? `/app/agenda?embed=1&orc=${search.orc}` : "/app/agenda?embed=1",
   );
-  const [orcamentosSrc] = useState("/app/orcamentos?embed=1");
-  const [showDica, setShowDica] = useState(true);
+  // A agenda só é montada (e só busca dados) depois que o modo dividido/agenda
+  // é usado pela primeira vez.
+  const [agendaMontada, setAgendaMontada] = useState(true);
 
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const agendaIframeRef = useRef<HTMLIFrameElement>(null);
   const orcamentosIframeRef = useRef<HTMLIFrameElement>(null);
+
+  const orcamentosSrc = useMemo(
+    () => (modo === "split" ? "/app/orcamentos?embed=1&compact=1" : "/app/orcamentos?embed=1"),
+    [modo],
+  );
+
+  const enviarAosOrcamentos = useCallback((msg: Record<string, unknown>) => {
+    orcamentosIframeRef.current?.contentWindow?.postMessage(msg, "*");
+  }, []);
 
   // ===== FUNÇÕES =====
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -66,6 +76,7 @@ function OrcamentosAgendaPage() {
 
     const onUp = () => {
       draggingRef.current = false;
+      setLeftPct((p) => { window.localStorage.setItem(LARGURA_KEY, String(Math.round(p))); return p; });
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -87,49 +98,47 @@ function OrcamentosAgendaPage() {
   }, []);
 
   const recarregarOrcamentos = useCallback(() => {
+    enviarAosOrcamentos({ type: "orc-recarregar" });
     setLeftKey((k) => k + 1);
-    toast.success("Orçamentos recarregados");
-  }, []);
+  }, [enviarAosOrcamentos]);
 
   const recarregarAgenda = useCallback(() => {
     setAgendaSrc(`/app/agenda?embed=1&t=${Date.now()}`);
     setRightKey((k) => k + 1);
-    toast.success("Agenda recarregada");
   }, []);
 
   const abrirEmNovaAba = useCallback((url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   }, []);
 
-  const alternarAgenda = useCallback(() => {
-    setAgendaAberta((prev) => {
-      if (!prev) {
-        // Se estava fechada, volta para split
-        setModoVisualizacao("split");
-      }
-      return !prev;
-    });
-  }, []);
+  // Busca da barra unificada → repassada ao painel de orçamentos (debounce).
+  useEffect(() => {
+    const t = setTimeout(() => enviarAosOrcamentos({ type: "orc-busca", q: busca }), 250);
+    return () => clearTimeout(t);
+  }, [busca, enviarAosOrcamentos]);
 
-  // Relay: quando o iframe de orçamentos manda postMessage pedindo para agendar
+  // Relay: o painel de orçamentos pede para agendar → abre a agenda já
+  // filtrada pelo médico do orçamento e com o modal pré-preenchido.
   useEffect(() => {
     const onMsg = (ev: MessageEvent) => {
-      const d = ev.data;
+      const d = ev.data as { type?: string; numero?: number; medico_nome?: string | null } | null;
       if (!d || typeof d !== "object") return;
 
       if (d.type === "agendar-orcamento" && typeof d.numero === "number") {
-        setAgendaAberta(true);
-        setModoVisualizacao("split");
+        setAgendaMontada(true);
+        setModo((m) => (m === "orcamentos" ? "split" : m));
+        const payload = { type: "agendar-orcamento", numero: d.numero, medico_nome: d.medico_nome ?? null };
 
         const win = agendaIframeRef.current?.contentWindow;
         if (win) {
-          win.postMessage({ type: "agendar-orcamento", numero: d.numero }, "*");
+          win.postMessage(payload, "*");
           toast.success(`Orçamento #${d.numero} enviado para a agenda`);
         } else {
-          // Fallback: recarrega o iframe com o parâmetro
-          setAgendaSrc(`/app/agenda?embed=1&orc=${d.numero}&t=${Date.now()}`);
+          // Fallback: (re)carrega a agenda já com o orçamento no parâmetro.
+          const med = d.medico_nome ? `&orcmed=${encodeURIComponent(d.medico_nome)}` : "";
+          setAgendaSrc(`/app/agenda?embed=1&orc=${d.numero}${med}&t=${Date.now()}`);
           setRightKey((k) => k + 1);
-          toast.info("Agenda recarregada com o orçamento");
+          toast.info("Agenda aberta com o orçamento");
         }
       }
     };
@@ -138,143 +147,91 @@ function OrcamentosAgendaPage() {
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
-  // Atualizar quando o modo de visualização mudar
   useEffect(() => {
-    if (modoVisualizacao === "orcamentos") {
-      setAgendaAberta(false);
-    } else if (modoVisualizacao === "agenda") {
-      setAgendaAberta(true);
-      setLeftPct(0); // Agenda ocupa 100%
-    } else {
-      setAgendaAberta(true);
-      setLeftPct(45); // Split 45/55
-    }
-  }, [modoVisualizacao]);
+    if (modo !== "orcamentos") setAgendaMontada(true);
+  }, [modo]);
+
+  const mostrarOrcamentos = modo !== "agenda";
+  const mostrarAgenda = modo !== "orcamentos" && agendaMontada;
+  const larguraEsquerda = modo === "split" ? `${leftPct}%` : "100%";
 
   // ===== RENDER =====
   return (
     <TooltipProvider>
       <div className="h-[calc(100vh-3.5rem)] w-full flex flex-col bg-background">
-        {/* Barra superior */}
-        <div className="px-4 py-2 border-b bg-muted/20 flex items-center justify-between gap-2 shrink-0 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <LayoutGrid className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Orçamentos + Agenda</span>
-              <Badge variant="outline" className="text-[10px] h-5">
-                Integrado
-              </Badge>
-            </div>
-
-            {showDica && (
-              <div className="hidden lg:flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
-                <Info className="h-3 w-3" />
-                <span>
-                  Clique em <span className="font-medium text-emerald-600">Agendar</span> para abrir na agenda
-                </span>
-              </div>
-            )}
+        {/* Barra superior única: busca + modo de visualização + ações */}
+        <div className="px-4 py-2.5 border-b bg-card flex items-center gap-3 shrink-0 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-lg">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por paciente, número ou médico…"
+              className="pl-9 h-9 rounded-xl"
+              aria-label="Buscar orçamentos"
+            />
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Modos de visualização */}
-            <div className="hidden md:flex items-center gap-1 mr-2 border-r pr-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={modoVisualizacao === "split" ? "default" : "ghost"}
-                    onClick={() => setModoVisualizacao("split")}
-                    className="h-8 px-2"
-                  >
-                    <SplitSquareVertical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Dividir tela</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={modoVisualizacao === "orcamentos" ? "default" : "ghost"}
-                    onClick={() => setModoVisualizacao("orcamentos")}
-                    className="h-8 px-2"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Apenas orçamentos</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={modoVisualizacao === "agenda" ? "default" : "ghost"}
-                    onClick={() => setModoVisualizacao("agenda")}
-                    className="h-8 px-2"
-                  >
-                    <CalendarDays className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Apenas agenda</TooltipContent>
-              </Tooltip>
-            </div>
+          <div className="bg-muted/60 p-1 rounded-full border border-border/40 inline-flex gap-1">
+            {([
+              ["orcamentos", "Apenas orçamentos", FileText],
+              ["split", "Dividido 50/50", Columns2],
+              ["agenda", "Apenas agenda", CalendarDays],
+            ] as const).map(([k, label, Icon]) => (
+              <button
+                key={k}
+                onClick={() => setModo(k)}
+                aria-pressed={modo === k}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full transition-all ${
+                  modo === k
+                    ? "bg-background text-foreground shadow-xs font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
 
-            {/* Controles */}
+          <div className="flex items-center gap-1 ml-auto">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-8 w-8 p-0">
-                  <RefreshCw className="h-3.5 w-3.5" />
+                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-9 w-9 p-0">
+                  <RefreshCw className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Recarregar orçamentos</TooltipContent>
             </Tooltip>
-
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-8 w-8 p-0">
-                  <RefreshCw className="h-3.5 w-3.5" />
+                <Button size="sm" variant="ghost" onClick={() => abrirEmNovaAba("/app/orcamentos")} className="h-9 w-9 p-0">
+                  <ExternalLink className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Recarregar agenda</TooltipContent>
+              <TooltipContent>Abrir em nova aba</TooltipContent>
             </Tooltip>
-
+            {modo !== "orcamentos" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-9 w-9 p-0">
+                    <CalendarDays className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Recarregar agenda</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => abrirEmNovaAba("/app/orcamentos")}
-                  className="h-8 w-8 p-0"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Abrir orçamentos em nova aba</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-8 w-8 p-0">
-                  {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-9 w-9 p-0">
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{isFullscreen ? "Sair da tela cheia" : "Tela cheia"}</TooltipContent>
             </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant={agendaAberta ? "default" : "ghost"}
-                  onClick={alternarAgenda}
-                  className="h-8 w-8 p-0"
-                >
-                  {agendaAberta ? <X className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{agendaAberta ? "Fechar agenda" : "Abrir agenda"}</TooltipContent>
-            </Tooltip>
+            <Button size="sm" className="h-9 gap-1.5" onClick={() => enviarAosOrcamentos({ type: "orc-novo" })}>
+              <Plus className="h-4 w-4" /> Novo orçamento
+            </Button>
           </div>
         </div>
 
@@ -282,56 +239,26 @@ function OrcamentosAgendaPage() {
         <div ref={containerRef} className="flex-1 flex min-h-0 w-full relative">
           {/* Painel de Orçamentos */}
           <div
-            style={{
-              width:
-                agendaAberta && modoVisualizacao === "split"
-                  ? `${leftPct}%`
-                  : modoVisualizacao === "orcamentos"
-                    ? "100%"
-                    : modoVisualizacao === "agenda"
-                      ? "0%"
-                      : "100%",
-              display: modoVisualizacao === "agenda" ? "none" : "flex",
-            }}
+            style={{ width: larguraEsquerda, display: mostrarOrcamentos ? "flex" : "none" }}
             className="min-w-0 h-full flex flex-col"
           >
-            <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30 shrink-0">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <FileText className="h-4 w-4 text-blue-500" />
-                Orçamentos
-                <Badge variant="secondary" className="text-[10px]">
-                  {modoVisualizacao === "split" ? `${Math.round(leftPct)}%` : "100%"}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-7 w-7 p-0">
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => abrirEmNovaAba("/app/orcamentos")}
-                  className="h-7 w-7 p-0"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
             <iframe
               ref={orcamentosIframeRef}
-              key={leftKey}
+              key={`${leftKey}-${modo === "split" ? "compact" : "full"}`}
               src={orcamentosSrc}
               className="flex-1 w-full border-0"
               title="Orçamentos"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              loading="lazy"
             />
           </div>
 
           {/* Divisor (apenas no modo split) */}
-          {agendaAberta && modoVisualizacao === "split" && (
+          {modo === "split" && (
             <div
               onMouseDown={handleMouseDown}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Redimensionar painéis"
               className="w-1.5 shrink-0 bg-border hover:bg-primary/60 cursor-col-resize flex items-center justify-center relative group transition-colors"
               title="Arraste para redimensionar"
             >
@@ -343,41 +270,11 @@ function OrcamentosAgendaPage() {
           )}
 
           {/* Painel da Agenda */}
-          {agendaAberta && modoVisualizacao !== "orcamentos" && (
+          {mostrarAgenda && (
             <div
-              style={{
-                width: modoVisualizacao === "split" ? `${100 - leftPct}%` : "100%",
-                flex: modoVisualizacao === "agenda" ? 1 : undefined,
-              }}
+              style={{ width: modo === "split" ? `${100 - leftPct}%` : "100%" }}
               className="min-w-0 h-full flex flex-col"
             >
-              <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/30 shrink-0">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <CalendarDays className="h-4 w-4 text-emerald-500" />
-                  Agenda
-                  <Badge variant="secondary" className="text-[10px]">
-                    {modoVisualizacao === "split" ? `${Math.round(100 - leftPct)}%` : "100%"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-7 w-7 p-0">
-                    <RefreshCw className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => abrirEmNovaAba("/app/agenda")}
-                    className="h-7 w-7 p-0"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                  {modoVisualizacao !== "agenda" && (
-                    <Button size="sm" variant="ghost" onClick={() => setAgendaAberta(false)} className="h-7 w-7 p-0">
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              </div>
               <iframe
                 ref={agendaIframeRef}
                 key={rightKey}
@@ -385,34 +282,23 @@ function OrcamentosAgendaPage() {
                 className="flex-1 w-full border-0"
                 title="Agenda"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                loading="lazy"
               />
             </div>
           )}
         </div>
 
-        {/* Rodapé com informações */}
+        {/* Rodapé enxuto */}
         <div className="px-4 py-1 border-t bg-muted/10 text-[10px] text-muted-foreground flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <span>Orçamentos + Agenda integrados</span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline">
-              {modoVisualizacao === "split"
-                ? "Dividido"
-                : modoVisualizacao === "orcamentos"
-                  ? "Apenas orçamentos"
-                  : "Apenas agenda"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span>
-              Clique em <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para enviar à
-              agenda
-            </span>
-            <Button variant="ghost" size="sm" className="h-5 px-2 text-[10px]" onClick={() => setShowDica(!showDica)}>
-              {showDica ? "Ocultar dica" : "Mostrar dica"}
-            </Button>
-          </div>
+          <span>
+            {modo === "split"
+              ? `Dividido · ${Math.round(leftPct)}% / ${Math.round(100 - leftPct)}%`
+              : modo === "orcamentos"
+                ? "Apenas orçamentos"
+                : "Apenas agenda"}
+          </span>
+          <span>
+            Clique em <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para enviar à agenda
+          </span>
         </div>
       </div>
     </TooltipProvider>

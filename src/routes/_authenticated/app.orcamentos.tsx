@@ -22,6 +22,7 @@ import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orca
 import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
+import { VirtualList } from "@/components/list-shell";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -172,7 +173,12 @@ function OrcamentosRouteDispatcher() {
   const { enabled, loading } = useOrcamentosV2Flag();
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!loading && enabled && v2Allowed) return <OrcamentosV2Mount />;
+  // No modo embutido (split "Orçamentos + Agenda") sempre usamos a tela
+  // clássica: é a única que conversa com o painel pai por postMessage.
+  const isEmbed =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("embed") === "1";
+  if (!isEmbed && !loading && enabled && v2Allowed) return <OrcamentosV2Mount />;
   return <OrcamentosPage />;
 }
 
@@ -227,6 +233,100 @@ type MedicoOpt = {
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/**
+ * Lista compacta (cards) usada apenas quando a tela roda embutida no split
+ * "Orçamentos + Agenda". Mostra só o essencial — paciente, valor, situação e
+ * o botão Agendar — evitando truncamento e rolagem horizontal em telas
+ * estreitas. Virtualizada para manter a rolagem fluida em listas longas.
+ */
+function OrcamentosCompactList({
+  itens, loading, selecionado, podeEscrever, onAgendar, onImprimir, onConverter,
+}: {
+  itens: Orc[];
+  loading: boolean;
+  selecionado: number | null;
+  podeEscrever: boolean;
+  onAgendar: (o: Orc) => void;
+  onImprimir: (id: string) => void;
+  onConverter: (id: string) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="flex-1 min-h-0 p-3 space-y-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-[86px] rounded-xl bg-muted/50 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+  if (itens.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-sm text-muted-foreground">
+        Nenhum orçamento encontrado.
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 min-h-0">
+      <VirtualList<Orc>
+        items={itens}
+        estimateSize={94}
+        getKey={(o) => o.id}
+        className="px-3 py-2"
+        renderItem={(o) => {
+          const realizado = (o.agendamentos_total ?? 0) > 0;
+          const ativo = selecionado === o.numero;
+          return (
+            <div className="pb-2">
+              <div
+                className={`rounded-xl border p-3 bg-card transition-colors ${
+                  ativo ? "border-primary ring-1 ring-primary/30" : "border-border/60 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{o.paciente_nome}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {new Date(o.created_at).toLocaleDateString("pt-BR")}
+                      {o.medico_nome?.trim() ? ` · ${o.medico_nome}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums shrink-0">{BRL(Number(o.valor_total))}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      realizado
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    }`}
+                  >
+                    {realizado ? <CheckCircle2 className="h-3 w-3" /> : <CircleDashed className="h-3 w-3" />}
+                    {realizado ? "Realizado" : "Não realizado"}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <IconAction label="Imprimir" onClick={() => onImprimir(o.id)}>
+                      <Printer className="h-4 w-4" />
+                    </IconAction>
+                    {podeEscrever && (
+                      <IconAction label="Converter itens" onClick={() => onConverter(o.id)}>
+                        <Workflow className="h-4 w-4 text-primary" />
+                      </IconAction>
+                    )}
+                    <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
+                      <Calendar className="h-3.5 w-3.5" /> Agendar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -244,6 +344,32 @@ function OrcamentosPage() {
   const hojeIso = new Date().toISOString().slice(0, 10);
   const [dataIni, setDataIni] = useState<string>(hojeIso);
   const [dataFim, setDataFim] = useState<string>(hojeIso);
+  // Modo compacto: usado quando a tela roda embutida no split
+  // "Orçamentos + Agenda". Só muda apresentação — nenhuma regra de negócio.
+  const [embedCompact] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get("embed") === "1" && sp.get("compact") === "1";
+  });
+  const [orcSelecionado, setOrcSelecionado] = useState<number | null>(null);
+
+  // Recebe busca e filtro da barra unificada do painel pai (split view).
+  useEffect(() => {
+    if (!embedCompact) return;
+    const onMsg = (ev: MessageEvent) => {
+      const d = ev.data as { type?: string; q?: string; value?: string } | null;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "orc-busca" && typeof d.q === "string") setQuery(d.q);
+      if (d.type === "orc-filtro" && typeof d.value === "string") {
+        setFiltroRealizacao(d.value as "todos" | "realizados" | "nao_realizados");
+      }
+      if (d.type === "orc-novo") setOpen(true);
+      if (d.type === "orc-recarregar") void load();
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedCompact]);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -375,8 +501,31 @@ function OrcamentosPage() {
     catch (e) { toast.error((e as Error).message); }
   };
 
+  /**
+   * Envia o orçamento para a agenda. Embutido: avisa o painel pai (que faz o
+   * relay para o iframe da agenda, já filtrando pelo médico). Fora do split:
+   * navega para a tela integrada.
+   */
+  const enviarParaAgenda = (o: Orc) => {
+    const isEmbed = typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("embed") === "1";
+    setOrcSelecionado(o.numero);
+    if (isEmbed && window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: "agendar-orcamento",
+        numero: o.numero,
+        medico_nome: o.medico_nome ?? null,
+        paciente_nome: o.paciente_nome ?? null,
+        categoria: o.categoria ?? null,
+      }, "*");
+    } else {
+      navigate({ to: "/app/orcamentos-agenda", search: { orc: o.numero } as never });
+    }
+  };
+
   return (
-    <div className="space-y-4 flex flex-col h-full min-h-0">
+    <div className={embedCompact ? "flex flex-col h-full min-h-0" : "space-y-4 flex flex-col h-full min-h-0"}>
+      {!embedCompact && (
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/15 shadow-2xs shrink-0 flex items-center justify-center">
@@ -406,7 +555,9 @@ function OrcamentosPage() {
           )}
         </div>
       </div>
+      )}
 
+      {!embedCompact && (
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -472,7 +623,19 @@ function OrcamentosPage() {
           })}
         </div>
       </div>
+      )}
 
+      {embedCompact ? (
+        <OrcamentosCompactList
+          itens={filtered}
+          loading={loading}
+          selecionado={orcSelecionado}
+          podeEscrever={podeEscrever}
+          onAgendar={enviarParaAgenda}
+          onImprimir={(id) => void imprimir(id)}
+          onConverter={(id) => setConversaoId(id)}
+        />
+      ) : (
       <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
@@ -551,16 +714,7 @@ function OrcamentosPage() {
                   <div className="flex items-center justify-end gap-1.5">
                     <IconAction
                       label="Agendar este orçamento"
-                      onClick={() => {
-                        const numero = o.numero;
-                        const isEmbed = typeof window !== "undefined" &&
-                          new URLSearchParams(window.location.search).get("embed") === "1";
-                        if (isEmbed && window.parent && window.parent !== window) {
-                          window.parent.postMessage({ type: "agendar-orcamento", numero }, "*");
-                        } else {
-                          navigate({ to: "/app/orcamentos-agenda", search: { orc: numero } as never });
-                        }
-                      }}
+                      onClick={() => enviarParaAgenda(o)}
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </IconAction>
@@ -588,6 +742,7 @@ function OrcamentosPage() {
         </table>
         </div>
       </div>
+      )}
 
       {open && clinicaAtual && (
         <NovoOrcamentoDialog
