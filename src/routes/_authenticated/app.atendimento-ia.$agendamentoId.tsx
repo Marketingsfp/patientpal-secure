@@ -365,6 +365,7 @@ function AtendimentoEditorPage() {
         prescricao: out.prescricao || soap.prescricao,
       };
       setSoap(nextSoap);
+      if (out.prescricao) setPrescItens(textoParaPrescricao(out.prescricao));
       toast.success("Prontuário preenchido pela IA como sugestão");
       // Gera CIDs/exames/prescrição sugerida na sequência
       try {
