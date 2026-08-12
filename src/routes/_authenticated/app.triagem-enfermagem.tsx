@@ -173,15 +173,14 @@ function TriagemEnfermagemPage() {
     return () => { void supabase.removeChannel(ch); };
   }, [clinicaAtual, carregar]);
 
-  const imc = useMemo(() => {
-    const p = parseFloat(form.peso.replace(",", "."));
-    const a = parseFloat(form.altura.replace(",", "."));
-    if (!p || !a) return "";
-    const aM = a > 3 ? a / 100 : a; // aceita cm ou m
-    const v = p / (aM * aM);
-    if (!isFinite(v)) return "";
-    return v.toFixed(2);
-  }, [form.peso, form.altura]);
+  const imcNum = useMemo(() => calcularImc(form.peso, form.altura), [form.peso, form.altura]);
+  const imc = imcNum == null ? "" : imcNum.toFixed(2);
+  const imcClasse = useMemo(() => classificarImc(imcNum), [imcNum]);
+  const alPa = useMemo(() => alertaPressao(form.pa_sis, form.pa_dia), [form.pa_sis, form.pa_dia]);
+  const alTemp = useMemo(() => alertaTemperatura(form.temp), [form.temp]);
+  const alSat = useMemo(() => alertaSaturacao(form.sat), [form.sat]);
+  const alFc = useMemo(() => alertaFc(form.fc), [form.fc]);
+  const alGli = useMemo(() => alertaGlicemia(form.glicemia), [form.glicemia]);
 
   const grupos = useMemo(() => agruparPorPaciente(ags), [ags]);
   function grupoPago(g: Grupo) {
