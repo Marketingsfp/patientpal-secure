@@ -412,9 +412,12 @@ function Page() {
           }
           let criadosNoDia = 0;
           for (const disp of dsEfetivo) {
-            const dur = overrideIntervalo > 0
+            const durBruta = overrideIntervalo > 0
               ? overrideIntervalo
               : (disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur);
+            // Segurança: durações menores que 5 min geram milhares de vagas
+            // sobrepostas. Nesse caso usamos o padrão de 15 min.
+            const dur = durBruta < 5 ? 15 : durBruta;
             const [hi, mi] = disp.hora_inicio.split(":").map(Number);
             const [hf, mf] = disp.hora_fim.split(":").map(Number);
             let cur = hi * 60 + mi;
