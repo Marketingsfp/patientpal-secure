@@ -131,7 +131,16 @@ function FluxoPage() {
   const [detalhe, setDetalhe] = useState<FluxoDetalheAg | null>(null);
   const [pagos, setPagos] = useState<Set<string>>(new Set());
   const [cidades, setCidades] = useState<Map<string, string | null>>(new Map());
+  const [prontuarios, setProntuarios] = useState<Map<string, string | null>>(new Map());
   const [loading, setLoading] = useState(false);
+  // Filtros da barra superior (somente visualização — não alteram dados).
+  const [busca, setBusca] = useState("");
+  const [filtroMedico, setFiltroMedico] = useState("");
+  const [filtroEspec, setFiltroEspec] = useState("");
+  // Tick de 30s para os cronômetros de espera ficarem "vivos".
+  const [agora, setAgora] = useState(() => Date.now());
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const [alvoColuna, setAlvoColuna] = useState<Etapa | null>(null);
   const [dataRef, setDataRef] = useState(() => {
   const tzOffset = new Date().getTimezoneOffset() * 60000;
   return new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
@@ -158,7 +167,7 @@ function FluxoPage() {
     const fim = `${dataRef}T23:59:59`;
     const { data, error } = await supabase
       .from("agendamentos")
-      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, prioridade, medicos(nome)")
+      .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, fluxo_atualizado_em, prioridade, medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("inicio", ini)
       .lte("inicio", fim)
@@ -172,12 +181,21 @@ function FluxoPage() {
     // Cidade do paciente (alerta "paciente de longe")
     const pacIds = Array.from(new Set(reais.map((a) => a.paciente_id).filter((x): x is string => !!x)));
     if (pacIds.length) {
-      const { data: pacs } = await supabase.from("pacientes").select("id, cidade").in("id", pacIds);
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cidade, codigo_prontuario")
+        .in("id", pacIds);
       const mapa = new Map<string, string | null>();
-      ((pacs ?? []) as { id: string; cidade: string | null }[]).forEach((p) => mapa.set(p.id, p.cidade));
+      const mapaPr = new Map<string, string | null>();
+      ((pacs ?? []) as { id: string; cidade: string | null; codigo_prontuario: string | null }[]).forEach((p) => {
+        mapa.set(p.id, p.cidade);
+        mapaPr.set(p.id, p.codigo_prontuario);
+      });
       setCidades(mapa);
+      setProntuarios(mapaPr);
     } else {
       setCidades(new Map());
+      setProntuarios(new Map());
     }
 
     // Pula o Caixa quando o paciente já pagou (check-in/pagamento na recepção):
