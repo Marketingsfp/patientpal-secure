@@ -281,6 +281,7 @@ function ClientesPage() {
   const loading = uxMelhorias ? listaQuery.isLoading : loadingManual;
 
   const queryClient = useQueryClient();
+  const [editarId, setEditarId] = useState<string | null>(null);
   const refrescar = () => {
     if (uxMelhorias) {
       void queryClient.invalidateQueries({ queryKey: ["clientes-lista", clinicaId] });
@@ -775,6 +776,16 @@ function ClientesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Editar cliente (modal centralizado) */}
+      {clinicaAtual && (
+        <EditarClienteDialog
+          pacienteId={editarId}
+          clinicaId={clinicaAtual.clinica_id}
+          onClose={() => setEditarId(null)}
+          onSaved={refrescar}
+        />
+      )}
     </div>
   );
 }
