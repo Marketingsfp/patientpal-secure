@@ -298,6 +298,7 @@ function AtendimentoEditorPage() {
 
   // Prescrição estruturada -> texto do prontuário.
   useEffect(() => {
+    if (prescItens.length === 0) return;
     const texto = prescricaoParaTexto(prescItens);
     setSoap((s) => (s.prescricao === texto ? s : { ...s, prescricao: texto }));
   }, [prescItens]);
