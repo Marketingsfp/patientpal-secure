@@ -81,9 +81,15 @@ type Ag = {
   medicos?: { nome: string } | null;
 };
 
-/** Instante de referência para o cronômetro de espera do card. */
+/**
+ * Instante de referência para o cronômetro de espera do card: a última
+ * movimentação no fluxo ou, se ela for anterior ao horário previsto (dado
+ * antigo), o próprio horário do agendamento.
+ */
 function refEspera(a: Ag): string {
-  return a.fluxo_atualizado_em ?? a.inicio;
+  const ini = new Date(a.inicio).getTime();
+  const mov = a.fluxo_atualizado_em ? new Date(a.fluxo_atualizado_em).getTime() : 0;
+  return mov > ini ? (a.fluxo_atualizado_em as string) : a.inicio;
 }
 
 // CORREÇÃO: Função proxima com ordem correta
