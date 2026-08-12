@@ -351,11 +351,16 @@ function OrcamentosPage() {
     const sp = new URLSearchParams(window.location.search);
     return sp.get("embed") === "1" && sp.get("compact") === "1";
   });
+  // Embutido no split "Orçamentos + Agenda": o cabeçalho vem do painel pai.
+  const [embedded] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("embed") === "1";
+  });
   const [orcSelecionado, setOrcSelecionado] = useState<number | null>(null);
 
   // Recebe busca e filtro da barra unificada do painel pai (split view).
   useEffect(() => {
-    if (!embedCompact) return;
+    if (!embedded) return;
     const onMsg = (ev: MessageEvent) => {
       const d = ev.data as { type?: string; q?: string; value?: string } | null;
       if (!d || typeof d !== "object") return;
@@ -364,12 +369,13 @@ function OrcamentosPage() {
         setFiltroRealizacao(d.value as "todos" | "realizados" | "nao_realizados");
       }
       if (d.type === "orc-novo") setOpen(true);
+      if (d.type === "orc-exportar") exportarCsv();
       if (d.type === "orc-recarregar") void load();
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embedCompact]);
+  }, [embedded]);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -525,7 +531,7 @@ function OrcamentosPage() {
 
   return (
     <div className={embedCompact ? "flex flex-col h-full min-h-0" : "space-y-4 flex flex-col h-full min-h-0"}>
-      {!embedCompact && (
+      {!embedded && (
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/15 shadow-2xs shrink-0 flex items-center justify-center">
@@ -539,14 +545,6 @@ function OrcamentosPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate({ to: "/app/orcamentos-agenda" })}
-            className="gap-2"
-            title="Abrir orçamentos e agenda lado a lado"
-          >
-            <Columns2 className="h-4 w-4" /> Abrir c/ agenda
-          </Button>
           <Button variant="outline" onClick={exportarCsv} className="gap-2" title="Exportar relatório CSV">
             <Download className="h-4 w-4" /> Exportar
           </Button>
@@ -557,8 +555,7 @@ function OrcamentosPage() {
       </div>
       )}
 
-      {!embedCompact && (
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className={`flex items-center gap-3 flex-wrap${embedded ? " px-4 py-2.5 border-b bg-card" : ""}`}>
         <div className="relative flex-1 min-w-[240px]">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9 rounded-xl" placeholder="Buscar por paciente, número ou médico…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -623,7 +620,6 @@ function OrcamentosPage() {
           })}
         </div>
       </div>
-      )}
 
       {embedCompact ? (
         <OrcamentosCompactList
