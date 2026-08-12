@@ -19,13 +19,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EmptyState } from "@/components/ui/empty-state";
 import { printPedidoCompra } from "@/lib/print-pedido-compra";
 import {
   CATEGORIAS_ESTOQUE, MOTIVOS_BAIXA, STATUS_ESTOQUE_CLASS, STATUS_ESTOQUE_LABEL,
@@ -238,13 +236,15 @@ function EstoquePage() {
 
       <div className="overflow-hidden rounded-xl border bg-card">
         {loading ? (
-          <TableSkeleton rows={6} />
+          <div className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando estoque…
+          </div>
         ) : filtrados.length === 0 ? (
-          <EmptyState
-            icon={<Package className="h-8 w-8" />}
-            title="Nenhum item encontrado"
-            description="Ajuste os filtros ou registre uma entrada de estoque."
-          />
+          <div className="space-y-1 py-14 text-center">
+            <Package className="mx-auto h-8 w-8 text-muted-foreground/60" />
+            <p className="text-sm font-medium">Nenhum item encontrado</p>
+            <p className="text-xs text-muted-foreground">Ajuste os filtros ou registre uma entrada de estoque.</p>
+          </div>
         ) : (
           <Table>
             <TableHeader>
@@ -535,7 +535,11 @@ function BaixaDialog({ open, onOpenChange, produtos, lotesPorProduto, clinicaId,
         if (error) throw error;
       }
 
-      const registros = previa.alocacoes.length > 0
+      type MovInsert = {
+        clinica_id: string; produto_id: string; tipo: string; quantidade: number;
+        lote_id: string | null; motivo: string; observacoes: string | null;
+      };
+      const registros: MovInsert[] = previa.alocacoes.length > 0
         ? previa.alocacoes.map((a) => ({
             clinica_id: clinicaId, produto_id: produtoId, tipo: "saida",
             quantidade: a.quantidade, lote_id: a.lote_id, motivo,
@@ -786,7 +790,9 @@ function HistoricoDialog({ produto, onOpenChange, lotes }: {
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto">
           {loading ? (
-            <TableSkeleton rows={4} />
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </div>
           ) : movs.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma movimentação registrada.</p>
           ) : (
