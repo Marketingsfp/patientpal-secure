@@ -6754,6 +6754,12 @@ function AgendaPage() {
           </div>
         </div>
       )}
+      {!podeEscrever && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <Eye className="h-4 w-4 shrink-0" />
+          <span className="min-w-0">{SEM_PERMISSAO_MSG}</span>
+        </div>
+      )}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
