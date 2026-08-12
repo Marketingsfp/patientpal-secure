@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -52,6 +53,7 @@ const dataHoraCurta = (iso: string | null) => {
 type Ag = {
   id: string; paciente_nome: string | null; inicio: string | null; status: string;
   fluxo_etapa: string | null; procedimento: string | null; prioridade: string | null;
+  medico_id?: string | null; paciente_id?: string | null; data_pagamento?: string | null;
 };
 type Senha = { id: string; codigo: string | null; tipo: string; numero: number; status: string; emitida_em: string | null; guiche: string | null };
 type Alerta = { id: string; titulo: string | null; paciente_nome: string | null; severidade: string | null; created_at: string };
@@ -82,9 +84,9 @@ function DashboardOperacional() {
     queryFn: async () => {
       const de = `${dia}T00:00:00`;
       const ate = `${dia}T23:59:59`;
-      const [ags, senhas, alertas, caixas] = await Promise.all([
+      const [ags, senhas, alertas, caixas, meds, esps, novos] = await Promise.all([
         supabase.from("agendamentos")
-          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade")
+          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento")
           .in("clinica_id", ids).gte("inicio", de).lte("inicio", ate).order("inicio"),
         supabase.from("senhas")
           .select("id,codigo,tipo,numero,status,emitida_em,guiche")
@@ -95,12 +97,20 @@ function DashboardOperacional() {
         supabase.from("caixa_sessoes")
           .select("id,user_nome,aberto_em,valor_abertura")
           .in("clinica_id", ids).eq("status", "aberto").order("aberto_em", { ascending: false }),
+        supabase.from("medicos")
+          .select("id,nome,especialidade_id").in("clinica_id", ids),
+        supabase.from("especialidades").select("id,nome"),
+        supabase.from("pacientes")
+          .select("id").in("clinica_id", ids).gte("created_at", `${dia}T00:00:00`).lte("created_at", `${dia}T23:59:59`),
       ]);
       return {
         ags: (ags.data ?? []) as Ag[],
         senhas: (senhas.data ?? []) as Senha[],
         alertas: (alertas.data ?? []) as Alerta[],
         caixas: (caixas.data ?? []) as CaixaSessao[],
+        medicos: (meds.data ?? []) as Array<{ id: string; nome: string; especialidade_id: string | null }>,
+        especialidades: (esps.data ?? []) as Array<{ id: string; nome: string }>,
+        pacientesNovos: new Set(((novos.data ?? []) as Array<{ id: string }>).map((p) => p.id)),
       };
     },
   });
@@ -141,6 +151,29 @@ function DashboardOperacional() {
 
   const senhasAguardando = (d?.senhas ?? []).filter((s) => s.status === "emitida");
   const ultimaChamada = (d?.senhas ?? []).find((s) => s.status === "chamada");
+
+  const medicosDoDia = useMemo(() => {
+    const ags = (d?.ags ?? []).filter((a) => a.medico_id && a.status !== "cancelado");
+    const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
+    const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
+    const novos = d?.pacientesNovos ?? new Set<string>();
+    const mapa = new Map<string, { id: string; nome: string; especialidade: string | null; total: number; pagos: number; novos: number }>();
+    for (const a of ags) {
+      const id = a.medico_id as string;
+      const info = medInfo.get(id);
+      const item = mapa.get(id) ?? {
+        id,
+        nome: info?.nome ?? "Médico",
+        especialidade: info?.especialidade_id ? (espNome.get(info.especialidade_id) ?? null) : null,
+        total: 0, pagos: 0, novos: 0,
+      };
+      item.total += 1;
+      if (a.data_pagamento) item.pagos += 1;
+      if (a.paciente_id && novos.has(a.paciente_id)) item.novos += 1;
+      mapa.set(id, item);
+    }
+    return [...mapa.values()].sort((a, b) => b.total - a.total);
+  }, [d]);
 
   const carregando = loading || q.isLoading;
 
@@ -187,6 +220,8 @@ function DashboardOperacional() {
             <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
           </HhpKpiRow>
         )}
+
+        <InformacoesRapidasCard />
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* Fila ao vivo */}
@@ -331,6 +366,55 @@ function DashboardOperacional() {
             </Painel>
           </div>
         </div>
+
+        {/* Médicos do dia */}
+        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />}>
+          {carregando ? (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+            </div>
+          ) : medicosDoDia.length === 0 ? (
+            <HhpEmptyState
+              icon={Stethoscope}
+              title="Nenhum médico com atendimentos hoje"
+              description="Assim que houver agendamentos vinculados a profissionais, eles aparecem aqui."
+              className="min-h-[180px]"
+            />
+          ) : (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {medicosDoDia.map((m) => {
+                const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
+                return (
+                  <div key={m.id} className="rounded-xl border border-slate-100 bg-white p-3 transition-shadow hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate" title={m.nome}>{m.nome}</div>
+                        <Badge variant="secondary" className="mt-1 text-[10px]">{m.especialidade ?? "Sem especialidade"}</Badge>
+                      </div>
+                      <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Abrir agenda deste médico">
+                        <Link to="/app/agenda" search={{ orcmed: m.id } as never}>
+                          <CalendarPlus className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">{m.total}</div>
+                    <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Atendimentos</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
+                        <div className="text-[10px] font-semibold text-emerald-700">Pagos</div>
+                        <div className="text-sm font-bold tabular-nums text-emerald-800">{pct}%</div>
+                      </div>
+                      <div className="rounded-lg bg-sky-50 px-2 py-1.5">
+                        <div className="text-[10px] font-semibold text-sky-700">Clientes novos</div>
+                        <div className="text-sm font-bold tabular-nums text-sky-800">{m.novos}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Painel>
 
         <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
           <Megaphone className="h-3.5 w-3.5" />
