@@ -3403,6 +3403,59 @@ export type Database = {
         }
         Relationships: []
       }
+      estoque_lotes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          custo_unitario: number
+          fornecedor: string | null
+          id: string
+          lote: string | null
+          observacoes: string | null
+          produto_id: string
+          quantidade: number
+          quantidade_inicial: number
+          updated_at: string
+          validade: string | null
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          custo_unitario?: number
+          fornecedor?: string | null
+          id?: string
+          lote?: string | null
+          observacoes?: string | null
+          produto_id: string
+          quantidade?: number
+          quantidade_inicial?: number
+          updated_at?: string
+          validade?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          custo_unitario?: number
+          fornecedor?: string | null
+          id?: string
+          lote?: string | null
+          observacoes?: string | null
+          produto_id?: string
+          quantidade?: number
+          quantidade_inicial?: number
+          updated_at?: string
+          validade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_lotes_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "estoque_produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estoque_movimentos: {
         Row: {
           clinica_id: string
@@ -3410,6 +3463,8 @@ export type Database = {
           custo_unitario: number | null
           data: string
           id: string
+          lote_id: string | null
+          motivo: string | null
           observacoes: string | null
           produto_id: string
           quantidade: number
@@ -3421,6 +3476,8 @@ export type Database = {
           custo_unitario?: number | null
           data?: string
           id?: string
+          lote_id?: string | null
+          motivo?: string | null
           observacoes?: string | null
           produto_id: string
           quantidade: number
@@ -3432,22 +3489,34 @@ export type Database = {
           custo_unitario?: number | null
           data?: string
           id?: string
+          lote_id?: string | null
+          motivo?: string | null
           observacoes?: string | null
           produto_id?: string
           quantidade?: number
           tipo?: Database["public"]["Enums"]["estoque_movimento_tipo"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "estoque_movimentos_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "estoque_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       estoque_produtos: {
         Row: {
           ativo: boolean
+          categoria: string
           clinica_id: string
           codigo: string | null
           created_at: string
           custo_unitario: number
           estoque_atual: number
           estoque_minimo: number
+          fornecedor: string | null
           id: string
           nome: string
           observacoes: string | null
@@ -3456,12 +3525,14 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          categoria?: string
           clinica_id: string
           codigo?: string | null
           created_at?: string
           custo_unitario?: number
           estoque_atual?: number
           estoque_minimo?: number
+          fornecedor?: string | null
           id?: string
           nome: string
           observacoes?: string | null
@@ -3470,12 +3541,14 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          categoria?: string
           clinica_id?: string
           codigo?: string | null
           created_at?: string
           custo_unitario?: number
           estoque_atual?: number
           estoque_minimo?: number
+          fornecedor?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
