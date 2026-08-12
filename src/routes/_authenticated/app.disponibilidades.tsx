@@ -78,7 +78,7 @@ function Page() {
   const [diasSel, setDiasSel] = useState<number[]>([1]);
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0, 10); })();
-  const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
+  const [gerar, setGerar] = useState({ medico_id: "", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
   // Piso por (medico|agenda|data-local) → maior `fim` (HH:MM local) já
@@ -412,9 +412,12 @@ function Page() {
           }
           let criadosNoDia = 0;
           for (const disp of dsEfetivo) {
-            const dur = overrideIntervalo > 0
+            const durBruta = overrideIntervalo > 0
               ? overrideIntervalo
               : (disp.intervalo_min && disp.intervalo_min > 0 ? disp.intervalo_min : fallbackDur);
+            // Segurança: durações menores que 5 min geram milhares de vagas
+            // sobrepostas. Nesse caso usamos o padrão de 15 min.
+            const dur = durBruta < 5 ? 15 : durBruta;
             const [hi, mi] = disp.hora_inicio.split(":").map(Number);
             const [hf, mf] = disp.hora_fim.split(":").map(Number);
             let cur = hi * 60 + mi;
@@ -448,6 +451,33 @@ function Page() {
     );
   }, [slotsPreview]);
 
+  // Resumo do cálculo exibido antes de gerar
+  const resumoGeracao = useMemo(() => {
+    const medicosSelecionados = gerar.medico_id === "all"
+      ? medicos.length
+      : (gerar.medico_id ? 1 : 0);
+    let diasNoPeriodo = 0;
+    if (gerar.data_inicio && gerar.data_fim) {
+      const ini = new Date(`${gerar.data_inicio}T00:00:00`);
+      const fimD = new Date(`${gerar.data_fim}T00:00:00`);
+      if (fimD >= ini) {
+        const total = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
+        for (let i = 0; i < total; i++) {
+          const d = new Date(ini); d.setDate(d.getDate() + i);
+          if (isFeriadoOuDomingo(d)) continue;
+          if (gerarDias.includes(d.getDay())) diasNoPeriodo += 1;
+        }
+      }
+    }
+    const porMedico = medicosSelecionados > 0
+      ? Math.round(slotsPreview.length / medicosSelecionados)
+      : 0;
+    return { medicosSelecionados, diasNoPeriodo, porMedico };
+  }, [gerar.medico_id, gerar.data_inicio, gerar.data_fim, gerarDias, medicos.length, slotsPreview.length]);
+
+  const duracaoInformada = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : null;
+  const duracaoInvalida = duracaoInformada !== null && (Number.isNaN(duracaoInformada) || duracaoInformada < 5);
+
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
   const cidadesDisponiveis = Array.from(
@@ -464,11 +494,24 @@ function Page() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
+    if (duracaoInvalida) {
+      toast.error("A duração mínima deve ser de 5 minutos.");
+      return;
+    }
     if (duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
       toast.error(`Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`);
       return;
     }
-    if (!await confirmDialog(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
+    const emLote = gerar.medico_id === "all" || slotsPreview.length > 1000;
+    const ok = await confirmDialog({
+      title: emLote ? "Geração em massa" : "Confirmar geração",
+      tone: emLote ? "warning" : "default",
+      confirmText: "Gerar horários",
+      description: emLote
+        ? `Você vai criar ${slotsPreview.length} horários para ${resumoGeracao.medicosSelecionados} médico(s), em ${resumoGeracao.diasNoPeriodo} dia(s) do período.\n\nEssa operação é grande e afeta a agenda de todos esses profissionais. Deseja continuar?`
+        : `Confirmar criação de ${slotsPreview.length} horários disponíveis?`,
+    });
+    if (!ok) return;
     setGerando(true);
     try {
       const medicoById = new Map(medicos.map((m) => [m.id, m]));
@@ -676,65 +719,75 @@ function Page() {
               <p className="text-xs text-muted-foreground">
                 Cria automaticamente slots de horários disponíveis com base na disponibilidade semanal dos médicos.
               </p>
-              <div className="flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-48">
-                  <label className="text-xs text-muted-foreground">Médico</label>
-                  <SearchableSelect
-                    value={gerar.medico_id}
-                    onChange={(v) => setGerar({ ...gerar, medico_id: v })}
-                    placeholder="Selecione"
-                    searchPlaceholder="Buscar médico..."
-                    options={[
-                      { value: "all", label: "Todos os médicos" },
-                      ...medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() })),
-                    ]}
-                  />
+              {/* Grupo 1 — Alvo e período */}
+              <section className="rounded-lg border bg-muted/30 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">1 · Médico e período</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Médico</label>
+                    <SearchableSelect
+                      value={gerar.medico_id}
+                      onChange={(v) => setGerar({ ...gerar, medico_id: v })}
+                      placeholder="Selecione um médico"
+                      searchPlaceholder="Buscar médico..."
+                      options={[
+                        ...medicos.map((m) => ({ value: m.id, label: m.nome.toUpperCase() })),
+                        { value: "all", label: `Todos os médicos (${medicos.length})` },
+                      ]}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Data inicial (De)</label>
+                    <DateInputBR className="w-full" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Data final (Até)</label>
+                    <DateInputBR className="w-full" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">De</label>
-                  <DateInputBR className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+              </section>
+
+              {/* Grupo 2 — Horários e regras de vaga */}
+              <section className="rounded-lg border bg-muted/30 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">2 · Horários e fichas</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Hora início</label>
+                    <Input type="time" className="w-full" value={gerar.hora_inicio}
+                      onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })} />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Hora fim</label>
+                    <Input type="time" className="w-full" value={gerar.hora_fim}
+                      onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Duração de cada atendimento (min)</label>
+                    <Input type="number" min={5} step={5} placeholder="15 (padrão)" className="w-full"
+                      value={gerar.intervalo_min}
+                      onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
+                    {duracaoInvalida && (
+                      <p className="mt-1 text-[11px] font-medium text-destructive">A duração mínima deve ser de 5 minutos</p>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <label className="text-xs text-muted-foreground">Limite de fichas por dia</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="padrão do médico"
+                      className="w-full"
+                      value={gerar.limite_fichas}
+                      onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Até</label>
-                  <DateInputBR className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Nº de fichas</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="padrão do médico"
-                    className="w-36"
-                    value={gerar.limite_fichas}
-                    onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Hora início</label>
-                  <Input type="time" className="w-28" value={gerar.hora_inicio}
-                    onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Hora fim</label>
-                  <Input type="time" className="w-28" value={gerar.hora_fim}
-                    onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })} />
-                </div>
-                 <div>
-                   <label className="text-xs text-muted-foreground">Duração de cada horário (min)</label>
-                   <Input type="number" min={5} step={5} placeholder="padrão" className="w-28"
-                    value={gerar.intervalo_min}
-                    onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
-                </div>
-                {podeEscrever && (
-                  <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
-                    <CalendarRange className="h-4 w-4 mr-1" />
-                    {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
-                  </Button>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Dias da semana</label>
-                <div className="flex flex-wrap gap-1 mt-1">
+              </section>
+
+              {/* Grupo 3 — Dias da semana */}
+              <section className="rounded-lg border bg-muted/30 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">3 · Dias da semana</p>
+                <div className="flex flex-wrap gap-1">
                   {DIAS.map((d, i) => {
                     const ativo = gerarDias.includes(i);
                     return (
@@ -759,28 +812,59 @@ function Page() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setGerarDias([1, 2, 3, 4, 5])}
+                    className="h-8 px-2 rounded-md border text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    Dias úteis
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setGerarDias([0, 1, 2, 3, 4, 5, 6])}
                     className="h-8 px-2 rounded-md border text-xs text-muted-foreground hover:bg-muted"
                   >
                     Todos
                   </button>
                 </div>
-              </div>
-               {slotsPreview.length > 0 && (
-                 <p className="text-xs text-muted-foreground">
-                   Serão criados <strong>{slotsPreview.length}</strong> horários disponíveis na agenda
-                   {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}. Exemplo do primeiro:{" "}
-                   <strong>{slotsPreview[0].inicio}–{slotsPreview[0].fim}</strong>.
-                 </p>
-               )}
-               {duracaoMinimaPreview !== null && duracaoMinimaPreview < 5 && (
-                 <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2">
-                   Atenção: a duração configurada gera horários de <strong>{duracaoMinimaPreview} min</strong>
-                   {" "}(ex.: {slotsPreview[0]?.inicio}–{slotsPreview[0]?.fim}), o que deixa as vagas sobrepostas na
-                   agenda. Esse campo é a <strong>duração de cada horário</strong>, não a quantidade de fichas —
-                   para limitar fichas use o campo "Limite de fichas". Ajuste para 5 min ou mais antes de gerar.
-                 </p>
-               )}
+              </section>
+
+              {/* Resumo do cálculo */}
+              <section className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Médicos selecionados</p>
+                    <p className="text-sm font-semibold">{resumoGeracao.medicosSelecionados}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Dias no período</p>
+                    <p className="text-sm font-semibold">{resumoGeracao.diasNoPeriodo}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimativa por médico</p>
+                    <p className="text-sm font-semibold">~{resumoGeracao.porMedico} horários</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {slotsPreview.length > 0 ? (
+                    <>
+                      Total: <strong>{slotsPreview.length}</strong> horários. Primeira ficha:{" "}
+                      <strong>{slotsPreview[0].inicio}–{slotsPreview[0].fim}</strong>.
+                    </>
+                  ) : (
+                    "Selecione um médico e o período para ver a estimativa."
+                  )}
+                </p>
+              </section>
+
+              {podeEscrever && (
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={gerarAgenda}
+                  disabled={gerando || duracaoInvalida || slotsPreview.length === 0}
+                >
+                  <CalendarRange className="h-4 w-4 mr-1" />
+                  {gerando ? "Gerando..." : "Gerar Horários na Agenda"}
+                </Button>
+              )}
               <p className="text-xs text-muted-foreground">
                 Se a data já tiver horários criados, os novos serão adicionados <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já existentes.
               </p>
