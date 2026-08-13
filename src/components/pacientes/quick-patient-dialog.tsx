@@ -6,6 +6,7 @@ import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -163,12 +164,7 @@ export function QuickPatientDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>CPF</Label>
-              <Input
-                value={cpf}
-                onChange={(e) => setCpf(e.target.value)}
-                placeholder="000.000.000-00"
-                inputMode="numeric"
-              />
+              <InputCPF value={cpf} onChange={(v) => setCpf(v)} />
             </div>
             <div>
               <Label>Data de nascimento</Label>
@@ -176,12 +172,7 @@ export function QuickPatientDialog({
             </div>
             <div>
               <Label>Telefone</Label>
-              <Input
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
-                placeholder="(00) 00000-0000"
-                inputMode="tel"
-              />
+              <InputTelefone value={telefone} onChange={(v) => setTelefone(v)} />
             </div>
             <div>
               <Label>E-mail</Label>
