@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { confirmDialog } from "@/lib/confirm";
-import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, FlipHorizontal, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -230,6 +230,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [camOpen, setCamOpen] = useState(false);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
+  const [camEspelhado, setCamEspelhado] = useState(false);
+  const [camDevices, setCamDevices] = useState<MediaDeviceInfo[]>([]);
+  const [camDeviceId, setCamDeviceId] = useState<string>("");
 
   // Voz
   const [recording, setRecording] = useState(false);
