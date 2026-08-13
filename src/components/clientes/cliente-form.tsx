@@ -281,13 +281,28 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
   }, [editing?.id]);
 
+  const iniciarStream = async (deviceId?: string) => {
+    camStreamRef.current?.getTracks().forEach(t => t.stop());
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
+        : { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+      audio: false,
+    });
+    camStreamRef.current = stream;
+    const atual = stream.getVideoTracks()[0]?.getSettings().deviceId ?? "";
+    if (atual) setCamDeviceId(atual);
+    // lista de câmeras só traz labels depois da permissão concedida
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setCamDevices(devs.filter(d => d.kind === "videoinput"));
+    } catch { /* ignora */ }
+    return stream;
+  };
+
   const abrirCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
-        audio: false,
-      });
-      camStreamRef.current = stream;
+      const stream = await iniciarStream();
       setCamOpen(true);
       setTimeout(() => {
         if (camVideoRef.current) {
@@ -297,6 +312,18 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       }, 50);
     } catch {
       toast.error("Não foi possível acessar a câmera. Verifique a permissão do navegador.");
+    }
+  };
+
+  const trocarCamera = async (deviceId: string) => {
+    try {
+      const stream = await iniciarStream(deviceId);
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = stream;
+        void camVideoRef.current.play();
+      }
+    } catch {
+      toast.error("Não foi possível abrir esta câmera.");
     }
   };
   const fecharCamera = () => {
@@ -315,7 +342,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     canvas.width = 480; canvas.height = 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    if (camEspelhado) { ctx.translate(480, 0); ctx.scale(-1, 1); }
     ctx.drawImage(v, sx, sy, side, side, 0, 0, 480, 480);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" });
