@@ -229,7 +229,7 @@ function AgendaMedicosPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto w-full max-w-[1600px] space-y-4 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-[1600px] space-y-4 overflow-x-hidden p-4 sm:p-6">
         <header>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
