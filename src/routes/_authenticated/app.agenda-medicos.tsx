@@ -336,7 +336,7 @@ function AgendaMedicosPage() {
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar médico, sala ou especialidade"
+                placeholder="Buscar médico, exame ou especialidade…"
                 className="h-9 w-full rounded-lg border-slate-200 bg-white pl-9 text-xs"
               />
             </div>

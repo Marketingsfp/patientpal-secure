@@ -117,8 +117,8 @@ export function AgendaPorMedicoDia({
       </div>
       )}
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-full gap-3">
+      <div className="w-full pb-10">
+        <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {colunas.map((m) => {
             const ags = porMedico.get(m.id) ?? [];
             const ocupados = ags.filter((a) => !a.livre);
@@ -126,7 +126,7 @@ export function AgendaPorMedicoDia({
             return (
               <section
                 key={m.id}
-                className="flex w-[264px] shrink-0 flex-col rounded-xl border border-slate-200/80 bg-white shadow-xs"
+                className="flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-white shadow-xs"
               >
                 <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-indigo-500 bg-white p-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700">
@@ -138,12 +138,14 @@ export function AgendaPorMedicoDia({
                       {m.especialidade_nome || "Profissional"}
                     </p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
-                    {ocupados.length}
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                    <span className="text-emerald-700">{livres.length} livres</span>
+                    <span className="mx-1 text-slate-300">·</span>
+                    <span className="text-indigo-700">{ocupados.length} agend.</span>
                   </span>
                 </header>
 
-                <div className="flex-1 space-y-1.5 overflow-y-auto p-2 max-h-[62vh]">
+                <div className="scrollbar-thin max-h-96 flex-1 space-y-1.5 overflow-y-auto p-2">
                   {ags.length === 0 && (
                     <p className="px-2 py-6 text-center text-[11px] text-slate-400">Sem horários</p>
                   )}
