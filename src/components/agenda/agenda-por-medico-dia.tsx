@@ -117,8 +117,8 @@ export function AgendaPorMedicoDia({
       </div>
       )}
 
-      <div className="w-full pb-10">
-        <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="w-full max-w-full overflow-x-hidden pb-10">
+        <div className="grid w-full max-w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {colunas.map((m) => {
             const ags = porMedico.get(m.id) ?? [];
             const ocupados = ags.filter((a) => !a.livre);
@@ -145,7 +145,7 @@ export function AgendaPorMedicoDia({
                   </span>
                 </header>
 
-                <div className="scrollbar-thin max-h-96 flex-1 space-y-1.5 overflow-y-auto p-2">
+                <div className="scrollbar-thin max-h-96 w-full min-w-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto p-2">
                   {ags.length === 0 && (
                     <p className="px-2 py-6 text-center text-[11px] text-slate-400">Sem horários</p>
                   )}
@@ -165,9 +165,9 @@ export function AgendaPorMedicoDia({
                         className={
                           livre
                             ? leituraLivre
-                              ? "w-full cursor-default rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
-                              : "w-full cursor-pointer rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
-                            : "w-full rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
+                              ? "flex w-full min-w-0 flex-col rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
+                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
+                            : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
                         }
                       >
                         {livre ? (
@@ -181,34 +181,34 @@ export function AgendaPorMedicoDia({
                           </>
                         ) : (
                           <>
-                            <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3 w-3 text-slate-400" />
+                            <div className="flex min-w-0 items-center justify-between gap-1 text-xs font-bold text-slate-800">
+                              <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                                <Clock className="h-3 w-3 shrink-0 text-slate-400" />
                                 {fmtHora(a.inicio)}
                                 <span className="text-slate-300">–</span>
                                 {fmtHora(a.fim)}
                               </span>
                               <span
-                                className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-bold ${
                                   STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {STATUS_LABEL[a.status] ?? a.status}
                               </span>
                             </div>
-                            <p className="mt-1 truncate text-xs font-bold uppercase tracking-tight text-slate-900">
+                            <p className="mt-1 block max-w-full truncate text-xs font-bold uppercase tracking-tight text-slate-900">
                               {ocultarPaciente ? (
                                 "—"
                               ) : (
-                                <span className="inline-flex items-center gap-1">
-                                  <UserRound className="h-3 w-3 text-slate-400" />
-                                  {a.paciente_nome}
+                                <span className="flex min-w-0 items-center gap-1">
+                                  <UserRound className="h-3 w-3 shrink-0 text-slate-400" />
+                                  <span className="truncate">{a.paciente_nome}</span>
                                 </span>
                               )}
                             </p>
-                            <p className="mt-0.5 inline-flex items-center gap-1 truncate text-[11px] font-medium text-slate-500">
-                              <Stethoscope className="h-3 w-3 text-slate-400" />
-                              {a.procedimento || "Consulta"}
+                            <p className="mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-[11px] font-medium text-slate-500">
+                              <Stethoscope className="h-3 w-3 shrink-0 text-slate-400" />
+                              <span className="truncate">{a.procedimento || "Consulta"}</span>
                             </p>
                           </>
                         )}
