@@ -2132,9 +2132,9 @@ function AgendaPage() {
     setPacEditSaving(true);
     try {
       const patch = {
-        cpf: pacEdit.cpf.trim() || null,
+        cpf: somenteDigitos(pacEdit.cpf) || null,
         data_nascimento: pacEdit.data_nascimento.trim() || null,
-        telefone: pacEdit.telefone.trim() || null,
+        telefone: somenteDigitos(pacEdit.telefone) || null,
         email: pacEdit.email.trim() || null,
         cep: pacEdit.cep.replace(/\D/g, "").slice(0, 8) || null,
         logradouro: pacEdit.logradouro.trim() || null,
