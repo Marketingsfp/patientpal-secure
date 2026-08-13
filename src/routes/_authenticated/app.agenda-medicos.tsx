@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,15 +30,16 @@ export const Route = createFileRoute("/_authenticated/app/agenda-medicos")({
   component: AgendaMedicosPage,
   head: () => ({
     meta: [
-      { title: "Agenda Multimédico — visão por profissional" },
+      { title: "Escala e Horários — disponibilidade por profissional" },
       {
         name: "description",
-        content: "Veja lado a lado a agenda do dia de cada profissional da clínica, com status e ações rápidas.",
+        content:
+          "Visualização rápida de disponibilidade para consultas, médicos e exames, em colunas por profissional.",
       },
-      { property: "og:title", content: "Agenda Multimédico — visão por profissional" },
+      { property: "og:title", content: "Escala e Horários — disponibilidade por profissional" },
       {
         property: "og:description",
-        content: "Colunas paralelas por médico com horários, status e ações rápidas do dia.",
+        content: "Grade somente leitura com horários livres e ocupados por profissional e sala de exame.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
