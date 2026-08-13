@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState } from "react";
+import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 
 /** Mapa: rótulo do grupo do menu → chaves dos itens na ordem escolhida. */
 export type MenuOrdem = Record<string, string[]>;
@@ -13,22 +13,14 @@ export type MenuOrdem = Record<string, string[]>;
  */
 export function useMenuOrdem(enabled: boolean) {
   const [ordem, setOrdem] = useState<MenuOrdem>({});
-  const uidRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user || !alive) return;
-      uidRef.current = u.user.id;
-      const { data } = await supabase
-        .from("profiles")
-        .select("preferencias_ui")
-        .eq("id", u.user.id)
-        .maybeSingle();
-      const prefs = (data?.preferencias_ui ?? {}) as { menu_ordem?: MenuOrdem };
-      if (alive && prefs.menu_ordem) setOrdem(prefs.menu_ordem);
+    void (async () => {
+      const { prefs } = await getPreferenciasUi();
+      const menuOrdem = (prefs as { menu_ordem?: MenuOrdem }).menu_ordem;
+      if (alive && menuOrdem) setOrdem(menuOrdem);
     })();
     return () => {
       alive = false;
@@ -37,19 +29,9 @@ export function useMenuOrdem(enabled: boolean) {
 
   const salvar = useCallback(async (nova: MenuOrdem) => {
     setOrdem(nova);
-    if (!uidRef.current) return;
     // Merge com o preferencias_ui existente para não apagar outras chaves
     // (flags, clientes.compact, etc.).
-    const { data } = await supabase
-      .from("profiles")
-      .select("preferencias_ui")
-      .eq("id", uidRef.current)
-      .maybeSingle();
-    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    await supabase
-      .from("profiles")
-      .update({ preferencias_ui: { ...prev, menu_ordem: nova } })
-      .eq("id", uidRef.current);
+    await updatePreferenciasUi((prev) => ({ ...prev, menu_ordem: nova }));
   }, []);
 
   return { ordem, salvar };
