@@ -120,18 +120,12 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
   // o usuário desliga explicitamente a flag (ub_v1 === false).
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
-  const uidRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) { if (alive) setLoading(false); return; }
-      uidRef.current = u.user.id;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-      const prefs = (data?.preferencias_ui ?? {}) as { flags?: { ub_v1?: boolean } };
-      if (alive) { setEnabled(prefs.flags?.ub_v1 !== false); setLoading(false); }
+    void (async () => {
+      const v = await getFlagUsuario("ub_v1");
+      if (alive) { setEnabled(v !== false); setLoading(false); }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ ub_v1: boolean }>;
@@ -142,13 +136,7 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
   }, []);
 
   const set = async (v: boolean) => {
-    if (!uidRef.current) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", uidRef.current).maybeSingle();
-    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    const flags = { ...((prev.flags as object) ?? {}), ub_v1: v };
-    const next = { ...prev, flags };
-    await supabase.from("profiles").update({ preferencias_ui: next }).eq("id", uidRef.current);
+    await setFlagUsuario("ub_v1", v);
     setEnabled(v);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("ub:flag-changed", { detail: { ub_v1: v } }));
