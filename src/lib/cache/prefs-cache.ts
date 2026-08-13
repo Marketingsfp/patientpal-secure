@@ -45,7 +45,7 @@ export async function setFlagUsuario(nome: string, valor: boolean): Promise<void
   if (!uid) return;
   const flags = { ...((prefs.flags as object) ?? {}), [nome]: valor };
   const next = { ...prefs, flags };
-  await supabase.from("profiles").update({ preferencias_ui: next }).eq("id", uid);
+  await supabase.from("profiles").update({ preferencias_ui: next as never }).eq("id", uid);
   invalidatePreferenciasUi();
 }
 
