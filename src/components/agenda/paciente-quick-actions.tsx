@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, Camera, Check, IdCard, Loader2, MapPin, Phone, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputCPF, InputTelefone, limparTelefone } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,10 +86,11 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
   async function salvarDadosBasicos() {
     setSavingPhone(true);
     const cpfDigits = (data.cpf ?? "").replace(/\D/g, "");
+    const telDigits = limparTelefone(data.telefone ?? "");
     const { error } = await supabase
       .from("pacientes")
       .update({
-        telefone: data.telefone?.trim() || null,
+        telefone: telDigits || null,
         cpf: cpfDigits || null,
         data_nascimento: data.data_nascimento || null,
       })
@@ -143,20 +145,18 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       <div className="grid grid-cols-12 gap-2 items-center">
         <div className="col-span-12 sm:col-span-4 flex items-center gap-1 min-w-0">
           <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
+          <InputTelefone
             value={data.telefone ?? ""}
-            placeholder="Telefone *"
-            onChange={(e) => { setData(d => ({ ...d, telefone: e.target.value })); setEdited(true); }}
+            placeholder="(00) 00000-0000"
+            onChange={(v) => { setData(d => ({ ...d, telefone: v })); setEdited(true); }}
             className="h-8 w-full min-w-0"
           />
         </div>
         <div className="col-span-7 sm:col-span-3 flex items-center gap-1 min-w-0">
           <IdCard className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
+          <InputCPF
             value={data.cpf ?? ""}
-            placeholder="CPF"
-            inputMode="numeric"
-            onChange={(e) => { setData(d => ({ ...d, cpf: e.target.value })); setEdited(true); }}
+            onChange={(v) => { setData(d => ({ ...d, cpf: v })); setEdited(true); }}
             className="h-8 w-full min-w-0"
           />
         </div>
