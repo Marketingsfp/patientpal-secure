@@ -2503,7 +2503,7 @@ function AgendaPage() {
         clinica_id: clinicaAtual.clinica_id,
         nome: novoPac.nome.trim(),
         cpf: novoPac.cpf.trim() ? somenteDigitos(novoPac.cpf) : null,
-        telefone: novoPac.telefone.trim() || null,
+        telefone: somenteDigitos(novoPac.telefone) || null,
         data_nascimento: novoPac.data_nascimento || null,
         email: novoPac.email.trim() || null,
       })
