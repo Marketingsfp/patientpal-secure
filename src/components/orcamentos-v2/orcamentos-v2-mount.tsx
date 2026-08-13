@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 import { OrcamentosShellV2 } from "./orcamentos-shell";
 
 /**
@@ -15,25 +15,19 @@ export function OrcamentosV2Mount() {
   const [compact, setCompact] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-      const p = (data?.preferencias_ui ?? {}) as { orcamentos?: { compact?: boolean } };
+    void (async () => {
+      const { prefs } = await getPreferenciasUi();
+      const p = prefs as { orcamentos?: { compact?: boolean } };
       if (typeof p.orcamentos?.compact === "boolean") setCompact(p.orcamentos.compact);
     })();
   }, []);
 
   const persistCompact = async (v: boolean) => {
     setCompact(v);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    const orcamentos = { ...((prev.orcamentos as object) ?? {}), compact: v };
-    await supabase.from("profiles").update({ preferencias_ui: { ...prev, orcamentos } }).eq("id", u.user.id);
+    await updatePreferenciasUi((prev) => ({
+      ...prev,
+      orcamentos: { ...((prev.orcamentos as object) ?? {}), compact: v },
+    }));
   };
 
   return (

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "./use-clinica";
+import {
+  getClinicFlags,
+  invalidateClinicFlags,
+  peekClinicFlags,
+} from "@/lib/cache/clinic-flags-cache";
 
 /**
  * Espelho das feature flags da POLICLINICA SAO FRANCISCO DE PAULA para a
@@ -52,8 +57,9 @@ function ehClinicaHerdeira(nome: string | null | undefined): boolean {
 export function useClinicFeatureFlag(flagKey: string) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
-  const [enabled, setEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const cachePrevio = clinicaId ? peekClinicFlags(clinicaId) : null;
+  const [enabled, setEnabled] = useState(Boolean(cachePrevio?.[flagKey]));
+  const [loading, setLoading] = useState(cachePrevio == null);
 
   useEffect(() => {
     let alive = true;
@@ -62,16 +68,19 @@ export function useClinicFeatureFlag(flagKey: string) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    (async () => {
-      const { data } = await supabase
-        .from("clinica_feature_flags")
-        .select("ativo")
-        .eq("clinica_id", clinicaId)
-        .eq("flag_key", flagKey)
-        .maybeSingle();
+    // Uma única leitura por clínica alimenta TODAS as flags (antes era um
+    // SELECT por flag, o que gerava ~11 requisições na abertura da Agenda).
+    const jaEmCache = peekClinicFlags(clinicaId);
+    if (jaEmCache) {
+      setEnabled(Boolean(jaEmCache[flagKey]));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    void (async () => {
+      const flags = await getClinicFlags(clinicaId);
       if (!alive) return;
-      setEnabled(Boolean(data?.ativo));
+      setEnabled(Boolean(flags[flagKey]));
       setLoading(false);
     })();
     return () => {
@@ -117,4 +126,5 @@ export async function setClinicFeatureFlag(
       { onConflict: "clinica_id,flag_key" },
     );
   if (error) throw error;
+  invalidateClinicFlags(clinicaId);
 }

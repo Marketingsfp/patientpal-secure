@@ -1,3 +1,4 @@
+import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -63,25 +64,19 @@ function ClientesV2Wrapper() {
   const [compact, setCompact] = useState(false);
   useEffect(() => {
     let alive = true;
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-      const p = (data?.preferencias_ui ?? {}) as { clientes?: { compact?: boolean } };
+    void (async () => {
+      const { prefs } = await getPreferenciasUi();
+      const p = prefs as { clientes?: { compact?: boolean } };
       if (alive && typeof p.clientes?.compact === "boolean") setCompact(p.clientes.compact);
     })();
     return () => { alive = false; };
   }, []);
   const persistCompact = async (v: boolean) => {
     setCompact(v);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    const clientes = { ...((prev.clientes as object) ?? {}), compact: v };
-    await supabase.from("profiles").update({ preferencias_ui: { ...prev, clientes } }).eq("id", u.user.id);
+    await updatePreferenciasUi((prev) => ({
+      ...prev,
+      clientes: { ...((prev.clientes as object) ?? {}), compact: v },
+    }));
   };
   return (
     <div className="h-[calc(100vh-64px)] -mx-3 -mt-1 -mb-3 sm:-mx-4 sm:-mt-1.5 sm:-mb-4 lg:-mx-6 lg:-mt-2 lg:-mb-6">

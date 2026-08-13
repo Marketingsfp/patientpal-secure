@@ -104,6 +104,7 @@ import {
   getMedicoProcedimentosAgenda,
   getMedicoConveniosAgenda,
   getProcedimentosComValor,
+  getMedicosAgenda,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
@@ -2944,12 +2945,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
-      supabase
-        .from("medicos")
-        .select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
+      getMedicosAgenda(clinicaAtual.clinica_id),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
       supabase
         .from("medico_especialidades")
@@ -2998,7 +2994,7 @@ function AgendaPage() {
     const procedimentosPorId = new Map(todos.map((p) => [p.id, { id: p.id, nome: p.nome, grupo: p.grupo ?? null }]));
     const especialidadesPorId = new Map<string, string>(((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]));
     type RawMedicoAgenda = Medico;
-    const medicosBase = ((m.data ?? []) as unknown as RawMedicoAgenda[]).map((x) => ({
+    const medicosBase = ((m ?? []) as unknown as RawMedicoAgenda[]).map((x) => ({
       ...x,
       procedimento_padrao_nome: x.procedimento_padrao_id
         ? (procedimentosPorId.get(x.procedimento_padrao_id)?.nome ?? null)
@@ -3083,7 +3079,7 @@ function AgendaPage() {
     }
     setProcPorMedico(pm);
     setProcOpcoesPorMedico(procOpcoesMap);
-    const medicosIds = new Set(((m.data ?? []) as unknown as Medico[]).map((x) => x.id));
+    const medicosIds = new Set(((m ?? []) as unknown as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
     for (const r of (mcRows ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
