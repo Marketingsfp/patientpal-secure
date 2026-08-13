@@ -85,6 +85,37 @@ const somaDias = (data: string, dias: number) => {
   return dt.toISOString().slice(0, 10);
 };
 
+const EXAME_KEYS = [
+  "eletrocardiograma",
+  "eletroencefalograma",
+  "ecocardiograma",
+  "ultrassom",
+  "ultrassonografia",
+  "raio",
+  "raio-x",
+  "rx",
+  "tomografia",
+  "ressonancia",
+  "laboratorio",
+  "exame",
+  "eeg",
+  "ecg",
+  "endoscopia",
+  "colonoscopia",
+  "densitometria",
+  "mamografia",
+  "holter",
+  "mapa",
+  "espirometria",
+  "teste ergometrico",
+];
+
+/** Heurística: especialidades de exame representam "salas", não consultas. */
+const isSalaExame = (especialidade: string | null | undefined, nome?: string) => {
+  const alvo = `${normalizar(especialidade ?? "")} ${normalizar(nome ?? "")}`;
+  return EXAME_KEYS.some((k) => alvo.includes(k));
+};
+
 function AgendaMedicosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("agenda");
@@ -92,6 +123,9 @@ function AgendaMedicosPage() {
 
   const [dataRef, setDataRef] = useState(() => hojeBR());
   const [busca, setBusca] = useState("");
+  const [medicoFiltro, setMedicoFiltro] = useState<string>("todos");
+  const [espFiltro, setEspFiltro] = useState<string>("todas");
+  const [tipoFiltro, setTipoFiltro] = useState<"todos" | "consultas" | "exames">("todos");
   const [loading, setLoading] = useState(false);
   const [medicos, setMedicos] = useState<Array<{ id: string; nome: string; especialidade_nome: string | null }>>([]);
   const [ags, setAgs] = useState<AgRow[]>([]);
@@ -140,11 +174,22 @@ function AgendaMedicosPage() {
 
   const medicosFiltrados = useMemo(() => {
     const q = normalizar(busca);
-    if (!q) return medicos;
-    return medicos.filter(
-      (m) => normalizar(m.nome).includes(q) || normalizar(m.especialidade_nome ?? "").includes(q),
-    );
-  }, [medicos, busca]);
+    return medicos.filter((m) => {
+      if (medicoFiltro !== "todos" && m.id !== medicoFiltro) return false;
+      if (espFiltro !== "todas" && (m.especialidade_nome ?? "—") !== espFiltro) return false;
+      const sala = isSalaExame(m.especialidade_nome, m.nome);
+      if (tipoFiltro === "consultas" && sala) return false;
+      if (tipoFiltro === "exames" && !sala) return false;
+      if (!q) return true;
+      return normalizar(m.nome).includes(q) || normalizar(m.especialidade_nome ?? "").includes(q);
+    });
+  }, [medicos, busca, medicoFiltro, espFiltro, tipoFiltro]);
+
+  const especialidadesOpcoes = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of medicos) if (m.especialidade_nome) set.add(m.especialidade_nome);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [medicos]);
 
   const items: AgendaMedicoItem[] = useMemo(() => {
     const ids = new Set(medicosFiltrados.map((m) => m.id));
