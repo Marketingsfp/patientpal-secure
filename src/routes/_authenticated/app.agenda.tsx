@@ -104,6 +104,7 @@ import {
   getMedicoProcedimentosAgenda,
   getMedicoConveniosAgenda,
   getProcedimentosComValor,
+  getMedicosAgenda,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
@@ -2944,12 +2945,7 @@ function AgendaPage() {
   const loadRef = async () => {
     if (!clinicaAtual) return;
     const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
-      supabase
-        .from("medicos")
-        .select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
+      getMedicosAgenda(clinicaAtual.clinica_id),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
       supabase
         .from("medico_especialidades")
