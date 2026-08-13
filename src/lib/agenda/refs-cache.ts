@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { makeCache } from "@/lib/cache/single-flight";
 
 /**
  * Cache in-memory (por clínica) das listas de referência usadas na Agenda.
@@ -48,116 +49,125 @@ export type ProcComValor = {
 const TTL_REFS_MS = 60_000; // 60s — listas leves
 const TTL_VALORES_MS = 300_000; // 5min — valores mudam pouco
 
-type Entry<T> = { ts: number; data: T };
+export type MedicoRef = {
+  id: string;
+  nome: string;
+  sexo?: string | null;
+  usa_sistema?: boolean | null;
+  especialidade_id?: string | null;
+  procedimento_padrao_id?: string | null;
+  procedimento_padrao_em_branco?: boolean | null;
+};
 
-const cProcedimentos = new Map<string, Entry<ProcedimentoRef[]>>();
-const cMedicoProcs = new Map<string, Entry<MedicoProcedimentoRef[]>>();
-const cMedicoConvenios = new Map<string, Entry<MedicoConvenioRef[]>>();
-const cProcedimentosComValor = new Map<string, Entry<ProcComValor[]>>();
+// `makeCache` acrescenta "single flight": chamadas simultâneas para a mesma
+// clínica compartilham a MESMA requisição em vez de cada uma bater no banco.
+const cProcedimentos = makeCache<ProcedimentoRef[]>(TTL_REFS_MS);
+const cMedicoProcs = makeCache<MedicoProcedimentoRef[]>(TTL_REFS_MS);
+const cMedicoConvenios = makeCache<MedicoConvenioRef[]>(TTL_REFS_MS);
+const cProcedimentosComValor = makeCache<ProcComValor[]>(TTL_VALORES_MS);
+const cMedicos = makeCache<MedicoRef[]>(TTL_REFS_MS);
 
-function fresh<T>(entry: Entry<T> | undefined, ttl: number): T | null {
-  if (!entry) return null;
-  return Date.now() - entry.ts < ttl ? entry.data : null;
+export function getProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
+  return cProcedimentos.get(clinicaId, async () => {
+    const pageSize = 1000;
+    const rows: ProcedimentoRef[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select("id,nome,tipo,grupo,tipo_procedimento")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("nome")
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as ProcedimentoRef[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  });
 }
 
-export async function getProcedimentosAgenda(
-  clinicaId: string,
-): Promise<ProcedimentoRef[]> {
-  const cached = fresh(cProcedimentos.get(clinicaId), TTL_REFS_MS);
-  if (cached) return cached;
-  const pageSize = 1000;
-  const rows: ProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
+export function getMedicosAgenda(clinicaId: string): Promise<MedicoRef[]> {
+  return cMedicos.get(clinicaId, async () => {
     const { data, error } = await supabase
-      .from("procedimentos")
-      .select("id,nome,tipo,grupo,tipo_procedimento")
+      .from("medicos")
+      .select(
+        "id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco",
+      )
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
-      .order("nome")
-      .range(from, from + pageSize - 1);
+      .order("nome");
     if (error) throw error;
-    const page = (data ?? []) as ProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  cProcedimentos.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
+    return (data ?? []) as MedicoRef[];
+  });
 }
 
-export async function getMedicoProcedimentosAgenda(
+export function getMedicoProcedimentosAgenda(
   clinicaId: string,
 ): Promise<MedicoProcedimentoRef[]> {
-  const cached = fresh(cMedicoProcs.get(clinicaId), TTL_REFS_MS);
-  if (cached) return cached;
-  // PostgREST cap the response at 1000 rows per request by default. Using a
-  // pageSize acima disso faz o loop de paginação parar cedo (o servidor
-  // devolve 1000, o código compara com 5000, pensa que terminou e nunca lê
-  // as próximas páginas — causando vínculos de médico "sumirem" na agenda).
-  const pageSize = 1000;
-  const rows: MedicoProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_procedimentos")
-      .select(
-        "medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)",
-      )
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  cMedicoProcs.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
+  return cMedicoProcs.get(clinicaId, async () => {
+    // PostgREST limita a resposta a 1000 linhas por requisição; usar pageSize
+    // maior faria o loop parar cedo e "sumir" vínculos de médico na agenda.
+    const pageSize = 1000;
+    const rows: MedicoProcedimentoRef[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("medico_procedimentos")
+        .select(
+          "medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)",
+        )
+        .eq("medicos.clinica_id", clinicaId)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  });
 }
 
-export async function getMedicoConveniosAgenda(
-  clinicaId: string,
-): Promise<MedicoConvenioRef[]> {
-  const cached = fresh(cMedicoConvenios.get(clinicaId), TTL_REFS_MS);
-  if (cached) return cached;
-  const pageSize = 1000;
-  const rows: MedicoConvenioRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_convenios")
-      .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
-      .eq("ativo", true)
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoConvenioRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  cMedicoConvenios.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
+export function getMedicoConveniosAgenda(clinicaId: string): Promise<MedicoConvenioRef[]> {
+  return cMedicoConvenios.get(clinicaId, async () => {
+    const pageSize = 1000;
+    const rows: MedicoConvenioRef[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("medico_convenios")
+        .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
+        .eq("ativo", true)
+        .eq("medicos.clinica_id", clinicaId)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as unknown as MedicoConvenioRef[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  });
 }
 
-export async function getProcedimentosComValor(
-  clinicaId: string,
-): Promise<ProcComValor[]> {
-  const cached = fresh(cProcedimentosComValor.get(clinicaId), TTL_VALORES_MS);
-  if (cached) return cached;
-  const pageSize = 1000;
-  const rows: ProcComValor[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select(
-        "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
-      )
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .range(from, from + pageSize - 1);
-    if (error) break;
-    const page = (data ?? []) as ProcComValor[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  cProcedimentosComValor.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
+export function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
+  return cProcedimentosComValor.get(clinicaId, async () => {
+    const pageSize = 1000;
+    const rows: ProcComValor[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("procedimentos")
+        .select(
+          "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
+        )
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .range(from, from + pageSize - 1);
+      if (error) break;
+      const page = (data ?? []) as ProcComValor[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  });
 }
 
 /**
@@ -165,15 +175,9 @@ export async function getProcedimentosComValor(
  * sem argumento, limpa todas.
  */
 export function invalidateAgendaRefs(clinicaId?: string): void {
-  if (clinicaId) {
-    cProcedimentos.delete(clinicaId);
-    cMedicoProcs.delete(clinicaId);
-    cMedicoConvenios.delete(clinicaId);
-    cProcedimentosComValor.delete(clinicaId);
-    return;
-  }
-  cProcedimentos.clear();
-  cMedicoProcs.clear();
-  cMedicoConvenios.clear();
-  cProcedimentosComValor.clear();
+  cProcedimentos.invalidate(clinicaId);
+  cMedicoProcs.invalidate(clinicaId);
+  cMedicoConvenios.invalidate(clinicaId);
+  cProcedimentosComValor.invalidate(clinicaId);
+  cMedicos.invalidate(clinicaId);
 }
