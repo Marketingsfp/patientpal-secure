@@ -162,6 +162,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   // Biometria
   const [hasBiometria, setHasBiometria] = useState(false);
+  const [bioEm, setBioEm] = useState<string | null>(null);
   const [bioLoading, setBioLoading] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
@@ -408,16 +409,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   // Carrega biometria do paciente (edição)
   useEffect(() => {
-    if (!editing) { setHasBiometria(false); return; }
+    if (!editing) { setHasBiometria(false); setBioEm(null); return; }
     (async () => {
       const { data } = await supabase
         .from("paciente_biometria")
-        .select("id")
+        .select("id, consentimento_em, created_at")
         .eq("paciente_id", editing.id)
         .eq("clinica_id", clinicaId)
         .is("revogado_em", null)
+        .order("created_at", { ascending: false })
         .limit(1);
-      setHasBiometria((data ?? []).length > 0);
+      const row = (data ?? [])[0] as any;
+      setHasBiometria(!!row);
+      setBioEm(row ? (row.consentimento_em ?? row.created_at ?? null) : null);
     })();
   }, [editing?.id, clinicaId]);
 
@@ -703,13 +707,29 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setHistFiltroAtivo(false);
   }
 
-  async function salvarBiometria(descriptor: number[]) {
+  async function salvarBiometria(descriptor: number[], foto?: Blob) {
     if (!editing) return;
     setBioLoading(true);
     const error = await registrarBiometriaPaciente(editing.id, clinicaId, descriptor);
+    if (error) { setBioLoading(false); mostrarErro(error); return; }
+    if (foto) {
+      const path = `${clinicaId}/${editing.id}/biometria-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("pacientes-fotos")
+        .upload(path, foto, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) {
+        mostrarErro(upErr, "biometria salva, mas a foto não foi armazenada");
+      } else {
+        await supabase.from("pacientes")
+          .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
+          .eq("id", editing.id);
+        const { data: signed } = await supabase.storage.from("pacientes-fotos").createSignedUrl(path, 3600);
+        if (signed?.signedUrl) setFotoPreview(signed.signedUrl);
+      }
+    }
     setBioLoading(false);
-    if (error) { mostrarErro(error); return; }
     setHasBiometria(true);
+    setBioEm(new Date().toISOString());
     toast.success("Biometria facial cadastrada");
   }
 
@@ -725,6 +745,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setBioLoading(false);
     if (error) { mostrarErro(error); return; }
     setHasBiometria(false);
+    setBioEm(null);
     toast.success("Biometria removida");
   }
 
@@ -1107,22 +1128,51 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </p>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <ScanFace className={`h-6 w-6 ${hasBiometria ? "text-emerald-600" : "text-muted-foreground"}`} />
-                  <div>
-                    <p className="font-medium">
-                      {hasBiometria ? "Biometria cadastrada" : "Biometria não cadastrada"}
-                    </p>
+                  <div className="space-y-1">
+                    {hasBiometria ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Biometria facial cadastrada
+                      </span>
+                    ) : (
+                      <p className="font-medium">Biometria não cadastrada</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Usada para identificação na recepção e no totem de auto-atendimento.
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                {hasBiometria && (
+                  <div className="flex items-center gap-3">
+                    <div className="h-24 w-24 overflow-hidden rounded-lg border border-border bg-muted">
+                      {fotoPreview ? (
+                        <img src={fotoPreview} alt="Foto biométrica do paciente" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ScanFace className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {bioEm
+                        ? `Cadastrada em ${new Date(bioEm).toLocaleString("pt-BR")}`
+                        : "Cadastro biométrico ativo"}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
                   {hasBiometria ? (
-                    <Button type="button" variant="outline" onClick={revogarBiometria} disabled={bioLoading}>
-                      Remover biometria
-                    </Button>
+                    <>
+                      <Button type="button" onClick={() => setConsentOpen(true)} disabled={bioLoading}>
+                        <ScanFace className="h-4 w-4 mr-2" /> Recadastrar biometria
+                      </Button>
+                      <Button type="button" variant="outline" onClick={revogarBiometria} disabled={bioLoading}>
+                        Remover biometria
+                      </Button>
+                    </>
                   ) : (
                     <Button type="button" onClick={() => setConsentOpen(true)} disabled={bioLoading}>
                       <ScanFace className="h-4 w-4 mr-2" /> Cadastrar biometria
@@ -1620,7 +1670,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       <FaceCaptureDialog
         open={faceOpen}
         onClose={() => setFaceOpen(false)}
-        onCaptured={async (d) => { await salvarBiometria(d); setFaceOpen(false); }}
+        onCaptured={async (d, foto) => { await salvarBiometria(d, foto); setFaceOpen(false); }}
         titulo={`Biometria — ${editing?.nome ?? ""}`}
       />
     </>
