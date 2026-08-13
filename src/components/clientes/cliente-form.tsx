@@ -1549,8 +1549,40 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <DialogTitle>Tirar foto</DialogTitle>
             <DialogDescription>Enquadre o rosto do paciente e clique em Capturar.</DialogDescription>
           </DialogHeader>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              type="button"
+              size="sm"
+              variant={camEspelhado ? "default" : "outline"}
+              onClick={() => setCamEspelhado(v => !v)}
+              title="Espelhar / inverter imagem"
+            >
+              <FlipHorizontal className="h-4 w-4 mr-1" />
+              {camEspelhado ? "Espelhado" : "Espelhar"}
+            </Button>
+            {camDevices.length > 1 && (
+              <Select value={camDeviceId} onValueChange={(v) => void trocarCamera(v)}>
+                <SelectTrigger className="h-9 w-[220px]">
+                  <SelectValue placeholder="Trocar câmera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {camDevices.map((d, i) => (
+                    <SelectItem key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Câmera ${i + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="rounded-md overflow-hidden bg-black aspect-square">
-            <video ref={camVideoRef} className="w-full h-full object-cover" playsInline muted />
+            <video
+              ref={camVideoRef}
+              className="w-full h-full object-cover"
+              style={{ transform: camEspelhado ? "scaleX(-1)" : "scaleX(1)" }}
+              playsInline
+              muted
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={fecharCamera}>Cancelar</Button>
