@@ -5,6 +5,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputTelefone, limparTelefone } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -75,7 +76,7 @@ export function EditarPacienteRapidoDialog({
     try {
       const patch: { email?: string | null; telefone?: string | null } = {};
       const novoEmail = email.trim() || null;
-      const novoTel = telefone.trim() || null;
+      const novoTel = limparTelefone(telefone) || null;
       if (novoEmail !== paciente!.email) patch.email = novoEmail;
       if (novoTel !== paciente!.telefone) patch.telefone = novoTel;
       if (Object.keys(patch).length === 0) {
@@ -130,12 +131,11 @@ export function EditarPacienteRapidoDialog({
           </div>
           <div>
             <Label htmlFor="ep-tel">Telefone / WhatsApp</Label>
-            <Input
+            <InputTelefone
               id="ep-tel"
               ref={telRef}
-              placeholder="(00) 00000-0000"
               value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
+              onChange={(v) => setTelefone(v)}
             />
           </div>
         </div>
