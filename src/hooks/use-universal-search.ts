@@ -1,3 +1,4 @@
+import { getFlagUsuario, setFlagUsuario } from "@/lib/cache/prefs-cache";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { CommandEntry } from "@/components/list-shell";

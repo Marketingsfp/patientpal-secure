@@ -1,3 +1,4 @@
+import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
