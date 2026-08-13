@@ -163,17 +163,17 @@ export function AgendaPorMedicoDia({
                         className={
                           livre
                             ? leituraLivre
-                              ? "w-full cursor-default rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center"
+                              ? "w-full cursor-default rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
                               : "w-full cursor-pointer rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
                             : "w-full rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
                         }
                       >
                         {livre ? (
                           <>
-                            <p className={somenteLeitura ? "text-[11px] font-semibold text-slate-900" : "text-[11px] font-medium text-slate-400"}>
+                            <p className={somenteLeitura ? "text-[11px] font-semibold text-emerald-900" : "text-[11px] font-medium text-slate-400"}>
                               {fmtHora(a.inicio)} – {fmtHora(a.fim)}
                             </p>
-                            <p className={somenteLeitura ? "text-[10px] font-semibold text-slate-900" : "text-[10px] font-semibold text-slate-400"}>
+                            <p className={somenteLeitura ? "text-[10px] font-semibold text-emerald-700" : "text-[10px] font-semibold text-slate-400"}>
                               {somenteLeitura ? "Livre" : "+ Agendar"}
                             </p>
                           </>

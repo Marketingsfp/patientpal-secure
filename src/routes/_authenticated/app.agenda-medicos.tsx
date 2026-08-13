@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,15 +30,16 @@ export const Route = createFileRoute("/_authenticated/app/agenda-medicos")({
   component: AgendaMedicosPage,
   head: () => ({
     meta: [
-      { title: "Agenda Multimédico — visão por profissional" },
+      { title: "Escala e Horários — disponibilidade por profissional" },
       {
         name: "description",
-        content: "Veja lado a lado a agenda do dia de cada profissional da clínica, com status e ações rápidas.",
+        content:
+          "Visualização rápida de disponibilidade para consultas, médicos e exames, em colunas por profissional.",
       },
-      { property: "og:title", content: "Agenda Multimédico — visão por profissional" },
+      { property: "og:title", content: "Escala e Horários — disponibilidade por profissional" },
       {
         property: "og:description",
-        content: "Colunas paralelas por médico com horários, status e ações rápidas do dia.",
+        content: "Grade somente leitura com horários livres e ocupados por profissional e sala de exame.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -77,6 +85,37 @@ const somaDias = (data: string, dias: number) => {
   return dt.toISOString().slice(0, 10);
 };
 
+const EXAME_KEYS = [
+  "eletrocardiograma",
+  "eletroencefalograma",
+  "ecocardiograma",
+  "ultrassom",
+  "ultrassonografia",
+  "raio",
+  "raio-x",
+  "rx",
+  "tomografia",
+  "ressonancia",
+  "laboratorio",
+  "exame",
+  "eeg",
+  "ecg",
+  "endoscopia",
+  "colonoscopia",
+  "densitometria",
+  "mamografia",
+  "holter",
+  "mapa",
+  "espirometria",
+  "teste ergometrico",
+];
+
+/** Heurística: especialidades de exame representam "salas", não consultas. */
+const isSalaExame = (especialidade: string | null | undefined, nome?: string) => {
+  const alvo = `${normalizar(especialidade ?? "")} ${normalizar(nome ?? "")}`;
+  return EXAME_KEYS.some((k) => alvo.includes(k));
+};
+
 function AgendaMedicosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("agenda");
@@ -84,6 +123,9 @@ function AgendaMedicosPage() {
 
   const [dataRef, setDataRef] = useState(() => hojeBR());
   const [busca, setBusca] = useState("");
+  const [medicoFiltro, setMedicoFiltro] = useState<string>("todos");
+  const [espFiltro, setEspFiltro] = useState<string>("todas");
+  const [tipoFiltro, setTipoFiltro] = useState<"todos" | "consultas" | "exames">("todos");
   const [loading, setLoading] = useState(false);
   const [medicos, setMedicos] = useState<Array<{ id: string; nome: string; especialidade_nome: string | null }>>([]);
   const [ags, setAgs] = useState<AgRow[]>([]);
@@ -132,11 +174,22 @@ function AgendaMedicosPage() {
 
   const medicosFiltrados = useMemo(() => {
     const q = normalizar(busca);
-    if (!q) return medicos;
-    return medicos.filter(
-      (m) => normalizar(m.nome).includes(q) || normalizar(m.especialidade_nome ?? "").includes(q),
-    );
-  }, [medicos, busca]);
+    return medicos.filter((m) => {
+      if (medicoFiltro !== "todos" && m.id !== medicoFiltro) return false;
+      if (espFiltro !== "todas" && (m.especialidade_nome ?? "—") !== espFiltro) return false;
+      const sala = isSalaExame(m.especialidade_nome, m.nome);
+      if (tipoFiltro === "consultas" && sala) return false;
+      if (tipoFiltro === "exames" && !sala) return false;
+      if (!q) return true;
+      return normalizar(m.nome).includes(q) || normalizar(m.especialidade_nome ?? "").includes(q);
+    });
+  }, [medicos, busca, medicoFiltro, espFiltro, tipoFiltro]);
+
+  const especialidadesOpcoes = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of medicos) if (m.especialidade_nome) set.add(m.especialidade_nome);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [medicos]);
 
   const items: AgendaMedicoItem[] = useMemo(() => {
     const ids = new Set(medicosFiltrados.map((m) => m.id));
@@ -182,12 +235,28 @@ function AgendaMedicosPage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
               <Columns3 className="h-5 w-5" />
             </span>
-            <h1 className="text-xl font-bold text-slate-900">Agenda Multimédico</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-slate-900">Escala e Horários</h1>
+              <p className="text-xs text-slate-500">
+                Visualização rápida de disponibilidade para consultas, médicos e exames
+              </p>
+            </div>
             <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {totalAgendados} agendamento{totalAgendados === 1 ? "" : "s"}
             </span>
             <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {medicosFiltrados.length} profissiona{medicosFiltrados.length === 1 ? "l" : "is"}
+            </span>
+            <span className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                Horários livres
+              </span>
+              <span className="text-slate-300">|</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-indigo-600" aria-hidden />
+                Ocupados
+              </span>
             </span>
           </div>
 
@@ -223,12 +292,51 @@ function AgendaMedicosPage() {
               />
             </div>
 
-            <div className="relative w-full max-w-sm flex-1">
+            <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Todos os médicos" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="todos">Todos os médicos</SelectItem>
+                {medicos.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={espFiltro} onValueChange={setEspFiltro}>
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Todas as especialidades" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="todas">Todas as especialidades</SelectItem>
+                {especialidadesOpcoes.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as typeof tipoFiltro)}>
+              <SelectTrigger className="h-9 w-[180px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Salas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as salas</SelectItem>
+                <SelectItem value="consultas">Consultas</SelectItem>
+                <SelectItem value="exames">Salas de exame</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="relative w-full max-w-xs flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar médico ou especialidade"
+                placeholder="Buscar médico, sala ou especialidade"
                 className="h-9 w-full rounded-lg border-slate-200 bg-white pl-9 text-xs"
               />
             </div>
