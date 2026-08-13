@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { confirmDialog } from "@/lib/confirm";
-import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, FlipHorizontal, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -230,6 +230,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   const [camOpen, setCamOpen] = useState(false);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
+  const [camEspelhado, setCamEspelhado] = useState(false);
+  const [camDevices, setCamDevices] = useState<MediaDeviceInfo[]>([]);
+  const [camDeviceId, setCamDeviceId] = useState<string>("");
 
   // Voz
   const [recording, setRecording] = useState(false);
@@ -278,13 +281,28 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
   }, [editing?.id]);
 
+  const iniciarStream = async (deviceId?: string) => {
+    camStreamRef.current?.getTracks().forEach(t => t.stop());
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
+        : { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+      audio: false,
+    });
+    camStreamRef.current = stream;
+    const atual = stream.getVideoTracks()[0]?.getSettings().deviceId ?? "";
+    if (atual) setCamDeviceId(atual);
+    // lista de câmeras só traz labels depois da permissão concedida
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setCamDevices(devs.filter(d => d.kind === "videoinput"));
+    } catch { /* ignora */ }
+    return stream;
+  };
+
   const abrirCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
-        audio: false,
-      });
-      camStreamRef.current = stream;
+      const stream = await iniciarStream();
       setCamOpen(true);
       setTimeout(() => {
         if (camVideoRef.current) {
@@ -294,6 +312,18 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       }, 50);
     } catch {
       toast.error("Não foi possível acessar a câmera. Verifique a permissão do navegador.");
+    }
+  };
+
+  const trocarCamera = async (deviceId: string) => {
+    try {
+      const stream = await iniciarStream(deviceId);
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = stream;
+        void camVideoRef.current.play();
+      }
+    } catch {
+      toast.error("Não foi possível abrir esta câmera.");
     }
   };
   const fecharCamera = () => {
@@ -312,7 +342,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     canvas.width = 480; canvas.height = 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    if (camEspelhado) { ctx.translate(480, 0); ctx.scale(-1, 1); }
     ctx.drawImage(v, sx, sy, side, side, 0, 0, 480, 480);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -1517,8 +1549,40 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <DialogTitle>Tirar foto</DialogTitle>
             <DialogDescription>Enquadre o rosto do paciente e clique em Capturar.</DialogDescription>
           </DialogHeader>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              type="button"
+              size="sm"
+              variant={camEspelhado ? "default" : "outline"}
+              onClick={() => setCamEspelhado(v => !v)}
+              title="Espelhar / inverter imagem"
+            >
+              <FlipHorizontal className="h-4 w-4 mr-1" />
+              {camEspelhado ? "Espelhado" : "Espelhar"}
+            </Button>
+            {camDevices.length > 1 && (
+              <Select value={camDeviceId} onValueChange={(v) => void trocarCamera(v)}>
+                <SelectTrigger className="h-9 w-[220px]">
+                  <SelectValue placeholder="Trocar câmera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {camDevices.map((d, i) => (
+                    <SelectItem key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Câmera ${i + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="rounded-md overflow-hidden bg-black aspect-square">
-            <video ref={camVideoRef} className="w-full h-full object-cover" playsInline muted />
+            <video
+              ref={camVideoRef}
+              className="w-full h-full object-cover"
+              style={{ transform: camEspelhado ? "scaleX(-1)" : "scaleX(1)" }}
+              playsInline
+              muted
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={fecharCamera}>Cancelar</Button>
