@@ -1670,7 +1670,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       <FaceCaptureDialog
         open={faceOpen}
         onClose={() => setFaceOpen(false)}
-        onCaptured={async (d) => { await salvarBiometria(d); setFaceOpen(false); }}
+        onCaptured={async (d, foto) => { await salvarBiometria(d, foto); setFaceOpen(false); }}
         titulo={`Biometria — ${editing?.nome ?? ""}`}
       />
     </>
