@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Camera, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { detectDescriptor, ensureFaceModels } from "@/lib/face-recognition";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   open: boolean;
@@ -19,6 +20,8 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
   const [camErro, setCamErro] = useState<string | null>(null);
   const [tentativa, setTentativa] = useState(0);
   const [msg, setMsg] = useState("Posicione o rosto na câmera");
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -28,17 +31,56 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
     (async () => {
       try {
         await ensureFaceModels();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
+        stop();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+            : { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+          audio: false,
+        });
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-      } catch {
-        if (!cancelled) setCamErro("Câmera não detectada ou permissão negada no navegador");
+        try {
+          const list = await navigator.mediaDevices.enumerateDevices();
+          if (!cancelled) {
+            const cams = list.filter((d) => d.kind === "videoinput");
+            setDevices(cams);
+            if (!deviceId) {
+              const atual = stream.getVideoTracks()[0]?.getSettings().deviceId;
+              if (atual) setDeviceId(atual);
+            }
+          }
+        } catch { /* enumeração indisponível */ }
+      } catch (e: any) {
+        if (cancelled) return;
+        const nome = e?.name as string | undefined;
+        if (nome === "NotReadableError" || nome === "TrackStartError") {
+          setCamErro("A câmera já está sendo usada por outro aplicativo (Meet, Zoom, etc.)");
+        } else if (nome === "NotAllowedError" || nome === "SecurityError") {
+          setCamErro("Permissão de câmera negada no navegador");
+        } else if (nome === "NotFoundError" || nome === "DevicesNotFoundError" || nome === "OverconstrainedError") {
+          setCamErro("Nenhuma webcam física foi encontrada");
+        } else {
+          setCamErro("Não foi possível iniciar a câmera");
+        }
+        try {
+          const list = await navigator.mediaDevices.enumerateDevices();
+          if (!cancelled) setDevices(list.filter((d) => d.kind === "videoinput"));
+        } catch { /* ignore */ }
       }
     })();
     return () => { cancelled = true; stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tentativa]);
+  }, [open, tentativa, deviceId]);
+
+  function resetarCamera() {
+    stop();
+    setCamErro(null);
+    setBusy(false);
+    setMsg("Reiniciando câmera…");
+    setTentativa((t) => t + 1);
+  }
 
   function stop() { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
 
@@ -83,7 +125,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{camErro}. Verifique se há uma webcam conectada e libere o acesso à câmera nas permissões do navegador.</span>
             </p>
-            <Button type="button" variant="outline" size="sm" onClick={() => { setCamErro(null); setTentativa((t) => t + 1); }}>
+            <Button type="button" variant="outline" size="sm" onClick={resetarCamera}>
               <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
             </Button>
           </div>
@@ -94,6 +136,19 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
             <span className="absolute bottom-2 inset-x-0 text-center text-[11px] text-white/85 pointer-events-none">
               Enquadre o rosto do paciente aqui
             </span>
+          </div>
+        )}
+        {devices.length > 1 && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Câmera</p>
+            <Select value={deviceId} onValueChange={(v) => { stop(); setDeviceId(v); }}>
+              <SelectTrigger><SelectValue placeholder="Selecionar câmera" /></SelectTrigger>
+              <SelectContent>
+                {devices.map((d, i) => (
+                  <SelectItem key={d.deviceId || i} value={d.deviceId}>{d.label || `Câmera ${i + 1}`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
         <DialogFooter>
