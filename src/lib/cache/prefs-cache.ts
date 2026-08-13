@@ -55,6 +55,9 @@ export async function updatePreferenciasUi(
 ): Promise<void> {
   const { uid, prefs } = await getPreferenciasUi();
   if (!uid) return;
-  await supabase.from("profiles").update({ preferencias_ui: patch(prefs) }).eq("id", uid);
+  await supabase
+    .from("profiles")
+    .update({ preferencias_ui: patch(prefs) as never })
+    .eq("id", uid);
   invalidatePreferenciasUi();
 }
