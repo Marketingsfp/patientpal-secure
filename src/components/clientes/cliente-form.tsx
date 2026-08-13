@@ -162,6 +162,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   // Biometria
   const [hasBiometria, setHasBiometria] = useState(false);
+  const [bioEm, setBioEm] = useState<string | null>(null);
   const [bioLoading, setBioLoading] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
@@ -408,16 +409,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   // Carrega biometria do paciente (edição)
   useEffect(() => {
-    if (!editing) { setHasBiometria(false); return; }
+    if (!editing) { setHasBiometria(false); setBioEm(null); return; }
     (async () => {
       const { data } = await supabase
         .from("paciente_biometria")
-        .select("id")
+        .select("id, consentimento_em, created_at")
         .eq("paciente_id", editing.id)
         .eq("clinica_id", clinicaId)
         .is("revogado_em", null)
+        .order("created_at", { ascending: false })
         .limit(1);
-      setHasBiometria((data ?? []).length > 0);
+      const row = (data ?? [])[0] as any;
+      setHasBiometria(!!row);
+      setBioEm(row ? (row.consentimento_em ?? row.created_at ?? null) : null);
     })();
   }, [editing?.id, clinicaId]);
 
@@ -703,13 +707,29 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setHistFiltroAtivo(false);
   }
 
-  async function salvarBiometria(descriptor: number[]) {
+  async function salvarBiometria(descriptor: number[], foto?: Blob) {
     if (!editing) return;
     setBioLoading(true);
     const error = await registrarBiometriaPaciente(editing.id, clinicaId, descriptor);
+    if (error) { setBioLoading(false); mostrarErro(error); return; }
+    if (foto) {
+      const path = `${clinicaId}/${editing.id}/biometria-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("pacientes-fotos")
+        .upload(path, foto, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) {
+        mostrarErro(upErr, "biometria salva, mas a foto não foi armazenada");
+      } else {
+        await supabase.from("pacientes")
+          .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
+          .eq("id", editing.id);
+        const { data: signed } = await supabase.storage.from("pacientes-fotos").createSignedUrl(path, 3600);
+        if (signed?.signedUrl) setFotoPreview(signed.signedUrl);
+      }
+    }
     setBioLoading(false);
-    if (error) { mostrarErro(error); return; }
     setHasBiometria(true);
+    setBioEm(new Date().toISOString());
     toast.success("Biometria facial cadastrada");
   }
 
@@ -725,6 +745,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setBioLoading(false);
     if (error) { mostrarErro(error); return; }
     setHasBiometria(false);
+    setBioEm(null);
     toast.success("Biometria removida");
   }
 
