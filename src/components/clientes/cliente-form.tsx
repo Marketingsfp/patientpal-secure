@@ -1128,22 +1128,51 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </p>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <ScanFace className={`h-6 w-6 ${hasBiometria ? "text-emerald-600" : "text-muted-foreground"}`} />
-                  <div>
-                    <p className="font-medium">
-                      {hasBiometria ? "Biometria cadastrada" : "Biometria não cadastrada"}
-                    </p>
+                  <div className="space-y-1">
+                    {hasBiometria ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Biometria facial cadastrada
+                      </span>
+                    ) : (
+                      <p className="font-medium">Biometria não cadastrada</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Usada para identificação na recepção e no totem de auto-atendimento.
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                {hasBiometria && (
+                  <div className="flex items-center gap-3">
+                    <div className="h-24 w-24 overflow-hidden rounded-lg border border-border bg-muted">
+                      {fotoPreview ? (
+                        <img src={fotoPreview} alt="Foto biométrica do paciente" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ScanFace className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {bioEm
+                        ? `Cadastrada em ${new Date(bioEm).toLocaleString("pt-BR")}`
+                        : "Cadastro biométrico ativo"}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
                   {hasBiometria ? (
-                    <Button type="button" variant="outline" onClick={revogarBiometria} disabled={bioLoading}>
-                      Remover biometria
-                    </Button>
+                    <>
+                      <Button type="button" onClick={() => setConsentOpen(true)} disabled={bioLoading}>
+                        <ScanFace className="h-4 w-4 mr-2" /> Recadastrar biometria
+                      </Button>
+                      <Button type="button" variant="outline" onClick={revogarBiometria} disabled={bioLoading}>
+                        Remover biometria
+                      </Button>
+                    </>
                   ) : (
                     <Button type="button" onClick={() => setConsentOpen(true)} disabled={bioLoading}>
                       <ScanFace className="h-4 w-4 mr-2" /> Cadastrar biometria
