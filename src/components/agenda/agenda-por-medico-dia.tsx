@@ -145,7 +145,7 @@ export function AgendaPorMedicoDia({
                   </span>
                 </header>
 
-                <div className="agenda-slots max-h-96 flex-1 space-y-1.5 overflow-y-auto p-2">
+                <div className="scrollbar-thin max-h-96 flex-1 space-y-1.5 overflow-y-auto p-2">
                   {ags.length === 0 && (
                     <p className="px-2 py-6 text-center text-[11px] text-slate-400">Sem horários</p>
                   )}
