@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CaixaShellV2 } from "@/components/caixa-v2/caixa-shell";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
-import { supabase } from "@/integrations/supabase/client";
+import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 
 export const Route = createFileRoute("/_authenticated/app/dev-caixa-shell")({
   component: DevCaixaShell,
@@ -22,25 +22,19 @@ function DevCaixaShell() {
   const [compact, setCompact] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-      const p = (data?.preferencias_ui ?? {}) as { caixa?: { compact?: boolean } };
+    void (async () => {
+      const { prefs } = await getPreferenciasUi();
+      const p = prefs as { caixa?: { compact?: boolean } };
       if (typeof p.caixa?.compact === "boolean") setCompact(p.caixa.compact);
     })();
   }, []);
 
   const persistCompact = async (v: boolean) => {
     setCompact(v);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
-    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
-    const caixa = { ...((prev.caixa as object) ?? {}), compact: v };
-    await supabase.from("profiles").update({ preferencias_ui: { ...prev, caixa } }).eq("id", u.user.id);
+    await updatePreferenciasUi((prev) => ({
+      ...prev,
+      caixa: { ...((prev.caixa as object) ?? {}), compact: v },
+    }));
   };
 
   return (
