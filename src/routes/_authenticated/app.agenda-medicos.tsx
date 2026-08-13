@@ -235,12 +235,28 @@ function AgendaMedicosPage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
               <Columns3 className="h-5 w-5" />
             </span>
-            <h1 className="text-xl font-bold text-slate-900">Agenda Multimédico</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-slate-900">Escala e Horários</h1>
+              <p className="text-xs text-slate-500">
+                Visualização rápida de disponibilidade para consultas, médicos e exames
+              </p>
+            </div>
             <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {totalAgendados} agendamento{totalAgendados === 1 ? "" : "s"}
             </span>
             <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
               {medicosFiltrados.length} profissiona{medicosFiltrados.length === 1 ? "l" : "is"}
+            </span>
+            <span className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                Horários livres
+              </span>
+              <span className="text-slate-300">|</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-indigo-600" aria-hidden />
+                Ocupados
+              </span>
             </span>
           </div>
 
@@ -276,12 +292,51 @@ function AgendaMedicosPage() {
               />
             </div>
 
-            <div className="relative w-full max-w-sm flex-1">
+            <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Todos os médicos" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="todos">Todos os médicos</SelectItem>
+                {medicos.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={espFiltro} onValueChange={setEspFiltro}>
+              <SelectTrigger className="h-9 w-[200px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Todas as especialidades" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="todas">Todas as especialidades</SelectItem>
+                {especialidadesOpcoes.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as typeof tipoFiltro)}>
+              <SelectTrigger className="h-9 w-[180px] rounded-lg border-slate-200 bg-white text-xs">
+                <SelectValue placeholder="Salas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as salas</SelectItem>
+                <SelectItem value="consultas">Consultas</SelectItem>
+                <SelectItem value="exames">Salas de exame</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="relative w-full max-w-xs flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar médico ou especialidade"
+                placeholder="Buscar médico, sala ou especialidade"
                 className="h-9 w-full rounded-lg border-slate-200 bg-white pl-9 text-xs"
               />
             </div>
