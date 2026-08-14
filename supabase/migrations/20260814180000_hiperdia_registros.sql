@@ -71,6 +71,15 @@ CREATE TABLE public.hiperdia_registros (
     CHECK (observacoes IS NULL OR length(observacoes) <= 2000)
 );
 
+-- GRANTs — mesma convenção das demais tabelas do projeto (`estoque_lotes`,
+-- `mkt_envios`, `clima_diario`). RLS e GRANT são camadas independentes: sem o
+-- GRANT, o Postgres barra a consulta com "permission denied for table" antes
+-- mesmo de avaliar a policy, e o card do Hiperdia quebraria na tela.
+-- Só SELECT e INSERT para `authenticated`, reforçando no nível de privilégio o
+-- mesmo desenho append-only das policies abaixo.
+GRANT SELECT, INSERT ON public.hiperdia_registros TO authenticated;
+GRANT ALL ON public.hiperdia_registros TO service_role;
+
 ALTER TABLE public.hiperdia_registros ENABLE ROW LEVEL SECURITY;
 
 -- RLS — leitura e inserção para usuários autenticados, restritas à clínica
