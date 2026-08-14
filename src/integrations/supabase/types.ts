@@ -4511,6 +4511,79 @@ export type Database = {
           },
         ]
       }
+      hiperdia_registros: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data_registro: string
+          glicemia_jejum: number | null
+          glicemia_pos_prandial: number | null
+          id: string
+          medico_id: string | null
+          observacoes: string | null
+          paciente_id: string
+          peso: number | null
+          pressao_diastolica: number | null
+          pressao_sistolica: number | null
+          registrado_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data_registro?: string
+          glicemia_jejum?: number | null
+          glicemia_pos_prandial?: number | null
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id: string
+          peso?: number | null
+          pressao_diastolica?: number | null
+          pressao_sistolica?: number | null
+          registrado_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data_registro?: string
+          glicemia_jejum?: number | null
+          glicemia_pos_prandial?: number | null
+          id?: string
+          medico_id?: string | null
+          observacoes?: string | null
+          paciente_id?: string
+          peso?: number | null
+          pressao_diastolica?: number | null
+          pressao_sistolica?: number | null
+          registrado_por?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiperdia_registros_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiperdia_registros_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiperdia_registros_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_banco_horas: {
         Row: {
           clinica_id: string
