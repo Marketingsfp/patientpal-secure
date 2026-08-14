@@ -1,6 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getSupabasePublishableKey,
+  getSupabaseUrl,
+  missingSupabaseEnvMessage,
+} from "@/integrations/supabase/env";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
 
@@ -51,18 +56,15 @@ function DiagnosticoPage() {
       return next;
     });
 
-    // 1. env
-    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-    if (url && key) {
-      update("env", { status: "ok", detail: `URL: ${url}` });
-    } else {
-      update("env", {
-        status: "error",
-        detail: "VITE_SUPABASE_URL ou VITE_SUPABASE_PUBLISHABLE_KEY ausente.",
-      });
+    // 1. env — aceita os nomes do Vite e os do Lovable (ver integrations/supabase/env.ts)
+    const url = getSupabaseUrl();
+    const key = getSupabasePublishableKey();
+    const envError = missingSupabaseEnvMessage(url, key);
+    if (envError) {
+      update("env", { status: "error", detail: envError });
       return;
     }
+    update("env", { status: "ok", detail: `URL: ${url}` });
 
     // 2. session
     let userId: string | null = null;
