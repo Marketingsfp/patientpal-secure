@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
+import { PacienteHiperdia } from "@/components/hiperdia/paciente-hiperdia";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
@@ -20,6 +21,10 @@ function VisualizarClientePage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
+  // Aferição do Hiperdia é dado clínico, não cadastral: usa a permissão de
+  // prontuários. Se o Hiperdia virar um módulo próprio em `perfil_permissoes`,
+  // trocar para usePodeEscrever("hiperdia").
+  const podeEscreverClinico = usePodeEscrever("prontuarios");
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
@@ -107,6 +112,13 @@ function VisualizarClientePage() {
       )}
       {!loading && paciente && clinicaAtual && (
         <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
+      )}
+      {!loading && paciente && clinicaAtual && (
+        <PacienteHiperdia
+          pacienteId={paciente.id}
+          clinicaId={clinicaAtual.clinica_id}
+          podeEscrever={podeEscreverClinico}
+        />
       )}
     </div>
   );
