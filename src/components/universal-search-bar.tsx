@@ -27,7 +27,9 @@ export function UniversalSearchBar() {
   );
   const searcher = useUniversalSearcher({
     clinicaIds,
-    navigate: (to) => { void navigate({ to: to as never }); },
+    navigate: (to) => {
+      void navigate({ to: to as never });
+    },
   });
 
   if (!ubEnabled) return null;

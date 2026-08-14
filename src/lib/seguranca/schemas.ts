@@ -11,7 +11,10 @@ import { validarCPF } from "@/lib/validators";
 
 /** Texto de uma linha (nome, título). Sanitizado e limitado. */
 export const zLinha = (max: number = LIMITES.nome) =>
-  z.string().transform(limparLinha).pipe(z.string().max(max, `Máximo de ${max} caracteres`));
+  z
+    .string()
+    .transform(limparLinha)
+    .pipe(z.string().max(max, `Máximo de ${max} caracteres`));
 
 /** Texto de uma linha obrigatório. */
 export const zLinhaObrigatoria = (max: number = LIMITES.nome, min = 1) =>
@@ -22,7 +25,10 @@ export const zLinhaObrigatoria = (max: number = LIMITES.nome, min = 1) =>
 
 /** Texto livre multi-linha (observações, evoluções). */
 export const zTexto = (max: number = LIMITES.observacao) =>
-  z.string().transform(limparTexto).pipe(z.string().max(max, `Máximo de ${max} caracteres`));
+  z
+    .string()
+    .transform(limparTexto)
+    .pipe(z.string().max(max, `Máximo de ${max} caracteres`));
 
 /** Campo opcional: string vazia vira null. */
 export const zOpcional = <T extends z.ZodTypeAny>(schema: T) =>
@@ -64,9 +70,7 @@ export const zDinheiro = (max = 10_000_000) =>
     .pipe(z.number().finite("Valor inválido").min(0, "Valor não pode ser negativo").max(max));
 
 /** Data no formato ISO (YYYY-MM-DD). */
-export const zDataIso = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida");
+export const zDataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida");
 
 /** URL segura (bloqueia javascript:, data:, etc.). */
 export const zUrl = z

@@ -27,14 +27,34 @@ export const R6Cuidados: React.FC = () => {
         <div style={{ height: 30 }} />
         <Panel delay={12} style={{ maxWidth: 1520 }}>
           {AVISOS.map((a, i) => {
-            const op = interpolate(frame, [18 + i * 12, 32 + i * 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            const op = interpolate(frame, [18 + i * 12, 32 + i * 12], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
             return (
-              <div key={a} style={{
-                opacity: op, display: "flex", gap: 22, alignItems: "flex-start", padding: "16px 4px",
-                borderBottom: i < AVISOS.length - 1 ? `1px solid ${C.greenSoft}33` : "none",
-              }}>
-                <div style={{ width: 14, height: 14, borderRadius: 4, background: C.clay, marginTop: 12 }} />
-                <div style={{ fontFamily: body, color: C.cream, fontSize: 30, lineHeight: 1.45 }}>{a}</div>
+              <div
+                key={a}
+                style={{
+                  opacity: op,
+                  display: "flex",
+                  gap: 22,
+                  alignItems: "flex-start",
+                  padding: "16px 4px",
+                  borderBottom: i < AVISOS.length - 1 ? `1px solid ${C.greenSoft}33` : "none",
+                }}
+              >
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 4,
+                    background: C.clay,
+                    marginTop: 12,
+                  }}
+                />
+                <div style={{ fontFamily: body, color: C.cream, fontSize: 30, lineHeight: 1.45 }}>
+                  {a}
+                </div>
               </div>
             );
           })}

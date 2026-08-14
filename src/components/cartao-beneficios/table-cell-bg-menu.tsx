@@ -4,9 +4,18 @@ import { PaintBucket, ChevronDown, Ban } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const PALETA: { nome: string; cores: string[] }[] = [
-  { nome: "Neutros", cores: ["#ffffff", "#f5f5f5", "#e5e7eb", "#d1d5db", "#9ca3af", "#4b5563", "#1f2937", "#000000"] },
-  { nome: "Corporativo", cores: ["#1b365d", "#274b78", "#3b6ea5", "#8fb3d9", "#dce7f3", "#0f766e", "#14b8a6", "#ccfbf1"] },
-  { nome: "Destaques", cores: ["#fef3c7", "#fde68a", "#fca5a5", "#fee2e2", "#dcfce7", "#bbf7d0", "#e9d5ff", "#fbcfe8"] },
+  {
+    nome: "Neutros",
+    cores: ["#ffffff", "#f5f5f5", "#e5e7eb", "#d1d5db", "#9ca3af", "#4b5563", "#1f2937", "#000000"],
+  },
+  {
+    nome: "Corporativo",
+    cores: ["#1b365d", "#274b78", "#3b6ea5", "#8fb3d9", "#dce7f3", "#0f766e", "#14b8a6", "#ccfbf1"],
+  },
+  {
+    nome: "Destaques",
+    cores: ["#fef3c7", "#fde68a", "#fca5a5", "#fee2e2", "#dcfce7", "#bbf7d0", "#e9d5ff", "#fbcfe8"],
+  },
 ];
 
 export function TableCellBgMenu({ editor }: { editor: Editor }) {
@@ -64,7 +73,9 @@ export function TableCellBgMenu({ editor }: { editor: Editor }) {
             <input
               type="color"
               value={atual || "#ffffff"}
-              onChange={(e) => editor.chain().focus().setCellAttribute("backgroundColor", e.target.value).run()}
+              onChange={(e) =>
+                editor.chain().focus().setCellAttribute("backgroundColor", e.target.value).run()
+              }
               className="h-7 w-9 cursor-pointer rounded border bg-background p-0.5"
               aria-label="Cor personalizada"
             />

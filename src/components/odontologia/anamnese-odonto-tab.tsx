@@ -32,11 +32,21 @@ interface Row {
 }
 
 const EMPTY: Row = {
-  em_tratamento_medico: false, em_tratamento_desc: "",
-  medicamentos: "", alergias: "", doencas: "", cirurgias: "",
-  gestante: false, fumante: false, bebida_alcoolica: false,
-  bruxismo: false, sangramento_gengival: false, sensibilidade: false,
-  ultima_visita_dentista: "", motivo_consulta: "", observacoes: "",
+  em_tratamento_medico: false,
+  em_tratamento_desc: "",
+  medicamentos: "",
+  alergias: "",
+  doencas: "",
+  cirurgias: "",
+  gestante: false,
+  fumante: false,
+  bebida_alcoolica: false,
+  bruxismo: false,
+  sangramento_gengival: false,
+  sensibilidade: false,
+  ultima_visita_dentista: "",
+  motivo_consulta: "",
+  observacoes: "",
 };
 
 const YESNO: Array<{ key: keyof Row; label: string }> = [
@@ -49,7 +59,13 @@ const YESNO: Array<{ key: keyof Row; label: string }> = [
   { key: "sensibilidade", label: "Sensibilidade dentária?" },
 ];
 
-export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId: string; readOnly?: boolean }) {
+export function AnamneseOdontoTab({
+  pacienteId,
+  readOnly = false,
+}: {
+  pacienteId: string;
+  readOnly?: boolean;
+}) {
   const { clinicaAtual } = useClinica();
   const [row, setRow] = useState<Row>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -80,8 +96,11 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
       respondida_em: new Date().toISOString(),
     };
     const { data: existing } = await supabase
-      .from("odonto_anamnese").select("id")
-      .eq("clinica_id", clinicaAtual.clinica_id).eq("paciente_id", pacienteId).maybeSingle();
+      .from("odonto_anamnese")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("paciente_id", pacienteId)
+      .maybeSingle();
     const { error } = existing
       ? await supabase.from("odonto_anamnese").update(payload).eq("id", existing.id)
       : await supabase.from("odonto_anamnese").insert(payload);
@@ -92,20 +111,24 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
 
   if (loading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
 
-  const set = <K extends keyof Row>(k: K, v: Row[K]) => setRow(r => ({ ...r, [k]: v }));
+  const set = <K extends keyof Row>(k: K, v: Row[K]) => setRow((r) => ({ ...r, [k]: v }));
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <TTSButton
-          text={[
-            row.motivo_consulta && `Motivo da consulta: ${row.motivo_consulta}.`,
-            row.medicamentos && `Medicamentos: ${row.medicamentos}.`,
-            row.alergias && `Alergias: ${row.alergias}.`,
-            row.doencas && `Doenças: ${row.doencas}.`,
-            row.cirurgias && `Cirurgias: ${row.cirurgias}.`,
-            row.observacoes && `Observações: ${row.observacoes}.`,
-          ].filter(Boolean).join(" ") || "Anamnese vazia."}
+          text={
+            [
+              row.motivo_consulta && `Motivo da consulta: ${row.motivo_consulta}.`,
+              row.medicamentos && `Medicamentos: ${row.medicamentos}.`,
+              row.alergias && `Alergias: ${row.alergias}.`,
+              row.doencas && `Doenças: ${row.doencas}.`,
+              row.cirurgias && `Cirurgias: ${row.cirurgias}.`,
+              row.observacoes && `Observações: ${row.observacoes}.`,
+            ]
+              .filter(Boolean)
+              .join(" ") || "Anamnese vazia."
+          }
           size="sm"
           variant="outline"
           label="Ouvir anamnese"
@@ -113,11 +136,21 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
       </div>
       <div>
         <Label>Motivo da consulta</Label>
-        <Textarea disabled={readOnly} rows={2} value={row.motivo_consulta ?? ""} onChange={e => set("motivo_consulta", e.target.value)} />
+        <Textarea
+          disabled={readOnly}
+          rows={2}
+          value={row.motivo_consulta ?? ""}
+          onChange={(e) => set("motivo_consulta", e.target.value)}
+        />
       </div>
       <div>
         <Label>Última visita ao dentista</Label>
-        <Input disabled={readOnly} value={row.ultima_visita_dentista ?? ""} onChange={e => set("ultima_visita_dentista", e.target.value)} placeholder="ex.: há 6 meses" />
+        <Input
+          disabled={readOnly}
+          value={row.ultima_visita_dentista ?? ""}
+          onChange={(e) => set("ultima_visita_dentista", e.target.value)}
+          placeholder="ex.: há 6 meses"
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 pt-2">
@@ -126,7 +159,7 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
             <Checkbox
               disabled={readOnly}
               checked={Boolean(row[key])}
-              onCheckedChange={v => set(key, Boolean(v) as never)}
+              onCheckedChange={(v) => set(key, Boolean(v) as never)}
             />
             {label}
           </label>
@@ -136,40 +169,75 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
       {row.em_tratamento_medico && (
         <div>
           <Label>Detalhes do tratamento médico</Label>
-          <Textarea disabled={readOnly} rows={2} value={row.em_tratamento_desc ?? ""} onChange={e => set("em_tratamento_desc", e.target.value)} />
+          <Textarea
+            disabled={readOnly}
+            rows={2}
+            value={row.em_tratamento_desc ?? ""}
+            onChange={(e) => set("em_tratamento_desc", e.target.value)}
+          />
         </div>
       )}
 
       <div className="grid md:grid-cols-2 gap-3">
         <div>
           <Label>Medicamentos em uso</Label>
-          <Textarea disabled={readOnly} rows={2} value={row.medicamentos ?? ""} onChange={e => set("medicamentos", e.target.value)} />
+          <Textarea
+            disabled={readOnly}
+            rows={2}
+            value={row.medicamentos ?? ""}
+            onChange={(e) => set("medicamentos", e.target.value)}
+          />
         </div>
         <div>
           <Label>Alergias</Label>
-          <Textarea disabled={readOnly} rows={2} value={row.alergias ?? ""} onChange={e => set("alergias", e.target.value)} />
+          <Textarea
+            disabled={readOnly}
+            rows={2}
+            value={row.alergias ?? ""}
+            onChange={(e) => set("alergias", e.target.value)}
+          />
         </div>
         <div>
           <Label>Doenças / condições</Label>
-          <Textarea disabled={readOnly} rows={2} value={row.doencas ?? ""} onChange={e => set("doencas", e.target.value)} />
+          <Textarea
+            disabled={readOnly}
+            rows={2}
+            value={row.doencas ?? ""}
+            onChange={(e) => set("doencas", e.target.value)}
+          />
         </div>
         <div>
           <Label>Cirurgias anteriores</Label>
-          <Textarea disabled={readOnly} rows={2} value={row.cirurgias ?? ""} onChange={e => set("cirurgias", e.target.value)} />
+          <Textarea
+            disabled={readOnly}
+            rows={2}
+            value={row.cirurgias ?? ""}
+            onChange={(e) => set("cirurgias", e.target.value)}
+          />
         </div>
       </div>
 
       <div>
         <Label>Observações</Label>
-        <Textarea disabled={readOnly} rows={3} value={row.observacoes ?? ""} onChange={e => set("observacoes", e.target.value)} />
+        <Textarea
+          disabled={readOnly}
+          rows={3}
+          value={row.observacoes ?? ""}
+          onChange={(e) => set("observacoes", e.target.value)}
+        />
       </div>
 
       {!readOnly && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-muted-foreground">
-            {row.respondida_em ? `Última atualização: ${new Date(row.respondida_em).toLocaleString("pt-BR")}` : "Ainda não respondida"}
+            {row.respondida_em
+              ? `Última atualização: ${new Date(row.respondida_em).toLocaleString("pt-BR")}`
+              : "Ainda não respondida"}
           </p>
-          <Button onClick={salvar} disabled={saving}><Save className="h-4 w-4 mr-1" />Salvar anamnese</Button>
+          <Button onClick={salvar} disabled={saving}>
+            <Save className="h-4 w-4 mr-1" />
+            Salvar anamnese
+          </Button>
         </div>
       )}
     </div>

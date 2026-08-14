@@ -17,14 +17,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { printGuiaMensalidade } from "@/lib/print-gr";
 
-type Convenio = { id: string; nome: string; valor_mensal: number | null; num_parcelas: number | null };
-type Faixa = { convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
+type Convenio = {
+  id: string;
+  nome: string;
+  valor_mensal: number | null;
+  num_parcelas: number | null;
+};
+type Faixa = {
+  convenio_id: string;
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
 type DependenteLinha = { key: string; paciente: PatientOption | null; parentesco: string };
 
 const TOTAL_PARCELAS = 12;
@@ -35,7 +51,7 @@ const PARENTESCOS = ["Filho(a)", "Cônjuge", "Pai", "Mãe", "Irmão(ã)", "Outro
 /** Vencimento (yyyy-mm-dd) do mês de referência + offset, respeitando o último dia do mês. */
 function vencimentoDe(refMes: string, offset: number, dia: number) {
   const [ano, mes] = refMes.split("-").map(Number);
-  const base = new Date(ano, (mes - 1) + offset, 1);
+  const base = new Date(ano, mes - 1 + offset, 1);
   const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
   const d = new Date(base.getFullYear(), base.getMonth(), Math.min(Math.max(1, dia), ultimo));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -69,9 +85,7 @@ function formatValorBR(n: number) {
 function parseValorBR(txt: string) {
   const limpo = String(txt).replace(/[^\d.,-]/g, "");
   if (!limpo) return 0;
-  const normalizado = limpo.includes(",")
-    ? limpo.replace(/\./g, "").replace(",", ".")
-    : limpo;
+  const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
   return Number(normalizado) || 0;
 }
 
@@ -119,7 +133,9 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [loading, setLoading] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteLinha[]>([]);
-  const [quickOpen, setQuickOpen] = useState<{ alvo: "titular" | string; nome: string } | null>(null);
+  const [quickOpen, setQuickOpen] = useState<{ alvo: "titular" | string; nome: string } | null>(
+    null,
+  );
   // Guardas contra duplicidade: impedem que o mesmo pagamento avulso gere
   // dois lançamentos/contratos (tela reaberta ou clique repetido).
   const processandoRef = useRef(false);
@@ -159,7 +175,10 @@ export function PagamentoAvulsoMensalidadeDialog({
         const { data: fx } = await supabase
           .from("cb_convenio_faixas")
           .select("convenio_id, vidas_de, vidas_ate, valor_mensal")
-          .in("convenio_id", lista.map((c) => c.id))
+          .in(
+            "convenio_id",
+            lista.map((c) => c.id),
+          )
           .order("vidas_de");
         setFaixas((fx ?? []) as Faixa[]);
       } else {
@@ -289,7 +308,9 @@ export function PagamentoAvulsoMensalidadeDialog({
         sem_carencia_motivo: semCarencia ? semCarenciaMotivo.trim() : null,
         observacoes:
           `Contrato criado pelo pagamento avulso (regularização) — mês de referência ${rotuloMes(refMes)}.` +
-          (pagasNum > 0 ? ` ${pagasNum} parcela(s) informada(s) como já paga(s) antes do sistema.` : "") +
+          (pagasNum > 0
+            ? ` ${pagasNum} parcela(s) informada(s) como já paga(s) antes do sistema.`
+            : "") +
           (semCarencia ? ` Isento de carência: ${semCarenciaMotivo.trim()}.` : ""),
       } as never)
       .select("id, numero")
@@ -309,7 +330,11 @@ export function PagamentoAvulsoMensalidadeDialog({
         vencimento: venc,
         valor: valorNum,
         status: paga || historico ? "pago" : "pendente",
-        pago_em: paga ? (dadosPagamento.data || new Date().toISOString().slice(0, 10)) : historico ? venc : null,
+        pago_em: paga
+          ? dadosPagamento.data || new Date().toISOString().slice(0, 10)
+          : historico
+            ? venc
+            : null,
         valor_pago: paga ? dadosPagamento.valor : historico ? valorNum : null,
         forma_pagamento: paga ? (dadosPagamento.forma_pagamento ?? "misto") : null,
         lancamento_id: paga ? (dadosPagamento.lancamento_id ?? null) : null,
@@ -355,8 +380,9 @@ export function PagamentoAvulsoMensalidadeDialog({
               <Receipt className="h-5 w-5" /> Pagamento avulso — Mensalidade do Cartão
             </DialogTitle>
             <DialogDescription>
-              Para pacientes sem contrato no sistema. Informe o mês de referência do pagamento; se quiser,
-              o sistema já cria o contrato e as mensalidades faltantes até completar 12 meses.
+              Para pacientes sem contrato no sistema. Informe o mês de referência do pagamento; se
+              quiser, o sistema já cria o contrato e as mensalidades faltantes até completar 12
+              meses.
             </DialogDescription>
           </DialogHeader>
 
@@ -402,8 +428,10 @@ export function PagamentoAvulsoMensalidadeDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   Data base do contrato: o término é calculado 12 meses depois
-                  {dataInicio ? ` (${somarMeses(dataInicio, TOTAL_PARCELAS).split("-").reverse().join("/")})` : ""}.
-                  Sugerida pelo mês de referência, mas pode ser ajustada.
+                  {dataInicio
+                    ? ` (${somarMeses(dataInicio, TOTAL_PARCELAS).split("-").reverse().join("/")})`
+                    : ""}
+                  . Sugerida pelo mês de referência, mas pode ser ajustada.
                 </p>
               </div>
             )}
@@ -411,8 +439,8 @@ export function PagamentoAvulsoMensalidadeDialog({
             {criarContrato && pagasNum === 0 && (
               <p className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Nenhuma parcela paga informada: será criado um novo contrato com as 12 mensalidades, sendo a do
-                mês de referência baixada agora.
+                Nenhuma parcela paga informada: será criado um novo contrato com as 12 mensalidades,
+                sendo a do mês de referência baixada agora.
               </p>
             )}
 
@@ -429,19 +457,19 @@ export function PagamentoAvulsoMensalidadeDialog({
             {criarContrato && (
               <div className="space-y-3 rounded-md border p-3">
                 <div className="space-y-1">
-                    <Label>Convênio</Label>
-                    <Select value={convenioId} onValueChange={escolherConvenio} disabled={loading}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={loading ? "Carregando…" : "Selecione o convênio"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {convenios.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <Label>Convênio</Label>
+                  <Select value={convenioId} onValueChange={escolherConvenio} disabled={loading}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={loading ? "Carregando…" : "Selecione o convênio"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {convenios.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2 rounded-md border p-2">
@@ -497,8 +525,8 @@ export function PagamentoAvulsoMensalidadeDialog({
                   ))}
                   {dependentes.length === 0 && (
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <UserPlus className="h-3.5 w-3.5" /> Somente o titular. Adicione dependentes para
-                      recalcular o valor por faixa de vidas.
+                      <UserPlus className="h-3.5 w-3.5" /> Somente o titular. Adicione dependentes
+                      para recalcular o valor por faixa de vidas.
                     </p>
                   )}
                 </div>
@@ -517,7 +545,10 @@ export function PagamentoAvulsoMensalidadeDialog({
                     {faixaAtual
                       ? `Faixa ${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate ?? "+"} vidas — ${Number(
                           faixaAtual.valor_mensal,
-                        ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} — definido pela tabela do convênio.`
+                        ).toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })} — definido pela tabela do convênio.`
                       : "Valor definido automaticamente pelo convênio e pelo número de vidas do contrato."}
                   </p>
                 </div>
@@ -547,8 +578,9 @@ export function PagamentoAvulsoMensalidadeDialog({
                     <span>
                       Isento de carência
                       <span className="block text-xs text-muted-foreground">
-                        Marque quando o paciente já cumpriu carência em contrato anterior (renovação,
-                        migração ou troca de convênio). Fica registrado quem marcou e quando.
+                        Marque quando o paciente já cumpriu carência em contrato anterior
+                        (renovação, migração ou troca de convênio). Fica registrado quem marcou e
+                        quando.
                       </span>
                     </span>
                   </label>
@@ -566,9 +598,12 @@ export function PagamentoAvulsoMensalidadeDialog({
 
                 {resumo && (
                   <p className="text-xs text-muted-foreground">
-                    Parcela {resumo.numeroAtual}/12 = {rotuloMes(refMes)} (será baixada como paga agora)
-                    {pagasNum > 0 ? ` · ${pagasNum} parcela(s) anterior(es) já marcada(s) como paga(s)` : ""} · demais{" "}
-                    {resumo.pendentes} parcelas ficam pendentes até{" "}
+                    Parcela {resumo.numeroAtual}/12 = {rotuloMes(refMes)} (será baixada como paga
+                    agora)
+                    {pagasNum > 0
+                      ? ` · ${pagasNum} parcela(s) anterior(es) já marcada(s) como paga(s)`
+                      : ""}{" "}
+                    · demais {resumo.pendentes} parcelas ficam pendentes até{" "}
                     {new Date(`${resumo.ultimo}T00:00:00`).toLocaleDateString("pt-BR")}.
                   </p>
                 )}

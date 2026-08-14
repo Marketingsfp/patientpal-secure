@@ -57,7 +57,9 @@ function RecepcaoPage() {
   // Refs para o atalho de teclado sempre ler o valor mais recente
   // sem precisar remontar o listener a cada mudança
   const clinicaIdRef = useRef(clinicaAtual?.clinica_id);
-  useEffect(() => { clinicaIdRef.current = clinicaAtual?.clinica_id; }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    clinicaIdRef.current = clinicaAtual?.clinica_id;
+  }, [clinicaAtual?.clinica_id]);
 
   // Carrega o guichê salvo assim que a clínica é conhecida (namespaced por clínica)
   useEffect(() => {
@@ -75,7 +77,8 @@ function RecepcaoPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
+        return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key.toLowerCase() === "c") {
         e.preventDefault();
@@ -91,14 +94,29 @@ function RecepcaoPage() {
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
-    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome, cidade)";
+    const sel =
+      "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome, cidade)";
     const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
       // Fila da recepção: apenas senhas emitidas pelo totem/recepção
       // (exclui as senhas geradas pela Triagem, que já nascem com status="chamada").
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
+      supabase
+        .from("senhas")
+        .select(sel)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("data_dia", hoje)
+        .eq("status", "emitida")
+        .order("emitida_em"),
       // Chamadas recentes: só as chamadas feitas pela Recepção — filtra fora
       // qualquer senha cujo guichê comece com "Triagem" (fila separada).
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").not("guiche", "ilike", "Triagem%").order("chamada_em", { ascending: false }).limit(10),
+      supabase
+        .from("senhas")
+        .select(sel)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("data_dia", hoje)
+        .eq("status", "chamada")
+        .not("guiche", "ilike", "Triagem%")
+        .order("chamada_em", { ascending: false })
+        .limit(10),
     ]);
 
     if (errEmit || errCham) {
@@ -117,24 +135,40 @@ function RecepcaoPage() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const debouncedReload = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => { void carregar(); }, 400);
+      timer = setTimeout(() => {
+        void carregar();
+      }, 400);
     };
     const ch = supabase
       .channel(`recepcao-${clinicaAtual.clinica_id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "senhas",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
         debouncedReload,
       )
       .subscribe();
-    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
   async function chamarProxima() {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!guiche.trim()) {
+      toast.error("Informe o guichê");
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase.rpc("chamar_proxima_senha_tipo", {
       _clinica_id: clinicaAtual.clinica_id,
@@ -142,9 +176,14 @@ function RecepcaoPage() {
       _tipo: tipoFiltro === "AUTO" ? null : tipoFiltro,
     } as never);
     setBusy(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     if (!data) {
-      toast.info(tipoFiltro === "AUTO" ? "Não há senhas na fila" : `Não há senhas do tipo ${tipoFiltro}`);
+      toast.info(
+        tipoFiltro === "AUTO" ? "Não há senhas na fila" : `Não há senhas do tipo ${tipoFiltro}`,
+      );
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -152,19 +191,27 @@ function RecepcaoPage() {
   }
 
   async function rechamar(id: string) {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const { data, error } = await supabase.rpc("rechamar_senha", { _id: id } as never);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const row = Array.isArray(data) ? data[0] : data;
     toast.success(`Rechamada ${row?.codigo ?? ""}`);
   }
 
   async function setStatus(id: string, status: "atendida" | "cancelada") {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const now = new Date().toISOString();
-    const patch = status === "atendida"
-      ? { status, atendida_em: now }
-      : { status, cancelada_em: now };
+    const patch =
+      status === "atendida" ? { status, atendida_em: now } : { status, cancelada_em: now };
     const { error } = await supabase.from("senhas").update(patch).eq("id", id);
     if (error) mostrarErro(error);
   }
@@ -176,11 +223,15 @@ function RecepcaoPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground/90">Recepção · Filas</h1>
-          <p className="text-sm text-muted-foreground/80 leading-relaxed mt-0.5">Chame a próxima senha e acompanhe a fila em tempo real.</p>
+          <p className="text-sm text-muted-foreground/80 leading-relaxed mt-0.5">
+            Chame a próxima senha e acompanhe a fila em tempo real.
+          </p>
         </div>
         <div className="flex items-center justify-end gap-3 flex-wrap">
           <div className="bg-background border border-border/60 rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-2 shadow-2xs">
-            <label htmlFor="guiche-input" className="text-muted-foreground font-medium">Meu guichê</label>
+            <label htmlFor="guiche-input" className="text-muted-foreground font-medium">
+              Meu guichê
+            </label>
             <input
               id="guiche-input"
               value={guiche}
@@ -189,7 +240,9 @@ function RecepcaoPage() {
             />
           </div>
           <div className="bg-background border border-border/60 rounded-xl px-3 py-1.5 text-xs font-semibold flex items-center gap-2 shadow-2xs">
-            <label htmlFor="tipo-select" className="text-muted-foreground font-medium">Tipo</label>
+            <label htmlFor="tipo-select" className="text-muted-foreground font-medium">
+              Tipo
+            </label>
             <select
               id="tipo-select"
               value={tipoFiltro}
@@ -210,7 +263,9 @@ function RecepcaoPage() {
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2.5 disabled:opacity-60"
           >
             <Bell className="h-4 w-4" /> Chamar próxima
-            <kbd className="hidden md:inline-flex bg-primary-foreground/20 text-primary-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-md">C</kbd>
+            <kbd className="hidden md:inline-flex bg-primary-foreground/20 text-primary-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-md">
+              C
+            </kbd>
           </button>
           <a
             href="/app/configuracoes/painel-totem"
@@ -227,19 +282,35 @@ function RecepcaoPage() {
           <div className="flex items-center justify-between">
             <h2 className="font-semibold flex items-center gap-2">
               Fila
-              <span className="bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full text-xs">{fila.length}</span>
+              <span className="bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full text-xs">
+                {fila.length}
+              </span>
             </h2>
-            <span className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/40 px-2.5 py-1 rounded-lg">Ordem: C · P · R · N</span>
+            <span className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/40 px-2.5 py-1 rounded-lg">
+              Ordem: C · P · R · N
+            </span>
           </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
-            {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
+            {fila.length === 0 && (
+              <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>
+            )}
             {fila.map((s) => (
-              <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/50 border border-border/40 transition-all">
+              <div
+                key={s.id}
+                className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/50 border border-border/40 transition-all"
+              >
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
-                  <span className="text-base font-bold tracking-tight text-foreground font-mono tabular-nums">{s.codigo}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-xs font-semibold ${TIPO_COR[s.tipo]}`}
+                  >
+                    {s.tipo}
+                  </span>
+                  <span className="text-base font-bold tracking-tight text-foreground font-mono tabular-nums">
+                    {s.codigo}
+                  </span>
                   <span className="text-sm text-muted-foreground">
-                    {s.pacientes?.nome ?? "Anônimo"}{s.identificado_por_facial ? " · 📷" : ""}
+                    {s.pacientes?.nome ?? "Anônimo"}
+                    {s.identificado_por_facial ? " · 📷" : ""}
                   </span>
                   <BadgePacienteDistante cidade={s.pacientes?.cidade} compact />
                 </div>
@@ -259,7 +330,11 @@ function RecepcaoPage() {
         <section className="bg-card border border-border/50 rounded-2xl p-5 shadow-2xs flex flex-col gap-4 min-h-[500px]">
           <h2 className="font-semibold">Em atendimento / chamadas recentes</h2>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
-            {chamadas.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Nenhuma chamada hoje</div>}
+            {chamadas.length === 0 && (
+              <div className="text-sm text-muted-foreground py-6 text-center">
+                Nenhuma chamada hoje
+              </div>
+            )}
             {chamadas.map((s, i) => (
               <div
                 key={s.id}
@@ -270,8 +345,14 @@ function RecepcaoPage() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
-                  <span className="text-base font-bold tracking-tight text-foreground font-mono tabular-nums">{s.codigo}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-xs font-semibold ${TIPO_COR[s.tipo]}`}
+                  >
+                    {s.tipo}
+                  </span>
+                  <span className="text-base font-bold tracking-tight text-foreground font-mono tabular-nums">
+                    {s.codigo}
+                  </span>
                   <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
                 </div>
                 <div className="flex items-center gap-2">

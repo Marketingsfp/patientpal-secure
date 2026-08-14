@@ -31,10 +31,18 @@ const ACTION_LABEL: Record<string, string> = {
   DELETE: "Exclusão",
 };
 
-export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agendamentoId, clinicaId }: Props) {
+export function HistoricoAtendimentoDialog({
+  open,
+  onClose,
+  lancamentoId,
+  agendamentoId,
+  clinicaId,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
-  const [autores, setAutores] = useState<Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }>>({});
+  const [autores, setAutores] = useState<
+    Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }>
+  >({});
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +55,9 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
     (async () => {
       const { data, error } = await supabase
         .from("audit_log")
-        .select("id, action, table_name, user_id, user_email, created_at, dados_antes, dados_depois")
+        .select(
+          "id, action, table_name, user_id, user_email, created_at, dados_antes, dados_depois",
+        )
         .eq("clinica_id", clinicaId)
         .in("record_id", ids)
         .order("created_at", { ascending: false })
@@ -60,13 +70,18 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
       const list = (data ?? []) as Row[];
       setRows(list);
       // Resolve autores
-      const userIds = Array.from(new Set(list.map((r) => r.user_id).filter((x): x is string => !!x)));
+      const userIds = Array.from(
+        new Set(list.map((r) => r.user_id).filter((x): x is string => !!x)),
+      );
       if (userIds.length) {
         const [{ data: profs }, { data: meds }] = await Promise.all([
           supabase.from("profiles").select("id, nome, email").in("id", userIds),
           supabase.from("medicos").select("user_id, nome").in("user_id", userIds),
         ]);
-        const map: Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }> = {};
+        const map: Record<
+          string,
+          { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }
+        > = {};
         const medUserIds = new Set((meds ?? []).map((m: any) => m.user_id));
         for (const p of profs ?? []) {
           const nome = (p as any).nome || (p as any).email || "Usuário";
@@ -102,15 +117,19 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
     const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
     const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
     if (r.action === "INSERT") {
-      if (r.table_name === "fin_lancamentos" || r.table_name === "fin_atendimentos") return "Pagamento registrado";
+      if (r.table_name === "fin_lancamentos" || r.table_name === "fin_atendimentos")
+        return "Pagamento registrado";
       return ACTION_LABEL[r.action] ?? r.action;
     }
     if (r.action === "DELETE") return "Registro excluído / estornado";
     // UPDATE
     if (antes && depois) {
-      if (antes.repasse_pago === false && depois.repasse_pago === true) return "Baixa do repasse realizada";
-      if (antes.repasse_pago === true && depois.repasse_pago === false) return "Baixa do repasse desfeita";
-      if (antes.status !== depois.status) return `Status: ${String(antes.status ?? "-")} → ${String(depois.status ?? "-")}`;
+      if (antes.repasse_pago === false && depois.repasse_pago === true)
+        return "Baixa do repasse realizada";
+      if (antes.repasse_pago === true && depois.repasse_pago === false)
+        return "Baixa do repasse desfeita";
+      if (antes.status !== depois.status)
+        return `Status: ${String(antes.status ?? "-")} → ${String(depois.status ?? "-")}`;
     }
     return "Alteração";
   }
@@ -126,7 +145,9 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
             <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
           </div>
         ) : rows.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Nenhum registro de histórico encontrado.</div>
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            Nenhum registro de histórico encontrado.
+          </div>
         ) : (
           <div className="max-h-[60vh] overflow-y-auto divide-y">
             {rows.map((r) => {
@@ -140,10 +161,24 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>Por: <span className="text-foreground">{a.nome}</span></span>
-                    {a.papel === "medico" && <Badge variant="secondary" className="text-[10px]">Médico</Badge>}
-                    {a.papel === "funcionario" && <Badge variant="outline" className="text-[10px]">Funcionário</Badge>}
-                    {a.papel === "sistema" && <Badge variant="outline" className="text-[10px]">Sistema</Badge>}
+                    <span>
+                      Por: <span className="text-foreground">{a.nome}</span>
+                    </span>
+                    {a.papel === "medico" && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Médico
+                      </Badge>
+                    )}
+                    {a.papel === "funcionario" && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Funcionário
+                      </Badge>
+                    )}
+                    {a.papel === "sistema" && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Sistema
+                      </Badge>
+                    )}
                     <span className="ml-auto text-[10px] opacity-60">{r.table_name}</span>
                   </div>
                 </div>

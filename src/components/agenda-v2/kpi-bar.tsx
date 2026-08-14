@@ -1,4 +1,12 @@
-import { Clock, Activity, CheckCircle2, XCircle, TestTube, Users, type LucideIcon } from "lucide-react";
+import {
+  Clock,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  TestTube,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { HhpKpiCard, HhpKpiRow, type HhpTone } from "@/design-system/hhp";
 
 export interface Kpi {

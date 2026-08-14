@@ -46,8 +46,10 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("Lovable AI transcribe error", res.status, body);
-      if (res.status === 429) return { text: "", error: "Limite de uso atingido. Tente em alguns segundos." };
-      if (res.status === 402) return { text: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
+      if (res.status === 429)
+        return { text: "", error: "Limite de uso atingido. Tente em alguns segundos." };
+      if (res.status === 402)
+        return { text: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
       return { text: "", error: `Falha na transcrição (${res.status})` };
     }
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };

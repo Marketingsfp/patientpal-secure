@@ -13,9 +13,15 @@ function isoToMask(iso: string): string {
 function maskToIso(mask: string): string {
   const d = mask.replace(/\D/g, "");
   if (d.length < 12) return "";
-  const dia = d.slice(0, 2), mes = d.slice(2, 4), ano = d.slice(4, 8);
-  const hh = d.slice(8, 10), mm = d.slice(10, 12);
-  const nd = Number(dia), nm = Number(mes), nh = Number(hh), nmin = Number(mm);
+  const dia = d.slice(0, 2),
+    mes = d.slice(2, 4),
+    ano = d.slice(4, 8);
+  const hh = d.slice(8, 10),
+    mm = d.slice(10, 12);
+  const nd = Number(dia),
+    nm = Number(mes),
+    nh = Number(hh),
+    nmin = Number(mm);
   if (nd < 1 || nd > 31 || nm < 1 || nm > 12 || nh > 23 || nmin > 59) return "";
   return `${ano}-${mes}-${dia}T${hh}:${mm}`;
 }

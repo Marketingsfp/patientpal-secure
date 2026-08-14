@@ -49,7 +49,10 @@ export const STATUS_ESTOQUE_CLASS: Record<StatusEstoque, string> = {
 };
 
 /** Dias até vencer (negativo = já vencido). Usa data local, sem hora. */
-export function diasParaVencer(validade: string | null | undefined, hoje = new Date()): number | null {
+export function diasParaVencer(
+  validade: string | null | undefined,
+  hoje = new Date(),
+): number | null {
   if (!validade) return null;
   const [y, m, d] = validade.slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return null;
@@ -94,7 +97,10 @@ export interface AlocacaoFefo {
  * Distribui uma baixa entre os lotes seguindo FEFO.
  * Retorna as alocações e o que sobrou sem lote (quando não há saldo suficiente).
  */
-export function alocarFefo(lotes: LoteBasico[], quantidade: number): {
+export function alocarFefo(
+  lotes: LoteBasico[],
+  quantidade: number,
+): {
   alocacoes: AlocacaoFefo[];
   restante: number;
 } {

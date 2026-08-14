@@ -45,14 +45,27 @@ interface ListShellProps<S extends string> {
  * Estado da busca é controlado (o pai persiste em URL / query).
  */
 export function ListShell<S extends string>({
-  title, actions,
-  searchValue, onSearchChange, searchPlaceholder = "Buscar…", searchDebounceMs = 200,
-  tabs, tabValue, onTabChange,
-  chips, loading, empty, isEmpty, children,
-  className, bodyClassName,
+  title,
+  actions,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Buscar…",
+  searchDebounceMs = 200,
+  tabs,
+  tabValue,
+  onTabChange,
+  chips,
+  loading,
+  empty,
+  isEmpty,
+  children,
+  className,
+  bodyClassName,
 }: ListShellProps<S>) {
   const [inner, setInner] = useState(searchValue);
-  useEffect(() => { setInner(searchValue); }, [searchValue]);
+  useEffect(() => {
+    setInner(searchValue);
+  }, [searchValue]);
   useEffect(() => {
     if (inner === searchValue) return;
     const t = setTimeout(() => onSearchChange(inner), searchDebounceMs);
@@ -69,7 +82,10 @@ export function ListShell<S extends string>({
       )}
 
       <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+          aria-hidden
+        />
         <Input
           value={inner}
           onChange={(e) => setInner(e.target.value)}
@@ -101,7 +117,12 @@ export function ListShell<S extends string>({
         </div>
       )}
 
-      <div className={cn("flex-1 min-h-0 rounded-lg border border-border bg-card overflow-hidden", bodyClassName)}>
+      <div
+        className={cn(
+          "flex-1 min-h-0 rounded-lg border border-border bg-card overflow-hidden",
+          bodyClassName,
+        )}
+      >
         {loading ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (

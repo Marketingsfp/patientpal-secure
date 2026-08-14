@@ -9,7 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { formatDatePura } from "@/lib/date-utils";
 
 interface Evolucao {
@@ -22,7 +29,13 @@ interface Evolucao {
   created_at: string;
 }
 
-export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId: string; readOnly?: boolean }) {
+export function EvolucaoOdontoTab({
+  pacienteId,
+  readOnly = false,
+}: {
+  pacienteId: string;
+  readOnly?: boolean;
+}) {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Evolucao[]>([]);
   const [open, setOpen] = useState(false);
@@ -55,11 +68,15 @@ export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId
 
   async function salvar() {
     if (!clinicaAtual || !form.descricao.trim()) {
-      toast.error("Descrição obrigatória"); return;
+      toast.error("Descrição obrigatória");
+      return;
     }
     setSaving(true);
     const dentesArr = form.dentes
-      .split(/[,\s]+/).filter(Boolean).map(n => Number(n)).filter(n => Number.isFinite(n));
+      .split(/[,\s]+/)
+      .filter(Boolean)
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n));
     const { error } = await supabase.from("odonto_evolucoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       paciente_id: pacienteId,
@@ -72,13 +89,19 @@ export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId
     setSaving(false);
     if (error) return mostrarErro(error);
     toast.success("Evolução registrada");
-    setForm({ data: new Date().toISOString().slice(0, 10), titulo: "", descricao: "", procedimento: "", dentes: "" });
+    setForm({
+      data: new Date().toISOString().slice(0, 10),
+      titulo: "",
+      descricao: "",
+      procedimento: "",
+      dentes: "",
+    });
     setOpen(false);
     void carregar();
   }
 
   async function excluir(id: string) {
-    if (!await confirmDialog("Excluir esta evolução?")) return;
+    if (!(await confirmDialog("Excluir esta evolução?"))) return;
     const { error } = await supabase.from("odonto_evolucoes").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Evolução excluída");
@@ -91,22 +114,65 @@ export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId
         <div className="flex justify-end">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Nova evolução</Button>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Nova evolução
+              </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Nova evolução clínica</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Nova evolução clínica</DialogTitle>
+              </DialogHeader>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Data</Label><Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} /></div>
-                  <div><Label>Dentes (separar por vírgula)</Label><Input value={form.dentes} onChange={e => setForm({ ...form, dentes: e.target.value })} placeholder="ex.: 11, 12, 21" /></div>
+                  <div>
+                    <Label>Data</Label>
+                    <Input
+                      type="date"
+                      value={form.data}
+                      onChange={(e) => setForm({ ...form, data: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Dentes (separar por vírgula)</Label>
+                    <Input
+                      value={form.dentes}
+                      onChange={(e) => setForm({ ...form, dentes: e.target.value })}
+                      placeholder="ex.: 11, 12, 21"
+                    />
+                  </div>
                 </div>
-                <div><Label>Título</Label><Input value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} placeholder="Resumo curto" /></div>
-                <div><Label>Procedimento</Label><Input value={form.procedimento} onChange={e => setForm({ ...form, procedimento: e.target.value })} /></div>
-                <div><Label>Descrição *</Label><Textarea rows={4} value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} /></div>
+                <div>
+                  <Label>Título</Label>
+                  <Input
+                    value={form.titulo}
+                    onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                    placeholder="Resumo curto"
+                  />
+                </div>
+                <div>
+                  <Label>Procedimento</Label>
+                  <Input
+                    value={form.procedimento}
+                    onChange={(e) => setForm({ ...form, procedimento: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Descrição *</Label>
+                  <Textarea
+                    rows={4}
+                    value={form.descricao}
+                    onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                  />
+                </div>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button onClick={salvar} disabled={saving}>Registrar</Button>
+                <Button variant="ghost" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={salvar} disabled={saving}>
+                  Registrar
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -120,7 +186,7 @@ export function EvolucaoOdontoTab({ pacienteId, readOnly = false }: { pacienteId
         </div>
       ) : (
         <ol className="relative border-l border-muted ml-3 space-y-4">
-          {rows.map(r => (
+          {rows.map((r) => (
             <li key={r.id} className="ml-6">
               <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-primary" />
               <div className="border rounded-md p-3 bg-card">

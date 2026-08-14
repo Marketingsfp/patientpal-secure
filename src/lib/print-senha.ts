@@ -27,7 +27,9 @@ function carregarJsPdf(): Promise<typeof import("jspdf")> {
 
 /** Aquecimento do gerador de PDF; nunca lança. */
 export function precarregarGeradorPdf(): void {
-  void carregarJsPdf().catch(() => { /* segue no fallback HTML */ });
+  void carregarJsPdf().catch(() => {
+    /* segue no fallback HTML */
+  });
 }
 
 /**
@@ -170,7 +172,11 @@ export function imprimirSenhaTotem(params: {
   doc.close();
 
   const cleanup = () => {
-    try { document.body.removeChild(iframe); } catch { /* noop */ }
+    try {
+      document.body.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
   };
 
   const doPrint = () => {

@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -31,7 +35,12 @@ export const Route = createFileRoute("/_authenticated/app/atendimento-multiplo")
   }),
 });
 
-type Paciente = { id: string; nome: string; telefone: string | null; data_nascimento: string | null };
+type Paciente = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  data_nascimento: string | null;
+};
 type Medico = { id: string; nome: string };
 type Recurso = { id: string; nome: string };
 type Procedimento = {
@@ -152,7 +161,9 @@ function AtendimentoMultiploPage() {
       setMedicos((med.data ?? []) as Medico[]);
       setRecursos([] as Recurso[]);
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [clinicaId]);
 
   // Busca de procedimentos por linha (server-side, debounced).
@@ -181,13 +192,15 @@ function AtendimentoMultiploPage() {
         }
         const { data } = await query.order("nome").limit(20);
         if (cancel) return;
-        const rows = ((data ?? []) as Array<{
-          id: string;
-          nome: string;
-          valor_padrao: number | null;
-          duracao_minutos: number | null;
-          tipo_procedimento: string | null;
-        }>).map((p) => ({
+        const rows = (
+          (data ?? []) as Array<{
+            id: string;
+            nome: string;
+            valor_padrao: number | null;
+            duracao_minutos: number | null;
+            tipo_procedimento: string | null;
+          }>
+        ).map((p) => ({
           id: p.id,
           nome: p.nome,
           valor: p.valor_padrao,
@@ -196,16 +209,24 @@ function AtendimentoMultiploPage() {
         }));
         setProcResultados((prev) => ({ ...prev, [key]: rows }));
       }, 200);
-      cancels.push(() => { cancel = true; clearTimeout(t); });
+      cancels.push(() => {
+        cancel = true;
+        clearTimeout(t);
+      });
     }
-    return () => { for (const c of cancels) c(); };
+    return () => {
+      for (const c of cancels) c();
+    };
   }, [buscaProc, clinicaId]);
 
   // Busca paciente (debounced simples)
   useEffect(() => {
     if (!clinicaId) return;
     const q = buscaPaciente.trim();
-    if (q.length < 2) { setPacientes([]); return; }
+    if (q.length < 2) {
+      setPacientes([]);
+      return;
+    }
     let cancel = false;
     const t = setTimeout(async () => {
       const { data } = await supabase
@@ -217,7 +238,10 @@ function AtendimentoMultiploPage() {
         .limit(10);
       if (!cancel) setPacientes((data ?? []) as Paciente[]);
     }, 200);
-    return () => { cancel = true; clearTimeout(t); };
+    return () => {
+      cancel = true;
+      clearTimeout(t);
+    };
   }, [buscaPaciente, clinicaId]);
 
   const total = useMemo(() => itens.reduce((s, i) => s + (Number(i.valor) || 0), 0), [itens]);
@@ -263,17 +287,27 @@ function AtendimentoMultiploPage() {
       return;
     }
     if (pacienteIncompleto) {
-      toast.error("Complete o cadastro do paciente (telefone e data de nascimento) antes de agendar.");
+      toast.error(
+        "Complete o cadastro do paciente (telefone e data de nascimento) antes de agendar.",
+      );
       return;
     }
     for (const it of itens) {
-      if (!it.procedimento_nome) { toast.error("Preencha o serviço em todas as linhas."); return; }
-      if (!it.inicio) { toast.error(`Preencha a data/hora de "${it.procedimento_nome}".`); return; }
+      if (!it.procedimento_nome) {
+        toast.error("Preencha o serviço em todas as linhas.");
+        return;
+      }
+      if (!it.inicio) {
+        toast.error(`Preencha a data/hora de "${it.procedimento_nome}".`);
+        return;
+      }
       if (it.executor_kind === "medico" && !it.medico_id) {
-        toast.error(`Escolha o médico para "${it.procedimento_nome}".`); return;
+        toast.error(`Escolha o médico para "${it.procedimento_nome}".`);
+        return;
       }
       if (it.executor_kind === "recurso" && !it.recurso_id) {
-        toast.error(`Escolha o recurso para "${it.procedimento_nome}".`); return;
+        toast.error(`Escolha o recurso para "${it.procedimento_nome}".`);
+        return;
       }
     }
 
@@ -298,7 +332,9 @@ function AtendimentoMultiploPage() {
         toast.error(res.message);
         return;
       }
-      toast.success(`Atendimento múltiplo criado — ${res.agendamento_ids.length} serviço(s) agendado(s).`);
+      toast.success(
+        `Atendimento múltiplo criado — ${res.agendamento_ids.length} serviço(s) agendado(s).`,
+      );
       navigate({ to: "/app/agenda" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao criar atendimento múltiplo.");
@@ -317,10 +353,9 @@ function AtendimentoMultiploPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Atendimento Múltiplo</h1>
           <p className="text-sm text-muted-foreground">
-            Marque em uma única ficha vários serviços diferentes para o mesmo paciente
-            — consulta, exame de laboratório, RX, ultrassom, tomografia, ressonância.
-            Cada serviço vai para a agenda do profissional/recurso correto e mantém
-            sua própria guia e valor no financeiro.
+            Marque em uma única ficha vários serviços diferentes para o mesmo paciente — consulta,
+            exame de laboratório, RX, ultrassom, tomografia, ressonância. Cada serviço vai para a
+            agenda do profissional/recurso correto e mantém sua própria guia e valor no financeiro.
           </p>
         </div>
       </header>
@@ -335,10 +370,18 @@ function AtendimentoMultiploPage() {
             <div className="flex-1 min-w-[240px]">
               <div className="font-medium">{paciente.nome}</div>
               <div className="text-xs text-muted-foreground">
-                {paciente.telefone ?? "sem telefone"} · {paciente.data_nascimento ?? "sem nascimento"}
+                {paciente.telefone ?? "sem telefone"} ·{" "}
+                {paciente.data_nascimento ?? "sem nascimento"}
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setPaciente(null); setBuscaPaciente(""); }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPaciente(null);
+                setBuscaPaciente("");
+              }}
+            >
               Trocar paciente
             </Button>
           </div>
@@ -370,7 +413,8 @@ function AtendimentoMultiploPage() {
         )}
         {pacienteIncompleto && (
           <div className="text-xs text-amber-600">
-            ⚠ Este paciente está sem telefone ou data de nascimento — complete o cadastro antes de confirmar.
+            ⚠ Este paciente está sem telefone ou data de nascimento — complete o cadastro antes de
+            confirmar.
           </div>
         )}
       </Card>
@@ -396,7 +440,12 @@ function AtendimentoMultiploPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">Serviço #{idx + 1}</div>
                   {itens.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removerItem(it.key)} aria-label="Remover">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removerItem(it.key)}
+                      aria-label="Remover"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -411,7 +460,8 @@ function AtendimentoMultiploPage() {
                         <div>
                           <div className="font-medium text-sm">{it.procedimento_nome}</div>
                           <div className="text-xs text-muted-foreground">
-                            {categoriaLabel(it.tipo_procedimento)} · {it.duracao} min · {fmtBRL(it.valor)}
+                            {categoriaLabel(it.tipo_procedimento)} · {it.duracao} min ·{" "}
+                            {fmtBRL(it.valor)}
                           </div>
                         </div>
                         <Button
@@ -449,7 +499,8 @@ function AtendimentoMultiploPage() {
                               >
                                 <span className="text-sm">{p.nome}</span>
                                 <span className="text-xs text-muted-foreground">
-                                  {categoriaLabel(p.tipo_procedimento)} · {fmtBRL(Number(p.valor) || 0)}
+                                  {categoriaLabel(p.tipo_procedimento)} ·{" "}
+                                  {fmtBRL(Number(p.valor) || 0)}
                                 </span>
                               </button>
                             ))}
@@ -466,7 +517,11 @@ function AtendimentoMultiploPage() {
                       <Select
                         value={it.executor_kind}
                         onValueChange={(v: "medico" | "recurso") =>
-                          atualizarItem(it.key, { executor_kind: v, medico_id: null, recurso_id: null })
+                          atualizarItem(it.key, {
+                            executor_kind: v,
+                            medico_id: null,
+                            recurso_id: null,
+                          })
                         }
                       >
                         <SelectTrigger className="w-[130px]">
@@ -487,7 +542,9 @@ function AtendimentoMultiploPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {medicos.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.nome}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -501,7 +558,9 @@ function AtendimentoMultiploPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {recursos.map((r) => (
-                              <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.nome}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -528,7 +587,9 @@ function AtendimentoMultiploPage() {
                       step={5}
                       value={it.duracao}
                       onChange={(e) =>
-                        atualizarItem(it.key, { duracao: Math.max(5, Number(e.target.value) || 30) })
+                        atualizarItem(it.key, {
+                          duracao: Math.max(5, Number(e.target.value) || 30),
+                        })
                       }
                     />
                   </div>
@@ -555,7 +616,9 @@ function AtendimentoMultiploPage() {
                       type="number"
                       step="0.01"
                       value={it.valor}
-                      onChange={(e) => atualizarItem(it.key, { valor: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        atualizarItem(it.key, { valor: Number(e.target.value) || 0 })
+                      }
                     />
                   </div>
                   <div className="md:col-span-3 flex items-end text-xs text-muted-foreground">
@@ -585,11 +648,15 @@ function AtendimentoMultiploPage() {
 
       <div className="sticky bottom-0 -mx-3 sm:-mx-4 lg:-mx-6 border-t bg-background/95 backdrop-blur px-4 py-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {itens.length} serviço(s)</span>
+          <span className="flex items-center gap-1">
+            <Calendar className="h-4 w-4" /> {itens.length} serviço(s)
+          </span>
           <span className="font-semibold">Total: {fmtBRL(total)}</span>
         </div>
         <div className="flex-1" />
-        <Button variant="ghost" onClick={() => navigate({ to: "/app/agenda" })}>Cancelar</Button>
+        <Button variant="ghost" onClick={() => navigate({ to: "/app/agenda" })}>
+          Cancelar
+        </Button>
         {podeEscrever && (
           <Button onClick={confirmar} disabled={salvando || !paciente}>
             <Save className="h-4 w-4 mr-1" />

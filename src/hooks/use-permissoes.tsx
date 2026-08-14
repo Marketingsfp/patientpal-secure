@@ -111,13 +111,19 @@ export function usePermissoes(): {
       } catch (e) {
         console.error("[usePermissoes] erro carregando permissões", e);
         // Autorização deve falhar fechada: erro de rede/RLS nunca amplia acesso.
-        if (!cancelled) { setAllowed(new Set()); setNivel(new Map()); setConfigured(new Set()); }
+        if (!cancelled) {
+          setAllowed(new Set());
+          setNivel(new Map());
+          setConfigured(new Set());
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [clinicaId, role]);
 
   return { allowed, nivel, configured, loading };

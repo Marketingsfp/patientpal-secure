@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -62,7 +68,9 @@ function Info({ k, v }: { k: string; v: string }) {
 }
 
 export function PacienteDetalheDrawer({
-  ag, pago, onClose,
+  ag,
+  pago,
+  onClose,
 }: {
   ag: FluxoDetalheAg | null;
   pago: boolean;
@@ -87,7 +95,9 @@ export function PacienteDetalheDrawer({
         .select("cpf, telefone, data_nascimento")
         .eq("id", pacienteId)
         .maybeSingle()
-        .then(({ data }) => { if (active && data) setInfo(data as PacienteInfo); });
+        .then(({ data }) => {
+          if (active && data) setInfo(data as PacienteInfo);
+        });
     }
     void supabase
       .from("agendamentos")
@@ -95,9 +105,12 @@ export function PacienteDetalheDrawer({
       .eq("id", ag.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (active && data) setEspecialidade((data as { especialidade?: string | null }).especialidade ?? null);
+        if (active && data)
+          setEspecialidade((data as { especialidade?: string | null }).especialidade ?? null);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [ag, pacienteId]);
 
   const carregarHistorico = async () => {
@@ -114,7 +127,13 @@ export function PacienteDetalheDrawer({
   };
 
   const hora = ag
-    ? new Date(ag.inicio).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    ? new Date(ag.inicio).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
   const anos = idade(info?.data_nascimento);
 
@@ -129,9 +148,13 @@ export function PacienteDetalheDrawer({
             </SheetHeader>
 
             <div className="mt-1">
-              <Badge className={pago
-                ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
-                : "bg-amber-100 text-amber-700 border border-amber-300"}>
+              <Badge
+                className={
+                  pago
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                    : "bg-amber-100 text-amber-700 border border-amber-300"
+                }
+              >
                 {pago ? "PAGO" : "PENDENTE"}
               </Badge>
             </div>
@@ -163,7 +186,10 @@ export function PacienteDetalheDrawer({
                 )}
                 <ul className="space-y-1.5">
                   {hist.map((h) => (
-                    <li key={h.id} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs">
+                    <li
+                      key={h.id}
+                      className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs"
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-slate-700">{fmtData(h.inicio)}</span>
                         <span className="text-muted-foreground">{h.status ?? "—"}</span>
@@ -183,10 +209,17 @@ export function PacienteDetalheDrawer({
                   </Link>
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={carregarHistorico} disabled={!pacienteId || loadingHist}>
-                {loadingHist
-                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  : <History className="h-4 w-4 mr-2" />}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={carregarHistorico}
+                disabled={!pacienteId || loadingHist}
+              >
+                {loadingHist ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <History className="h-4 w-4 mr-2" />
+                )}
                 Ver histórico de agendamentos
               </Button>
               <Button size="sm" variant="ghost" onClick={onClose}>

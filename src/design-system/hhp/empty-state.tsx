@@ -14,14 +14,23 @@ export interface HhpEmptyStateProps {
   className?: string;
 }
 
-export function HhpEmptyState({ icon: Icon, title, description, action, className }: HhpEmptyStateProps) {
+export function HhpEmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  className,
+}: HhpEmptyStateProps) {
   return (
-    <div className={cn("min-h-full flex flex-col items-center justify-center text-center px-6 py-8 gap-3", className)}>
+    <div
+      className={cn(
+        "min-h-full flex flex-col items-center justify-center text-center px-6 py-8 gap-3",
+        className,
+      )}
+    >
       <Icon className="h-12 w-12 text-slate-500 dark:text-slate-400" strokeWidth={1.5} />
       <div className="text-sm font-semibold text-slate-700">{title}</div>
-      {description && (
-        <div className="text-xs text-slate-500 max-w-sm">{description}</div>
-      )}
+      {description && <div className="text-xs text-slate-500 max-w-sm">{description}</div>}
       {action && <div className="pt-1">{action}</div>}
     </div>
   );

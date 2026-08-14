@@ -7,10 +7,46 @@ import { useMemo } from "react";
  */
 
 // ── Antropometria simplificada (mm) — largura mesiodistal e profundidade vestíbulo-lingual
-const SUP_LARG: Record<number, number> = { 1: 8.6, 2: 6.6, 3: 7.6, 4: 7.1, 5: 6.6, 6: 10.4, 7: 9.8, 8: 9.0 };
-const SUP_PROF: Record<number, number> = { 1: 7.1, 2: 6.2, 3: 8.1, 4: 9.2, 5: 9.0, 6: 11.3, 7: 11.0, 8: 10.5 };
-const INF_LARG: Record<number, number> = { 1: 5.3, 2: 5.7, 3: 6.9, 4: 7.1, 5: 7.1, 6: 11.2, 7: 10.7, 8: 10.0 };
-const INF_PROF: Record<number, number> = { 1: 6.0, 2: 6.5, 3: 7.5, 4: 7.9, 5: 8.6, 6: 10.5, 7: 10.3, 8: 9.8 };
+const SUP_LARG: Record<number, number> = {
+  1: 8.6,
+  2: 6.6,
+  3: 7.6,
+  4: 7.1,
+  5: 6.6,
+  6: 10.4,
+  7: 9.8,
+  8: 9.0,
+};
+const SUP_PROF: Record<number, number> = {
+  1: 7.1,
+  2: 6.2,
+  3: 8.1,
+  4: 9.2,
+  5: 9.0,
+  6: 11.3,
+  7: 11.0,
+  8: 10.5,
+};
+const INF_LARG: Record<number, number> = {
+  1: 5.3,
+  2: 5.7,
+  3: 6.9,
+  4: 7.1,
+  5: 7.1,
+  6: 11.2,
+  7: 10.7,
+  8: 10.0,
+};
+const INF_PROF: Record<number, number> = {
+  1: 6.0,
+  2: 6.5,
+  3: 7.5,
+  4: 7.9,
+  5: 8.6,
+  6: 10.5,
+  7: 10.3,
+  8: 9.8,
+};
 
 const ESCALA = 2.9; // px por mm
 const FOLGA = 3.5; // px entre coroas
@@ -143,8 +179,12 @@ function montarDentes(): DenteRender[] {
 
 const DENTES = montarDentes();
 
-export const DENTES_SUPERIORES = DENTES.filter((d) => d.numero < 30).map((d) => d.numero).sort((a, b) => a - b);
-export const DENTES_INFERIORES = DENTES.filter((d) => d.numero >= 30).map((d) => d.numero).sort((a, b) => a - b);
+export const DENTES_SUPERIORES = DENTES.filter((d) => d.numero < 30)
+  .map((d) => d.numero)
+  .sort((a, b) => a - b);
+export const DENTES_INFERIORES = DENTES.filter((d) => d.numero >= 30)
+  .map((d) => d.numero)
+  .sort((a, b) => a - b);
 
 interface Props {
   /** Dentes selecionados (FDI). */
@@ -214,7 +254,15 @@ export function OdontogramaArcada({ value, onChange, disabled, destaque, semAcoe
         className="w-full max-w-[440px] mx-auto h-auto"
       >
         {/* linha média / referência da mordida */}
-        <line x1="-165" y1="2" x2="165" y2="2" className="stroke-border" strokeWidth="1" strokeDasharray="4 5" />
+        <line
+          x1="-165"
+          y1="2"
+          x2="165"
+          y2="2"
+          className="stroke-border"
+          strokeWidth="1"
+          strokeDasharray="4 5"
+        />
 
         {DENTES.map((d) => {
           const on = selecionados.has(d.numero);
@@ -240,7 +288,9 @@ export function OdontogramaArcada({ value, onChange, disabled, destaque, semAcoe
               className={disabled ? "opacity-60" : "cursor-pointer focus:outline-none"}
             >
               <title>{`Dente ${d.numero}${on ? " — selecionado" : ""}`}</title>
-              <g transform={`translate(${d.x.toFixed(2)} ${d.y.toFixed(2)}) rotate(${d.ang.toFixed(2)})`}>
+              <g
+                transform={`translate(${d.x.toFixed(2)} ${d.y.toFixed(2)}) rotate(${d.ang.toFixed(2)})`}
+              >
                 <path
                   d={contorno(d.pos, d.w, d.h)}
                   className={
@@ -281,7 +331,9 @@ export function OdontogramaArcada({ value, onChange, disabled, destaque, semAcoe
       </svg>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{selecionados.size === 0 ? "Nenhum dente selecionado" : `${selecionados.size} dente(s)`}</span>
+        <span>
+          {selecionados.size === 0 ? "Nenhum dente selecionado" : `${selecionados.size} dente(s)`}
+        </span>
         {selecionados.size > 0 && (
           <span className="truncate max-w-[60%] text-right font-mono">
             {value.slice(0, 12).join(", ")}

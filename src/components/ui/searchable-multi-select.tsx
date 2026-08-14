@@ -4,7 +4,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 
 export type SearchableMultiOption = { value: string; label: string };
@@ -57,7 +62,12 @@ export function SearchableMultiSelect({
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        if (!disabled) setOpen(o);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -65,13 +75,14 @@ export function SearchableMultiSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal min-h-10 h-auto py-2 disabled:opacity-100", className)}
+          className={cn(
+            "w-full justify-between font-normal min-h-10 h-auto py-2 disabled:opacity-100",
+            className,
+          )}
         >
           <span className="min-w-0 flex-1 text-left text-sm leading-5 text-slate-900 dark:text-slate-50 font-medium opacity-100">
             {selectedLabels.length > 0 ? (
-              <span className="line-clamp-2">
-                {selectedLabels.join(" + ")}
-              </span>
+              <span className="line-clamp-2">{selectedLabels.join(" + ")}</span>
             ) : (
               <span className="font-normal text-muted-foreground">{placeholder}</span>
             )}
@@ -129,7 +140,9 @@ export function SearchableMultiSelect({
                     <span
                       className={cn(
                         "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                        checked ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background",
+                        checked
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background",
                       )}
                     >
                       <Check className={cn("h-3 w-3", checked ? "opacity-100" : "opacity-0")} />

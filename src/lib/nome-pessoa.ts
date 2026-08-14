@@ -39,7 +39,11 @@ export function validarNomePessoa(
   if (erro) return { valido: false, mensagem: erro, valor: limpo };
   if (limpo.length < 2) return { valido: false, mensagem: "Nome muito curto.", valor: limpo };
   if (limpo.length > maxLength) {
-    return { valido: false, mensagem: `Nome muito longo (máx. ${maxLength} caracteres).`, valor: limpo };
+    return {
+      valido: false,
+      mensagem: `Nome muito longo (máx. ${maxLength} caracteres).`,
+      valor: limpo,
+    };
   }
   if (!NOME_PESSOA_REGEX.test(limpo)) {
     return { valido: false, mensagem: "O nome aceita apenas letras e espaços.", valor: limpo };

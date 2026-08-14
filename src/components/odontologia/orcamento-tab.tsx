@@ -9,10 +9,23 @@ import { printOrcamento } from "@/lib/print-orcamento";
 import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { type OrcV2 } from "@/components/orcamentos-v2/orcamento-card";
 import { OrcamentoDrawer } from "@/components/orcamentos-v2/orcamento-drawer";
@@ -41,7 +54,13 @@ const BRL = (v: number) =>
 
 const dataHora = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    ? new Date(iso).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "—";
 
 /**
@@ -50,8 +69,12 @@ const dataHora = (iso: string | null) =>
  * - reutiliza o drawer de detalhe e a impressão (2ª via) do módulo v2
  */
 export function OrcamentoTab({
-  pacienteId, pacienteNome, pacienteTelefone, especialidadeOdontoId,
-  novoOpen, onNovoOpenChange,
+  pacienteId,
+  pacienteNome,
+  pacienteTelefone,
+  especialidadeOdontoId,
+  novoOpen,
+  onNovoOpenChange,
 }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -67,29 +90,53 @@ export function OrcamentoTab({
     setLoading(true);
     let q = supabase
       .from("orcamentos")
-      .select("id, numero, serie, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, desconto, status, created_at, categoria, validade_dias")
+      .select(
+        "id, numero, serie, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, desconto, status, created_at, categoria, validade_dias",
+      )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("especialidade_id", especialidadeOdontoId)
       .order("created_at", { ascending: false })
       .limit(200);
     if (pacienteId) q = q.eq("paciente_id", pacienteId);
     const { data, error } = await q;
-    if (error) { mostrarErro(error); setLoading(false); return; }
+    if (error) {
+      mostrarErro(error);
+      setLoading(false);
+      return;
+    }
 
-    const orcs = ((data ?? []) as unknown as Array<OrcV2 & { valores_pagamento: Record<string, number> | null; desconto: number | null }>).map((o) => ({
+    const orcs = (
+      (data ?? []) as unknown as Array<
+        OrcV2 & { valores_pagamento: Record<string, number> | null; desconto: number | null }
+      >
+    ).map((o) => ({
       ...o,
-      agendamentos_total: 0, agendamentos_realizados: 0,
-      itens_total: 0, itens_consumidos: 0,
-      itens_qtd: 0, total_dinheiro: 0, total_cartao: 0, itens_pagos: 0,
-    })) as (Linha & { valores_pagamento: Record<string, number> | null; desconto: number | null })[];
+      agendamentos_total: 0,
+      agendamentos_realizados: 0,
+      itens_total: 0,
+      itens_consumidos: 0,
+      itens_qtd: 0,
+      total_dinheiro: 0,
+      total_cartao: 0,
+      itens_pagos: 0,
+    })) as (Linha & {
+      valores_pagamento: Record<string, number> | null;
+      desconto: number | null;
+    })[];
 
     if (orcs.length > 0) {
       const ids = orcs.map((o) => o.id);
       const [{ data: ags }, { data: itens }, { data: links }] = await Promise.all([
-        supabase.from("agendamentos").select("orcamento_id, status").in("orcamento_id", ids).neq("status", "cancelado"),
+        supabase
+          .from("agendamentos")
+          .select("orcamento_id, status")
+          .in("orcamento_id", ids)
+          .neq("status", "cancelado"),
         supabase
           .from("orcamento_itens")
-          .select("id, orcamento_id, quantidade, valor_unitario, valor_total, valores_formas, status_financeiro")
+          .select(
+            "id, orcamento_id, quantidade, valor_unitario, valor_total, valores_formas, status_financeiro",
+          )
           .in("orcamento_id", ids),
         supabase
           .from("agendamento_orcamento_itens")
@@ -98,12 +145,20 @@ export function OrcamentoTab({
       ]);
 
       type ItemRow = {
-        id: string; orcamento_id: string; quantidade: number | null;
-        valor_unitario: number | null; valor_total: number | null;
-        valores_formas: Record<string, number> | null; status_financeiro: string | null;
+        id: string;
+        orcamento_id: string;
+        quantidade: number | null;
+        valor_unitario: number | null;
+        valor_total: number | null;
+        valores_formas: Record<string, number> | null;
+        status_financeiro: string | null;
       };
       const itensRows = (itens ?? []) as ItemRow[];
-      const linkRows = (links ?? []) as { orcamento_id: string; orcamento_item_id: string; agendamento_id: string }[];
+      const linkRows = (links ?? []) as {
+        orcamento_id: string;
+        orcamento_item_id: string;
+        agendamento_id: string;
+      }[];
 
       // Itens pagos: quitados no financeiro do orçamento OU com agendamento
       // vinculado que já tenha recebimento confirmado (mesma regra da agenda).
@@ -126,15 +181,25 @@ export function OrcamentoTab({
         linkRows.filter((l) => agPagos.has(l.agendamento_id)).map((l) => l.orcamento_item_id),
       );
 
-      const tot = new Map<string, number>(); const real = new Map<string, number>();
+      const tot = new Map<string, number>();
+      const real = new Map<string, number>();
       for (const a of (ags ?? []) as { orcamento_id: string; status: string }[]) {
         tot.set(a.orcamento_id, (tot.get(a.orcamento_id) ?? 0) + 1);
         if (a.status === "realizado") real.set(a.orcamento_id, (real.get(a.orcamento_id) ?? 0) + 1);
       }
 
-      const agg = new Map<string, { qtd: number; dinheiro: number; cartao: number; pagos: number; unidades: number }>();
+      const agg = new Map<
+        string,
+        { qtd: number; dinheiro: number; cartao: number; pagos: number; unidades: number }
+      >();
       for (const it of itensRows) {
-        const cur = agg.get(it.orcamento_id) ?? { qtd: 0, dinheiro: 0, cartao: 0, pagos: 0, unidades: 0 };
+        const cur = agg.get(it.orcamento_id) ?? {
+          qtd: 0,
+          dinheiro: 0,
+          cartao: 0,
+          pagos: 0,
+          unidades: 0,
+        };
         const q = Number(it.quantidade ?? 1) || 1;
         const bruto = Number(it.valor_total ?? q * Number(it.valor_unitario ?? 0));
         const vf = it.valores_formas ?? null;
@@ -167,11 +232,14 @@ export function OrcamentoTab({
         // Desconto do orçamento é global: aplica proporcionalmente às colunas.
         const descontoOrc = Number(o.desconto ?? 0);
         const vp = o.valores_pagamento ?? null;
-        const dinTotal = vp && Number(vp["Dinheiro"] ?? 0) > 0
-          ? Number(vp["Dinheiro"])
-          : Math.max(0, (a?.dinheiro ?? Number(o.valor_total ?? 0)) - descontoOrc);
+        const dinTotal =
+          vp && Number(vp["Dinheiro"] ?? 0) > 0
+            ? Number(vp["Dinheiro"])
+            : Math.max(0, (a?.dinheiro ?? Number(o.valor_total ?? 0)) - descontoOrc);
         const cardTotal = vp
-          ? Number(vp["Cartão de Crédito"] ?? vp["Cartão de Débito"] ?? vp["PIX"] ?? vp["Pix"] ?? 0) || Math.max(0, (a?.cartao ?? Number(o.valor_total ?? 0)) - descontoOrc)
+          ? Number(
+              vp["Cartão de Crédito"] ?? vp["Cartão de Débito"] ?? vp["PIX"] ?? vp["Pix"] ?? 0,
+            ) || Math.max(0, (a?.cartao ?? Number(o.valor_total ?? 0)) - descontoOrc)
           : Math.max(0, (a?.cartao ?? Number(o.valor_total ?? 0)) - descontoOrc);
         o.total_dinheiro = dinTotal;
         o.total_cartao = cardTotal;
@@ -181,12 +249,17 @@ export function OrcamentoTab({
     setLoading(false);
   }, [clinicaAtual, especialidadeOdontoId, pacienteId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const imprimir = async (id: string) => {
     if (!clinicaAtual) return;
-    try { await printOrcamento(id, clinicaAtual.clinica_id, "a4"); }
-    catch (e) { toast.error((e as Error).message); }
+    try {
+      await printOrcamento(id, clinicaAtual.clinica_id, "a4");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   const confirmarExclusao = async () => {
@@ -194,7 +267,10 @@ export function OrcamentoTab({
     setExcluindo(true);
     const { error } = await supabase.from("orcamentos").delete().eq("id", excluir.id);
     setExcluindo(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Orçamento excluído");
     setExcluir(null);
     void load();
@@ -231,22 +307,27 @@ export function OrcamentoTab({
                 const parcial = o.itens_pagos > 0 && o.itens_pagos < o.itens_qtd;
                 const tudoPago = o.itens_qtd > 0 && o.itens_pagos === o.itens_qtd;
                 return (
-                  <TableRow
-                    key={o.id}
-                    className="cursor-pointer"
-                    onClick={() => setDrawerOrc(o)}
-                  >
+                  <TableRow key={o.id} className="cursor-pointer" onClick={() => setDrawerOrc(o)}>
                     <TableCell className="whitespace-nowrap text-sm font-medium tabular-nums">
                       {formatNumeroOrcamento(o.serie, o.numero)}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">{dataHora(o.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {dataHora(o.created_at)}
+                    </TableCell>
                     <TableCell className="text-sm font-medium">{o.paciente_nome ?? "—"}</TableCell>
                     <TableCell className="text-sm">{o.medico_nome ?? "—"}</TableCell>
                     <TableCell className="text-center text-sm">{o.itens_qtd}</TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">{BRL(o.total_dinheiro)}</TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">{BRL(o.total_cartao)}</TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {BRL(o.total_dinheiro)}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {BRL(o.total_cartao)}
+                    </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={tudoPago ? "secondary" : parcial ? "default" : "outline"} className="font-normal">
+                      <Badge
+                        variant={tudoPago ? "secondary" : parcial ? "default" : "outline"}
+                        className="font-normal"
+                      >
                         {o.itens_pagos}/{o.itens_qtd}
                       </Badge>
                     </TableCell>
@@ -254,9 +335,16 @@ export function OrcamentoTab({
                       <Button
                         size="icon"
                         variant="ghost"
-                        title={o.itens_pagos > 0 ? "Orçamento com itens pagos — não pode ser editado" : "Editar orçamento"}
+                        title={
+                          o.itens_pagos > 0
+                            ? "Orçamento com itens pagos — não pode ser editado"
+                            : "Editar orçamento"
+                        }
                         disabled={o.itens_pagos > 0}
-                        onClick={(e) => { e.stopPropagation(); setEditId(o.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditId(o.id);
+                        }}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -264,7 +352,10 @@ export function OrcamentoTab({
                         size="icon"
                         variant="ghost"
                         title="Imprimir 2ª via"
-                        onClick={(e) => { e.stopPropagation(); void imprimir(o.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void imprimir(o.id);
+                        }}
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
@@ -280,7 +371,10 @@ export function OrcamentoTab({
                               : "Excluir orçamento"
                         }
                         disabled={o.itens_pagos > 0 || (o.agendamentos_total ?? 0) > 0}
-                        onClick={(e) => { e.stopPropagation(); setExcluir(o); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExcluir(o);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -301,20 +395,30 @@ export function OrcamentoTab({
         ocultarConversao
       />
 
-      <AlertDialog open={!!excluir} onOpenChange={(v) => { if (!v) setExcluir(null); }}>
+      <AlertDialog
+        open={!!excluir}
+        onOpenChange={(v) => {
+          if (!v) setExcluir(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir orçamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Excluir o orçamento {excluir ? formatNumeroOrcamento(excluir.serie, excluir.numero) : ""}
-              {excluir?.paciente_nome ? ` de ${excluir.paciente_nome}` : ""}? Esta ação não pode ser desfeita.
+              Excluir o orçamento{" "}
+              {excluir ? formatNumeroOrcamento(excluir.serie, excluir.numero) : ""}
+              {excluir?.paciente_nome ? ` de ${excluir.paciente_nome}` : ""}? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={excluindo}
-              onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmarExclusao();
+              }}
             >
               {excluindo ? "Excluindo…" : "Excluir"}
             </AlertDialogAction>
@@ -332,7 +436,10 @@ export function OrcamentoTab({
           pacienteTelefone={pacienteTelefone ?? null}
           especialidadeOdontoId={especialidadeOdontoId}
           userId={user?.id ?? null}
-          onCreated={() => { onNovoOpenChange(false); void load(); }}
+          onCreated={() => {
+            onNovoOpenChange(false);
+            void load();
+          }}
         />
       )}
 
@@ -345,7 +452,10 @@ export function OrcamentoTab({
           especialidadeOdontoId={especialidadeOdontoId}
           userId={user?.id ?? null}
           orcamentoId={editId}
-          onCreated={() => { setEditId(null); void load(); }}
+          onCreated={() => {
+            setEditId(null);
+            void load();
+          }}
         />
       )}
     </div>

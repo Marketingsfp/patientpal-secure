@@ -6,7 +6,10 @@ import { C } from "../theme";
 
 export const A3SemParcela: React.FC = () => {
   const frame = useCurrentFrame();
-  const aviso = interpolate(frame, [40, 58], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const aviso = interpolate(frame, [40, 58], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
     <AbsoluteFill>
       <Backdrop tone={2} />
@@ -24,20 +27,39 @@ export const A3SemParcela: React.FC = () => {
             O sistema avisa e já oferece a saída:
           </div>
           <div style={{ height: 20, opacity: aviso }} />
-          <div style={{
-            opacity: aviso,
-            background: `${C.clay}22`, border: `1px solid ${C.clay}77`, borderRadius: 16, padding: "22px 26px",
-            fontFamily: body, fontSize: 28, color: C.cream,
-          }}>
-            “Este paciente não tem contrato ativo cadastrado — pode ser um cadastro que não veio
-            na migração do sistema antigo. Use o pagamento avulso abaixo.”
+          <div
+            style={{
+              opacity: aviso,
+              background: `${C.clay}22`,
+              border: `1px solid ${C.clay}77`,
+              borderRadius: 16,
+              padding: "22px 26px",
+              fontFamily: body,
+              fontSize: 28,
+              color: C.cream,
+            }}
+          >
+            “Este paciente não tem contrato ativo cadastrado — pode ser um cadastro que não veio na
+            migração do sistema antigo. Use o pagamento avulso abaixo.”
           </div>
           <div style={{ height: 22 }} />
-          <div style={{
-            opacity: interpolate(frame, [62, 78], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-            background: `${C.green}44`, border: `1px solid ${C.greenSoft}`, borderRadius: 16, padding: "24px 30px",
-            fontFamily: display, fontSize: 36, fontWeight: 700, color: C.cream, textAlign: "center",
-          }}>
+          <div
+            style={{
+              opacity: interpolate(frame, [62, 78], [0, 1], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }),
+              background: `${C.green}44`,
+              border: `1px solid ${C.greenSoft}`,
+              borderRadius: 16,
+              padding: "24px 30px",
+              fontFamily: display,
+              fontSize: 36,
+              fontWeight: 700,
+              color: C.cream,
+              textAlign: "center",
+            }}
+          >
             Pagamento avulso (sem contrato)
           </div>
         </Panel>

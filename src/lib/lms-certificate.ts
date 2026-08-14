@@ -43,7 +43,9 @@ export async function gerarCertificadoPDF(opts: {
   doc.text(lines, W / 2, 108, { align: "center" });
 
   doc.setFontSize(11);
-  doc.text(`Emitido em ${opts.emitidoEm.toLocaleDateString("pt-BR")}`, W / 2, 150, { align: "center" });
+  doc.text(`Emitido em ${opts.emitidoEm.toLocaleDateString("pt-BR")}`, W / 2, 150, {
+    align: "center",
+  });
 
   // QR
   const verifyUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/verificar/${opts.codigoVerificacao}`;

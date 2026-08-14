@@ -4,7 +4,13 @@ import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,21 +66,38 @@ interface Props {
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"] as const;
 
 function valorPorForma(p: Procedimento, f: string): number {
-  if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
+  if (f === "Dinheiro")
+    return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
   if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
-  if (f === "Cartão de Crédito") return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
-  if (f === "Cartão de Débito") return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
+  if (f === "Cartão de Crédito")
+    return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
+  if (f === "Cartão de Débito")
+    return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
   return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
 }
 
 export function NovoOrcamentoOdontoDialog({
-  open, onClose, clinicaId, pacienteId, pacienteNome, pacienteTelefone,
-  especialidadeOdontoId, userId, onCreated, orcamentoId = null,
+  open,
+  onClose,
+  clinicaId,
+  pacienteId,
+  pacienteNome,
+  pacienteTelefone,
+  especialidadeOdontoId,
+  userId,
+  onCreated,
+  orcamentoId = null,
 }: Props) {
   const editando = !!orcamentoId;
   // Paciente do orçamento — inicia com o filtro da tela, mas é editável aqui.
   const [paciente, setPaciente] = useState<PatientOption | null>(
-    pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+    pacienteId
+      ? ({
+          id: pacienteId,
+          nome: pacienteNome ?? "",
+          telefone: pacienteTelefone ?? null,
+        } as PatientOption)
+      : null,
   );
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickInitial, setQuickInitial] = useState("");
@@ -102,7 +125,13 @@ export function NovoOrcamentoOdontoDialog({
   useEffect(() => {
     if (!open) return;
     setPaciente(
-      pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+      pacienteId
+        ? ({
+            id: pacienteId,
+            nome: pacienteNome ?? "",
+            telefone: pacienteTelefone ?? null,
+          } as PatientOption)
+        : null,
     );
     void (async () => {
       // Médicos que atendem Odontologia (join via medico_especialidades)
@@ -113,7 +142,12 @@ export function NovoOrcamentoOdontoDialog({
         .eq("medico_especialidades.especialidade_id", especialidadeOdontoId)
         .order("nome")
         .limit(500);
-      setMedicos(((medRows ?? []) as { id: string; nome: string }[]).map((m) => ({ id: m.id, nome: m.nome })));
+      setMedicos(
+        ((medRows ?? []) as { id: string; nome: string }[]).map((m) => ({
+          id: m.id,
+          nome: m.nome,
+        })),
+      );
 
       // Procedimentos vinculados à especialidade Odontologia — carrega todos para lista suspensa
       const { data: peRows } = await supabase
@@ -122,10 +156,15 @@ export function NovoOrcamentoOdontoDialog({
         .eq("clinica_id", clinicaId)
         .eq("especialidade_id", especialidadeOdontoId);
       const ids = ((peRows ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id);
-      if (ids.length === 0) { setProcsOdonto([]); return; }
+      if (ids.length === 0) {
+        setProcsOdonto([]);
+        return;
+      }
       const { data: procRows } = await supabase
         .from("procedimentos")
-        .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
+        .select(
+          "id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel",
+        )
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .in("id", ids)
@@ -144,36 +183,66 @@ export function NovoOrcamentoOdontoDialog({
       const [{ data: orc, error }, { data: itensRows }] = await Promise.all([
         supabase
           .from("orcamentos")
-          .select("id, paciente_id, paciente_nome, paciente_telefone, medico_id, medico_nome, forma_pagamento, desconto, validade_dias, observacoes")
+          .select(
+            "id, paciente_id, paciente_nome, paciente_telefone, medico_id, medico_nome, forma_pagamento, desconto, validade_dias, observacoes",
+          )
           .eq("id", orcamentoId)
           .maybeSingle(),
         supabase
           .from("orcamento_itens")
-          .select("procedimento_id, descricao, quantidade, valor_unitario, valores_formas, dentes, sinal_valor, ordem")
+          .select(
+            "procedimento_id, descricao, quantidade, valor_unitario, valores_formas, dentes, sinal_valor, ordem",
+          )
           .eq("orcamento_id", orcamentoId)
           .order("ordem"),
       ]);
       if (cancelado) return;
-      if (error || !orc) { setCarregando(false); return mostrarErro(error); }
+      if (error || !orc) {
+        setCarregando(false);
+        return mostrarErro(error);
+      }
       const o = orc as unknown as {
-        paciente_id: string | null; paciente_nome: string | null; paciente_telefone: string | null;
-        medico_id: string | null; medico_nome: string | null; forma_pagamento: string | null;
-        desconto: number | null; validade_dias: number | null; observacoes: string | null;
+        paciente_id: string | null;
+        paciente_nome: string | null;
+        paciente_telefone: string | null;
+        medico_id: string | null;
+        medico_nome: string | null;
+        forma_pagamento: string | null;
+        desconto: number | null;
+        validade_dias: number | null;
+        observacoes: string | null;
       };
-      setPaciente(o.paciente_id ? ({ id: o.paciente_id, nome: o.paciente_nome ?? "", telefone: o.paciente_telefone ?? null } as PatientOption) : null);
+      setPaciente(
+        o.paciente_id
+          ? ({
+              id: o.paciente_id,
+              nome: o.paciente_nome ?? "",
+              telefone: o.paciente_telefone ?? null,
+            } as PatientOption)
+          : null,
+      );
       setMedicoId(o.medico_id ?? "");
       setMedicoNome(o.medico_nome ?? "");
-      const formas = (o.forma_pagamento ?? "").split("+").map((s) => s.trim()).filter(Boolean);
+      const formas = (o.forma_pagamento ?? "")
+        .split("+")
+        .map((s) => s.trim())
+        .filter(Boolean);
       setFormasPagamento(formas.length ? formas : ["Dinheiro"]);
       setDesconto(Number(o.desconto ?? 0));
       setValidade(Number(o.validade_dias ?? 30));
       setObservacoes(o.observacoes ?? "");
       setItens(
-        ((itensRows ?? []) as unknown as Array<{
-          procedimento_id: string | null; descricao: string | null; quantidade: number | null;
-          valor_unitario: number | null; valores_formas: Record<string, number> | null;
-          dentes: number[] | null; sinal_valor: number | null;
-        }>).map((r) => ({
+        (
+          (itensRows ?? []) as unknown as Array<{
+            procedimento_id: string | null;
+            descricao: string | null;
+            quantidade: number | null;
+            valor_unitario: number | null;
+            valores_formas: Record<string, number> | null;
+            dentes: number[] | null;
+            sinal_valor: number | null;
+          }>
+        ).map((r) => ({
           descricao: r.descricao ?? "",
           quantidade: Number(r.quantidade ?? 1) || 1,
           valor_unitario: Number(r.valor_unitario ?? 0),
@@ -185,16 +254,24 @@ export function NovoOrcamentoOdontoDialog({
       );
       setCarregando(false);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [open, orcamentoId]);
 
   useEffect(() => {
     if (!open) {
       // reset ao fechar
-      setMedicoNome(""); setMedicoId(""); setFormasPagamento(["Dinheiro"]);
-      setDesconto(0); setValidade(30); setObservacoes(""); setItens([]);
+      setMedicoNome("");
+      setMedicoId("");
+      setFormasPagamento(["Dinheiro"]);
+      setDesconto(0);
+      setValidade(30);
+      setObservacoes("");
+      setItens([]);
       setProcsSelecionados([]);
-      setSelecao([]); setBuscaAberta(false);
+      setSelecao([]);
+      setBuscaAberta(false);
     }
   }, [open]);
 
@@ -207,7 +284,10 @@ export function NovoOrcamentoOdontoDialog({
   const toggleForma = (f: string) => {
     setFormasPagamento((cur) => {
       if (cur.includes(f)) return cur.filter((x) => x !== f);
-      if (cur.length >= 2) { toast.info("Máximo de 2 formas de pagamento"); return cur; }
+      if (cur.length >= 2) {
+        toast.info("Máximo de 2 formas de pagamento");
+        return cur;
+      }
       return [...cur, f];
     });
   };
@@ -215,8 +295,12 @@ export function NovoOrcamentoOdontoDialog({
   // Adiciona os procedimentos selecionados no combobox — 1 item por dente x procedimento.
   // Ex.: 3 procedimentos em 2 dentes = 6 linhas independentes.
   const adicionarProcsSelecionados = () => {
-    if (procsSelecionados.length === 0) { toast.info("Selecione ao menos um procedimento"); return; }
-    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
+    if (procsSelecionados.length === 0) {
+      toast.info("Selecione ao menos um procedimento");
+      return;
+    }
+    const dentes =
+      selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
     const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
     const novos: Item[] = [];
     let algumVariavel = false;
@@ -231,7 +315,8 @@ export function NovoOrcamentoOdontoDialog({
         // conseguem exibir os totais separados de Dinheiro vs Cartão/PIX
         // (PIX é agrupado junto com Cartão).
         if (valores["Dinheiro"] == null) valores["Dinheiro"] = valorPorForma(p, "Dinheiro");
-        if (valores["Cartão de Crédito"] == null) valores["Cartão de Crédito"] = valorPorForma(p, "Cartão de Crédito");
+        if (valores["Cartão de Crédito"] == null)
+          valores["Cartão de Crédito"] = valorPorForma(p, "Cartão de Crédito");
         // PIX passa a valer o mesmo que Cartão (regra da clínica).
         valores["PIX"] = valores["Cartão de Crédito"];
         novos.push({
@@ -251,7 +336,8 @@ export function NovoOrcamentoOdontoDialog({
     setItens((arr) => [...novos.reverse(), ...arr]);
     if (algumVariavel) toast.info("Algum procedimento tem valor variável — revise no fechamento.");
     setProcsSelecionados([]);
-    setSelecao([]); setBuscaAberta(false);
+    setSelecao([]);
+    setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
@@ -264,7 +350,8 @@ export function NovoOrcamentoOdontoDialog({
     // Toggle: clicar de novo em um dente já selecionado remove ele
     setSelecao((cur) => {
       const set = new Set(cur);
-      if (set.has(d)) set.delete(d); else set.add(d);
+      if (set.has(d)) set.delete(d);
+      else set.add(d);
       const arr = Array.from(set).sort((a, b) => a - b);
       if (arr.length > 0) setBuscaAberta(true);
       else setBuscaAberta(false);
@@ -273,8 +360,8 @@ export function NovoOrcamentoOdontoDialog({
   };
 
   const selecionarArcada = (tipo: "sup" | "inf") => {
-    const sup = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
-    const inf = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+    const sup = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+    const inf = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
     setSelecao(tipo === "sup" ? sup : inf);
     setBuscaAberta(true);
   };
@@ -285,7 +372,10 @@ export function NovoOrcamentoOdontoDialog({
 
   const remover = (idx: number) => setItens((arr) => arr.filter((_, i) => i !== idx));
 
-  const subtotal = itens.reduce((s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0), 0);
+  const subtotal = itens.reduce(
+    (s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0),
+    0,
+  );
   const total = Math.max(0, subtotal - Number(desconto || 0));
 
   const totaisPorForma = useMemo(() => {
@@ -304,23 +394,29 @@ export function NovoOrcamentoOdontoDialog({
   const salvar = async () => {
     if (!paciente?.id) return toast.error("Selecione o paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
-    if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
+    if (formasPagamento.length === 0)
+      return toast.error("Selecione ao menos uma forma de pagamento");
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i];
       if (!it.descricao?.trim()) return toast.error(`Item ${i + 1}: informe a descrição`);
       const qtd = Number(it.quantidade);
-      if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) return toast.error(`Item ${i + 1}: quantidade 1..999`);
+      if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999)
+        return toast.error(`Item ${i + 1}: quantidade 1..999`);
       const vu = Number(it.valor_unitario);
-      if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
+      if (!Number.isFinite(vu) || vu <= 0)
+        return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
       if (it.dentes.length > 32) return toast.error(`Item ${i + 1}: máximo 32 dentes`);
       const sinal = Number(it.sinal_valor ?? 0);
       const totalItem = (Number(it.quantidade) || 0) * vu;
       if (sinal < 0) return toast.error(`Item ${i + 1}: sinal não pode ser negativo`);
-      if (sinal > totalItem) return toast.error(`Item ${i + 1}: sinal não pode ser maior que o total do item`);
+      if (sinal > totalItem)
+        return toast.error(`Item ${i + 1}: sinal não pode ser maior que o total do item`);
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
-    if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
-    if (!Number.isFinite(Number(validade)) || Number(validade) < 1) return toast.error("Validade deve ser ≥ 1");
+    if (Number(desconto) > subtotal)
+      return toast.error("Desconto não pode ser maior que o subtotal");
+    if (!Number.isFinite(Number(validade)) || Number(validade) < 1)
+      return toast.error("Validade deve ser ≥ 1");
 
     setSaving(true);
     const valoresPag = formasPagamento.length > 1 ? { ...totaisPorForma } : null;
@@ -356,10 +452,21 @@ export function NovoOrcamentoOdontoDialog({
           observacoes: observacoes.trim() || null,
         })
         .eq("id", orcamentoId);
-      if (eUp) { setSaving(false); return mostrarErro(eUp); }
-      const { error: eDel } = await supabase.from("orcamento_itens").delete().eq("orcamento_id", orcamentoId);
-      if (eDel) { setSaving(false); return mostrarErro(eDel); }
-      const { error: eIns } = await supabase.from("orcamento_itens").insert(montarItens(orcamentoId));
+      if (eUp) {
+        setSaving(false);
+        return mostrarErro(eUp);
+      }
+      const { error: eDel } = await supabase
+        .from("orcamento_itens")
+        .delete()
+        .eq("orcamento_id", orcamentoId);
+      if (eDel) {
+        setSaving(false);
+        return mostrarErro(eDel);
+      }
+      const { error: eIns } = await supabase
+        .from("orcamento_itens")
+        .insert(montarItens(orcamentoId));
       setSaving(false);
       if (eIns) return mostrarErro(eIns);
       toast.success("Orçamento atualizado");
@@ -390,14 +497,21 @@ export function NovoOrcamentoOdontoDialog({
       })
       .select("id")
       .single();
-    if (error || !orc) { setSaving(false); return mostrarErro(error); }
+    if (error || !orc) {
+      setSaving(false);
+      return mostrarErro(error);
+    }
 
     const payload = montarItens(orc.id);
     const { error: e2 } = await supabase.from("orcamento_itens").insert(payload);
     setSaving(false);
     if (e2) return mostrarErro(e2);
     toast.success("Orçamento odontológico criado");
-    try { await printOrcamento(orc.id, clinicaId, "a4"); } catch (e) { toast.error((e as Error).message); }
+    try {
+      await printOrcamento(orc.id, clinicaId, "a4");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
     onCreated(orc.id);
   };
 
@@ -405,7 +519,9 @@ export function NovoOrcamentoOdontoDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editando ? "Editar orçamento — Odontologia" : "Novo orçamento — Odontologia"}</DialogTitle>
+          <DialogTitle>
+            {editando ? "Editar orçamento — Odontologia" : "Novo orçamento — Odontologia"}
+          </DialogTitle>
         </DialogHeader>
 
         {carregando && <p className="text-sm text-muted-foreground">Carregando orçamento…</p>}
@@ -418,10 +534,16 @@ export function NovoOrcamentoOdontoDialog({
               <PatientSearchInput
                 value={paciente}
                 onSelect={(p) => setPaciente(p)}
-                onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
+                onRequestCreate={(q) => {
+                  setQuickInitial(q);
+                  setQuickOpen(true);
+                }}
               />
             </div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={paciente?.telefone ?? ""} disabled /></div>
+            <div className="space-y-1">
+              <Label>Telefone</Label>
+              <Input value={paciente?.telefone ?? ""} disabled />
+            </div>
             <div className="space-y-1">
               <Label>Dentista</Label>
               <select
@@ -430,7 +552,11 @@ export function NovoOrcamentoOdontoDialog({
                 onChange={(e) => selecionarMedico(e.target.value)}
               >
                 <option value="">— selecionar —</option>
-                {medicos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                {medicos.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -440,7 +566,10 @@ export function NovoOrcamentoOdontoDialog({
             <div className="flex flex-wrap gap-3 pt-1">
               {FORMAS.map((f) => (
                 <label key={f} className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={formasPagamento.includes(f)} onCheckedChange={() => toggleForma(f)} />
+                  <Checkbox
+                    checked={formasPagamento.includes(f)}
+                    onCheckedChange={() => toggleForma(f)}
+                  />
                   {f}
                 </label>
               ))}
@@ -457,15 +586,30 @@ export function NovoOrcamentoOdontoDialog({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => selecionarArcada("sup")}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => selecionarArcada("sup")}
+                >
                   Arcada superior
                 </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => selecionarArcada("inf")}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => selecionarArcada("inf")}
+                >
                   Arcada inferior
                 </Button>
                 <Button
-                  type="button" size="sm" variant="ghost"
-                  onClick={() => { setSelecao([]); setBuscaAberta(false); }}
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelecao([]);
+                    setBuscaAberta(false);
+                  }}
                   disabled={selecao.length === 0}
                 >
                   Limpar
@@ -476,14 +620,19 @@ export function NovoOrcamentoOdontoDialog({
               <DentePicker
                 inline
                 value={selecao}
-                onChange={(v) => { setSelecao(v); if (v.length > 0) setBuscaAberta(true); else setBuscaAberta(false); }}
+                onChange={(v) => {
+                  setSelecao(v);
+                  if (v.length > 0) setBuscaAberta(true);
+                  else setBuscaAberta(false);
+                }}
               />
             </div>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div />
               <div className="flex gap-2">
                 <Button
-                  type="button" size="sm"
+                  type="button"
+                  size="sm"
                   onClick={() => setBuscaAberta(true)}
                   disabled={selecao.length === 0}
                 >
@@ -501,7 +650,10 @@ export function NovoOrcamentoOdontoDialog({
                   <Label className="text-sm">Escolher procedimento(s) — Odontologia</Label>
                   <button
                     type="button"
-                    onClick={() => { setBuscaAberta(false); setProcsSelecionados([]); }}
+                    onClick={() => {
+                      setBuscaAberta(false);
+                      setProcsSelecionados([]);
+                    }}
                     className="text-xs text-muted-foreground hover:text-foreground"
                     aria-label="Fechar"
                   >
@@ -510,7 +662,8 @@ export function NovoOrcamentoOdontoDialog({
                 </div>
                 {procsOdonto.length === 0 ? (
                   <p className="text-xs text-amber-600">
-                    Nenhum procedimento cadastrado na especialidade Odontologia. Cadastre em Serviços.
+                    Nenhum procedimento cadastrado na especialidade Odontologia. Cadastre em
+                    Serviços.
                   </p>
                 ) : (
                   <>
@@ -529,7 +682,8 @@ export function NovoOrcamentoOdontoDialog({
                         disabled={procsSelecionados.length === 0}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Adicionar {procsSelecionados.length > 0 ? `(${procsSelecionados.length})` : ""}
+                        Adicionar{" "}
+                        {procsSelecionados.length > 0 ? `(${procsSelecionados.length})` : ""}
                       </Button>
                     </div>
                   </>
@@ -549,9 +703,10 @@ export function NovoOrcamentoOdontoDialog({
                   const valDin = Number(it.valores_formas?.["Dinheiro"] ?? it.valor_unitario ?? 0);
                   const valCart = Number(
                     it.valores_formas?.["Cartão de Crédito"] ??
-                    it.valores_formas?.["Cartão de Débito"] ??
-                    it.valores_formas?.["PIX"] ??
-                    it.valor_unitario ?? 0,
+                      it.valores_formas?.["Cartão de Débito"] ??
+                      it.valores_formas?.["PIX"] ??
+                      it.valor_unitario ??
+                      0,
                   );
                   const sub = Number(it.quantidade || 0) * Number(it.valor_unitario || 0);
                   return (
@@ -562,13 +717,24 @@ export function NovoOrcamentoOdontoDialog({
                             <div className="flex items-start gap-2 flex-wrap">
                               <div className="flex flex-wrap gap-1 min-w-[120px]">
                                 {it.dentes.length === 0 ? (
-                                  <span className="text-xs text-muted-foreground italic">sem dente</span>
+                                  <span className="text-xs text-muted-foreground italic">
+                                    sem dente
+                                  </span>
                                 ) : (
                                   it.dentes.map((d) => (
-                                    <Badge key={d} variant="secondary" className="font-mono text-[11px]">{d}</Badge>
+                                    <Badge
+                                      key={d}
+                                      variant="secondary"
+                                      className="font-mono text-[11px]"
+                                    >
+                                      {d}
+                                    </Badge>
                                   ))
                                 )}
-                                <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
+                                <DentePicker
+                                  value={it.dentes}
+                                  onChange={(v) => atualizarItem(idx, "dentes", v)}
+                                />
                               </div>
                             </div>
                           )}
@@ -579,16 +745,24 @@ export function NovoOrcamentoOdontoDialog({
                               placeholder="Descrição"
                             />
                             <Input
-                              type="number" min={1} max={999}
+                              type="number"
+                              min={1}
+                              max={999}
                               value={it.quantidade}
-                              onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
+                              onChange={(e) =>
+                                atualizarItem(idx, "quantidade", Number(e.target.value))
+                              }
                             />
                             {it.procedimento_id == null ? (
                               <div className="space-y-0.5 md:col-span-2">
-                                <div className="text-[10px] text-muted-foreground">Valor unitário</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  Valor unitário
+                                </div>
                                 <CurrencyInput
                                   value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
-                                  onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
+                                  onChange={(v) =>
+                                    atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))
+                                  }
                                 />
                               </div>
                             ) : (
@@ -598,29 +772,45 @@ export function NovoOrcamentoOdontoDialog({
                                   <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
                                 </div>
                                 <div className="space-y-0.5">
-                                  <div className="text-[10px] text-muted-foreground">Cartão/PIX</div>
-                                  <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    Cartão/PIX
+                                  </div>
+                                  <div className="text-sm tabular-nums">
+                                    R$ {valCart.toFixed(2)}
+                                  </div>
                                 </div>
                               </>
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
+                            Subtotal deste item:{" "}
+                            <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2 items-center rounded-md bg-muted/30 p-2">
                             <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">Sinal (entrada) R$</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Sinal (entrada) R$
+                              </div>
                               <CurrencyInput
                                 value={it.sinal_valor ? it.sinal_valor.toFixed(2) : ""}
-                                onChange={(v) => atualizarItem(idx, "sinal_valor", v === "" ? null : Number(v))}
+                                onChange={(v) =>
+                                  atualizarItem(idx, "sinal_valor", v === "" ? null : Number(v))
+                                }
                               />
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {Number(it.sinal_valor ?? 0) > 0 ? (
                                 Number(it.sinal_valor) > sub ? (
-                                  <span className="text-destructive">Sinal maior que o total deste item</span>
+                                  <span className="text-destructive">
+                                    Sinal maior que o total deste item
+                                  </span>
                                 ) : (
-                                  <>Saldo ao final: <span className="font-medium text-foreground">R$ {(sub - Number(it.sinal_valor)).toFixed(2)}</span></>
+                                  <>
+                                    Saldo ao final:{" "}
+                                    <span className="font-medium text-foreground">
+                                      R$ {(sub - Number(it.sinal_valor)).toFixed(2)}
+                                    </span>
+                                  </>
                                 )
                               ) : (
                                 <>Deixe vazio para pagamento único (sem sinal).</>
@@ -628,7 +818,12 @@ export function NovoOrcamentoOdontoDialog({
                             </div>
                           </div>
                         </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remover(idx)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -650,7 +845,8 @@ export function NovoOrcamentoOdontoDialog({
             <div className="space-y-1">
               <Label>Validade (dias)</Label>
               <Input
-                type="number" min={1}
+                type="number"
+                min={1}
                 value={validade}
                 onChange={(e) => setValidade(Number(e.target.value))}
               />
@@ -665,12 +861,19 @@ export function NovoOrcamentoOdontoDialog({
 
           <div>
             <Label>Observações</Label>
-            <Textarea rows={2} maxLength={1000} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+            <Textarea
+              rows={2}
+              maxLength={1000}
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+            />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
           <Button onClick={salvar} disabled={saving || carregando}>
             {saving ? "Salvando…" : editando ? "Salvar alterações" : "Salvar orçamento"}
           </Button>
@@ -681,7 +884,10 @@ export function NovoOrcamentoOdontoDialog({
           onOpenChange={setQuickOpen}
           clinicaId={clinicaId}
           nomeInicial={quickInitial}
-          onCreated={(p) => { setPaciente(p); setQuickOpen(false); }}
+          onCreated={(p) => {
+            setPaciente(p);
+            setQuickOpen(false);
+          }}
         />
       </DialogContent>
     </Dialog>

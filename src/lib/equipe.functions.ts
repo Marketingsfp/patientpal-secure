@@ -3,7 +3,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
-const ROLES = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "caixa", "financeiro", "supervisor"] as const;
+const ROLES = [
+  "admin",
+  "gestor",
+  "medico",
+  "enfermeiro",
+  "recepcao",
+  "caixa",
+  "financeiro",
+  "supervisor",
+] as const;
 
 async function assertManager(userId: string, clinicaId: string) {
   const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {
@@ -27,9 +36,7 @@ async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
 
 export const listarEquipe = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: mems, error } = await supabase
@@ -66,13 +73,15 @@ export const listarEquipe = createServerFn({ method: "POST" })
 export const cadastrarUsuario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      email: z.string().email(),
-      password: z.string().min(6).max(100),
-      nome: z.string().min(2).max(120),
-      role: z.enum(ROLES),
-    }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        email: z.string().email(),
+        password: z.string().min(6).max(100),
+        nome: z.string().min(2).max(120),
+        role: z.enum(ROLES),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
@@ -124,14 +133,16 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
 export const editarMembro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      membershipId: z.string().uuid(),
-      role: z.enum(ROLES),
-      ativo: z.boolean(),
-      nome: z.string().min(2).max(120).optional(),
-      novaSenha: z.string().min(6).max(100).optional().or(z.literal("")),
-    }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        membershipId: z.string().uuid(),
+        role: z.enum(ROLES),
+        ativo: z.boolean(),
+        nome: z.string().min(2).max(120).optional(),
+        novaSenha: z.string().min(6).max(100).optional().or(z.literal("")),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
@@ -167,10 +178,12 @@ export const editarMembro = createServerFn({ method: "POST" })
 export const getFuncionarioLogin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      userId: z.string().uuid(),
-    }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        userId: z.string().uuid(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
@@ -182,11 +195,13 @@ export const getFuncionarioLogin = createServerFn({ method: "POST" })
 export const definirSenhaFuncionario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      userId: z.string().uuid(),
-      novaSenha: z.string().min(6).max(72),
-    }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        userId: z.string().uuid(),
+        novaSenha: z.string().min(6).max(72),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);

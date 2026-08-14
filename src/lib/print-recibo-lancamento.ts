@@ -95,13 +95,18 @@ export function printReciboLancamento(input: ReciboLancamentoInput) {
     <div class="sep"></div>
     ${linhas
       .filter(([, v]) => !!(v && String(v).trim()))
-      .map(([k, v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(String(v))}</span></div>`)
+      .map(
+        ([k, v]) =>
+          `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(String(v))}</span></div>`,
+      )
       .join("")}
     <div class="sep"></div>
     <div class="desc"><b>Descrição:</b> ${esc(input.descricao)}</div>
-    ${input.observacoes && input.observacoes.trim()
-      ? `<div class="desc"><b>Observações:</b> ${esc(input.observacoes)}</div>`
-      : ""}
+    ${
+      input.observacoes && input.observacoes.trim()
+        ? `<div class="desc"><b>Observações:</b> ${esc(input.observacoes)}</div>`
+        : ""
+    }
     <div class="sep"></div>
     <div class="sig"><div class="line">Assinatura do Atendente</div></div>
     <div class="rodape">Emitido em ${esc(fmtDT(agora))} — ClinicaOS</div>
@@ -121,13 +126,20 @@ export function printReciboLancamento(input: ReciboLancamentoInput) {
 
   const cleanup = () => {
     setTimeout(() => {
-      try { document.body.removeChild(iframe); } catch { /* noop */ }
+      try {
+        document.body.removeChild(iframe);
+      } catch {
+        /* noop */
+      }
     }, 1000);
   };
 
   const doc = iframe.contentDocument;
   const win = iframe.contentWindow;
-  if (!doc || !win) { cleanup(); return; }
+  if (!doc || !win) {
+    cleanup();
+    return;
+  }
   doc.open();
   doc.write(html);
   doc.close();
@@ -136,8 +148,13 @@ export function printReciboLancamento(input: ReciboLancamentoInput) {
     try {
       win.focus();
       win.print();
-    } catch { /* noop */ }
-    const onAfter = () => { cleanup(); win.removeEventListener("afterprint", onAfter); };
+    } catch {
+      /* noop */
+    }
+    const onAfter = () => {
+      cleanup();
+      win.removeEventListener("afterprint", onAfter);
+    };
     win.addEventListener("afterprint", onAfter);
     setTimeout(cleanup, 60000);
   };

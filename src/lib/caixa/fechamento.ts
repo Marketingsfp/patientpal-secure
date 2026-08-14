@@ -24,9 +24,7 @@ export interface ComposicaoGaveta {
  * − Sangrias − Despesas em espécie = Saldo Esperado na Gaveta.
  */
 export function saldoEsperadoGaveta(c: ComposicaoGaveta): number {
-  return (
-    c.saldoInicial + c.recebimentosDinheiro + c.suprimentos - c.sangrias - c.despesas
-  );
+  return c.saldoInicial + c.recebimentosDinheiro + c.suprimentos - c.sangrias - c.despesas;
 }
 
 export type TipoDiferenca = "sobra" | "falta" | "exato";

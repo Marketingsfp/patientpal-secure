@@ -73,8 +73,7 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
         .maybeSingle();
       const role = (link?.role ?? "").toLowerCase();
       const podeRealizar =
-        role === "medico" ||
-        ["admin", "gestor", "financeiro", "recepcao"].includes(role);
+        role === "medico" || ["admin", "gestor", "financeiro", "recepcao"].includes(role);
       if (!podeRealizar) {
         throw new Error("Sem permissão para marcar como 'Realizado'.");
       }
@@ -82,9 +81,7 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
       const hojeFim = new Date();
       hojeFim.setHours(23, 59, 59, 999);
       if (inicio.getTime() > hojeFim.getTime()) {
-        throw new Error(
-          "Não é possível baixar como Realizado um atendimento de data futura.",
-        );
+        throw new Error("Não é possível baixar como Realizado um atendimento de data futura.");
       }
     }
 
@@ -124,9 +121,7 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
     // Cancelamento também desfaz o atendimento externo (remove o registro no
     // Financeiro e zera as marcações de origem), deixando só o histórico.
     if (novo_status === "cancelado") {
-      const claims = context.claims as
-        | { email?: string; user_metadata?: { nome?: string } }
-        | null;
+      const claims = context.claims as { email?: string; user_metadata?: { nome?: string } } | null;
       for (const id of ids) {
         const res = await limparExternoCore(supabase as never, id, {
           email: claims?.email ?? null,
@@ -146,9 +141,7 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
  */
 export const listarIrmaosDoPacote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z.object({ agendamento_id: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ agendamento_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: ag } = await supabase
@@ -156,7 +149,8 @@ export const listarIrmaosDoPacote = createServerFn({ method: "POST" })
       .select("pacote_id")
       .eq("id", data.agendamento_id)
       .maybeSingle();
-    if (!ag?.pacote_id) return [] as Array<{ id: string; inicio: string; procedimento: string | null }>;
+    if (!ag?.pacote_id)
+      return [] as Array<{ id: string; inicio: string; procedimento: string | null }>;
     const { data: irmaos } = await supabase
       .from("agendamentos")
       .select("id,inicio,procedimento,status")

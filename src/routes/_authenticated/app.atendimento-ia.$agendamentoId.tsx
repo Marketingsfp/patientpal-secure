@@ -1,6 +1,25 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer, AlertTriangle, Zap, Pill, FlaskConical, FileText, Cloud, CloudOff } from "lucide-react";
+import {
+  Brain,
+  Sparkles,
+  FileHeart,
+  Stethoscope,
+  Loader2,
+  History,
+  Wand2,
+  ArrowLeft,
+  HeartPulse,
+  CheckCircle2,
+  Printer,
+  AlertTriangle,
+  Zap,
+  Pill,
+  FlaskConical,
+  FileText,
+  Cloud,
+  CloudOff,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -16,7 +35,11 @@ import { Input } from "@/components/ui/input";
 import { VoiceInput } from "@/components/voice-input";
 import { Cid10Autocomplete } from "@/components/prontuario/cid10-autocomplete";
 import { PrescricaoBuilder } from "@/components/prontuario/prescricao-builder";
-import { prescricaoParaTexto, textoParaPrescricao, type ItemPrescricao } from "@/lib/prontuario/prescricao";
+import {
+  prescricaoParaTexto,
+  textoParaPrescricao,
+  type ItemPrescricao,
+} from "@/lib/prontuario/prescricao";
 import { macrosPorCampo, type Macro } from "@/lib/prontuario/macros";
 import { imprimirDocumentoA4, type DadosClinicaA4 } from "@/lib/print-a4-medico";
 import type { Cid10 } from "@/data/cid10";
@@ -81,7 +104,14 @@ const SOAP_KEYS = [
   ["prescricao", "Prescrição", 4],
 ] as const;
 type Soap = Record<(typeof SOAP_KEYS)[number][0], string>;
-const EMPTY: Soap = { queixa_principal: "", historia_doenca: "", exame_fisico: "", hipotese_diagnostica: "", conduta: "", prescricao: "" };
+const EMPTY: Soap = {
+  queixa_principal: "",
+  historia_doenca: "",
+  exame_fisico: "",
+  hipotese_diagnostica: "",
+  conduta: "",
+  prescricao: "",
+};
 
 function AtendimentoEditorPage() {
   const { agendamentoId } = Route.useParams();
@@ -96,7 +126,15 @@ function AtendimentoEditorPage() {
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
 
-  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string; status: string } | null>(null);
+  const [agendamento, setAgendamento] = useState<{
+    id: string;
+    paciente_id: string | null;
+    paciente_nome: string;
+    medico_id: string | null;
+    procedimento: string | null;
+    fluxo_etapa: string;
+    status: string;
+  } | null>(null);
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
@@ -104,10 +142,16 @@ function AtendimentoEditorPage() {
 
   const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
-  const [sugestoes, setSugestoes] = useState<{ cids: { codigo: string; descricao: string }[]; exames: string[]; prescricao: string } | null>(null);
+  const [sugestoes, setSugestoes] = useState<{
+    cids: { codigo: string; descricao: string }[];
+    exames: string[];
+    prescricao: string;
+  } | null>(null);
   const [resumo, setResumo] = useState<string>("");
   const [resumoOpen, setResumoOpen] = useState(false);
-  const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
+  const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(
+    null,
+  );
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
   // PEP estruturado
@@ -115,7 +159,10 @@ function AtendimentoEditorPage() {
   const [prescItens, setPrescItens] = useState<ItemPrescricao[]>([]);
   const [atestadoDias, setAtestadoDias] = useState("1");
   const [examesTexto, setExamesTexto] = useState("");
-  const [paciente, setPaciente] = useState<{ cpf: string | null; data_nascimento: string | null } | null>(null);
+  const [paciente, setPaciente] = useState<{
+    cpf: string | null;
+    data_nascimento: string | null;
+  } | null>(null);
   const [clinicaDados, setClinicaDados] = useState<DadosClinicaA4 | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
   const rascunhoRestaurado = useRef(false);
@@ -125,51 +172,70 @@ function AtendimentoEditorPage() {
   const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
     const { data: ag, error } = await supabase
-        .from("agendamentos")
-        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status")
-        .eq("id", agendamentoId)
+      .from("agendamentos")
+      .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status")
+      .eq("id", agendamentoId)
+      .maybeSingle();
+    if (error || !ag) {
+      toast.error("Agendamento não encontrado");
+      navigate({ to: "/app/atendimento-ia" });
+      return;
+    }
+    // CRIT-09: consulta cancelada não pode ser "atendida" — sem esta
+    // checagem, o médico conseguia abrir a tela e criar prontuário para um
+    // agendamento cancelado, e a promoção automática de etapa abaixo
+    // (quando já pago) ignorava o cancelamento e empurrava para
+    // "atendimento" mesmo assim. Roda de novo a cada refresh via realtime,
+    // então também tira o médico da tela se o agendamento for cancelado
+    // no meio do atendimento.
+    if (ag.status === "cancelado") {
+      toast.error("Este atendimento foi cancelado.");
+      navigate({ to: "/app/atendimento-ia" });
+      return;
+    }
+    setAgendamento(ag as never);
+
+    // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
+    const status = await agendamentoStatusPagamento(ag.id);
+    setPagamento(status);
+
+    if (ag.medico_id) {
+      const { data: med } = await supabase
+        .from("medicos")
+        .select(
+          "id, nome, email, user_id, especialidade_id, crm, crm_uf, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+        )
+        .eq("id", ag.medico_id)
         .maybeSingle();
-      if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
-      // CRIT-09: consulta cancelada não pode ser "atendida" — sem esta
-      // checagem, o médico conseguia abrir a tela e criar prontuário para um
-      // agendamento cancelado, e a promoção automática de etapa abaixo
-      // (quando já pago) ignorava o cancelamento e empurrava para
-      // "atendimento" mesmo assim. Roda de novo a cada refresh via realtime,
-      // então também tira o médico da tela se o agendamento for cancelado
-      // no meio do atendimento.
-      if (ag.status === "cancelado") {
-        toast.error("Este atendimento foi cancelado.");
-        navigate({ to: "/app/atendimento-ia" });
-        return;
-      }
-      setAgendamento(ag as never);
-
-      // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
-      const status = await agendamentoStatusPagamento(ag.id);
-      setPagamento(status);
-
-      if (ag.medico_id) {
-        const { data: med } = await supabase
-          .from("medicos")
-          .select("id, nome, email, user_id, especialidade_id, crm, crm_uf, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
-          .eq("id", ag.medico_id)
-          .maybeSingle();
-        if (med) {
-          let sens: any = {};
-          try {
-            const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: ag.medico_id });
-            sens = (s as any) ?? {};
-          } catch { sens = {}; }
-          setMedico({ ...(med as any), tipo_repasse: sens.tipo_repasse ?? null, percentual_repasse_padrao: sens.percentual_repasse_padrao ?? null, valor_repasse_padrao: sens.valor_repasse_padrao ?? null } as never);
+      if (med) {
+        let sens: any = {};
+        try {
+          const { data: s } = await supabase.rpc("medico_dados_sensiveis", {
+            _medico_id: ag.medico_id,
+          });
+          sens = (s as any) ?? {};
+        } catch {
+          sens = {};
         }
+        setMedico({
+          ...(med as any),
+          tipo_repasse: sens.tipo_repasse ?? null,
+          percentual_repasse_padrao: sens.percentual_repasse_padrao ?? null,
+          valor_repasse_padrao: sens.valor_repasse_padrao ?? null,
+        } as never);
       }
+    }
 
-      // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
-      if (status.pago && ag.fluxo_etapa !== "atendimento") {
-        void supabase.from("agendamentos")
-          .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
-          .eq("id", ag.id);
-      }
+    // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
+    if (status.pago && ag.fluxo_etapa !== "atendimento") {
+      void supabase
+        .from("agendamentos")
+        .update({
+          fluxo_etapa: "atendimento",
+          fluxo_atualizado_em: new Date().toISOString(),
+        } as never)
+        .eq("id", ag.id);
+    }
   }, [agendamentoId, clinicaAtual?.clinica_id, navigate]);
 
   useEffect(() => {
@@ -197,12 +263,14 @@ function AtendimentoEditorPage() {
   const carregarTriagem = useCallback(async () => {
     if (!agendamentoId) return;
     const { data } = await supabase
-        .from("triagens_enfermagem")
-        .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
-        .eq("agendamento_id", agendamentoId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      .from("triagens_enfermagem")
+      .select(
+        "id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes",
+      )
+      .eq("agendamento_id", agendamentoId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     setTriagem((data as unknown as Triagem) ?? null);
   }, [agendamentoId]);
 
@@ -268,7 +336,14 @@ function AtendimentoEditorPage() {
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return;
-      const d = JSON.parse(raw) as { soap?: Soap; transcricao?: string; cids?: Cid10[]; presc?: ItemPrescricao[]; exames?: string; em?: string };
+      const d = JSON.parse(raw) as {
+        soap?: Soap;
+        transcricao?: string;
+        cids?: Cid10[];
+        presc?: ItemPrescricao[];
+        exames?: string;
+        em?: string;
+      };
       if (d.soap) setSoap((s) => ({ ...s, ...d.soap }));
       if (d.transcricao) setTranscricao(d.transcricao);
       if (d.cids) setCids(d.cids);
@@ -276,21 +351,39 @@ function AtendimentoEditorPage() {
       if (d.exames) setExamesTexto(d.exames);
       if (d.em) setRascunhoEm(new Date(d.em));
       toast.info("Rascunho recuperado deste atendimento");
-    } catch { /* rascunho inválido — ignora */ }
+    } catch {
+      /* rascunho inválido — ignora */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agendamentoId]);
 
   useEffect(() => {
     if (!agendamentoId || !rascunhoRestaurado.current) return;
-    const vazio = !transcricao && !examesTexto && cids.length === 0 && prescItens.length === 0 &&
+    const vazio =
+      !transcricao &&
+      !examesTexto &&
+      cids.length === 0 &&
+      prescItens.length === 0 &&
       Object.values(soap).every((v) => !v);
     if (vazio) return;
     const t = setTimeout(() => {
       const em = new Date();
       try {
-        localStorage.setItem(draftKey, JSON.stringify({ soap, transcricao, cids, presc: prescItens, exames: examesTexto, em: em.toISOString() }));
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            soap,
+            transcricao,
+            cids,
+            presc: prescItens,
+            exames: examesTexto,
+            em: em.toISOString(),
+          }),
+        );
         setRascunhoEm(em);
-      } catch { /* storage cheio */ }
+      } catch {
+        /* storage cheio */
+      }
     }, 1200);
     return () => clearTimeout(t);
   }, [soap, transcricao, cids, prescItens, examesTexto, agendamentoId, draftKey]);
@@ -303,7 +396,10 @@ function AtendimentoEditorPage() {
   }, [prescItens]);
 
   // CIDs selecionados -> hipótese diagnóstica.
-  const cidsTexto = useMemo(() => cids.map((c) => `[CID ${c.codigo} — ${c.descricao}]`).join(" "), [cids]);
+  const cidsTexto = useMemo(
+    () => cids.map((c) => `[CID ${c.codigo} — ${c.descricao}]`).join(" "),
+    [cids],
+  );
 
   function aplicarTriagemNoSoap(t: Triagem) {
     const linhas: string[] = [];
@@ -329,7 +425,9 @@ function AtendimentoEditorPage() {
         queixa_principal: s.queixa_principal || t.queixa_principal || "",
         exame_fisico: jaContem
           ? s.exame_fisico
-          : (s.exame_fisico ? `${s.exame_fisico}\n${txt}` : txt),
+          : s.exame_fisico
+            ? `${s.exame_fisico}\n${txt}`
+            : txt,
       };
     });
   }
@@ -351,10 +449,15 @@ function AtendimentoEditorPage() {
 
   async function handleEstruturar(textoOverride?: string) {
     const texto = (textoOverride ?? transcricao).trim();
-    if (!texto) { toast.error("Grave ou cole a transcrição primeiro"); return; }
+    if (!texto) {
+      toast.error("Grave ou cole a transcrição primeiro");
+      return;
+    }
     setLoading("estruturar");
     try {
-      const out = await estruturar({ data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
+      const out = await estruturar({
+        data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined },
+      });
       const nextSoap = {
         queixa_principal: out.queixa_principal || soap.queixa_principal,
         historia_doenca: out.historia_doenca || soap.historia_doenca,
@@ -373,8 +476,11 @@ function AtendimentoEditorPage() {
       } catch (err) {
         console.error("sugerir falhou", err);
       }
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleSugerir() {
@@ -383,25 +489,40 @@ function AtendimentoEditorPage() {
       const out = await sugerir({ data: { ...soap, especialidade } });
       setSugestoes(out);
       toast.success("Sugestões geradas");
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleResumir() {
-    if (!pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (!pacienteId) {
+      toast.error("Paciente não identificado");
+      return;
+    }
     setLoading("resumir");
     try {
       const out = await resumir({ data: { pacienteId } });
       setResumo(out.resumo);
       setResumoOpen(true);
       if (out.total === 0) toast.info("Sem prontuários anteriores");
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleSalvar() {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!clinicaAtual || !pacienteId) {
+      toast.error("Paciente não identificado");
+      return;
+    }
     if (pagamento && !pagamento.pago) {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
       return;
@@ -433,9 +554,12 @@ function AtendimentoEditorPage() {
       let lancamentoId: string | null = null;
       if (procNome) {
         const { data: proc } = await supabase
-          .from("procedimentos").select("valor_padrao, valor_dinheiro")
-          .eq("clinica_id", cid).ilike("nome", procNome).maybeSingle();
-        valorTotal = Number((proc?.valor_dinheiro ?? proc?.valor_padrao) ?? 0);
+          .from("procedimentos")
+          .select("valor_padrao, valor_dinheiro")
+          .eq("clinica_id", cid)
+          .ilike("nome", procNome)
+          .maybeSingle();
+        valorTotal = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
       }
       let valorMedico = 0;
       if (medico && valorTotal > 0) {
@@ -448,8 +572,10 @@ function AtendimentoEditorPage() {
       const valorClinica = Math.max(0, valorTotal - valorMedico);
 
       const { data: lancExist } = await supabase
-        .from("fin_lancamentos").select("id, valor")
-        .eq("agendamento_id", agendamentoId).maybeSingle();
+        .from("fin_lancamentos")
+        .select("id, valor")
+        .eq("agendamento_id", agendamentoId)
+        .maybeSingle();
       if (lancExist) {
         lancamentoId = lancExist.id;
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
@@ -477,21 +603,38 @@ function AtendimentoEditorPage() {
         } as never);
       }
 
-      await supabase.from("agendamentos")
-        .update({ fluxo_etapa: "finalizado", status: "realizado", fluxo_atualizado_em: new Date().toISOString() } as never)
+      await supabase
+        .from("agendamentos")
+        .update({
+          fluxo_etapa: "finalizado",
+          status: "realizado",
+          fluxo_atualizado_em: new Date().toISOString(),
+        } as never)
         .eq("id", agendamentoId);
 
-      toast.success(valorMedico > 0
-        ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
-        : "Prontuário salvo");
-      try { localStorage.removeItem(draftKey); } catch { /* ok */ }
+      toast.success(
+        valorMedico > 0
+          ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
+          : "Prontuário salvo",
+      );
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        /* ok */
+      }
       setSalvo({ valorMedico });
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   function addToHipotese(t: string) {
-    setSoap((s) => ({ ...s, hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t }));
+    setSoap((s) => ({
+      ...s,
+      hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t,
+    }));
   }
 
   function aplicarMacro(m: Macro) {
@@ -512,7 +655,10 @@ function AtendimentoEditorPage() {
       rodapeTexto = "Em caso de reação adversa, suspender o uso e procurar atendimento médico.";
     } else if (tipo === "exames") {
       conteudo = examesTexto.trim() || soap.conduta;
-      rodapeTexto = cidsTexto || soap.hipotese_diagnostica ? `Hipótese diagnóstica: ${cidsTexto || soap.hipotese_diagnostica}` : null;
+      rodapeTexto =
+        cidsTexto || soap.hipotese_diagnostica
+          ? `Hipótese diagnóstica: ${cidsTexto || soap.hipotese_diagnostica}`
+          : null;
     } else if (tipo === "atestado") {
       const dias = Math.max(1, Number(atestadoDias) || 1);
       conteudo =
@@ -523,7 +669,10 @@ function AtendimentoEditorPage() {
     } else {
       conteudo = soap.conduta;
     }
-    if (!conteudo.trim()) { toast.error("Preencha o conteúdo antes de imprimir."); return; }
+    if (!conteudo.trim()) {
+      toast.error("Preencha o conteúdo antes de imprimir.");
+      return;
+    }
     const ok = imprimirDocumentoA4({
       tipo,
       clinica: dadosClinicaDoc,
@@ -551,11 +700,19 @@ function AtendimentoEditorPage() {
           <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto" />
           <h1 className="text-xl font-semibold">Prontuário salvo</h1>
           <p className="text-sm text-muted-foreground">
-            O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi registrado.
-            {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
+            O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi
+            registrado.
+            {salvo.valorMedico > 0 && (
+              <>
+                {" "}
+                Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>
+                .
+              </>
+            )}
           </p>
           <Button size="lg" onClick={() => navigate({ to: backTo })}>
-            <ArrowLeft className="h-4 w-4" /> {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
+            <ArrowLeft className="h-4 w-4" />{" "}
+            {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
           </Button>
         </Card>
       </div>
@@ -573,8 +730,8 @@ function AtendimentoEditorPage() {
                 Pagamento pendente — consulta requer pagamento antecipado
               </div>
               <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
-                Envie o paciente ao caixa antes de iniciar o atendimento.
-                O prontuário fica disponível somente após a confirmação do pagamento.
+                Envie o paciente ao caixa antes de iniciar o atendimento. O prontuário fica
+                disponível somente após a confirmação do pagamento.
               </p>
               <div className="mt-2 flex gap-2">
                 <Button size="sm" asChild>
@@ -596,20 +753,37 @@ function AtendimentoEditorPage() {
               Atendimento — <span className="uppercase">{pacienteNome || "…"}</span>
             </h1>
             <p className="text-sm text-muted-foreground">
-              {medico?.nome ? <>Profissional: <b className="text-foreground uppercase">{medico.nome}</b></> : "Carregando…"}
+              {medico?.nome ? (
+                <>
+                  Profissional: <b className="text-foreground uppercase">{medico.nome}</b>
+                </>
+              ) : (
+                "Carregando…"
+              )}
               {especialidadeMedico && <> · {especialidadeMedico}</>}
             </p>
           </div>
         </div>
         <Button variant="outline" asChild>
-          <Link to={backTo}><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
+          <Link to={backTo}>
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
+          </Link>
         </Button>
       </div>
 
       <Card className="p-4">
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleResumir} disabled={loading === "resumir" || !pacienteId}>
-            {loading === "resumir" ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResumir}
+            disabled={loading === "resumir" || !pacienteId}
+          >
+            {loading === "resumir" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <History className="h-4 w-4" />
+            )}
             Resumir histórico
           </Button>
         </div>
@@ -622,7 +796,9 @@ function AtendimentoEditorPage() {
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{resumo}</div>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                {resumo}
+              </div>
             </CollapsibleContent>
           </Collapsible>
         )}
@@ -635,7 +811,9 @@ function AtendimentoEditorPage() {
               <HeartPulse className="h-5 w-5 text-rose-500" />
               <h2 className="font-semibold">Triagem da enfermagem</h2>
               {triagem.enfermeira_nome && (
-                <Badge variant="secondary" className="text-[10px]">Por {triagem.enfermeira_nome}</Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  Por {triagem.enfermeira_nome}
+                </Badge>
               )}
             </div>
             <span className="text-xs text-muted-foreground">
@@ -647,34 +825,82 @@ function AtendimentoEditorPage() {
               ["Peso", triagem.peso_kg, "kg"],
               ["Altura", triagem.altura_cm, "cm"],
               ["IMC", triagem.imc, ""],
-              ["PA", triagem.pa_sistolica && triagem.pa_diastolica ? `${triagem.pa_sistolica}/${triagem.pa_diastolica}` : null, "mmHg"],
+              [
+                "PA",
+                triagem.pa_sistolica && triagem.pa_diastolica
+                  ? `${triagem.pa_sistolica}/${triagem.pa_diastolica}`
+                  : null,
+                "mmHg",
+              ],
               ["FC", triagem.freq_cardiaca, "bpm"],
               ["Temp.", triagem.temperatura, "°C"],
               ["SatO₂", triagem.saturacao, "%"],
               ["Glicemia", triagem.glicemia, "mg/dL"],
-            ].filter(([, v]) => v !== null && v !== undefined && v !== "").map(([label, value, unit]) => (
-              <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
-                <div className="text-[10px] uppercase text-muted-foreground">{label as string}</div>
-                <div className="font-semibold tabular-nums">{String(value)} <span className="text-xs font-normal text-muted-foreground">{unit as string}</span></div>
-              </div>
-            ))}
+            ]
+              .filter(([, v]) => v !== null && v !== undefined && v !== "")
+              .map(([label, value, unit]) => (
+                <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    {label as string}
+                  </div>
+                  <div className="font-semibold tabular-nums">
+                    {String(value)}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {unit as string}
+                    </span>
+                  </div>
+                </div>
+              ))}
           </div>
-          {(triagem.queixa_principal || (triagem.doencas && triagem.doencas.length) || triagem.medicamentos || triagem.alergias || triagem.observacoes) && (
+          {(triagem.queixa_principal ||
+            (triagem.doencas && triagem.doencas.length) ||
+            triagem.medicamentos ||
+            triagem.alergias ||
+            triagem.observacoes) && (
             <div className="grid sm:grid-cols-2 gap-2 text-sm">
               {triagem.queixa_principal && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Queixa principal</div><div>{triagem.queixa_principal}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Queixa principal
+                  </div>
+                  <div>{triagem.queixa_principal}</div>
+                </div>
               )}
               {triagem.doencas && triagem.doencas.length > 0 && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Doenças pré-existentes</div><div className="flex flex-wrap gap-1 mt-1">{triagem.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Doenças pré-existentes
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {triagem.doencas.map((d, i) => (
+                      <Badge key={i} variant="outline" className="text-[10px]">
+                        {d}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               )}
               {triagem.medicamentos && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Medicamentos em uso</div><div>{triagem.medicamentos}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Medicamentos em uso
+                  </div>
+                  <div>{triagem.medicamentos}</div>
+                </div>
               )}
               {triagem.alergias && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Alergias</div><div>{triagem.alergias}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">Alergias</div>
+                  <div>{triagem.alergias}</div>
+                </div>
               )}
               {triagem.observacoes && (
-                <div className="rounded-md border p-2 sm:col-span-2"><div className="text-[10px] uppercase text-muted-foreground">Observações da enfermagem</div><div className="whitespace-pre-wrap">{triagem.observacoes}</div></div>
+                <div className="rounded-md border p-2 sm:col-span-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Observações da enfermagem
+                  </div>
+                  <div className="whitespace-pre-wrap">{triagem.observacoes}</div>
+                </div>
               )}
             </div>
           )}
@@ -710,8 +936,16 @@ function AtendimentoEditorPage() {
             onChange={(e) => setTranscricao(e.target.value)}
             placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
           />
-          <Button onClick={() => handleEstruturar()} disabled={loading === "estruturar"} className="w-full">
-            {loading === "estruturar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          <Button
+            onClick={() => handleEstruturar()}
+            disabled={loading === "estruturar"}
+            className="w-full"
+          >
+            {loading === "estruturar" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
             Estruturar prontuário com IA
           </Button>
         </Card>
@@ -723,8 +957,16 @@ function AtendimentoEditorPage() {
               <h2 className="font-semibold">Prontuário ({especialidade})</h2>
             </div>
             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-              {rascunhoEm ? (<><Cloud className="h-3.5 w-3.5 text-emerald-500" /> Rascunho salvo {rascunhoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</>)
-                : (<><CloudOff className="h-3.5 w-3.5" /> Auto-save ativo</>)}
+              {rascunhoEm ? (
+                <>
+                  <Cloud className="h-3.5 w-3.5 text-emerald-500" /> Rascunho salvo{" "}
+                  {rascunhoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </>
+              ) : (
+                <>
+                  <CloudOff className="h-3.5 w-3.5" /> Auto-save ativo
+                </>
+              )}
             </span>
           </div>
 
@@ -732,7 +974,9 @@ function AtendimentoEditorPage() {
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
               <div className="text-sm">
-                <span className="font-semibold text-destructive uppercase text-[11px] tracking-wide">Alergias (triagem)</span>
+                <span className="font-semibold text-destructive uppercase text-[11px] tracking-wide">
+                  Alergias (triagem)
+                </span>
                 <div className="text-foreground">{triagem.alergias}</div>
               </div>
             </div>
@@ -749,38 +993,72 @@ function AtendimentoEditorPage() {
             </TabsList>
 
             <TabsContent value="qp" className="space-y-3 mt-3">
-              <CampoClinico rotulo="Queixa principal" valor={soap.queixa_principal} rows={3}
-                onChange={(v) => setSoap((s) => ({ ...s, queixa_principal: v }))} />
-              <CampoClinico rotulo="História da doença atual (HMA)" valor={soap.historia_doenca} rows={6}
-                macros={macrosPorCampo("historia_doenca")} onMacro={aplicarMacro}
-                onChange={(v) => setSoap((s) => ({ ...s, historia_doenca: v }))} />
+              <CampoClinico
+                rotulo="Queixa principal"
+                valor={soap.queixa_principal}
+                rows={3}
+                onChange={(v) => setSoap((s) => ({ ...s, queixa_principal: v }))}
+              />
+              <CampoClinico
+                rotulo="História da doença atual (HMA)"
+                valor={soap.historia_doenca}
+                rows={6}
+                macros={macrosPorCampo("historia_doenca")}
+                onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, historia_doenca: v }))}
+              />
             </TabsContent>
 
             <TabsContent value="hist" className="space-y-3 mt-3">
               {triagem ? (
                 <div className="grid sm:grid-cols-2 gap-2 text-sm">
                   {triagem.medicamentos && (
-                    <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Medicamentos em uso</div><div>{triagem.medicamentos}</div></div>
+                    <div className="rounded-md border p-2">
+                      <div className="text-[10px] uppercase text-muted-foreground">
+                        Medicamentos em uso
+                      </div>
+                      <div>{triagem.medicamentos}</div>
+                    </div>
                   )}
                   {triagem.doencas && triagem.doencas.length > 0 && (
-                    <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Comorbidades</div><div className="flex flex-wrap gap-1 mt-1">{triagem.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}</div></div>
+                    <div className="rounded-md border p-2">
+                      <div className="text-[10px] uppercase text-muted-foreground">
+                        Comorbidades
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {triagem.doencas.map((d, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px]">
+                            {d}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   {triagem.alergias && (
                     <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 sm:col-span-2">
-                      <div className="text-[10px] uppercase text-destructive font-semibold">Alergias</div>
+                      <div className="text-[10px] uppercase text-destructive font-semibold">
+                        Alergias
+                      </div>
                       <div>{triagem.alergias}</div>
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Sem triagem registrada para este atendimento.</p>
+                <p className="text-sm text-muted-foreground">
+                  Sem triagem registrada para este atendimento.
+                </p>
               )}
             </TabsContent>
 
             <TabsContent value="ef" className="space-y-3 mt-3">
-              <CampoClinico rotulo="Exame físico" valor={soap.exame_fisico} rows={10}
-                macros={macrosPorCampo("exame_fisico")} onMacro={aplicarMacro}
-                onChange={(v) => setSoap((s) => ({ ...s, exame_fisico: v }))} />
+              <CampoClinico
+                rotulo="Exame físico"
+                valor={soap.exame_fisico}
+                rows={10}
+                macros={macrosPorCampo("exame_fisico")}
+                onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, exame_fisico: v }))}
+              />
             </TabsContent>
 
             <TabsContent value="hd" className="space-y-3 mt-3">
@@ -794,28 +1072,63 @@ function AtendimentoEditorPage() {
                 }}
                 onRemove={(codigo) => setCids(cids.filter((c) => c.codigo !== codigo))}
               />
-              <CampoClinico rotulo="Hipótese diagnóstica" valor={soap.hipotese_diagnostica} rows={5}
-                onChange={(v) => setSoap((s) => ({ ...s, hipotese_diagnostica: v }))} />
+              <CampoClinico
+                rotulo="Hipótese diagnóstica"
+                valor={soap.hipotese_diagnostica}
+                rows={5}
+                onChange={(v) => setSoap((s) => ({ ...s, hipotese_diagnostica: v }))}
+              />
             </TabsContent>
 
             <TabsContent value="cond" className="space-y-3 mt-3">
-              <CampoClinico rotulo="Conduta / plano terapêutico" valor={soap.conduta} rows={8}
-                macros={macrosPorCampo("conduta")} onMacro={aplicarMacro}
-                onChange={(v) => setSoap((s) => ({ ...s, conduta: v }))} />
+              <CampoClinico
+                rotulo="Conduta / plano terapêutico"
+                valor={soap.conduta}
+                rows={8}
+                macros={macrosPorCampo("conduta")}
+                onMacro={aplicarMacro}
+                onChange={(v) => setSoap((s) => ({ ...s, conduta: v }))}
+              />
               <div className="space-y-1">
-                <Label className="text-xs uppercase text-muted-foreground">Exames solicitados (documento A4)</Label>
-                <Textarea rows={4} value={examesTexto} onChange={(e) => setExamesTexto(e.target.value)}
-                  placeholder="Um exame por linha — ex.: Hemograma completo" />
+                <Label className="text-xs uppercase text-muted-foreground">
+                  Exames solicitados (documento A4)
+                </Label>
+                <Textarea
+                  rows={4}
+                  value={examesTexto}
+                  onChange={(e) => setExamesTexto(e.target.value)}
+                  placeholder="Um exame por linha — ex.: Hemograma completo"
+                />
               </div>
               <div className="flex items-end gap-2">
                 <div className="space-y-1">
-                  <Label className="text-xs uppercase text-muted-foreground">Dias de atestado</Label>
-                  <Input type="number" min={1} className="h-9 w-24" value={atestadoDias} onChange={(e) => setAtestadoDias(e.target.value)} />
+                  <Label className="text-xs uppercase text-muted-foreground">
+                    Dias de atestado
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-9 w-24"
+                    value={atestadoDias}
+                    onChange={(e) => setAtestadoDias(e.target.value)}
+                  />
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("atestado")} className="gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => imprimirA4("atestado")}
+                  className="gap-1"
+                >
                   <FileText className="h-3.5 w-3.5" /> Imprimir atestado (A4)
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("exames")} className="gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => imprimirA4("exames")}
+                  className="gap-1"
+                >
                   <FlaskConical className="h-3.5 w-3.5" /> Imprimir exames (A4)
                 </Button>
               </div>
@@ -824,14 +1137,24 @@ function AtendimentoEditorPage() {
             <TabsContent value="presc" className="space-y-3 mt-3">
               <div className="flex flex-wrap gap-1">
                 {macrosPorCampo("prescricao").map((m) => (
-                  <button key={m.rotulo} type="button" onClick={() => aplicarMacro(m)}
-                    className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1">
+                  <button
+                    key={m.rotulo}
+                    type="button"
+                    onClick={() => aplicarMacro(m)}
+                    className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
+                  >
                     <Zap className="h-3 w-3" /> {m.rotulo}
                   </button>
                 ))}
               </div>
               <PrescricaoBuilder itens={prescItens} onChange={setPrescItens} />
-              <Button type="button" variant="outline" size="sm" onClick={() => imprimirA4("receita")} className="gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imprimirA4("receita")}
+                className="gap-1"
+              >
                 <Pill className="h-3.5 w-3.5" /> Imprimir receita (A4)
               </Button>
             </TabsContent>
@@ -845,22 +1168,41 @@ function AtendimentoEditorPage() {
             <Sparkles className="h-5 w-5 text-amber-500" />
             <h2 className="font-semibold">Sugestões clínicas</h2>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSugerir} disabled={loading === "sugerir"}>
-            {loading === "sugerir" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSugerir}
+            disabled={loading === "sugerir"}
+          >
+            {loading === "sugerir" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
             Sugerir CID, exames e prescrição
           </Button>
         </div>
         {!sugestoes ? (
-          <p className="text-sm text-muted-foreground">Preencha o prontuário e clique em "Sugerir" para a IA propor CIDs, exames e prescrição.</p>
+          <p className="text-sm text-muted-foreground">
+            Preencha o prontuário e clique em "Sugerir" para a IA propor CIDs, exames e prescrição.
+          </p>
         ) : (
           <div className="space-y-4">
             <div>
-              <Label className="text-xs uppercase text-muted-foreground">CIDs sugeridos (clique para adicionar)</Label>
+              <Label className="text-xs uppercase text-muted-foreground">
+                CIDs sugeridos (clique para adicionar)
+              </Label>
               <div className="flex gap-2 flex-wrap mt-1">
-                {sugestoes.cids.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
+                {sugestoes.cids.length === 0 && (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
                 {sugestoes.cids.map((c, i) => (
-                  <Badge key={i} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}>
+                  <Badge
+                    key={i}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                    onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}
+                  >
                     {c.codigo} · {c.descricao}
                   </Badge>
                 ))}
@@ -869,19 +1211,38 @@ function AtendimentoEditorPage() {
             <div>
               <Label className="text-xs uppercase text-muted-foreground">Exames sugeridos</Label>
               <ul className="list-disc pl-5 text-sm space-y-0.5 mt-1">
-                {sugestoes.exames.map((e, i) => <li key={i}>{e}</li>)}
+                {sugestoes.exames.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
               </ul>
               {sugestoes.exames.length > 0 && (
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setSoap((s) => ({ ...s, conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.` }))}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() =>
+                    setSoap((s) => ({
+                      ...s,
+                      conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.`,
+                    }))
+                  }
+                >
                   Adicionar à conduta
                 </Button>
               )}
             </div>
             <div>
               <Label className="text-xs uppercase text-muted-foreground">Prescrição sugerida</Label>
-              <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">{sugestoes.prescricao || "—"}</pre>
+              <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">
+                {sugestoes.prescricao || "—"}
+              </pre>
               {sugestoes.prescricao && (
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}
+                >
                   Usar como prescrição
                 </Button>
               )}
@@ -891,16 +1252,31 @@ function AtendimentoEditorPage() {
       </Card>
 
       <div className="flex justify-end gap-2 flex-wrap">
-        <Button variant="outline" size="lg" onClick={() => imprimirA4("receita")} disabled={!prescItens.length && !soap.prescricao.trim()}>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => imprimirA4("receita")}
+          disabled={!prescItens.length && !soap.prescricao.trim()}
+        >
           <Pill className="h-4 w-4" /> Imprimir receita (A4)
         </Button>
-        <Button variant="outline" size="lg" onClick={() => imprimirA4("exames")} disabled={!examesTexto.trim() && !soap.conduta.trim()}>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => imprimirA4("exames")}
+          disabled={!examesTexto.trim() && !soap.conduta.trim()}
+        >
           <FlaskConical className="h-4 w-4" /> Imprimir exames (A4)
         </Button>
         <Button variant="outline" size="lg" onClick={() => imprimirA4("atestado")}>
           <FileText className="h-4 w-4" /> Imprimir atestado (A4)
         </Button>
-        <Button variant="outline" size="lg" onClick={() => imprimirA4("conduta")} disabled={!soap.conduta.trim()}>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => imprimirA4("conduta")}
+          disabled={!soap.conduta.trim()}
+        >
           <Printer className="h-4 w-4" /> Imprimir conduta
         </Button>
         {podeEscrever && (
@@ -910,7 +1286,11 @@ function AtendimentoEditorPage() {
             disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
             title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
           >
-            {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            {loading === "salvar" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
             Finalizar atendimento
           </Button>
         )}
@@ -920,7 +1300,13 @@ function AtendimentoEditorPage() {
 }
 
 function CampoClinico({
-  rotulo, valor, rows, onChange, macros, onMacro, oculto,
+  rotulo,
+  valor,
+  rows,
+  onChange,
+  macros,
+  onMacro,
+  oculto,
 }: {
   rotulo: string;
   valor: string;

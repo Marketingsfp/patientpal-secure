@@ -36,17 +36,9 @@ import { brl } from "@/lib/financeiro/format";
  *   3. Deduz o valor do faturamento do dia (refletido no painel).
  */
 
-export type StatusMedico =
-  | "agendado"
-  | "em_atendimento"
-  | "realizado"
-  | "cancelado";
+export type StatusMedico = "agendado" | "em_atendimento" | "realizado" | "cancelado";
 
-export type StatusFinanceiro =
-  | "pendente"
-  | "pago"
-  | "reembolsado"
-  | "cancelado";
+export type StatusFinanceiro = "pendente" | "pago" | "reembolsado" | "cancelado";
 
 export interface AtendimentoEstornavel {
   id: string;
@@ -145,9 +137,7 @@ export function EstornoAtendimentosPanel({
       setAlvo(null);
       setMotivo("");
     } catch (err) {
-      toast.error(
-        `Não foi possível estornar: ${(err as Error).message ?? "erro desconhecido"}`,
-      );
+      toast.error(`Não foi possível estornar: ${(err as Error).message ?? "erro desconhecido"}`);
     } finally {
       setSaving(false);
     }
@@ -199,15 +189,23 @@ export function EstornoAtendimentosPanel({
             )}
             {atendimentos.map((a) => {
               const estornado = a.id in deducoes;
-              const sm = estornado ? statusMedicoLabel.cancelado : statusMedicoLabel[a.status_medico];
-              const sf = estornado ? statusFinanceiroLabel.reembolsado : statusFinanceiroLabel[a.status_financeiro];
+              const sm = estornado
+                ? statusMedicoLabel.cancelado
+                : statusMedicoLabel[a.status_medico];
+              const sf = estornado
+                ? statusFinanceiroLabel.reembolsado
+                : statusFinanceiroLabel[a.status_financeiro];
               return (
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">{a.paciente_nome}</TableCell>
                   <TableCell>{a.medico_nome}</TableCell>
                   <TableCell className="text-right tabular-nums">{brl(a.valor)}</TableCell>
-                  <TableCell><Badge variant={sm.variant}>{sm.label}</Badge></TableCell>
-                  <TableCell><Badge variant={sf.variant}>{sf.label}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant={sm.variant}>{sm.label}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={sf.variant}>{sf.label}</Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
@@ -234,17 +232,25 @@ export function EstornoAtendimentosPanel({
               Confirmar estorno
             </DialogTitle>
             <DialogDescription>
-              Esta ação atualiza o status médico e o status financeiro deste atendimento
-              e deduz o valor do faturamento do dia.
+              Esta ação atualiza o status médico e o status financeiro deste atendimento e deduz o
+              valor do faturamento do dia.
             </DialogDescription>
           </DialogHeader>
 
           {alvo && (
             <div className="space-y-3">
               <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
-                <div><span className="text-muted-foreground">Paciente:</span> <strong>{alvo.paciente_nome}</strong></div>
-                <div><span className="text-muted-foreground">Médico:</span> {alvo.medico_nome}</div>
-                <div><span className="text-muted-foreground">Valor:</span> <strong>{brl(alvo.valor)}</strong></div>
+                <div>
+                  <span className="text-muted-foreground">Paciente:</span>{" "}
+                  <strong>{alvo.paciente_nome}</strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Médico:</span> {alvo.medico_nome}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Valor:</span>{" "}
+                  <strong>{brl(alvo.valor)}</strong>
+                </div>
               </div>
               <div>
                 <Label htmlFor="motivo-estorno">Motivo do estorno (obrigatório)</Label>
@@ -264,7 +270,9 @@ export function EstornoAtendimentosPanel({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={fechar} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" onClick={fechar} disabled={saving}>
+              Cancelar
+            </Button>
             <Button
               variant="destructive"
               onClick={confirmar}

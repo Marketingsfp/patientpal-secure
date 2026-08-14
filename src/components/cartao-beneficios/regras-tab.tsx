@@ -8,16 +8,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -54,7 +68,7 @@ const CARENCIA_GROUPS: Array<{ value: number; label: string }> = [
 ];
 const carenciaLabel = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
-  return CARENCIA_GROUPS.find(g => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
+  return CARENCIA_GROUPS.find((g) => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
 };
 const carenciaShort = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
@@ -95,7 +109,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,valor_cartao,percentual_cartao,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
+        .select(
+          "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,valor_cartao,percentual_cartao,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade",
+        )
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -113,15 +129,27 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         .eq("ativo", true)
         .order("nome")
         .range(from, from + PAGE - 1);
-      if (error) { e3 = error; break; }
+      if (error) {
+        e3 = error;
+        break;
+      }
       const page = (data ?? []) as ProcOpt[];
       allProcs.push(...page);
       if (page.length < PAGE) break;
     }
     setLoading(false);
-    if (e1) { mostrarErro(e1); return; }
-    if (e2) { mostrarErro(e2); return; }
-    if (e3) { mostrarErro(e3); return; }
+    if (e1) {
+      mostrarErro(e1);
+      return;
+    }
+    if (e2) {
+      mostrarErro(e2);
+      return;
+    }
+    if (e3) {
+      mostrarErro(e3);
+      return;
+    }
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
     setProcedimentos(allProcs);
@@ -130,7 +158,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     // Serve só para avisar quando uma regra foi cadastrada com um tipo que não
     // corresponde a nenhum serviço (ex.: Odontologia + "exame").
     try {
-      const tipoDe = new Map(allProcs.map(p => [p.id, (p.tipo ?? "").toLowerCase()]));
+      const tipoDe = new Map(allProcs.map((p) => [p.id, (p.tipo ?? "").toLowerCase()]));
       const pares = new Set<string>();
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
@@ -148,20 +176,27 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (page.length < PAGE) break;
       }
       setParesEspTipo(pares);
-    } catch { /* aviso é opcional */ }
+    } catch {
+      /* aviso é opcional */
+    }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line */
+  }, [convenioId]);
 
   const espOpts = useMemo(
-    () => [{ value: "__any__", label: "Qualquer especialidade" }, ...especialidades.map(e => ({ value: e.id, label: e.nome }))],
+    () => [
+      { value: "__any__", label: "Qualquer especialidade" },
+      ...especialidades.map((e) => ({ value: e.id, label: e.nome })),
+    ],
     [especialidades],
   );
 
   const procOpts = useMemo(
     () => [
       { value: "__any__", label: "Qualquer serviço", tipo: null as string | null },
-      ...procedimentos.map(p => ({
+      ...procedimentos.map((p) => ({
         value: p.id,
         label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome,
         tipo: p.tipo,
@@ -172,12 +207,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const procById = useMemo(() => {
     const m = new Map<string, string>();
-    procedimentos.forEach(p => m.set(p.id, p.nome));
+    procedimentos.forEach((p) => m.set(p.id, p.nome));
     return m;
   }, [procedimentos]);
   const espById = useMemo(() => {
     const m = new Map<string, string>();
-    especialidades.forEach(e => m.set(e.id, e.nome));
+    especialidades.forEach((e) => m.set(e.id, e.nome));
     return m;
   }, [especialidades]);
 
@@ -198,29 +233,31 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [excSel, setExcSel] = useState<string[]>([]);
   const [excSaving, setExcSaving] = useState(false);
   const excecoes = useMemo(
-    () => regras.filter(r =>
-      r.procedimento_id &&
-      r.modo === "percentual_desconto" &&
-      Number(r.percentual) === 0 &&
-      !r.gratuito &&
-      !r.limite_qtd
-    ),
+    () =>
+      regras.filter(
+        (r) =>
+          r.procedimento_id &&
+          r.modo === "percentual_desconto" &&
+          Number(r.percentual) === 0 &&
+          !r.gratuito &&
+          !r.limite_qtd,
+      ),
     [regras],
   );
   const excecoesProcIds = useMemo(
-    () => new Set(excecoes.map(e => e.procedimento_id as string)),
+    () => new Set(excecoes.map((e) => e.procedimento_id as string)),
     [excecoes],
   );
   const addExcecao = async () => {
     if (!convenioId || excSel.length === 0) return;
-    const novos = excSel.filter(id => !excecoesProcIds.has(id));
+    const novos = excSel.filter((id) => !excecoesProcIds.has(id));
     const jaExistiam = excSel.length - novos.length;
     if (novos.length === 0) {
       toast.info("Todos os serviços selecionados já estão nas exceções.");
       return;
     }
     setExcSaving(true);
-    const payload = novos.map(procedimento_id => ({
+    const payload = novos.map((procedimento_id) => ({
       convenio_id: convenioId,
       clinica_id: clinicaId,
       procedimento_id,
@@ -236,7 +273,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     }));
     const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
     setExcSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success(
       jaExistiam > 0
         ? `${novos.length} exceção(ões) adicionada(s). ${jaExistiam} já existia(m).`
@@ -247,14 +287,21 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   };
   const removeExcecao = async (id: string) => {
     const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", id);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Exceção removida.");
     await load();
   };
 
   const regrasFiltradas = useMemo(() => {
     const HIGH = "\uffff";
-    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const norm = (s: string) =>
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
     const items = regras
       .map((r, idx) => ({ r, idx }))
       .filter(({ r }) => {
@@ -265,27 +312,36 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           Number(r.percentual) === 0 &&
           !r.gratuito &&
           !r.limite_qtd
-        ) return false;
+        )
+          return false;
         if (filtroGratuito === "sim" && !r.gratuito) return false;
         if (filtroGratuito === "nao" && r.gratuito) return false;
-        if (filtroCarencia !== "todos" && Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)) return false;
+        if (
+          filtroCarencia !== "todos" &&
+          Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)
+        )
+          return false;
         const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
         if (filtroLimite === "com" && !hasLimit) return false;
         if (filtroLimite === "sem" && hasLimit) return false;
         if (filtroEspecialidade !== "todos") {
-          if (filtroEspecialidade === "__any__") { if (r.especialidade_id) return false; }
-          else if (r.especialidade_id !== filtroEspecialidade) return false;
+          if (filtroEspecialidade === "__any__") {
+            if (r.especialidade_id) return false;
+          } else if (r.especialidade_id !== filtroEspecialidade) return false;
         }
         if (filtroTipo !== "todos") {
-          if (filtroTipo === "__any__") { if (r.tipo) return false; }
-          else if ((r.tipo ?? "").toLowerCase() !== filtroTipo) return false;
+          if (filtroTipo === "__any__") {
+            if (r.tipo) return false;
+          } else if ((r.tipo ?? "").toLowerCase() !== filtroTipo) return false;
         }
         if (filtroProcedimento !== "todos") {
-          if (filtroProcedimento === "__any__") { if (r.procedimento_id) return false; }
-          else if (r.procedimento_id !== filtroProcedimento) return false;
+          if (filtroProcedimento === "__any__") {
+            if (r.procedimento_id) return false;
+          } else if (r.procedimento_id !== filtroProcedimento) return false;
         }
         if (filtroModo !== "todos" && r.modo !== filtroModo) return false;
-        if (filtroPrioridade !== "todos" && Number(r.prioridade) !== Number(filtroPrioridade)) return false;
+        if (filtroPrioridade !== "todos" && Number(r.prioridade) !== Number(filtroPrioridade))
+          return false;
         return true;
       });
     items.sort((a, b) => {
@@ -301,11 +357,23 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
+  }, [
+    regras,
+    filtroGratuito,
+    filtroCarencia,
+    filtroLimite,
+    filtroEspecialidade,
+    filtroTipo,
+    filtroProcedimento,
+    filtroModo,
+    filtroPrioridade,
+    procById,
+    espById,
+  ]);
 
   const prioridadesUsadas = useMemo(() => {
     const s = new Set<number>();
-    regras.forEach(r => s.add(Number(r.prioridade) || 0));
+    regras.forEach((r) => s.add(Number(r.prioridade) || 0));
     return Array.from(s).sort((a, b) => b - a);
   }, [regras]);
 
@@ -315,17 +383,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   };
 
   const update = (idx: number, patch: Partial<CbRegra>) => {
-    setRegras(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+    setRegras((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   };
 
   const remove = async (idx: number) => {
     const r = regras[idx];
-    if (!await confirmDialog("Excluir esta regra?")) return;
+    if (!(await confirmDialog("Excluir esta regra?"))) return;
     if (!r.id.startsWith("new-")) {
       const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", r.id);
-      if (error) { mostrarErro(error); return; }
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
     }
-    setRegras(prev => prev.filter((_, i) => i !== idx));
+    setRegras((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const salvar = async () => {
@@ -343,32 +414,54 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
-        valor_cartao: r.modo === "valor_fixo"
-          ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
-          : null,
-        percentual_cartao: r.modo === "percentual_desconto"
-          ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
-          : null,
+        valor_cartao:
+          r.modo === "valor_fixo"
+            ? r.valor_cartao != null
+              ? Number(r.valor_cartao) || 0
+              : Number(r.valor) || 0
+            : null,
+        percentual_cartao:
+          r.modo === "percentual_desconto"
+            ? r.percentual_cartao != null
+              ? Number(r.percentual_cartao) || 0
+              : Number(r.percentual) || 0
+            : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
         limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
         limite_periodo: r.limite_qtd != null ? (r.limite_periodo ?? "dia") : null,
         limite_escopo: r.limite_qtd != null ? (r.limite_escopo ?? "contrato") : null,
         excedente_modo: r.limite_qtd != null ? (r.excedente_modo ?? "percentual_particular") : null,
-        excedente_percentual: r.limite_qtd != null && (r.excedente_modo ?? "percentual_particular") === "percentual_particular"
-          ? Number(r.excedente_percentual ?? 50) : null,
-        excedente_valor: r.limite_qtd != null && r.excedente_modo === "valor_fixo"
-          ? Number(r.excedente_valor ?? 0) : null,
+        excedente_percentual:
+          r.limite_qtd != null &&
+          (r.excedente_modo ?? "percentual_particular") === "percentual_particular"
+            ? Number(r.excedente_percentual ?? 50)
+            : null,
+        excedente_valor:
+          r.limite_qtd != null && r.excedente_modo === "valor_fixo"
+            ? Number(r.excedente_valor ?? 0)
+            : null,
         carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
         gratuito: !!r.gratuito,
         grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
-        if (error) { setLoading(false); mostrarErro(error); return; }
+        if (error) {
+          setLoading(false);
+          mostrarErro(error);
+          return;
+        }
       } else {
-        const { error } = await (supabase as any).from("cb_convenio_regras").update(payload).eq("id", r.id);
-        if (error) { setLoading(false); mostrarErro(error); return; }
+        const { error } = await (supabase as any)
+          .from("cb_convenio_regras")
+          .update(payload)
+          .eq("id", r.id);
+        if (error) {
+          setLoading(false);
+          mostrarErro(error);
+          return;
+        }
       }
     }
     setLoading(false);
@@ -377,7 +470,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     // Não há mais reaplicação em massa: os valores por serviço são mantidos
     // manualmente e a Agenda/Caixa calculam sempre pela regra viva.
   };
-
 
   if (!convenioId) {
     return (
@@ -389,50 +481,52 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const blocoExcecoes = (
     <div className="border border-destructive/30 rounded-md p-3 bg-destructive/5 space-y-3">
-          <div>
-            <div className="font-medium text-destructive">Exceção às regras (sem desconto)</div>
-            <p className="text-xs text-muted-foreground">
-              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria, tipo ou especialidade. Serviços que não estão nas regras nem nas exceções também são cobrados como particular.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <Label className="text-xs">Serviço</Label>
-              <SearchableMultiSelect
-                options={procOpts.filter(o => o.value !== "__any__").map(o => ({ value: o.value, label: o.label }))}
-                value={excSel}
-                onChange={setExcSel}
-                placeholder="Selecione um ou mais serviços"
-              />
-            </div>
-            <Button
-              size="sm"
-              onClick={addExcecao}
-              disabled={excSel.length === 0 || excSaving}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {excSel.length > 1 ? `Adicionar exceções (${excSel.length})` : "Adicionar exceção"}
-            </Button>
-          </div>
-          {excecoes.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
-          ) : (
-             <ul className="divide-y divide-destructive/20 border border-destructive/20 rounded-md bg-background">
-              {excecoes.map(e => (
-                <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                  <span className="truncate">{procById.get(e.procedimento_id as string) ?? "(serviço removido)"}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => removeExcecao(e.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+      <div>
+        <div className="font-medium text-destructive">Exceção às regras (sem desconto)</div>
+        <p className="text-xs text-muted-foreground">
+          Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio,
+          ignorando qualquer regra por categoria, tipo ou especialidade. Serviços que não estão nas
+          regras nem nas exceções também são cobrados como particular.
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <Label className="text-xs">Serviço</Label>
+          <SearchableMultiSelect
+            options={procOpts
+              .filter((o) => o.value !== "__any__")
+              .map((o) => ({ value: o.value, label: o.label }))}
+            value={excSel}
+            onChange={setExcSel}
+            placeholder="Selecione um ou mais serviços"
+          />
+        </div>
+        <Button size="sm" onClick={addExcecao} disabled={excSel.length === 0 || excSaving}>
+          <Plus className="h-4 w-4 mr-1" />
+          {excSel.length > 1 ? `Adicionar exceções (${excSel.length})` : "Adicionar exceção"}
+        </Button>
+      </div>
+      {excecoes.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
+      ) : (
+        <ul className="divide-y divide-destructive/20 border border-destructive/20 rounded-md bg-background">
+          {excecoes.map((e) => (
+            <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+              <span className="truncate">
+                {procById.get(e.procedimento_id as string) ?? "(serviço removido)"}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => removeExcecao(e.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 
@@ -442,7 +536,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
           <p className="text-sm text-muted-foreground">
-            Cadastre regras por serviço específico, especialidade e/ou tipo. A regra mais específica e de maior prioridade vence (serviço &gt; especialidade+tipo &gt; especialidade &gt; tipo). Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
+            Cadastre regras por serviço específico, especialidade e/ou tipo. A regra mais específica
+            e de maior prioridade vence (serviço &gt; especialidade+tipo &gt; especialidade &gt;
+            tipo). Ao cadastrar um serviço, o valor deste convênio será preenchido automaticamente.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -467,14 +563,18 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Especialidade
-                      {filtroEspecialidade !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroEspecialidade !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
                     <SelectItem value="todos">Todas</SelectItem>
                     <SelectItem value="__any__">Qualquer especialidade</SelectItem>
-                    {especialidades.map(e => (
-                      <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                    {especialidades.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -484,13 +584,19 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Categoria
-                      {filtroTipo !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroTipo !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todas</SelectItem>
                     <SelectItem value="__any__">Qualquer</SelectItem>
-                    {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {TIPOS.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </TableHead>
@@ -499,13 +605,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1 truncate">
                       Serviço
-                      {filtroProcedimento !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroProcedimento !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="__any__">Qualquer serviço</SelectItem>
-                    {procedimentos.map(p => (
+                    {procedimentos.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.codigo ? `${p.codigo} — ${p.nome}` : p.nome}
                       </SelectItem>
@@ -518,7 +626,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Modo
-                      {filtroModo !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroModo !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -534,13 +644,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
                     <span className="inline-flex items-center gap-1">
                       Prio.
-                      {filtroPrioridade !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroPrioridade !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todas</SelectItem>
-                    {prioridadesUsadas.map(p => (
-                      <SelectItem key={p} value={String(p)}>{p}</SelectItem>
+                    {prioridadesUsadas.map((p) => (
+                      <SelectItem key={p} value={String(p)}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -550,7 +664,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Limite
-                      {filtroLimite !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroLimite !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -565,13 +681,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Carência
-                      {filtroCarencia !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroCarencia !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todas</SelectItem>
-                    {CARENCIA_GROUPS.map(g => (
-                      <SelectItem key={g.value} value={String(g.value)}>{carenciaShort(g.value)}</SelectItem>
+                    {CARENCIA_GROUPS.map((g) => (
+                      <SelectItem key={g.value} value={String(g.value)}>
+                        {carenciaShort(g.value)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -581,7 +701,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
                     <span className="inline-flex items-center gap-1">
                       Gratuito
-                      {filtroGratuito !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {filtroGratuito !== "todos" && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -596,154 +718,195 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
-            ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
-            ) : regrasFiltradas.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra corresponde aos filtros.</TableCell></TableRow>
-            ) : (
-              regrasFiltradas.map(({ r, idx }) => (
-              <TableRow key={r.id}>
-                <TableCell>
-                  <SearchableSelect
-                    options={espOpts}
-                    value={r.especialidade_id ?? "__any__"}
-                    onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
-                    placeholder="Qualquer"
-                    disabled
-                    className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={r.tipo ?? "__any__"}
-                    onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
-                    disabled
-                  >
-                    <SelectTrigger className="w-24 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__any__">Qualquer</SelectItem>
-                      {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {regraSemServico(r) && (
-                    <span
-                      className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
-                      title="Nenhum serviço ativo desta especialidade tem esse tipo. Esta regra não será aplicada em nenhum atendimento."
-                    >
-                      sem serviço
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <SearchableSelect
-                    options={procOpts}
-                    value={r.procedimento_id ?? "__any__"}
-                    onChange={(v) => update(idx, {
-                      procedimento_id: v === "__any__" ? null : v,
-                      // limpar filtros por especialidade/tipo quando escolhe serviço
-                      ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
-                    })}
-                    placeholder="Qualquer serviço"
-                    disabled
-                    className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })} disabled>
-                    <SelectTrigger className="w-28 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="valor_fixo">Valor fixo</SelectItem>
-                      <SelectItem value="percentual_desconto">% desconto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-right w-[80px]">
-                  <div className="flex justify-end">
-                    {r.modo === "valor_fixo" ? (
-                      <CurrencyInput
-                        className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
-                        value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
-                        onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
-                        disabled
-                      />
-                    ) : (
-                      <Input
-                        className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
-                        type="number" min="0" max="100" step="0.01"
-                        value={r.percentual ?? ""}
-                        onChange={(e) => update(idx, { percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
-                        disabled
-                      />
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="w-[60px] text-center">
-                  <Input
-                    className="w-12 h-8 text-xs text-center px-1 mx-auto border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
-                    type="number" min="1" max="100"
-                    value={r.prioridade}
-                    onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
-                    disabled
-                  />
-                </TableCell>
-                <TableCell className="w-[100px]">
-                  <Button
-                    size="sm"
-                    variant={r.limite_qtd ? "secondary" : "ghost"}
-                    className="text-[11px] h-7 px-2"
-                    onClick={() => setLimiteIdx(idx)}
-                    title="Configurar limite de uso"
-                    disabled
-                  >
-                    <Timer className="h-3.5 w-3.5 mr-1" />
-                    {r.limite_qtd
-                      ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : r.limite_escopo === "titular_ou_dependente" ? "titular-ou-dep" : "contrato"}`
-                      : "Sem limite"}
-                  </Button>
-                </TableCell>
-                <TableCell className="w-[92px]">
-                  <Select
-                    value={String(r.carencia_mensalidades ?? 0)}
-                    onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
-                    disabled
-                  >
-                    <SelectTrigger className="w-full h-8 text-xs px-2 border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Imediato</SelectItem>
-                      <SelectItem value="1">Após 1ª</SelectItem>
-                      <SelectItem value="2">Após 2ª</SelectItem>
-                      <SelectItem value="3">Após 3ª</SelectItem>
-                      <SelectItem value="6">Após 6ª</SelectItem>
-                      <SelectItem value="12">Após 12ª</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-center w-[52px] !px-1">
-                  <div className="flex items-center justify-center" title="Marca como cortesia (valor 0, exibido como Gratuito)">
-                    <Checkbox
-                      checked={!!r.gratuito}
-                      disabled
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="w-[64px] !px-0">
-                  <div className="flex items-center gap-0.5">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => setEditRegra(r)}
-                      title="Editar regra"
-                    >
-                      <Pencil className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(idx)} title="Excluir regra">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
+              <TableRow>
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                  Carregando…
                 </TableCell>
               </TableRow>
+            ) : regras.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                  Nenhuma regra. Clique em "Adicionar regra".
+                </TableCell>
+              </TableRow>
+            ) : regrasFiltradas.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                  Nenhuma regra corresponde aos filtros.
+                </TableCell>
+              </TableRow>
+            ) : (
+              regrasFiltradas.map(({ r, idx }) => (
+                <TableRow key={r.id}>
+                  <TableCell>
+                    <SearchableSelect
+                      options={espOpts}
+                      value={r.especialidade_id ?? "__any__"}
+                      onChange={(v) =>
+                        update(idx, { especialidade_id: v === "__any__" ? null : v })
+                      }
+                      placeholder="Qualquer"
+                      disabled
+                      className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={r.tipo ?? "__any__"}
+                      onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
+                      disabled
+                    >
+                      <SelectTrigger className="w-24 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__any__">Qualquer</SelectItem>
+                        {TIPOS.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {regraSemServico(r) && (
+                      <span
+                        className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                        title="Nenhum serviço ativo desta especialidade tem esse tipo. Esta regra não será aplicada em nenhum atendimento."
+                      >
+                        sem serviço
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <SearchableSelect
+                      options={procOpts}
+                      value={r.procedimento_id ?? "__any__"}
+                      onChange={(v) =>
+                        update(idx, {
+                          procedimento_id: v === "__any__" ? null : v,
+                          // limpar filtros por especialidade/tipo quando escolhe serviço
+                          ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                        })
+                      }
+                      placeholder="Qualquer serviço"
+                      disabled
+                      className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })} disabled>
+                      <SelectTrigger className="w-28 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="valor_fixo">Valor fixo</SelectItem>
+                        <SelectItem value="percentual_desconto">% desconto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-right w-[80px]">
+                    <div className="flex justify-end">
+                      {r.modo === "valor_fixo" ? (
+                        <CurrencyInput
+                          className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
+                          value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
+                          onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
+                          disabled
+                        />
+                      ) : (
+                        <Input
+                          className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={r.percentual ?? ""}
+                          onChange={(e) =>
+                            update(idx, {
+                              percentual: e.target.value ? parseFloat(e.target.value) : 0,
+                            })
+                          }
+                          disabled
+                        />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="w-[60px] text-center">
+                    <Input
+                      className="w-12 h-8 text-xs text-center px-1 mx-auto border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={r.prioridade}
+                      onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
+                      disabled
+                    />
+                  </TableCell>
+                  <TableCell className="w-[100px]">
+                    <Button
+                      size="sm"
+                      variant={r.limite_qtd ? "secondary" : "ghost"}
+                      className="text-[11px] h-7 px-2"
+                      onClick={() => setLimiteIdx(idx)}
+                      title="Configurar limite de uso"
+                      disabled
+                    >
+                      <Timer className="h-3.5 w-3.5 mr-1" />
+                      {r.limite_qtd
+                        ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : r.limite_escopo === "titular_ou_dependente" ? "titular-ou-dep" : "contrato"}`
+                        : "Sem limite"}
+                    </Button>
+                  </TableCell>
+                  <TableCell className="w-[92px]">
+                    <Select
+                      value={String(r.carencia_mensalidades ?? 0)}
+                      onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
+                      disabled
+                    >
+                      <SelectTrigger className="w-full h-8 text-xs px-2 border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Imediato</SelectItem>
+                        <SelectItem value="1">Após 1ª</SelectItem>
+                        <SelectItem value="2">Após 2ª</SelectItem>
+                        <SelectItem value="3">Após 3ª</SelectItem>
+                        <SelectItem value="6">Após 6ª</SelectItem>
+                        <SelectItem value="12">Após 12ª</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-center w-[52px] !px-1">
+                    <div
+                      className="flex items-center justify-center"
+                      title="Marca como cortesia (valor 0, exibido como Gratuito)"
+                    >
+                      <Checkbox checked={!!r.gratuito} disabled />
+                    </div>
+                  </TableCell>
+                  <TableCell className="w-[64px] !px-0">
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => setEditRegra(r)}
+                        title="Editar regra"
+                      >
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => remove(idx)}
+                        title="Excluir regra"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))
             )}
           </TableBody>
@@ -752,7 +915,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <p className="text-xs text-muted-foreground">
-          Dica: prioridade maior vence em caso de empate. Regras por serviço específico sempre vencem regras por especialidade/categoria.
+          Dica: prioridade maior vence em caso de empate. Regras por serviço específico sempre
+          vencem regras por especialidade/categoria.
         </p>
         <Button size="sm" onClick={salvar} disabled={loading}>
           {loading ? "Salvando…" : "Salvar regras"}
@@ -765,8 +929,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         idx={limiteIdx}
         regras={regras}
         onClose={() => setLimiteIdx(null)}
-        onChange={(patch) => { if (limiteIdx != null) update(limiteIdx, patch); }}
-        onSave={async () => { await salvar(); setLimiteIdx(null); }}
+        onChange={(patch) => {
+          if (limiteIdx != null) update(limiteIdx, patch);
+        }}
+        onSave={async () => {
+          await salvar();
+          setLimiteIdx(null);
+        }}
         saving={loading}
       />
       <NovaRegraDialog
@@ -776,7 +945,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         clinicaId={clinicaId}
         espOpts={espOpts}
         procOpts={procOpts}
-        onSaved={async () => { setNovoOpen(false); await load(); }}
+        onSaved={async () => {
+          setNovoOpen(false);
+          await load();
+        }}
       />
       <NovaRegraDialog
         open={editRegra != null}
@@ -786,14 +958,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         espOpts={espOpts}
         procOpts={procOpts}
         regra={editRegra}
-        onSaved={async () => { setEditRegra(null); await load(); }}
+        onSaved={async () => {
+          setEditRegra(null);
+          await load();
+        }}
       />
     </div>
   );
 }
 
 function LimiteDialog({
-  idx, regras, onClose, onChange, onSave, saving,
+  idx,
+  regras,
+  onClose,
+  onChange,
+  onSave,
+  saving,
 }: {
   idx: number | null;
   regras: CbRegra[];
@@ -806,7 +986,12 @@ function LimiteDialog({
   const r = idx != null ? regras[idx] : null;
   if (!r) {
     return (
-      <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
+      >
         <DialogContent />
       </Dialog>
     );
@@ -814,12 +999,18 @@ function LimiteDialog({
   const hasLimit = r.limite_qtd != null && r.limite_qtd > 0;
   const modo = r.excedente_modo ?? "percentual_particular";
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Limite de uso desta regra</DialogTitle>
           <DialogDescription>
-            Ex.: "1 consulta por contrato" ou "1 consulta por dia por contrato". Vazio = sem limite. Após salvar as regras, o limite passa a valer na agenda.
+            Ex.: "1 consulta por contrato" ou "1 consulta por dia por contrato". Vazio = sem limite.
+            Após salvar as regras, o limite passa a valer na agenda.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -827,9 +1018,12 @@ function LimiteDialog({
             <div>
               <Label className="text-xs">Quantidade</Label>
               <Input
-                type="number" min="1"
+                type="number"
+                min="1"
                 value={r.limite_qtd ?? ""}
-                onChange={(e) => onChange({ limite_qtd: e.target.value ? Number(e.target.value) : null })}
+                onChange={(e) =>
+                  onChange({ limite_qtd: e.target.value ? Number(e.target.value) : null })
+                }
                 placeholder="Ex.: 1"
               />
             </div>
@@ -840,7 +1034,9 @@ function LimiteDialog({
                 onValueChange={(v) => onChange({ limite_periodo: v })}
                 disabled={!hasLimit}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dia">Por dia</SelectItem>
                   <SelectItem value="semana">Por semana</SelectItem>
@@ -857,11 +1053,15 @@ function LimiteDialog({
                 onValueChange={(v) => onChange({ limite_escopo: v })}
                 disabled={!hasLimit}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
                   <SelectItem value="paciente">Por paciente</SelectItem>
-                  <SelectItem value="titular_ou_dependente">Titular ou dependente (exclusivo)</SelectItem>
+                  <SelectItem value="titular_ou_dependente">
+                    Titular ou dependente (exclusivo)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -871,12 +1071,16 @@ function LimiteDialog({
               <div>
                 <Label className="text-xs">Quando exceder, cobrar:</Label>
                 <Select value={modo} onValueChange={(v) => onChange({ excedente_modo: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                     <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                     <SelectItem value="particular">Valor particular cheio (100%)</SelectItem>
-                    <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
+                    <SelectItem value="regra_padrao_convenio">
+                      Aplicar regra padrão do convênio
+                    </SelectItem>
                     <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                   </SelectContent>
                 </Select>
@@ -885,9 +1089,15 @@ function LimiteDialog({
                 <div>
                   <Label className="text-xs">% do particular (0-100)</Label>
                   <Input
-                    type="number" min="0" max="100"
+                    type="number"
+                    min="0"
+                    max="100"
                     value={r.excedente_percentual ?? 50}
-                    onChange={(e) => onChange({ excedente_percentual: e.target.value ? Number(e.target.value) : 0 })}
+                    onChange={(e) =>
+                      onChange({
+                        excedente_percentual: e.target.value ? Number(e.target.value) : 0,
+                      })
+                    }
                     placeholder="Ex.: 50"
                   />
                 </div>
@@ -896,9 +1106,12 @@ function LimiteDialog({
                 <div>
                   <Label className="text-xs">Valor fixo (R$)</Label>
                   <Input
-                    type="number" inputMode="decimal"
+                    type="number"
+                    inputMode="decimal"
                     value={r.excedente_valor ?? ""}
-                    onChange={(e) => onChange({ excedente_valor: e.target.value ? Number(e.target.value) : null })}
+                    onChange={(e) =>
+                      onChange({ excedente_valor: e.target.value ? Number(e.target.value) : null })
+                    }
                     placeholder="Ex.: 50.00"
                   />
                 </div>
@@ -913,14 +1126,16 @@ function LimiteDialog({
               placeholder='Ex.: "mama-preventivo"'
             />
             <p className="text-[11px] text-muted-foreground">
-              Regras com o mesmo grupo dividem a mesma cota. Ex.: uma regra grátis
-              para Mamografia e outra para USG Mama, ambas com grupo
-              "mama-preventivo" e limite 1/contrato → usar uma consome a outra.
+              Regras com o mesmo grupo dividem a mesma cota. Ex.: uma regra grátis para Mamografia e
+              outra para USG Mama, ambas com grupo "mama-preventivo" e limite 1/contrato → usar uma
+              consome a outra.
             </p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
           <Button onClick={() => void onSave()} disabled={saving}>
             {saving ? "Salvando…" : "Salvar"}
           </Button>
@@ -931,7 +1146,14 @@ function LimiteDialog({
 }
 
 function NovaRegraDialog({
-  open, onClose, convenioId, clinicaId, espOpts, procOpts, onSaved, regra,
+  open,
+  onClose,
+  convenioId,
+  clinicaId,
+  espOpts,
+  procOpts,
+  onSaved,
+  regra,
 }: {
   open: boolean;
   onClose: () => void;
@@ -974,7 +1196,7 @@ function NovaRegraDialog({
     /* eslint-disable-next-line */
   }, [open, convenioId, regra]);
 
-  const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
+  const upd = (patch: Partial<CbRegra>) => setR((prev) => ({ ...prev, ...patch }));
 
   // Regra "base" por especialidade deste convênio para o procedimento selecionado.
   // Serve para avisar o operador (e pré-preencher) que ao salvar uma regra por
@@ -988,7 +1210,10 @@ function NovaRegraDialog({
 
   useEffect(() => {
     if (!open) return;
-    if (!r.procedimento_id) { setRegraBase(null); return; }
+    if (!r.procedimento_id) {
+      setRegraBase(null);
+      return;
+    }
     let cancel = false;
     (async () => {
       // especialidades do procedimento
@@ -997,7 +1222,10 @@ function NovaRegraDialog({
         .select("especialidade_id, especialidades(nome)")
         .eq("procedimento_id", r.procedimento_id);
       const espIds = (pes ?? []).map((x: any) => x.especialidade_id);
-      if (!espIds.length) { if (!cancel) setRegraBase(null); return; }
+      if (!espIds.length) {
+        if (!cancel) setRegraBase(null);
+        return;
+      }
       const { data: regras } = await (supabase as any)
         .from("cb_convenio_regras")
         .select("valor, valor_cartao, especialidade_id, prioridade")
@@ -1008,10 +1236,13 @@ function NovaRegraDialog({
         .eq("ativo", true)
         .eq("gratuito", false)
         .order("prioridade", { ascending: false });
-      const escolhida = (regras ?? []).find(
-        (x: any) => x.valor_cartao != null && Number(x.valor_cartao) > 0
-      ) ?? (regras ?? [])[0];
-      if (!escolhida) { if (!cancel) setRegraBase(null); return; }
+      const escolhida =
+        (regras ?? []).find((x: any) => x.valor_cartao != null && Number(x.valor_cartao) > 0) ??
+        (regras ?? [])[0];
+      if (!escolhida) {
+        if (!cancel) setRegraBase(null);
+        return;
+      }
       const espNome =
         (pes ?? []).find((x: any) => x.especialidade_id === escolhida.especialidade_id)
           ?.especialidades?.nome ?? "especialidade";
@@ -1022,20 +1253,26 @@ function NovaRegraDialog({
         especialidade_nome: espNome,
       });
       // Pré-preenche valor_cartao se estiver vazio/zerado e o usuário ainda não digitou
-      if (!isEdit && !valorCartaoTocado && (r.valor_cartao == null || Number(r.valor_cartao) === 0)) {
+      if (
+        !isEdit &&
+        !valorCartaoTocado &&
+        (r.valor_cartao == null || Number(r.valor_cartao) === 0)
+      ) {
         if (escolhida.valor_cartao != null && Number(escolhida.valor_cartao) > 0) {
-          setR(prev => ({ ...prev, valor_cartao: Number(escolhida.valor_cartao) }));
+          setR((prev) => ({ ...prev, valor_cartao: Number(escolhida.valor_cartao) }));
         }
       }
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
     /* eslint-disable-next-line */
   }, [open, r.procedimento_id, convenioId]);
 
   const procOptsFiltrados = useMemo(() => {
     if (!r.tipo) return procOpts;
     const t = r.tipo.toLowerCase();
-    return procOpts.filter(o => o.value === "__any__" || (o.tipo ?? "").toLowerCase() === t);
+    return procOpts.filter((o) => o.value === "__any__" || (o.tipo ?? "").toLowerCase() === t);
   }, [procOpts, r.tipo]);
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
   const excModo = r.excedente_modo ?? "percentual_particular";
@@ -1071,9 +1308,9 @@ function NovaRegraDialog({
       if (cartaoDivergente && (cartaoIgualDinheiro || vc === 0)) {
         const ok = await confirmDialog(
           `Atenção: a regra por especialidade (${regraBase.especialidade_nome}) deste convênio ` +
-          `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
-          `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +
-          `o que substitui o preço do convênio.\n\nDeseja continuar mesmo assim?`
+            `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
+            `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +
+            `o que substitui o preço do convênio.\n\nDeseja continuar mesmo assim?`,
         );
         if (!ok) return;
       }
@@ -1088,22 +1325,29 @@ function NovaRegraDialog({
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
-      valor_cartao: r.modo === "valor_fixo"
-        ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
-        : null,
-      percentual_cartao: r.modo === "percentual_desconto"
-        ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
-        : null,
+      valor_cartao:
+        r.modo === "valor_fixo"
+          ? r.valor_cartao != null
+            ? Number(r.valor_cartao) || 0
+            : Number(r.valor) || 0
+          : null,
+      percentual_cartao:
+        r.modo === "percentual_desconto"
+          ? r.percentual_cartao != null
+            ? Number(r.percentual_cartao) || 0
+            : Number(r.percentual) || 0
+          : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
       limite_periodo: hasLimit ? (r.limite_periodo ?? "dia") : null,
       limite_escopo: hasLimit ? (r.limite_escopo ?? "contrato") : null,
       excedente_modo: hasLimit ? excModo : null,
-      excedente_percentual: hasLimit && excModo === "percentual_particular"
-        ? Number(r.excedente_percentual ?? 50) : null,
-      excedente_valor: hasLimit && excModo === "valor_fixo"
-        ? Number(r.excedente_valor ?? 0) : null,
+      excedente_percentual:
+        hasLimit && excModo === "percentual_particular"
+          ? Number(r.excedente_percentual ?? 50)
+          : null,
+      excedente_valor: hasLimit && excModo === "valor_fixo" ? Number(r.excedente_valor ?? 0) : null,
       carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
       gratuito: !!r.gratuito,
       grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
@@ -1112,18 +1356,27 @@ function NovaRegraDialog({
       ? await (supabase as any).from("cb_convenio_regras").update(payload).eq("id", r.id)
       : await (supabase as any).from("cb_convenio_regras").insert(payload);
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success(isEdit ? "Regra atualizada." : "Regra adicionada.");
     await onSaved();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !saving) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !saving) onClose();
+      }}
+    >
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar regra de preço" : "Nova regra de preço"}</DialogTitle>
           <DialogDescription>
-            Preencha os dados da regra. Regras por serviço específico ignoram especialidade/categoria.
+            Preencha os dados da regra. Regras por serviço específico ignoram
+            especialidade/categoria.
           </DialogDescription>
         </DialogHeader>
 
@@ -1148,7 +1401,7 @@ function NovaRegraDialog({
                   const patch: Partial<CbRegra> = { tipo: novoTipo };
                   // Se o serviço atual não pertencer à nova categoria, limpa
                   if (r.procedimento_id && novoTipo) {
-                    const p = procOpts.find(o => o.value === r.procedimento_id);
+                    const p = procOpts.find((o) => o.value === r.procedimento_id);
                     if (p && (p.tipo ?? "").toLowerCase() !== novoTipo.toLowerCase()) {
                       patch.procedimento_id = null;
                     }
@@ -1157,10 +1410,16 @@ function NovaRegraDialog({
                 }}
                 disabled={!!r.procedimento_id}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__any__">Qualquer</SelectItem>
-                  {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {TIPOS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1171,10 +1430,12 @@ function NovaRegraDialog({
             <SearchableSelect
               options={procOptsFiltrados}
               value={r.procedimento_id ?? "__any__"}
-              onChange={(v) => upd({
-                procedimento_id: v === "__any__" ? null : v,
-                ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
-              })}
+              onChange={(v) =>
+                upd({
+                  procedimento_id: v === "__any__" ? null : v,
+                  ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                })
+              }
               placeholder="Qualquer serviço"
             />
             <p className="text-[11px] text-muted-foreground">
@@ -1187,7 +1448,9 @@ function NovaRegraDialog({
             <div className="space-y-1.5">
               <Label className="text-xs">Modo</Label>
               <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="valor_fixo">Valor fixo</SelectItem>
                   <SelectItem value="percentual_desconto">% desconto</SelectItem>
@@ -1197,7 +1460,9 @@ function NovaRegraDialog({
             <div className="space-y-1.5">
               <Label className="text-xs">Prioridade</Label>
               <Input
-                type="number" min="1" max="100"
+                type="number"
+                min="1"
+                max="100"
                 value={r.prioridade}
                 onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
               />
@@ -1216,9 +1481,14 @@ function NovaRegraDialog({
                 />
               ) : (
                 <Input
-                  type="number" min="0" max="100" step="0.01"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
                   value={r.percentual ?? ""}
-                  onChange={(e) => upd({ percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
+                  onChange={(e) =>
+                    upd({ percentual: e.target.value ? parseFloat(e.target.value) : 0 })
+                  }
                 />
               )}
             </div>
@@ -1229,13 +1499,21 @@ function NovaRegraDialog({
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
-                  onChange={(v) => { setValorCartaoTocado(true); upd({ valor_cartao: v ? parseFloat(v) : 0 }); }}
+                  onChange={(v) => {
+                    setValorCartaoTocado(true);
+                    upd({ valor_cartao: v ? parseFloat(v) : 0 });
+                  }}
                 />
               ) : (
                 <Input
-                  type="number" min="0" max="100" step="0.01"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
                   value={r.percentual_cartao ?? ""}
-                  onChange={(e) => upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })}
+                  onChange={(e) =>
+                    upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })
+                  }
                 />
               )}
               <p className="text-[11px] text-muted-foreground">
@@ -1243,8 +1521,8 @@ function NovaRegraDialog({
               </p>
               {r.procedimento_id && regraBase && r.modo === "valor_fixo" && (
                 <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                  Regra do convênio para <b>{regraBase.especialidade_nome}</b>:{" "}
-                  R$ {(regraBase.valor ?? 0).toFixed(2)} dinheiro
+                  Regra do convênio para <b>{regraBase.especialidade_nome}</b>: R${" "}
+                  {(regraBase.valor ?? 0).toFixed(2)} dinheiro
                   {regraBase.valor_cartao != null && (
                     <> / R$ {regraBase.valor_cartao.toFixed(2)} cartão·PIX</>
                   )}
@@ -1261,10 +1539,14 @@ function NovaRegraDialog({
                 value={String(r.carencia_mensalidades ?? 0)}
                 onValueChange={(v) => upd({ carencia_mensalidades: Number(v) })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {CARENCIA_GROUPS.map(g => (
-                    <SelectItem key={g.value} value={String(g.value)}>{g.label}</SelectItem>
+                  {CARENCIA_GROUPS.map((g) => (
+                    <SelectItem key={g.value} value={String(g.value)}>
+                      {g.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1276,9 +1558,18 @@ function NovaRegraDialog({
                   checked={!!r.gratuito}
                   onCheckedChange={(v) => {
                     const on = v === true;
-                    upd(on
-                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null, valor_cartao: 0, percentual_cartao: null }
-                      : { gratuito: false });
+                    upd(
+                      on
+                        ? {
+                            gratuito: true,
+                            modo: "valor_fixo",
+                            valor: 0,
+                            percentual: null,
+                            valor_cartao: 0,
+                            percentual_cartao: null,
+                          }
+                        : { gratuito: false },
+                    );
                   }}
                 />
                 <span className="text-sm">Gratuito (valor 0)</span>
@@ -1287,14 +1578,19 @@ function NovaRegraDialog({
           </div>
 
           <div className="border-t pt-3 space-y-3">
-            <div className="text-xs font-semibold text-muted-foreground uppercase">Limite de uso (opcional)</div>
+            <div className="text-xs font-semibold text-muted-foreground uppercase">
+              Limite de uso (opcional)
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Quantidade</Label>
                 <Input
-                  type="number" min="1"
+                  type="number"
+                  min="1"
                   value={r.limite_qtd ?? ""}
-                  onChange={(e) => upd({ limite_qtd: e.target.value ? Number(e.target.value) : null })}
+                  onChange={(e) =>
+                    upd({ limite_qtd: e.target.value ? Number(e.target.value) : null })
+                  }
                   placeholder="Sem limite"
                 />
               </div>
@@ -1305,7 +1601,9 @@ function NovaRegraDialog({
                   onValueChange={(v) => upd({ limite_periodo: v })}
                   disabled={!hasLimit}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dia">Por dia</SelectItem>
                     <SelectItem value="semana">Por semana</SelectItem>
@@ -1322,7 +1620,9 @@ function NovaRegraDialog({
                   onValueChange={(v) => upd({ limite_escopo: v })}
                   disabled={!hasLimit}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
                     <SelectItem value="paciente">Por paciente</SelectItem>
@@ -1336,12 +1636,16 @@ function NovaRegraDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">Quando exceder, cobrar:</Label>
                   <Select value={excModo} onValueChange={(v) => upd({ excedente_modo: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                       <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                       <SelectItem value="particular">Valor particular cheio</SelectItem>
-                      <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
+                      <SelectItem value="regra_padrao_convenio">
+                        Aplicar regra padrão do convênio
+                      </SelectItem>
                       <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1350,9 +1654,13 @@ function NovaRegraDialog({
                   <div className="space-y-1.5">
                     <Label className="text-xs">% do particular (0-100)</Label>
                     <Input
-                      type="number" min="0" max="100"
+                      type="number"
+                      min="0"
+                      max="100"
                       value={r.excedente_percentual ?? 50}
-                      onChange={(e) => upd({ excedente_percentual: e.target.value ? Number(e.target.value) : 0 })}
+                      onChange={(e) =>
+                        upd({ excedente_percentual: e.target.value ? Number(e.target.value) : 0 })
+                      }
                     />
                   </div>
                 )}
@@ -1360,9 +1668,12 @@ function NovaRegraDialog({
                   <div className="space-y-1.5">
                     <Label className="text-xs">Valor fixo (R$)</Label>
                     <Input
-                      type="number" inputMode="decimal"
+                      type="number"
+                      inputMode="decimal"
                       value={r.excedente_valor ?? ""}
-                      onChange={(e) => upd({ excedente_valor: e.target.value ? Number(e.target.value) : null })}
+                      onChange={(e) =>
+                        upd({ excedente_valor: e.target.value ? Number(e.target.value) : null })
+                      }
                     />
                   </div>
                 )}
@@ -1376,8 +1687,8 @@ function NovaRegraDialog({
                 placeholder='Ex.: "mama-preventivo"'
               />
               <p className="text-[11px] text-muted-foreground">
-                Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis
-                que pode ser Mamografia OU USG Mama).
+                Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis que pode ser
+                Mamografia OU USG Mama).
               </p>
             </div>
           </div>
@@ -1388,9 +1699,11 @@ function NovaRegraDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
           <Button onClick={() => void salvarNovo()} disabled={saving}>
-            {saving ? "Salvando…" : (isEdit ? "Salvar alterações" : "Salvar regra")}
+            {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Salvar regra"}
           </Button>
         </DialogFooter>
       </DialogContent>

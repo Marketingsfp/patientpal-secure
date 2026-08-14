@@ -129,16 +129,11 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
  * estiver salvo em `perfil_permissoes`. Nenhum perfil não-admin entra aqui,
  * nem digitando a URL na barra de endereços.
  */
-export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = [
-  "/app/configuracoes/voz",
-  "/app/planos",
-];
+export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = ["/app/configuracoes/voz", "/app/planos"];
 
 /** True quando a rota atual só pode ser aberta por administrador. */
 export function rotaSomenteAdmin(pathname: string): boolean {
-  const p = pathname.length > 1 && pathname.endsWith("/")
-    ? pathname.slice(0, -1)
-    : pathname;
+  const p = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   return ADMIN_ONLY_ROUTES.some((r) => p === r || p.startsWith(r + "/"));
 }
 
@@ -159,8 +154,9 @@ export const SUBMODULE_PARENT: Record<string, string> = {
  * Lista de prefixos ordenada do mais específico para o mais genérico.
  * Usada para casar rotas com parâmetros dinâmicos (ex.: /app/clientes/abc/editar).
  */
-const PREFIX_ENTRIES: ReadonlyArray<readonly [string, string | null]> = Object
-  .entries(ROUTE_TO_MODULE)
+const PREFIX_ENTRIES: ReadonlyArray<readonly [string, string | null]> = Object.entries(
+  ROUTE_TO_MODULE,
+)
   // "/app" é raiz de TODAS as rotas do sistema. Se ele participasse do
   // casamento por prefixo, qualquer rota ainda não cadastrada no mapa
   // herdaria "livre" (null) e passaria pela guarda sem checagem de
@@ -175,9 +171,7 @@ const PREFIX_ENTRIES: ReadonlyArray<readonly [string, string | null]> = Object
  */
 export function moduloDaRota(pathname: string): string | null | undefined {
   // remove trailing slash (exceto raiz)
-  const p = pathname.length > 1 && pathname.endsWith("/")
-    ? pathname.slice(0, -1)
-    : pathname;
+  const p = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   // match exato primeiro
   if (p in ROUTE_TO_MODULE) return ROUTE_TO_MODULE[p];
   // prefix mais longo primeiro (para segmentos dinâmicos)

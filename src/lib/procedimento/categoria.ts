@@ -16,12 +16,7 @@
  */
 
 export type CategoriaProc =
-  | "laboratorio"
-  | "imagem"
-  | "consulta"
-  | "procedimento"
-  | "cirurgia"
-  | "outro";
+  "laboratorio" | "imagem" | "consulta" | "procedimento" | "cirurgia" | "outro";
 
 export function categoriaDoProcedimento(tipo: string | null | undefined): CategoriaProc {
   const t = (tipo ?? "").trim().toLowerCase();
@@ -82,15 +77,25 @@ export function buildCategoriaResolver(rows: ProcedimentoCatRow[]) {
     categoriaDoTexto(texto: string | null | undefined): CategoriaProc {
       const t = (texto ?? "").trim();
       if (!t) return "outro";
-      const partes = t.split(/\s+\+\s+/).map((s) => s.trim()).filter(Boolean);
+      const partes = t
+        .split(/\s+\+\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (partes.length === 0) return "outro";
-      const cats = partes.map((p) => byName.get(normalizarNome(p)) ?? "outro" as CategoriaProc);
+      const cats = partes.map((p) => byName.get(normalizarNome(p)) ?? ("outro" as CategoriaProc));
       // Regra: laboratório prevalece quando todos são lab; se qualquer for imagem
       // ou cirurgia, sobe para essa; senão a mais rica dentre as encontradas.
       const uniq = new Set(cats);
       if (uniq.size === 1) return cats[0];
       // Prioridade decrescente (mais operacional para menos)
-      const ordem: CategoriaProc[] = ["cirurgia", "imagem", "procedimento", "consulta", "laboratorio", "outro"];
+      const ordem: CategoriaProc[] = [
+        "cirurgia",
+        "imagem",
+        "procedimento",
+        "consulta",
+        "laboratorio",
+        "outro",
+      ];
       for (const c of ordem) if (uniq.has(c)) return c;
       return "outro";
     },

@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Printer, FileDown,
-  Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle, HandCoins,
+  PlusCircle,
+  MinusCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Printer,
+  FileDown,
+  Lock,
+  Unlock,
+  ChevronRight,
+  Users,
+  Wallet,
+  AlertTriangle,
+  HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
@@ -22,36 +33,71 @@ import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
 import { KpiBar, type KpiData } from "./kpi-bar";
 import { useCaixaShortcuts } from "./atalhos";
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
+type MovTipo =
+  | "abertura"
+  | "sangria"
+  | "suprimento"
+  | "recebimento"
+  | "despesa"
+  | "fechamento"
+  | "estorno"
+  | "reabertura";
 interface Sessao {
-  id: string; clinica_id: string; user_id: string; user_nome: string | null;
-  aberto_em: string; valor_abertura: number;
-  fechado_em: string | null; status: "aberto" | "fechado";
+  id: string;
+  clinica_id: string;
+  user_id: string;
+  user_nome: string | null;
+  aberto_em: string;
+  valor_abertura: number;
+  fechado_em: string | null;
+  status: "aberto" | "fechado";
 }
 interface Mov {
-  id: string; sessao_id: string; user_id: string; tipo: MovTipo;
-  valor: number; descricao: string | null; forma_pagamento: string | null;
-  created_at: string; lancamento_id: string | null;
+  id: string;
+  sessao_id: string;
+  user_id: string;
+  tipo: MovTipo;
+  valor: number;
+  descricao: string | null;
+  forma_pagamento: string | null;
+  created_at: string;
+  lancamento_id: string | null;
 }
 interface FilaItem {
-  id: string; paciente_id: string | null; paciente_nome: string;
-  procedimento: string | null; inicio: string; medico_nome: string | null;
-  valor: number; valor_cartao: number; ja_pago: boolean;
+  id: string;
+  paciente_id: string | null;
+  paciente_nome: string;
+  procedimento: string | null;
+  inicio: string;
+  medico_nome: string | null;
+  valor: number;
+  valor_cartao: number;
+  ja_pago: boolean;
 }
 
 type TabKey = "hoje" | "sessao" | "todos";
 type PeriodoKey = "hoje" | "7d" | "30d" | "custom";
 /** Linha mínima usada apenas para somar os totais do período filtrado. */
 interface AggRow {
-  id: string; sessao_id: string; tipo: MovTipo;
-  valor: number; forma_pagamento: string | null; created_at: string;
-  lancamento_id: string | null; descricao: string | null;
+  id: string;
+  sessao_id: string;
+  tipo: MovTipo;
+  valor: number;
+  forma_pagamento: string | null;
+  created_at: string;
+  lancamento_id: string | null;
+  descricao: string | null;
 }
 
 const TIPO_LABEL: Record<MovTipo, string> = {
-  abertura: "Abertura", suprimento: "Suprimento", recebimento: "Recebimento",
-  sangria: "Sangria", despesa: "Despesa", fechamento: "Fechamento",
-  estorno: "Estorno", reabertura: "Reabertura",
+  abertura: "Abertura",
+  suprimento: "Suprimento",
+  recebimento: "Recebimento",
+  sangria: "Sangria",
+  despesa: "Despesa",
+  fechamento: "Fechamento",
+  estorno: "Estorno",
+  reabertura: "Reabertura",
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -64,9 +110,15 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   reabertura: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
-  abertura: 1, suprimento: 1, recebimento: 1, sangria: -1, despesa: -1, fechamento: 0,
+  abertura: 1,
+  suprimento: 1,
+  recebimento: 1,
+  sangria: -1,
+  despesa: -1,
+  fechamento: 0,
   // Estorno devolve dinheiro ao paciente: sempre reduz o total.
-  estorno: -1, reabertura: 0,
+  estorno: -1,
+  reabertura: 0,
 } as Record<MovTipo, 1 | -1 | 0>;
 
 const TIPO_OPTS = [
@@ -85,14 +137,19 @@ const FORMA_OPTS = [
 ] as const;
 
 const PERIODO_OPTS: ReadonlyArray<{ value: PeriodoKey; label: string }> = [
-  { value: "hoje", label: "Hoje" }, { value: "7d", label: "7 dias" }, { value: "30d", label: "30 dias" },
+  { value: "hoje", label: "Hoje" },
+  { value: "7d", label: "7 dias" },
+  { value: "30d", label: "30 dias" },
   { value: "custom", label: "Personalizado" },
 ];
 
 const BATCH = 40;
 const FIRST_BATCH = 60;
 
-function parsePrefixado(q: string): { field: "paciente" | "recibo" | "valor" | "data" | null; term: string } {
+function parsePrefixado(q: string): {
+  field: "paciente" | "recibo" | "valor" | "data" | null;
+  term: string;
+} {
   const m = q.match(/^([prvd]):(.*)$/i);
   if (!m) return { field: null, term: q };
   const map = { p: "paciente", r: "recibo", v: "valor", d: "data" } as const;
@@ -107,8 +164,12 @@ function agoraTexto(iso: string) {
   return `${m}min`;
 }
 
-export function CaixaShellV2({ compactPref, onToggleCompact }: {
-  compactPref: boolean; onToggleCompact: (v: boolean) => void;
+export function CaixaShellV2({
+  compactPref,
+  onToggleCompact,
+}: {
+  compactPref: boolean;
+  onToggleCompact: (v: boolean) => void;
 }) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -140,16 +201,23 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const loadSessao = useCallback(async () => {
     if (!clinicaAtual || !user) return;
     setSessaoLoading(true);
-    const { data } = await supabase.from("caixa_sessoes")
+    const { data } = await supabase
+      .from("caixa_sessoes")
       .select("id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, status")
-      .eq("clinica_id", clinicaAtual.clinica_id).eq("user_id", user.id)
-      .eq("status", "aberto").order("aberto_em", { ascending: false }).limit(1).maybeSingle();
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("user_id", user.id)
+      .eq("status", "aberto")
+      .order("aberto_em", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     setSessao((data as Sessao | null) ?? null);
     setSessaoLoading(false);
   }, [clinicaAtual, user]);
 
   // Default: se houver sessão aberta, aba "sessao"
-  useEffect(() => { void loadSessao(); }, [loadSessao]);
+  useEffect(() => {
+    void loadSessao();
+  }, [loadSessao]);
   const defaultedRef = useRef(false);
   useEffect(() => {
     if (defaultedRef.current || sessaoLoading) return;
@@ -161,7 +229,8 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const buildRange = useCallback((): { from: string; to: string } => {
     const now = new Date();
     const end = now.toISOString();
-    let start = new Date(now); start.setHours(0, 0, 0, 0);
+    let start = new Date(now);
+    start.setHours(0, 0, 0, 0);
     if (tab === "todos") {
       if (periodo === "custom" && (dataDe || dataAte)) {
         const s = dataDe ? new Date(`${dataDe}T00:00:00`) : new Date(0);
@@ -174,50 +243,66 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     return { from: start.toISOString(), to: end };
   }, [tab, periodo, dataDe, dataAte]);
 
-  const applyFilters = useCallback((qb: any): any => {
-    let q: any = qb;
-    q = q.eq("clinica_id", clinicaAtual!.clinica_id);
-    if (tab === "sessao" && sessao) q = q.eq("sessao_id", sessao.id);
-    else {
-      const { from, to } = buildRange();
-      q = q.gte("created_at", from).lte("created_at", to);
-    }
-    if (tipos.length) q = q.in("tipo", tipos);
-    if (formas.length) {
-      if (formas.includes("cartao")) {
-        const others = formas.filter((f) => f !== "cartao");
-        q = q.or(`forma_pagamento.in.(${[...others, "credito", "debito"].map((f) => `"${f}"`).join(",")})`);
-      } else {
-        q = q.in("forma_pagamento", formas);
+  const applyFilters = useCallback(
+    (qb: any): any => {
+      let q: any = qb;
+      q = q.eq("clinica_id", clinicaAtual!.clinica_id);
+      if (tab === "sessao" && sessao) q = q.eq("sessao_id", sessao.id);
+      else {
+        const { from, to } = buildRange();
+        q = q.gte("created_at", from).lte("created_at", to);
       }
-    }
-    const { field, term } = parsePrefixado(search);
-    if (term) {
-      if (field === "valor") {
-        const n = Number(term.replace(",", "."));
-        if (!isNaN(n)) q = q.eq("valor", n);
-      } else if (field === "recibo") {
-        q = q.ilike("id", `%${term}%`);
-      } else {
-        q = q.ilike("descricao", `%${term}%`);
+      if (tipos.length) q = q.in("tipo", tipos);
+      if (formas.length) {
+        if (formas.includes("cartao")) {
+          const others = formas.filter((f) => f !== "cartao");
+          q = q.or(
+            `forma_pagamento.in.(${[...others, "credito", "debito"].map((f) => `"${f}"`).join(",")})`,
+          );
+        } else {
+          q = q.in("forma_pagamento", formas);
+        }
       }
-    }
-    return q;
-  }, [clinicaAtual, tab, sessao, tipos, formas, search, buildRange]);
+      const { field, term } = parsePrefixado(search);
+      if (term) {
+        if (field === "valor") {
+          const n = Number(term.replace(",", "."));
+          if (!isNaN(n)) q = q.eq("valor", n);
+        } else if (field === "recibo") {
+          q = q.ilike("id", `%${term}%`);
+        } else {
+          q = q.ilike("descricao", `%${term}%`);
+        }
+      }
+      return q;
+    },
+    [clinicaAtual, tab, sessao, tipos, formas, search, buildRange],
+  );
 
   // Carrega movimentos (primeiro batch)
   const loadMovs = useCallback(async () => {
     if (!clinicaAtual) return;
-    if (tab === "sessao" && !sessao) { setMovs([]); setMovsLoading(false); setHasMore(false); return; }
+    if (tab === "sessao" && !sessao) {
+      setMovs([]);
+      setMovsLoading(false);
+      setHasMore(false);
+      return;
+    }
     setMovsLoading(true);
     setNovosCount(0);
-    let q = supabase.from("caixa_movimentos")
-      .select("id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id, clinica_id");
+    let q = supabase
+      .from("caixa_movimentos")
+      .select(
+        "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id, clinica_id",
+      );
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, FIRST_BATCH - 1);
     const { data, error } = await q;
-    if (error) { notify.error("Erro ao carregar movimentos"); setMovs([]); setHasMore(false); }
-    else {
+    if (error) {
+      notify.error("Erro ao carregar movimentos");
+      setMovs([]);
+      setHasMore(false);
+    } else {
       const rows = (data ?? []) as Mov[];
       setMovs(rows);
       setHasMore(rows.length === FIRST_BATCH);
@@ -225,13 +310,22 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     setMovsLoading(false);
   }, [clinicaAtual, tab, sessao, applyFilters]);
 
-  useEffect(() => { void loadMovs(); }, [loadMovs]);
+  useEffect(() => {
+    void loadMovs();
+  }, [loadMovs]);
 
   // Totais do período/filtro inteiro (independente da paginação da lista)
   const loadTotais = useCallback(async () => {
-    if (!clinicaAtual) { setAggRows([]); return; }
-    if (tab === "sessao" && !sessao) { setAggRows([]); return; }
-    let q = supabase.from("caixa_movimentos")
+    if (!clinicaAtual) {
+      setAggRows([]);
+      return;
+    }
+    if (tab === "sessao" && !sessao) {
+      setAggRows([]);
+      return;
+    }
+    let q = supabase
+      .from("caixa_movimentos")
       .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id, descricao");
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, 9999);
@@ -242,26 +336,40 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     // Classificação Particular x Associado do período filtrado: um recebimento
     // é "Associado" quando o lançamento de origem tem convênio/contrato ligado.
     const ids = Array.from(new Set(rows.map((r) => r.lancamento_id).filter(Boolean))) as string[];
-    if (ids.length === 0) { setAssocIds(new Set()); return; }
+    if (ids.length === 0) {
+      setAssocIds(new Set());
+      return;
+    }
     const assoc = new Set<string>();
     for (let i = 0; i < ids.length; i += 400) {
       const chunk = ids.slice(i, i + 400);
-      const { data: lancs } = await supabase.from("fin_lancamentos")
-        .select("id, convenio_id, contrato_id").in("id", chunk);
-      for (const l of (lancs ?? []) as Array<{ id: string; convenio_id: string | null; contrato_id: string | null }>) {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("id, convenio_id, contrato_id")
+        .in("id", chunk);
+      for (const l of (lancs ?? []) as Array<{
+        id: string;
+        convenio_id: string | null;
+        contrato_id: string | null;
+      }>) {
         if (l.convenio_id || l.contrato_id) assoc.add(l.id);
       }
     }
     setAssocIds(assoc);
   }, [clinicaAtual, tab, sessao, applyFilters]);
 
-  useEffect(() => { void loadTotais(); }, [loadTotais]);
+  useEffect(() => {
+    void loadTotais();
+  }, [loadTotais]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !clinicaAtual) return;
     setLoadingMore(true);
-    let q = supabase.from("caixa_movimentos")
-      .select("id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id, clinica_id");
+    let q = supabase
+      .from("caixa_movimentos")
+      .select(
+        "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id, clinica_id",
+      );
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(movs.length, movs.length + BATCH - 1);
     const { data } = await q;
@@ -277,12 +385,24 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // Realtime: novo mov -> incrementa badge
   useEffect(() => {
     if (!clinicaAtual) return;
-    const ch = supabase.channel(`caixa-v2-mov-${clinicaAtual.clinica_id}`)
-      .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "caixa_movimentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => { setNovosCount((n) => n + 1); })
+    const ch = supabase
+      .channel(`caixa-v2-mov-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "caixa_movimentos",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => {
+          setNovosCount((n) => n + 1);
+        },
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual]);
 
   // Fila do caixa (RPC existente, extremamente rápida)
@@ -291,37 +411,70 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     setFilaLoading(true);
     const hoje = new Date().toISOString().slice(0, 10);
     const { data, error } = await supabase.rpc("fila_caixa_hoje", {
-      _clinica_id: clinicaAtual.clinica_id, _data: hoje,
+      _clinica_id: clinicaAtual.clinica_id,
+      _data: hoje,
     });
-    if (error) { setFila([]); setFilaLoading(false); return; }
-    const rows = (data ?? []) as Array<Omit<FilaItem, "valor" | "valor_cartao"> & { valor: number | string | null; valor_cartao: number | string | null; desconto_origem: string | null }>;
-    setFila(rows.map((r) => ({
-      id: r.id, paciente_id: r.paciente_id,
-      paciente_nome: r.paciente_nome,
-      procedimento: r.desconto_origem ? `${r.procedimento} (${r.desconto_origem})` : r.procedimento,
-      inicio: r.inicio, medico_nome: r.medico_nome,
-      valor: Number(r.valor ?? 0), valor_cartao: Number(r.valor_cartao ?? 0),
-      ja_pago: r.ja_pago,
-    })));
+    if (error) {
+      setFila([]);
+      setFilaLoading(false);
+      return;
+    }
+    const rows = (data ?? []) as Array<
+      Omit<FilaItem, "valor" | "valor_cartao"> & {
+        valor: number | string | null;
+        valor_cartao: number | string | null;
+        desconto_origem: string | null;
+      }
+    >;
+    setFila(
+      rows.map((r) => ({
+        id: r.id,
+        paciente_id: r.paciente_id,
+        paciente_nome: r.paciente_nome,
+        procedimento: r.desconto_origem
+          ? `${r.procedimento} (${r.desconto_origem})`
+          : r.procedimento,
+        inicio: r.inicio,
+        medico_nome: r.medico_nome,
+        valor: Number(r.valor ?? 0),
+        valor_cartao: Number(r.valor_cartao ?? 0),
+        ja_pago: r.ja_pago,
+      })),
+    );
     setFilaLoading(false);
   }, [clinicaAtual]);
 
-  useEffect(() => { void loadFila(); }, [loadFila]);
+  useEffect(() => {
+    void loadFila();
+  }, [loadFila]);
   useEffect(() => {
     if (!clinicaAtual) return;
-    const ch = supabase.channel(`caixa-v2-fila-${clinicaAtual.clinica_id}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => { void loadFila(); })
+    const ch = supabase
+      .channel(`caixa-v2-fila-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agendamentos",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => {
+          void loadFila();
+        },
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual, loadFila]);
 
   // Toggle compacto por atalho Ctrl+Shift+C
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "c") {
-        e.preventDefault(); onToggleCompact(!compact);
+        e.preventDefault();
+        onToggleCompact(!compact);
       }
     };
     window.addEventListener("keydown", on);
@@ -345,19 +498,21 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     // (estornos abatem), classificando pelo lançamento de origem.
     const ehMensalidade = (m: AggRow) => {
       const d = (m.descricao ?? "").toUpperCase();
-      return d.includes("MENSALIDADE") || d.includes("TAXA DE ADESAO") || d.includes("TAXA DE ADESÃO");
+      return (
+        d.includes("MENSALIDADE") || d.includes("TAXA DE ADESAO") || d.includes("TAXA DE ADESÃO")
+      );
     };
     const ehAssoc = (m: AggRow) =>
       (!!m.lancamento_id && assocIds.has(m.lancamento_id)) || ehMensalidade(m);
     const particular =
       soma(recebimentos.filter((m) => !ehAssoc(m))) - soma(estornos.filter((m) => !ehAssoc(m)));
-    const associado =
-      soma(recebimentos.filter(ehAssoc)) - soma(estornos.filter(ehAssoc));
+    const associado = soma(recebimentos.filter(ehAssoc)) - soma(estornos.filter(ehAssoc));
     return {
       recebidoHoje: recebidoTotal,
       estornos: soma(estornos),
       estornosQtd: estornos.length,
-      particular, associado,
+      particular,
+      associado,
       dinheiro: somaForma("dinheiro"),
       pix: somaForma("pix"),
       cartao: somaForma("cart") + somaForma("credito") + somaForma("debito"),
@@ -371,9 +526,11 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     return filaPend.map((f) => {
       const status: StatusFila = f.ja_pago ? "paid" : "waiting";
       const alertas: AlertaBadge[] = detectarAlertas({
-        inicio: f.inicio, ja_pago: f.ja_pago,
+        inicio: f.inicio,
+        ja_pago: f.ja_pago,
         // dados extras não presentes na RPC; futuras fases podem enriquecer
-        paciente_cpf: null, paciente_endereco: null,
+        paciente_cpf: null,
+        paciente_endereco: null,
       });
       const tipoCobranca: FilaCardData["tipoCobranca"] =
         f.valor_cartao > 0 ? "Associado" : "Particular";
@@ -385,7 +542,9 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         medicoNome: f.medico_nome,
         inicio: f.inicio,
         valor: f.valor + f.valor_cartao,
-        tipoCobranca, status, alertas,
+        tipoCobranca,
+        status,
+        alertas,
       };
     });
   }, [filaPend]);
@@ -409,37 +568,47 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const soma = (arr: typeof aggRows) => arr.reduce((s, m) => s + Number(m.valor || 0), 0);
     const receitaHoje = soma(recebimentos) - soma(estornos);
     const receitaSessao = sessao
-      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id))
-        - soma(estornos.filter((m) => m.sessao_id === sessao.id))
+      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id)) -
+        soma(estornos.filter((m) => m.sessao_id === sessao.id))
       : 0;
     // Tempo médio de espera atual (min) — só quando há fila pendente
-    const esperas = filaPend.map((f) => (Date.now() - new Date(f.inicio).getTime()) / 60000)
+    const esperas = filaPend
+      .map((f) => (Date.now() - new Date(f.inicio).getTime()) / 60000)
       .filter((n) => Number.isFinite(n) && n >= 0);
     const tempoMedioPagamentoMin = esperas.length
       ? esperas.reduce((s, n) => s + n, 0) / esperas.length
       : null;
     // Intervalo médio entre recebimentos consecutivos da sessão (min)
-    const recSessao = (sessao
-      ? recebimentos.filter((m) => m.sessao_id === sessao.id)
-      : recebimentos)
+    const recSessao = (
+      sessao ? recebimentos.filter((m) => m.sessao_id === sessao.id) : recebimentos
+    )
       .slice()
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     let tempoMedioCaixaMin: number | null = null;
     if (recSessao.length >= 2) {
       const gaps: number[] = [];
       for (let i = 1; i < recSessao.length; i++) {
-        gaps.push((new Date(recSessao[i].created_at).getTime() - new Date(recSessao[i - 1].created_at).getTime()) / 60000);
+        gaps.push(
+          (new Date(recSessao[i].created_at).getTime() -
+            new Date(recSessao[i - 1].created_at).getTime()) /
+            60000,
+        );
       }
       tempoMedioCaixaMin = gaps.reduce((s, n) => s + n, 0) / gaps.length;
     }
-    const maiorFila = filaPend.length > 0
-      ? { qtd: filaPend.length, hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) }
-      : null;
+    const maiorFila =
+      filaPend.length > 0
+        ? {
+            qtd: filaPend.length,
+            hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+          }
+        : null;
     return {
       tempoMedioPagamentoMin,
       maiorFila,
       tempoMedioCaixaMin,
-      receitaSessao, receitaHoje,
+      receitaSessao,
+      receitaHoje,
       atendimentos: recebimentos.length,
     };
   }, [aggRows, sessao, filaPend]);
@@ -459,11 +628,17 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // Ação primária "Receber" — 1 clique. Se houver único item pendente,
   // navega direto para /app/caixa com hint via query; caso contrário abre
   // seleção lá. A gravação/regra continua no clássico.
-  const receberFila = useCallback((filaId?: string) => {
-    const id = filaId ?? filaCards[0]?.id;
-    if (!id) { toast.info("Nenhum paciente na fila."); return; }
-    window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
-  }, [filaCards]);
+  const receberFila = useCallback(
+    (filaId?: string) => {
+      const id = filaId ?? filaCards[0]?.id;
+      if (!id) {
+        toast.info("Nenhum paciente na fila.");
+        return;
+      }
+      window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
+    },
+    [filaCards],
+  );
 
   // Atalhos F2/F3/F4/Esc
   useCaixaShortcuts({
@@ -476,39 +651,92 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // Layout
   const listEl = (
     <ListShell<TabKey>
-      title={<div className="text-sm text-muted-foreground">
-        {tab === "sessao" && sessao ? `Sessão #${sessao.id.slice(0, 8)}` : tab === "hoje" ? "Movimentos de hoje" : `Últimos ${periodo === "hoje" ? "hoje" : periodo}`}
-      </div>}
-      actions={novosCount > 0 ? (
-        <Button size="sm" variant="secondary" onClick={() => { setNovosCount(0); void loadMovs(); void loadTotais(); }}>
-          {novosCount} novo{novosCount > 1 ? "s" : ""} — atualizar
-        </Button>
-      ) : null}
-      searchValue={search} onSearchChange={setSearch}
+      title={
+        <div className="text-sm text-muted-foreground">
+          {tab === "sessao" && sessao
+            ? `Sessão #${sessao.id.slice(0, 8)}`
+            : tab === "hoje"
+              ? "Movimentos de hoje"
+              : `Últimos ${periodo === "hoje" ? "hoje" : periodo}`}
+        </div>
+      }
+      actions={
+        novosCount > 0 ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setNovosCount(0);
+              void loadMovs();
+              void loadTotais();
+            }}
+          >
+            {novosCount} novo{novosCount > 1 ? "s" : ""} — atualizar
+          </Button>
+        ) : null
+      }
+      searchValue={search}
+      onSearchChange={setSearch}
       searchPlaceholder="Buscar movimento — p: paciente, r: recibo, v: valor, d: data…"
-      tabs={tabs} tabValue={tab} onTabChange={setTab}
+      tabs={tabs}
+      tabValue={tab}
+      onTabChange={setTab}
       chips={
         <div className="flex flex-col gap-2">
-          <QuickFilters options={TIPO_OPTS as any} value={tipos as any} onChange={(v) => setTipos(v as any)} multi ariaLabel="Tipo" />
-          <QuickFilters options={FORMA_OPTS as any} value={formas as any} onChange={(v) => setFormas(v as any)} multi ariaLabel="Forma de pagamento" />
+          <QuickFilters
+            options={TIPO_OPTS as any}
+            value={tipos as any}
+            onChange={(v) => setTipos(v as any)}
+            multi
+            ariaLabel="Tipo"
+          />
+          <QuickFilters
+            options={FORMA_OPTS as any}
+            value={formas as any}
+            onChange={(v) => setFormas(v as any)}
+            multi
+            ariaLabel="Forma de pagamento"
+          />
           {tab === "todos" && (
             <div className="flex flex-col gap-2">
-              <QuickFilters options={PERIODO_OPTS as any} value={[periodo] as any} onChange={(v) => setPeriodo(((v[0] as any) ?? "7d"))} ariaLabel="Período" />
+              <QuickFilters
+                options={PERIODO_OPTS as any}
+                value={[periodo] as any}
+                onChange={(v) => setPeriodo((v[0] as any) ?? "7d")}
+                ariaLabel="Período"
+              />
               {periodo === "custom" && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <label className="flex items-center gap-1">
                     De
-                    <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)}
-                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                    <input
+                      type="date"
+                      value={dataDe}
+                      onChange={(e) => setDataDe(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    />
                   </label>
                   <label className="flex items-center gap-1">
                     Até
-                    <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)}
-                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                    <input
+                      type="date"
+                      value={dataAte}
+                      onChange={(e) => setDataAte(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    />
                   </label>
                   {(dataDe || dataAte) && (
-                    <Button size="sm" variant="ghost" className="h-8 px-2"
-                      onClick={() => { setDataDe(""); setDataAte(""); }}>Limpar datas</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2"
+                      onClick={() => {
+                        setDataDe("");
+                        setDataAte("");
+                      }}
+                    >
+                      Limpar datas
+                    </Button>
                   )}
                 </div>
               )}
@@ -528,33 +756,60 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         renderItem={(m) => {
           const sinal = TIPO_SINAL[m.tipo];
           return (
-            <div className={cn(
-              "grid items-center gap-3 border-b border-border/50 px-3",
-              compact ? "h-8 text-[13px]" : "h-10 text-sm",
-              compact ? "grid-cols-[118px_100px_1fr_90px]" : "grid-cols-[140px_120px_1fr_100px_100px]",
-            )}>
+            <div
+              className={cn(
+                "grid items-center gap-3 border-b border-border/50 px-3",
+                compact ? "h-8 text-[13px]" : "h-10 text-sm",
+                compact
+                  ? "grid-cols-[118px_100px_1fr_90px]"
+                  : "grid-cols-[140px_120px_1fr_100px_100px]",
+              )}
+            >
               <span className="tabular-nums text-muted-foreground whitespace-nowrap">
-                {new Date(m.created_at).toLocaleString("pt-BR", {
-                  day: "2-digit", month: "2-digit", year: "numeric",
-                  hour: "2-digit", minute: "2-digit",
-                }).replace(",", "")}
+                {new Date(m.created_at)
+                  .toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  .replace(",", "")}
               </span>
-              <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium w-fit", TIPO_CLASS[m.tipo])}>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium w-fit",
+                  TIPO_CLASS[m.tipo],
+                )}
+              >
                 {TIPO_LABEL[m.tipo]}
               </span>
               <span className="truncate">{m.descricao ?? "—"}</span>
               {!compact && (
-                <span className="text-xs text-muted-foreground truncate">{m.forma_pagamento ?? "—"}</span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {m.forma_pagamento ?? "—"}
+                </span>
               )}
-              <span className={cn("tabular-nums text-right font-medium",
-                sinal > 0 ? "text-emerald-600 dark:text-emerald-400" : sinal < 0 ? "text-rose-600 dark:text-rose-400" : "")}>
-                {sinal < 0 ? "-" : sinal > 0 ? "+" : ""}{brl(Number(m.valor) || 0)}
+              <span
+                className={cn(
+                  "tabular-nums text-right font-medium",
+                  sinal > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : sinal < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "",
+                )}
+              >
+                {sinal < 0 ? "-" : sinal > 0 ? "+" : ""}
+                {brl(Number(m.valor) || 0)}
               </span>
             </div>
           );
         }}
       />
-      {loadingMore && <div className="p-2 text-center text-xs text-muted-foreground">Carregando mais…</div>}
+      {loadingMore && (
+        <div className="p-2 text-center text-xs text-muted-foreground">Carregando mais…</div>
+      )}
     </ListShell>
   );
 
@@ -566,7 +821,10 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
           <div className="font-semibold text-sm">Fila do caixa</div>
           <Badge variant="secondary">{filaCards.length}</Badge>
           {totalAlertas > 0 && (
-            <Badge variant="outline" className="text-status-canceled border-status-canceled/40 gap-1">
+            <Badge
+              variant="outline"
+              className="text-status-canceled border-status-canceled/40 gap-1"
+            >
               <AlertTriangle className="h-3 w-3" /> {totalAlertas}
             </Badge>
           )}
@@ -577,7 +835,9 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         {filaLoading ? (
           <div className="p-3 text-sm text-muted-foreground">Carregando…</div>
         ) : filaCards.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground text-center">Nenhum paciente aguardando.</div>
+          <div className="p-6 text-sm text-muted-foreground text-center">
+            Nenhum paciente aguardando.
+          </div>
         ) : (
           filaCards.map((c) => (
             <FilaCard
@@ -602,16 +862,25 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
           <div className="min-w-0">
             <div className="text-lg font-semibold leading-tight">Caixa</div>
             <div className="text-xs text-muted-foreground truncate">
-              {sessaoLoading ? "…" : sessao
-                ? `Sessão aberta há ${agoraTexto(sessao.aberto_em)} · abertura ${brl(sessao.valor_abertura)}`
-                : "Nenhuma sessão aberta"}
+              {sessaoLoading
+                ? "…"
+                : sessao
+                  ? `Sessão aberta há ${agoraTexto(sessao.aberto_em)} · abertura ${brl(sessao.valor_abertura)}`
+                  : "Nenhuma sessão aberta"}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => onToggleCompact(!compact)} data-testid="toggle-compact">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onToggleCompact(!compact)}
+            data-testid="toggle-compact"
+          >
             {compact ? "Modo normal" : "Modo compacto"}
-            <span className="ml-2 text-[10px] text-muted-foreground hidden sm:inline">Ctrl+Shift+C</span>
+            <span className="ml-2 text-[10px] text-muted-foreground hidden sm:inline">
+              Ctrl+Shift+C
+            </span>
           </Button>
           {isMobile && (
             <Sheet>
@@ -621,17 +890,28 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[92vw] sm:max-w-md p-0 flex flex-col">
-                <SheetHeader className="p-3 border-b"><SheetTitle>Fila do caixa</SheetTitle></SheetHeader>
+                <SheetHeader className="p-3 border-b">
+                  <SheetTitle>Fila do caixa</SheetTitle>
+                </SheetHeader>
                 <div className="flex-1 min-h-0 p-2">{filaEl}</div>
               </SheetContent>
             </Sheet>
           )}
           {!sessao ? (
-            <Button size="sm" onClick={() => goCaixa("Abrir caixa na tela clássica")} data-testid="btn-abrir">
+            <Button
+              size="sm"
+              onClick={() => goCaixa("Abrir caixa na tela clássica")}
+              data-testid="btn-abrir"
+            >
               <Unlock className="h-4 w-4" /> Abrir caixa
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => goCaixa("Fechar caixa na tela clássica")} data-testid="btn-fechar">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => goCaixa("Fechar caixa na tela clássica")}
+              data-testid="btn-fechar"
+            >
               <Lock className="h-4 w-4" /> Fechar caixa
             </Button>
           )}
@@ -657,7 +937,10 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         <Button size="sm" variant="ghost" onClick={() => goCaixa()}>
           <FileDown className="h-4 w-4" /> Exportar
         </Button>
-        <a href="/app/caixa?classico=1" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center">
+        <a
+          href="/app/caixa?classico=1"
+          className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center"
+        >
           Ir para o caixa clássico <ChevronRight className="h-3 w-3" />
         </a>
       </div>
@@ -669,37 +952,52 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       <div className="p-3 md:p-4 pb-2">
         <PainelResumo
           data={resumoData}
-          sessaoInfo={sessao ? `#${sessao.id.slice(0, 6)} · ${agoraTexto(sessao.aberto_em)}` : "Nenhuma aberta"}
+          sessaoInfo={
+            sessao
+              ? `#${sessao.id.slice(0, 6)} · ${agoraTexto(sessao.aberto_em)}`
+              : "Nenhuma aberta"
+          }
         />
       </div>
       <div className="px-3 md:px-4">{topbar}</div>
-      <div className={cn("flex-1 min-h-0 grid gap-3 px-3 md:px-4",
-        isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]",
-      )}>
+      <div
+        className={cn(
+          "flex-1 min-h-0 grid gap-3 px-3 md:px-4",
+          isMobile ? "grid-cols-1" : "grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]",
+        )}
+      >
         <div className="min-h-0">{listEl}</div>
         {!isMobile && <div className="min-h-0">{filaEl}</div>}
       </div>
       <KpiBar data={kpiData} />
 
       {/* Drawer da Mini Timeline */}
-      <Sheet open={!!drawerItem} onOpenChange={(o) => { if (!o) setDrawerId(null); }}>
+      <Sheet
+        open={!!drawerItem}
+        onOpenChange={(o) => {
+          if (!o) setDrawerId(null);
+        }}
+      >
         <SheetContent side="right" className="w-[92vw] sm:max-w-md p-0 flex flex-col">
           <SheetHeader className="p-4 border-b">
             <SheetTitle className="truncate">{drawerItem?.pacienteNome ?? "Paciente"}</SheetTitle>
             <div className="text-xs text-muted-foreground truncate">
-              {drawerItem?.procedimento ?? ""}{drawerItem?.medicoNome ? ` · ${drawerItem.medicoNome}` : ""}
+              {drawerItem?.procedimento ?? ""}
+              {drawerItem?.medicoNome ? ` · ${drawerItem.medicoNome}` : ""}
             </div>
           </SheetHeader>
           <div className="p-4 space-y-4 overflow-auto">
             {drawerItem && (
               <>
-                <MiniTimeline etapas={buildTimeline({
-                  checkin: drawerItem.inicio,
-                  recepcao: drawerItem.inicio,
-                  caixa: drawerItem.status === "paid" ? drawerItem.inicio : null,
-                  atendimento: null,
-                  finalizado: null,
-                })} />
+                <MiniTimeline
+                  etapas={buildTimeline({
+                    checkin: drawerItem.inicio,
+                    recepcao: drawerItem.inicio,
+                    caixa: drawerItem.status === "paid" ? drawerItem.inicio : null,
+                    atendimento: null,
+                    finalizado: null,
+                  })}
+                />
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{drawerItem.tipoCobranca}</span>
                   <span className="font-semibold tabular-nums">{brl(drawerItem.valor)}</span>

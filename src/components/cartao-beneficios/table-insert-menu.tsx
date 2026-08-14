@@ -80,7 +80,11 @@ export function TableInsertMenu({ editor }: { editor: Editor }) {
           </Button>
         </div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={withHeader} onChange={(e) => setWithHeader(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={withHeader}
+            onChange={(e) => setWithHeader(e.target.checked)}
+          />
           Com linha de cabeçalho
         </label>
       </PopoverContent>

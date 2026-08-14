@@ -16,17 +16,29 @@ const T = springTiming({ config: { damping: 200 }, durationInFrames: 18 });
 export const MainVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: C.bgDeep }}>
     <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={110}><S1Hook /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={110}>
+        <S1Hook />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-bottom" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={130}><S2Onde /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={130}>
+        <S2Onde />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={130}><S3Busca /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={130}>
+        <S3Busca />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={140}><S4Parcelas /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={140}>
+        <S4Parcelas />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={140}><S5Pagar /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={140}>
+        <S5Pagar />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={fade()} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={110}><S6Close /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={110}>
+        <S6Close />
+      </TransitionSeries.Sequence>
     </TransitionSeries>
   </AbsoluteFill>
 );

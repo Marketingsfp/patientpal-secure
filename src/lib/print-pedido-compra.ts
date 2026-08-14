@@ -1,7 +1,7 @@
 /** Pedido de compra / reposição — folha A4 pronta para impressão ou PDF. */
 
 const esc = (s: string | null | undefined) =>
-  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -47,6 +47,9 @@ export function printPedidoCompra(input: PedidoCompraInput) {
     )
     .join("");
 
+  // A barra em `<\/script>` lá embaixo é obrigatória: sem ela a sequência
+  // literal `</script>` fecharia o <script> do documento gerado antes da hora.
+  /* eslint-disable no-useless-escape */
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
   <title>Pedido de compra — ${esc(input.clinicaNome)}</title>
   <style>
@@ -81,7 +84,8 @@ export function printPedidoCompra(input: PedidoCompraInput) {
     </div>
   </header>
 
-  ${input.itens.length === 0
+  ${
+    input.itens.length === 0
       ? `<p class="vazio">Nenhum item abaixo do estoque mínimo no momento.</p>`
       : `<table>
     <thead><tr>
@@ -91,13 +95,15 @@ export function printPedidoCompra(input: PedidoCompraInput) {
     </tr></thead>
     <tbody>${linhas}</tbody>
     <tfoot><tr><td colspan="7" style="text-align:right">Estimativa total</td><td class="num">${fmtBRL(total)}</td></tr></tfoot>
-  </table>`}
+  </table>`
+  }
 
   <div class="assinaturas">
     <div>Solicitante</div><div>Aprovação / Compras</div>
   </div>
   <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 400); };<\/script>
   </body></html>`;
+  /* eslint-enable no-useless-escape */
 
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;

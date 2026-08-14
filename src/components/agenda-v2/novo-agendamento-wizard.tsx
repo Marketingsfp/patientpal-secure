@@ -3,16 +3,34 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
-import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X, AlertTriangle } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  User,
+  Stethoscope,
+  UserRound,
+  Clock,
+  CheckCircle2,
+  Loader2,
+  UserPlus,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
-import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
+import {
+  ProcedimentoPicker,
+  type ProcedimentoOption,
+} from "@/components/agenda/procedimento-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
-import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
+import {
+  calcularRepasseExterno,
+  listarConveniosClinica,
+} from "@/lib/agenda/atendimento-externo-repasse";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +56,7 @@ const STEPS = [
   { key: "confirmar", label: "Confirmação", Icon: CheckCircle2 },
 ] as const;
 
-type StepKey = typeof STEPS[number]["key"];
+type StepKey = (typeof STEPS)[number]["key"];
 
 type MedicoLite = {
   id: string;
@@ -141,7 +159,9 @@ export function NovoAgendamentoWizard({
       setExternoTemConvenio(true);
       setExternoConvenioId(vinculo.convenioId);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [tipoAtendimento, clinicaId, paciente?.id]);
 
   // Repasse automático do atendimento externo — cadastro de repasse do médico.
@@ -151,9 +171,12 @@ export function NovoAgendamentoWizard({
       setExternoRepasse(null);
       return;
     }
-    if (externoTemConvenio && !externoConvenioId) { setExternoRepasse(null); return; }
+    if (externoTemConvenio && !externoConvenioId) {
+      setExternoRepasse(null);
+      return;
+    }
     const modalidade = externoTemConvenio
-      ? externoConvenios.find((c) => c.id === externoConvenioId)?.modalidade ?? null
+      ? (externoConvenios.find((c) => c.id === externoConvenioId)?.modalidade ?? null)
       : null;
     let cancelado = false;
     setExternoBuscando(true);
@@ -169,8 +192,18 @@ export function NovoAgendamentoWizard({
       setExternoRepasse(r.repasse);
       setExternoBuscando(false);
     })();
-    return () => { cancelado = true; };
-  }, [tipoAtendimento, clinicaId, procedimento?.nome, medico?.id, externoTemConvenio, externoConvenioId, externoConvenios]);
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    tipoAtendimento,
+    clinicaId,
+    procedimento?.nome,
+    medico?.id,
+    externoTemConvenio,
+    externoConvenioId,
+    externoConvenios,
+  ]);
 
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
@@ -181,7 +214,11 @@ export function NovoAgendamentoWizard({
 
   const resetQuickCreate = () => {
     setShowQuickCreate(false);
-    setQcNome(""); setQcSexo("F"); setQcNasc(""); setQcTel(""); setQcCpf("");
+    setQcNome("");
+    setQcSexo("F");
+    setQcNasc("");
+    setQcTel("");
+    setQcCpf("");
     setQcSaving(false);
   };
 
@@ -240,7 +277,11 @@ export function NovoAgendamentoWizard({
         .order("inicio", { ascending: true });
       if (error) throw error;
       const nomeLivre = (n: string | null | undefined) =>
-        (n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === "disponivel";
+        (n ?? "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim() === "disponivel";
       return (data ?? [])
         .filter((s) => nomeLivre(s.paciente_nome as string))
         .map((s) => ({ id: s.id as string, inicio: s.inicio as string, fim: s.fim as string }));
@@ -259,10 +300,14 @@ export function NovoAgendamentoWizard({
       if (!medico) return [];
       const { data: sec, error } = await supabase
         .from("medico_especialidades")
-        .select("especialidade_id, especialidade:especialidades!medico_especialidades_especialidade_id_fkey(id,nome)")
+        .select(
+          "especialidade_id, especialidade:especialidades!medico_especialidades_especialidade_id_fkey(id,nome)",
+        )
         .eq("medico_id", medico.id);
       if (error) throw error;
-      const listaSec = ((sec ?? []) as Array<{ especialidade: { id: string; nome: string } | null }>)
+      const listaSec = (
+        (sec ?? []) as Array<{ especialidade: { id: string; nome: string } | null }>
+      )
         .map((r) => r.especialidade)
         .filter((e): e is { id: string; nome: string } => !!e);
       let principal: { id: string; nome: string } | null = null;
@@ -290,7 +335,10 @@ export function NovoAgendamentoWizard({
   // Sempre que trocar médico ou a lista de especialidades carregar,
   // define o default como a principal do médico (ou a primeira).
   useEffect(() => {
-    if (!medico) { setEspecialidadeId(null); return; }
+    if (!medico) {
+      setEspecialidadeId(null);
+      return;
+    }
     const opts = especialidadesQuery.data ?? [];
     if (opts.length === 0) return;
     const jaSelecionadaValida = especialidadeId && opts.some((o) => o.id === especialidadeId);
@@ -320,9 +368,7 @@ export function NovoAgendamentoWizard({
   // slots do médico carregam. Só age se o usuário ainda não escolheu slot.
   useEffect(() => {
     if (!open || !initial || initial.hour == null || slot) return;
-    const hit = (slotsQuery.data ?? []).find(
-      (s) => new Date(s.inicio).getHours() === initial.hour,
-    );
+    const hit = (slotsQuery.data ?? []).find((s) => new Date(s.inicio).getHours() === initial.hour);
     if (hit) setSlot(hit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.hour, slotsQuery.data]);
@@ -340,10 +386,22 @@ export function NovoAgendamentoWizard({
     const nasc = qcNasc.trim();
     const telDigits = qcTel.replace(/\D/g, "");
     const cpfDigits = qcCpf.replace(/\D/g, "");
-    if (nome.length < 3) { notify.error("Informe o nome completo"); return; }
-    if (!nasc) { notify.error("Data de nascimento é obrigatória"); return; }
-    if (telDigits.length < 10) { notify.error("Telefone com DDD é obrigatório"); return; }
-    if (cpfDigits && cpfDigits.length !== 11) { notify.error("CPF inválido"); return; }
+    if (nome.length < 3) {
+      notify.error("Informe o nome completo");
+      return;
+    }
+    if (!nasc) {
+      notify.error("Data de nascimento é obrigatória");
+      return;
+    }
+    if (telDigits.length < 10) {
+      notify.error("Telefone com DDD é obrigatório");
+      return;
+    }
+    if (cpfDigits && cpfDigits.length !== 11) {
+      notify.error("CPF inválido");
+      return;
+    }
     setQcSaving(true);
     try {
       const { data, error } = await supabase
@@ -379,11 +437,15 @@ export function NovoAgendamentoWizard({
   }
 
   const heading =
-    step === "paciente" ? "Quem é o paciente?" :
-    step === "servico" ? "Qual o serviço?" :
-    step === "profissional" ? "Com qual profissional?" :
-    step === "horario" ? "Quando será?" :
-    "Confirmar agendamento";
+    step === "paciente"
+      ? "Quem é o paciente?"
+      : step === "servico"
+        ? "Qual o serviço?"
+        : step === "profissional"
+          ? "Com qual profissional?"
+          : step === "horario"
+            ? "Quando será?"
+            : "Confirmar agendamento";
 
   async function handleConfirmar() {
     if (!clinicaId || !paciente || !procedimento || !medico || !slot) return;
@@ -442,7 +504,10 @@ export function NovoAgendamentoWizard({
       }
 
       if (result.vinculo_warning) {
-        mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
+        mostrarErro(
+          result.vinculo_warning.pg_error,
+          "agendamento salvo, mas vínculo com itens do orçamento falhou",
+        );
       }
 
       if (tipoAtendimento === "externo" && result.id) {
@@ -491,7 +556,10 @@ export function NovoAgendamentoWizard({
               <PatientSearchInput
                 autoFocus
                 value={paciente}
-                onSelect={(p) => { setPaciente(p); if (p) setShowQuickCreate(false); }}
+                onSelect={(p) => {
+                  setPaciente(p);
+                  if (p) setShowQuickCreate(false);
+                }}
                 placeholder="Buscar por nome, CPF ou telefone…"
               />
               {!paciente && !showQuickCreate && (
@@ -507,7 +575,9 @@ export function NovoAgendamentoWizard({
               {!paciente && showQuickCreate && (
                 <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold uppercase tracking-widest text-indigo-700">Novo paciente</div>
+                    <div className="text-xs font-semibold uppercase tracking-widest text-indigo-700">
+                      Novo paciente
+                    </div>
                     <button
                       type="button"
                       onClick={resetQuickCreate}
@@ -555,8 +625,8 @@ export function NovoAgendamentoWizard({
                     />
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Nome, sexo, nascimento e telefone são obrigatórios porque o agendamento
-                    exige paciente com cadastro completo.
+                    Nome, sexo, nascimento e telefone são obrigatórios porque o agendamento exige
+                    paciente com cadastro completo.
                   </div>
                   <button
                     type="button"
@@ -564,7 +634,9 @@ export function NovoAgendamentoWizard({
                     onClick={handleQuickCreatePaciente}
                     className={cn(
                       "inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
-                      qcSaving ? "bg-slate-200 text-slate-600 dark:text-slate-400" : "bg-indigo-600 text-white hover:bg-indigo-700",
+                      qcSaving
+                        ? "bg-slate-200 text-slate-600 dark:text-slate-400"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700",
                     )}
                   >
                     {qcSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -574,17 +646,23 @@ export function NovoAgendamentoWizard({
               )}
             </>
           ) : (
-            <p className="text-sm text-slate-500">Selecione uma clínica antes de criar o agendamento.</p>
+            <p className="text-sm text-slate-500">
+              Selecione uma clínica antes de criar o agendamento.
+            </p>
           )}
           {paciente && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm">
               <div className="font-semibold text-slate-900">{paciente.nome}</div>
               <div className="text-[11px] text-slate-500">
-                {paciente.telefone ?? "sem telefone"} · {paciente.data_nascimento ? paciente.data_nascimento.split("-").reverse().join("/") : "sem nascimento"}
+                {paciente.telefone ?? "sem telefone"} ·{" "}
+                {paciente.data_nascimento
+                  ? paciente.data_nascimento.split("-").reverse().join("/")
+                  : "sem nascimento"}
               </div>
               {(!paciente.telefone || !paciente.data_nascimento) && (
                 <div className="mt-2 text-[11px] text-amber-700">
-                  ⚠ Cadastro incompleto — a criação será bloqueada. Complete o paciente antes de salvar.
+                  ⚠ Cadastro incompleto — a criação será bloqueada. Complete o paciente antes de
+                  salvar.
                 </div>
               )}
             </div>
@@ -608,7 +686,9 @@ export function NovoAgendamentoWizard({
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm">
               <div className="font-semibold text-slate-900">{procedimento.nome}</div>
               <div className="text-[11px] text-slate-500">
-                {procedimento.duracao_minutos ? `${procedimento.duracao_minutos} min` : "duração padrão"}
+                {procedimento.duracao_minutos
+                  ? `${procedimento.duracao_minutos} min`
+                  : "duração padrão"}
                 {procedimento.tipo ? ` · ${procedimento.tipo}` : ""}
               </div>
             </div>
@@ -619,7 +699,9 @@ export function NovoAgendamentoWizard({
       {step === "profissional" && (
         <div>
           {medicosQuery.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </div>
           )}
           {medicosQuery.isError && (
             <p className="text-sm text-red-600">Não foi possível carregar os profissionais.</p>
@@ -632,7 +714,10 @@ export function NovoAgendamentoWizard({
               <button
                 key={m.id}
                 type="button"
-                onClick={() => { setMedico(m); setSlot(null); }}
+                onClick={() => {
+                  setMedico(m);
+                  setSlot(null);
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors",
                   medico?.id === m.id ? "bg-indigo-50 ring-1 ring-indigo-200" : "hover:bg-slate-50",
@@ -646,7 +731,8 @@ export function NovoAgendamentoWizard({
             ))}
           </div>
           <p className="mt-4 text-[11px] text-slate-600 dark:text-slate-400">
-            Fase F: recursos de enfermagem ainda não estão disponíveis pelo wizard V2 — use a Agenda clássica.
+            Fase F: recursos de enfermagem ainda não estão disponíveis pelo wizard V2 — use a Agenda
+            clássica.
           </p>
           {medico && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
@@ -659,7 +745,8 @@ export function NovoAgendamentoWizard({
                 </div>
               ) : (especialidadesQuery.data ?? []).length === 0 ? (
                 <p className="text-xs text-slate-500">
-                  Este profissional não tem especialidade cadastrada. O comprovante sairá sem especialidade.
+                  Este profissional não tem especialidade cadastrada. O comprovante sairá sem
+                  especialidade.
                 </p>
               ) : (
                 <>
@@ -670,7 +757,8 @@ export function NovoAgendamentoWizard({
                   >
                     {(especialidadesQuery.data ?? []).map((e) => (
                       <option key={e.id} value={e.id}>
-                        {e.nome}{e.isPrincipal ? " (principal)" : ""}
+                        {e.nome}
+                        {e.isPrincipal ? " (principal)" : ""}
                       </option>
                     ))}
                   </select>
@@ -687,22 +775,30 @@ export function NovoAgendamentoWizard({
       {step === "horario" && (
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">Data</label>
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
+              Data
+            </label>
             <DateInputBR
               value={dataDia}
-              onChange={(e) => { setDataDia(e.target.value); setSlot(null); }}
+              onChange={(e) => {
+                setDataDia(e.target.value);
+                setSlot(null);
+              }}
               className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
             />
           </div>
           {slotsQuery.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Buscando horários…</div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Buscando horários…
+            </div>
           )}
           {slotsQuery.isError && (
             <p className="text-sm text-red-600">Não foi possível carregar os horários.</p>
           )}
           {!slotsQuery.isLoading && (slotsQuery.data ?? []).length === 0 && (
             <p className="text-sm text-slate-500">
-              Nenhum horário DISPONÍVEL para este médico nessa data. Gere horários em Disponibilidades ou escolha outro dia.
+              Nenhum horário DISPONÍVEL para este médico nessa data. Gere horários em
+              Disponibilidades ou escolha outro dia.
             </p>
           )}
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -727,26 +823,40 @@ export function NovoAgendamentoWizard({
 
       {step === "confirmar" && (
         <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-6 space-y-3">
-          <div className="flex justify-between text-sm"><span className="text-slate-500">Paciente</span><span className="font-semibold text-slate-900">{paciente?.nome}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-slate-500">Serviço</span><span className="font-semibold text-slate-900">{procedimento?.nome}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-slate-500">Profissional</span><span className="font-semibold text-slate-900">{medico?.nome}</span></div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">Paciente</span>
+            <span className="font-semibold text-slate-900">{paciente?.nome}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">Serviço</span>
+            <span className="font-semibold text-slate-900">{procedimento?.nome}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">Profissional</span>
+            <span className="font-semibold text-slate-900">{medico?.nome}</span>
+          </div>
           {especialidadeId && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Especialidade</span>
               <span className="font-semibold text-slate-900">
-                {(especialidadesQuery.data ?? []).find((e) => e.id === especialidadeId)?.nome ?? "—"}
+                {(especialidadesQuery.data ?? []).find((e) => e.id === especialidadeId)?.nome ??
+                  "—"}
               </span>
             </div>
           )}
           <div className="flex justify-between text-sm">
             <span className="text-slate-500">Data · horário</span>
             <span className="font-semibold text-slate-900 tabular-nums">
-              {slot ? `${dataDia.split("-").reverse().join("/")} · ${fmtHora(slot.inicio)}–${fmtHora(slot.fim)}` : "—"}
+              {slot
+                ? `${dataDia.split("-").reverse().join("/")} · ${fmtHora(slot.inicio)}–${fmtHora(slot.fim)}`
+                : "—"}
             </span>
           </div>
 
           <div className="pt-3 border-t border-slate-200">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">Tipo de atendimento</div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
+              Tipo de atendimento
+            </div>
             <div className="flex gap-2">
               {(["particular", "convenio", "externo"] as const).map((t) => (
                 <button
@@ -763,8 +873,8 @@ export function NovoAgendamentoWizard({
                   {t === "particular"
                     ? "Particular"
                     : t === "convenio"
-                    ? "Convênio (cartão benefícios)"
-                    : "Externo (outra clínica)"}
+                      ? "Convênio (cartão benefícios)"
+                      : "Externo (outra clínica)"}
                 </button>
               ))}
             </div>
@@ -772,11 +882,13 @@ export function NovoAgendamentoWizard({
             {tipoAtendimento === "externo" && (
               <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
                 <p className="text-[11px] text-orange-800">
-                  Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui —
-                  gera apenas o registro de repasse para o médico.
+                  Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui — gera
+                  apenas o registro de repasse para o médico.
                 </p>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Clínica de origem</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Clínica de origem
+                  </label>
                   <input
                     value={externoClinicaNome}
                     onChange={(e) => setExternoClinicaNome(e.target.value)}
@@ -804,21 +916,31 @@ export function NovoAgendamentoWizard({
                     >
                       <option value="">Selecione o convênio</option>
                       {externoConvenios.map((c) => (
-                        <option key={c.id} value={c.id}>{c.nome}</option>
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
                       ))}
                     </select>
                   )}
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Repasse do médico</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Repasse do médico
+                  </label>
                   <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
-                    {externoBuscando
-                      ? <span className="text-xs font-normal text-slate-500">Calculando…</span>
-                      : externoTemConvenio && !externoConvenioId
-                      ? <span className="text-xs font-normal text-slate-500">Selecione o convênio</span>
-                      : externoRepasse != null && externoRepasse > 0
-                      ? `R$ ${externoRepasse.toFixed(2).replace(".", ",")}`
-                      : <span className="text-xs font-normal text-slate-500">Sem regra de repasse cadastrada (R$ 0,00)</span>}
+                    {externoBuscando ? (
+                      <span className="text-xs font-normal text-slate-500">Calculando…</span>
+                    ) : externoTemConvenio && !externoConvenioId ? (
+                      <span className="text-xs font-normal text-slate-500">
+                        Selecione o convênio
+                      </span>
+                    ) : externoRepasse != null && externoRepasse > 0 ? (
+                      `R$ ${externoRepasse.toFixed(2).replace(".", ",")}`
+                    ) : (
+                      <span className="text-xs font-normal text-slate-500">
+                        Sem regra de repasse cadastrada (R$ 0,00)
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-[10px] text-slate-500">
                     Calculado pelo cadastro de repasse do médico
@@ -837,7 +959,8 @@ export function NovoAgendamentoWizard({
           </div>
 
           <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-3 border-t border-slate-200">
-            Rastreabilidade: o agendamento será gravado com <code>observacoes = &quot;[V2]&quot;</code> durante o piloto da Agenda V2.
+            Rastreabilidade: o agendamento será gravado com{" "}
+            <code>observacoes = &quot;[V2]&quot;</code> durante o piloto da Agenda V2.
           </p>
         </div>
       )}
@@ -857,10 +980,14 @@ export function NovoAgendamentoWizard({
       <button
         type="button"
         disabled={!canNext || saving}
-        onClick={() => (stepIdx === STEPS.length - 1 ? handleConfirmar() : setStepIdx((i) => i + 1))}
+        onClick={() =>
+          stepIdx === STEPS.length - 1 ? handleConfirmar() : setStepIdx((i) => i + 1)
+        }
         className={cn(
           "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-semibold transition-all",
-          (canNext && !saving) ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-200 text-slate-600 dark:text-slate-400 cursor-not-allowed",
+          canNext && !saving
+            ? "bg-slate-900 text-white hover:bg-slate-800"
+            : "bg-slate-200 text-slate-600 dark:text-slate-400 cursor-not-allowed",
         )}
       >
         {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -873,7 +1000,10 @@ export function NovoAgendamentoWizard({
   return (
     <HhpWizardShell
       open={open}
-      onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
       title="Novo agendamento"
       description="Assistente em 5 passos para criar um agendamento simples."
       stepLabel={`Passo ${stepIdx + 1} de ${STEPS.length}`}

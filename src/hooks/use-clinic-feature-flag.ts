@@ -112,19 +112,17 @@ export async function setClinicFeatureFlag(
 ) {
   const { data: u } = await supabase.auth.getUser();
   const uid = u.user?.id ?? null;
-  const { error } = await supabase
-    .from("clinica_feature_flags")
-    .upsert(
-      {
-        clinica_id: clinicaId,
-        flag_key: flagKey,
-        ativo,
-        descricao: descricao ?? null,
-        updated_by: uid,
-        created_by: uid,
-      },
-      { onConflict: "clinica_id,flag_key" },
-    );
+  const { error } = await supabase.from("clinica_feature_flags").upsert(
+    {
+      clinica_id: clinicaId,
+      flag_key: flagKey,
+      ativo,
+      descricao: descricao ?? null,
+      updated_by: uid,
+      created_by: uid,
+    },
+    { onConflict: "clinica_id,flag_key" },
+  );
   if (error) throw error;
   invalidateClinicFlags(clinicaId);
 }

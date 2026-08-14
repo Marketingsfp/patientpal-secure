@@ -69,7 +69,11 @@ export interface RepasseCtx {
 }
 
 export const normRepasse = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 export const procVariants = (nome: string): string[] => {
   const base = normRepasse(nome);

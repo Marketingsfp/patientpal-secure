@@ -20,7 +20,9 @@ function VisualizarClientePage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-  const [paciente, setPaciente] = useState<(Paciente & { codigo_prontuario?: string | null }) | null>(null);
+  const [paciente, setPaciente] = useState<
+    (Paciente & { codigo_prontuario?: string | null }) | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -28,7 +30,11 @@ function VisualizarClientePage() {
     let active = true;
     setLoading(true);
     setNotFound(false);
-    void supabase.from("pacientes").select("*").eq("id", pacienteId).single()
+    void supabase
+      .from("pacientes")
+      .select("*")
+      .eq("id", pacienteId)
+      .single()
       .then(({ data, error }) => {
         if (!active) return;
         if (error || !data) {
@@ -40,7 +46,9 @@ function VisualizarClientePage() {
         setPaciente(data as Paciente);
         setLoading(false);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [pacienteId]);
 
   const voltar = () => navigate({ to: "/app/clientes" });

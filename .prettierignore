@@ -6,3 +6,7 @@ pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+
+# Gerado pelo Supabase CLI (`supabase gen types`). Reformatar aqui só cria
+# ruído no diff a cada regeneração — eram 8.759 dos erros de lint do projeto.
+src/integrations/supabase/types.ts

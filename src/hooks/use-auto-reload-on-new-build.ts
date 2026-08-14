@@ -20,12 +20,13 @@ const CHECK_INTERVAL_MS = 60_000;
 
 function extractMainScript(html: string): string | null {
   // Procura tags <script ... src="/assets/xxx.js"> ou entry-client
-  const matches = Array.from(
-    html.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/gi),
-  );
+  const matches = Array.from(html.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/gi));
   if (matches.length === 0) return null;
   // Ordena para pegar o mais estável (o último costuma ser o entry principal)
-  return matches.map((m) => m[1]).sort().join("|");
+  return matches
+    .map((m) => m[1])
+    .sort()
+    .join("|");
 }
 
 let reloading = false;

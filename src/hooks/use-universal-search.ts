@@ -4,8 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CommandEntry } from "@/components/list-shell";
 
 export type UBTipo =
-  | "paciente" | "orcamento" | "agendamento" | "financeiro" | "nfse"
-  | "cartao_convenio" | "contrato_associado" | "medico" | "procedimento";
+  | "paciente"
+  | "orcamento"
+  | "agendamento"
+  | "financeiro"
+  | "nfse"
+  | "cartao_convenio"
+  | "contrato_associado"
+  | "medico"
+  | "procedimento";
 
 export interface UBRow {
   tipo: UBTipo;
@@ -89,7 +96,6 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
         _limite: 24,
       });
       if (error) {
-        // eslint-disable-next-line no-console
         console.error("[ub] rpc", error);
         return [];
       }
@@ -108,7 +114,6 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
       cacheRef.current.set(cacheKey, entries);
       return entries;
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("[ub] catch", e);
       return [];
     }
@@ -116,7 +121,11 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
 }
 
 /** Lê feature flag ub_v1 de profiles.preferencias_ui (default false). */
-export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (v: boolean) => Promise<void> } {
+export function useUBFlag(): {
+  enabled: boolean;
+  loading: boolean;
+  setEnabled: (v: boolean) => Promise<void>;
+} {
   // Liberada por padrão para todos os perfis/clínicas. Só fica oculta quando
   // o usuário desliga explicitamente a flag (ub_v1 === false).
   const [enabled, setEnabled] = useState(true);
@@ -126,14 +135,20 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
     let alive = true;
     void (async () => {
       const v = await getFlagUsuario("ub_v1");
-      if (alive) { setEnabled(v !== false); setLoading(false); }
+      if (alive) {
+        setEnabled(v !== false);
+        setLoading(false);
+      }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ ub_v1: boolean }>;
       if (alive && ce.detail) setEnabled(Boolean(ce.detail.ub_v1));
     };
     window.addEventListener("ub:flag-changed", onChange as EventListener);
-    return () => { alive = false; window.removeEventListener("ub:flag-changed", onChange as EventListener); };
+    return () => {
+      alive = false;
+      window.removeEventListener("ub:flag-changed", onChange as EventListener);
+    };
   }, []);
 
   const set = async (v: boolean) => {

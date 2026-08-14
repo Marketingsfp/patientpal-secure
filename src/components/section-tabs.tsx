@@ -54,7 +54,25 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
   );
 }
 
-import { Megaphone, Send, Sparkles, Users, Filter, Clock, Palmtree, FileText, FileSignature, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
+import {
+  Megaphone,
+  Send,
+  Sparkles,
+  Users,
+  Filter,
+  Clock,
+  Palmtree,
+  FileText,
+  FileSignature,
+  GraduationCap,
+  BookOpen,
+  HeartPulse,
+  LayoutGrid,
+  ClipboardList,
+  ShieldCheck,
+  KeyRound,
+  Stethoscope,
+} from "lucide-react";
 
 export const MARKETING_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/mkt-leads", label: "Leads", icon: Users, modulo: "mkt-leads" },
@@ -74,7 +92,12 @@ export const RH_TABS: ReadonlyArray<SectionTab> = [
 ];
 
 export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse, modulo: "especialidades" },
+  {
+    to: "/app/especialidades",
+    label: "Especialidades",
+    icon: HeartPulse,
+    modulo: "especialidades",
+  },
   { to: "/app/tipos-servico", label: "Categorias", icon: LayoutGrid, modulo: "tipos-servico" },
   { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList, modulo: "procedimentos" },
 ];
@@ -82,7 +105,12 @@ export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
 export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck, modulo: "auditoria" },
   { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck, modulo: "lgpd" },
-  { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound, modulo: "integration-secrets" },
+  {
+    to: "/app/integration-secrets",
+    label: "Integrações",
+    icon: KeyRound,
+    modulo: "integration-secrets",
+  },
 ];
 
 export const MARKETING_META = { title: "Marketing", icon: Megaphone };

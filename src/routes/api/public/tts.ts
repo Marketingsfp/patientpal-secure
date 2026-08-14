@@ -13,8 +13,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * validamos tamanho para evitar abuso.
  */
 
-const TTS_UPSTREAM =
-  process.env.TTS_UPSTREAM_URL ?? "https://server-mj.tailec426c.ts.net/api/tts";
+const TTS_UPSTREAM = process.env.TTS_UPSTREAM_URL ?? "https://server-mj.tailec426c.ts.net/api/tts";
 const MAX_TEXT = 4000;
 
 /**

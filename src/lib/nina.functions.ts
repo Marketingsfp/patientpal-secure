@@ -4,11 +4,7 @@ import { z } from "zod";
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-async function assertMembership(
-  supabase: any,
-  userId: string,
-  clinicaId: string,
-) {
+async function assertMembership(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase
     .from("clinica_memberships")
     .select("id")
@@ -39,9 +35,7 @@ const ChatSchema = z.object({
  */
 export const getContextoClinica = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
@@ -52,7 +46,9 @@ export const getContextoClinica = createServerFn({ method: "POST" })
       for (let from = 0; ; from += pageSize) {
         const { data: page, error } = await supabase
           .from("procedimentos")
-          .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
+          .select(
+            "id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo",
+          )
           .eq("clinica_id", data.clinicaId)
           .eq("ativo", true)
           .order("nome")
@@ -79,12 +75,8 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .order("dia_semana")
         .order("hora_inicio"),
       carregarProcedimentos(),
-      supabase
-        .from("medico_especialidades")
-        .select("medico_id, especialidade_id"),
-      supabase
-        .from("especialidades")
-        .select("id, nome"),
+      supabase.from("medico_especialidades").select("medico_id, especialidade_id"),
+      supabase.from("especialidades").select("id, nome"),
     ]);
 
     const espNome = new Map<string, string>();
@@ -144,10 +136,29 @@ function montarContextoTexto(ctx: {
     especialidades?: string[];
     horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
   }>;
-  procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
+  procedimentos: Array<{
+    nome: string;
+    valor_dinheiro_pix: number;
+    valor_cartao: number;
+    grupo: string | null;
+    preparo?: string | null;
+  }>;
   especialidades?: string[];
-  convenios?: Array<{ nome: string; modalidade: string; valor_mensal: number; max_dependentes: number; descricao: string | null }>;
-  clinica?: { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; email: string | null } | null;
+  convenios?: Array<{
+    nome: string;
+    modalidade: string;
+    valor_mensal: number;
+    max_dependentes: number;
+    descricao: string | null;
+  }>;
+  clinica?: {
+    nome: string;
+    endereco: string | null;
+    cidade: string | null;
+    estado: string | null;
+    telefone: string | null;
+    email: string | null;
+  } | null;
   agendaResumo?: Array<{ medico: string; total: number; livres: number; ocupados: number }>;
 }) {
   const meds = ctx.medicos
@@ -169,18 +180,22 @@ function montarContextoTexto(ctx: {
     .join("\n");
 
   const espText = (ctx.especialidades ?? []).join(", ") || "(nenhuma)";
-  const convText = (ctx.convenios ?? [])
-    .map(
-      (c) =>
-        `- ${c.nome} [${c.modalidade}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao ? ` | ${c.descricao.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
-    )
-    .join("\n") || "(nenhum)";
+  const convText =
+    (ctx.convenios ?? [])
+      .map(
+        (c) =>
+          `- ${c.nome} [${c.modalidade}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao ? ` | ${c.descricao.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
+      )
+      .join("\n") || "(nenhum)";
   const clinicaText = ctx.clinica
     ? `Nome: ${ctx.clinica.nome}\nEndereço: ${[ctx.clinica.endereco, ctx.clinica.cidade, ctx.clinica.estado].filter(Boolean).join(", ") || "(não informado)"}\nTelefone: ${ctx.clinica.telefone || "(não informado)"}\nE-mail: ${ctx.clinica.email || "(não informado)"}`
     : "(não informado)";
-  const agendaText = (ctx.agendaResumo ?? [])
-    .map((a) => `- ${a.medico}: ${a.ocupados} ocupado(s), ${a.livres} livre(s) (total ${a.total})`)
-    .join("\n") || "(sem dados do dia)";
+  const agendaText =
+    (ctx.agendaResumo ?? [])
+      .map(
+        (a) => `- ${a.medico}: ${a.ocupados} ocupado(s), ${a.livres} livre(s) (total ${a.total})`,
+      )
+      .join("\n") || "(sem dados do dia)";
 
   return [
     `CLÍNICA:\n${clinicaText}`,
@@ -201,8 +216,10 @@ export const chatNina = createServerFn({ method: "POST" })
 
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
-    const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
+    const inicioDia = new Date();
+    inicioDia.setHours(0, 0, 0, 0);
+    const fimDia = new Date();
+    fimDia.setHours(23, 59, 59, 999);
 
     const carregarProcedimentos = async () => {
       const pageSize = 1000;
@@ -234,10 +251,7 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       carregarProcedimentos(),
-      supabase
-        .from("especialidades")
-        .select("id, nome")
-        .eq("ativo", true),
+      supabase.from("especialidades").select("id, nome").eq("ativo", true),
       supabase
         .from("cb_convenios")
         .select("nome, modalidade, valor_mensal, max_dependentes, descricao")
@@ -254,9 +268,7 @@ export const chatNina = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("inicio", inicioDia.toISOString())
         .lte("inicio", fimDia.toISOString()),
-      supabase
-        .from("medico_especialidades")
-        .select("medico_id, especialidade_id"),
+      supabase.from("medico_especialidades").select("medico_id, especialidade_id"),
     ]);
 
     const espMap = new Map<string, string>();
@@ -290,7 +302,7 @@ export const chatNina = createServerFn({ method: "POST" })
     for (const m of medR.data ?? []) nomeMedico.set(m.id, m.nome);
     const agendaAgg = new Map<string, { total: number; livres: number; ocupados: number }>();
     for (const a of agR.data ?? []) {
-      const nome = a.medico_id ? nomeMedico.get(a.medico_id) ?? "Sem médico" : "Sem médico";
+      const nome = a.medico_id ? (nomeMedico.get(a.medico_id) ?? "Sem médico") : "Sem médico";
       const cur = agendaAgg.get(nome) ?? { total: 0, livres: 0, ocupados: 0 };
       cur.total += 1;
       if (a.status === "cancelado" || a.status === "faltou") cur.livres += 1;
@@ -346,8 +358,10 @@ ${contextoTexto}
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("Nina AI error", res.status, body);
-      if (res.status === 429) return { reply: "", error: "Limite de uso atingido. Tente em alguns segundos." };
-      if (res.status === 402) return { reply: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
+      if (res.status === 429)
+        return { reply: "", error: "Limite de uso atingido. Tente em alguns segundos." };
+      if (res.status === 402)
+        return { reply: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
       return { reply: "", error: `Falha na resposta da Nina (${res.status})` };
     }
 

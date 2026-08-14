@@ -6,7 +6,7 @@
  * Remove máscara e caracteres especiais do CPF
  */
 export function limparCPF(cpf: string): string {
-  return cpf.replace(/\D/g, '');
+  return cpf.replace(/\D/g, "");
 }
 
 /**
@@ -14,10 +14,10 @@ export function limparCPF(cpf: string): string {
  */
 export function mascaraCPF(cpf: string): string {
   let valor = limparCPF(cpf);
-  
+
   // Limita a 11 caracteres
   valor = valor.slice(0, 11);
-  
+
   // Aplica a máscara
   if (valor.length <= 3) {
     return valor;
@@ -35,22 +35,22 @@ export function mascaraCPF(cpf: string): string {
  */
 export function validarCPF(cpf: string): { valido: boolean; mensagem: string; cpfLimpo?: string } {
   const cpfLimpo = limparCPF(cpf);
-  
+
   // Verifica tamanho máximo
   if (cpfLimpo.length > 11) {
     return { valido: false, mensagem: "CPF deve ter no máximo 11 dígitos" };
   }
-  
+
   // Verifica se tem 11 dígitos
   if (cpfLimpo.length !== 11) {
     return { valido: false, mensagem: "CPF deve ter exatamente 11 dígitos" };
   }
-  
+
   // Verifica se todos os dígitos são iguais (ex: 111.111.111-11)
   if (/^(\d)\1{10}$/.test(cpfLimpo)) {
     return { valido: false, mensagem: "CPF inválido (dígitos repetidos)" };
   }
-  
+
   // Validação do primeiro dígito verificador
   let soma = 0;
   for (let i = 0; i < 9; i++) {
@@ -58,7 +58,7 @@ export function validarCPF(cpf: string): { valido: boolean; mensagem: string; cp
   }
   let resto = 11 - (soma % 11);
   const digito1 = resto >= 10 ? 0 : resto;
-  
+
   // Validação do segundo dígito verificador
   soma = 0;
   for (let i = 0; i < 10; i++) {
@@ -66,16 +66,16 @@ export function validarCPF(cpf: string): { valido: boolean; mensagem: string; cp
   }
   resto = 11 - (soma % 11);
   const digito2 = resto >= 10 ? 0 : resto;
-  
+
   // Verifica se os dígitos calculados batem com os informados
   if (parseInt(cpfLimpo.charAt(9)) !== digito1 || parseInt(cpfLimpo.charAt(10)) !== digito2) {
     return { valido: false, mensagem: "CPF inválido (dígitos verificadores não conferem)" };
   }
-  
-  return { 
-    valido: true, 
+
+  return {
+    valido: true,
     mensagem: "CPF válido",
-    cpfLimpo
+    cpfLimpo,
   };
 }
 
@@ -87,7 +87,7 @@ export function validarCPF(cpf: string): { valido: boolean; mensagem: string; cp
  * Remove máscara e caracteres especiais do telefone
  */
 export function limparTelefone(telefone: string): string {
-  return telefone.replace(/\D/g, '');
+  return telefone.replace(/\D/g, "");
 }
 
 /**
@@ -95,10 +95,10 @@ export function limparTelefone(telefone: string): string {
  */
 export function mascaraTelefone(telefone: string): string {
   let valor = limparTelefone(telefone);
-  
+
   // Limita a 11 caracteres
   valor = valor.slice(0, 11);
-  
+
   // Aplica a máscara progressivamente
   if (valor.length <= 2) {
     return valor.length === 2 ? `(${valor}` : valor;
@@ -114,38 +114,42 @@ export function mascaraTelefone(telefone: string): string {
 /**
  * Valida telefone (10 ou 11 dígitos, DDD válido)
  */
-export function validarTelefone(telefone: string): { valido: boolean; mensagem: string; telefoneLimpo?: string } {
+export function validarTelefone(telefone: string): {
+  valido: boolean;
+  mensagem: string;
+  telefoneLimpo?: string;
+} {
   const telefoneLimpo = limparTelefone(telefone);
-  
+
   // Verifica tamanho (10 ou 11 dígitos)
   if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
-    return { 
-      valido: false, 
-      mensagem: "Telefone deve ter 10 ou 11 dígitos" 
+    return {
+      valido: false,
+      mensagem: "Telefone deve ter 10 ou 11 dígitos",
     };
   }
-  
+
   // Verifica DDD (de 11 a 99)
   const ddd = parseInt(telefoneLimpo.slice(0, 2));
   if (ddd < 11 || ddd > 99) {
-    return { 
-      valido: false, 
-      mensagem: "DDD inválido (deve ser entre 11 e 99)" 
+    return {
+      valido: false,
+      mensagem: "DDD inválido (deve ser entre 11 e 99)",
     };
   }
-  
+
   // Verifica se o primeiro dígito do número é 9 (celular)
-  if (telefoneLimpo.length === 11 && telefoneLimpo.charAt(2) !== '9') {
-    return { 
-      valido: false, 
-      mensagem: "Celular com 11 dígitos deve começar com 9" 
+  if (telefoneLimpo.length === 11 && telefoneLimpo.charAt(2) !== "9") {
+    return {
+      valido: false,
+      mensagem: "Celular com 11 dígitos deve começar com 9",
     };
   }
-  
-  return { 
-    valido: true, 
+
+  return {
+    valido: true,
     mensagem: "Telefone válido",
-    telefoneLimpo
+    telefoneLimpo,
   };
 }
 
@@ -170,13 +174,13 @@ export interface ValidacaoPaciente {
 
 export function validarDadosPaciente(dados: DadosPaciente): ValidacaoPaciente {
   const mensagens: string[] = [];
-  
+
   // Valida nome
   const nomeValido = dados.nome.trim().length >= 2;
   if (!nomeValido) {
     mensagens.push("Nome deve ter pelo menos 2 caracteres");
   }
-  
+
   // Valida CPF (se preenchido)
   let cpfValido = true;
   let cpfFormatado;
@@ -189,7 +193,7 @@ export function validarDadosPaciente(dados: DadosPaciente): ValidacaoPaciente {
       cpfFormatado = mascaraCPF(dados.cpf);
     }
   }
-  
+
   // Valida Telefone (se preenchido)
   let telefoneValido = true;
   let telefoneFormatado;
@@ -202,13 +206,13 @@ export function validarDadosPaciente(dados: DadosPaciente): ValidacaoPaciente {
       telefoneFormatado = mascaraTelefone(dados.telefone);
     }
   }
-  
+
   return {
     nomeValido,
     cpfValido,
     telefoneValido,
     cpfFormatado,
     telefoneFormatado,
-    mensagens
+    mensagens,
   };
 }

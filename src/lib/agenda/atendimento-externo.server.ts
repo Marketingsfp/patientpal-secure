@@ -19,9 +19,7 @@ export async function buscarValorProcedimento(
   return valorDaTabela(data as PrecosProcedimento | null);
 }
 
-export type LimparExternoResult =
-  | { ok: true; limpou: boolean }
-  | { ok: false; message: string };
+export type LimparExternoResult = { ok: true; limpou: boolean } | { ok: false; message: string };
 
 /**
  * Desfaz um atendimento externo: remove o registro em `fin_atendimentos`

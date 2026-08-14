@@ -3,7 +3,14 @@ import { toast } from "sonner";
 import { Search, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +32,11 @@ interface Procedimento {
   tipo: string | null;
 }
 
-interface OrcamentoAberto { id: string; numero: number; valor_total: number | null; }
+interface OrcamentoAberto {
+  id: string;
+  numero: number;
+  valor_total: number | null;
+}
 
 /** Convênio ativo do paciente (via titular ou dependente). */
 interface ConvenioPaciente {
@@ -65,8 +76,16 @@ interface Props {
  * Fase 3 — integração odontograma × plano de tratamento.
  */
 export function AddToOrcamentoDialog({
-  open, onClose, clinicaId, pacienteId, pacienteNome, pacienteTelefone,
-  especialidadeOdontoId, userId, dente, onCreated,
+  open,
+  onClose,
+  clinicaId,
+  pacienteId,
+  pacienteNome,
+  pacienteTelefone,
+  especialidadeOdontoId,
+  userId,
+  dente,
+  onCreated,
 }: Props) {
   const [orcs, setOrcs] = useState<OrcamentoAberto[]>([]);
   const [alvo, setAlvo] = useState<"novo" | string>("novo");
@@ -88,7 +107,7 @@ export function AddToOrcamentoDialog({
       .eq("especialidade_id", especialidadeOdontoId!)
       .eq("status", "aberto")
       .order("created_at", { ascending: false });
-    setOrcs(((data ?? []) as OrcamentoAberto[]));
+    setOrcs((data ?? []) as OrcamentoAberto[]);
   }, [clinicaId, pacienteId, especialidadeOdontoId]);
 
   useEffect(() => {
@@ -100,13 +119,18 @@ export function AddToOrcamentoDialog({
         .select("procedimento_id")
         .eq("clinica_id", clinicaId)
         .eq("especialidade_id", especialidadeOdontoId);
-      setProcIdsOdonto(new Set(((data ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id)));
+      setProcIdsOdonto(
+        new Set(((data ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id)),
+      );
     })();
   }, [open, carregar, clinicaId, especialidadeOdontoId]);
 
   // Carrega convênios ativos do paciente + regras da Odontologia.
   useEffect(() => {
-    if (!open || !especialidadeOdontoId || !pacienteId) { setConvenios([]); return; }
+    if (!open || !especialidadeOdontoId || !pacienteId) {
+      setConvenios([]);
+      return;
+    }
     let cancel = false;
     void (async () => {
       setLoadingConv(true);
@@ -114,14 +138,18 @@ export function AddToOrcamentoDialog({
         // 1) Contratos ativos do paciente (titular)
         const { data: titRows } = await supabase
           .from("contratos_assinatura")
-          .select("id,convenio_id,cb_convenios(nome,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor)")
+          .select(
+            "id,convenio_id,cb_convenios(nome,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor)",
+          )
           .eq("clinica_id", clinicaId)
           .eq("status", "ativo")
           .eq("paciente_id", pacienteId);
         // 2) Contratos como dependente
         const { data: depRows } = await supabase
           .from("contrato_dependentes")
-          .select("contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor))")
+          .select(
+            "contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor))",
+          )
           .eq("paciente_id", pacienteId)
           .eq("ativo", true);
         const contratosDep = ((depRows ?? []) as any[])
@@ -134,17 +162,22 @@ export function AddToOrcamentoDialog({
           if (!c?.convenio_id || porConvenio.has(c.convenio_id)) continue;
           porConvenio.set(c.convenio_id, c);
         }
-        if (porConvenio.size === 0) { if (!cancel) setConvenios([]); return; }
+        if (porConvenio.size === 0) {
+          if (!cancel) setConvenios([]);
+          return;
+        }
 
         // 3) Regras da especialidade Odontologia por convênio
         const conveniosIds = Array.from(porConvenio.keys());
         const { data: regrasRaw } = await supabase
           .from("cb_convenio_regras")
-          .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
+          .select(
+            "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade",
+          )
           .in("convenio_id", conveniosIds)
           .eq("ativo", true);
         const regrasByConv = new Map<string, CbRegra[]>();
-        for (const r of ((regrasRaw ?? []) as CbRegra[])) {
+        for (const r of (regrasRaw ?? []) as CbRegra[]) {
           const arr = regrasByConv.get(r.convenio_id) ?? [];
           arr.push(r);
           regrasByConv.set(r.convenio_id, arr);
@@ -171,25 +204,33 @@ export function AddToOrcamentoDialog({
         if (!cancel) setLoadingConv(false);
       }
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [open, clinicaId, pacienteId, especialidadeOdontoId]);
 
   useEffect(() => {
     if (!open) {
       setAlvo("novo");
-      setProcQuery(""); setProcResults([]); setProcSel(null);
+      setProcQuery("");
+      setProcResults([]);
+      setProcSel(null);
     }
   }, [open]);
 
   useEffect(() => {
     let cancel = false;
     if (!open || procQuery.trim().length < 2 || !procIdsOdonto || procIdsOdonto.size === 0) {
-      setProcResults([]); return;
+      setProcResults([]);
+      return;
     }
     const t = setTimeout(async () => {
       const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
       const safe = sanitizePostgrestSearch(procQuery);
-      if (!safe) { setProcResults([]); return; }
+      if (!safe) {
+        setProcResults([]);
+        return;
+      }
       const { data } = await supabase
         .from("procedimentos")
         .select("id, nome, valor_padrao, valor_dinheiro_pix, tipo")
@@ -200,7 +241,10 @@ export function AddToOrcamentoDialog({
         .limit(15);
       if (!cancel) setProcResults((data ?? []) as Procedimento[]);
     }, 200);
-    return () => { cancel = true; clearTimeout(t); };
+    return () => {
+      cancel = true;
+      clearTimeout(t);
+    };
   }, [procQuery, open, clinicaId, procIdsOdonto]);
 
   const selecionarProc = (p: Procedimento) => {
@@ -218,7 +262,12 @@ export function AddToOrcamentoDialog({
     const baseDinheiro = Number(procSel.valor_dinheiro_pix ?? procSel.valor_padrao) || 0;
     const linhas: LinhaPreco[] = [
       { chave: "din", rotulo: "Dinheiro", valorDinheiro: baseDinheiro, valorCartao: baseDinheiro },
-      { chave: "cartaopix", rotulo: "Cartão / PIX", valorDinheiro: baseCartao, valorCartao: baseCartao },
+      {
+        chave: "cartaopix",
+        rotulo: "Cartão / PIX",
+        valorDinheiro: baseCartao,
+        valorCartao: baseCartao,
+      },
     ];
     const tipoNorm = (procSel.tipo ?? "").toLowerCase() || null;
     for (const c of convenios) {
@@ -227,7 +276,7 @@ export function AddToOrcamentoDialog({
       if (regra.gratuito) {
         linhas.push({
           chave: `conv-${c.convenioId}`,
-        rotulo: `${c.convenioNome} — gratuito (aplicado no pagamento)`,
+          rotulo: `${c.convenioNome} — gratuito (aplicado no pagamento)`,
           valorDinheiro: 0,
           valorCartao: 0,
           gratuito: true,
@@ -310,7 +359,9 @@ export function AddToOrcamentoDialog({
       if (e2) throw e2;
       if (alvo !== "novo") {
         const { data: itensTot } = await supabase
-          .from("orcamento_itens").select("valor_total").eq("orcamento_id", orcamentoId);
+          .from("orcamento_itens")
+          .select("valor_total")
+          .eq("orcamento_id", orcamentoId);
         const subtotal = (itensTot ?? []).reduce((s, i) => s + Number(i.valor_total || 0), 0);
         await supabase.from("orcamentos").update({ valor_total: subtotal }).eq("id", orcamentoId);
       }
@@ -368,7 +419,10 @@ export function AddToOrcamentoDialog({
               <Input
                 className="pl-8"
                 value={procQuery}
-                onChange={(e) => { setProcQuery(e.target.value); setProcSel(null); }}
+                onChange={(e) => {
+                  setProcQuery(e.target.value);
+                  setProcSel(null);
+                }}
                 placeholder="Buscar serviço cadastrado em Odontologia…"
               />
               {procResults.length > 0 && (
@@ -382,7 +436,9 @@ export function AddToOrcamentoDialog({
                     >
                       <div className="font-medium">{p.nome}</div>
                       <div className="text-xs text-muted-foreground">
-                        {p.valor_padrao ? `R$ ${Number(p.valor_padrao).toFixed(2)}` : "Valor variável"}
+                        {p.valor_padrao
+                          ? `R$ ${Number(p.valor_padrao).toFixed(2)}`
+                          : "Valor variável"}
                       </div>
                     </button>
                   ))}
@@ -391,7 +447,8 @@ export function AddToOrcamentoDialog({
             </div>
             {!procSel && (
               <p className="text-xs text-muted-foreground">
-                Digite ao menos 2 letras para buscar. Só aparecem serviços vinculados à especialidade Odontologia.
+                Digite ao menos 2 letras para buscar. Só aparecem serviços vinculados à
+                especialidade Odontologia.
               </p>
             )}
           </div>
@@ -408,7 +465,9 @@ export function AddToOrcamentoDialog({
                 <div className="text-muted-foreground text-right">Cartão/PIX</div>
                 {linhasPreco.map((l) => (
                   <div key={l.chave} className="contents">
-                    <div className={l.destaque ? "font-medium text-emerald-700" : ""}>{l.rotulo}</div>
+                    <div className={l.destaque ? "font-medium text-emerald-700" : ""}>
+                      {l.rotulo}
+                    </div>
                     <div className="text-right tabular-nums">
                       {l.gratuito ? "—" : `R$ ${l.valorDinheiro.toFixed(2)}`}
                     </div>
@@ -419,18 +478,28 @@ export function AddToOrcamentoDialog({
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground pt-1">
-                O item é lançado no orçamento sempre pelo <strong>valor particular</strong>. O desconto do
-                convênio é apurado na hora do pagamento, conforme a situação do contrato naquele momento
-                (mensalidade em dia, carência). Os valores de convênio acima são apenas uma referência.
+                O item é lançado no orçamento sempre pelo <strong>valor particular</strong>. O
+                desconto do convênio é apurado na hora do pagamento, conforme a situação do contrato
+                naquele momento (mensalidade em dia, carência). Os valores de convênio acima são
+                apenas uma referência.
               </p>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
           <Button onClick={salvar} disabled={saving || !procSel}>
-            {saving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Salvando…</> : "Incluir no orçamento"}
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Salvando…
+              </>
+            ) : (
+              "Incluir no orçamento"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

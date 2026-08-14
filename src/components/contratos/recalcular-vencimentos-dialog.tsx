@@ -14,7 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateInputBR } from "@/components/ui/date-input-br";
 
@@ -88,7 +94,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
 
   // Preview: recalcula vencimentos a partir da parcela escolhida.
   const preview = useMemo(() => {
-    if (!parcelaSelecionada || !novoVenc) return [] as Array<Parcela & { novoVencimento: string; alterado: boolean }>;
+    if (!parcelaSelecionada || !novoVenc)
+      return [] as Array<Parcela & { novoVencimento: string; alterado: boolean }>;
     const idx = elegiveis.findIndex((p) => p.id === parcelaSelecionada.id);
     const intervalo = Math.max(1, Number(intervaloValor) || 0);
     const afetadas = cascatear ? elegiveis.slice(idx) : [elegiveis[idx]];
@@ -98,7 +105,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
       if (i === 0) {
         venc = novoVenc;
       } else {
-        venc = intervaloTipo === "meses" ? addMonths(anterior, intervalo) : addDays(anterior, intervalo);
+        venc =
+          intervaloTipo === "meses" ? addMonths(anterior, intervalo) : addDays(anterior, intervalo);
       }
       anterior = venc;
       return { ...p, novoVencimento: venc, alterado: venc !== p.vencimento };
@@ -152,8 +160,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
             Recalcular vencimentos
           </DialogTitle>
           <DialogDescription>
-            Escolha a parcela inicial e o novo vencimento. As parcelas seguintes serão
-            reescalonadas de acordo com o intervalo escolhido.
+            Escolha a parcela inicial e o novo vencimento. As parcelas seguintes serão reescalonadas
+            de acordo com o intervalo escolhido.
           </DialogDescription>
         </DialogHeader>
 
@@ -161,7 +169,9 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
           <div className="space-y-1">
             <Label>A partir da parcela</Label>
             <Select value={parcelaId} onValueChange={setParcelaId}>
-              <SelectTrigger><SelectValue placeholder="Selecionar parcela..." /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar parcela..." />
+              </SelectTrigger>
               <SelectContent>
                 {elegiveis.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -186,8 +196,13 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
                 onChange={(e) => setIntervaloValor(e.target.value)}
                 className="w-20"
               />
-              <Select value={intervaloTipo} onValueChange={(v) => setIntervaloTipo(v as "dias" | "meses")}>
-                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+              <Select
+                value={intervaloTipo}
+                onValueChange={(v) => setIntervaloTipo(v as "dias" | "meses")}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dias">Dias</SelectItem>
                   <SelectItem value="meses">Meses</SelectItem>
@@ -201,8 +216,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
           <Checkbox checked={cascatear} onCheckedChange={(v) => setCascatear(!!v)} />
           <span>
             Aplicar a partir da parcela
-            {parcelaSelecionada ? ` ${parcelaSelecionada.numero_parcela}` : ""}
-            {" "}(reescalona todas as seguintes)
+            {parcelaSelecionada ? ` ${parcelaSelecionada.numero_parcela}` : ""} (reescalona todas as
+            seguintes)
           </span>
         </label>
 
@@ -231,7 +246,9 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
                     >
                       {fmtBR(p.novoVencimento)}
                     </td>
-                    <td className="px-3 py-1.5 text-xs capitalize text-muted-foreground">{p.status}</td>
+                    <td className="px-3 py-1.5 text-xs capitalize text-muted-foreground">
+                      {p.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -26,7 +26,9 @@ export function BadgePacienteDistante({
       } ${className}`}
     >
       <AlertTriangle className={compact ? "h-2.5 w-2.5 shrink-0" : "h-3.5 w-3.5"} />
-      <span className="truncate">{compact ? nome.toUpperCase() : `PACIENTE DE LONGE: ${nome}`}</span>
+      <span className="truncate">
+        {compact ? nome.toUpperCase() : `PACIENTE DE LONGE: ${nome}`}
+      </span>
     </span>
   );
 }

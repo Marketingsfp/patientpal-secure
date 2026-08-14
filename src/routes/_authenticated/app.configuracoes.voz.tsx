@@ -9,7 +9,13 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import {
   DEFAULT_TTS_RATE,
@@ -40,8 +46,7 @@ export const Route = createFileRoute("/_authenticated/app/configuracoes/voz")({
   }),
 });
 
-const FRASE_PADRAO =
-  "Senha número 27, guichê 3. Boa tarde, dirija-se ao atendimento.";
+const FRASE_PADRAO = "Senha número 27, guichê 3. Boa tarde, dirija-se ao atendimento.";
 
 function VozConfigPage() {
   const { clinicaAtual } = useClinica();
@@ -166,8 +171,8 @@ function VozConfigPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Voz & Áudio (TTS)</h1>
         <p className="text-sm text-muted-foreground">
-          Configure a síntese de voz usada no painel de senhas, alertas sonoros
-          e leitura de anamnese. As preferências são salvas neste navegador.
+          Configure a síntese de voz usada no painel de senhas, alertas sonoros e leitura de
+          anamnese. As preferências são salvas neste navegador.
         </p>
       </div>
 
@@ -251,30 +256,19 @@ function VozConfigPage() {
                 : "Preferências salvas — todas as telas usarão esta configuração."}
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={descartar}
-                disabled={!dirty}
-              >
+              <Button variant="outline" size="sm" onClick={descartar} disabled={!dirty}>
                 Descartar
               </Button>
-              <Button
-                size="sm"
-                onClick={salvar}
-                disabled={!dirty || salvando}
-                className="gap-2"
-              >
+              <Button size="sm" onClick={salvar} disabled={!dirty || salvando} className="gap-2">
                 <Save className="h-4 w-4" /> {salvando ? "Salvando…" : "Salvar"}
               </Button>
             </div>
           </div>
 
           <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-            A voz é gerada pelo servidor local Piper via <code>/api/tts</code>.
-            A velocidade é aplicada no navegador mantendo o tom natural
-            (<code>preservesPitch</code>). Quando o Piper estiver indisponível,
-            o painel usa a voz nativa do navegador na mesma velocidade.
+            A voz é gerada pelo servidor local Piper via <code>/api/tts</code>. A velocidade é
+            aplicada no navegador mantendo o tom natural (<code>preservesPitch</code>). Quando o
+            Piper estiver indisponível, o painel usa a voz nativa do navegador na mesma velocidade.
           </div>
         </CardContent>
       </Card>
@@ -291,9 +285,7 @@ const VOZES = [
 ] as const;
 
 function TesteServidorLocalCard() {
-  const [texto, setTexto] = useState<string>(
-    "Olá! Este é um teste de síntese de voz.",
-  );
+  const [texto, setTexto] = useState<string>("Olá! Este é um teste de síntese de voz.");
   const [voice, setVoice] = useState<string>("faber");
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -394,15 +386,7 @@ function TesteServidorLocalCard() {
             )}
           </Button>
         </div>
-        {audioUrl && (
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            controls
-            autoPlay
-            className="w-full"
-          />
-        )}
+        {audioUrl && <audio ref={audioRef} src={audioUrl} controls autoPlay className="w-full" />}
         <p className="text-xs text-muted-foreground">
           Faz uma requisição POST direta para <code>{TTS_ENDPOINT}</code>.
         </p>

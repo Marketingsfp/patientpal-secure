@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +60,7 @@ export function aplicarValorParcial(
   const pct = Math.max(1, Math.min(100, Math.round(tomador.percentualValor ?? 100)));
   const base = Number(valorBase) || 0;
   if (pct >= 100) return { valor: +base.toFixed(2), descricaoSufixo: "" };
-  const valor = +(base * pct / 100).toFixed(2);
+  const valor = +((base * pct) / 100).toFixed(2);
   return { valor, descricaoSufixo: ` — Nota parcial (${pct}% de ${fmtBRL(base)})` };
 }
 
@@ -79,7 +84,16 @@ export function usePickTomador() {
   const [percentual, setPercentual] = useState<number>(100);
   const [erro, setErro] = useState<string>("");
   const [terceiro, setTerceiro] = useState<TomadorPayload>({
-    nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "",
+    nome: "",
+    cpfCnpj: "",
+    email: "",
+    cep: "",
+    logradouro: "",
+    numero: "",
+    bairro: "",
+    municipio: "",
+    uf: "",
+    dependenteAtendido: "",
   });
   // "Dependente atendido" é compartilhado entre os dois modos (paciente e
   // terceiro), porque também vale quando o titular financeiro paga a nota em
@@ -96,7 +110,18 @@ export function usePickTomador() {
     setValorBase(Number(input.valorBase) || 0);
     setPercentual(100);
     setErro("");
-    setTerceiro({ nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "" });
+    setTerceiro({
+      nome: "",
+      cpfCnpj: "",
+      email: "",
+      cep: "",
+      logradouro: "",
+      numero: "",
+      bairro: "",
+      municipio: "",
+      uf: "",
+      dependenteAtendido: "",
+    });
     setDependenteAtendido(input.paciente?.nome ?? "");
     return new Promise<TomadorPayload | null>((resolve) => {
       resolverRef.current = resolve;
@@ -106,21 +131,28 @@ export function usePickTomador() {
 
   const confirm = () => {
     const pct = Math.max(1, Math.min(100, Math.round(Number(percentual) || 0)));
-    if (!pct) { setErro("Informe um percentual entre 1 e 100."); return; }
+    if (!pct) {
+      setErro("Informe um percentual entre 1 e 100.");
+      return;
+    }
 
     if (modo === "paciente" && paciente) {
       if (!temEnderecoValido(paciente)) {
-        setErro("O paciente não tem endereço cadastrado. Complete o cadastro (logradouro, número, bairro, cidade/UF, CEP) antes de emitir a NFS-e — ou emita em nome de um terceiro informando o endereço.");
+        setErro(
+          "O paciente não tem endereço cadastrado. Complete o cadastro (logradouro, número, bairro, cidade/UF, CEP) antes de emitir a NFS-e — ou emita em nome de um terceiro informando o endereço.",
+        );
         return;
       }
-      const r = resolverRef.current; resolverRef.current = null;
+      const r = resolverRef.current;
+      resolverRef.current = null;
       setOpen(false);
       r?.({
         ...paciente,
         percentualValor: pct,
-        dependenteAtendido: dependenteAtendido.trim() && dependenteAtendido.trim() !== (paciente.nome ?? "").trim()
-          ? dependenteAtendido.trim()
-          : undefined,
+        dependenteAtendido:
+          dependenteAtendido.trim() && dependenteAtendido.trim() !== (paciente.nome ?? "").trim()
+            ? dependenteAtendido.trim()
+            : undefined,
       });
       return;
     }
@@ -132,10 +164,13 @@ export function usePickTomador() {
       return;
     }
     if (!terceiro.logradouro?.trim()) {
-      setErro("Endereço do terceiro é obrigatório (logradouro). Sem endereço a prefeitura usa o cadastro da Receita para o CPF/CNPJ.");
+      setErro(
+        "Endereço do terceiro é obrigatório (logradouro). Sem endereço a prefeitura usa o cadastro da Receita para o CPF/CNPJ.",
+      );
       return;
     }
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     r?.({
       nome,
@@ -153,29 +188,50 @@ export function usePickTomador() {
   };
 
   const cancel = () => {
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     r?.(null);
   };
 
   const pacienteSemEndereco = !!paciente && !temEnderecoValido(paciente);
   const valorFinal = aplicarValorParcial(valorBase, {
-    nome: "", percentualValor: percentual,
+    nome: "",
+    percentualValor: percentual,
   }).valor;
 
   const dialog = (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) cancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) cancel();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Em nome de quem emitir a NFS-e?</DialogTitle>
           <DialogDescription>
-            Escolha se a nota vai para o paciente (cliente do serviço) ou para um terceiro que pagou pelo atendimento.
+            Escolha se a nota vai para o paciente (cliente do serviço) ou para um terceiro que pagou
+            pelo atendimento.
           </DialogDescription>
         </DialogHeader>
 
-        <RadioGroup value={modo} onValueChange={(v) => { setModo(v as "paciente" | "terceiro"); setErro(""); }} className="space-y-2">
-          <label className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || pacienteSemEndereco ? "opacity-60 cursor-not-allowed" : ""}`}>
-            <RadioGroupItem value="paciente" disabled={!paciente || pacienteSemEndereco} className="mt-0.5" />
+        <RadioGroup
+          value={modo}
+          onValueChange={(v) => {
+            setModo(v as "paciente" | "terceiro");
+            setErro("");
+          }}
+          className="space-y-2"
+        >
+          <label
+            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || pacienteSemEndereco ? "opacity-60 cursor-not-allowed" : ""}`}
+          >
+            <RadioGroupItem
+              value="paciente"
+              disabled={!paciente || pacienteSemEndereco}
+              className="mt-0.5"
+            />
             <div className="text-sm">
               <div className="font-medium">Cliente do serviço (paciente)</div>
               <div className="text-xs text-muted-foreground">
@@ -184,16 +240,21 @@ export function usePickTomador() {
               </div>
               {pacienteSemEndereco && (
                 <div className="text-xs text-destructive mt-1">
-                  Paciente sem endereço cadastrado — não é possível emitir NFS-e no nome dele. Complete o cadastro do paciente para liberar esta opção.
+                  Paciente sem endereço cadastrado — não é possível emitir NFS-e no nome dele.
+                  Complete o cadastro do paciente para liberar esta opção.
                 </div>
               )}
             </div>
           </label>
-          <label className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "terceiro" ? "border-primary bg-primary/5" : ""}`}>
+          <label
+            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "terceiro" ? "border-primary bg-primary/5" : ""}`}
+          >
             <RadioGroupItem value="terceiro" className="mt-0.5" />
             <div className="text-sm">
               <div className="font-medium">Terceiro (outro pagador)</div>
-              <div className="text-xs text-muted-foreground">Empresa ou pessoa diferente do paciente. Endereço obrigatório.</div>
+              <div className="text-xs text-muted-foreground">
+                Empresa ou pessoa diferente do paciente. Endereço obrigatório.
+              </div>
             </div>
           </label>
         </RadioGroup>
@@ -203,39 +264,68 @@ export function usePickTomador() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2 space-y-1">
                 <Label>Nome / Razão social *</Label>
-                <Input value={terceiro.nome} onChange={(e) => setTerceiro({ ...terceiro, nome: e.target.value })} />
+                <Input
+                  value={terceiro.nome}
+                  onChange={(e) => setTerceiro({ ...terceiro, nome: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>CPF/CNPJ * (só números)</Label>
-                <Input value={terceiro.cpfCnpj ?? ""} onChange={(e) => setTerceiro({ ...terceiro, cpfCnpj: e.target.value })} placeholder="11 ou 14 dígitos" />
+                <Input
+                  value={terceiro.cpfCnpj ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, cpfCnpj: e.target.value })}
+                  placeholder="11 ou 14 dígitos"
+                />
               </div>
               <div className="space-y-1">
                 <Label>E-mail</Label>
-                <Input value={terceiro.email ?? ""} onChange={(e) => setTerceiro({ ...terceiro, email: e.target.value })} />
+                <Input
+                  value={terceiro.email ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, email: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>CEP</Label>
-                <Input value={terceiro.cep ?? ""} onChange={(e) => setTerceiro({ ...terceiro, cep: e.target.value })} />
+                <Input
+                  value={terceiro.cep ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, cep: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>UF</Label>
-                <Input value={terceiro.uf ?? ""} onChange={(e) => setTerceiro({ ...terceiro, uf: e.target.value })} maxLength={2} />
+                <Input
+                  value={terceiro.uf ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, uf: e.target.value })}
+                  maxLength={2}
+                />
               </div>
               <div className="sm:col-span-2 space-y-1">
                 <Label>Logradouro *</Label>
-                <Input value={terceiro.logradouro ?? ""} onChange={(e) => setTerceiro({ ...terceiro, logradouro: e.target.value })} />
+                <Input
+                  value={terceiro.logradouro ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, logradouro: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Número</Label>
-                <Input value={terceiro.numero ?? ""} onChange={(e) => setTerceiro({ ...terceiro, numero: e.target.value })} />
+                <Input
+                  value={terceiro.numero ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, numero: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Bairro</Label>
-                <Input value={terceiro.bairro ?? ""} onChange={(e) => setTerceiro({ ...terceiro, bairro: e.target.value })} />
+                <Input
+                  value={terceiro.bairro ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, bairro: e.target.value })}
+                />
               </div>
               <div className="sm:col-span-2 space-y-1">
                 <Label>Município</Label>
-                <Input value={terceiro.municipio ?? ""} onChange={(e) => setTerceiro({ ...terceiro, municipio: e.target.value })} />
+                <Input
+                  value={terceiro.municipio ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, municipio: e.target.value })}
+                />
               </div>
             </div>
           </div>
@@ -251,7 +341,8 @@ export function usePickTomador() {
             onChange={(e) => setDependenteAtendido(e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            Se preenchido, aparecerá na descrição da NFS-e como "Dependente do pagador: …". Deixe em branco se o próprio tomador foi atendido.
+            Se preenchido, aparecerá na descrição da NFS-e como "Dependente do pagador: …". Deixe em
+            branco se o próprio tomador foi atendido.
           </p>
         </div>
 
@@ -259,7 +350,7 @@ export function usePickTomador() {
           <Label>Valor a emitir na NFS-e (R$)</Label>
           <div className="flex flex-wrap items-center gap-2">
             {[100, 75, 50, 25].map((p) => {
-              const v = +((Number(valorBase) || 0) * p / 100).toFixed(2);
+              const v = +(((Number(valorBase) || 0) * p) / 100).toFixed(2);
               const ativo = Math.abs(valorFinal - v) < 0.005;
               return (
                 <Button
@@ -268,7 +359,10 @@ export function usePickTomador() {
                   size="sm"
                   variant={ativo ? "default" : "outline"}
                   disabled={!valorBase}
-                  onClick={() => { setPercentual(p); setErro(""); }}
+                  onClick={() => {
+                    setPercentual(p);
+                    setErro("");
+                  }}
                 >
                   {fmtBRL(v)}
                 </Button>
@@ -280,7 +374,10 @@ export function usePickTomador() {
                 onChange={(v) => {
                   const n = Number(v) || 0;
                   const base = Number(valorBase) || 0;
-                  if (base <= 0) { setPercentual(100); return; }
+                  if (base <= 0) {
+                    setPercentual(100);
+                    return;
+                  }
                   const pct = Math.max(1, Math.min(100, (n / base) * 100));
                   setPercentual(pct);
                   setErro("");
@@ -290,7 +387,8 @@ export function usePickTomador() {
           </div>
           {valorBase > 0 && (
             <p className="text-xs text-muted-foreground">
-              Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e: <b>{fmtBRL(valorFinal)}</b>
+              Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e:{" "}
+              <b>{fmtBRL(valorFinal)}</b>
               {valorFinal < valorBase ? " (nota parcial)" : ""}
             </p>
           )}
@@ -303,7 +401,9 @@ export function usePickTomador() {
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancelar</Button>
+          <Button variant="outline" onClick={cancel}>
+            Cancelar
+          </Button>
           <Button onClick={confirm}>Emitir nesta pessoa</Button>
         </DialogFooter>
       </DialogContent>

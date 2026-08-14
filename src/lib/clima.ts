@@ -69,7 +69,9 @@ async function resolverCoordenadas(
   try {
     const cached = localStorage.getItem(cacheKey);
     if (cached) return JSON.parse(cached);
-  } catch { /* ignora */ }
+  } catch {
+    /* ignora */
+  }
 
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c.cidade)}&count=5&language=pt&format=json`;
@@ -80,11 +82,22 @@ async function resolverCoordenadas(
     const uf = (c.estado ?? "").trim().toLowerCase();
     const match =
       results.find(
-        (r) => r.country_code === "BR" && uf && String(r.admin1 ?? "").toLowerCase().includes(uf),
-      ) ?? results.find((r) => r.country_code === "BR") ?? results[0];
+        (r) =>
+          r.country_code === "BR" &&
+          uf &&
+          String(r.admin1 ?? "")
+            .toLowerCase()
+            .includes(uf),
+      ) ??
+      results.find((r) => r.country_code === "BR") ??
+      results[0];
     if (!match) return null;
     const coords = { lat: match.latitude, lon: match.longitude };
-    try { localStorage.setItem(cacheKey, JSON.stringify(coords)); } catch { /* ignora */ }
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(coords));
+    } catch {
+      /* ignora */
+    }
     return coords;
   } catch {
     return null;
@@ -114,7 +127,12 @@ function parseDaily(json: any): ClimaDia[] {
   return out;
 }
 
-async function fetchArchive(lat: number, lon: number, ini: string, fim: string): Promise<ClimaDia[]> {
+async function fetchArchive(
+  lat: number,
+  lon: number,
+  ini: string,
+  fim: string,
+): Promise<ClimaDia[]> {
   const url =
     `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
     `&start_date=${ini}&end_date=${fim}&daily=${DAILY_VARS}&timezone=auto`;
@@ -164,7 +182,9 @@ export async function getClimaPeriodo(
         weather_code: r.weather_code,
       });
     }
-  } catch { /* tabela pode não existir ainda — segue só com a API */ }
+  } catch {
+    /* tabela pode não existir ainda — segue só com a API */
+  }
 
   const faltantes = listarDias(ini, fimReal).filter((d) => !mapa.has(d));
   if (faltantes.length === 0) return mapa;
@@ -175,16 +195,22 @@ export async function getClimaPeriodo(
 
   const novos = new Map<string, ClimaDia>();
   try {
-    const arquivo = await fetchArchive(coords.lat, coords.lon, faltantes[0], faltantes[faltantes.length - 1]);
+    const arquivo = await fetchArchive(
+      coords.lat,
+      coords.lon,
+      faltantes[0],
+      faltantes[faltantes.length - 1],
+    );
     for (const c of arquivo) if (faltantes.includes(c.data)) novos.set(c.data, c);
 
     // Dias recentes ainda não consolidados no archive → forecast/past_days
     const aindaFaltam = faltantes.filter((d) => !novos.has(d));
     if (aindaFaltam.length > 0) {
       const maisAntigo = aindaFaltam[0];
-      const diasAtras = Math.ceil(
-        (Date.parse(hoje + "T12:00:00") - Date.parse(maisAntigo + "T12:00:00")) / 86400000,
-      ) + 1;
+      const diasAtras =
+        Math.ceil(
+          (Date.parse(hoje + "T12:00:00") - Date.parse(maisAntigo + "T12:00:00")) / 86400000,
+        ) + 1;
       if (diasAtras <= 92) {
         const recentes = await fetchRecentes(coords.lat, coords.lon, diasAtras);
         for (const c of recentes) {
@@ -213,7 +239,9 @@ export async function getClimaPeriodo(
   if (persistir.length > 0) {
     try {
       await tabelaClima().upsert(persistir, { onConflict: "clinica_id,data" });
-    } catch { /* sem cache — tudo bem */ }
+    } catch {
+      /* sem cache — tudo bem */
+    }
   }
 
   return mapa;

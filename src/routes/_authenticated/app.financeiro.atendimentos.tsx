@@ -48,15 +48,42 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -202,16 +229,27 @@ function AtendimentosPage() {
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
-  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("gr");
+  const [fOrdem, setFOrdem] = useState<
+    "data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za"
+  >("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
+  const [payForm, setPayForm] = useState({
+    data: hoje,
+    conta_id: "",
+    forma_pagamento: "",
+    valor_manual: "",
+  });
   // Edição pontual do repasse médico de um atendimento (linha da tabela)
-  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: string }>({
+  const [editRepasse, setEditRepasse] = useState<{
+    open: boolean;
+    atend: Atend | null;
+    valor: string;
+  }>({
     open: false,
     atend: null,
     valor: "",
@@ -271,7 +309,8 @@ function AtendimentosPage() {
             .select("valor")
             .eq("id", lancId)
             .maybeSingle();
-          const valorAtual = Number((desp as { valor?: number | string | null } | null)?.valor) || 0;
+          const valorAtual =
+            Number((desp as { valor?: number | string | null } | null)?.valor) || 0;
           const novoValor = +(valorAtual + delta).toFixed(2);
           if (novoValor < 0) {
             toast.error(
@@ -300,7 +339,15 @@ function AtendimentosPage() {
     }
   };
   // Comprovante de pagamento de repasse (para impressão)
-  type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
+  type CompItem = {
+    data: string;
+    medico: string;
+    paciente: string;
+    servico: string;
+    valorMedico: number;
+    pagoEm: string | null;
+    pagoHora: string | null;
+  };
   type Comprovante = {
     clinicaNome: string;
     medicoNome: string;
@@ -400,7 +447,7 @@ function AtendimentosPage() {
             .pt-8 { padding-top: 4mm; }
             .pb-3 { padding-bottom: 2.4mm; }
             .mb-3 { margin-bottom: 2.4mm; }
-            .mt-0\.5 { margin-top: .5mm; }
+            .mt-0\\.5 { margin-top: .5mm; }
             .mt-1 { margin-top: 1mm; }
             .mt-8 { margin-top: 4mm; }
             .mt-10 { margin-top: 10mm; }
@@ -452,14 +499,18 @@ function AtendimentosPage() {
   };
   const buildComprovante = (
     itens: Atend[],
-    meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
+    meta: {
+      data: string;
+      forma_pagamento: string;
+      conta_id: string;
+      pago_at?: string | null;
+      reimpressao?: boolean;
+    },
   ): Comprovante => {
     if (!itens.length) return null;
     const medicoIds = new Set(itens.map((i) => i.medico_id ?? ""));
     const medicoNome =
-      medicoIds.size === 1
-        ? (medMap.get([...medicoIds][0]) ?? "—")
-        : `${medicoIds.size} médicos`;
+      medicoIds.size === 1 ? (medMap.get([...medicoIds][0]) ?? "—") : `${medicoIds.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
     const derivarHora = (iso: string | null | undefined): string | null => {
       if (!iso) return null;
@@ -512,7 +563,8 @@ function AtendimentosPage() {
     };
   };
   const abrirComprovanteDoItem = (a: Atend) => {
-    const dataPag = a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
+    const dataPag =
+      a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
     const c = buildComprovante([a], {
       data: dataPag,
       forma_pagamento: a.repasse_forma_pagamento || a.forma_pagamento || "",
@@ -591,7 +643,10 @@ function AtendimentosPage() {
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [emitenteId, setEmitenteId] = useState("");
-  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({ open: false, atend: null });
+  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({
+    open: false,
+    atend: null,
+  });
   const [nfseDesc, setNfseDesc] = useState("");
   const [nfseEmitting, setNfseEmitting] = useState(false);
   const emitirNfseFn = useServerFn(emitirNfse);
@@ -627,12 +682,17 @@ function AtendimentosPage() {
       return;
     }
     const pacNome = pacMap.get(a.paciente_id) ?? a.paciente_nome_extra ?? "";
-    setNfseDesc(`${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim());
+    setNfseDesc(
+      `${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim(),
+    );
     setNfseDialog({ open: true, atend: a });
   };
 
   const doEmitNfse = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const a = nfseDialog.atend;
     if (!a || !emitenteId || !a.paciente_id) return;
     setNfseEmitting(true);
@@ -660,24 +720,33 @@ function AtendimentosPage() {
         },
         valorBase: valor,
       });
-      if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      if (!tomador) {
+        setNfseEmitting(false);
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const parcial = aplicarValorParcial(valor, tomador);
       // Sempre compõe a discriminação com procedimento + paciente + data de
       // referência, mesmo se o usuário deixou o campo do diálogo em branco.
       const dataRef = a.agendamento_inicio ?? a.data;
-      const descBase = (nfseDesc && nfseDesc.trim())
-        ? nfseDesc.trim()
-        : montarDiscriminacaoNfse({
-            procedimento: a.procedimento,
-            pacienteNome: p.nome,
-            dataReferencia: dataRef,
-          });
+      const descBase =
+        nfseDesc && nfseDesc.trim()
+          ? nfseDesc.trim()
+          : montarDiscriminacaoNfse({
+              procedimento: a.procedimento,
+              pacienteNome: p.nome,
+              dataReferencia: dataRef,
+            });
       const descComDep = tomador.dependenteAtendido
         ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : descBase;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
-      if (!descFinal) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      if (!descFinal) {
+        setNfseEmitting(false);
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const res = await emitirNfseFn({
         data: {
           emitenteId,
@@ -766,7 +835,10 @@ function AtendimentosPage() {
   };
 
   const emitirLaudo = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!laudoTarget) return;
     if (!laudoForm.medico_laudador_id) {
       toast.error("Selecione o médico laudador");
@@ -824,14 +896,17 @@ function AtendimentosPage() {
   };
 
   const desvincularLaudo = async (a: Atend) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (
-      !await confirmDialog(
+      !(await confirmDialog(
         "Desvincular o médico laudador deste atendimento?\n\n" +
           "• O laudo voltará ao status 'Pendente'.\n" +
           "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
           "• Você poderá vincular outro médico depois clicando em 'Vincular'.",
-      )
+      ))
     )
       return;
     const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
@@ -863,7 +938,10 @@ function AtendimentosPage() {
 
   const vincularLaudoLote = async () => {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!laudoLoteLaudadorId) {
       toast.error("Selecione o médico laudador");
       return;
@@ -939,7 +1017,9 @@ function AtendimentosPage() {
       if (erros.length) partes.push(`${erros.length} com erro`);
       toast.success(partes.join(" • "));
     } else if (semRegra.length) {
-      toast.error(`Nenhum vinculado — ${semRegra.length} sem regra de repasse cadastrada para este laudador.`);
+      toast.error(
+        `Nenhum vinculado — ${semRegra.length} sem regra de repasse cadastrada para este laudador.`,
+      );
     } else if (erros.length) {
       toast.error(`Falha ao vincular: ${erros[0]}`);
     }
@@ -1099,7 +1179,10 @@ function AtendimentosPage() {
           if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
             return { total: base, repasse: Math.min(Number(med.valor_repasse_padrao), base) };
           }
-          return { total: base, repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2) };
+          return {
+            total: base,
+            repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
+          };
         }
         return { total: base, repasse: 0 };
       }
@@ -1196,7 +1279,12 @@ function AtendimentosPage() {
         .gte("data", fIni)
         .lte("data", fFim);
     const fetchAllPaged = async <T,>(
-      builder: () => { order: (col: string, opts: { ascending: boolean }) => { range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }> } },
+      builder: () => {
+        order: (
+          col: string,
+          opts: { ascending: boolean },
+        ) => { range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }> };
+      },
     ): Promise<{ data: T[]; error: unknown }> => {
       const acc: T[] = [];
       for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -1261,23 +1349,20 @@ function AtendimentosPage() {
         .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
         .filter((x): x is string => !!x),
     );
-    const manuaisRaw = (mr.data ?? []).filter(
-      (r: { lancamento_id?: string | null }) => {
-        if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
-        if (r.lancamento_id && lancamentosEspelhoAgenda.has(r.lancamento_id)) return false;
-        // Sem lancamento_id: descarta se algum lançamento carregado apontar
-        // para um agendamento que também aparece no lote manual (mesma data,
-        // procedimento e paciente). O DB já tem trigger que impede este caso
-        // em novos inserts; aqui blindamos registros históricos.
-        if (r.lancamento_id && lancAgendIds.size > 0) {
-          const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
-            | { agendamento_id?: string | null }
-            | undefined;
-          if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
-        }
-        return true;
-      },
-    );
+    const manuaisRaw = (mr.data ?? []).filter((r: { lancamento_id?: string | null }) => {
+      if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+      if (r.lancamento_id && lancamentosEspelhoAgenda.has(r.lancamento_id)) return false;
+      // Sem lancamento_id: descarta se algum lançamento carregado apontar
+      // para um agendamento que também aparece no lote manual (mesma data,
+      // procedimento e paciente). O DB já tem trigger que impede este caso
+      // em novos inserts; aqui blindamos registros históricos.
+      if (r.lancamento_id && lancAgendIds.size > 0) {
+        const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
+          { agendamento_id?: string | null } | undefined;
+        if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
+      }
+      return true;
+    });
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
@@ -1346,14 +1431,16 @@ function AtendimentosPage() {
         proc,
         r.descricao ?? null,
         resolverModalidade({
-          modalidadeLancamento: (r as { convenio_modalidade?: string | null }).convenio_modalidade ?? null,
+          modalidadeLancamento:
+            (r as { convenio_modalidade?: string | null }).convenio_modalidade ?? null,
           pacienteId: pacIdEff,
           mapa: mapaConvenio,
         }),
       );
       // Override manual do repasse (editado na tela). Quando presente,
       // sobrescreve o cálculo por regra.
-      const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
+      const overrideRaw = (r as { valor_medico_override?: number | string | null })
+        .valor_medico_override;
       const override =
         overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
           ? Number(overrideRaw)
@@ -1388,7 +1475,8 @@ function AtendimentosPage() {
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
-    const agendFiltered = fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
+    const agendFiltered =
+      fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
     let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
@@ -1409,7 +1497,9 @@ function AtendimentosPage() {
     const medicosReq = Promise.resolve(
       supabase
         .from("medicos")
-        .select("id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
+        .select(
+          "id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
+        )
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .order("nome"),
@@ -1432,7 +1522,13 @@ function AtendimentosPage() {
     // — mesma razão do medico_convenios (teto de 1000 do PostgREST) — mas a
     // paginação em si não depende de nenhuma das outras requisições.
     const procsReq = (async () => {
-      const procs: Array<{ nome: string | null; valor_padrao?: number | string | null; valor_dinheiro?: number | string | null; tipo?: string | null; requer_laudo?: boolean | null }> = [];
+      const procs: Array<{
+        nome: string | null;
+        valor_padrao?: number | string | null;
+        valor_dinheiro?: number | string | null;
+        tipo?: string | null;
+        requer_laudo?: boolean | null;
+      }> = [];
       const CHUNK = 1000;
       const MAX = 50000;
       let offset = 0;
@@ -1494,7 +1590,11 @@ function AtendimentosPage() {
 
     const repMap = new Map<
       string,
-      { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
+      {
+        tipo_repasse: string;
+        percentual_repasse_padrao: number | null;
+        valor_repasse_padrao: number | null;
+      }
     >();
     for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
     const merged: Medico[] = ((m.data ?? []) as any[]).map((x) => {
@@ -1590,7 +1690,10 @@ function AtendimentosPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -1618,8 +1721,11 @@ function AtendimentosPage() {
   };
 
   const remove = async (a: Atend) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!await confirmDialog("Excluir atendimento?")) return;
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!(await confirmDialog("Excluir atendimento?"))) return;
 
     try {
       let error;
@@ -1647,11 +1753,14 @@ function AtendimentosPage() {
   };
 
   const darBaixa = async (a: Atend) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (
-      !await confirmDialog(
+      !(await confirmDialog(
         "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
-      )
+      ))
     )
       return;
     try {
@@ -1695,13 +1804,15 @@ function AtendimentosPage() {
       return;
     }
     if (a.repasse_pago) {
-      toast.error("Repasse já foi pago — estorne o pagamento do repasse antes de desfazer a baixa.");
+      toast.error(
+        "Repasse já foi pago — estorne o pagamento do repasse antes de desfazer a baixa.",
+      );
       return;
     }
     if (
-      !await confirmDialog(
+      !(await confirmDialog(
         "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado'. O pagamento do paciente (se houver) permanece intacto no caixa — só o lançamento-sombra de R$ 0,00 é removido.",
-      )
+      ))
     )
       return;
     try {
@@ -1776,13 +1887,16 @@ function AtendimentosPage() {
   };
 
   const darBaixaLote = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
     if (alvos.length === 0) return;
     if (
-      !await confirmDialog(
+      !(await confirmDialog(
         `Confirmar baixa de ${alvos.length} atendimento(s)?\n\nOs médicos serão marcados como tendo atendido esses pacientes e os repasses ficarão liberados para pagamento.`,
-      )
+      ))
     )
       return;
     try {
@@ -1829,9 +1943,9 @@ function AtendimentosPage() {
     const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
     if (alvos.length === 0) return;
     if (
-      !await confirmDialog(
+      !(await confirmDialog(
         `Desfazer a baixa de ${alvos.length} atendimento(s)?\n\nOs atendimentos voltam para 'Confirmado'. Os pagamentos dos pacientes permanecem intactos no caixa — apenas lançamentos-sombra de R$ 0,00 são removidos.`,
-      )
+      ))
     )
       return;
     try {
@@ -1841,7 +1955,7 @@ function AtendimentosPage() {
       const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
 
       // Coleta lançamentos-sombra (R$ 0,00) para apagar.
-      let sombraIds: string[] = [];
+      const sombraIds: string[] = [];
       if (agIds.length) {
         const { data: lancs } = await supabase
           .from("fin_lancamentos")
@@ -1915,7 +2029,8 @@ function AtendimentosPage() {
     const base = !q
       ? items
       : items.filter((a) => {
-          const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+          const nome =
+            (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
           return norm(nome).includes(q);
         });
     const baseTipo =
@@ -1931,7 +2046,9 @@ function AtendimentosPage() {
           ? baseTipo.filter((a) => a.laudo_status === "emitido")
           : baseTipo.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
-      norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
+      norm(
+        ((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim(),
+      );
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
     const arr = [...baseLaudo];
     switch (fOrdem) {
@@ -1998,7 +2115,8 @@ function AtendimentosPage() {
     selectedLaudoElegiveis,
   } = useMemo(() => {
     const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
-    const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
+    const allSelected =
+      selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
     const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
     const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
     const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
@@ -2035,7 +2153,8 @@ function AtendimentosPage() {
   };
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
-  const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const misturado =
+    selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
   const reimprimirSelecionados = () => {
     if (!podeReimprimir) return;
     abrirSegundaViaLote(selectedPagos);
@@ -2046,13 +2165,21 @@ function AtendimentosPage() {
       toast.info("Selecione ao menos um atendimento.");
       return;
     }
-    setPayForm({ data: hoje, conta_id: contas[0]?.id ?? "", forma_pagamento: "", valor_manual: "" });
+    setPayForm({
+      data: hoje,
+      conta_id: contas[0]?.id ?? "",
+      forma_pagamento: "",
+      valor_manual: "",
+    });
     setPayOpen(true);
   };
 
   const confirmarPagamento = async () => {
     if (!clinicaAtual || !selectedItems.length) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     setPayingNow(true);
     try {
       // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
@@ -2089,7 +2216,9 @@ function AtendimentosPage() {
         }
       }
       // Mesma validação para atendimentos manuais (fin_atendimentos)
-      const manualBloq = selectedItems.filter((x) => x.origem === "manual" && x.status !== "realizado");
+      const manualBloq = selectedItems.filter(
+        (x) => x.origem === "manual" && x.status !== "realizado",
+      );
       if (manualBloq.length) {
         toast.error(
           `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) manual(is) não estão com status 'realizado'.`,
@@ -2110,7 +2239,9 @@ function AtendimentosPage() {
       const valorManualNum = Number((payForm.valor_manual ?? "").toString().replace(",", "."));
       const usarValorManual = valorManualNum > 0 && byMed.size === 1;
       if (valorManualNum > 0 && byMed.size > 1) {
-        toast.warning("Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.");
+        toast.warning(
+          "Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.",
+        );
       }
       for (const [medId, list] of byMed) {
         const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
@@ -2170,7 +2301,10 @@ function AtendimentosPage() {
             }
             item.valor_medico = valorItem;
             if (item.origem === "manual") {
-              await supabase.from("fin_atendimentos").update({ valor_medico: valorItem }).eq("id", item.id);
+              await supabase
+                .from("fin_atendimentos")
+                .update({ valor_medico: valorItem })
+                .eq("id", item.id);
             }
           }
         }
@@ -2194,7 +2328,11 @@ function AtendimentosPage() {
       // Sincroniza o estado local com o banco após falha para evitar que
       // o usuário tente pagar de novo achando que nada foi feito quando na
       // verdade um médico do lote já foi processado com sucesso.
-      try { await load(); } catch { /* noop */ }
+      try {
+        await load();
+      } catch {
+        /* noop */
+      }
     } finally {
       setPayingNow(false);
     }
@@ -2208,1398 +2346,1547 @@ function AtendimentosPage() {
           <TabsTrigger value="comprovantes">Comprovantes</TabsTrigger>
         </TabsList>
         <TabsContent value="atendimentos" className="space-y-3 mt-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
-          <p className="text-xs text-muted-foreground">
-            {isMedicoOnly
-              ? "Seus atendimentos e o repasse devido por serviço"
-              : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!filteredItems.length) {
-                toast.info("Sem dados para exportar.");
-                return;
-              }
-              exportToExcel(
-                filteredItems.map((a) => ({
-                  data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
-                  medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
-                  paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "") : "",
-                  procedimento: a.procedimento ?? "",
-                  valor_total: Number(a.valor_total).toFixed(2),
-                  valor_medico: Number(a.valor_medico).toFixed(2),
-                  valor_clinica: Number(a.valor_clinica).toFixed(2),
-                  forma_pagamento: a.forma_pagamento ?? "",
-                  status: a.status,
-                })),
-                `atendimentos-${new Date().toISOString().slice(0, 10)}`,
-                isMedicoOnly
-                  ? [
-                      { key: "data", label: "Data" },
-                      { key: "paciente", label: "Paciente" },
-                      { key: "procedimento", label: "Serviço" },
-                      { key: "valor_medico", label: "Repasse (R$)" },
-                      { key: "status", label: "Status" },
-                    ]
-                  : [
-                      { key: "data", label: "Data" },
-                      { key: "medico", label: "Médico" },
-                      { key: "paciente", label: "Paciente" },
-                      { key: "procedimento", label: "Serviço" },
-                      { key: "valor_total", label: "Valor total (R$)" },
-                      { key: "valor_medico", label: "Repasse médico (R$)" },
-                      { key: "valor_clinica", label: "Clínica (R$)" },
-                      { key: "forma_pagamento", label: "Forma pagamento" },
-                      { key: "status", label: "Status" },
-                    ],
-              );
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar Excel
-          </Button>
-          {!isMedicoOnly && podeEscrever && (
-            <Button
-              onClick={openPay}
-              disabled={!podePagar}
-              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
-            >
-              <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
-            </Button>
-          )}
-          {!isMedicoOnly && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <MoreHorizontal className="h-4 w-4 mr-2" />
-                  Opções
-                  {selectedItems.length ? ` (${selectedItems.length})` : ""}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
+              <p className="text-xs text-muted-foreground">
+                {isMedicoOnly
+                  ? "Seus atendimentos e o repasse devido por serviço"
+                  : "Serviços realizados com repasse automático (inclui pagamentos da agenda)"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!filteredItems.length) {
+                    toast.info("Sem dados para exportar.");
+                    return;
+                  }
+                  exportToExcel(
+                    filteredItems.map((a) => ({
+                      data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
+                      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "") : "",
+                      procedimento: a.procedimento ?? "",
+                      valor_total: Number(a.valor_total).toFixed(2),
+                      valor_medico: Number(a.valor_medico).toFixed(2),
+                      valor_clinica: Number(a.valor_clinica).toFixed(2),
+                      forma_pagamento: a.forma_pagamento ?? "",
+                      status: a.status,
+                    })),
+                    `atendimentos-${new Date().toISOString().slice(0, 10)}`,
+                    isMedicoOnly
+                      ? [
+                          { key: "data", label: "Data" },
+                          { key: "paciente", label: "Paciente" },
+                          { key: "procedimento", label: "Serviço" },
+                          { key: "valor_medico", label: "Repasse (R$)" },
+                          { key: "status", label: "Status" },
+                        ]
+                      : [
+                          { key: "data", label: "Data" },
+                          { key: "medico", label: "Médico" },
+                          { key: "paciente", label: "Paciente" },
+                          { key: "procedimento", label: "Serviço" },
+                          { key: "valor_total", label: "Valor total (R$)" },
+                          { key: "valor_medico", label: "Repasse médico (R$)" },
+                          { key: "valor_clinica", label: "Clínica (R$)" },
+                          { key: "forma_pagamento", label: "Forma pagamento" },
+                          { key: "status", label: "Status" },
+                        ],
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+              {!isMedicoOnly && podeEscrever && (
+                <Button
+                  onClick={openPay}
+                  disabled={!podePagar}
+                  title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+                >
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Pagar repasse
+                  {selectedNaoPagos.length
+                    ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})`
+                    : ""}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>
-                  {selectedItems.length
-                    ? `${selectedItems.length} atendimento(s) selecionado(s)`
-                    : "Selecione atendimentos na lista"}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedNaoBaixados.length > 0) darBaixaLote();
-                  }}
+              )}
+              {!isMedicoOnly && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <MoreHorizontal className="h-4 w-4 mr-2" />
+                      Opções
+                      {selectedItems.length ? ` (${selectedItems.length})` : ""}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>
+                      {selectedItems.length
+                        ? `${selectedItems.length} atendimento(s) selecionado(s)`
+                        : "Selecione atendimentos na lista"}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedNaoBaixados.length > 0) darBaixaLote();
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                      Dar baixa
+                      {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedBaixados.length > 0) desfazerBaixaLote();
+                      }}
+                    >
+                      <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                      Desfazer baixa
+                      {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                      }}
+                    >
+                      <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                      Vincular vários laudos
+                      {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <Dialog open={open} onOpenChange={setOpen}>
+                {!isMedicoOnly && podeEscrever && (
+                  <DialogTrigger asChild>
+                    <Button onClick={openNew} disabled={!clinicaAtual}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo atendimento
+                    </Button>
+                  </DialogTrigger>
+                )}
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={submit} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Data</Label>
+                        <DateInputBR
+                          required
+                          value={form.data}
+                          onChange={(e) => setForm({ ...form, data: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={form.status}
+                          onValueChange={(v) => setForm({ ...form, status: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="realizado">Realizado</SelectItem>
+                            <SelectItem value="agendado">Agendado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Médico</Label>
+                      <Select
+                        value={form.medico_id || "none"}
+                        onValueChange={(v) =>
+                          setForm({ ...form, medico_id: v === "none" ? "" : v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          {medicos.map((m) => (
+                            <SelectItem key={m.id} value={m.id} className="uppercase">
+                              {m.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Paciente</Label>
+                      <Select
+                        value={form.paciente_id || "none"}
+                        onValueChange={(v) =>
+                          setForm({ ...form, paciente_id: v === "none" ? "" : v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          {pacientes.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Serviço</Label>
+                      <Input
+                        value={form.procedimento}
+                        onChange={(e) => setForm({ ...form, procedimento: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Valor total *</Label>
+                        <CurrencyInput
+                          value={form.valor_total}
+                          onChange={(v) => setForm({ ...form, valor_total: v })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Forma de pagamento</Label>
+                        <Input
+                          value={form.forma_pagamento}
+                          onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="bg-muted rounded-md p-3 text-sm flex justify-between">
+                      <span>
+                        Repasse médico: <strong>{fmt(calc.medico)}</strong>
+                      </span>
+                      <span>
+                        Clínica: <strong>{fmt(calc.clinica)}</strong>
+                      </span>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={saving}>
+                        {saving ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* Filtros */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium flex items-center gap-1">
+                    <Filter className="h-3.5 w-3.5" />
+                    Médico
+                  </Label>
+                  <MedicoCombobox
+                    value={fMedico}
+                    onChange={(v) => {
+                      if (!isMedicoOnly) setFMedico(v);
+                    }}
+                    medicos={
+                      isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Paciente</Label>
+                  <Input
+                    className="h-9"
+                    placeholder="Buscar por nome..."
+                    value={fPaciente}
+                    onChange={(e) => setFPaciente(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">De</Label>
+                  <DateInputBR
+                    className="h-9"
+                    value={fIni}
+                    onChange={(e) => setFIni(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Até</Label>
+                  <DateInputBR
+                    className="h-9"
+                    value={fFim}
+                    onChange={(e) => setFFim(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Status repasse</Label>
+                  <Select
+                    value={fStatus}
+                    onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aberto">A receber</SelectItem>
+                      <SelectItem value="pago">Pagos</SelectItem>
+                      <SelectItem value="todos">Todos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Tipo</Label>
+                  <Select
+                    value={fTipo}
+                    onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
+                      <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    Laudo
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados ·{" "}
+                      {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                    </span>
+                  </Label>
+                  <Select
+                    value={fLaudo}
+                    onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="baixado">Baixados</SelectItem>
+                      <SelectItem value="nao_baixado">Não baixados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Ordenar por</Label>
+                  <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="data_desc">Data (mais recente)</SelectItem>
+                      <SelectItem value="data_asc">Data (mais antiga)</SelectItem>
+                      <SelectItem value="gr">Nº da GR (agenda)</SelectItem>
+                      <SelectItem value="paciente_az">Paciente (A-Z)</SelectItem>
+                      <SelectItem value="paciente_za">Paciente (Z-A)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Cards de valores - mais compactos e próximos */}
+                {isMedicoOnly ? (
+                  <div className="flex gap-1.5 min-w-[140px]">
+                    <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
+                      <div>
+                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                          A receber
+                        </div>
+                        <div className="text-xs font-bold text-primary leading-tight">
+                          {fmt(totais.aReceber)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
+                      <div>
+                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                          Recebido
+                        </div>
+                        <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-1.5 min-w-[140px]">
+                    <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
+                      <div>
+                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                          A pagar
+                        </div>
+                        <div className="text-xs font-bold text-amber-600 leading-tight">
+                          {fmt(totais.aReceber)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
+                      <div>
+                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                          Pago
+                        </div>
+                        <div className="text-xs font-bold text-emerald-600 leading-tight">
+                          {fmt(totais.pago)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-xl bg-card">
+            <div className="p-0">
+              {loading ? (
+                <ListSkeleton
+                  rows={7}
+                  fallback={
+                    <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+                  }
+                />
+              ) : filteredItems.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
+                  Nenhum atendimento no período/filtro selecionado.
+                </div>
+              ) : (
+                <Table
+                  containerClassName="max-h-[70vh] scroll-slim rounded-xl border-0"
+                  className="max-lg:table max-lg:overflow-visible border-separate border-spacing-0"
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
-                  Dar baixa
-                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedBaixados.length > 0) desfazerBaixaLote();
-                  }}
-                >
-                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
-                  Desfazer baixa
-                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
-                  }}
-                >
-                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
-                  Vincular vários laudos
-                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <Dialog open={open} onOpenChange={setOpen}>
-            {!isMedicoOnly && podeEscrever && (
-              <DialogTrigger asChild>
-                <Button onClick={openNew} disabled={!clinicaAtual}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo atendimento
+                  <TableHeader className="sticky top-0 z-20">
+                    <TableRow className="bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 border-0 [&>th]:border-b [&>th]:border-border/60 [&>th]:h-9 [&>th]:text-muted-foreground [&>th]:uppercase [&>th]:tracking-wide hover:bg-background/90">
+                      {!isMedicoOnly && (
+                        <TableHead className="w-8 px-2">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={toggleAll}
+                            aria-label="Selecionar todos"
+                          />
+                        </TableHead>
+                      )}
+                      <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">
+                        Ficha
+                      </TableHead>
+                      <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">
+                        Data
+                      </TableHead>
+                      <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
+                      <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
+                      <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
+                      {!isMedicoOnly && (
+                        <TableHead className="text-right text-[11px] font-medium px-2">
+                          Total
+                        </TableHead>
+                      )}
+                      <TableHead className="text-right text-[11px] font-medium px-2">
+                        {isMedicoOnly ? "Repasse" : "Médico"}
+                      </TableHead>
+                      {!isMedicoOnly && (
+                        <TableHead className="text-right text-[11px] font-medium px-2">
+                          Clínica
+                        </TableHead>
+                      )}
+                      <TableHead className="text-center text-[11px] font-medium px-2">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-center text-[11px] font-medium px-2">
+                        Pgto
+                      </TableHead>
+                      <TableHead className="text-center text-[11px] font-medium px-2">
+                        Laudo
+                      </TableHead>
+                      {!isMedicoOnly && (
+                        <TableHead className="text-center text-[11px] font-medium px-2">
+                          Ações
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.map((a, idx) => {
+                      const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
+                      const pacienteNome =
+                        (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
+                        a.paciente_nome_extra ??
+                        "—";
+                      const procedimentoNome = a.procedimento ?? "—";
+
+                      // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
+                      const isSelected = sel.has(`${a.origem}:${a.id}`);
+                      const baixaPendente = !a.repasse_pago && !isAtendido(a);
+                      // Atendimento externo (faturado em outra clínica) — destaque
+                      // vermelho bem claro para diferenciar do fluxo normal.
+                      const ehExterno =
+                        (a.forma_pagamento ?? "").trim().toLowerCase() === "externo";
+                      const rowBg =
+                        isSelected && baixaPendente
+                          ? "bg-amber-50 dark:bg-amber-950/30"
+                          : ehExterno
+                            ? "bg-rose-50 dark:bg-rose-950/30"
+                            : idx % 2 === 0
+                              ? "bg-background"
+                              : "bg-slate-50 dark:bg-slate-900/40";
+
+                      return (
+                        <TableRow
+                          key={`${a.origem}:${a.id}`}
+                          className={cn(
+                            "border-0 transition-colors duration-150 hover:bg-muted/40 [&>td]:border-b [&>td]:border-border/40 [&>td]:py-2.5",
+                            rowBg,
+                          )}
+                        >
+                          {!isMedicoOnly && (
+                            <TableCell className="px-2">
+                              {(a.valor_medico ?? 0) > 0 ? (
+                                <Checkbox
+                                  checked={sel.has(`${a.origem}:${a.id}`)}
+                                  onCheckedChange={() => toggleOne(a)}
+                                  aria-label={
+                                    a.repasse_pago ? "Selecionar para 2ª via" : "Selecionar"
+                                  }
+                                  title={
+                                    a.repasse_pago ? "Selecionar para reimprimir 2ª via" : undefined
+                                  }
+                                  className="h-4 w-4"
+                                />
+                              ) : (
+                                <span
+                                  title="Sem valor de repasse cadastrado para este médico/procedimento"
+                                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                                >
+                                  Sem repasse
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
+                            {String(idx + 1).padStart(3, "0")}
+                          </TableCell>
+                          <TableCell className="text-xs whitespace-nowrap px-2">
+                            {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "2-digit",
+                            })}
+                          </TableCell>
+
+                          {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
+                          <TableCell
+                            className="text-xs max-w-[90px] truncate px-2"
+                            title={medicoNome}
+                          >
+                            {medicoNome}
+                          </TableCell>
+                          <TableCell
+                            className="text-xs font-medium max-w-[190px] truncate px-2"
+                            title={pacienteNome}
+                          >
+                            {pacienteNome}
+                          </TableCell>
+                          <TableCell
+                            className="text-xs text-muted-foreground max-w-[160px] truncate px-2"
+                            title={procedimentoNome}
+                          >
+                            {procedimentoNome}
+                          </TableCell>
+
+                          {!isMedicoOnly && (
+                            <TableCell className="text-xs text-right font-medium whitespace-nowrap px-2">
+                              {fmt(Number(a.valor_total))}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-xs text-right font-semibold text-primary whitespace-nowrap px-2">
+                            {fmt(Number(a.valor_medico))}
+                          </TableCell>
+                          {!isMedicoOnly && (
+                            <TableCell className="text-xs text-right text-muted-foreground whitespace-nowrap px-2">
+                              {fmt(Number(a.valor_clinica))}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-center px-2">
+                            {a.repasse_pago ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-nowrap px-1.5 py-0"
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                Pago
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-nowrap px-1.5 py-0"
+                              >
+                                <Clock className="h-3 w-3 mr-0.5 inline" />A receber
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center px-2">
+                            <div className="flex justify-center">
+                              <FormaPagamentoIcon forma={a.forma_pagamento} />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center px-2">
+                            {(() => {
+                              const procKey = a.procedimento ? norm(a.procedimento) : "";
+                              const exigeLaudo = procKey && procLaudo.get(procKey);
+                              const laudadorNome = a.medico_laudador_id
+                                ? (medMap.get(a.medico_laudador_id) ?? null)
+                                : null;
+                              if (a.laudo_status === "emitido")
+                                return podeEscrever ? (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                      title={
+                                        laudadorNome
+                                          ? `Laudador: ${laudadorNome}. Clique para desvincular.`
+                                          : "Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                      }
+                                      onClick={() => desvincularLaudo(a)}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                      Vinculado
+                                    </Button>
+                                    {laudadorNome && (
+                                      <span
+                                        className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                        title={laudadorNome}
+                                      >
+                                        {laudadorNome}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                      Vinculado
+                                    </Badge>
+                                    {laudadorNome && (
+                                      <span
+                                        className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                        title={laudadorNome}
+                                      >
+                                        {laudadorNome}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              if (!exigeLaudo)
+                                return <span className="text-muted-foreground text-[10px]">—</span>;
+                              if (!podeEstornar || !podeEscrever)
+                                return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2"
+                                  onClick={() => openLaudo(a)}
+                                >
+                                  Vincular
+                                </Button>
+                              );
+                            })()}
+                          </TableCell>
+
+                          {/* Célula de Ações Fixa na Direita com sombra lateral */}
+                          {!isMedicoOnly && (
+                            <TableCell
+                              className={cn(
+                                "text-right px-2 sticky right-0 z-10 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]",
+                                rowBg, // Usa a mesma cor zebrada da linha para o fundo do bloco fixo
+                              )}
+                            >
+                              {a.origem === "agenda" ? (
+                                <div className="flex items-center justify-end gap-0.5">
+                                  <span className="text-[9px] text-muted-foreground uppercase mr-1">
+                                    Agenda
+                                  </span>
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Emitir NFS-e"
+                                      onClick={() => openEmitNfse(a)}
+                                      disabled={!a.paciente_id}
+                                    >
+                                      <Send className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {a.repasse_pago && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Imprimir comprovante de repasse"
+                                      onClick={() => abrirComprovanteDoItem(a)}
+                                    >
+                                      <Printer className="h-3.5 w-3.5 text-primary" />
+                                    </Button>
+                                  )}
+                                  {a.repasse_pago || a.agendamento_status === "realizado" ? (
+                                    <Button
+                                      size="sm"
+                                      disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
+                                      className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                      title={
+                                        a.repasse_pago
+                                          ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                          : podeEstornar
+                                            ? "Clique para desfazer a baixa"
+                                            : "Repasse já baixado"
+                                      }
+                                      onClick={() => desfazerBaixa(a)}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" /> Baixado
+                                    </Button>
+                                  ) : (
+                                    podeEscrever && (
+                                      <Button
+                                        size="sm"
+                                        className={cn(
+                                          "h-6 px-2 text-[10px] gap-1 border",
+                                          isSelected
+                                            ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                            : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                        )}
+                                        title="Dá baixa (marcar como realizado e liberar repasse)"
+                                        onClick={() => darBaixa(a)}
+                                      >
+                                        {isSelected ? (
+                                          <CheckCircle2 className="h-3 w-3" />
+                                        ) : (
+                                          <Clock className="h-3 w-3" />
+                                        )}
+                                        Baixar
+                                      </Button>
+                                    )
+                                  )}
+                                  {/* Botão de excluir para agenda */}
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        "h-7 w-7",
+                                        a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                      )}
+                                      title={
+                                        a.repasse_pago
+                                          ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                          : "Editar repasse médico deste atendimento"
+                                      }
+                                      onClick={() => abrirEditRepasse(a)}
+                                    >
+                                      <Wallet className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
+                                      onClick={() => remove(a)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    title="Ver histórico"
+                                    onClick={() => setHistoricoAtend(a)}
+                                  >
+                                    <History className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-0.5">
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Emitir NFS-e"
+                                      onClick={() => openEmitNfse(a)}
+                                      disabled={!a.paciente_id}
+                                    >
+                                      <Send className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => openEdit(a)}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {a.repasse_pago && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Imprimir comprovante de repasse"
+                                      onClick={() => abrirComprovanteDoItem(a)}
+                                    >
+                                      <Printer className="h-3.5 w-3.5 text-primary" />
+                                    </Button>
+                                  )}
+                                  {a.repasse_pago || a.status === "realizado" ? (
+                                    <Button
+                                      size="sm"
+                                      disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
+                                      className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                      title={
+                                        a.repasse_pago
+                                          ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                          : podeEstornar
+                                            ? "Clique para desfazer a baixa"
+                                            : "Repasse já baixado"
+                                      }
+                                      onClick={() => desfazerBaixa(a)}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" /> Baixado
+                                    </Button>
+                                  ) : (
+                                    podeEscrever && (
+                                      <Button
+                                        size="sm"
+                                        className={cn(
+                                          "h-6 px-2 text-[10px] gap-1 border",
+                                          isSelected
+                                            ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                            : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                        )}
+                                        title="Dá baixa (marcar como realizado e liberar repasse)"
+                                        onClick={() => darBaixa(a)}
+                                      >
+                                        {isSelected ? (
+                                          <CheckCircle2 className="h-3 w-3" />
+                                        ) : (
+                                          <Clock className="h-3 w-3" />
+                                        )}
+                                        Baixar
+                                      </Button>
+                                    )
+                                  )}
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        "h-7 w-7",
+                                        a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                      )}
+                                      title={
+                                        a.repasse_pago
+                                          ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                          : "Editar repasse médico deste atendimento"
+                                      }
+                                      onClick={() => abrirEditRepasse(a)}
+                                    >
+                                      <Wallet className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {podeEscrever && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
+                                      onClick={() => remove(a)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    title="Ver histórico"
+                                    onClick={() => setHistoricoAtend(a)}
+                                  >
+                                    <History className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+
+          {/* Barra de ações do rodapé: repete botões quando houver seleção */}
+          {!isMedicoOnly && selectedItems.length > 0 && (
+            <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+              <div className="text-sm">
+                <b>{selectedItems.length}</b> selecionado(s)
+                {selectedPagos.length > 0 && (
+                  <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
+                )}
+                {selectedNaoPagos.length > 0 && (
+                  <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
+                )}
+                <span className="ml-2 text-muted-foreground">— total {fmt(selectedTotal)}</span>
+                {misturado && (
+                  <span className="ml-2 text-xs text-rose-700">
+                    Separe pagos e não pagos para agir.
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {podeEscrever && (
+                  <Button
+                    size="sm"
+                    onClick={openPay}
+                    disabled={!podePagar}
+                    title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <MoreHorizontal className="h-4 w-4 mr-2" />
+                      Opções
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuItem
+                      disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedNaoBaixados.length > 0) darBaixaLote();
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                      Dar baixa
+                      {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedBaixados.length > 0) desfazerBaixaLote();
+                      }}
+                    >
+                      <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                      Desfazer baixa
+                      {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                      }}
+                    >
+                      <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                      Vincular vários laudos
+                      {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
+                  Limpar
                 </Button>
-              </DialogTrigger>
-            )}
-            <DialogContent className="max-w-lg">
+              </div>
+            </div>
+          )}
+
+          {/* Diálogo pagar repasse */}
+          <Dialog open={payOpen} onOpenChange={setPayOpen}>
+            <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>{editing ? "Editar" : "Novo"} atendimento</DialogTitle>
+                <DialogTitle>Pagar repasse médico</DialogTitle>
               </DialogHeader>
-              <form onSubmit={submit} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Data</Label>
-                    <DateInputBR
-                      required
-                      value={form.data}
-                      onChange={(e) => setForm({ ...form, data: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="realizado">Realizado</SelectItem>
-                        <SelectItem value="agendado">Agendado</SelectItem>
-                        <SelectItem value="cancelado">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-3">
+                <div className="rounded-md border bg-muted/40 p-3 text-sm flex justify-between">
+                  <span>{selectedItems.length} atendimento(s)</span>
+                  <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
                 </div>
                 <div className="space-y-2">
-                  <Label>Médico</Label>
+                  <Label>Valor do repasse (opcional)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={`Padrão: ${fmt(selectedTotal)}`}
+                    value={payForm.valor_manual}
+                    onChange={(e) => setPayForm({ ...payForm, valor_manual: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Deixe em branco para usar o valor calculado. Para alterar manualmente, selecione
+                    atendimentos de apenas um médico.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Data do pagamento</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !payForm.data && "text-muted-foreground",
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {payForm.data
+                          ? format(parse(payForm.data, "yyyy-MM-dd", new Date()), "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })
+                          : "Selecionar data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        locale={ptBR}
+                        selected={
+                          payForm.data ? parse(payForm.data, "yyyy-MM-dd", new Date()) : undefined
+                        }
+                        onSelect={(d) =>
+                          d && setPayForm({ ...payForm, data: format(d, "yyyy-MM-dd") })
+                        }
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Use uma data anterior para lançar pagamentos retroativos.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Conta</Label>
                   <Select
-                    value={form.medico_id || "none"}
-                    onValueChange={(v) => setForm({ ...form, medico_id: v === "none" ? "" : v })}
+                    value={payForm.conta_id || "none"}
+                    onValueChange={(v) =>
+                      setPayForm({ ...payForm, conta_id: v === "none" ? "" : v })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="—" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">—</SelectItem>
-                      {medicos.map((m) => (
-                        <SelectItem key={m.id} value={m.id} className="uppercase">
+                      {contas.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Forma de pagamento</Label>
+                  <Select
+                    value={payForm.forma_pagamento || undefined}
+                    onValueChange={(v) => setPayForm({ ...payForm, forma_pagamento: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pix">Pix</SelectItem>
+                      <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="Transferência">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPayOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={confirmarPagamento} disabled={payingNow}>
+                  {payingNow ? "Registrando..." : "Confirmar pagamento"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Diálogo: comprovante de repasse (imprimível) */}
+          <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader className="no-print">
+                <DialogTitle>
+                  Comprovante de pagamento de repasse
+                  {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+                </DialogTitle>
+              </DialogHeader>
+              {comprovantes.length > 0 && (
+                <div
+                  ref={printAreaRef}
+                  className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible"
+                >
+                  {comprovantes.map((comprovante, blocoIdx) => (
+                    <div
+                      key={blocoIdx}
+                      className={cn(
+                        "comprovante-bloco",
+                        blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
+                      )}
+                    >
+                      {comprovante.reimpressao && (
+                        <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
+                          <div className="text-xl font-extrabold tracking-wide uppercase">
+                            Segunda via — Reimpressão de comprovante
+                          </div>
+                          <div className="text-sm mt-1">
+                            Pagamento realizado em{" "}
+                            <b>
+                              {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString(
+                                "pt-BR",
+                              )}
+                              {comprovante.horaPagamento
+                                ? ` às ${comprovante.horaPagamento}`
+                                : " (horário não registrado)"}
+                            </b>
+                            {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
+                              <span className="ml-1">
+                                (contém pagamentos de {comprovante.multiplasDatas} datas)
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-xs mt-0.5 opacity-80">
+                            Reimpressão emitida em {comprovante.emitidoEm}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-start justify-between border-b pb-3 mb-3">
+                        <div>
+                          <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Clínica
+                          </div>
+                          <div className="text-lg font-semibold">{comprovante.clinicaNome}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-base font-semibold">
+                            Comprovante de repasse médico
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Emitido em {comprovante.emitidoEm}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+                        <div>
+                          <span className="text-xs text-muted-foreground">Médico: </span>
+                          <b>{comprovante.medicoNome}</b>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">
+                            Data e hora do pagamento:{" "}
+                          </span>
+                          <b>
+                            {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString(
+                              "pt-BR",
+                            )}
+                            {comprovante.horaPagamento
+                              ? ` às ${comprovante.horaPagamento}`
+                              : " (horário não registrado)"}
+                          </b>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Forma: </span>
+                          <b>{comprovante.formaPagamento}</b>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Conta: </span>
+                          <b>{comprovante.contaNome}</b>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Atendimentos: </span>
+                          <b>{comprovante.qtd}</b>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-muted-foreground">
+                            Total pago ao médico:{" "}
+                          </span>
+                          <b className="text-base text-primary">{fmt(comprovante.total)}</b>
+                        </div>
+                      </div>
+
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/40">
+                            <th className="text-left p-2">Data</th>
+                            <th className="text-left p-2">Pago em</th>
+                            <th className="text-left p-2">Médico</th>
+                            <th className="text-left p-2">Paciente</th>
+                            <th className="text-left p-2">Serviço</th>
+                            <th className="text-right p-2">Valor pago (R$)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comprovante.itens.map((it, idx) => (
+                            <tr key={idx} className="border-b">
+                              <td className="p-2 whitespace-nowrap">
+                                {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                              </td>
+                              <td className="p-2 whitespace-nowrap">
+                                {it.pagoEm
+                                  ? `${new Date(it.pagoEm + "T00:00:00").toLocaleDateString("pt-BR")}${it.pagoHora ? ` às ${it.pagoHora}` : ""}`
+                                  : "—"}
+                              </td>
+                              <td className="p-2">{it.medico}</td>
+                              <td className="p-2">{it.paciente}</td>
+                              <td className="p-2">{it.servico}</td>
+                              <td className="p-2 text-right whitespace-nowrap">
+                                {fmt(it.valorMedico)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="font-semibold">
+                            <td className="p-2" colSpan={5}>
+                              Total
+                            </td>
+                            <td className="p-2 text-right">{fmt(comprovante.total)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+
+                      <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
+                        <div className="text-center">
+                          <div className="border-t pt-1">Assinatura do médico</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="border-t pt-1">Assinatura da clínica</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <DialogFooter className="no-print">
+                <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
+                  Fechar
+                </Button>
+                <Button variant="secondary" onClick={() => imprimirComprovante(true)}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir resumo (médico)
+                </Button>
+                <Button onClick={() => imprimirComprovante()}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Diálogo: marcar laudo emitido */}
+          <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Vincular laudo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                {laudoTarget && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Paciente:</span>{" "}
+                      {laudoTarget.paciente_nome_extra ??
+                        (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Serviço:</span>{" "}
+                      {laudoTarget.procedimento ?? "—"}
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>Médico laudador</Label>
+                  <Select
+                    value={laudoForm.medico_laudador_id || undefined}
+                    onValueChange={onChangeLaudador}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o médico..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(laudoRegras.length > 0
+                        ? laudoRegras.map((r) => ({
+                            id: r.laudador_medico_id,
+                            nome: r.laudador_nome,
+                          }))
+                        : medicos
+                      ).map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
                           {m.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {laudoRegras.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhum laudador cadastrado na aba Repasse desta agenda — informe o valor
+                      manualmente.
+                    </p>
+                  )}
+                </div>
+                {laudoForm.medico_laudador_id && (
+                  <div className="space-y-2">
+                    <Label>Valor do laudo (R$)</Label>
+                    <CurrencyInput
+                      value={laudoForm.valor_laudo}
+                      onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
+                    />
+                    {laudoSemRegra && (
+                      <p className="text-xs text-muted-foreground">
+                        Sem regra cadastrada para este laudador — informe o valor manualmente.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o
+                  laudador no valor informado.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setLaudoOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={emitirLaudo} disabled={laudoSaving}>
+                  {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Diálogo: vincular laudos em lote */}
+          <Dialog open={laudoLoteOpen} onOpenChange={setLaudoLoteOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Vincular laudos em lote</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                  <b>{selectedLaudoElegiveis.length}</b> atendimento(s) elegível(is) para vínculo de
+                  laudo.
                 </div>
                 <div className="space-y-2">
-                  <Label>Paciente</Label>
+                  <Label>Médico laudador</Label>
                   <Select
-                    value={form.paciente_id || "none"}
-                    onValueChange={(v) => setForm({ ...form, paciente_id: v === "none" ? "" : v })}
+                    value={laudoLoteLaudadorId || undefined}
+                    onValueChange={setLaudoLoteLaudadorId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="—" />
+                      <SelectValue placeholder="Selecione o médico..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">—</SelectItem>
-                      {pacientes.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome}
+                      {medicos.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O valor de cada laudo será calculado automaticamente pela regra de repasse da
+                    agenda de cada atendimento. Atendimentos sem regra para este laudador serão
+                    ignorados.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setLaudoLoteOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={vincularLaudoLote}
+                  disabled={laudoLoteSaving || !laudoLoteLaudadorId}
+                >
+                  {laudoLoteSaving
+                    ? "Vinculando..."
+                    : `Vincular (${selectedLaudoElegiveis.length})`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Diálogo: emitir NFS-e */}
+          <Dialog
+            open={nfseDialog.open}
+            onOpenChange={(o) =>
+              setNfseDialog((prev) => ({ open: o, atend: o ? prev.atend : null }))
+            }
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Emitir NFS-e</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Emitente *</Label>
+                  <Select value={emitenteId} onValueChange={setEmitenteId}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {emitentes.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                {nfseDialog.atend && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Paciente:</span>{" "}
+                      <b>
+                        {nfseDialog.atend.paciente_id
+                          ? (pacMap.get(nfseDialog.atend.paciente_id) ?? "—")
+                          : (nfseDialog.atend.paciente_nome_extra ?? "—")}
+                      </b>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Serviço:</span>{" "}
+                      {nfseDialog.atend.procedimento ?? "—"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Valor:</span>{" "}
+                      <b>{fmt(Number(nfseDialog.atend.valor_total))}</b>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label>Serviço</Label>
-                  <Input
-                    value={form.procedimento}
-                    onChange={(e) => setForm({ ...form, procedimento: e.target.value })}
+                  <Label>Descrição dos serviços *</Label>
+                  <Textarea
+                    rows={3}
+                    value={nfseDesc}
+                    onChange={(e) => setNfseDesc(e.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Valor total *</Label>
-                    <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Forma de pagamento</Label>
-                    <Input
-                      value={form.forma_pagamento}
-                      onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="bg-muted rounded-md p-3 text-sm flex justify-between">
-                  <span>
-                    Repasse médico: <strong>{fmt(calc.medico)}</strong>
-                  </span>
-                  <span>
-                    Clínica: <strong>{fmt(calc.clinica)}</strong>
-                  </span>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Salvando..." : "Salvar"}
-                  </Button>
-                </DialogFooter>
-              </form>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setNfseDialog({ open: false, atend: null })}
+                  disabled={nfseEmitting}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={doEmitNfse} disabled={nfseEmitting || !emitenteId}>
+                  {nfseEmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Emitindo...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Emitir
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          {tomadorNfseDialog}
+          {descricaoNfseDialog}
 
-      {/* Filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium flex items-center gap-1">
-                <Filter className="h-3.5 w-3.5" />
-                Médico
-              </Label>
-              <MedicoCombobox
-                value={fMedico}
-                onChange={(v) => {
-                  if (!isMedicoOnly) setFMedico(v);
-                }}
-                medicos={isMedicoOnly ? medicos.filter((m) => m.id === medicoLogadoId) : medicos}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Paciente</Label>
-              <Input
-                className="h-9"
-                placeholder="Buscar por nome..."
-                value={fPaciente}
-                onChange={(e) => setFPaciente(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">De</Label>
-              <DateInputBR className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Até</Label>
-              <DateInputBR className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Status repasse</Label>
-              <Select value={fStatus} onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aberto">A receber</SelectItem>
-                  <SelectItem value="pago">Pagos</SelectItem>
-                  <SelectItem value="todos">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Tipo</Label>
-              <Select value={fTipo} onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
-                  <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
-                Laudo
-                <span className="ml-1 font-normal text-muted-foreground">
-                  ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados · {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
-                </span>
-              </Label>
-              <Select value={fLaudo} onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="baixado">Baixados</SelectItem>
-                  <SelectItem value="nao_baixado">Não baixados</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Ordenar por</Label>
-              <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="data_desc">Data (mais recente)</SelectItem>
-                  <SelectItem value="data_asc">Data (mais antiga)</SelectItem>
-                  <SelectItem value="gr">Nº da GR (agenda)</SelectItem>
-                  <SelectItem value="paciente_az">Paciente (A-Z)</SelectItem>
-                  <SelectItem value="paciente_za">Paciente (Z-A)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Cards de valores - mais compactos e próximos */}
-            {isMedicoOnly ? (
-              <div className="flex gap-1.5 min-w-[140px]">
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
-                  <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A receber</div>
-                    <div className="text-xs font-bold text-primary leading-tight">{fmt(totais.aReceber)}</div>
+          {/* Edição pontual do repasse médico de um atendimento */}
+          <Dialog
+            open={editRepasse.open}
+            onOpenChange={(o) => setEditRepasse((s) => ({ ...s, open: o }))}
+          >
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Editar repasse médico</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
+                  {fmt(Number(editRepasse.atend?.valor_total) || 0)}
+                </div>
+                {editRepasse.atend?.repasse_pago && (
+                  <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
+                    Este repasse já foi pago. Ao salvar, a despesa vinculada (fin_lancamentos) será
+                    ajustada pela diferença para o caixa continuar batendo. Confirme com o médico
+                    antes de gravar.
                   </div>
-                </div>
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
-                  <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Recebido</div>
-                    <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-1.5 min-w-[140px]">
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
-                  <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A pagar</div>
-                    <div className="text-xs font-bold text-amber-600 leading-tight">{fmt(totais.aReceber)}</div>
-                  </div>
-                </div>
-                <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
-                  <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Pago</div>
-                    <div className="text-xs font-bold text-emerald-600 leading-tight">{fmt(totais.pago)}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="rounded-xl bg-card">
-        <div className="p-0">
-          {loading ? (
-            <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
-          ) : filteredItems.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
-              Nenhum atendimento no período/filtro selecionado.
-            </div>
-          ) : (
-            <Table
-              containerClassName="max-h-[70vh] scroll-slim rounded-xl border-0"
-              className="max-lg:table max-lg:overflow-visible border-separate border-spacing-0"
-            >
-              <TableHeader className="sticky top-0 z-20">
-                <TableRow className="bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 border-0 [&>th]:border-b [&>th]:border-border/60 [&>th]:h-9 [&>th]:text-muted-foreground [&>th]:uppercase [&>th]:tracking-wide hover:bg-background/90">
-                  {!isMedicoOnly && (
-                    <TableHead className="w-8 px-2">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                    </TableHead>
-                  )}
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>}
-                  <TableHead className="text-right text-[11px] font-medium px-2">
-                    {isMedicoOnly ? "Repasse" : "Médico"}
-                  </TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Clínica</TableHead>}
-                  <TableHead className="text-center text-[11px] font-medium px-2">Status</TableHead>
-                  <TableHead className="text-center text-[11px] font-medium px-2">Pgto</TableHead>
-                  <TableHead className="text-center text-[11px] font-medium px-2">Laudo</TableHead>
-                  {!isMedicoOnly && <TableHead className="text-center text-[11px] font-medium px-2">Ações</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.map((a, idx) => {
-                  const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
-                  const pacienteNome =
-                    (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "—";
-                  const procedimentoNome = a.procedimento ?? "—";
-
-                  // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
-                  const isSelected = sel.has(`${a.origem}:${a.id}`);
-                  const baixaPendente = !a.repasse_pago && !isAtendido(a);
-                  // Atendimento externo (faturado em outra clínica) — destaque
-                  // vermelho bem claro para diferenciar do fluxo normal.
-                  const ehExterno = (a.forma_pagamento ?? "").trim().toLowerCase() === "externo";
-                  const rowBg =
-                    isSelected && baixaPendente
-                      ? "bg-amber-50 dark:bg-amber-950/30"
-                      : ehExterno
-                        ? "bg-rose-50 dark:bg-rose-950/30"
-                        : idx % 2 === 0
-                          ? "bg-background"
-                          : "bg-slate-50 dark:bg-slate-900/40";
-
-                  return (
-                    <TableRow
-                      key={`${a.origem}:${a.id}`}
-                      className={cn(
-                        "border-0 transition-colors duration-150 hover:bg-muted/40 [&>td]:border-b [&>td]:border-border/40 [&>td]:py-2.5",
-                        rowBg,
-                      )}
-                    >
-                      {!isMedicoOnly && (
-                        <TableCell className="px-2">
-                          {(a.valor_medico ?? 0) > 0 ? (
-                            <Checkbox
-                              checked={sel.has(`${a.origem}:${a.id}`)}
-                              onCheckedChange={() => toggleOne(a)}
-                              aria-label={a.repasse_pago ? "Selecionar para 2ª via" : "Selecionar"}
-                              title={a.repasse_pago ? "Selecionar para reimprimir 2ª via" : undefined}
-                              className="h-4 w-4"
-                            />
-                          ) : (
-                            <span
-                              title="Sem valor de repasse cadastrado para este médico/procedimento"
-                              className="text-[10px] text-muted-foreground whitespace-nowrap"
-                            >
-                              Sem repasse
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
-                        {String(idx + 1).padStart(3, "0")}
-                      </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap px-2">
-                        {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "2-digit",
-                        })}
-                      </TableCell>
-
-                      {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
-                      <TableCell className="text-xs max-w-[90px] truncate px-2" title={medicoNome}>
-                        {medicoNome}
-                      </TableCell>
-                      <TableCell className="text-xs font-medium max-w-[190px] truncate px-2" title={pacienteNome}>
-                        {pacienteNome}
-                      </TableCell>
-                      <TableCell
-                        className="text-xs text-muted-foreground max-w-[160px] truncate px-2"
-                        title={procedimentoNome}
-                      >
-                        {procedimentoNome}
-                      </TableCell>
-
-                      {!isMedicoOnly && (
-                        <TableCell className="text-xs text-right font-medium whitespace-nowrap px-2">
-                          {fmt(Number(a.valor_total))}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-xs text-right font-semibold text-primary whitespace-nowrap px-2">
-                        {fmt(Number(a.valor_medico))}
-                      </TableCell>
-                      {!isMedicoOnly && (
-                        <TableCell className="text-xs text-right text-muted-foreground whitespace-nowrap px-2">
-                          {fmt(Number(a.valor_clinica))}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-center px-2">
-                        {a.repasse_pago ? (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-nowrap px-1.5 py-0"
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                            Pago
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-nowrap px-1.5 py-0"
-                          >
-                            <Clock className="h-3 w-3 mr-0.5 inline" />A receber
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center px-2">
-                        <div className="flex justify-center">
-                          <FormaPagamentoIcon forma={a.forma_pagamento} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center px-2">
-                        {(() => {
-                          const procKey = a.procedimento ? norm(a.procedimento) : "";
-                          const exigeLaudo = procKey && procLaudo.get(procKey);
-                          const laudadorNome = a.medico_laudador_id
-                            ? medMap.get(a.medico_laudador_id) ?? null
-                            : null;
-                          if (a.laudo_status === "emitido")
-                            return (
-                              podeEscrever ? (
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
-                                    title={
-                                      laudadorNome
-                                        ? `Laudador: ${laudadorNome}. Clique para desvincular.`
-                                        : "Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
-                                    }
-                                    onClick={() => desvincularLaudo(a)}
-                                  >
-                                    <CheckCircle2 className="h-3 w-3 mr-0.5" />
-                                    Vinculado
-                                  </Button>
-                                  {laudadorNome && (
-                                    <span
-                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
-                                      title={laudadorNome}
-                                    >
-                                      {laudadorNome}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                                  >
-                                    <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                    Vinculado
-                                  </Badge>
-                                  {laudadorNome && (
-                                    <span
-                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
-                                      title={laudadorNome}
-                                    >
-                                      {laudadorNome}
-                                    </span>
-                                  )}
-                                </div>
-                              )
-                            );
-                          if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
-                          if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
-                          return (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-[10px] px-2"
-                              onClick={() => openLaudo(a)}
-                            >
-                              Vincular
-                            </Button>
-                          );
-                        })()}
-                      </TableCell>
-
-                      {/* Célula de Ações Fixa na Direita com sombra lateral */}
-                      {!isMedicoOnly && (
-                        <TableCell
-                          className={cn(
-                            "text-right px-2 sticky right-0 z-10 border-l shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.05)]",
-                            rowBg, // Usa a mesma cor zebrada da linha para o fundo do bloco fixo
-                          )}
-                        >
-                          {a.origem === "agenda" ? (
-                            <div className="flex items-center justify-end gap-0.5">
-                              <span className="text-[9px] text-muted-foreground uppercase mr-1">Agenda</span>
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Emitir NFS-e"
-                                  onClick={() => openEmitNfse(a)}
-                                  disabled={!a.paciente_id}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {a.repasse_pago && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Imprimir comprovante de repasse"
-                                  onClick={() => abrirComprovanteDoItem(a)}
-                                >
-                                  <Printer className="h-3.5 w-3.5 text-primary" />
-                                </Button>
-                              )}
-                              {a.repasse_pago || a.agendamento_status === "realizado" ? (
-                                <Button
-                                  size="sm"
-                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
-                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
-                                  title={
-                                    a.repasse_pago
-                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
-                                      : podeEstornar
-                                        ? "Clique para desfazer a baixa"
-                                        : "Repasse já baixado"
-                                  }
-                                  onClick={() => desfazerBaixa(a)}
-                                >
-                                  <CheckCircle2 className="h-3 w-3" /> Baixado
-                                </Button>
-                              ) : (
-                                podeEscrever && (
-                                  <Button
-                                    size="sm"
-                                    className={cn(
-                                      "h-6 px-2 text-[10px] gap-1 border",
-                                      isSelected
-                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
-                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-                                    )}
-                                    title="Dá baixa (marcar como realizado e liberar repasse)"
-                                    onClick={() => darBaixa(a)}
-                                  >
-                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                    Baixar
-                                  </Button>
-                                )
-                              )}
-                              {/* Botão de excluir para agenda */}
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "h-7 w-7",
-                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
-                                  )}
-                                  title={
-                                    a.repasse_pago
-                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
-                                      : "Editar repasse médico deste atendimento"
-                                  }
-                                  onClick={() => abrirEditRepasse(a)}
-                                >
-                                  <Wallet className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
-                                  onClick={() => remove(a)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Ver histórico"
-                                onClick={() => setHistoricoAtend(a)}
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end gap-0.5">
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Emitir NFS-e"
-                                  onClick={() => openEmitNfse(a)}
-                                  disabled={!a.paciente_id}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {podeEscrever && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {a.repasse_pago && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Imprimir comprovante de repasse"
-                                  onClick={() => abrirComprovanteDoItem(a)}
-                                >
-                                  <Printer className="h-3.5 w-3.5 text-primary" />
-                                </Button>
-                              )}
-                              {a.repasse_pago || a.status === "realizado" ? (
-                                <Button
-                                  size="sm"
-                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
-                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
-                                  title={
-                                    a.repasse_pago
-                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
-                                      : podeEstornar
-                                        ? "Clique para desfazer a baixa"
-                                        : "Repasse já baixado"
-                                  }
-                                  onClick={() => desfazerBaixa(a)}
-                                >
-                                  <CheckCircle2 className="h-3 w-3" /> Baixado
-                                </Button>
-                              ) : (
-                                podeEscrever && (
-                                  <Button
-                                    size="sm"
-                                    className={cn(
-                                      "h-6 px-2 text-[10px] gap-1 border",
-                                      isSelected
-                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
-                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-                                    )}
-                                    title="Dá baixa (marcar como realizado e liberar repasse)"
-                                    onClick={() => darBaixa(a)}
-                                  >
-                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                    Baixar
-                                  </Button>
-                                )
-                              )}
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "h-7 w-7",
-                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
-                                  )}
-                                  title={
-                                    a.repasse_pago
-                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
-                                      : "Editar repasse médico deste atendimento"
-                                  }
-                                  onClick={() => abrirEditRepasse(a)}
-                                >
-                                  <Wallet className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {podeEscrever && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
-                                  onClick={() => remove(a)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Ver histórico"
-                                onClick={() => setHistoricoAtend(a)}
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </div>
-
-      {/* Barra de ações do rodapé: repete botões quando houver seleção */}
-      {!isMedicoOnly && selectedItems.length > 0 && (
-        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
-          <div className="text-sm">
-            <b>{selectedItems.length}</b> selecionado(s)
-            {selectedPagos.length > 0 && (
-              <span className="ml-2 text-emerald-700">• {selectedPagos.length} pago(s)</span>
-            )}
-            {selectedNaoPagos.length > 0 && (
-              <span className="ml-2 text-amber-700">• {selectedNaoPagos.length} a pagar</span>
-            )}
-            <span className="ml-2 text-muted-foreground">
-              — total {fmt(selectedTotal)}
-            </span>
-            {misturado && (
-              <span className="ml-2 text-xs text-rose-700">
-                Separe pagos e não pagos para agir.
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {podeEscrever && (
-              <Button
-                size="sm"
-                onClick={openPay}
-                disabled={!podePagar}
-                title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
-              >
-                <Wallet className="h-4 w-4 mr-2" />
-                Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <MoreHorizontal className="h-4 w-4 mr-2" />
-                  Opções
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem
-                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedNaoBaixados.length > 0) darBaixaLote();
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
-                  Dar baixa
-                  {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedBaixados.length > 0) desfazerBaixaLote();
-                  }}
-                >
-                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
-                  Desfazer baixa
-                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
-                  }}
-                >
-                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
-                  Vincular vários laudos
-                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
-              Limpar
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Diálogo pagar repasse */}
-      <Dialog open={payOpen} onOpenChange={setPayOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Pagar repasse médico</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-md border bg-muted/40 p-3 text-sm flex justify-between">
-              <span>{selectedItems.length} atendimento(s)</span>
-              <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
-            </div>
-            <div className="space-y-2">
-              <Label>Valor do repasse (opcional)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder={`Padrão: ${fmt(selectedTotal)}`}
-                value={payForm.valor_manual}
-                onChange={(e) => setPayForm({ ...payForm, valor_manual: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Deixe em branco para usar o valor calculado. Para alterar manualmente, selecione atendimentos de apenas um médico.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Data do pagamento</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !payForm.data && "text-muted-foreground")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {payForm.data
-                      ? format(parse(payForm.data, "yyyy-MM-dd", new Date()), "dd/MM/yyyy", { locale: ptBR })
-                      : "Selecionar data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    locale={ptBR}
-                    selected={payForm.data ? parse(payForm.data, "yyyy-MM-dd", new Date()) : undefined}
-                    onSelect={(d) => d && setPayForm({ ...payForm, data: format(d, "yyyy-MM-dd") })}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground">
-                Use uma data anterior para lançar pagamentos retroativos.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Conta</Label>
-              <Select
-                value={payForm.conta_id || "none"}
-                onValueChange={(v) => setPayForm({ ...payForm, conta_id: v === "none" ? "" : v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">—</SelectItem>
-                  {contas.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
-              <Select
-                value={payForm.forma_pagamento || undefined}
-                onValueChange={(v) => setPayForm({ ...payForm, forma_pagamento: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pix">Pix</SelectItem>
-                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="Transferência">Transferência</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmarPagamento} disabled={payingNow}>
-              {payingNow ? "Registrando..." : "Confirmar pagamento"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: comprovante de repasse (imprimível) */}
-      <Dialog open={comprovanteOpen} onOpenChange={setComprovanteOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader className="no-print">
-            <DialogTitle>
-              Comprovante de pagamento de repasse
-              {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
-            </DialogTitle>
-          </DialogHeader>
-          {comprovantes.length > 0 && (
-            <div ref={printAreaRef} className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
-              {comprovantes.map((comprovante, blocoIdx) => (
-                <div
-                  key={blocoIdx}
-                  className={cn(
-                    "comprovante-bloco",
-                    blocoIdx > 0 && "mt-8 pt-8 border-t-4 border-dashed border-slate-400",
-                  )}
-                >
-                  {comprovante.reimpressao && (
-                <div className="mb-3 border-2 border-rose-600 bg-rose-100 text-rose-900 rounded-md p-3 text-center">
-                  <div className="text-xl font-extrabold tracking-wide uppercase">
-                    Segunda via — Reimpressão de comprovante
-                  </div>
-                  <div className="text-sm mt-1">
-                    Pagamento realizado em{" "}
-                    <b>
-                      {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
-                      {comprovante.horaPagamento
-                        ? ` às ${comprovante.horaPagamento}`
-                        : " (horário não registrado)"}
-                    </b>
-                    {comprovante.multiplasDatas && comprovante.multiplasDatas > 1 ? (
-                      <span className="ml-1">
-                        (contém pagamentos de {comprovante.multiplasDatas} datas)
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-xs mt-0.5 opacity-80">
-                    Reimpressão emitida em {comprovante.emitidoEm}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-start justify-between border-b pb-3 mb-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Clínica</div>
-                  <div className="text-lg font-semibold">{comprovante.clinicaNome}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-base font-semibold">Comprovante de repasse médico</div>
-                  <div className="text-xs text-muted-foreground">Emitido em {comprovante.emitidoEm}</div>
-                </div>
-              </div>
-
-              <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Médico: </span>
-                  <b>{comprovante.medicoNome}</b>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Data e hora do pagamento: </span>
-                  <b>
-                    {new Date(comprovante.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}
-                    {comprovante.horaPagamento
-                      ? ` às ${comprovante.horaPagamento}`
-                      : " (horário não registrado)"}
-                  </b>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Forma: </span>
-                  <b>{comprovante.formaPagamento}</b>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Conta: </span>
-                  <b>{comprovante.contaNome}</b>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Atendimentos: </span>
-                  <b>{comprovante.qtd}</b>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-muted-foreground">Total pago ao médico: </span>
-                  <b className="text-base text-primary">{fmt(comprovante.total)}</b>
-                </div>
-              </div>
-
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b bg-muted/40">
-                    <th className="text-left p-2">Data</th>
-                    <th className="text-left p-2">Pago em</th>
-                    <th className="text-left p-2">Médico</th>
-                    <th className="text-left p-2">Paciente</th>
-                    <th className="text-left p-2">Serviço</th>
-                    <th className="text-right p-2">Valor pago (R$)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comprovante.itens.map((it, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="p-2 whitespace-nowrap">
-                        {new Date(it.data + "T00:00:00").toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="p-2 whitespace-nowrap">
-                        {it.pagoEm
-                          ? `${new Date(it.pagoEm + "T00:00:00").toLocaleDateString("pt-BR")}${it.pagoHora ? ` às ${it.pagoHora}` : ""}`
-                          : "—"}
-                      </td>
-                      <td className="p-2">{it.medico}</td>
-                      <td className="p-2">{it.paciente}</td>
-                      <td className="p-2">{it.servico}</td>
-                      <td className="p-2 text-right whitespace-nowrap">{fmt(it.valorMedico)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="font-semibold">
-                    <td className="p-2" colSpan={5}>
-                      Total
-                    </td>
-                    <td className="p-2 text-right">{fmt(comprovante.total)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-
-              <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
-                <div className="text-center">
-                  <div className="border-t pt-1">Assinatura do médico</div>
-                </div>
-                <div className="text-center">
-                  <div className="border-t pt-1">Assinatura da clínica</div>
-                </div>
-              </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <DialogFooter className="no-print">
-            <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
-              Fechar
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => imprimirComprovante(true)}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir resumo (médico)
-            </Button>
-            <Button onClick={() => imprimirComprovante()}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: marcar laudo emitido */}
-      <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Vincular laudo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {laudoTarget && (
-              <div className="rounded-md border bg-muted/40 p-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Paciente:</span>{" "}
-                  {laudoTarget.paciente_nome_extra ??
-                    (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Serviço:</span> {laudoTarget.procedimento ?? "—"}
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Médico laudador</Label>
-              <Select
-                value={laudoForm.medico_laudador_id || undefined}
-                onValueChange={onChangeLaudador}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o médico..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(laudoRegras.length > 0
-                    ? laudoRegras.map((r) => ({ id: r.laudador_medico_id, nome: r.laudador_nome }))
-                    : medicos
-                  ).map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {laudoRegras.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Nenhum laudador cadastrado na aba Repasse desta agenda — informe o valor manualmente.
-                </p>
-              )}
-            </div>
-            {laudoForm.medico_laudador_id && (
-              <div className="space-y-2">
-                <Label>Valor do laudo (R$)</Label>
-                <CurrencyInput
-                  value={laudoForm.valor_laudo}
-                  onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
-                />
-                {laudoSemRegra && (
-                  <p className="text-xs text-muted-foreground">
-                    Sem regra cadastrada para este laudador — informe o valor manualmente.
-                  </p>
                 )}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLaudoOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={emitirLaudo} disabled={laudoSaving}>
-              {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: vincular laudos em lote */}
-      <Dialog open={laudoLoteOpen} onOpenChange={setLaudoLoteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Vincular laudos em lote</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-md border bg-muted/40 p-3 text-xs">
-              <b>{selectedLaudoElegiveis.length}</b> atendimento(s) elegível(is) para vínculo de laudo.
-            </div>
-            <div className="space-y-2">
-              <Label>Médico laudador</Label>
-              <Select
-                value={laudoLoteLaudadorId || undefined}
-                onValueChange={setLaudoLoteLaudadorId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o médico..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {medicos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                O valor de cada laudo será calculado automaticamente pela regra de repasse
-                da agenda de cada atendimento. Atendimentos sem regra para este laudador serão ignorados.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLaudoLoteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={vincularLaudoLote}
-              disabled={laudoLoteSaving || !laudoLoteLaudadorId}
-            >
-              {laudoLoteSaving ? "Vinculando..." : `Vincular (${selectedLaudoElegiveis.length})`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: emitir NFS-e */}
-      <Dialog
-        open={nfseDialog.open}
-        onOpenChange={(o) => setNfseDialog((prev) => ({ open: o, atend: o ? prev.atend : null }))}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Emitir NFS-e</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Emitente *</Label>
-              <Select value={emitenteId} onValueChange={setEmitenteId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {emitentes.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {nfseDialog.atend && (
-              <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
-                <div>
-                  <span className="text-muted-foreground">Paciente:</span>{" "}
-                  <b>
-                    {nfseDialog.atend.paciente_id
-                      ? (pacMap.get(nfseDialog.atend.paciente_id) ?? "—")
-                      : (nfseDialog.atend.paciente_nome_extra ?? "—")}
-                  </b>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Serviço:</span> {nfseDialog.atend.procedimento ?? "—"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Valor:</span>{" "}
-                  <b>{fmt(Number(nfseDialog.atend.valor_total))}</b>
+                <div className="space-y-1">
+                  <Label>Valor do repasse (R$)</Label>
+                  <CurrencyInput
+                    value={editRepasse.valor}
+                    onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Só ajusta este atendimento. Não altera a regra padrão do médico.
+                  </p>
                 </div>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label>Descrição dos serviços *</Label>
-              <Textarea rows={3} value={nfseDesc} onChange={(e) => setNfseDesc(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setNfseDialog({ open: false, atend: null })}
-              disabled={nfseEmitting}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={doEmitNfse} disabled={nfseEmitting || !emitenteId}>
-              {nfseEmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Emitindo...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Emitir
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {tomadorNfseDialog}
-      {descricaoNfseDialog}
-
-      {/* Edição pontual do repasse médico de um atendimento */}
-      <Dialog
-        open={editRepasse.open}
-        onOpenChange={(o) => setEditRepasse((s) => ({ ...s, open: o }))}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Editar repasse médico</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">
-              {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
-              {fmt(Number(editRepasse.atend?.valor_total) || 0)}
-            </div>
-            {editRepasse.atend?.repasse_pago && (
-              <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
-                Este repasse já foi pago. Ao salvar, a despesa vinculada
-                (fin_lancamentos) será ajustada pela diferença para o caixa
-                continuar batendo. Confirme com o médico antes de gravar.
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label>Valor do repasse (R$)</Label>
-              <CurrencyInput
-                value={editRepasse.valor}
-                onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Só ajusta este atendimento. Não altera a regra padrão do médico.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditRepasse({ open: false, atend: null, valor: "" })}
-              disabled={savingRepasse}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={() => void salvarEditRepasse()} disabled={savingRepasse}>
-              {savingRepasse ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                "Salvar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditRepasse({ open: false, atend: null, valor: "" })}
+                  disabled={savingRepasse}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={() => void salvarEditRepasse()} disabled={savingRepasse}>
+                  {savingRepasse ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
         <TabsContent value="comprovantes" className="mt-0">
           <ComprovantesTab />
@@ -3655,7 +3942,9 @@ function MedicoCombobox({
                   setOpen(false);
                 }}
               >
-                <Check className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")} />
+                <Check
+                  className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")}
+                />
                 Todos os médicos
               </CommandItem>
               {medicos.map((m) => (
@@ -3668,7 +3957,9 @@ function MedicoCombobox({
                   }}
                   className="uppercase"
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")}
+                  />
                   {m.nome}
                 </CommandItem>
               ))}

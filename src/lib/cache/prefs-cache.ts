@@ -45,14 +45,15 @@ export async function setFlagUsuario(nome: string, valor: boolean): Promise<void
   if (!uid) return;
   const flags = { ...((prefs.flags as object) ?? {}), [nome]: valor };
   const next = { ...prefs, flags };
-  await supabase.from("profiles").update({ preferencias_ui: next as never }).eq("id", uid);
+  await supabase
+    .from("profiles")
+    .update({ preferencias_ui: next as never })
+    .eq("id", uid);
   invalidatePreferenciasUi();
 }
 
 /** Atualiza `preferencias_ui` inteiro a partir do valor atual. */
-export async function updatePreferenciasUi(
-  patch: (prev: PrefsUi) => PrefsUi,
-): Promise<void> {
+export async function updatePreferenciasUi(patch: (prev: PrefsUi) => PrefsUi): Promise<void> {
   const { uid, prefs } = await getPreferenciasUi();
   if (!uid) return;
   await supabase

@@ -7,7 +7,10 @@
  */
 export type FaixaEspera = "normal" | "atencao" | "critico";
 
-export function minutosEspera(desde: string | null | undefined, agora: number = Date.now()): number {
+export function minutosEspera(
+  desde: string | null | undefined,
+  agora: number = Date.now(),
+): number {
   if (!desde) return 0;
   const t = new Date(desde).getTime();
   if (Number.isNaN(t)) return 0;
@@ -38,7 +41,10 @@ export const CLASSE_ESPERA: Record<FaixaEspera, string> = {
 };
 
 /** Média (arredondada) de espera de uma lista de instantes de referência. */
-export function mediaEspera(refs: Array<string | null | undefined>, agora: number = Date.now()): number | null {
+export function mediaEspera(
+  refs: Array<string | null | undefined>,
+  agora: number = Date.now(),
+): number | null {
   const vals = refs.filter(Boolean).map((r) => minutosEspera(r, agora));
   if (!vals.length) return null;
   return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);

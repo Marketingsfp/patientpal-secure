@@ -26,8 +26,12 @@ export const S2Onde: React.FC = () => (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22, maxWidth: 1200 }}>
         {locais.map((l, i) => (
           <Panel key={l.t} delay={16 + i * 7} style={{ padding: "24px 28px" }}>
-            <div style={{ fontFamily: display, color: C.cream, fontSize: 34, fontWeight: 600 }}>{l.t}</div>
-            <div style={{ fontFamily: body, color: C.creamDim, fontSize: 22, marginTop: 6 }}>{l.d}</div>
+            <div style={{ fontFamily: display, color: C.cream, fontSize: 34, fontWeight: 600 }}>
+              {l.t}
+            </div>
+            <div style={{ fontFamily: body, color: C.creamDim, fontSize: 22, marginTop: 6 }}>
+              {l.d}
+            </div>
           </Panel>
         ))}
       </div>

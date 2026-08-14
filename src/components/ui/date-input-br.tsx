@@ -21,7 +21,9 @@ function brToIso(br: string): string {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br);
   if (!m) return "";
   const yearText = m[3];
-  const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
+  const day = Number(m[1]),
+    month = Number(m[2]),
+    year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
   return `${yearText}-${m[2]}-${m[1]}`;
 }
@@ -67,7 +69,18 @@ type Props = Omit<NativeInputProps, "type"> & {
 };
 
 export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInputBR(
-  { value, onChange, onBlur, placeholder = "dd/mm/aaaa", inputMode = "numeric", maxLength = 10, showCalendar = true, className, disabled, ...rest },
+  {
+    value,
+    onChange,
+    onBlur,
+    placeholder = "dd/mm/aaaa",
+    inputMode = "numeric",
+    maxLength = 10,
+    showCalendar = true,
+    className,
+    disabled,
+    ...rest
+  },
   ref,
 ) {
   const external = typeof value === "string" ? value : "";

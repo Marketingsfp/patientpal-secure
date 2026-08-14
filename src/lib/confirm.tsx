@@ -53,21 +53,23 @@ export function ConfirmDialogHost() {
     };
   }, []);
 
-  const close = React.useCallback(
-    (value: boolean) => {
-      setPending((cur) => {
-        cur?.resolve(value);
-        return null;
-      });
-    },
-    [],
-  );
+  const close = React.useCallback((value: boolean) => {
+    setPending((cur) => {
+      cur?.resolve(value);
+      return null;
+    });
+  }, []);
 
   const tone = pending?.tone ?? "default";
   const Icon = tone === "danger" ? Trash2 : tone === "warning" ? AlertTriangle : HelpCircle;
 
   return (
-    <AlertDialog open={!!pending} onOpenChange={(o) => { if (!o) close(false); }}>
+    <AlertDialog
+      open={!!pending}
+      onOpenChange={(o) => {
+        if (!o) close(false);
+      }}
+    >
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
           <div className="flex items-start gap-3">

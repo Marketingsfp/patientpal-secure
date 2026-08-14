@@ -23,8 +23,16 @@ export interface HhpKpiCardProps {
 }
 
 export function HhpKpiCard({
-  label, value, icon: Icon = Activity, tone = "default",
-  hint, delta, active, compact = false, onClick, className,
+  label,
+  value,
+  icon: Icon = Activity,
+  tone = "default",
+  hint,
+  delta,
+  active,
+  compact = false,
+  onClick,
+  className,
 }: HhpKpiCardProps) {
   const Comp = onClick ? "button" : "div";
   return (
@@ -36,7 +44,8 @@ export function HhpKpiCard({
       className={cn(
         "group relative text-left rounded-2xl border bg-white transition-all shrink-0",
         "min-w-0",
-        onClick && "hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)] hover:-translate-y-[1px] hover:border-slate-200 cursor-pointer",
+        onClick &&
+          "hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)] hover:-translate-y-[1px] hover:border-slate-200 cursor-pointer",
         compact ? "p-3" : "p-4",
         active
           ? "border-[var(--clinic-accent)] shadow-sm ring-2 ring-[color:var(--clinic-accent-glow)]"
@@ -57,7 +66,12 @@ export function HhpKpiCard({
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 leading-tight line-clamp-2 min-w-0">
           {label}
         </span>
-        <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", HHP_TONE_BG[tone])}>
+        <span
+          className={cn(
+            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg",
+            HHP_TONE_BG[tone],
+          )}
+        >
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
@@ -77,8 +91,14 @@ export function HhpKpiCard({
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>
         {delta !== undefined && delta !== 0 && (
-          <span className={cn("text-[10px] font-semibold tabular-nums", delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-600 dark:text-slate-400")}>
-            {delta > 0 ? "+" : ""}{delta}
+          <span
+            className={cn(
+              "text-[10px] font-semibold tabular-nums",
+              delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-600 dark:text-slate-400",
+            )}
+          >
+            {delta > 0 ? "+" : ""}
+            {delta}
           </span>
         )}
       </div>
@@ -88,8 +108,14 @@ export function HhpKpiCard({
 
 /** Grade responsiva de KPIs com scroll horizontal no mobile e grid ≥ md. */
 export function HhpKpiRow({
-  children, compact = false, className,
-}: { children: React.ReactNode; compact?: boolean; className?: string }) {
+  children,
+  compact = false,
+  className,
+}: {
+  children: React.ReactNode;
+  compact?: boolean;
+  className?: string;
+}) {
   return (
     <div
       className={cn(

@@ -1,14 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  FileText,
-  CalendarDays,
-  GripVertical,
-  Columns2,
-  Plus,
-  Download,
-} from "lucide-react";
+import { FileText, CalendarDays, GripVertical, Columns2, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -68,7 +61,10 @@ function OrcamentosAgendaPage() {
 
     const onUp = () => {
       draggingRef.current = false;
-      setLeftPct((p) => { window.localStorage.setItem(LARGURA_KEY, String(Math.round(p))); return p; });
+      setLeftPct((p) => {
+        window.localStorage.setItem(LARGURA_KEY, String(Math.round(p)));
+        return p;
+      });
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -87,7 +83,11 @@ function OrcamentosAgendaPage() {
       if (d.type === "agendar-orcamento" && typeof d.numero === "number") {
         setAgendaMontada(true);
         setModo((m) => (m === "orcamentos" ? "split" : m));
-        const payload = { type: "agendar-orcamento", numero: d.numero, medico_nome: d.medico_nome ?? null };
+        const payload = {
+          type: "agendar-orcamento",
+          numero: d.numero,
+          medico_nome: d.medico_nome ?? null,
+        };
 
         const win = agendaIframeRef.current?.contentWindow;
         if (win) {
@@ -126,7 +126,9 @@ function OrcamentosAgendaPage() {
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold tracking-tight text-foreground/90 leading-tight">Orçamentos</h1>
+              <h1 className="text-lg font-bold tracking-tight text-foreground/90 leading-tight">
+                Orçamentos
+              </h1>
               <p className="text-xs text-muted-foreground/80 truncate">
                 Orçamentos rápidos com impressão térmica 80mm
               </p>
@@ -134,11 +136,13 @@ function OrcamentosAgendaPage() {
           </div>
 
           <div className="bg-muted/60 p-1 rounded-full border border-border/40 inline-flex gap-1 ml-auto">
-            {([
-              ["orcamentos", "Apenas orçamentos", FileText],
-              ["split", "Dividido 50/50", Columns2],
-              ["agenda", "Apenas agenda", CalendarDays],
-            ] as const).map(([k, label, Icon]) => (
+            {(
+              [
+                ["orcamentos", "Apenas orçamentos", FileText],
+                ["split", "Dividido 50/50", Columns2],
+                ["agenda", "Apenas agenda", CalendarDays],
+              ] as const
+            ).map(([k, label, Icon]) => (
               <button
                 key={k}
                 onClick={() => setModo(k)}
@@ -156,10 +160,19 @@ function OrcamentosAgendaPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => enviarAosOrcamentos({ type: "orc-exportar" })}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 gap-1.5"
+              onClick={() => enviarAosOrcamentos({ type: "orc-exportar" })}
+            >
               <Download className="h-4 w-4" /> Exportar
             </Button>
-            <Button size="sm" className="h-9 gap-1.5" onClick={() => enviarAosOrcamentos({ type: "orc-novo" })}>
+            <Button
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => enviarAosOrcamentos({ type: "orc-novo" })}
+            >
               <Plus className="h-4 w-4" /> Novo orçamento
             </Button>
           </div>
@@ -227,7 +240,9 @@ function OrcamentosAgendaPage() {
                 : "Apenas agenda"}
           </span>
           <span>
-            Clique em <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para enviar à agenda
+            Clique em{" "}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para
+            enviar à agenda
           </span>
         </div>
       </div>

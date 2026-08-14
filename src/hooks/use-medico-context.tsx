@@ -51,11 +51,7 @@ export function useMedicoContext() {
         return;
       }
       setLoading(true);
-      const mid = await buscarMedicoId(
-        clinicaAtual.clinica_id,
-        user.id,
-        user.email ?? null,
-      );
+      const mid = await buscarMedicoId(clinicaAtual.clinica_id, user.id, user.email ?? null);
       if (!cancel) {
         setMedicoId(mid);
         setLoading(false);

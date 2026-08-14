@@ -35,7 +35,9 @@ export function garantirContrasteTextoBranco(hex: string, minRatio = 4.5): strin
   let [r, g, b] = rgb;
   let guard = 0;
   while (contrastWithWhite([r, g, b]) < minRatio && guard < 20) {
-    r *= 0.88; g *= 0.88; b *= 0.88;
+    r *= 0.88;
+    g *= 0.88;
+    b *= 0.88;
     guard++;
   }
   return guard === 0 ? hex : rgbToHex([r, g, b]);

@@ -2,12 +2,24 @@ import { useEffect, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
 import { Trash2, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatDatePura } from "@/lib/date-utils";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
@@ -71,7 +83,10 @@ export function VisualizarImagemDialog({ open, onClose, imagem, onChanged, readO
 
   async function excluir() {
     if (!imagem) return;
-    if (!await confirmDialog("Confirmar exclusão desta imagem? Ela ficará arquivada no histórico.")) return;
+    if (
+      !(await confirmDialog("Confirmar exclusão desta imagem? Ela ficará arquivada no histórico."))
+    )
+      return;
     setExcluindo(true);
     try {
       await softDeleteOdontoImagem(imagem.id);
@@ -182,11 +197,7 @@ export function VisualizarImagemDialog({ open, onClose, imagem, onChanged, readO
 
         <DialogFooter className="gap-2 sm:justify-between">
           {!readOnly ? (
-            <Button
-              variant="destructive"
-              onClick={excluir}
-              disabled={excluindo || salvando}
-            >
+            <Button variant="destructive" onClick={excluir} disabled={excluindo || salvando}>
               {excluindo ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
               ) : (

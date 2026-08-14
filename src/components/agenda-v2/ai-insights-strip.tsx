@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, CalendarPlus, DoorOpen, ArrowRight, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarPlus,
+  DoorOpen,
+  ArrowRight,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SessionCardData } from "./session-card";
 
@@ -32,7 +40,10 @@ export function AiInsightsStrip({
     // Encaixe possível: primeira hora com >= 1 slot livre a partir de agora.
     let encaixeH: number | null = null;
     for (const [h, n] of Array.from(livresPorHora.entries()).sort((a, b) => a[0] - b[0])) {
-      if (h >= currentH && n > 0) { encaixeH = h; break; }
+      if (h >= currentH && n > 0) {
+        encaixeH = h;
+        break;
+      }
     }
 
     // Sala ociosa: recurso com 0 sessões no dia mas outras têm.
@@ -44,8 +55,9 @@ export function AiInsightsStrip({
         nomesRecursos.set(s.recurso_id, s.recurso_nome);
       }
     }
-    const salaOciosa = Array.from(nomesRecursos.entries())
-      .find(([id]) => (usoRecursos.get(id) ?? 0) <= 1)?.[1] ?? null;
+    const salaOciosa =
+      Array.from(nomesRecursos.entries()).find(([id]) => (usoRecursos.get(id) ?? 0) <= 1)?.[1] ??
+      null;
 
     // Próximo atendimento após "agora".
     const proximo = sessoes.find((s) => {
@@ -56,7 +68,13 @@ export function AiInsightsStrip({
     return { atrasos, encaixeH, salaOciosa, proximo, currentMin };
   }, [sessoes, livresPorHora]);
 
-  const chips: Array<{ key: string; icon: React.ElementType; tone: string; label: string; detail: string }> = [];
+  const chips: Array<{
+    key: string;
+    icon: React.ElementType;
+    tone: string;
+    label: string;
+    detail: string;
+  }> = [];
 
   if (insights.atrasos.length > 0) {
     chips.push({
@@ -64,7 +82,10 @@ export function AiInsightsStrip({
       icon: AlertTriangle,
       tone: "text-amber-700 bg-amber-50/70 border-amber-200/70",
       label: `${insights.atrasos.length} atraso${insights.atrasos.length > 1 ? "s" : ""} previsto${insights.atrasos.length > 1 ? "s" : ""}`,
-      detail: insights.atrasos.slice(0, 2).map((a) => a.paciente_nome.split(" ")[0]).join(", "),
+      detail: insights.atrasos
+        .slice(0, 2)
+        .map((a) => a.paciente_nome.split(" ")[0])
+        .join(", "),
     });
   }
   if (insights.encaixeH !== null) {

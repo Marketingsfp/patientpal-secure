@@ -2,9 +2,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CalendarPlus, UserCheck, Search, Banknote, Ticket, Stethoscope,
-  Clock, Users, AlertTriangle, Activity, CheckCircle2, XCircle,
-  RefreshCw, Megaphone, ArrowRight, Wallet, ListChecks,
+  CalendarPlus,
+  UserCheck,
+  Search,
+  Banknote,
+  Ticket,
+  Stethoscope,
+  Clock,
+  Users,
+  AlertTriangle,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Megaphone,
+  ArrowRight,
+  Wallet,
+  ListChecks,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -21,7 +35,11 @@ export const Route = createFileRoute("/_authenticated/app/painel")({
   head: () => ({
     meta: [
       { title: "Dashboard operacional — ClinicaOS" },
-      { name: "description", content: "Fila ao vivo, check-ins do dia, próximos atendimentos e alertas imediatos da clínica." },
+      {
+        name: "description",
+        content:
+          "Fila ao vivo, check-ins do dia, próximos atendimentos e alertas imediatos da clínica.",
+      },
       { property: "og:title", content: "Dashboard operacional — ClinicaOS" },
       { property: "og:description", content: "Acompanhe a operação do dia em tempo real." },
       { property: "og:type", content: "website" },
@@ -34,7 +52,8 @@ const hojeISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const hhmm = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--");
+const hhmm = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
 
 /** "Hoje às 13:46" ou "08/08 às 18:27". */
 const dataHoraCurta = (iso: string | null) => {
@@ -43,7 +62,9 @@ const dataHoraCurta = (iso: string | null) => {
   const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const hoje = new Date();
   const mesmoDia =
-    d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth() && d.getDate() === hoje.getDate();
+    d.getFullYear() === hoje.getFullYear() &&
+    d.getMonth() === hoje.getMonth() &&
+    d.getDate() === hoje.getDate();
   if (mesmoDia) return `Hoje às ${hora}`;
   const dia = String(d.getDate()).padStart(2, "0");
   const mes = String(d.getMonth() + 1).padStart(2, "0");
@@ -51,13 +72,39 @@ const dataHoraCurta = (iso: string | null) => {
 };
 
 type Ag = {
-  id: string; paciente_nome: string | null; inicio: string | null; status: string;
-  fluxo_etapa: string | null; procedimento: string | null; prioridade: string | null;
-  medico_id?: string | null; paciente_id?: string | null; data_pagamento?: string | null;
+  id: string;
+  paciente_nome: string | null;
+  inicio: string | null;
+  status: string;
+  fluxo_etapa: string | null;
+  procedimento: string | null;
+  prioridade: string | null;
+  medico_id?: string | null;
+  paciente_id?: string | null;
+  data_pagamento?: string | null;
 };
-type Senha = { id: string; codigo: string | null; tipo: string; numero: number; status: string; emitida_em: string | null; guiche: string | null };
-type Alerta = { id: string; titulo: string | null; paciente_nome: string | null; severidade: string | null; created_at: string };
-type CaixaSessao = { id: string; user_nome: string | null; aberto_em: string; valor_abertura: number | null };
+type Senha = {
+  id: string;
+  codigo: string | null;
+  tipo: string;
+  numero: number;
+  status: string;
+  emitida_em: string | null;
+  guiche: string | null;
+};
+type Alerta = {
+  id: string;
+  titulo: string | null;
+  paciente_nome: string | null;
+  severidade: string | null;
+  created_at: string;
+};
+type CaixaSessao = {
+  id: string;
+  user_nome: string | null;
+  aberto_em: string;
+  valor_abertura: number | null;
+};
 
 const ETAPA_LABEL: Record<string, string> = {
   aguardando_recepcao: "Aguardando recepção",
@@ -85,30 +132,54 @@ function DashboardOperacional() {
       const de = `${dia}T00:00:00`;
       const ate = `${dia}T23:59:59`;
       const [ags, senhas, alertas, caixas, meds, esps, novos] = await Promise.all([
-        supabase.from("agendamentos")
-          .select("id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento")
-          .in("clinica_id", ids).gte("inicio", de).lte("inicio", ate).order("inicio"),
-        supabase.from("senhas")
+        supabase
+          .from("agendamentos")
+          .select(
+            "id,paciente_nome,inicio,status,fluxo_etapa,procedimento,prioridade,medico_id,paciente_id,data_pagamento",
+          )
+          .in("clinica_id", ids)
+          .gte("inicio", de)
+          .lte("inicio", ate)
+          .order("inicio"),
+        supabase
+          .from("senhas")
           .select("id,codigo,tipo,numero,status,emitida_em,guiche")
-          .in("clinica_id", ids).eq("data_dia", dia).order("emitida_em", { ascending: false }).limit(50),
-        supabase.from("alertas_enfermagem")
+          .in("clinica_id", ids)
+          .eq("data_dia", dia)
+          .order("emitida_em", { ascending: false })
+          .limit(50),
+        supabase
+          .from("alertas_enfermagem")
           .select("id,titulo,paciente_nome,severidade,created_at")
-          .in("clinica_id", ids).eq("status", "aberto").order("created_at", { ascending: false }).limit(8),
-        supabase.from("caixa_sessoes")
+          .in("clinica_id", ids)
+          .eq("status", "aberto")
+          .order("created_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("caixa_sessoes")
           .select("id,user_nome,aberto_em,valor_abertura")
-          .in("clinica_id", ids).eq("status", "aberto").order("aberto_em", { ascending: false }),
-        supabase.from("medicos")
-          .select("id,nome,especialidade_id").in("clinica_id", ids),
+          .in("clinica_id", ids)
+          .eq("status", "aberto")
+          .order("aberto_em", { ascending: false }),
+        supabase.from("medicos").select("id,nome,especialidade_id").in("clinica_id", ids),
         supabase.from("especialidades").select("id,nome"),
-        supabase.from("pacientes")
-          .select("id").in("clinica_id", ids).gte("created_at", `${dia}T00:00:00`).lte("created_at", `${dia}T23:59:59`),
+        supabase
+          .from("pacientes")
+          .select("id")
+          .in("clinica_id", ids)
+          .gte("created_at", `${dia}T00:00:00`)
+          .lte("created_at", `${dia}T23:59:59`),
       ]);
       return {
         ags: (ags.data ?? []) as Ag[],
         senhas: (senhas.data ?? []) as Senha[],
         alertas: (alertas.data ?? []) as Alerta[],
         caixas: (caixas.data ?? []) as CaixaSessao[],
-        medicos: (meds.data ?? []) as Array<{ id: string; nome: string; especialidade_id: string | null }>,
+        medicos: (meds.data ?? []) as Array<{
+          id: string;
+          nome: string;
+          especialidade_id: string | null;
+        }>,
         especialidades: (esps.data ?? []) as Array<{ id: string; nome: string }>,
         pacientesNovos: new Set(((novos.data ?? []) as Array<{ id: string }>).map((p) => p.id)),
       };
@@ -118,12 +189,18 @@ function DashboardOperacional() {
   const refresh = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ["dashboard-operacional"] });
   }, [qc]);
-  useRealtimeRefresh(["agendamentos", "senhas", "alertas_enfermagem", "caixa_sessoes"], refresh, enabled);
+  useRealtimeRefresh(
+    ["agendamentos", "senhas", "alertas_enfermagem", "caixa_sessoes"],
+    refresh,
+    enabled,
+  );
 
   const d = q.data;
   const k = useMemo(() => {
     const ags = d?.ags ?? [];
-    const naFila = ags.filter((a) => ["recepcao", "caixa", "triagem"].includes(a.fluxo_etapa ?? ""));
+    const naFila = ags.filter((a) =>
+      ["recepcao", "caixa", "triagem"].includes(a.fluxo_etapa ?? ""),
+    );
     const emAtend = ags.filter((a) => ["atendimento", "exame"].includes(a.fluxo_etapa ?? ""));
     const checkins = ags.filter((a) => a.fluxo_etapa && a.fluxo_etapa !== "aguardando_recepcao");
     return {
@@ -131,21 +208,33 @@ function DashboardOperacional() {
       checkins: checkins.length,
       naFila: naFila.length,
       emAtend: emAtend.length,
-      concluidos: ags.filter((a) => a.status === "realizado" || a.fluxo_etapa === "finalizado").length,
+      concluidos: ags.filter((a) => a.status === "realizado" || a.fluxo_etapa === "finalizado")
+        .length,
       faltas: ags.filter((a) => a.status === "faltou").length,
-      aguardando: ags.filter((a) => !a.fluxo_etapa || a.fluxo_etapa === "aguardando_recepcao").length,
+      aguardando: ags.filter((a) => !a.fluxo_etapa || a.fluxo_etapa === "aguardando_recepcao")
+        .length,
     };
   }, [d]);
 
   const proximos = useMemo(() => {
     const agora = Date.now();
     return (d?.ags ?? [])
-      .filter((a) => a.inicio && new Date(a.inicio).getTime() >= agora && !["cancelado", "realizado", "faltou"].includes(a.status))
+      .filter(
+        (a) =>
+          a.inicio &&
+          new Date(a.inicio).getTime() >= agora &&
+          !["cancelado", "realizado", "faltou"].includes(a.status),
+      )
       .slice(0, 8);
   }, [d]);
 
   const filaAtual = useMemo(
-    () => (d?.ags ?? []).filter((a) => ["recepcao", "caixa", "triagem", "atendimento", "exame"].includes(a.fluxo_etapa ?? "")).slice(0, 10),
+    () =>
+      (d?.ags ?? [])
+        .filter((a) =>
+          ["recepcao", "caixa", "triagem", "atendimento", "exame"].includes(a.fluxo_etapa ?? ""),
+        )
+        .slice(0, 10),
     [d],
   );
 
@@ -157,7 +246,17 @@ function DashboardOperacional() {
     const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
     const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
     const novos = d?.pacientesNovos ?? new Set<string>();
-    const mapa = new Map<string, { id: string; nome: string; especialidade: string | null; total: number; pagos: number; novos: number }>();
+    const mapa = new Map<
+      string,
+      {
+        id: string;
+        nome: string;
+        especialidade: string | null;
+        total: number;
+        pagos: number;
+        novos: number;
+      }
+    >();
     for (const a of ags) {
       const id = a.medico_id as string;
       const info = medInfo.get(id);
@@ -165,7 +264,9 @@ function DashboardOperacional() {
         id,
         nome: info?.nome ?? "Médico",
         especialidade: info?.especialidade_id ? (espNome.get(info.especialidade_id) ?? null) : null,
-        total: 0, pagos: 0, novos: 0,
+        total: 0,
+        pagos: 0,
+        novos: 0,
       };
       item.total += 1;
       if (a.data_pagamento) item.pagos += 1;
@@ -188,7 +289,8 @@ function DashboardOperacional() {
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> ao vivo
             </span>
             <Button variant="outline" size="sm" onClick={refresh} disabled={q.isFetching}>
-              <RefreshCw className={cn("h-4 w-4 mr-1.5", q.isFetching && "animate-spin")} /> Atualizar
+              <RefreshCw className={cn("h-4 w-4 mr-1.5", q.isFetching && "animate-spin")} />{" "}
+              Atualizar
             </Button>
           </>
         }
@@ -208,14 +310,33 @@ function DashboardOperacional() {
         {/* KPIs operacionais do dia */}
         {carregando ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-2xl" />
+            ))}
           </div>
         ) : (
           <HhpKpiRow className="grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
             <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
-            <HhpKpiCard label="Check-ins feitos" value={k.checkins} icon={UserCheck} tone="ok" hint="Pacientes que já chegaram" />
-            <HhpKpiCard label="Aguardando chegada" value={k.aguardando} icon={Clock} tone="default" />
-            <HhpKpiCard label="Na fila" value={k.naFila} icon={ListChecks} tone="warn" hint="Recepção, caixa e triagem" />
+            <HhpKpiCard
+              label="Check-ins feitos"
+              value={k.checkins}
+              icon={UserCheck}
+              tone="ok"
+              hint="Pacientes que já chegaram"
+            />
+            <HhpKpiCard
+              label="Aguardando chegada"
+              value={k.aguardando}
+              icon={Clock}
+              tone="default"
+            />
+            <HhpKpiCard
+              label="Na fila"
+              value={k.naFila}
+              icon={ListChecks}
+              tone="warn"
+              hint="Recepção, caixa e triagem"
+            />
             <HhpKpiCard label="Em atendimento" value={k.emAtend} icon={Activity} tone="info" />
             <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
           </HhpKpiRow>
@@ -225,86 +346,133 @@ function DashboardOperacional() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
           <div className="flex flex-col gap-6">
-          {/* Fila ao vivo */}
-          <Painel
-            title="Fila ao vivo"
-            subtitle="Pacientes dentro da clínica agora"
-            action={<LinkMais to="/app/fluxo" />}
-          >
-            {carregando ? <Linhas /> : filaAtual.length === 0 ? (
-              <HhpEmptyState
-                icon={Users}
-                title="Ninguém na fila"
-                description="Assim que um paciente fizer check-in ele aparece aqui em tempo real."
-                className="min-h-[220px]"
-              />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {filaAtual.map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400 w-11 shrink-0">{hhmm(a.inicio)}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-slate-800 truncate">{a.paciente_nome ?? "Paciente"}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{a.procedimento ?? "—"}</div>
-                    </div>
-                    {a.prioridade && a.prioridade !== "normal" && (
-                      <Badge variant="destructive" className="text-[10px]">{a.prioridade}</Badge>
-                    )}
-                    <Badge variant="secondary" className="text-[10px] shrink-0">
-                      {ETAPA_LABEL[a.fluxo_etapa ?? ""] ?? a.fluxo_etapa}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Painel>
+            {/* Fila ao vivo */}
+            <Painel
+              title="Fila ao vivo"
+              subtitle="Pacientes dentro da clínica agora"
+              action={<LinkMais to="/app/fluxo" />}
+            >
+              {carregando ? (
+                <Linhas />
+              ) : filaAtual.length === 0 ? (
+                <HhpEmptyState
+                  icon={Users}
+                  title="Ninguém na fila"
+                  description="Assim que um paciente fizer check-in ele aparece aqui em tempo real."
+                  className="min-h-[220px]"
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {filaAtual.map((a) => (
+                    <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className="text-xs tabular-nums text-slate-600 dark:text-slate-400 w-11 shrink-0">
+                        {hhmm(a.inicio)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-slate-800 truncate">
+                          {a.paciente_nome ?? "Paciente"}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {a.procedimento ?? "—"}
+                        </div>
+                      </div>
+                      {a.prioridade && a.prioridade !== "normal" && (
+                        <Badge variant="destructive" className="text-[10px]">
+                          {a.prioridade}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[10px] shrink-0">
+                        {ETAPA_LABEL[a.fluxo_etapa ?? ""] ?? a.fluxo_etapa}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Painel>
 
-          {/* Próximos atendimentos */}
-          <Painel title="Próximos atendimentos" subtitle="Ainda hoje" action={<LinkMais to="/app/agenda" />}>
-            {carregando ? <Linhas /> : proximos.length === 0 ? (
-              <div className="min-h-[260px] rounded-xl bg-white p-6 flex flex-col items-center justify-center text-center gap-3">
-                <CalendarPlus className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
-                <div className="text-sm font-semibold text-slate-700">Nada mais agendado hoje</div>
-                <p className="text-xs text-slate-500 max-w-xs">Use os atalhos acima para criar um novo agendamento.</p>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/app/agenda">
-                    <CalendarPlus className="h-4 w-4 mr-1.5" /> Novo agendamento
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {proximos.map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="text-sm font-semibold tabular-nums text-slate-700 w-12 shrink-0">{hhmm(a.inicio)}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-slate-800 truncate">{a.paciente_nome ?? "Paciente"}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{a.procedimento ?? "—"}</div>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0">{a.status}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Painel>
+            {/* Próximos atendimentos */}
+            <Painel
+              title="Próximos atendimentos"
+              subtitle="Ainda hoje"
+              action={<LinkMais to="/app/agenda" />}
+            >
+              {carregando ? (
+                <Linhas />
+              ) : proximos.length === 0 ? (
+                <div className="min-h-[260px] rounded-xl bg-white p-6 flex flex-col items-center justify-center text-center gap-3">
+                  <CalendarPlus className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
+                  <div className="text-sm font-semibold text-slate-700">
+                    Nada mais agendado hoje
+                  </div>
+                  <p className="text-xs text-slate-500 max-w-xs">
+                    Use os atalhos acima para criar um novo agendamento.
+                  </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/app/agenda">
+                      <CalendarPlus className="h-4 w-4 mr-1.5" /> Novo agendamento
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {proximos.map((a) => (
+                    <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className="text-sm font-semibold tabular-nums text-slate-700 w-12 shrink-0">
+                        {hhmm(a.inicio)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-slate-800 truncate">
+                          {a.paciente_nome ?? "Paciente"}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {a.procedimento ?? "—"}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {a.status}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Painel>
           </div>
 
           {/* Senhas + Alertas + caixa */}
           <div className="flex flex-col gap-6">
-            <Painel title="Senhas" subtitle="Emissão e chamada do dia" action={<LinkMais to="/app/recepcao" />}>
+            <Painel
+              title="Senhas"
+              subtitle="Emissão e chamada do dia"
+              action={<LinkMais to="/app/recepcao" />}
+            >
               <div className="p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <MiniStat label="Aguardando" value={senhasAguardando.length} tone="warn" />
-                  <MiniStat label="Última chamada" value={ultimaChamada?.codigo ?? "—"} tone="info" />
+                  <MiniStat
+                    label="Última chamada"
+                    value={ultimaChamada?.codigo ?? "—"}
+                    tone="info"
+                  />
                 </div>
-                {carregando ? <Linhas n={4} /> : senhasAguardando.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-4 text-center">Nenhuma senha aguardando chamada.</p>
+                {carregando ? (
+                  <Linhas n={4} />
+                ) : senhasAguardando.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-4 text-center">
+                    Nenhuma senha aguardando chamada.
+                  </p>
                 ) : (
                   <ul className="space-y-1.5">
                     {senhasAguardando.slice(0, 6).map((s) => (
-                      <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                        <span className="font-semibold tabular-nums text-slate-800 text-sm">{s.codigo ?? `${s.tipo}${s.numero}`}</span>
-                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{hhmm(s.emitida_em)}</span>
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"
+                      >
+                        <span className="font-semibold tabular-nums text-slate-800 text-sm">
+                          {s.codigo ?? `${s.tipo}${s.numero}`}
+                        </span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                          {hhmm(s.emitida_em)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -312,20 +480,33 @@ function DashboardOperacional() {
               </div>
             </Painel>
 
-            <Painel title="Alertas imediatos" subtitle="Enfermagem e faltas" action={<LinkMais to="/app/alertas-enfermagem" />}>
+            <Painel
+              title="Alertas imediatos"
+              subtitle="Enfermagem e faltas"
+              action={<LinkMais to="/app/alertas-enfermagem" />}
+            >
               <div className="p-4 space-y-2">
                 {k.faltas > 0 && (
                   <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-100 px-3 py-2">
                     <XCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                    <span className="text-xs text-rose-700">{k.faltas} falta(s) registrada(s) hoje</span>
+                    <span className="text-xs text-rose-700">
+                      {k.faltas} falta(s) registrada(s) hoje
+                    </span>
                   </div>
                 )}
                 {(d?.alertas ?? []).map((a) => (
-                  <div key={a.id} className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                  <div
+                    key={a.id}
+                    className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2"
+                  >
                     <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <div className="text-xs font-medium text-amber-800 truncate">{a.titulo ?? "Alerta"}</div>
-                      <div className="text-[11px] text-amber-700/80 truncate">{a.paciente_nome ?? "—"}</div>
+                      <div className="text-xs font-medium text-amber-800 truncate">
+                        {a.titulo ?? "Alerta"}
+                      </div>
+                      <div className="text-[11px] text-amber-700/80 truncate">
+                        {a.paciente_nome ?? "—"}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -337,9 +518,15 @@ function DashboardOperacional() {
               </div>
             </Painel>
 
-            <Painel title="Caixas abertos" subtitle="Operadores em turno" action={<LinkMais to="/app/caixa" />}>
+            <Painel
+              title="Caixas abertos"
+              subtitle="Operadores em turno"
+              action={<LinkMais to="/app/caixa" />}
+            >
               <div className="p-4 space-y-2">
-                {carregando ? <Linhas n={2} /> : (d?.caixas ?? []).length === 0 ? (
+                {carregando ? (
+                  <Linhas n={2} />
+                ) : (d?.caixas ?? []).length === 0 ? (
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <Wallet className="h-4 w-4" /> Nenhum caixa aberto no momento.
                   </div>
@@ -347,16 +534,28 @@ function DashboardOperacional() {
                   <>
                     {(d?.caixas ?? [])
                       .slice()
-                      .sort((a, b) => new Date(b.aberto_em).getTime() - new Date(a.aberto_em).getTime())
+                      .sort(
+                        (a, b) => new Date(b.aberto_em).getTime() - new Date(a.aberto_em).getTime(),
+                      )
                       .slice(0, 5)
                       .map((c) => (
-                        <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                          <span className="text-xs font-medium text-slate-700 truncate">{c.user_nome ?? "Operador"}</span>
-                          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">{dataHoraCurta(c.aberto_em)}</span>
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"
+                        >
+                          <span className="text-xs font-medium text-slate-700 truncate">
+                            {c.user_nome ?? "Operador"}
+                          </span>
+                          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                            {dataHoraCurta(c.aberto_em)}
+                          </span>
                         </div>
                       ))}
                     {(d?.caixas ?? []).length > 5 && (
-                      <Link to="/app/caixa" className="block pt-1 text-[11px] font-medium text-slate-500 hover:text-slate-800">
+                      <Link
+                        to="/app/caixa"
+                        className="block pt-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
+                      >
                         +{(d?.caixas ?? []).length - 5} caixa(s) aberto(s) — ver todos
                       </Link>
                     )}
@@ -368,10 +567,17 @@ function DashboardOperacional() {
         </div>
 
         {/* Médicos do dia */}
-        <Painel title="Médicos do dia — Total de atendimentos" subtitle="Agendamentos de hoje por profissional" action={<LinkMais to="/app/agenda-medicos" />} className="mb-6">
+        <Painel
+          title="Médicos do dia — Total de atendimentos"
+          subtitle="Agendamentos de hoje por profissional"
+          action={<LinkMais to="/app/agenda-medicos" />}
+          className="mb-6"
+        >
           {carregando ? (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-28 rounded-xl" />
+              ))}
             </div>
           ) : medicosDoDia.length === 0 ? (
             <HhpEmptyState
@@ -385,24 +591,46 @@ function DashboardOperacional() {
               {medicosDoDia.map((m) => {
                 const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
                 return (
-                  <div key={m.id} className="rounded-xl border border-slate-100 bg-white p-3 transition-shadow hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]">
+                  <div
+                    key={m.id}
+                    className="rounded-xl border border-slate-100 bg-white p-3 transition-shadow hover:shadow-[0_10px_28px_-16px_rgba(15,23,42,0.20)]"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-800 truncate" title={m.nome}>{m.nome}</div>
-                        <Badge variant="secondary" className="mt-1 text-[10px]">{m.especialidade ?? "Sem especialidade"}</Badge>
+                        <div
+                          className="text-sm font-semibold text-slate-800 truncate"
+                          title={m.nome}
+                        >
+                          {m.nome}
+                        </div>
+                        <Badge variant="secondary" className="mt-1 text-[10px]">
+                          {m.especialidade ?? "Sem especialidade"}
+                        </Badge>
                       </div>
-                      <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Abrir agenda deste médico">
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        title="Abrir agenda deste médico"
+                      >
                         <Link to="/app/agenda" search={{ orcmed: m.id } as never}>
                           <CalendarPlus className="h-4 w-4" />
                         </Link>
                       </Button>
                     </div>
-                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">{m.total}</div>
-                    <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Atendimentos</div>
+                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">
+                      {m.total}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">
+                      Atendimentos
+                    </div>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
                         <div className="text-[10px] font-semibold text-emerald-700">Pagos</div>
-                        <div className="text-sm font-bold tabular-nums text-emerald-800">{pct}%</div>
+                        <div className="text-sm font-bold tabular-nums text-emerald-800">
+                          {pct}%
+                        </div>
                       </div>
                       <div className="rounded-lg bg-sky-50 px-2 py-1.5">
                         <div className="text-[10px] font-semibold text-sky-700">Clientes novos</div>
@@ -419,7 +647,13 @@ function DashboardOperacional() {
         <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
           <Megaphone className="h-3.5 w-3.5" />
           Indicadores estratégicos, financeiros e comparativos estão no{" "}
-          <Link to="/app/painel-executivo" className="underline underline-offset-2 hover:text-slate-600">Painel Executivo</Link>.
+          <Link
+            to="/app/painel-executivo"
+            className="underline underline-offset-2 hover:text-slate-600"
+          >
+            Painel Executivo
+          </Link>
+          .
         </p>
       </div>
     </div>
@@ -435,20 +669,36 @@ function Atalho({ to, icon: Icon, label }: { to: string; icon: typeof Users; lab
       <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 group-hover:bg-[var(--clinic-accent)] group-hover:text-white transition-colors">
         <Icon className="h-4 w-4" />
       </span>
-      <span className="text-xs font-medium text-slate-700 leading-tight whitespace-nowrap">{label}</span>
+      <span className="text-xs font-medium text-slate-700 leading-tight whitespace-nowrap">
+        {label}
+      </span>
     </Link>
   );
 }
 
 function Painel({
-  title, subtitle, action, children, className,
-}: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  title,
+  subtitle,
+  action,
+  children,
+  className,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <section className={cn("rounded-2xl border border-slate-100 bg-white overflow-hidden", className)}>
+    <section
+      className={cn("rounded-2xl border border-slate-100 bg-white overflow-hidden", className)}
+    >
       <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
-          {subtitle && <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{subtitle}</p>
+          )}
         </div>
         {action}
       </header>
@@ -459,16 +709,29 @@ function Painel({
 
 function LinkMais({ to }: { to: string }) {
   return (
-    <Link to={to as never} className="text-[11px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 shrink-0">
+    <Link
+      to={to as never}
+      className="text-[11px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 shrink-0"
+    >
       abrir <ArrowRight className="h-3 w-3" />
     </Link>
   );
 }
 
-function MiniStat({ label, value, tone }: { label: string; value: number | string; tone: "warn" | "info" }) {
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone: "warn" | "info";
+}) {
   return (
     <div className={cn("rounded-xl px-3 py-2", tone === "warn" ? "bg-amber-50" : "bg-sky-50")}>
-      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 dark:text-slate-400">{label}</div>
+      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 dark:text-slate-400">
+        {label}
+      </div>
       <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>
     </div>
   );
@@ -477,7 +740,9 @@ function MiniStat({ label, value, tone }: { label: string; value: number | strin
 function Linhas({ n = 5 }: { n?: number }) {
   return (
     <div className="p-4 space-y-2">
-      {Array.from({ length: n }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+      {Array.from({ length: n }).map((_, i) => (
+        <Skeleton key={i} className="h-9 w-full" />
+      ))}
     </div>
   );
 }

@@ -31,9 +31,7 @@ describe("guarda de rotas privadas", () => {
   });
 
   it("toda rota privada tem módulo mapeado (ou é livre/admin)", () => {
-    const semMapa = ROTAS.filter(
-      (r) => moduloDaRota(r) === undefined && !rotaSomenteAdmin(r),
-    );
+    const semMapa = ROTAS.filter((r) => moduloDaRota(r) === undefined && !rotaSomenteAdmin(r));
     expect(semMapa).toEqual([]);
   });
 

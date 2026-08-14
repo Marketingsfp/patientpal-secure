@@ -44,9 +44,14 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={q}
-          onChange={(e) => { setQ(e.target.value); setAberto(true); }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setAberto(true);
+          }}
           onFocus={() => setAberto(true)}
-          onBlur={() => { blurTimer.current = setTimeout(() => setAberto(false), 120); }}
+          onBlur={() => {
+            blurTimer.current = setTimeout(() => setAberto(false), 120);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -63,18 +68,27 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
               <button
                 key={`${m.nome}-${i}`}
                 type="button"
-                onMouseDown={() => { if (blurTimer.current) clearTimeout(blurTimer.current); }}
+                onMouseDown={() => {
+                  if (blurTimer.current) clearTimeout(blurTimer.current);
+                }}
                 onClick={() => adicionar(m)}
                 className="w-full text-left px-3 py-2 hover:bg-muted/70 border-b border-border/50 last:border-0"
               >
-                <div className="text-sm font-medium">{m.nome} <span className="text-muted-foreground font-normal">— {m.apresentacao}</span></div>
-                {m.posologia && <div className="text-[11px] text-muted-foreground truncate">{m.posologia}</div>}
+                <div className="text-sm font-medium">
+                  {m.nome}{" "}
+                  <span className="text-muted-foreground font-normal">— {m.apresentacao}</span>
+                </div>
+                {m.posologia && (
+                  <div className="text-[11px] text-muted-foreground truncate">{m.posologia}</div>
+                )}
               </button>
             ))}
             {q.trim() && (
               <button
                 type="button"
-                onMouseDown={() => { if (blurTimer.current) clearTimeout(blurTimer.current); }}
+                onMouseDown={() => {
+                  if (blurTimer.current) clearTimeout(blurTimer.current);
+                }}
                 onClick={() => adicionar()}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-muted/70 flex items-center gap-2"
               >
@@ -86,7 +100,9 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
       </div>
 
       {itens.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum medicamento na prescrição. Use a busca acima.</p>
+        <p className="text-sm text-muted-foreground">
+          Nenhum medicamento na prescrição. Use a busca acima.
+        </p>
       ) : (
         <div className="space-y-2">
           {itens.map((it, idx) => (
@@ -103,21 +119,61 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
               className={`p-3 space-y-2 ${arrastando === idx ? "opacity-60" : ""}`}
             >
               <div className="flex items-start gap-2">
-                <Badge variant="secondary" className="mt-1.5 font-mono shrink-0">{idx + 1}</Badge>
+                <Badge variant="secondary" className="mt-1.5 font-mono shrink-0">
+                  {idx + 1}
+                </Badge>
                 <div className="flex-1 grid gap-2 sm:grid-cols-[2fr_1.4fr_0.9fr]">
-                  <Input value={it.nome} onChange={(e) => atualizar(it.id, { nome: e.target.value })} placeholder="Medicamento" className="h-9" />
-                  <Input value={it.apresentacao} onChange={(e) => atualizar(it.id, { apresentacao: e.target.value })} placeholder="Apresentação" className="h-9" />
-                  <Input value={it.quantidade} onChange={(e) => atualizar(it.id, { quantidade: e.target.value })} placeholder="Qtd. (ex.: 20 cp)" className="h-9" />
+                  <Input
+                    value={it.nome}
+                    onChange={(e) => atualizar(it.id, { nome: e.target.value })}
+                    placeholder="Medicamento"
+                    className="h-9"
+                  />
+                  <Input
+                    value={it.apresentacao}
+                    onChange={(e) => atualizar(it.id, { apresentacao: e.target.value })}
+                    placeholder="Apresentação"
+                    className="h-9"
+                  />
+                  <Input
+                    value={it.quantidade}
+                    onChange={(e) => atualizar(it.id, { quantidade: e.target.value })}
+                    placeholder="Qtd. (ex.: 20 cp)"
+                    className="h-9"
+                  />
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <div className="flex gap-1">
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={idx === 0} onClick={() => onChange(mover(itens, idx, idx - 1))} title="Subir">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      disabled={idx === 0}
+                      onClick={() => onChange(mover(itens, idx, idx - 1))}
+                      title="Subir"
+                    >
                       <ArrowUp className="h-3.5 w-3.5" />
                     </Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={idx === itens.length - 1} onClick={() => onChange(mover(itens, idx, idx + 1))} title="Descer">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      disabled={idx === itens.length - 1}
+                      onClick={() => onChange(mover(itens, idx, idx + 1))}
+                      title="Descer"
+                    >
                       <ArrowDown className="h-3.5 w-3.5" />
                     </Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => remover(it.id)} title="Remover">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => remover(it.id)}
+                      title="Remover"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -150,10 +206,18 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
       )}
 
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" size="sm" onClick={() => adicionar()} className="gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => adicionar()}
+          className="gap-1"
+        >
           <Pill className="h-3.5 w-3.5" /> Item em branco
         </Button>
-        <span className="text-xs text-muted-foreground">{itens.length} item(ns) · arraste para reordenar</span>
+        <span className="text-xs text-muted-foreground">
+          {itens.length} item(ns) · arraste para reordenar
+        </span>
       </div>
     </div>
   );

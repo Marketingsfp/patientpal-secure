@@ -21,11 +21,22 @@ export function TecladoNumerico({
   return (
     <div className="grid grid-cols-3 gap-2.5 max-w-sm mx-auto select-none">
       {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-        <button key={d} type="button" className={base} disabled={disabled} onClick={() => onDigit(d)}>
+        <button
+          key={d}
+          type="button"
+          className={base}
+          disabled={disabled}
+          onClick={() => onDigit(d)}
+        >
           {d}
         </button>
       ))}
-      <button type="button" className={`${base} text-lg text-muted-foreground`} disabled={disabled} onClick={onClear}>
+      <button
+        type="button"
+        className={`${base} text-lg text-muted-foreground`}
+        disabled={disabled}
+        onClick={onClear}
+      >
         Limpar
       </button>
       <button type="button" className={base} disabled={disabled} onClick={() => onDigit("0")}>

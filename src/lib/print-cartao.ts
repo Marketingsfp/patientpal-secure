@@ -38,8 +38,10 @@ type CardItem = {
 };
 
 function corPlano(tipo: string): { bg: string; accent: string } {
-  if (tipo === "cartao_consulta") return { bg: "linear-gradient(135deg,#0f766e,#0d9488)", accent: "#5eead4" };
-  if (tipo === "cartao_desconto") return { bg: "linear-gradient(135deg,#1e3a8a,#3b82f6)", accent: "#93c5fd" };
+  if (tipo === "cartao_consulta")
+    return { bg: "linear-gradient(135deg,#0f766e,#0d9488)", accent: "#5eead4" };
+  if (tipo === "cartao_desconto")
+    return { bg: "linear-gradient(135deg,#1e3a8a,#3b82f6)", accent: "#93c5fd" };
   return { bg: "linear-gradient(135deg,#334155,#475569)", accent: "#cbd5e1" };
 }
 
@@ -84,7 +86,11 @@ export async function printCartoes(contratoId: string) {
           .maybeSingle()
       : Promise.resolve({ data: null as any }),
     c.clinica_id
-      ? supabase.from("clinicas").select("nome, cidade, estado, telefone").eq("id", c.clinica_id).maybeSingle()
+      ? supabase
+          .from("clinicas")
+          .select("nome, cidade, estado, telefone")
+          .eq("id", c.clinica_id)
+          .maybeSingle()
       : Promise.resolve({ data: null as any }),
     c.paciente_id
       ? supabase.from("pacientes").select("cpf").eq("id", c.paciente_id).maybeSingle()
@@ -106,12 +112,12 @@ export async function printCartoes(contratoId: string) {
   const numero = String(c.numero).padStart(6, "0");
 
   // PAC = total de pessoas vinculadas ao contrato (titular + dependentes ativos)
-  const totalPessoas = 1 + ((deps ?? []).length);
+  const totalPessoas = 1 + (deps ?? []).length;
   const pacStr = String(totalPessoas).padStart(2, "0");
 
   // Buscar CPF dos dependentes
   const depIds = (deps ?? []).map((d: any) => d.paciente_id);
-  let depCpf = new Map<string, string>();
+  const depCpf = new Map<string, string>();
   if (depIds.length) {
     const { data: pacs } = await supabase.from("pacientes").select("id, cpf").in("id", depIds);
     (pacs ?? []).forEach((p: any) => depCpf.set(p.id, p.cpf ?? ""));
@@ -128,13 +134,25 @@ export async function printCartoes(contratoId: string) {
       cpf: _pa.cpf ?? "",
       tipo: (c as any).titular_apenas_financeiro ? "TITULAR FINANCEIRO" : "TITULAR",
       aviso: (c as any).titular_apenas_financeiro ? "Não utiliza os benefícios" : undefined,
-      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone, pac: pacStr,
+      numero,
+      plano: planoNome,
+      validade,
+      clinica: clinicaNome,
+      cidadeUf,
+      telefone,
+      pac: pacStr,
     },
     ...((deps ?? []) as any[]).map((d) => ({
       nome: d.paciente_nome,
       cpf: depCpf.get(d.paciente_id) ?? "",
       tipo: (d.tipo === "agregado" ? "AGREGADO" : "DEPENDENTE") as "DEPENDENTE" | "AGREGADO",
-      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone, pac: pacStr,
+      numero,
+      plano: planoNome,
+      validade,
+      clinica: clinicaNome,
+      cidadeUf,
+      telefone,
+      pac: pacStr,
     })),
   ];
 

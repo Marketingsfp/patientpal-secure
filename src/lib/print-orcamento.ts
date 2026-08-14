@@ -11,7 +11,7 @@ const fmtData = (iso: string) => {
 };
 
 const esc = (s: string | null | undefined) =>
-  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 export async function printOrcamento(
   orcamentoId: string,
@@ -21,7 +21,11 @@ export async function printOrcamento(
   const [orc, itens, cli] = await Promise.all([
     supabase.from("orcamentos").select("*").eq("id", orcamentoId).maybeSingle(),
     supabase.from("orcamento_itens").select("*").eq("orcamento_id", orcamentoId).order("ordem"),
-    supabase.from("clinicas").select("nome, endereco, cidade, estado, telefone, cnpj").eq("id", clinicaId).maybeSingle(),
+    supabase
+      .from("clinicas")
+      .select("nome, endereco, cidade, estado, telefone, cnpj")
+      .eq("id", clinicaId)
+      .maybeSingle(),
   ]);
 
   if (orc.error || !orc.data) throw new Error(orc.error?.message ?? "Orçamento não encontrado");
@@ -30,7 +34,9 @@ export async function printOrcamento(
   const c = cli.data as any;
 
   // Busca preparos dos procedimentos para destacar no cupom
-  const procIds = Array.from(new Set(its.map((i) => i.procedimento_id).filter(Boolean))) as string[];
+  const procIds = Array.from(
+    new Set(its.map((i) => i.procedimento_id).filter(Boolean)),
+  ) as string[];
   const preparoMap = new Map<string, string>();
   if (procIds.length > 0) {
     const { data: procs } = await supabase
@@ -79,30 +85,37 @@ export async function printOrcamento(
     (s, i) => s + Math.max(0, totalDoItem(i) - sinalDoItem(i)),
     0,
   );
-  const totalDinheiro = its.reduce((s, i) => {
-    const sp = splitFormas(i);
-    const v = sp ? sp.din : Number(i.valor_unitario || 0);
-    return s + Number(i.quantidade || 0) * v;
-  }, 0) - (temSplit ? desconto : 0);
-  const totalCartao = its.reduce((s, i) => {
-    const sp = splitFormas(i);
-    const v = sp ? sp.cart : Number(i.valor_unitario || 0);
-    return s + Number(i.quantidade || 0) * v;
-  }, 0) - (temSplit ? desconto : 0);
+  const totalDinheiro =
+    its.reduce((s, i) => {
+      const sp = splitFormas(i);
+      const v = sp ? sp.din : Number(i.valor_unitario || 0);
+      return s + Number(i.quantidade || 0) * v;
+    }, 0) - (temSplit ? desconto : 0);
+  const totalCartao =
+    its.reduce((s, i) => {
+      const sp = splitFormas(i);
+      const v = sp ? sp.cart : Number(i.valor_unitario || 0);
+      return s + Number(i.quantidade || 0) * v;
+    }, 0) - (temSplit ? desconto : 0);
 
   const formasList: string[] = o.forma_pagamento
-    ? String(o.forma_pagamento).split("+").map((s: string) => s.trim()).filter(Boolean)
+    ? String(o.forma_pagamento)
+        .split("+")
+        .map((s: string) => s.trim())
+        .filter(Boolean)
     : [];
   const abreviar = (f: string) =>
-    f === "Cartão de Crédito" ? "CRÉDITO"
-    : f === "Cartão de Débito" ? "DÉBITO"
-    : f.toUpperCase();
+    f === "Cartão de Crédito" ? "CRÉDITO" : f === "Cartão de Débito" ? "DÉBITO" : f.toUpperCase();
 
   const validade = new Date(new Date(o.created_at).getTime() + (o.validade_dias || 30) * 86400000);
   const validadeStr = `${String(validade.getDate()).padStart(2, "0")}/${String(validade.getMonth() + 1).padStart(2, "0")}/${validade.getFullYear()}`;
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado]
-    .filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
 
   const htmlA4 = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/>
@@ -169,63 +182,85 @@ export async function printOrcamento(
       </tr>
     </thead>
     <tbody>
-      ${its.map((i) => {
-        const qtd = Number(i.quantidade) || 1;
-        const sp = splitFormas(i);
-        const sinalIt = sinalDoItem(i);
-        const saldoIt = sinalIt > 0 ? Math.max(0, totalDoItem(i) - sinalIt) : 0;
-        return `
+      ${its
+        .map((i) => {
+          const qtd = Number(i.quantidade) || 1;
+          const sp = splitFormas(i);
+          const sinalIt = sinalDoItem(i);
+          const saldoIt = sinalIt > 0 ? Math.max(0, totalDoItem(i) - sinalIt) : 0;
+          return `
       <tr>
         <td>${esc(i.descricao)}</td>
         <td class="center">${qtd}</td>
         <td class="right">${fmtBRL(Number(i.valor_unitario))}</td>
-        ${temSplit
-          ? `<td class="right">${fmtBRL(qtd * (sp ? sp.din : Number(i.valor_unitario || 0)))}</td>
+        ${
+          temSplit
+            ? `<td class="right">${fmtBRL(qtd * (sp ? sp.din : Number(i.valor_unitario || 0)))}</td>
              <td class="right">${fmtBRL(qtd * (sp ? sp.cart : Number(i.valor_unitario || 0)))}</td>`
-          : `<td class="right bold">${fmtBRL(Number(i.valor_total))}</td>`}
-        ${temSinal
-          ? `<td class="right">${sinalIt > 0 ? fmtBRL(sinalIt) : "-"}</td>
+            : `<td class="right bold">${fmtBRL(Number(i.valor_total))}</td>`
+        }
+        ${
+          temSinal
+            ? `<td class="right">${sinalIt > 0 ? fmtBRL(sinalIt) : "-"}</td>
              <td class="right">${sinalIt > 0 ? fmtBRL(saldoIt) : "-"}</td>`
-          : ""}
+            : ""
+        }
       </tr>`;
-      }).join("")}
+        })
+        .join("")}
     </tbody>
   </table>
 
   <table class="totais">
-    ${temSplit
-      ? `${desconto > 0 ? `<tr><td>Desconto</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+    ${
+      temSplit
+        ? `${desconto > 0 ? `<tr><td>Desconto</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
          <tr class="total"><td>Dinheiro</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
          <tr class="total"><td>Cartão/PIX</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
-      : `<tr><td>Subtotal</td><td class="right">${fmtBRL(subtotal)}</td></tr>
+        : `<tr><td>Subtotal</td><td class="right">${fmtBRL(subtotal)}</td></tr>
          ${desconto > 0 ? `<tr><td>Desconto</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
-         <tr class="total"><td>Total</td><td class="right">${fmtBRL(total)}</td></tr>`}
-    ${temSinal
-      ? `<tr><td>Total sinal</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
+         <tr class="total"><td>Total</td><td class="right">${fmtBRL(total)}</td></tr>`
+    }
+    ${
+      temSinal
+        ? `<tr><td>Total sinal</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
          <tr><td>Total saldo final</td><td class="right">${fmtBRL(totalSaldo)}</td></tr>`
-      : ""}
+        : ""
+    }
   </table>
 
-  ${o.forma_pagamento ? `<div class="box"><h3>Pagamento</h3>${
-    formasList.length <= 1
-      ? `<div class="bold">${esc(o.forma_pagamento)}</div>`
-      : `<table class="itens" style="margin-top:4px">
+  ${
+    o.forma_pagamento
+      ? `<div class="box"><h3>Pagamento</h3>${
+          formasList.length <= 1
+            ? `<div class="bold">${esc(o.forma_pagamento)}</div>`
+            : `<table class="itens" style="margin-top:4px">
            <tr>${formasList.map((f: string) => `<th>${esc(f)}</th>`).join("")}</tr>
            <tr>${formasList.map((f: string) => `<td class="center bold">${fmtBRL(Number(((o.valores_pagamento ?? {}) as Record<string, number>)[f] ?? 0))}</td>`).join("")}</tr>
          </table>`
-  }</div>` : ""}
+        }</div>`
+      : ""
+  }
 
   ${o.observacoes ? `<div class="box"><h3>Observações</h3><div style="white-space:pre-wrap">${esc(o.observacoes)}</div></div>` : ""}
 
-  ${preparos.length > 0 ? `
+  ${
+    preparos.length > 0
+      ? `
   <div class="preparo">
     <div class="bold center">ATENÇÃO: PREPARO</div>
-    ${preparos.map((p) => `
+    ${preparos
+      .map(
+        (p) => `
       <div style="margin-top:6px">
         <div class="bold">${esc(p.nome)}</div>
         <div class="sm" style="white-space:pre-wrap">${esc(p.preparo)}</div>
-      </div>`).join("")}
-  </div>` : ""}
+      </div>`,
+      )
+      .join("")}
+  </div>`
+      : ""
+  }
 
   <div class="assin">
     <div>Assinatura do paciente</div>
@@ -283,7 +318,9 @@ export async function printOrcamento(
 
     <div class="sep"></div>
     <div class="bold">SERVIÇOS</div>
-    ${its.map((i) => `
+    ${its
+      .map(
+        (i) => `
       <div class="item-linha">
         <div class="item-nome">${esc(i.descricao)}</div>
         <div class="row sm">
@@ -306,18 +343,24 @@ export async function printOrcamento(
             </div>
           </div>`;
           }
-          return formasList.length > 1 ? `
+          return formasList.length > 1
+            ? `
           <div class="sm" style="margin-top:2px; padding-left:4px">
-            ${formasList.map((f: string) => {
-              const vu = Number((i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0);
-              const vt = Number(i.quantidade) * vu;
-              return `<div style="display:flex; justify-content:space-between">
+            ${formasList
+              .map((f: string) => {
+                const vu = Number(
+                  (i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0,
+                );
+                const vt = Number(i.quantidade) * vu;
+                return `<div style="display:flex; justify-content:space-between">
                 <span>${esc(abreviar(f))}</span>
                 <span>${fmtBRL(vt)}</span>
               </div>`;
-            }).join("")}
+              })
+              .join("")}
           </div>
-        ` : "";
+        `
+            : "";
         })()}
         ${(() => {
           const sinalIt = sinalDoItem(i);
@@ -335,56 +378,80 @@ export async function printOrcamento(
           </div>`;
         })()}
       </div>
-    `).join("")}
+    `,
+      )
+      .join("")}
 
     <div class="sep"></div>
     <table>
-      ${temSplit
-        ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+      ${
+        temSplit
+          ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
            <tr class="bold lg"><td>DINHEIRO</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
            <tr class="bold lg"><td>CARTÃO/PIX</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
-        : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
+          : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
            ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
-           <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
-      ${temSinal
-        ? `<tr><td>TOTAL SINAL</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
+           <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`
+      }
+      ${
+        temSinal
+          ? `<tr><td>TOTAL SINAL</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
            <tr><td>TOTAL SALDO FINAL</td><td class="right">${fmtBRL(totalSaldo)}</td></tr>`
-        : ""}
+          : ""
+      }
     </table>
 
-    ${o.forma_pagamento ? (() => {
-      const formas = formasList;
-      if (formas.length <= 1) {
-        return `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>`;
-      }
-      const vals = (o.valores_pagamento ?? {}) as Record<string, number>;
-      const headerCols = formas.map((f: string) => `
+    ${
+      o.forma_pagamento
+        ? (() => {
+            const formas = formasList;
+            if (formas.length <= 1) {
+              return `<div class="sm" style="margin-top:6px">PAGAMENTO: <span class="bold">${esc(o.forma_pagamento)}</span></div>`;
+            }
+            const vals = (o.valores_pagamento ?? {}) as Record<string, number>;
+            const headerCols = formas
+              .map(
+                (f: string) => `
         <td class="center bold" style="border:1px solid #000; padding:3px 2px; width:${(100 / formas.length).toFixed(2)}%">
           ${esc(f)}
-        </td>`).join("");
-      const valueCols = formas.map((f: string) => {
-        const v = Number(vals[f] ?? 0);
-        return `<td class="center bold" style="border:1px solid #000; padding:3px 2px">${fmtBRL(v)}</td>`;
-      }).join("");
-      return `
+        </td>`,
+              )
+              .join("");
+            const valueCols = formas
+              .map((f: string) => {
+                const v = Number(vals[f] ?? 0);
+                return `<td class="center bold" style="border:1px solid #000; padding:3px 2px">${fmtBRL(v)}</td>`;
+              })
+              .join("");
+            return `
         <div class="sm bold" style="margin-top:6px">PAGAMENTO (escolha uma forma)</div>
         <table style="margin-top:2px; border-collapse:collapse; width:100%">
           <tr>${headerCols}</tr>
           <tr>${valueCols}</tr>
         </table>`;
-    })() : ""}
+          })()
+        : ""
+    }
     ${o.observacoes ? `<div class="sep"></div><div class="sm"><div class="bold">OBSERVAÇÕES</div>${esc(o.observacoes)}</div>` : ""}
 
-    ${preparos.length > 0 ? `
+    ${
+      preparos.length > 0
+        ? `
     <div class="sep"></div>
     <div class="bold" style="text-align:center">** ATENÇÃO: PREPARO **</div>
-    ${preparos.map((p) => `
+    ${preparos
+      .map(
+        (p) => `
       <div style="margin-top:4px">
         <div class="bold sm">${esc(p.nome)}</div>
         <div class="sm" style="white-space:pre-wrap">${esc(p.preparo)}</div>
       </div>
-    `).join("")}
-    ` : ""}
+    `,
+      )
+      .join("")}
+    `
+        : ""
+    }
 
     <div class="sep"></div>
     <div class="center sm">VÁLIDO ATÉ ${validadeStr}</div>
@@ -403,7 +470,10 @@ export async function printOrcamento(
     "_blank",
     formato === "a4" ? "width=900,height=1000" : "width=420,height=720",
   );
-  if (!w) throw new Error("O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.");
+  if (!w)
+    throw new Error(
+      "O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.",
+    );
   w.document.open();
   w.document.write(html);
   w.document.close();

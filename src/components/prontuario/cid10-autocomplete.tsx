@@ -34,15 +34,27 @@ export function Cid10Autocomplete({ selecionados = [], onAdd, onRemove, placehol
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={q}
-          onChange={(e) => { setQ(e.target.value); setAberto(true); setIdx(0); }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setAberto(true);
+            setIdx(0);
+          }}
           onFocus={() => setAberto(true)}
-          onBlur={() => { blurTimer.current = setTimeout(() => setAberto(false), 120); }}
+          onBlur={() => {
+            blurTimer.current = setTimeout(() => setAberto(false), 120);
+          }}
           onKeyDown={(e) => {
             if (!resultados.length) return;
-            if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, resultados.length - 1)); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
-            else if (e.key === "Enter") { e.preventDefault(); escolher(resultados[idx]); }
-            else if (e.key === "Escape") setAberto(false);
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setIdx((i) => Math.min(i + 1, resultados.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setIdx((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              escolher(resultados[idx]);
+            } else if (e.key === "Escape") setAberto(false);
           }}
           className="pl-8 h-9"
           placeholder={placeholder ?? "Buscar CID-10 por código ou doença (ex.: J00, hipertensão)…"}
@@ -53,12 +65,16 @@ export function Cid10Autocomplete({ selecionados = [], onAdd, onRemove, placehol
               <button
                 key={c.codigo}
                 type="button"
-                onMouseDown={() => { if (blurTimer.current) clearTimeout(blurTimer.current); }}
+                onMouseDown={() => {
+                  if (blurTimer.current) clearTimeout(blurTimer.current);
+                }}
                 onClick={() => escolher(c)}
                 onMouseEnter={() => setIdx(i)}
                 className={`w-full text-left px-3 py-2 flex items-start gap-2 border-b border-border/50 last:border-0 ${i === idx ? "bg-muted" : "hover:bg-muted/60"}`}
               >
-                <Badge variant="secondary" className="font-mono text-[11px] shrink-0 mt-0.5">{c.codigo}</Badge>
+                <Badge variant="secondary" className="font-mono text-[11px] shrink-0 mt-0.5">
+                  {c.codigo}
+                </Badge>
                 <span className="text-sm flex-1">{c.descricao}</span>
               </button>
             ))}
@@ -74,7 +90,12 @@ export function Cid10Autocomplete({ selecionados = [], onAdd, onRemove, placehol
               <span className="font-mono text-[11px]">{c.codigo}</span>
               <span className="max-w-[220px] truncate">{c.descricao}</span>
               {onRemove && (
-                <button type="button" onClick={() => onRemove(c.codigo)} className="ml-0.5 rounded p-0.5 hover:bg-destructive/15" title="Remover">
+                <button
+                  type="button"
+                  onClick={() => onRemove(c.codigo)}
+                  className="ml-0.5 rounded p-0.5 hover:bg-destructive/15"
+                  title="Remover"
+                >
                   <X className="h-3 w-3" />
                 </button>
               )}

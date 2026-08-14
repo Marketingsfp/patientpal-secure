@@ -1,10 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  ClinicaContext,
-  type ClinicaBranding,
-  type ClinicaMembership,
-} from "@/hooks/use-clinica";
+import { ClinicaContext, type ClinicaBranding, type ClinicaMembership } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
 
 /**

@@ -13,8 +13,7 @@ describe("normalizarProcedimento", () => {
   });
 
   it("trata serviços equivalentes com acento diferente como iguais", () => {
-    expect(normalizarProcedimento("Ecocardiograma"))
-      .toBe(normalizarProcedimento("ecocardiograma"));
+    expect(normalizarProcedimento("Ecocardiograma")).toBe(normalizarProcedimento("ecocardiograma"));
   });
 });
 
@@ -49,10 +48,7 @@ describe("calcularAvisoLimitePendentes — gratuidade", () => {
   it("avisa quando existe pendente do MESMO serviço (case/acento insensitive)", () => {
     const aviso = calcularAvisoLimitePendentes({
       beneficio,
-      pendentes: [
-        { procedimento: "consulta medica" },
-        { procedimento: "Ecocardiograma" },
-      ],
+      pendentes: [{ procedimento: "consulta medica" }, { procedimento: "Ecocardiograma" }],
       usados: 0,
       procedimentoNome: "Consulta Médica",
     });
@@ -113,11 +109,7 @@ describe("calcularAvisoLimitePendentes — demais benefícios", () => {
     // todos de serviços diferentes, mas estouram o limite → deve avisar
     const aviso = calcularAvisoLimitePendentes({
       beneficio,
-      pendentes: [
-        { procedimento: "A" },
-        { procedimento: "B" },
-        { procedimento: "C" },
-      ],
+      pendentes: [{ procedimento: "A" }, { procedimento: "B" }, { procedimento: "C" }],
       usados: 0,
       procedimentoNome: "D",
     });

@@ -18,18 +18,45 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Heading1, Heading2, Heading3,
-  Undo2, Redo2, Image as ImageIcon, Link as LinkIcon,
-  Table as TableIcon, Rows3, Columns3, Trash2, Crop, Upload,
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+  Heading3,
+  Undo2,
+  Redo2,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Table as TableIcon,
+  Rows3,
+  Columns3,
+  Trash2,
+  Crop,
+  Upload,
   Code2,
 } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { ImageCropDialog } from "./image-crop-dialog";
 import { TableInsertMenu } from "./table-insert-menu";
@@ -47,8 +74,16 @@ const PreservarEstiloInline = Extension.create({
     return [
       {
         types: [
-          "paragraph", "heading", "table", "tableRow", "tableCell",
-          "tableHeader", "bulletList", "orderedList", "listItem", "image",
+          "paragraph",
+          "heading",
+          "table",
+          "tableRow",
+          "tableCell",
+          "tableHeader",
+          "bulletList",
+          "orderedList",
+          "listItem",
+          "image",
         ],
         attributes: {
           style: {
@@ -146,9 +181,7 @@ const ResizableTable = Table.extend({
       width: {
         default: null,
         parseHTML: (el) =>
-          (el as HTMLElement).getAttribute("data-width") ||
-          (el as HTMLElement).style.width ||
-          null,
+          (el as HTMLElement).getAttribute("data-width") || (el as HTMLElement).style.width || null,
         renderHTML: (attrs) => {
           if (!attrs.width) return {};
           return {
@@ -185,10 +218,34 @@ const ResizableTableRow = TableRow.extend({
 });
 
 const FONTS = [
-  "Arial", "Calibri", "Times New Roman", "Georgia", "Verdana",
-  "Tahoma", "Courier New", "Helvetica", "Garamond", "Trebuchet MS",
+  "Arial",
+  "Calibri",
+  "Times New Roman",
+  "Georgia",
+  "Verdana",
+  "Tahoma",
+  "Courier New",
+  "Helvetica",
+  "Garamond",
+  "Trebuchet MS",
 ];
-const SIZES = ["5px", "6px", "7px", "8px", "9px", "10px", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "40px"];
+const SIZES = [
+  "5px",
+  "6px",
+  "7px",
+  "8px",
+  "9px",
+  "10px",
+  "12px",
+  "14px",
+  "16px",
+  "18px",
+  "20px",
+  "24px",
+  "28px",
+  "32px",
+  "40px",
+];
 
 // NodeView React para imagem: contorno quando selecionada + handle para redimensionar.
 function ImageNodeView(props: NodeViewProps) {
@@ -217,7 +274,8 @@ function ImageNodeView(props: NodeViewProps) {
       const next = Math.max(40, Math.round(startWidth + dx));
       updateAttributes({ width: `${next}px` });
       // height segue via CSS height:auto + ratio mantido naturalmente pelo img
-      void keepRatio; void ratio;
+      void keepRatio;
+      void ratio;
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -259,10 +317,13 @@ function ImageNodeView(props: NodeViewProps) {
   };
 
   const alignClass =
-    align === "center" ? "rt-img-block-center"
-    : align === "left" ? "rt-img-block-left"
-    : align === "right" ? "rt-img-block-right"
-    : "";
+    align === "center"
+      ? "rt-img-block-center"
+      : align === "left"
+        ? "rt-img-block-left"
+        : align === "right"
+          ? "rt-img-block-right"
+          : "";
 
   const freeStyle: React.CSSProperties | undefined = free
     ? { position: "absolute", left: posX, top: posY, zIndex: 5, cursor: "move" }
@@ -298,10 +359,26 @@ function ImageNodeView(props: NodeViewProps) {
       />
       {selected && editor.isEditable && (
         <>
-          <span className="rt-img-handle rt-img-handle-nw" onPointerDown={startResize("nw")} title="Redimensionar" />
-          <span className="rt-img-handle rt-img-handle-ne" onPointerDown={startResize("ne")} title="Redimensionar" />
-          <span className="rt-img-handle rt-img-handle-sw" onPointerDown={startResize("sw")} title="Redimensionar" />
-          <span className="rt-img-handle rt-img-handle-se" onPointerDown={startResize("se")} title="Redimensionar" />
+          <span
+            className="rt-img-handle rt-img-handle-nw"
+            onPointerDown={startResize("nw")}
+            title="Redimensionar"
+          />
+          <span
+            className="rt-img-handle rt-img-handle-ne"
+            onPointerDown={startResize("ne")}
+            title="Redimensionar"
+          />
+          <span
+            className="rt-img-handle rt-img-handle-sw"
+            onPointerDown={startResize("sw")}
+            title="Redimensionar"
+          />
+          <span
+            className="rt-img-handle rt-img-handle-se"
+            onPointerDown={startResize("se")}
+            title="Redimensionar"
+          />
         </>
       )}
     </NodeViewWrapper>
@@ -362,10 +439,17 @@ const ResizableImage = Image.extend({
 });
 
 function ToolbarButton({
-  active, onClick, title, children, disabled,
+  active,
+  onClick,
+  title,
+  children,
+  disabled,
 }: {
-  active?: boolean; onClick: () => void; title: string;
-  children: React.ReactNode; disabled?: boolean;
+  active?: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -408,8 +492,12 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     if (typeof window === "undefined") return null;
     try {
       const raw = window.localStorage.getItem(storageKey);
-      return raw ? (JSON.parse(raw) as { t: number; b: number; l: number; r: number; s: boolean }) : null;
-    } catch { return null; }
+      return raw
+        ? (JSON.parse(raw) as { t: number; b: number; l: number; r: number; s: boolean })
+        : null;
+    } catch {
+      return null;
+    }
   };
   const stored = readStored();
   const [marginTop, setMarginTop] = useState(stored?.t ?? 12);
@@ -425,9 +513,17 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     try {
       window.localStorage.setItem(
         storageKey,
-        JSON.stringify({ t: marginTop, b: marginBottom, l: marginLeft, r: marginRight, s: showRuler }),
+        JSON.stringify({
+          t: marginTop,
+          b: marginBottom,
+          l: marginLeft,
+          r: marginRight,
+          s: showRuler,
+        }),
       );
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [storageKey, marginTop, marginBottom, marginLeft, marginRight, showRuler]);
 
   const editor = useEditor({
@@ -438,15 +534,16 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       FontFamily.configure({ types: ["textStyle"] }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       ResizableTable.configure({ resizable: true, HTMLAttributes: { class: "rt-table" } }),
-      ResizableTableRow, ColoredTableHeader, ColoredTableCell,
+      ResizableTableRow,
+      ColoredTableHeader,
+      ColoredTableCell,
       ResizableImage.configure({ inline: true, allowBase64: true }),
       PreservarEstiloInline,
     ],
     content: value || "<p></p>",
     editorProps: {
       attributes: {
-        class:
-          "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
+        class: "rt-editor prose prose-sm max-w-none focus:outline-none min-h-[60vh]",
       },
       // Colagem vinda de MS Word / Google Docs: preserva tabelas, mesclagens
       // e sombreamento das células, limpando o markup proprietário.
@@ -460,7 +557,6 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     if (!editor) return;
     const current = editor.getHTML();
     if (value !== current) editor.commands.setContent(value || "<p></p>", { emitUpdate: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editor]);
 
   useEffect(() => {
@@ -484,7 +580,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   };
 
   // Helpers para encontrar a tabela/linha atuais e atualizar atributos (largura/altura)
-  const findAncestorPos = (typeName: string): { pos: number; attrs: Record<string, unknown> } | null => {
+  const findAncestorPos = (
+    typeName: string,
+  ): { pos: number; attrs: Record<string, unknown> } | null => {
     const { $from } = editor.state.selection;
     for (let d = $from.depth; d > 0; d--) {
       const node = $from.node(d);
@@ -497,12 +595,16 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const updateAncestor = (typeName: string, patch: Record<string, unknown>) => {
     const found = findAncestorPos(typeName);
     if (!found) return;
-    editor.chain().focus().command(({ tr, dispatch, state }) => {
-      const node = state.doc.nodeAt(found.pos);
-      if (!node) return false;
-      dispatch?.(tr.setNodeMarkup(found.pos, undefined, { ...node.attrs, ...patch }));
-      return true;
-    }).run();
+    editor
+      .chain()
+      .focus()
+      .command(({ tr, dispatch, state }) => {
+        const node = state.doc.nodeAt(found.pos);
+        if (!node) return false;
+        dispatch?.(tr.setNodeMarkup(found.pos, undefined, { ...node.attrs, ...patch }));
+        return true;
+      })
+      .run();
   };
   const tableNode = findAncestorPos("table");
   const rowNode = findAncestorPos("tableRow");
@@ -514,12 +616,16 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
       editor.chain().focus().updateAttributes("image", { src: dataUrl }).run();
       return;
     }
-    editor.chain().focus().command(({ state, tr, dispatch }) => {
-      const node = state.doc.nodeAt(cropTargetPos);
-      if (!node || node.type.name !== "image") return false;
-      dispatch?.(tr.setNodeMarkup(cropTargetPos, undefined, { ...node.attrs, src: dataUrl }));
-      return true;
-    }).run();
+    editor
+      .chain()
+      .focus()
+      .command(({ state, tr, dispatch }) => {
+        const node = state.doc.nodeAt(cropTargetPos);
+        if (!node || node.type.name !== "image") return false;
+        dispatch?.(tr.setNodeMarkup(cropTargetPos, undefined, { ...node.attrs, src: dataUrl }));
+        return true;
+      })
+      .run();
   };
 
   const handleUpload = async (file: File) => {
@@ -534,9 +640,13 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     const ext = file.name.split(".").pop() || "png";
     const path = `${clinicaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error } = await supabase.storage.from("cb-informativos").upload(path, file, {
-      cacheControl: "3600", upsert: false,
+      cacheControl: "3600",
+      upsert: false,
     });
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const { data } = supabase.storage.from("cb-informativos").getPublicUrl(path);
     editor.chain().focus().setImage({ src: data.publicUrl }).run();
   };
@@ -544,7 +654,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   const handleUploadMany = async (files: File[]) => {
     for (const f of files) {
       // sequencial para preservar ordem de inserção (ficam lado a lado)
-      // eslint-disable-next-line no-await-in-loop
+
       await handleUpload(f);
     }
   };
@@ -553,7 +663,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
     const prev = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("URL do link:", prev || "https://");
     if (url === null) return;
-    if (url === "") { (editor.chain().focus() as any).unsetLink?.().run(); return; }
+    if (url === "") {
+      (editor.chain().focus() as any).unsetLink?.().run();
+      return;
+    }
     (editor.chain().focus() as any).setLink?.({ href: url, target: "_blank" }).run();
   };
 
@@ -576,9 +689,15 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           value={(editor.getAttributes("textStyle").fontFamily as string) || ""}
           onValueChange={(v) => editor.chain().focus().setFontFamily(v).run()}
         >
-          <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Fonte" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectValue placeholder="Fonte" />
+          </SelectTrigger>
           <SelectContent>
-            {FONTS.map((f) => <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>)}
+            {FONTS.map((f) => (
+              <SelectItem key={f} value={f} style={{ fontFamily: f }}>
+                {f}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -589,23 +708,45 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             (editor.chain().focus() as any).setMark("textStyle", { fontSize: v }).run();
           }}
         >
-          <SelectTrigger className="h-8 w-[90px] text-xs"><SelectValue placeholder="Tam." /></SelectTrigger>
+          <SelectTrigger className="h-8 w-[90px] text-xs">
+            <SelectValue placeholder="Tam." />
+          </SelectTrigger>
           <SelectContent>
-            {SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {SIZES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
         <div className="w-px h-6 bg-border mx-1" />
-        <ToolbarButton title="Negrito" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
+        <ToolbarButton
+          title="Negrito"
+          active={editor.isActive("bold")}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
           <Bold className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Itálico" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <ToolbarButton
+          title="Itálico"
+          active={editor.isActive("italic")}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
           <Italic className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Sublinhado" active={editor.isActive("underline")} onClick={() => (editor.chain().focus() as any).toggleUnderline?.().run()}>
+        <ToolbarButton
+          title="Sublinhado"
+          active={editor.isActive("underline")}
+          onClick={() => (editor.chain().focus() as any).toggleUnderline?.().run()}
+        >
           <UnderlineIcon className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Tachado" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <ToolbarButton
+          title="Tachado"
+          active={editor.isActive("strike")}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        >
           <Strikethrough className="h-4 w-4" />
         </ToolbarButton>
 
@@ -627,63 +768,135 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </label>
 
         <div className="w-px h-6 bg-border mx-1" />
-        <ToolbarButton title="Alinhar à esquerda" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>
+        <ToolbarButton
+          title="Alinhar à esquerda"
+          active={editor.isActive({ textAlign: "left" })}
+          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+        >
           <AlignLeft className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Centralizar" active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}>
+        <ToolbarButton
+          title="Centralizar"
+          active={editor.isActive({ textAlign: "center" })}
+          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+        >
           <AlignCenter className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Alinhar à direita" active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()}>
+        <ToolbarButton
+          title="Alinhar à direita"
+          active={editor.isActive({ textAlign: "right" })}
+          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+        >
           <AlignRight className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Justificar" active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()}>
+        <ToolbarButton
+          title="Justificar"
+          active={editor.isActive({ textAlign: "justify" })}
+          onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+        >
           <AlignJustify className="h-4 w-4" />
         </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
-        <ToolbarButton title="Título 1" active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+        <ToolbarButton
+          title="Título 1"
+          active={editor.isActive("heading", { level: 1 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        >
           <Heading1 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Título 2" active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+        <ToolbarButton
+          title="Título 2"
+          active={editor.isActive("heading", { level: 2 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        >
           <Heading2 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Título 3" active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+        <ToolbarButton
+          title="Título 3"
+          active={editor.isActive("heading", { level: 3 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        >
           <Heading3 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Lista" active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <ToolbarButton
+          title="Lista"
+          active={editor.isActive("bulletList")}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
           <List className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Lista numerada" active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <ToolbarButton
+          title="Lista numerada"
+          active={editor.isActive("orderedList")}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
           <ListOrdered className="h-4 w-4" />
         </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
         <TableInsertMenu editor={editor} />
-        <ToolbarButton title="Adicionar linha acima" onClick={() => editor.chain().focus().addRowBefore().run()} disabled={!editor.can().addRowBefore()}>
+        <ToolbarButton
+          title="Adicionar linha acima"
+          onClick={() => editor.chain().focus().addRowBefore().run()}
+          disabled={!editor.can().addRowBefore()}
+        >
           <span className="text-[10px] font-bold">↑L</span>
         </ToolbarButton>
-        <ToolbarButton title="Adicionar linha abaixo" onClick={() => editor.chain().focus().addRowAfter().run()} disabled={!editor.can().addRowAfter()}>
+        <ToolbarButton
+          title="Adicionar linha abaixo"
+          onClick={() => editor.chain().focus().addRowAfter().run()}
+          disabled={!editor.can().addRowAfter()}
+        >
           <Rows3 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Adicionar coluna à esquerda" onClick={() => editor.chain().focus().addColumnBefore().run()} disabled={!editor.can().addColumnBefore()}>
+        <ToolbarButton
+          title="Adicionar coluna à esquerda"
+          onClick={() => editor.chain().focus().addColumnBefore().run()}
+          disabled={!editor.can().addColumnBefore()}
+        >
           <span className="text-[10px] font-bold">←C</span>
         </ToolbarButton>
-        <ToolbarButton title="Adicionar coluna à direita" onClick={() => editor.chain().focus().addColumnAfter().run()} disabled={!editor.can().addColumnAfter()}>
+        <ToolbarButton
+          title="Adicionar coluna à direita"
+          onClick={() => editor.chain().focus().addColumnAfter().run()}
+          disabled={!editor.can().addColumnAfter()}
+        >
           <Columns3 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Excluir linha" onClick={() => editor.chain().focus().deleteRow().run()} disabled={!editor.can().deleteRow()}>
+        <ToolbarButton
+          title="Excluir linha"
+          onClick={() => editor.chain().focus().deleteRow().run()}
+          disabled={!editor.can().deleteRow()}
+        >
           <span className="text-[10px] font-bold">−L</span>
         </ToolbarButton>
-        <ToolbarButton title="Excluir coluna" onClick={() => editor.chain().focus().deleteColumn().run()} disabled={!editor.can().deleteColumn()}>
+        <ToolbarButton
+          title="Excluir coluna"
+          onClick={() => editor.chain().focus().deleteColumn().run()}
+          disabled={!editor.can().deleteColumn()}
+        >
           <span className="text-[10px] font-bold">−C</span>
         </ToolbarButton>
-        <ToolbarButton title="Excluir tabela" onClick={() => editor.chain().focus().deleteTable().run()} disabled={!editor.can().deleteTable()}>
+        <ToolbarButton
+          title="Excluir tabela"
+          onClick={() => editor.chain().focus().deleteTable().run()}
+          disabled={!editor.can().deleteTable()}
+        >
           <Trash2 className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton title="Alternar linha de cabeçalho" onClick={() => editor.chain().focus().toggleHeaderRow().run()} disabled={!editor.can().toggleHeaderRow()}>
+        <ToolbarButton
+          title="Alternar linha de cabeçalho"
+          onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+          disabled={!editor.can().toggleHeaderRow()}
+        >
           <span className="text-[10px] font-bold">↥H</span>
         </ToolbarButton>
-        <ToolbarButton title="Alternar coluna de cabeçalho" onClick={() => editor.chain().focus().toggleHeaderColumn().run()} disabled={!editor.can().toggleHeaderColumn()}>
+        <ToolbarButton
+          title="Alternar coluna de cabeçalho"
+          onClick={() => editor.chain().focus().toggleHeaderColumn().run()}
+          disabled={!editor.can().toggleHeaderColumn()}
+        >
           <span className="text-[10px] font-bold">↤H</span>
         </ToolbarButton>
         <ToolbarButton
@@ -703,7 +916,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <ToolbarButton
           title="Centralizar conteúdo da célula (horizontal + vertical)"
           onClick={() => {
-            editor.chain().focus()
+            editor
+              .chain()
+              .focus()
               .setCellAttribute("verticalAlign", "middle")
               .setTextAlign("center")
               .run();
@@ -740,7 +955,11 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           value={currentTableWidth || "auto"}
           onValueChange={(v) => updateAncestor("table", { width: v === "auto" ? null : v })}
         >
-          <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da tabela" disabled={!tableNode}>
+          <SelectTrigger
+            className="h-8 w-[110px] text-xs"
+            title="Largura da tabela"
+            disabled={!tableNode}
+          >
             <SelectValue placeholder="Larg. tabela" />
           </SelectTrigger>
           <SelectContent>
@@ -762,7 +981,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           value={currentRowHeight.replace(/px$/, "")}
           onChange={(e) => {
             const v = e.target.value.trim();
-            updateAncestor("tableRow", { height: v ? (`${parseInt(v, 10) || 0}px`) : null });
+            updateAncestor("tableRow", { height: v ? `${parseInt(v, 10) || 0}px` : null });
           }}
         />
 
@@ -797,7 +1016,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 title="Alinhar imagem à esquerda"
                 active={imgActive && editor.getAttributes("image").align === "left"}
                 disabled={!imgActive}
-                onClick={() => editor.chain().focus().updateAttributes("image", { align: "left" }).run()}
+                onClick={() =>
+                  editor.chain().focus().updateAttributes("image", { align: "left" }).run()
+                }
               >
                 <AlignLeft className="h-4 w-4" />
               </ToolbarButton>
@@ -805,7 +1026,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 title="Centralizar imagem"
                 active={imgActive && editor.getAttributes("image").align === "center"}
                 disabled={!imgActive}
-                onClick={() => editor.chain().focus().updateAttributes("image", { align: "center" }).run()}
+                onClick={() =>
+                  editor.chain().focus().updateAttributes("image", { align: "center" }).run()
+                }
               >
                 <AlignCenter className="h-4 w-4" />
               </ToolbarButton>
@@ -813,7 +1036,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 title="Alinhar imagem à direita"
                 active={imgActive && editor.getAttributes("image").align === "right"}
                 disabled={!imgActive}
-                onClick={() => editor.chain().focus().updateAttributes("image", { align: "right" }).run()}
+                onClick={() =>
+                  editor.chain().focus().updateAttributes("image", { align: "right" }).run()
+                }
               >
                 <AlignRight className="h-4 w-4" />
               </ToolbarButton>
@@ -839,11 +1064,15 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 disabled={!imgActive}
                 onClick={() => {
                   const isFree = Boolean(editor.getAttributes("image").free);
-                  editor.chain().focus().updateAttributes("image", {
-                    free: !isFree,
-                    posX: isFree ? 0 : (editor.getAttributes("image").posX ?? 40),
-                    posY: isFree ? 0 : (editor.getAttributes("image").posY ?? 40),
-                  }).run();
+                  editor
+                    .chain()
+                    .focus()
+                    .updateAttributes("image", {
+                      free: !isFree,
+                      posX: isFree ? 0 : (editor.getAttributes("image").posX ?? 40),
+                      posY: isFree ? 0 : (editor.getAttributes("image").posY ?? 40),
+                    })
+                    .run();
                 }}
               >
                 <span className="text-[10px] font-bold">✥</span>
@@ -852,13 +1081,23 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 value=""
                 disabled={!imgActive}
                 onValueChange={(v) => {
-                  editor.chain().focus().updateAttributes("image", {
-                    width: v === "auto" ? null : v,
-                  }).run();
+                  editor
+                    .chain()
+                    .focus()
+                    .updateAttributes("image", {
+                      width: v === "auto" ? null : v,
+                    })
+                    .run();
                 }}
               >
-                <SelectTrigger className="h-8 w-[110px] text-xs" title="Largura da imagem" disabled={!imgActive}>
-                  <SelectValue placeholder={(editor.getAttributes("image").width as string) || "Largura"} />
+                <SelectTrigger
+                  className="h-8 w-[110px] text-xs"
+                  title="Largura da imagem"
+                  disabled={!imgActive}
+                >
+                  <SelectValue
+                    placeholder={(editor.getAttributes("image").width as string) || "Largura"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="25%">25%</SelectItem>
@@ -872,7 +1111,11 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           );
         })()}
         <input
-          ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
           onChange={(e) => {
             const files = e.target.files ? Array.from(e.target.files) : [];
             if (files.length) handleUploadMany(files);
@@ -888,7 +1131,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
-            const ehPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+            const ehPdf =
+              file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
             if (ehPdf) {
               // PDF: abre o visualizador nativo e deixa o usuário escolher
               // entre manter só leitura ou extrair o texto para edição.
@@ -900,8 +1144,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             try {
               const { extrairHtmlDeArquivo } = await import("@/lib/importar-documento");
               const html = await extrairHtmlDeArquivo(file);
-              const ehHtml =
-                /\.html?$/.test(file.name.toLowerCase()) || file.type === "text/html";
+              const ehHtml = /\.html?$/.test(file.name.toLowerCase()) || file.type === "text/html";
               if (ehHtml) {
                 // Injeta o código bruto direto no editor, sem transformar tags.
                 editor.commands.setContent(html, { emitUpdate: true });
@@ -919,7 +1162,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           }}
         />
         <Button
-          type="button" variant="outline" size="sm" className="h-8 gap-1.5"
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
           disabled={importando}
           onClick={() => docRef.current?.click()}
           title="Importar documento (.docx, .pdf, .txt, .html)"
@@ -951,7 +1197,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         </Button>
         {htmlMode && (
           <Button
-            type="button" variant="ghost" size="sm" className="h-8"
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8"
             onClick={() => setHtmlMode(false)}
           >
             Cancelar
@@ -982,7 +1231,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           </Select>
         )}
         <Button
-          type="button" variant="ghost" size="sm" className="h-8"
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8"
           onClick={() => editor.commands.setContent("<p></p>")}
         >
           Limpar
@@ -1004,31 +1256,35 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             />
           </div>
         ) : (
-        <div className="mx-auto my-4" style={{ width: "210mm" }}>
-          {showRuler && (
-            <HorizontalRuler
-              widthMm={pageWidthMm}
-              marginLeft={marginLeft}
-              marginRight={marginRight}
-              onChangeLeft={(v) => setMarginLeft(Math.max(0, Math.min(pageWidthMm - marginRight - 20, v)))}
-              onChangeRight={(v) => setMarginRight(Math.max(0, Math.min(pageWidthMm - marginLeft - 20, v)))}
-            />
-          )}
-          <div
-            className="rt-page print-document bg-white shadow-md"
-            style={{
-              width: "210mm",
-              minHeight: "297mm",
-              position: "relative",
-              paddingTop: `${marginTop}mm`,
-              paddingBottom: `${marginBottom}mm`,
-              paddingLeft: `${marginLeft}mm`,
-              paddingRight: `${marginRight}mm`,
-            }}
-          >
-            <EditorContent editor={editor} />
+          <div className="mx-auto my-4" style={{ width: "210mm" }}>
+            {showRuler && (
+              <HorizontalRuler
+                widthMm={pageWidthMm}
+                marginLeft={marginLeft}
+                marginRight={marginRight}
+                onChangeLeft={(v) =>
+                  setMarginLeft(Math.max(0, Math.min(pageWidthMm - marginRight - 20, v)))
+                }
+                onChangeRight={(v) =>
+                  setMarginRight(Math.max(0, Math.min(pageWidthMm - marginLeft - 20, v)))
+                }
+              />
+            )}
+            <div
+              className="rt-page print-document bg-white shadow-md"
+              style={{
+                width: "210mm",
+                minHeight: "297mm",
+                position: "relative",
+                paddingTop: `${marginTop}mm`,
+                paddingBottom: `${marginBottom}mm`,
+                paddingLeft: `${marginLeft}mm`,
+                paddingRight: `${marginRight}mm`,
+              }}
+            >
+              <EditorContent editor={editor} />
+            </div>
           </div>
-        </div>
         )}
       </div>
 
@@ -1050,7 +1306,12 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
         <MarginInput label="Dir" value={marginRight} onChange={setMarginRight} />
         <button
           type="button"
-          onClick={() => { setMarginTop(12); setMarginBottom(12); setMarginLeft(14); setMarginRight(14); }}
+          onClick={() => {
+            setMarginTop(12);
+            setMarginBottom(12);
+            setMarginLeft(14);
+            setMarginRight(14);
+          }}
           className="px-2 py-1 rounded hover:bg-muted ml-auto"
         >
           Restaurar padrão
@@ -1079,8 +1340,8 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <DialogHeader>
             <DialogTitle>Documento PDF</DialogTitle>
             <DialogDescription>
-              {pdfFile?.name} — visualize o PDF original abaixo. Você pode mantê-lo somente
-              para leitura ou importar o texto para edição no editor.
+              {pdfFile?.name} — visualize o PDF original abaixo. Você pode mantê-lo somente para
+              leitura ou importar o texto para edição no editor.
             </DialogDescription>
           </DialogHeader>
           {pdfUrl && (
@@ -1094,7 +1355,9 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => { if (pdfUrl) window.open(pdfUrl, "_blank"); }}
+              onClick={() => {
+                if (pdfUrl) window.open(pdfUrl, "_blank");
+              }}
             >
               Abrir em nova aba
             </Button>
@@ -1128,7 +1391,15 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
   );
 }
 
-function MarginInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function MarginInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <label className="inline-flex items-center gap-1">
       <span className="text-muted-foreground">{label}</span>
@@ -1150,7 +1421,11 @@ function MarginInput({ label, value, onChange }: { label: string; value: number;
 
 // Régua horizontal estilo Word: marcações em cm + alças arrastáveis para margem esq./dir.
 function HorizontalRuler({
-  widthMm, marginLeft, marginRight, onChangeLeft, onChangeRight,
+  widthMm,
+  marginLeft,
+  marginRight,
+  onChangeLeft,
+  onChangeRight,
 }: {
   widthMm: number;
   marginLeft: number;
@@ -1197,7 +1472,7 @@ function HorizontalRuler({
       />
       {/* marcações em cm */}
       {Array.from({ length: totalCm + 1 }).map((_, cm) => {
-        const pct = (cm * 10 / widthMm) * 100;
+        const pct = ((cm * 10) / widthMm) * 100;
         const inMargin = cm * 10 < marginLeft || cm * 10 > widthMm - marginRight;
         return (
           <div
@@ -1210,7 +1485,9 @@ function HorizontalRuler({
             >
               {cm}
             </span>
-            <span className={`w-px flex-1 mt-0.5 ${inMargin ? "bg-background/60" : "bg-muted-foreground/50"}`} />
+            <span
+              className={`w-px flex-1 mt-0.5 ${inMargin ? "bg-background/60" : "bg-muted-foreground/50"}`}
+            />
           </div>
         );
       })}

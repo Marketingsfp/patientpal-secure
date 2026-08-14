@@ -4,9 +4,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Check, FileText, CalendarClock, Wallet, FileSignature,
-  MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
-  Coffee, DollarSign, Clock, ClipboardCheck, LogIn, XCircle, UserX,
+  Check,
+  FileText,
+  CalendarClock,
+  Wallet,
+  FileSignature,
+  MessageCircle,
+  History,
+  Stethoscope,
+  Sparkles,
+  AlertTriangle,
+  Coffee,
+  DollarSign,
+  Clock,
+  ClipboardCheck,
+  LogIn,
+  XCircle,
+  UserX,
   ArrowUpRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +37,7 @@ export interface DrawerPatientData {
   medico_nome?: string | null;
   especialidade?: string | null;
   status?: string | null;
-  chegou_em?: string | null;         // "09:28"
+  chegou_em?: string | null; // "09:28"
   etapa_atual: string | null;
   historico: Array<{ etapa: string; timestamp: string }>;
   proc_titulo?: string | null;
@@ -54,7 +68,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function idadeFromDob(dob: string | null | undefined): number | null {
@@ -78,7 +97,12 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data, onChangeStatus, onOpenProntuario, onReagendar,
+  open,
+  onOpenChange,
+  data,
+  onChangeStatus,
+  onOpenProntuario,
+  onReagendar,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -142,177 +166,199 @@ export function PatientDrawer({
       description="Centro de Atendimento do paciente: jornada, ações rápidas e sugestões."
     >
       {data && (
-          <div className="animate-in fade-in duration-150">
-            {/* Alerta de ficha em uso simultâneo por outro funcionário */}
-            {open && primeiroAgendamentoId && (
-              <div className="px-6 pt-4">
-                <FichaEmUsoAlert agendamentoId={primeiroAgendamentoId} />
-              </div>
-            )}
-            {/* 1. Cabeçalho */}
-            <div className="px-6 pt-7 pb-5 border-b border-slate-100">
-              <div className="flex items-start gap-4">
-                <Avatar className="h-24 w-24 border border-slate-200/80 shadow-sm shrink-0">
-                  {data.paciente_avatar_url && <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />}
-                  <AvatarFallback className="bg-slate-50 text-slate-500 text-2xl font-semibold">
-                    {initials(data.paciente_nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <h2
-                    className="text-[22px] leading-tight font-semibold text-slate-900 truncate"
-                    style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
-                  >
-                    {data.paciente_nome}
-                  </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                    <MetaChip label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`} />
-                    <MetaChip label={/* convênio: placeholder */ "Particular"} muted />
-                    {data.medico_nome && <MetaChip label={data.medico_nome} />}
-                    {data.especialidade && <MetaChip label={data.especialidade} />}
-                    {data.hora && <MetaChip label={data.hora} tabular />}
-                    {data.status && (
-                      <HhpChip tone="focus" variant="outline" size="sm">
-                        {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
-                      </HhpChip>
-                    )}
-                  </div>
-                  {data.chegou_em && (
-                    <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
-                      Chegou {data.chegou_em}
-                    </p>
+        <div className="animate-in fade-in duration-150">
+          {/* Alerta de ficha em uso simultâneo por outro funcionário */}
+          {open && primeiroAgendamentoId && (
+            <div className="px-6 pt-4">
+              <FichaEmUsoAlert agendamentoId={primeiroAgendamentoId} />
+            </div>
+          )}
+          {/* 1. Cabeçalho */}
+          <div className="px-6 pt-7 pb-5 border-b border-slate-100">
+            <div className="flex items-start gap-4">
+              <Avatar className="h-24 w-24 border border-slate-200/80 shadow-sm shrink-0">
+                {data.paciente_avatar_url && (
+                  <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />
+                )}
+                <AvatarFallback className="bg-slate-50 text-slate-500 text-2xl font-semibold">
+                  {initials(data.paciente_nome)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <h2
+                  className="text-[22px] leading-tight font-semibold text-slate-900 truncate"
+                  style={{
+                    fontFamily: "'Inter Tight', Inter, sans-serif",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {data.paciente_nome}
+                </h2>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                  <MetaChip
+                    label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`}
+                  />
+                  <MetaChip label={/* convênio: placeholder */ "Particular"} muted />
+                  {data.medico_nome && <MetaChip label={data.medico_nome} />}
+                  {data.especialidade && <MetaChip label={data.especialidade} />}
+                  {data.hora && <MetaChip label={data.hora} tabular />}
+                  {data.status && (
+                    <HhpChip tone="focus" variant="outline" size="sm">
+                      {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
+                    </HhpChip>
                   )}
                 </div>
+                {data.chegou_em && (
+                  <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
+                    Chegou {data.chegou_em}
+                  </p>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* 2. Jornada (linha contínua) */}
-            <div className="px-6 py-5 border-b border-slate-100">
-              <SectionTitle>Jornada</SectionTitle>
-              <JourneyLine currentIdx={idx} />
+          {/* 2. Jornada (linha contínua) */}
+          <div className="px-6 py-5 border-b border-slate-100">
+            <SectionTitle>Jornada</SectionTitle>
+            <JourneyLine currentIdx={idx} />
+          </div>
+
+          {/* 4. Ações rápidas */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            {onChangeStatus && data.agendamento_ids && data.agendamento_ids.length > 0 && (
+              <StatusActions
+                status={data.status ?? "agendado"}
+                onChange={(novo) => onChangeStatus(data.agendamento_ids!, novo)}
+              />
+            )}
+            <SectionTitle>Ações rápidas</SectionTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <QuickAction
+                icon={<Stethoscope className="h-4 w-4" />}
+                label="Prontuário"
+                onClick={onOpenProntuario && primeiroAgendamentoId ? abrirProntuario : undefined}
+              />
+              <QuickAction
+                icon={<CalendarClock className="h-4 w-4" />}
+                label="Reagendar"
+                onClick={onReagendar}
+              />
+              <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
+              <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
+              <QuickAction icon={<FileText className="h-4 w-4" />} label="Documentos" />
+              <QuickAction icon={<MessageCircle className="h-4 w-4" />} label="WhatsApp" />
+              <QuickAction icon={<History className="h-4 w-4" />} label="Histórico" />
+              <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Nina" />
             </div>
+          </div>
 
-            {/* 4. Ações rápidas */}
-            <div className="px-6 py-4 border-b border-slate-100">
-              {onChangeStatus && data.agendamento_ids && data.agendamento_ids.length > 0 && (
-                <StatusActions
-                  status={data.status ?? "agendado"}
-                  onChange={(novo) => onChangeStatus(data.agendamento_ids!, novo)}
-                />
-              )}
-              <SectionTitle>Ações rápidas</SectionTitle>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <QuickAction
-                  icon={<Stethoscope className="h-4 w-4" />}
-                  label="Prontuário"
-                  onClick={onOpenProntuario && primeiroAgendamentoId ? abrirProntuario : undefined}
-                />
-                <QuickAction icon={<CalendarClock className="h-4 w-4" />} label="Reagendar" onClick={onReagendar} />
-                <QuickAction icon={<Wallet className="h-4 w-4" />} label="Financeiro" />
-                <QuickAction icon={<FileSignature className="h-4 w-4" />} label="Orçamento" />
-                <QuickAction icon={<FileText className="h-4 w-4" />} label="Documentos" />
-                <QuickAction icon={<MessageCircle className="h-4 w-4" />} label="WhatsApp" />
-                <QuickAction icon={<History className="h-4 w-4" />} label="Histórico" />
-                <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Nina" />
+          {/* 5. Sugestões IA (estrutura visual) */}
+          <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-indigo-50/40 to-white">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
+                <Sparkles className="h-3 w-3" /> Sugestões da IA
               </div>
+              <span className="text-[10px] text-slate-600 dark:text-slate-400">3 sinais</span>
             </div>
-
-            {/* 5. Sugestões IA (estrutura visual) */}
-            <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-indigo-50/40 to-white">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
-                  <Sparkles className="h-3 w-3" /> Sugestões da IA
-                </div>
-                <span className="text-[10px] text-slate-600 dark:text-slate-400">3 sinais</span>
-              </div>
-              <div className="space-y-1.5">
-                <AiChip
-                  icon={<Clock className="h-3.5 w-3.5" />}
-                  tone="warn"
-                  label="Paciente chegou antes do horário"
-                  hint="Considere adiantar a triagem."
-                />
-                <AiChip
-                  icon={<Coffee className="h-3.5 w-3.5" />}
-                  tone="info"
-                  label="Exame exige jejum de 8h"
-                  hint="Confirmar preparo antes da coleta."
-                />
-                <AiChip
-                  icon={<DollarSign className="h-3.5 w-3.5" />}
-                  tone="danger"
-                  label="Existe pendência financeira"
-                  hint="Verifique no Financeiro antes da alta."
-                />
-              </div>
+            <div className="space-y-1.5">
+              <AiChip
+                icon={<Clock className="h-3.5 w-3.5" />}
+                tone="warn"
+                label="Paciente chegou antes do horário"
+                hint="Considere adiantar a triagem."
+              />
+              <AiChip
+                icon={<Coffee className="h-3.5 w-3.5" />}
+                tone="info"
+                label="Exame exige jejum de 8h"
+                hint="Confirmar preparo antes da coleta."
+              />
+              <AiChip
+                icon={<DollarSign className="h-3.5 w-3.5" />}
+                tone="danger"
+                label="Existe pendência financeira"
+                hint="Verifique no Financeiro antes da alta."
+              />
             </div>
+          </div>
 
-            {/* 3 + tabs: Painel rápido + demais abas (conteúdo pesado só ao trocar de aba) */}
-            <div className="px-6 py-4">
-              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
-                {([
+          {/* 3 + tabs: Painel rápido + demais abas (conteúdo pesado só ao trocar de aba) */}
+          <div className="px-6 py-4">
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+              {(
+                [
                   { key: "resumo", label: "Resumo" },
                   { key: "financeiro", label: "Financeiro" },
                   { key: "docs", label: "Docs" },
                   { key: "historico", label: "Histórico" },
                   { key: "prontuario", label: "Prontuário" },
-                ] as const).map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setTab(t.key)}
-                    className={cn(
-                      "flex-1 h-8 rounded-lg text-[11px] font-medium transition-all",
-                      tab === t.key
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700",
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="min-h-[180px]">
-                {tab === "resumo" && <ResumoPanel proc={data.proc_titulo ?? null} />}
-                {tab === "financeiro" && <TabPlaceholder title="Financeiro">
-                  Total previsto, pago e em aberto — conectado no roadmap sem alterar as regras do módulo Financeiro clássico.
-                </TabPlaceholder>}
-                {tab === "docs" && <TabPlaceholder title="Documentos">
-                  Anamneses, receitas e atestados serão listados aqui.
-                </TabPlaceholder>}
-                {tab === "historico" && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
-                    {data.historico.length === 0 ? (
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Sem eventos registrados.</p>
-                    ) : (
-                      <ol className="space-y-2">
-                        {data.historico.map((h, i) => (
-                          <li key={i} className="flex justify-between text-xs">
-                            <span className="text-slate-600">{h.etapa.replace(/_/g, " ")}</span>
-                            <span className="text-slate-600 dark:text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </div>
-                )}
-                {tab === "prontuario" && (
-                  <ProntuarioPanel
-                    proc={data.proc_titulo ?? null}
-                    canOpen={!!onOpenProntuario && !!primeiroAgendamentoId}
-                    onOpen={abrirProntuario}
-                  />
-                )}
-              </div>
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "flex-1 h-8 rounded-lg text-[11px] font-medium transition-all",
+                    tab === t.key
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
-            {openMs !== null && (
-              <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-500 dark:text-slate-400 tabular-nums text-right">
-                aberto em {openMs}ms
-              </div>
-            )}
+            <div className="min-h-[180px]">
+              {tab === "resumo" && <ResumoPanel proc={data.proc_titulo ?? null} />}
+              {tab === "financeiro" && (
+                <TabPlaceholder title="Financeiro">
+                  Total previsto, pago e em aberto — conectado no roadmap sem alterar as regras do
+                  módulo Financeiro clássico.
+                </TabPlaceholder>
+              )}
+              {tab === "docs" && (
+                <TabPlaceholder title="Documentos">
+                  Anamneses, receitas e atestados serão listados aqui.
+                </TabPlaceholder>
+              )}
+              {tab === "historico" && (
+                <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+                  {data.historico.length === 0 ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Sem eventos registrados.
+                    </p>
+                  ) : (
+                    <ol className="space-y-2">
+                      {data.historico.map((h, i) => (
+                        <li key={i} className="flex justify-between text-xs">
+                          <span className="text-slate-600">{h.etapa.replace(/_/g, " ")}</span>
+                          <span className="text-slate-600 dark:text-slate-400 tabular-nums">
+                            {new Date(h.timestamp).toLocaleString("pt-BR")}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
+              {tab === "prontuario" && (
+                <ProntuarioPanel
+                  proc={data.proc_titulo ?? null}
+                  canOpen={!!onOpenProntuario && !!primeiroAgendamentoId}
+                  onOpen={abrirProntuario}
+                />
+              )}
+            </div>
           </div>
+
+          {openMs !== null && (
+            <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-500 dark:text-slate-400 tabular-nums text-right">
+              aberto em {openMs}ms
+            </div>
+          )}
+        </div>
       )}
     </HhpDrawer>
   );
@@ -326,13 +372,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MetaChip({ label, muted, tabular }: { label: string; muted?: boolean; tabular?: boolean }) {
+function MetaChip({
+  label,
+  muted,
+  tabular,
+}: {
+  label: string;
+  muted?: boolean;
+  tabular?: boolean;
+}) {
   return (
-    <span className={cn(
-      "inline-flex items-center px-1.5 rounded",
-      tabular && "tabular-nums",
-      muted ? "text-slate-600 dark:text-slate-400" : "text-slate-600",
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center px-1.5 rounded",
+        tabular && "tabular-nums",
+        muted ? "text-slate-600 dark:text-slate-400" : "text-slate-600",
+      )}
+    >
       {label}
     </span>
   );
@@ -347,27 +403,42 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
       {currentIdx > 0 && (
         <div
           className="absolute top-3 left-3 h-px bg-emerald-400/70 transition-all"
-          style={{ width: `calc(${(currentIdx / (ETAPAS.length - 1)) * 100}% - 24px * ${currentIdx / (ETAPAS.length - 1)})` }}
+          style={{
+            width: `calc(${(currentIdx / (ETAPAS.length - 1)) * 100}% - 24px * ${currentIdx / (ETAPAS.length - 1)})`,
+          }}
         />
       )}
-      <div className="relative grid" style={{ gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)` }}>
+      <div
+        className="relative grid"
+        style={{ gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)` }}
+      >
         {ETAPAS.map((e, i) => {
           const past = i < currentIdx;
           const current = i === currentIdx;
           return (
             <div key={e.key} className="flex flex-col items-center gap-2">
-              <div className={cn(
-                "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
-                past && "bg-emerald-500 text-white",
-                current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
-                !past && !current && "bg-white text-slate-600 dark:text-slate-400 border border-slate-200",
-              )}>
+              <div
+                className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
+                  past && "bg-emerald-500 text-white",
+                  current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
+                  !past &&
+                    !current &&
+                    "bg-white text-slate-600 dark:text-slate-400 border border-slate-200",
+                )}
+              >
                 {past ? <Check className="h-3 w-3" /> : i + 1}
               </div>
-              <div className={cn(
-                "text-[10px] leading-tight text-center max-w-full truncate px-1",
-                current ? "font-semibold text-slate-900" : past ? "text-slate-600" : "text-slate-600 dark:text-slate-400",
-              )}>
+              <div
+                className={cn(
+                  "text-[10px] leading-tight text-center max-w-full truncate px-1",
+                  current
+                    ? "font-semibold text-slate-900"
+                    : past
+                      ? "text-slate-600"
+                      : "text-slate-600 dark:text-slate-400",
+                )}
+              >
                 {e.label}
               </div>
             </div>
@@ -423,9 +494,7 @@ function ProntuarioPanel({
       <div className="flex items-start gap-2">
         <Stethoscope className="h-4 w-4 text-indigo-500 mt-0.5" />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold text-slate-700">
-            Prontuário do atendimento
-          </div>
+          <div className="text-[11px] font-semibold text-slate-700">Prontuário do atendimento</div>
           <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
             {proc
               ? `Abrir o prontuário deste atendimento (${proc}) para registrar evolução, exames e conduta.`
@@ -447,15 +516,18 @@ function ProntuarioPanel({
         Abrir prontuário completo
       </button>
       <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
-        A tela do prontuário abre no mesmo destino usado pela Agenda clássica e
-        pela fila de Atendimento IA — nenhuma regra clínica é alterada.
+        A tela do prontuário abre no mesmo destino usado pela Agenda clássica e pela fila de
+        Atendimento IA — nenhuma regra clínica é alterada.
       </p>
     </div>
   );
 }
 
 function AiChip({
-  icon, label, hint, tone,
+  icon,
+  label,
+  hint,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -463,13 +535,13 @@ function AiChip({
   tone: "info" | "warn" | "danger";
 }) {
   const toneCls =
-    tone === "warn" ? "bg-amber-50/60 border-amber-200/60 text-amber-800"
-    : tone === "danger" ? "bg-rose-50/60 border-rose-200/60 text-rose-800"
-    : "bg-slate-50 border-slate-200/60 text-slate-700";
+    tone === "warn"
+      ? "bg-amber-50/60 border-amber-200/60 text-amber-800"
+      : tone === "danger"
+        ? "bg-rose-50/60 border-rose-200/60 text-rose-800"
+        : "bg-slate-50 border-slate-200/60 text-slate-700";
   const iconCls =
-    tone === "warn" ? "text-amber-500"
-    : tone === "danger" ? "text-rose-500"
-    : "text-indigo-500";
+    tone === "warn" ? "text-amber-500" : tone === "danger" ? "text-rose-500" : "text-indigo-500";
   return (
     <div className={cn("flex items-start gap-2 rounded-xl border px-3 py-2", toneCls)}>
       <span className={cn("mt-0.5", iconCls)}>{icon}</span>
@@ -506,15 +578,52 @@ function StatusActions({
 }) {
   const podeConfirmar = status === "agendado";
   const podeCheckin = status === "agendado" || status === "confirmado";
-  const podeRealizar = status === "agendado" || status === "confirmado" || status === "em_atendimento";
+  const podeRealizar =
+    status === "agendado" || status === "confirmado" || status === "em_atendimento";
   const podeCancelar = status !== "cancelado" && status !== "realizado";
   const podeFaltou = status !== "faltou" && status !== "cancelado" && status !== "realizado";
-  const acoes: Array<{ key: StatusAgendamento; label: string; icon: React.ReactNode; on: boolean; cls: string }> = [
-    { key: "confirmado", label: "Confirmar", icon: <Check className="h-4 w-4" />, on: podeConfirmar, cls: "text-blue-600" },
-    { key: "em_atendimento", label: "Check-in", icon: <LogIn className="h-4 w-4" />, on: podeCheckin, cls: "text-indigo-600" },
-    { key: "realizado", label: "Realizar", icon: <ClipboardCheck className="h-4 w-4" />, on: podeRealizar, cls: "text-emerald-600" },
-    { key: "faltou", label: "Faltou", icon: <UserX className="h-4 w-4" />, on: podeFaltou, cls: "text-amber-600" },
-    { key: "cancelado", label: "Cancelar", icon: <XCircle className="h-4 w-4" />, on: podeCancelar, cls: "text-rose-600" },
+  const acoes: Array<{
+    key: StatusAgendamento;
+    label: string;
+    icon: React.ReactNode;
+    on: boolean;
+    cls: string;
+  }> = [
+    {
+      key: "confirmado",
+      label: "Confirmar",
+      icon: <Check className="h-4 w-4" />,
+      on: podeConfirmar,
+      cls: "text-blue-600",
+    },
+    {
+      key: "em_atendimento",
+      label: "Check-in",
+      icon: <LogIn className="h-4 w-4" />,
+      on: podeCheckin,
+      cls: "text-indigo-600",
+    },
+    {
+      key: "realizado",
+      label: "Realizar",
+      icon: <ClipboardCheck className="h-4 w-4" />,
+      on: podeRealizar,
+      cls: "text-emerald-600",
+    },
+    {
+      key: "faltou",
+      label: "Faltou",
+      icon: <UserX className="h-4 w-4" />,
+      on: podeFaltou,
+      cls: "text-amber-600",
+    },
+    {
+      key: "cancelado",
+      label: "Cancelar",
+      icon: <XCircle className="h-4 w-4" />,
+      on: podeCancelar,
+      cls: "text-rose-600",
+    },
   ];
   const visiveis = acoes.filter((a) => a.on);
   if (visiveis.length === 0) return null;
@@ -545,22 +654,42 @@ function StatusActions({
 function ResumoPanel({ proc }: { proc: string | null }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <PanelCard icon={<ClipboardCheck className="h-3.5 w-3.5" />} title="Observações" body="Sem observações registradas." />
-      <PanelCard icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-500" />} title="Alergias" body="Nenhuma alergia informada." tone="danger" />
-      <PanelCard icon={<Wallet className="h-3.5 w-3.5" />} title="Pendências" body="Sem pendências no momento." />
+      <PanelCard
+        icon={<ClipboardCheck className="h-3.5 w-3.5" />}
+        title="Observações"
+        body="Sem observações registradas."
+      />
+      <PanelCard
+        icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-500" />}
+        title="Alergias"
+        body="Nenhuma alergia informada."
+        tone="danger"
+      />
+      <PanelCard
+        icon={<Wallet className="h-3.5 w-3.5" />}
+        title="Pendências"
+        body="Sem pendências no momento."
+      />
       <PanelCard icon={<FileText className="h-3.5 w-3.5" />} title="Documentos" body="0 anexos" />
       <PanelCard
         icon={<Coffee className="h-3.5 w-3.5" />}
         title="Preparo do exame"
         body={proc ? `${proc} — verificar preparo.` : "Sem preparo específico."}
       />
-      <PanelCard icon={<CalendarClock className="h-3.5 w-3.5" />} title="Retorno previsto" body="Sem retorno agendado." />
+      <PanelCard
+        icon={<CalendarClock className="h-3.5 w-3.5" />}
+        title="Retorno previsto"
+        body="Sem retorno agendado."
+      />
     </div>
   );
 }
 
 function PanelCard({
-  icon, title, body, tone,
+  icon,
+  title,
+  body,
+  tone,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -568,10 +697,12 @@ function PanelCard({
   tone?: "danger";
 }) {
   return (
-    <div className={cn(
-      "rounded-xl border p-3 space-y-1",
-      tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
-    )}>
+    <div
+      className={cn(
+        "rounded-xl border p-3 space-y-1",
+        tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
+      )}
+    >
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
         <span className="text-slate-500">{icon}</span> {title}
       </div>

@@ -101,12 +101,31 @@ const RESPOSTAS_RAPIDAS = [
   "Estou em atendimento, retorno em instantes.",
 ];
 
-const EMOJIS = ["👍", "👏", "🙏", "✅", "❗", "⏰", "😀", "😉", "😅", "🤝", "💉", "🩺", "📋", "🚑", "❤️", "🔔"];
+const EMOJIS = [
+  "👍",
+  "👏",
+  "🙏",
+  "✅",
+  "❗",
+  "⏰",
+  "😀",
+  "😉",
+  "😅",
+  "🤝",
+  "💉",
+  "🩺",
+  "📋",
+  "🚑",
+  "❤️",
+  "🔔",
+];
 
 function iniciais(nome: string | null | undefined) {
   const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) return "?";
-  return ((partes[0][0] ?? "") + (partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "")).toUpperCase();
+  return (
+    (partes[0][0] ?? "") + (partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "")
+  ).toUpperCase();
 }
 
 function horaCurta(iso: string | null) {
@@ -153,7 +172,9 @@ function ChatPage() {
   const [pacienteDialog, setPacienteDialog] = useState(false);
   const [buscaPaciente, setBuscaPaciente] = useState("");
   const buscaPacienteDeb = useDebouncedValue(buscaPaciente, 350);
-  const [pacientes, setPacientes] = useState<Array<{ id: string; nome: string; cpf: string | null; telefone: string | null }>>([]);
+  const [pacientes, setPacientes] = useState<
+    Array<{ id: string; nome: string; cpf: string | null; telefone: string | null }>
+  >([]);
   const [buscandoPac, setBuscandoPac] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -167,7 +188,10 @@ function ChatPage() {
   // ---------- carregar canais + metadados ----------
   const carregarCanais = useCallback(async () => {
     if (!clinicaId || !user) return;
-    const { data: mems } = await supabase.from("chat_membros").select("canal_id").eq("user_id", user.id);
+    const { data: mems } = await supabase
+      .from("chat_membros")
+      .select("canal_id")
+      .eq("user_id", user.id);
     const ids = (mems ?? []).map((m: any) => m.canal_id);
     if (ids.length === 0) {
       setCanais([]);
@@ -191,7 +215,10 @@ function ChatPage() {
         .neq("user_id", user.id);
       if (outros && outros.length > 0) {
         const outrosIds = Array.from(new Set(outros.map((m: any) => m.user_id)));
-        const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", outrosIds);
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, nome")
+          .in("id", outrosIds);
         const profsMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.nome]));
         const nomes: Record<string, string> = {};
         const donos: Record<string, string> = {};
@@ -256,7 +283,8 @@ function ChatPage() {
         supabase.from("user_roles").select("user_id, role").in("user_id", ids),
       ]);
       const roleMap = new Map<string, string>();
-      for (const r of (roles ?? []) as any[]) if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
+      for (const r of (roles ?? []) as any[])
+        if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
       setEquipe(
         (profs ?? []).map((p: any) => ({
           user_id: p.id,
@@ -271,15 +299,16 @@ function ChatPage() {
   // ---------- presença (quem está online) ----------
   useEffect(() => {
     if (!clinicaId || !user) return;
-    const ch = supabase.channel(`presenca-chat:${clinicaId}`, { config: { presence: { key: user.id } } });
+    const ch = supabase.channel(`presenca-chat:${clinicaId}`, {
+      config: { presence: { key: user.id } },
+    });
     const sync = () => {
       const state = ch.presenceState() as Record<string, unknown[]>;
       setOnline(new Set(Object.keys(state)));
     };
-    ch.on("presence", { event: "sync" }, sync)
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") void ch.track({ at: new Date().toISOString() });
-      });
+    ch.on("presence", { event: "sync" }, sync).subscribe((status) => {
+      if (status === "SUBSCRIBED") void ch.track({ at: new Date().toISOString() });
+    });
     return () => {
       supabase.removeChannel(ch);
     };
@@ -308,7 +337,12 @@ function ChatPage() {
       .channel(`chat:${canalSel}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_mensagens", filter: `canal_id=eq.${canalSel}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_mensagens",
+          filter: `canal_id=eq.${canalSel}`,
+        },
         async (payload) => {
           const m = payload.new as Mensagem;
           setMensagens((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
@@ -338,8 +372,14 @@ function ChatPage() {
     if (!canalSel || !user) return;
     void supabase
       .from("chat_leituras")
-      .upsert({ canal_id: canalSel, user_id: user.id, ultima_lida_em: new Date().toISOString() }, { onConflict: "canal_id,user_id" });
-    setMetas((prev) => ({ ...prev, [canalSel]: { ...(prev[canalSel] ?? { ultimaEm: null, ultimaTexto: "" }), naoLidas: 0 } }));
+      .upsert(
+        { canal_id: canalSel, user_id: user.id, ultima_lida_em: new Date().toISOString() },
+        { onConflict: "canal_id,user_id" },
+      );
+    setMetas((prev) => ({
+      ...prev,
+      [canalSel]: { ...(prev[canalSel] ?? { ultimaEm: null, ultimaTexto: "" }), naoLidas: 0 },
+    }));
   }, [canalSel, user]);
 
   async function carregarAutores(msgs: Mensagem[]) {
@@ -417,7 +457,7 @@ function ChatPage() {
       toast.error("Arquivo maior que 10MB.");
       return;
     }
-    const caminho = `${clinicaId}/${canalSel}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
+    const caminho = `${clinicaId}/${canalSel}/${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
     const { error } = await supabase.storage.from("chat-anexos").upload(caminho, file);
     if (error) {
       mostrarErro(error, "erro ao enviar anexo");
@@ -451,7 +491,11 @@ function ChatPage() {
       return;
     }
     const tipo: Canal["tipo"] = ehCanal ? "grupo" : selecionados.size === 1 ? "direto" : "grupo";
-    const nome = ehCanal ? novoNome.trim().replace(/^#/, "") : tipo === "grupo" ? novoNome.trim() || "Novo grupo" : null;
+    const nome = ehCanal
+      ? novoNome.trim().replace(/^#/, "")
+      : tipo === "grupo"
+        ? novoNome.trim() || "Novo grupo"
+        : null;
 
     const { data: canal, error } = await supabase
       .from("chat_canais")
@@ -462,7 +506,10 @@ function ChatPage() {
       mostrarErro(error);
       return;
     }
-    const membros = [user.id, ...Array.from(selecionados)].map((uid) => ({ canal_id: canal.id, user_id: uid }));
+    const membros = [user.id, ...Array.from(selecionados)].map((uid) => ({
+      canal_id: canal.id,
+      user_id: uid,
+    }));
     const { error: e2 } = await supabase.from("chat_membros").insert(membros);
     if (e2) {
       mostrarErro(e2);
@@ -509,13 +556,17 @@ function ChatPage() {
       ? (nomesDiretos[canalAtual.id] ?? "Conversa direta")
       : (canalAtual.nome ?? "Grupo")
     : "";
-  const parceiro = canalAtual?.tipo === "direto" ? equipe.find((e) => e.user_id === membrosDiretos[canalAtual.id]) : undefined;
+  const parceiro =
+    canalAtual?.tipo === "direto"
+      ? equipe.find((e) => e.user_id === membrosDiretos[canalAtual.id])
+      : undefined;
   const parceiroOnline = parceiro ? online.has(parceiro.user_id) : false;
 
   const canaisFiltrados = useMemo(() => {
     const termo = buscaLista.trim().toLowerCase();
     return canais.filter((c) => {
-      const nome = c.tipo === "direto" ? (nomesDiretos[c.id] ?? "Conversa direta") : (c.nome ?? "Grupo");
+      const nome =
+        c.tipo === "direto" ? (nomesDiretos[c.id] ?? "Conversa direta") : (c.nome ?? "Grupo");
       if (termo && !nome.toLowerCase().includes(termo)) return false;
       if (aba === "diretas" && c.tipo !== "direto") return false;
       if (aba === "canais" && c.tipo === "direto") return false;
@@ -560,7 +611,12 @@ function ChatPage() {
             {podeEscrever && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" title="Nova conversa">
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8 rounded-full"
+                    title="Nova conversa"
+                  >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -586,10 +642,18 @@ function ChatPage() {
           </div>
           <Tabs value={aba} onValueChange={(v) => setAba(v as typeof aba)}>
             <TabsList className="w-full grid grid-cols-4 h-8">
-              <TabsTrigger value="todas" className="text-[11px] px-1">Todas</TabsTrigger>
-              <TabsTrigger value="diretas" className="text-[11px] px-1">Diretas</TabsTrigger>
-              <TabsTrigger value="canais" className="text-[11px] px-1">Canais</TabsTrigger>
-              <TabsTrigger value="nao_lidas" className="text-[11px] px-1">Não lidas</TabsTrigger>
+              <TabsTrigger value="todas" className="text-[11px] px-1">
+                Todas
+              </TabsTrigger>
+              <TabsTrigger value="diretas" className="text-[11px] px-1">
+                Diretas
+              </TabsTrigger>
+              <TabsTrigger value="canais" className="text-[11px] px-1">
+                Canais
+              </TabsTrigger>
+              <TabsTrigger value="nao_lidas" className="text-[11px] px-1">
+                Não lidas
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -602,10 +666,17 @@ function ChatPage() {
               </div>
               <p className="text-xs font-medium">Nenhuma conversa aqui</p>
               <p className="text-[11px] text-muted-foreground">
-                {canais.length === 0 ? "Comece uma conversa com a equipe." : "Ajuste a busca ou o filtro."}
+                {canais.length === 0
+                  ? "Comece uma conversa com a equipe."
+                  : "Ajuste a busca ou o filtro."}
               </p>
               {podeEscrever && canais.length === 0 && (
-                <Button size="sm" variant="outline" className="mt-1" onClick={() => abrirNova("privada")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-1"
+                  onClick={() => abrirNova("privada")}
+                >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Nova conversa
                 </Button>
               )}
@@ -615,8 +686,12 @@ function ChatPage() {
           {canaisFiltrados.map((c) => {
             const ativo = c.id === canalSel;
             const direto = c.tipo === "direto";
-            const nomeDisplay = direto ? (nomesDiretos[c.id] ?? "Conversa direta") : (c.nome ?? "Grupo");
-            const membro = direto ? equipe.find((e) => e.user_id === membrosDiretos[c.id]) : undefined;
+            const nomeDisplay = direto
+              ? (nomesDiretos[c.id] ?? "Conversa direta")
+              : (c.nome ?? "Grupo");
+            const membro = direto
+              ? equipe.find((e) => e.user_id === membrosDiretos[c.id])
+              : undefined;
             const estaOnline = membro ? online.has(membro.user_id) : false;
             const meta = metas[c.id];
             return (
@@ -629,7 +704,9 @@ function ChatPage() {
               >
                 <div className="relative shrink-0">
                   <Avatar className="h-9 w-9">
-                    {membro?.avatar_url && <AvatarImage src={membro.avatar_url} alt={nomeDisplay} />}
+                    {membro?.avatar_url && (
+                      <AvatarImage src={membro.avatar_url} alt={nomeDisplay} />
+                    )}
                     <AvatarFallback className="text-[11px] font-semibold">
                       {direto ? iniciais(nomeDisplay) : <Users className="h-4 w-4" />}
                     </AvatarFallback>
@@ -647,14 +724,19 @@ function ChatPage() {
                     <span className="text-sm font-medium truncate flex-1">
                       {direto ? nomeDisplay : `#${nomeDisplay}`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{horaCurta(meta?.ultimaEm ?? null)}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {horaCurta(meta?.ultimaEm ?? null)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-muted-foreground truncate flex-1">
-                      {meta?.ultimaTexto || (direto ? (membro?.setor ?? "Equipe") : "Canal da equipe")}
+                      {meta?.ultimaTexto ||
+                        (direto ? (membro?.setor ?? "Equipe") : "Canal da equipe")}
                     </span>
                     {meta?.naoLidas > 0 && (
-                      <Badge className="h-4 min-w-4 px-1 text-[10px] justify-center rounded-full">{meta.naoLidas}</Badge>
+                      <Badge className="h-4 min-w-4 px-1 text-[10px] justify-center rounded-full">
+                        {meta.naoLidas}
+                      </Badge>
                     )}
                   </div>
                   {direto && membro?.setor && (
@@ -707,9 +789,15 @@ function ChatPage() {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative">
                   <Avatar className="h-10 w-10">
-                    {parceiro?.avatar_url && <AvatarImage src={parceiro.avatar_url} alt={nomeAtual} />}
+                    {parceiro?.avatar_url && (
+                      <AvatarImage src={parceiro.avatar_url} alt={nomeAtual} />
+                    )}
                     <AvatarFallback className="text-xs font-semibold">
-                      {canalAtual.tipo === "direto" ? iniciais(nomeAtual) : <Users className="h-4 w-4" />}
+                      {canalAtual.tipo === "direto" ? (
+                        iniciais(nomeAtual)
+                      ) : (
+                        <Users className="h-4 w-4" />
+                      )}
                     </AvatarFallback>
                   </Avatar>
                   {canalAtual.tipo === "direto" && (
@@ -742,7 +830,12 @@ function ChatPage() {
               </div>
               <div className="flex items-center gap-1">
                 {podeEscrever && (
-                  <Button variant="ghost" size="sm" onClick={() => setPacienteDialog(true)} title="Anexar ficha de paciente">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPacienteDialog(true)}
+                    title="Anexar ficha de paciente"
+                  >
                     <FileText className="h-4 w-4" />
                   </Button>
                 )}
@@ -752,7 +845,11 @@ function ChatPage() {
                   onClick={() => setBuscaConversa((v) => (v === null ? "" : null))}
                   title="Buscar na conversa"
                 >
-                  {buscaConversa === null ? <Search className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                  {buscaConversa === null ? (
+                    <Search className="h-4 w-4" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
                 </Button>
                 <Popover open={infoAberta} onOpenChange={setInfoAberta}>
                   <PopoverTrigger asChild>
@@ -761,12 +858,18 @@ function ChatPage() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-64 space-y-2">
-                    <p className="text-sm font-semibold">{canalAtual.tipo === "direto" ? nomeAtual : `#${nomeAtual}`}</p>
+                    <p className="text-sm font-semibold">
+                      {canalAtual.tipo === "direto" ? nomeAtual : `#${nomeAtual}`}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Tipo: {canalAtual.tipo === "direto" ? "Conversa privada" : "Canal / grupo"}
                     </p>
-                    {parceiro && <p className="text-xs text-muted-foreground">Setor: {parceiro.setor}</p>}
-                    <p className="text-xs text-muted-foreground">Mensagens carregadas: {mensagens.length}</p>
+                    {parceiro && (
+                      <p className="text-xs text-muted-foreground">Setor: {parceiro.setor}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Mensagens carregadas: {mensagens.length}
+                    </p>
                     {podeEscrever && (
                       <Button
                         variant="ghost"
@@ -801,7 +904,9 @@ function ChatPage() {
             <div ref={listRef} className="flex-1 overflow-auto p-4 space-y-3">
               {mensagensVisiveis.length === 0 && (
                 <p className="text-center text-xs text-muted-foreground py-8">
-                  {buscaConversa ? "Nenhuma mensagem encontrada." : "Nenhuma mensagem ainda. Diga olá 👋"}
+                  {buscaConversa
+                    ? "Nenhuma mensagem encontrada."
+                    : "Nenhuma mensagem ainda. Diga olá 👋"}
                 </p>
               )}
               {mensagensVisiveis.map((m) => {
@@ -819,7 +924,9 @@ function ChatPage() {
                   <div key={m.id} className={`flex gap-2 ${meu ? "justify-end" : "justify-start"}`}>
                     {!meu && (
                       <Avatar className="h-7 w-7 mt-auto">
-                        <AvatarFallback className="text-[10px]">{iniciais(autores[m.autor_id])}</AvatarFallback>
+                        <AvatarFallback className="text-[10px]">
+                          {iniciais(autores[m.autor_id])}
+                        </AvatarFallback>
                       </Avatar>
                     )}
                     <div
@@ -829,7 +936,11 @@ function ChatPage() {
                           : "bg-secondary text-secondary-foreground border rounded-bl-sm"
                       }`}
                     >
-                      {!meu && <p className="text-[11px] font-semibold opacity-80 mb-0.5">{autores[m.autor_id] ?? "…"}</p>}
+                      {!meu && (
+                        <p className="text-[11px] font-semibold opacity-80 mb-0.5">
+                          {autores[m.autor_id] ?? "…"}
+                        </p>
+                      )}
                       {m.anexo_tipo === "arquivo" && m.anexo_url ? (
                         <button
                           onClick={() => void abrirAnexo(m.anexo_url!)}
@@ -839,13 +950,19 @@ function ChatPage() {
                         </button>
                       ) : m.anexo_tipo === "paciente" ? (
                         <div className="rounded-lg border border-current/20 bg-background/10 px-2 py-1.5">
-                          <p className="text-[10px] uppercase tracking-wide opacity-70">Ficha de paciente</p>
-                          <p className="whitespace-pre-wrap break-words leading-relaxed">{m.texto}</p>
+                          <p className="text-[10px] uppercase tracking-wide opacity-70">
+                            Ficha de paciente
+                          </p>
+                          <p className="whitespace-pre-wrap break-words leading-relaxed">
+                            {m.texto}
+                          </p>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap break-words leading-relaxed">{m.texto}</p>
                       )}
-                      <p className={`text-[10px] mt-1 text-right ${meu ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                      <p
+                        className={`text-[10px] mt-1 text-right ${meu ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                      >
                         {formatDateTime(m.created_at)}
                       </p>
                     </div>
@@ -895,7 +1012,14 @@ function ChatPage() {
                         e.target.value = "";
                       }}
                     />
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Anexar arquivo" onClick={() => fileRef.current?.click()}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Anexar arquivo"
+                      onClick={() => fileRef.current?.click()}
+                    >
                       <Paperclip className="h-4 w-4" />
                     </Button>
                     <Button
@@ -910,7 +1034,13 @@ function ChatPage() {
                     </Button>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Respostas rápidas">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Respostas rápidas"
+                        >
                           <Zap className="h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
@@ -929,7 +1059,13 @@ function ChatPage() {
                     </Popover>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Emojis">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Emojis"
+                        >
                           <Smile className="h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
@@ -948,8 +1084,17 @@ function ChatPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    <Button type="submit" size="icon" disabled={!texto.trim() || enviando} className="h-8 w-8 rounded-full">
-                      {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={!texto.trim() || enviando}
+                      className="h-8 w-8 rounded-full"
+                    >
+                      {enviando ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -967,7 +1112,9 @@ function ChatPage() {
       <Dialog open={novoModo !== null} onOpenChange={(o) => !o && setNovoModo(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{novoModo === "canal" ? "Novo canal / grupo" : "Conversa privada"}</DialogTitle>
+            <DialogTitle>
+              {novoModo === "canal" ? "Novo canal / grupo" : "Conversa privada"}
+            </DialogTitle>
             <DialogDescription>
               {novoModo === "canal"
                 ? "Crie um canal por setor ou assunto (ex.: Recepção-Triagem, Avisos-Gerais)."
@@ -978,7 +1125,11 @@ function ChatPage() {
             {novoModo === "canal" && (
               <div>
                 <Label>Nome do canal</Label>
-                <Input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="#Recepcao-Triagem" />
+                <Input
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  placeholder="#Recepcao-Triagem"
+                />
               </div>
             )}
             <div>
@@ -1017,8 +1168,12 @@ function ChatPage() {
                         >
                           <div className="relative">
                             <Avatar className="h-7 w-7">
-                              {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.nome ?? ""} />}
-                              <AvatarFallback className="text-[10px]">{iniciais(m.nome)}</AvatarFallback>
+                              {m.avatar_url && (
+                                <AvatarImage src={m.avatar_url} alt={m.nome ?? ""} />
+                              )}
+                              <AvatarFallback className="text-[10px]">
+                                {iniciais(m.nome)}
+                              </AvatarFallback>
                             </Avatar>
                             <span
                               className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${
@@ -1027,7 +1182,9 @@ function ChatPage() {
                             />
                           </div>
                           <span className="flex-1 truncate">{m.nome ?? "Usuário"}</span>
-                          {online.has(m.user_id) && <span className="text-[10px] text-emerald-600">online</span>}
+                          {online.has(m.user_id) && (
+                            <span className="text-[10px] text-emerald-600">online</span>
+                          )}
                         </button>
                       );
                     })}
@@ -1052,7 +1209,9 @@ function ChatPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Anexar ficha de paciente</DialogTitle>
-            <DialogDescription>Busque pelo nome e envie os dados básicos na conversa.</DialogDescription>
+            <DialogDescription>
+              Busque pelo nome e envie os dados básicos na conversa.
+            </DialogDescription>
           </DialogHeader>
           <Input
             autoFocus

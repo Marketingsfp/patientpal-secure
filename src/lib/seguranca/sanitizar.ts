@@ -41,11 +41,16 @@ export function escapeHtml(valor: unknown): string {
  * Não escapa HTML — o React já escapa ao renderizar como texto.
  */
 export function limparTexto(valor: unknown): string {
-  return String(valor ?? "")
-    .replace(/\r\n?/g, "\n")
-    // caracteres de controle e marcas invisíveis usadas em ataques de spoofing
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u2028\u2029\uFEFF]/g, "")
-    .trim();
+  return (
+    String(valor ?? "")
+      .replace(/\r\n?/g, "\n")
+      // Caracteres de controle e marcas invisíveis usadas em ataques de
+      // spoofing. Casar caracteres de controle É o propósito desta função,
+      // então `no-control-regex` é falso positivo aqui.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u2028\u2029\uFEFF]/g, "")
+      .trim()
+  );
 }
 
 /** Igual a `limparTexto`, mas também colapsa espaços internos (nomes, títulos). */

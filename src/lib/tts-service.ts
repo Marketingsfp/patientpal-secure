@@ -44,7 +44,9 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
       try {
         currentAudio.playbackRate = clamped;
         (currentAudio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     }
   }
   if (typeof cfg.enabled === "boolean") {
@@ -55,9 +57,7 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
 }
 
 /** Busca a configuração atual da clínica no banco. */
-export async function fetchClinicaTtsConfig(
-  clinicaId: string,
-): Promise<ClinicaTtsConfig | null> {
+export async function fetchClinicaTtsConfig(clinicaId: string): Promise<ClinicaTtsConfig | null> {
   const { data, error } = await supabase
     .from("clinica_tts_config")
     .select("rate, enabled")
@@ -72,17 +72,15 @@ export async function saveClinicaTtsConfig(
   clinicaId: string,
   cfg: ClinicaTtsConfig,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from("clinica_tts_config")
-    .upsert(
-      {
-        clinica_id: clinicaId,
-        rate: cfg.rate,
-        enabled: cfg.enabled,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "clinica_id" },
-    );
+  const { error } = await supabase.from("clinica_tts_config").upsert(
+    {
+      clinica_id: clinicaId,
+      rate: cfg.rate,
+      enabled: cfg.enabled,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "clinica_id" },
+  );
   return { error: error?.message ?? null };
 }
 
@@ -107,9 +105,7 @@ export function subscribeClinicaTtsConfig(clinicaId: string): () => void {
         filter: `clinica_id=eq.${clinicaId}`,
       },
       (payload) => {
-        const row = (payload.new ?? payload.old) as
-          | { rate?: number; enabled?: boolean }
-          | null;
+        const row = (payload.new ?? payload.old) as { rate?: number; enabled?: boolean } | null;
         if (!row) return;
         applyClinicaTtsConfig({
           rate: typeof row.rate === "number" ? row.rate : Number(row.rate),

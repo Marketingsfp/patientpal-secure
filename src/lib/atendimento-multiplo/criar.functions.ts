@@ -12,7 +12,7 @@ export type ItemAtendimentoMultiplo = {
   procedimento: string;
   medico_id: string | null;
   inicio: string; // ISO
-  fim: string;    // ISO
+  fim: string; // ISO
   tipo_atendimento: "particular" | "convenio";
   observacoes?: string | null;
 };
@@ -76,10 +76,14 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
     hojeInicio.setHours(0, 0, 0, 0);
     const passado = itens.find((it) => new Date(it.inicio).getTime() < hojeInicio.getTime());
     if (passado) {
-      return { ok: false, message: "Não é possível criar um agendamento para uma data que já passou." };
+      return {
+        ok: false,
+        message: "Não é possível criar um agendamento para uma data que já passou.",
+      };
     }
     const overlap = (aIni: string, aFim: string, bIni: string, bFim: string) =>
-      new Date(aIni).getTime() < new Date(bFim).getTime() && new Date(aFim).getTime() > new Date(bIni).getTime();
+      new Date(aIni).getTime() < new Date(bFim).getTime() &&
+      new Date(aFim).getTime() > new Date(bIni).getTime();
     for (let i = 0; i < itens.length; i++) {
       for (let j = i + 1; j < itens.length; j++) {
         if (overlap(itens[i].inicio, itens[i].fim, itens[j].inicio, itens[j].fim)) {
@@ -100,8 +104,9 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       .neq("status", "cancelado")
       .lt("inicio", maxFim)
       .gt("fim", minIni);
-    const conflitoExistente = ((existentes ?? []) as Array<{ id: string; inicio: string; fim: string }>)
-      .find((ex) => itens.some((it) => overlap(it.inicio, it.fim, ex.inicio, ex.fim)));
+    const conflitoExistente = (
+      (existentes ?? []) as Array<{ id: string; inicio: string; fim: string }>
+    ).find((ex) => itens.some((it) => overlap(it.inicio, it.fim, ex.inicio, ex.fim)));
     if (conflitoExistente) {
       return {
         ok: false,
@@ -153,10 +158,7 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: novos, error } = await supabase
-      .from("agendamentos")
-      .insert(rows)
-      .select("id");
+    const { data: novos, error } = await supabase.from("agendamentos").insert(rows).select("id");
 
     if (error || !novos) {
       return {

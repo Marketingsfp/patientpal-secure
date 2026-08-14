@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -30,38 +35,39 @@ export function usePromptDescricaoNfse() {
   }, []);
 
   const confirm = () => {
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     const t = (texto ?? "").trim();
     r?.(t.length ? t : null);
   };
   const cancel = () => {
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     r?.(null);
   };
 
   const dialog = (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) cancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) cancel();
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Descrição dos serviços</DialogTitle>
           <DialogDescription>
-            Revise e edite o texto que sairá impresso na NFS-e. Este é o
-            texto que o tomador verá na nota.
+            Revise e edite o texto que sairá impresso na NFS-e. Este é o texto que o tomador verá na
+            nota.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label>Descrição</Label>
           <div className="flex flex-wrap gap-2">
             {SERVICOS_PRESET.map((s) => (
-              <Button
-                key={s}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setTexto(s)}
-              >
+              <Button key={s} type="button" variant="outline" size="sm" onClick={() => setTexto(s)}>
                 {s}
               </Button>
             ))}
@@ -73,13 +79,15 @@ export function usePromptDescricaoNfse() {
             maxLength={2000}
             autoFocus
           />
-          <p className="text-xs text-muted-foreground">
-            {texto.length}/2000 caracteres
-          </p>
+          <p className="text-xs text-muted-foreground">{texto.length}/2000 caracteres</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancelar</Button>
-          <Button onClick={confirm} disabled={!texto.trim()}>Emitir com este texto</Button>
+          <Button variant="outline" onClick={cancel}>
+            Cancelar
+          </Button>
+          <Button onClick={confirm} disabled={!texto.trim()}>
+            Emitir com este texto
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

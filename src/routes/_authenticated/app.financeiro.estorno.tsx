@@ -13,8 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -47,7 +60,11 @@ const fmt = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 
 const norm = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -109,10 +126,7 @@ function Page() {
       ),
     );
     if (ids.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, nome")
-        .in("id", ids);
+      const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
       const map: Record<string, string> = {};
       (profs ?? []).forEach((p: { id: string; nome: string }) => {
         map[p.id] = p.nome;
@@ -251,7 +265,7 @@ function Page() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!await confirmDialog("Aprovar e estornar esta solicitação?")) return;
+    if (!(await confirmDialog("Aprovar e estornar esta solicitação?"))) return;
     setBusy(s.id);
     try {
       const r = await executarEstorno(s);
@@ -366,8 +380,8 @@ function Page() {
           <div>
             <h1 className="text-lg font-semibold leading-tight">Estorno</h1>
             <p className="text-xs text-muted-foreground">
-              Solicitações enviadas pelo caixa/recepção — aprove para estornar o atendimento ou recuse
-              com uma justificativa.
+              Solicitações enviadas pelo caixa/recepção — aprove para estornar o atendimento ou
+              recuse com uma justificativa.
             </p>
           </div>
         </div>
@@ -434,11 +448,7 @@ function Page() {
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Até</label>
-            <DateInputBR
-              className="h-9"
-              value={fAte}
-              onChange={(e) => setFAte(e.target.value)}
-            />
+            <DateInputBR className="h-9" value={fAte} onChange={(e) => setFAte(e.target.value)} />
           </div>
           {(fBusca || fStatus !== "pendente" || fTipo !== "todos" || fDe || fAte) && (
             <Button
@@ -500,24 +510,20 @@ function Page() {
                       {s.descricao && (
                         <div className="text-xs text-muted-foreground">{s.descricao}</div>
                       )}
-                      {s.tipo === "devolucao" &&
-                        (s.data_pagamento_original || s.data_estorno) && (
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {s.data_pagamento_original && (
-                              <>
-                                Pago em{" "}
-                                {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")}
-                              </>
-                            )}
-                            {s.data_pagamento_original && s.data_estorno && " • "}
-                            {s.data_estorno && (
-                              <>
-                                Devolver em{" "}
-                                {new Date(s.data_estorno).toLocaleDateString("pt-BR")}
-                              </>
-                            )}
-                          </div>
-                        )}
+                      {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {s.data_pagamento_original && (
+                            <>
+                              Pago em{" "}
+                              {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")}
+                            </>
+                          )}
+                          {s.data_pagamento_original && s.data_estorno && " • "}
+                          {s.data_estorno && (
+                            <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {s.valor != null ? fmt(Number(s.valor)) : "—"}
@@ -549,9 +555,7 @@ function Page() {
                       {s.resolvido_em && (
                         <div className="not-italic text-[10px] text-muted-foreground">
                           Resolvido em {new Date(s.resolvido_em).toLocaleString("pt-BR")}
-                          {s.resolvido_por && (
-                            <> por {nomesUsuarios[s.resolvido_por] ?? "—"}</>
-                          )}
+                          {s.resolvido_por && <> por {nomesUsuarios[s.resolvido_por] ?? "—"}</>}
                         </div>
                       )}
                     </TableCell>

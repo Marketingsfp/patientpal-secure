@@ -69,14 +69,24 @@ export function useFichaPresence(agendamentoId: string | null | undefined): {
             .maybeSingle();
           const nomeProf = (prof as { nome?: string | null } | null)?.nome;
           if (nomeProf && nomeProf.trim()) nome = nomeProf.toUpperCase();
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
         if (cancelled) return;
-        await channel.track({ user_id: userId, nome, entrou_em: Date.now() } satisfies PresencaFicha);
+        await channel.track({
+          user_id: userId,
+          nome,
+          entrou_em: Date.now(),
+        } satisfies PresencaFicha);
       });
 
     return () => {
       cancelled = true;
-      try { channel.untrack(); } catch { /* noop */ }
+      try {
+        channel.untrack();
+      } catch {
+        /* noop */
+      }
       supabase.removeChannel(channel);
     };
   }, [agendamentoId, user?.id, user?.email, user?.user_metadata]);

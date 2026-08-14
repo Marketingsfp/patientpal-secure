@@ -57,7 +57,10 @@ export async function incluirDependenteContrato(params: {
   if (eContrato) return { ok: false, mensagem: "Falha ao buscar o contrato.", error: eContrato };
   if (!contrato) return { ok: false, mensagem: "Contrato não encontrado." };
   if (contrato.status === "cancelado") {
-    return { ok: false, mensagem: "Este contrato está cancelado — não é possível incluir dependentes." };
+    return {
+      ok: false,
+      mensagem: "Este contrato está cancelado — não é possível incluir dependentes.",
+    };
   }
   if (contrato.paciente_id === pacienteId) {
     return { ok: false, mensagem: "O titular não pode ser dependente do próprio contrato." };
@@ -68,7 +71,8 @@ export async function incluirDependenteContrato(params: {
     .select("id, paciente_id")
     .eq("contrato_id", contratoId)
     .eq("ativo", true);
-  if (eAtivos) return { ok: false, mensagem: "Falha ao checar dependentes atuais.", error: eAtivos };
+  if (eAtivos)
+    return { ok: false, mensagem: "Falha ao checar dependentes atuais.", error: eAtivos };
   const ativosRows = (ativos ?? []) as Array<{ id: string; paciente_id: string }>;
   if (ativosRows.some((d) => d.paciente_id === pacienteId)) {
     return { ok: false, mensagem: "Esse paciente já é dependente ativo deste contrato." };
@@ -86,7 +90,10 @@ export async function incluirDependenteContrato(params: {
   if (ativosRows.length >= maxDep) {
     return {
       ok: false,
-      mensagem: maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`,
+      mensagem:
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Limite de ${maxDep} dependentes atingido.`,
     };
   }
 
@@ -107,9 +114,10 @@ export async function incluirDependenteContrato(params: {
   if (error) {
     // Trava de banco (trigger) é a última linha de defesa contra corrida —
     // mesma mensagem amigável de duplicidade caso a checagem acima perca.
-    const mensagem = (error as { code?: string }).code === "23505"
-      ? "Esse paciente já é dependente ativo deste contrato."
-      : "Falha ao incluir dependente.";
+    const mensagem =
+      (error as { code?: string }).code === "23505"
+        ? "Esse paciente já é dependente ativo deste contrato."
+        : "Falha ao incluir dependente.";
     return { ok: false, mensagem, error };
   }
   const dependente = data as unknown as DependenteIncluido;

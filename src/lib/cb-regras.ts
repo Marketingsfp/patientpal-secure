@@ -18,7 +18,7 @@ export interface CbRegra {
   ativo?: boolean;
   limite_qtd?: number | null;
   limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "contrato"
-  limite_escopo?: string | null;  // "contrato" | "paciente"
+  limite_escopo?: string | null; // "contrato" | "paciente"
   excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
@@ -70,7 +70,7 @@ export function findRegra(
       return true;
     }
     if (r.especialidade_id && r.especialidade_id !== espId) return false;
-    if (r.tipo && (r.tipo.toLowerCase() !== tipoNorm)) return false;
+    if (r.tipo && r.tipo.toLowerCase() !== tipoNorm) return false;
     return true;
   });
   if (candidates.length === 0) return null;
@@ -81,11 +81,11 @@ export function findRegra(
   // no mesmo serviço (ex.: ECG saindo R$ 45,90 em vez de gratuito). A
   // prioridade só desempata entre regras do mesmo tipo.
   const score = (r: CbRegra) =>
-    (r.procedimento_id ? 1000 : 0)
-    + (r.especialidade_id ? 100 : 0)
-    + (r.tipo ? 50 : 0)
-    + (r.gratuito ? 10 : 0)
-    + (r.prioridade || 0) * 0.001;
+    (r.procedimento_id ? 1000 : 0) +
+    (r.especialidade_id ? 100 : 0) +
+    (r.tipo ? 50 : 0) +
+    (r.gratuito ? 10 : 0) +
+    (r.prioridade || 0) * 0.001;
   return candidates.slice().sort((a, b) => score(b) - score(a))[0];
 }
 
@@ -98,12 +98,12 @@ export function computeValor(
   const round2 = (n: number) => Math.round(n * 100) / 100;
   if (regra.modo === "valor_fixo") {
     const v = Number(regra.valor) || 0;
-    const vCartao = regra.valor_cartao != null ? (Number(regra.valor_cartao) || 0) : v;
+    const vCartao = regra.valor_cartao != null ? Number(regra.valor_cartao) || 0 : v;
     return { dinheiro: round2(v), outros: round2(vCartao) };
   }
   if (regra.modo === "percentual_desconto") {
     const p = Number(regra.percentual) || 0;
-    const pCartao = regra.percentual_cartao != null ? (Number(regra.percentual_cartao) || 0) : p;
+    const pCartao = regra.percentual_cartao != null ? Number(regra.percentual_cartao) || 0 : p;
     const kDin = 1 - p / 100;
     const kOut = 1 - pCartao / 100;
     return { dinheiro: round2(baseDinheiro * kDin), outros: round2(baseOutros * kOut) };

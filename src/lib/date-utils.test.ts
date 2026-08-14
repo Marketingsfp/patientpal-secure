@@ -25,12 +25,8 @@ describe("janelaDiaClinica", () => {
   });
 
   it("atravessa virada de mês e de ano corretamente", () => {
-    expect(janelaDiaClinica("2026-07-31").fimExclusivo).toBe(
-      janelaDiaClinica("2026-08-01").inicio,
-    );
-    expect(janelaDiaClinica("2026-12-31").fimExclusivo).toBe(
-      janelaDiaClinica("2027-01-01").inicio,
-    );
+    expect(janelaDiaClinica("2026-07-31").fimExclusivo).toBe(janelaDiaClinica("2026-08-01").inicio);
+    expect(janelaDiaClinica("2026-12-31").fimExclusivo).toBe(janelaDiaClinica("2027-01-01").inicio);
   });
 
   it("não depende do fuso do runtime — mesmo resultado independente de qual TZ é passado explicitamente", () => {
@@ -56,8 +52,6 @@ describe("zonedDateStringToUtcISO", () => {
     // Caso do bug em fn_registrar_lancamento_e_caixa, que grava
     // `(data || ' 12:00:00+00')::timestamptz` — meio-dia UTC vira 09:00 BRT,
     // não meio-dia BRT como o nome sugere.
-    expect(zonedDateStringToUtcISO("2026-07-24", "12:00:00")).toBe(
-      "2026-07-24T15:00:00.000Z",
-    );
+    expect(zonedDateStringToUtcISO("2026-07-24", "12:00:00")).toBe("2026-07-24T15:00:00.000Z");
   });
 });

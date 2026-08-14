@@ -39,8 +39,16 @@ export interface ResponsiveCardsProps<T> {
 }
 
 export function ResponsiveCards<T>({
-  items, getKey, renderCard, onItemClick, desktop,
-  empty, loading, loadingCount = 4, className, cardClassName,
+  items,
+  getKey,
+  renderCard,
+  onItemClick,
+  desktop,
+  empty,
+  loading,
+  loadingCount = 4,
+  className,
+  cardClassName,
 }: ResponsiveCardsProps<T>) {
   return (
     <>
@@ -87,23 +95,30 @@ export function ResponsiveCards<T>({
 
 /** Linha rótulo/valor dentro de um card mobile. */
 export function MobileCardRow({
-  label, value, className,
-}: { label: React.ReactNode; value: React.ReactNode; className?: string }) {
+  label,
+  value,
+  className,
+}: {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cn("flex items-baseline justify-between gap-3 py-1 min-w-0", className)}>
       <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
         {label}
       </span>
-      <span className="text-sm text-foreground text-right min-w-0 truncate">
-        {value}
-      </span>
+      <span className="text-sm text-foreground text-right min-w-0 truncate">{value}</span>
     </div>
   );
 }
 
 /** Cabeçalho do card mobile — título + ação/status à direita. */
 export function MobileCardHeader({
-  title, right, subtitle, className,
+  title,
+  right,
+  subtitle,
+  className,
 }: {
   title: React.ReactNode;
   right?: React.ReactNode;
@@ -114,9 +129,7 @@ export function MobileCardHeader({
     <div className={cn("flex items-start justify-between gap-2 mb-1", className)}>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-foreground truncate">{title}</div>
-        {subtitle && (
-          <div className="text-xs text-muted-foreground truncate">{subtitle}</div>
-        )}
+        {subtitle && <div className="text-xs text-muted-foreground truncate">{subtitle}</div>}
       </div>
       {right && <div className="shrink-0">{right}</div>}
     </div>

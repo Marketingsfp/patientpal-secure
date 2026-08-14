@@ -47,7 +47,15 @@ interface Props {
   podeHistorico?: boolean;
 }
 
-export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico, ocultarConversao }: Props) {
+export function OrcamentoDrawer({
+  orc,
+  onClose,
+  onPrint,
+  onConverter,
+  onHistorico,
+  podeHistorico,
+  ocultarConversao,
+}: Props) {
   const [itens, setItens] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -58,14 +66,18 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
     void (async () => {
       const { data } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, quantidade, valor_unitario, valores_formas, sinal_valor, valor_pago, valor_total, status_financeiro")
+        .select(
+          "id, descricao, quantidade, valor_unitario, valores_formas, sinal_valor, valor_pago, valor_total, status_financeiro",
+        )
         .eq("orcamento_id", orc.id)
         .order("created_at", { ascending: true });
       if (cancel) return;
       setItens((data ?? []) as Item[]);
       setLoading(false);
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [orc]);
 
   return (
@@ -74,7 +86,9 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
         {orc && (
           <>
             <SheetHeader>
-              <SheetTitle>#ORC-{formatNumeroOrcamento(orc.serie, orc.numero)} · {orc.paciente_nome}</SheetTitle>
+              <SheetTitle>
+                #ORC-{formatNumeroOrcamento(orc.serie, orc.numero)} · {orc.paciente_nome}
+              </SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
@@ -95,92 +109,107 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                 }, 0);
                 return (
                   <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Médico</div>
-                  <div>{orc.medico_nome ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Telefone</div>
-                  <div>{orc.paciente_telefone ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Criado em</div>
-                  <div>{new Date(orc.created_at).toLocaleString("pt-BR")}</div>
-                </div>
-                {temSplit ? (
-                  <>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Total Dinheiro</div>
-                      <div className="font-semibold">{BRL(totalDin)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Total Cartão/PIX</div>
-                      <div className="font-semibold">{BRL(totalCart)}</div>
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <div className="text-xs text-muted-foreground">Valor total</div>
-                    <div className="font-semibold">{BRL(Number(orc.valor_total))}</div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Itens</div>
-                {loading ? (
-                  <div className="text-muted-foreground text-xs">Carregando…</div>
-                ) : itens.length === 0 ? (
-                  <div className="text-muted-foreground text-xs">Sem itens.</div>
-                ) : (
-                  <ul className="divide-y border rounded">
-                    {itens.map((i, idx) => {
-                      const sp = splits[idx];
-                      const q = Number(i.quantidade);
-                      return (
-                        <li key={i.id} className="px-3 py-2">
-                          <div className="flex justify-between gap-2">
-                            <span className="truncate">{q}× {i.descricao}</span>
-                            {!sp && (
-                              <span className="tabular-nums">{BRL(q * Number(i.valor_unitario))}</span>
-                            )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Médico</div>
+                        <div>{orc.medico_nome ?? "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Telefone</div>
+                        <div>{orc.paciente_telefone ?? "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Criado em</div>
+                        <div>{new Date(orc.created_at).toLocaleString("pt-BR")}</div>
+                      </div>
+                      {temSplit ? (
+                        <>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Total Dinheiro</div>
+                            <div className="font-semibold">{BRL(totalDin)}</div>
                           </div>
-                          {sp && (
-                            <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
-                              <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Dinheiro</span>
-                                <span className="tabular-nums font-medium">{BRL(q * sp.din)}</span>
-                              </div>
-                              <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Cartão/PIX</span>
-                                <span className="tabular-nums font-medium">{BRL(q * sp.cart)}</span>
-                              </div>
-                            </div>
-                          )}
-                          {Number(i.sinal_valor ?? 0) > 0 && (() => {
-                            const totalItem = Number(i.valor_total ?? q * Number(i.valor_unitario));
-                            const pago = Number(i.valor_pago ?? 0);
-                            const saldo = Math.max(0, totalItem - pago);
-                            const quitado = i.status_financeiro === "pago" || saldo <= 0.004;
+                          <div>
+                            <div className="text-xs text-muted-foreground">Total Cartão/PIX</div>
+                            <div className="font-semibold">{BRL(totalCart)}</div>
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Valor total</div>
+                          <div className="font-semibold">{BRL(Number(orc.valor_total))}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Itens</div>
+                      {loading ? (
+                        <div className="text-muted-foreground text-xs">Carregando…</div>
+                      ) : itens.length === 0 ? (
+                        <div className="text-muted-foreground text-xs">Sem itens.</div>
+                      ) : (
+                        <ul className="divide-y border rounded">
+                          {itens.map((i, idx) => {
+                            const sp = splits[idx];
+                            const q = Number(i.quantidade);
                             return (
-                              <div className="mt-1 text-xs">
-                                <Badge variant={quitado ? "secondary" : "outline"} className="font-normal">
-                                  {quitado
-                                    ? "Quitado"
-                                    : pago > 0
-                                      ? `Sinal pago — saldo ${BRL(saldo)}`
-                                      : `Sinal pendente ${BRL(Number(i.sinal_valor))}`}
-                                </Badge>
-                              </div>
+                              <li key={i.id} className="px-3 py-2">
+                                <div className="flex justify-between gap-2">
+                                  <span className="truncate">
+                                    {q}× {i.descricao}
+                                  </span>
+                                  {!sp && (
+                                    <span className="tabular-nums">
+                                      {BRL(q * Number(i.valor_unitario))}
+                                    </span>
+                                  )}
+                                </div>
+                                {sp && (
+                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                                    <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
+                                      <span className="text-muted-foreground">Dinheiro</span>
+                                      <span className="tabular-nums font-medium">
+                                        {BRL(q * sp.din)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
+                                      <span className="text-muted-foreground">Cartão/PIX</span>
+                                      <span className="tabular-nums font-medium">
+                                        {BRL(q * sp.cart)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                {Number(i.sinal_valor ?? 0) > 0 &&
+                                  (() => {
+                                    const totalItem = Number(
+                                      i.valor_total ?? q * Number(i.valor_unitario),
+                                    );
+                                    const pago = Number(i.valor_pago ?? 0);
+                                    const saldo = Math.max(0, totalItem - pago);
+                                    const quitado =
+                                      i.status_financeiro === "pago" || saldo <= 0.004;
+                                    return (
+                                      <div className="mt-1 text-xs">
+                                        <Badge
+                                          variant={quitado ? "secondary" : "outline"}
+                                          className="font-normal"
+                                        >
+                                          {quitado
+                                            ? "Quitado"
+                                            : pago > 0
+                                              ? `Sinal pago — saldo ${BRL(saldo)}`
+                                              : `Sinal pendente ${BRL(Number(i.sinal_valor))}`}
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })()}
+                              </li>
                             );
-                          })()}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   </>
                 );
               })()}

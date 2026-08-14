@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 type ThemeKey = "classic" | "ocean" | "slate" | "emerald";
 
 const THEMES: { key: ThemeKey; label: string; swatch: string; sidebar: string }[] = [
-  { key: "classic", label: "Classic Azure",   swatch: "#0284C7", sidebar: "#3B5F8A" },
-  { key: "ocean",   label: "Ocean Teal",      swatch: "#0EA5A4", sidebar: "#2E6B7A" },
-  { key: "slate",   label: "Slate Premium",   swatch: "#6366F1", sidebar: "#475569" },
-  { key: "emerald", label: "Emerald Exec",    swatch: "#059669", sidebar: "#2F6B4E" },
+  { key: "classic", label: "Classic Azure", swatch: "#0284C7", sidebar: "#3B5F8A" },
+  { key: "ocean", label: "Ocean Teal", swatch: "#0EA5A4", sidebar: "#2E6B7A" },
+  { key: "slate", label: "Slate Premium", swatch: "#6366F1", sidebar: "#475569" },
+  { key: "emerald", label: "Emerald Exec", swatch: "#059669", sidebar: "#2F6B4E" },
 ];
 
 const STORAGE_KEY = "hhp:theme";
@@ -33,7 +33,11 @@ export function ThemeSwitcher() {
   function pick(key: ThemeKey) {
     setTheme(key);
     applyTheme(key);
-    try { localStorage.setItem(STORAGE_KEY, key); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, key);
+    } catch {
+      // Sem localStorage o tema não persiste entre sessões, mas já foi aplicado.
+    }
     setOpen(false);
   }
 

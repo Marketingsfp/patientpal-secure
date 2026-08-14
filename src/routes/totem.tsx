@@ -46,12 +46,37 @@ function formatarNomeClinica(nome: string): string {
     .replace(/\bPOLICLINICA\b/g, "POLICLÍNICA");
 }
 
-const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
-  { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-sky-600 to-sky-700" },
-  { tipo: "P", titulo: "Preferencial", sub: "Idoso · Gestante · PCD · Crianças de colo", Icon: Accessibility, classe: "from-amber-500 to-amber-600" },
-  { tipo: "C", titulo: "Cartão consulta", sub: "Titulares do cartão benefício", Icon: Stethoscope, classe: "from-rose-600 to-rose-700" },
-  { tipo: "R", titulo: "Retorno", sub: "Pacientes em retorno", Icon: RotateCcw, classe: "from-emerald-600 to-emerald-700" },
-];
+const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] =
+  [
+    {
+      tipo: "N",
+      titulo: "Comum",
+      sub: "Atendimento padrão",
+      Icon: Hash,
+      classe: "from-sky-600 to-sky-700",
+    },
+    {
+      tipo: "P",
+      titulo: "Preferencial",
+      sub: "Idoso · Gestante · PCD · Crianças de colo",
+      Icon: Accessibility,
+      classe: "from-amber-500 to-amber-600",
+    },
+    {
+      tipo: "C",
+      titulo: "Cartão consulta",
+      sub: "Titulares do cartão benefício",
+      Icon: Stethoscope,
+      classe: "from-rose-600 to-rose-700",
+    },
+    {
+      tipo: "R",
+      titulo: "Retorno",
+      sub: "Pacientes em retorno",
+      Icon: RotateCcw,
+      classe: "from-emerald-600 to-emerald-700",
+    },
+  ];
 
 // "menu" é a tela inicial (check-in OU retirar senha); "senha" mostra os
 // tipos; "checkin-facial" é a câmera de reconhecimento; "ticket"/"checkin-ok"
@@ -114,7 +139,9 @@ export function TotemPage() {
       const e = Number(localStorage.getItem("totem.escala") ?? "0");
       if (Number.isFinite(e) && e >= 0 && e <= ESCALAS.length - 1) setEscalaIdx(e);
       setContraste(localStorage.getItem("totem.contraste") === "1");
-    } catch { /* ignora */ }
+    } catch {
+      /* ignora */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -124,21 +151,31 @@ export function TotemPage() {
     if (typeof document === "undefined") return;
     const html = document.documentElement;
     html.style.fontSize = `${16 * ESCALAS[escalaIdx]}px`;
-    return () => { html.style.fontSize = ""; };
+    return () => {
+      html.style.fontSize = "";
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escalaIdx]);
 
   function mudarEscala(delta: number) {
     setEscalaIdx((i) => {
       const next = Math.min(ESCALAS.length - 1, Math.max(0, i + delta));
-      try { localStorage.setItem("totem.escala", String(next)); } catch { /* ignora */ }
+      try {
+        localStorage.setItem("totem.escala", String(next));
+      } catch {
+        /* ignora */
+      }
       return next;
     });
   }
   function toggleContraste() {
     setContraste((c) => {
       const next = !c;
-      try { localStorage.setItem("totem.contraste", next ? "1" : "0"); } catch { /* ignora */ }
+      try {
+        localStorage.setItem("totem.contraste", next ? "1" : "0");
+      } catch {
+        /* ignora */
+      }
       return next;
     });
   }
@@ -152,9 +189,13 @@ export function TotemPage() {
         printStatus === "falha"
           ? "Não foi possível imprimir. Anote o número ou procure a recepção."
           : "Retire sua senha impressa.";
-      setAnnounce(`Senha ${nome}, número ${ticket.codigo}. ${avisoImpressao} Acompanhe o painel de chamada.`);
+      setAnnounce(
+        `Senha ${nome}, número ${ticket.codigo}. ${avisoImpressao} Acompanhe o painel de chamada.`,
+      );
     } else if (step === "checkin-ok" && checkinInfo) {
-      setAnnounce(`Check-in confirmado. Olá, ${checkinInfo.paciente_nome}. Aguarde sua chamada no painel.`);
+      setAnnounce(
+        `Check-in confirmado. Olá, ${checkinInfo.paciente_nome}. Aguarde sua chamada no painel.`,
+      );
     } else if (step === "checkin-facial") {
       setAnnounce(scanMsg);
     } else {
@@ -209,7 +250,9 @@ export function TotemPage() {
   const INATIVIDADE_MS = 45_000;
   const ultimaAtividadeRef = useRef(Date.now());
   useEffect(() => {
-    const bump = () => { ultimaAtividadeRef.current = Date.now(); };
+    const bump = () => {
+      ultimaAtividadeRef.current = Date.now();
+    };
     window.addEventListener("pointerdown", bump);
     window.addEventListener("keydown", bump);
     return () => {
@@ -255,13 +298,17 @@ export function TotemPage() {
     setBusy(true);
     // Usa a RPC pública quando não há sessão (totem em quiosque via URL com token);
     // clínicas com token público habilitado emitem sem exigir login.
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     const rpcName = session ? "emitir_senha" : "emitir_senha_publica";
     const args: Record<string, unknown> = { _clinica_id: clinicaAtual.clinica_id, _tipo };
-    const { data, error } = await (supabase.rpc as unknown as (
-      fn: string,
-      a: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>)(rpcName, args);
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        a: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )(rpcName, args);
     setBusy(false);
     if (error || !data) {
       mostrarErro(error);
@@ -318,10 +365,12 @@ export function TotemPage() {
     // RPC SECURITY DEFINER com grant para anon — o totem roda também nas
     // rotas públicas (/totem/$clinicaId e /totem/t/$token), onde não há
     // sessão e o RLS bloquearia consultas diretas a pacientes/agendamentos.
-    const { data, error } = await (supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>)("totem_checkin_cpf", {
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("totem_checkin_cpf", {
       _clinica_id: clinicaAtual.clinica_id,
       _cpf: cpf,
     });
@@ -349,10 +398,12 @@ export function TotemPage() {
   async function fazerCheckinPaciente(pacienteId: string) {
     if (!clinicaAtual) return;
     setBusy(true);
-    const { data, error } = await (supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>)("totem_checkin_paciente", {
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("totem_checkin_paciente", {
       _clinica_id: clinicaAtual.clinica_id,
       _paciente_id: pacienteId,
     });
@@ -413,10 +464,12 @@ export function TotemPage() {
       }
 
       setScanMsg("Verificando…");
-      const { data: matchData, error } = await (supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: unknown }>)("totem_match_biometria", {
+      const { data: matchData, error } = await (
+        supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>
+      )("totem_match_biometria", {
         _clinica_id: clinicaAtual.clinica_id,
         _descriptor: Array.from(descritor),
         _threshold: FACE_MATCH_THRESHOLD,
@@ -428,8 +481,7 @@ export function TotemPage() {
         return;
       }
       const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
-        | { paciente_id: string; nome: string }
-        | undefined;
+        { paciente_id: string; nome: string } | undefined;
       if (!match?.paciente_id) {
         toast.error("Não reconhecemos seu rosto. Digite o CPF.");
         setStep("checkin");
@@ -460,7 +512,9 @@ export function TotemPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-8 cursor-none [&_*]:cursor-none">
         <div className="text-center space-y-4 max-w-md">
           <h1 className="text-2xl font-semibold">Nenhuma clínica selecionada</h1>
-          <p className="text-muted-foreground">Faça login no painel administrativo e selecione a clínica antes de abrir o totem.</p>
+          <p className="text-muted-foreground">
+            Faça login no painel administrativo e selecione a clínica antes de abrir o totem.
+          </p>
           <Button onClick={() => navigate({ to: "/app" })}>Ir para o painel</Button>
         </div>
       </div>
@@ -471,9 +525,13 @@ export function TotemPage() {
     // h-screen + overflow-hidden (em vez de min-h-screen): a página do totem
     // não pode rolar de jeito nenhum — trava exatamente na altura da
     // viewport e cada tela (header/main/footer) precisa caber dentro disso.
-    <div className={`h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none${contraste ? " totem-hc" : ""}`}>
+    <div
+      className={`h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none${contraste ? " totem-hc" : ""}`}
+    >
       {/* Anúncios para leitor de tela (invisível visualmente). */}
-      <div aria-live="assertive" role="status" className="sr-only">{announce}</div>
+      <div aria-live="assertive" role="status" className="sr-only">
+        {announce}
+      </div>
 
       {/* Barra de acessibilidade — fixa, sempre acessível em qualquer etapa.
           Ampliar/reduzir texto e alternar alto contraste. */}
@@ -508,11 +566,21 @@ export function TotemPage() {
       <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
-          <h1 className="text-xl md:text-2xl font-bold">{formatarNomeClinica(clinicaAtual.clinica.nome)}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">
+            {formatarNomeClinica(clinicaAtual.clinica.nome)}
+          </h1>
         </div>
         <div className="text-right text-sm text-muted-foreground">
-          <div className="capitalize">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>
-          <div className="text-xl md:text-2xl font-mono tabular-nums text-foreground"><Clock /></div>
+          <div className="capitalize">
+            {new Date().toLocaleDateString("pt-BR", {
+              weekday: "long",
+              day: "2-digit",
+              month: "long",
+            })}
+          </div>
+          <div className="text-xl md:text-2xl font-mono tabular-nums text-foreground">
+            <Clock />
+          </div>
         </div>
       </header>
 
@@ -520,8 +588,12 @@ export function TotemPage() {
         {step === "menu" && (
           <div className="w-full max-w-4xl space-y-10">
             <div className="text-center space-y-2">
-              <h2 className="text-[clamp(1.75rem,4.5vw,3rem)] font-bold tracking-tight">Como podemos ajudar?</h2>
-              <p className="text-[clamp(1rem,2.2vw,1.25rem)] text-muted-foreground">Toque em uma das opções</p>
+              <h2 className="text-[clamp(1.75rem,4.5vw,3rem)] font-bold tracking-tight">
+                Como podemos ajudar?
+              </h2>
+              <p className="text-[clamp(1rem,2.2vw,1.25rem)] text-muted-foreground">
+                Toque em uma das opções
+              </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <button
@@ -531,18 +603,25 @@ export function TotemPage() {
                 <Ticket className="h-14 w-14" />
                 <div>
                   <div className="text-3xl font-bold">Retirar senha</div>
-                  <div className="text-white/90 text-sm mt-1">Comum, preferencial, cartão ou retorno</div>
+                  <div className="text-white/90 text-sm mt-1">
+                    Comum, preferencial, cartão ou retorno
+                  </div>
                 </div>
                 <Ticket className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
               </button>
               <button
-                onClick={() => { setCpf(""); setStep("checkin"); }}
+                onClick={() => {
+                  setCpf("");
+                  setStep("checkin");
+                }}
                 className="group relative overflow-hidden rounded-3xl p-8 text-left text-white bg-gradient-to-br from-emerald-600 to-emerald-700 shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] min-h-[240px] flex flex-col justify-between"
               >
                 <BadgeCheck className="h-14 w-14" />
                 <div>
                   <div className="text-3xl font-bold">Fazer check-in</div>
-                  <div className="text-white/90 text-sm mt-1">Confirme presença na sua consulta de hoje</div>
+                  <div className="text-white/90 text-sm mt-1">
+                    Confirme presença na sua consulta de hoje
+                  </div>
                 </div>
                 <BadgeCheck className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
               </button>
@@ -556,8 +635,12 @@ export function TotemPage() {
         {step === "senha" && (
           <div className="w-full max-w-5xl space-y-8">
             <div className="text-center space-y-2">
-              <h2 className="text-[clamp(1.5rem,4vw,2.25rem)] font-bold tracking-tight">Retire sua senha</h2>
-              <p className="text-[clamp(0.95rem,2vw,1.125rem)] text-muted-foreground">Toque na opção desejada</p>
+              <h2 className="text-[clamp(1.5rem,4vw,2.25rem)] font-bold tracking-tight">
+                Retire sua senha
+              </h2>
+              <p className="text-[clamp(0.95rem,2vw,1.125rem)] text-muted-foreground">
+                Toque na opção desejada
+              </p>
             </div>
             {/* 1 coluna em retrato (formato mais comum de totem) e 2 colunas
                 em paisagem — em vez de grid-cols-2 fixo, que apertava os
@@ -575,7 +658,9 @@ export function TotemPage() {
                       <div className="text-[clamp(1.5rem,3.5vw,1.875rem)] font-bold">{titulo}</div>
                       <div className="text-white/90 text-sm">{sub}</div>
                     </div>
-                    <div className="text-[clamp(2.5rem,6vw,3.75rem)] font-black opacity-90">{t}</div>
+                    <div className="text-[clamp(2.5rem,6vw,3.75rem)] font-black opacity-90">
+                      {t}
+                    </div>
                   </div>
                   <Icon className="absolute -right-4 -bottom-4 h-32 w-32 opacity-10" />
                 </button>
@@ -625,7 +710,11 @@ export function TotemPage() {
               <Button variant="outline" className="h-12 text-base" onClick={reset}>
                 <ArrowLeft className="h-5 w-5 mr-2" /> Voltar
               </Button>
-              <Button className="h-12 text-base" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
+              <Button
+                className="h-12 text-base"
+                disabled={busy || cpf.length !== 11}
+                onClick={() => void fazerCheckin()}
+              >
                 {busy && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
@@ -635,7 +724,12 @@ export function TotemPage() {
         {step === "checkin-facial" && (
           <div className="max-w-xl w-full text-center space-y-4 my-auto">
             <div className="relative mx-auto w-full max-w-[420px] aspect-[4/3] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
-              <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover scale-x-[-1]"
+                playsInline
+                muted
+              />
               <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
             </div>
             <p className="text-base">{scanMsg}</p>
@@ -643,7 +737,10 @@ export function TotemPage() {
               variant="outline"
               size="lg"
               className="h-12 px-6"
-              onClick={() => { stopCamera(); setStep("checkin"); }}
+              onClick={() => {
+                stopCamera();
+                setStep("checkin");
+              }}
             >
               <X className="h-5 w-5 mr-2" /> Cancelar
             </Button>
@@ -660,7 +757,10 @@ export function TotemPage() {
                 <div>
                   <span className="text-muted-foreground text-sm">Horário: </span>
                   <span className="text-lg font-semibold">
-                    {new Date(checkinInfo.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(checkinInfo.inicio).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </div>
               )}
@@ -678,7 +778,9 @@ export function TotemPage() {
               )}
             </div>
             <p className="text-muted-foreground">Aguarde sua chamada no painel.</p>
-            {contagem !== null && <Contagem segundos={contagem} total={DURACAO_CONCLUSAO["checkin-ok"]} />}
+            {contagem !== null && (
+              <Contagem segundos={contagem} total={DURACAO_CONCLUSAO["checkin-ok"]} />
+            )}
           </div>
         )}
 
@@ -687,7 +789,9 @@ export function TotemPage() {
             <div className="text-muted-foreground uppercase tracking-widest text-sm">Sua senha</div>
             {/* clamp com min(vw,vh): nunca estoura nem a largura nem a altura
                 da viewport do totem, em qualquer proporção de tela. */}
-            <div className="text-[clamp(4rem,min(18vw,28vh),12rem)] leading-none font-black text-primary tabular-nums">{ticket.codigo}</div>
+            <div className="text-[clamp(4rem,min(18vw,28vh),12rem)] leading-none font-black text-primary tabular-nums">
+              {ticket.codigo}
+            </div>
             {/* Item 10: feedback do status de impressão em vez de sempre
                 afirmar "retire sua senha impressa" mesmo quando nada saiu. */}
             {printStatus === "imprimindo" && (
@@ -700,18 +804,24 @@ export function TotemPage() {
             )}
             {printStatus === "falha" && (
               <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">
-                <AlertTriangle className="h-6 w-6 shrink-0" /> Não foi possível imprimir — anote o número ou procure a recepção
+                <AlertTriangle className="h-6 w-6 shrink-0" /> Não foi possível imprimir — anote o
+                número ou procure a recepção
               </div>
             )}
-            <p className="text-muted-foreground">Acompanhe o painel de chamada na sala de espera.</p>
+            <p className="text-muted-foreground">
+              Acompanhe o painel de chamada na sala de espera.
+            </p>
             {contagem !== null && <Contagem segundos={contagem} total={DURACAO_CONCLUSAO.ticket} />}
           </div>
         )}
       </main>
 
       <footer className="px-6 py-2 text-center text-xs text-muted-foreground shrink-0">
-        ClinicaOS · Totem · {step !== "menu" && (
-          <button onClick={reset} className="underline ml-2">Voltar ao início</button>
+        ClinicaOS · Totem ·{" "}
+        {step !== "menu" && (
+          <button onClick={reset} className="underline ml-2">
+            Voltar ao início
+          </button>
         )}
       </footer>
     </div>

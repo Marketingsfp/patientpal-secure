@@ -143,7 +143,8 @@ export function QuickPatientDialog({
         <DialogHeader>
           <DialogTitle>Cadastro rápido de paciente</DialogTitle>
           <DialogDescription>
-            Preencha os dados básicos. O cadastro completo pode ser feito depois na tela de Clientes.
+            Preencha os dados básicos. O cadastro completo pode ser feito depois na tela de
+            Clientes.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={salvar} className="space-y-3">

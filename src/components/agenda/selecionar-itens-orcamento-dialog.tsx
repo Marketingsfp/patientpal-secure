@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,20 +45,21 @@ export function SelecionarItensOrcamentoDialog(props: {
   const jaAgendados = Math.max(0, totalItens - restantes);
 
   const total = useMemo(
-    () => itensRestantes
-      .filter((i) => selecionados.has(i.id))
-      .reduce(
-        (s, i) =>
-          s + Math.max(0, Number(i.valor_total || 0) - Number(i.valor_pago || 0)),
-        0,
-      ),
+    () =>
+      itensRestantes
+        .filter((i) => selecionados.has(i.id))
+        .reduce(
+          (s, i) => s + Math.max(0, Number(i.valor_total || 0) - Number(i.valor_pago || 0)),
+          0,
+        ),
     [itensRestantes, selecionados],
   );
 
   const toggle = (id: string) => {
     setSelecionados((prev) => {
       const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   };
@@ -70,13 +76,11 @@ export function SelecionarItensOrcamentoDialog(props: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            Escolher itens do orçamento #{String(numero).padStart(5, "0")}
-          </DialogTitle>
+          <DialogTitle>Escolher itens do orçamento #{String(numero).padStart(5, "0")}</DialogTitle>
           <DialogDescription>
-            Marque quais itens deste orçamento entram neste agendamento. Os demais
-            continuam disponíveis para agendar depois — o mesmo orçamento pode ser
-            usado várias vezes até esgotar os itens ou expirar.
+            Marque quais itens deste orçamento entram neste agendamento. Os demais continuam
+            disponíveis para agendar depois — o mesmo orçamento pode ser usado várias vezes até
+            esgotar os itens ou expirar.
           </DialogDescription>
         </DialogHeader>
 

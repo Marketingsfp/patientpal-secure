@@ -38,10 +38,10 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
         // (segredo server-only, comparado com timingSafeEqual).
         const token = process.env.BACKUP_WEBHOOK_TOKEN;
         if (!token) {
-          return new Response(
-            JSON.stringify({ error: "backup token not configured" }),
-            { status: 503, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ error: "backup token not configured" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         const provided = request.headers.get("x-backup-token") ?? "";
         if (!safeEq(provided, token)) {
@@ -51,9 +51,7 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
           });
         }
 
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const hoje = new Date().toISOString().slice(0, 10);
         const MAX_TABELAS_POR_RUN = 40;
@@ -239,9 +237,7 @@ function toCSV(rows: Record<string, unknown>[]): string {
   if (!rows.length) return "";
   const cols = Object.keys(rows[0]);
   const header = cols.map(escapeCSV).join(",");
-  const lines = rows.map((r) =>
-    cols.map((c) => escapeCSV(serialize(r[c]))).join(","),
-  );
+  const lines = rows.map((r) => cols.map((c) => escapeCSV(serialize(r[c]))).join(","));
   return [header, ...lines].join("\n");
 }
 
@@ -252,17 +248,13 @@ function serialize(v: unknown): string {
 }
 
 function escapeCSV(s: string): string {
-  if (s.includes(",") || s.includes("\"") || s.includes("\n") || s.includes("\r")) {
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
     return '"' + s.replace(/"/g, '""') + '"';
   }
   return s;
 }
 
-async function limparAntigos(
-  admin: Admin,
-  bucket: string,
-  diasRetencao: number,
-) {
+async function limparAntigos(admin: Admin, bucket: string, diasRetencao: number) {
   const limite = new Date();
   limite.setDate(limite.getDate() - diasRetencao);
   const cortoStr = limite.toISOString().slice(0, 10);
@@ -273,9 +265,7 @@ async function limparAntigos(
   });
   for (const cli of raiz ?? []) {
     if (!cli.name) continue;
-    const { data: dias } = await admin.storage
-      .from(bucket)
-      .list(cli.name, { limit: 1000 });
+    const { data: dias } = await admin.storage.from(bucket).list(cli.name, { limit: 1000 });
     for (const d of dias ?? []) {
       if (!d.name || d.name >= cortoStr) continue;
       const { data: files } = await admin.storage
@@ -292,42 +282,120 @@ async function limparAntigos(
 // Whitelist de tabelas do schema public com coluna clinica_id.
 // Gerada a partir do schema atual. Adicione novas tabelas aqui quando criar.
 const TABELAS_COM_CLINICA_ARR = [
-  "agendamento_orcamento_itens", "agendamentos", "alertas_enfermagem",
-  "anamnese_modelos", "anamnese_respostas", "atend_avaliacoes",
-  "atend_bot_configs", "atend_conversas", "atend_departamento_membros",
-  "atend_departamentos", "atend_horarios", "atend_kb", "atend_macros",
-  "atend_msg_fora_horario", "atend_notas_internas",
-  "atend_numeros_autorizados", "atend_pausas_log", "atend_pause_reasons",
-  "atend_protocolo_config", "atend_routing_rules", "atend_transferencias",
-  "audit_log", "boletos", "caixa_movimentos", "caixa_sessoes",
-  "campanhas_marketing", "cargos", "cartoes_convenio", "cb_beneficios",
-  "cb_convenio_faixas", "cb_convenio_regras", "cb_convenios",
-  "chat_canais", "chat_mensagens", "contrato_dependentes",
-  "contrato_mensalidades", "contratos_assinatura", "crm_etapas",
-  "crm_oportunidades", "documentos_emitidos",
-  "especialidades", "estoque_movimentos", "estoque_produtos",
-  "estorno_solicitacoes", "exame_resultados", "fin_alertas",
-  "fin_atendimentos", "fin_categorias", "fin_contas", "fin_empresas",
-  "fin_lancamentos", "fin_lembretes", "fin_notas_pacientes",
-  "fin_regras_ia", "gr_impressoes", "hr_banco_horas", "hr_contratos",
-  "hr_escalas", "hr_ferias", "hr_holerites", "hr_pontos",
-  "lgpd_consentimentos", "lgpd_solicitacoes", "lms_certificados",
-  "lms_cursos", "lms_licoes", "lms_modulos", "lms_progresso",
-  "lms_quizzes", "lms_trilhas_cargo", "medico_agenda_procedimentos",
-  "medico_agendas", "medico_biometria", "medico_convenios",
-  "medico_disponibilidades", "medico_especialidades",
-  "medico_expediente_encerramento", "medico_procedimentos", "medicos",
-  "mkt_envios", "mkt_landing_pages", "mkt_leads", "mkt_segmentos",
-  "modelos_documentos", "nfse", "nfse_emitentes", "odonto_dentes",
-  "odonto_prontuarios", "orcamento_itens", "orcamentos",
-  "paciente_biometria", "pacientes", "pagamento_splits", "pagamentos",
-  "perfil_permissoes", "perfis_acesso",
-  "prestadores", "procedimento_cb_convenio_valores",
-  "procedimento_especialidades", "procedimento_split_regras",
-  "procedimento_unidade_regras", "procedimentos", "prontuario_modelos",
-  "prontuarios", "regras_rateio", "senhas", "setores", "tipos_servico",
-  "triagens_enfermagem", "unidades", "whatsapp_configs",
-  "whatsapp_mensagens", "whatsapp_templates", "backup_execucoes",
+  "agendamento_orcamento_itens",
+  "agendamentos",
+  "alertas_enfermagem",
+  "anamnese_modelos",
+  "anamnese_respostas",
+  "atend_avaliacoes",
+  "atend_bot_configs",
+  "atend_conversas",
+  "atend_departamento_membros",
+  "atend_departamentos",
+  "atend_horarios",
+  "atend_kb",
+  "atend_macros",
+  "atend_msg_fora_horario",
+  "atend_notas_internas",
+  "atend_numeros_autorizados",
+  "atend_pausas_log",
+  "atend_pause_reasons",
+  "atend_protocolo_config",
+  "atend_routing_rules",
+  "atend_transferencias",
+  "audit_log",
+  "boletos",
+  "caixa_movimentos",
+  "caixa_sessoes",
+  "campanhas_marketing",
+  "cargos",
+  "cartoes_convenio",
+  "cb_beneficios",
+  "cb_convenio_faixas",
+  "cb_convenio_regras",
+  "cb_convenios",
+  "chat_canais",
+  "chat_mensagens",
+  "contrato_dependentes",
+  "contrato_mensalidades",
+  "contratos_assinatura",
+  "crm_etapas",
+  "crm_oportunidades",
+  "documentos_emitidos",
+  "especialidades",
+  "estoque_movimentos",
+  "estoque_produtos",
+  "estorno_solicitacoes",
+  "exame_resultados",
+  "fin_alertas",
+  "fin_atendimentos",
+  "fin_categorias",
+  "fin_contas",
+  "fin_empresas",
+  "fin_lancamentos",
+  "fin_lembretes",
+  "fin_notas_pacientes",
+  "fin_regras_ia",
+  "gr_impressoes",
+  "hr_banco_horas",
+  "hr_contratos",
+  "hr_escalas",
+  "hr_ferias",
+  "hr_holerites",
+  "hr_pontos",
+  "lgpd_consentimentos",
+  "lgpd_solicitacoes",
+  "lms_certificados",
+  "lms_cursos",
+  "lms_licoes",
+  "lms_modulos",
+  "lms_progresso",
+  "lms_quizzes",
+  "lms_trilhas_cargo",
+  "medico_agenda_procedimentos",
+  "medico_agendas",
+  "medico_biometria",
+  "medico_convenios",
+  "medico_disponibilidades",
+  "medico_especialidades",
+  "medico_expediente_encerramento",
+  "medico_procedimentos",
+  "medicos",
+  "mkt_envios",
+  "mkt_landing_pages",
+  "mkt_leads",
+  "mkt_segmentos",
+  "modelos_documentos",
+  "nfse",
+  "nfse_emitentes",
+  "odonto_dentes",
+  "odonto_prontuarios",
+  "orcamento_itens",
+  "orcamentos",
+  "paciente_biometria",
+  "pacientes",
+  "pagamento_splits",
+  "pagamentos",
+  "perfil_permissoes",
+  "perfis_acesso",
+  "prestadores",
+  "procedimento_cb_convenio_valores",
+  "procedimento_especialidades",
+  "procedimento_split_regras",
+  "procedimento_unidade_regras",
+  "procedimentos",
+  "prontuario_modelos",
+  "prontuarios",
+  "regras_rateio",
+  "senhas",
+  "setores",
+  "tipos_servico",
+  "triagens_enfermagem",
+  "unidades",
+  "whatsapp_configs",
+  "whatsapp_mensagens",
+  "whatsapp_templates",
+  "backup_execucoes",
 ];
 const TABELAS_COM_CLINICA = new Set(TABELAS_COM_CLINICA_ARR);
 const TABELAS_PUBLIC = TABELAS_COM_CLINICA_ARR;

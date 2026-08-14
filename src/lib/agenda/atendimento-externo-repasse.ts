@@ -41,7 +41,9 @@ export async function calcularRepasseExterno(params: {
     medicoId
       ? supabase
           .from("medicos")
-          .select("id,aceita_cartao_beneficios,cb_tipo_repasse,cb_valor_repasse,cb_percentual_repasse")
+          .select(
+            "id,aceita_cartao_beneficios,cb_tipo_repasse,cb_valor_repasse,cb_percentual_repasse",
+          )
           .eq("id", medicoId)
           .maybeSingle()
       : Promise.resolve({ data: null } as { data: null }),
@@ -88,7 +90,7 @@ export async function calcularRepasseExterno(params: {
 
   const ctx: RepasseCtx = {
     medicos: [medico],
-    convenios: ((convRows ?? []) as RepasseConvenio[]),
+    convenios: (convRows ?? []) as RepasseConvenio[],
     procTipos,
   };
 
@@ -111,6 +113,8 @@ export async function listarConveniosClinica(
     .map((c) => ({
       id: String(c.id),
       nome: String(c.nome ?? "Convênio"),
-      modalidade: (c.modalidade === "cartao_desconto" ? "cartao_desconto" : "cartao_consulta") as ModalidadeConvenio,
+      modalidade: (c.modalidade === "cartao_desconto"
+        ? "cartao_desconto"
+        : "cartao_consulta") as ModalidadeConvenio,
     }));
 }

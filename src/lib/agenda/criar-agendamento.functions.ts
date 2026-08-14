@@ -63,7 +63,7 @@ export type CriarAgendamentoInput = {
     // checagem de agenda/slot roda (CRIT-04). O servidor decide sozinho;
     // ver criarAgendamento.handler.
     validar_agenda_aberta: boolean;
-    validar_inadimplencia: boolean;     // paciente_id && tipo_atendimento === "convenio"
+    validar_inadimplencia: boolean; // paciente_id && tipo_atendimento === "convenio"
   };
   pending_orc_item_ids: string[];
 };
@@ -110,7 +110,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CriarAgendamentoResult> => {
     const { supabase } = context;
     const normalizarLocal = (s: string) =>
-      (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      (s ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
     const isSlotLivreLocal = (pacienteNome: string | null | undefined) => {
       const nome = normalizarLocal(pacienteNome ?? "").trim();
       return nome === "disponivel" || nome === "bloqueio";
@@ -125,10 +128,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       };
     };
     const { clinica_id, editing_id, payload, checagens, pending_orc_item_ids } = data;
-    const procedimentos = Array.from(new Set((data.procedimentos ?? [])
-      .map((p) => String(p ?? "").trim())
-      .filter(Boolean)));
-    const multiModo = procedimentos.length > 1 ? data.multi_exames_modo ?? null : null;
+    const procedimentos = Array.from(
+      new Set((data.procedimentos ?? []).map((p) => String(p ?? "").trim()).filter(Boolean)),
+    );
+    const multiModo = procedimentos.length > 1 ? (data.multi_exames_modo ?? null) : null;
 
     // ---------- 0. Procedimento obrigatório (2026-07-16) ----------
     // Vale para agendamentos de paciente real (paciente_id preenchido).
@@ -157,7 +160,9 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       const semTel = !pacCheck?.telefone || !String(pacCheck.telefone).trim();
       const semNasc = !pacCheck?.data_nascimento;
       if (semTel || semNasc) {
-        const faltando = [semTel && "telefone", semNasc && "data de nascimento"].filter(Boolean).join(" e ");
+        const faltando = [semTel && "telefone", semNasc && "data de nascimento"]
+          .filter(Boolean)
+          .join(" e ");
         return {
           ok: false,
           validation_error: {
@@ -196,15 +201,19 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // agenda/paciente/horário estão de fato mudando, servindo às duas
     // checagens abaixo (MED-03) e à de recurso mais adiante.
     const atual = editing_id
-      ? (await supabase
-          .from("agendamentos")
-          .select("medico_id, paciente_id, inicio, fim, agenda_id")
-          .eq("id", editing_id)
-          .maybeSingle()).data
+      ? (
+          await supabase
+            .from("agendamentos")
+            .select("medico_id, paciente_id, inicio, fim, agenda_id")
+            .eq("id", editing_id)
+            .maybeSingle()
+        ).data
       : null;
-    const horarioMudou = !editing_id || !atual
-      || new Date(atual.inicio).getTime() !== new Date(payload.inicio).getTime()
-      || new Date(atual.fim).getTime() !== new Date(payload.fim).getTime();
+    const horarioMudou =
+      !editing_id ||
+      !atual ||
+      new Date(atual.inicio).getTime() !== new Date(payload.inicio).getTime() ||
+      new Date(atual.fim).getTime() !== new Date(payload.fim).getTime();
 
     let precisaValidarAgenda = false;
     if (recursoField && recursoId) {
@@ -234,7 +243,8 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         };
       }
     }
-    const pacienteOuHorarioMudou = horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
+    const pacienteOuHorarioMudou =
+      horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
     if (payload.paciente_id && pacienteOuHorarioMudou) {
       const { data: conflitos } = await supabase
         .from("agendamentos")
@@ -260,8 +270,22 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       const rotuloRecurso = "médico";
       const di = new Date(payload.inicio);
       const df = new Date(payload.fim);
-      const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
-      const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
+      const inicioDia = new Date(
+        di.getFullYear(),
+        di.getMonth(),
+        di.getDate(),
+        0,
+        0,
+        0,
+      ).toISOString();
+      const fimDia = new Date(
+        di.getFullYear(),
+        di.getMonth(),
+        di.getDate(),
+        23,
+        59,
+        59,
+      ).toISOString();
       const { data: slotsDia } = await supabase
         .from("agendamentos")
         .select("id,paciente_nome,inicio,fim,agenda_id", { count: "exact", head: false })
@@ -270,7 +294,13 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia)
         .limit(500);
-      const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string; agenda_id: string | null }[];
+      const lista = (slotsDia ?? []) as {
+        id: string;
+        paciente_nome: string;
+        inicio: string;
+        fim: string;
+        agenda_id: string | null;
+      }[];
       if (editing_id) {
         slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
       }
@@ -309,9 +339,9 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       // vazio) ou mistas ficam fora da checagem.
       const agendaAlvoId = slotEscolhido.agenda_id;
       if (agendaAlvoId) {
-        const nomesProc = (procedimentos.length > 0
-          ? procedimentos
-          : [String(payload.procedimento ?? "").trim()])
+        const nomesProc = (
+          procedimentos.length > 0 ? procedimentos : [String(payload.procedimento ?? "").trim()]
+        )
           .map((n) => n.trim())
           .filter(Boolean);
         if (nomesProc.length > 0) {
@@ -329,10 +359,11 @@ export const criarAgendamento = createServerFn({ method: "POST" })
               .map((l) => l.procedimentos?.tipo)
               .filter((t): t is string => !!t),
           );
-          const isConsulta = tiposAgenda.size > 0
-            && tiposAgenda.size === 1 && tiposAgenda.has("consulta");
-          const isExame = tiposAgenda.size > 0
-            && Array.from(tiposAgenda).every((t) => t === "exame" || t === "procedimento");
+          const isConsulta =
+            tiposAgenda.size > 0 && tiposAgenda.size === 1 && tiposAgenda.has("consulta");
+          const isExame =
+            tiposAgenda.size > 0 &&
+            Array.from(tiposAgenda).every((t) => t === "exame" || t === "procedimento");
           if (isConsulta || isExame) {
             const rotuloAgenda = isConsulta ? "consultas" : "exames";
             const procs = (procsEscolhidos ?? []) as Array<{ nome: string; tipo: string | null }>;
@@ -357,7 +388,11 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     }
 
     // ---------- 5. Inadimplência em cartão benefícios (2483-2501) ----------
-    if (checagens.validar_inadimplencia && payload.paciente_id && payload.tipo_atendimento === "convenio") {
+    if (
+      checagens.validar_inadimplencia &&
+      payload.paciente_id &&
+      payload.tipo_atendimento === "convenio"
+    ) {
       const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
         _paciente_id: payload.paciente_id,
         _clinica_id: clinica_id,
@@ -370,7 +405,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       if (info.bloqueado) {
         const linhas = (info.mensalidades ?? [])
           .slice(0, 5)
-          .map((m) => `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`)
+          .map(
+            (m) =>
+              `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`,
+          )
           .join("\n");
         const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
         return { ok: false, validation_error: { message: msg, toast_duration: 10000 } };
@@ -388,7 +426,8 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     const conflitoDeSlot: CriarAgendamentoResult = {
       ok: false,
       validation_error: {
-        message: "Este horário acabou de ser ocupado por outro atendimento. Atualize a agenda e escolha outro horário.",
+        message:
+          "Este horário acabou de ser ocupado por outro atendimento. Atualize a agenda e escolha outro horário.",
       },
     };
     if (multiModo === "imagem") {
@@ -399,8 +438,9 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       // grava atendimento_grupo_id em todas as linhas, vinculando o
       // multi-exame como um grupo (antes não havia vínculo nenhum entre
       // as linhas irmãs).
-      const grupoId = (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.()
-        ?? Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
+      const grupoId =
+        (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.() ??
+        Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
       const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_multi_imagem", {
         _editing_id: editing_id,
         _clinica_id: clinica_id,
@@ -427,7 +467,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       }
       const resultado = (rpcData ?? {}) as { principal_id?: string; sibling_ids?: string[] };
       if (!resultado.principal_id) {
-        return { ok: false, pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar multi-exame.")) };
+        return {
+          ok: false,
+          pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar multi-exame.")),
+        };
       }
       novoId = resultado.principal_id;
       siblingIds = resultado.sibling_ids ?? [];
@@ -438,35 +481,40 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       // orçamento ficavam órfãos, nunca marcados como agendados/cobrados, e
       // o erro virava só um aviso fácil de ignorar (vinculo_warning). A RPC
       // agora grava agendamento + vínculo na MESMA transação.
-      const procedimentoFinal = multiModo === "laboratorio"
-        ? procedimentos.join(" + ")
-        : payload.procedimento;
-      const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_e_vincular_orcamento", {
-        _editing_id: editing_id,
-        _clinica_id: clinica_id,
-        _paciente_id: payload.paciente_id,
-        _paciente_nome: payload.paciente_nome,
-        _medico_id: payload.medico_id,
-        _inicio: payload.inicio,
-        _fim: payload.fim,
-        _procedimento: procedimentoFinal,
-        _status: payload.status,
-        _observacoes: payload.observacoes,
-        _data_pagamento: payload.data_pagamento,
-        _orcamento_id: payload.orcamento_id,
-        _tipo_atendimento: payload.tipo_atendimento,
-        _forma_pagamento_prevista: payload.forma_pagamento_prevista,
-        _especialidade_id: payload.especialidade_id ?? null,
-        _orcamento_item_ids: pending_orc_item_ids,
-        _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
-      } as never);
+      const procedimentoFinal =
+        multiModo === "laboratorio" ? procedimentos.join(" + ") : payload.procedimento;
+      const { data: rpcData, error } = await supabase.rpc(
+        "salvar_agendamento_e_vincular_orcamento",
+        {
+          _editing_id: editing_id,
+          _clinica_id: clinica_id,
+          _paciente_id: payload.paciente_id,
+          _paciente_nome: payload.paciente_nome,
+          _medico_id: payload.medico_id,
+          _inicio: payload.inicio,
+          _fim: payload.fim,
+          _procedimento: procedimentoFinal,
+          _status: payload.status,
+          _observacoes: payload.observacoes,
+          _data_pagamento: payload.data_pagamento,
+          _orcamento_id: payload.orcamento_id,
+          _tipo_atendimento: payload.tipo_atendimento,
+          _forma_pagamento_prevista: payload.forma_pagamento_prevista,
+          _especialidade_id: payload.especialidade_id ?? null,
+          _orcamento_item_ids: pending_orc_item_ids,
+          _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+        } as never,
+      );
       if (error) {
         if ((error as { code?: string }).code === "23505") return conflitoDeSlot;
         return { ok: false, pg_error: toPgErrorLikeLocal(error) };
       }
       const resultado = (rpcData ?? {}) as { id?: string };
       if (!resultado.id) {
-        return { ok: false, pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar agendamento.")) };
+        return {
+          ok: false,
+          pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar agendamento.")),
+        };
       }
       novoId = resultado.id;
     }

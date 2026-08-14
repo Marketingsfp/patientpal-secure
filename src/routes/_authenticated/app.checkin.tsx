@@ -15,7 +15,14 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { DateInputBR } from "@/components/ui/date-input-br";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import {
   BadgeCheck,
@@ -143,7 +150,13 @@ function combinaComBusca(item: Item, termo: string): boolean {
 // ============ COMPONENTES ============
 
 // 1. DateSelector - Componente de seleção de data (Corrigido o texto cortado)
-function DateSelector({ data, onDataChange }: { data: string; onDataChange: (value: string) => void }) {
+function DateSelector({
+  data,
+  onDataChange,
+}: {
+  data: string;
+  onDataChange: (value: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const hoje = new Date();
   const dataObj = new Date(`${data}T00:00:00`);
@@ -399,7 +412,9 @@ function PatientCard({
 
         <div className="flex-1 min-w-[220px] space-y-2">
           <div className="flex items-center gap-2 flex-wrap pr-16">
-            <h3 className="text-lg font-bold leading-tight text-foreground">{item.paciente_nome}</h3>
+            <h3 className="text-lg font-bold leading-tight text-foreground">
+              {item.paciente_nome}
+            </h3>
             <BadgePacienteDistante cidade={item.paciente?.cidade ?? null} compact />
             {item.pago ? (
               <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">PAGO</Badge>
@@ -439,7 +454,8 @@ function PatientCard({
 
         <div className="w-full sm:w-auto sm:self-center">
           {pendente ? (
-            podeEscrever && (item.pago ? (
+            podeEscrever &&
+            (item.pago ? (
               <Button
                 onClick={() => onConfirm(item)}
                 disabled={isConfirming}
@@ -531,7 +547,7 @@ function CheckinPage() {
     try {
       const { inicio, fimExclusivo } = janelaDiaClinica(data);
 
-      let query = supabase
+      const query = supabase
         .from("agendamentos")
         .select("id, paciente_nome, paciente_id, inicio, procedimento, fluxo_etapa, medicos(nome)")
         .eq("clinica_id", clinicaAtual.clinica_id)
@@ -567,7 +583,9 @@ function CheckinPage() {
 
       const candidatos = ags;
 
-      const pacIds = Array.from(new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
+      const pacIds = Array.from(
+        new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)),
+      );
 
       const pacMap = new Map<string, PacienteRow>();
 
@@ -595,7 +613,10 @@ function CheckinPage() {
           if (comFoto.length > 0) {
             const { data: signed } = await supabase.storage
               .from("pacientes-fotos")
-              .createSignedUrls(comFoto.map((p) => p.foto_url as string), 3600);
+              .createSignedUrls(
+                comFoto.map((p) => p.foto_url as string),
+                3600,
+              );
             (signed ?? []).forEach((s, i) => {
               const alvo = comFoto[i];
               const atual = pacMap.get(alvo.id);
@@ -613,7 +634,9 @@ function CheckinPage() {
 
       const termoAplicado = buscaAplicada.trim();
       const itemsFiltrados =
-        termoAplicado.length > 0 ? resultado.filter((item) => combinaComBusca(item, termoAplicado)) : resultado;
+        termoAplicado.length > 0
+          ? resultado.filter((item) => combinaComBusca(item, termoAplicado))
+          : resultado;
 
       setItems(itemsFiltrados);
     } catch (err) {
@@ -735,10 +758,13 @@ function CheckinPage() {
 
     try {
       if (item.paciente_id && clinicaAtual) {
-        const { data: bloqueio, error: bloqueioError } = await supabase.rpc("paciente_cartao_inadimplente", {
-          _paciente_id: item.paciente_id,
-          _clinica_id: clinicaAtual.clinica_id,
-        });
+        const { data: bloqueio, error: bloqueioError } = await supabase.rpc(
+          "paciente_cartao_inadimplente",
+          {
+            _paciente_id: item.paciente_id,
+            _clinica_id: clinicaAtual.clinica_id,
+          },
+        );
 
         if (bloqueioError) {
           console.error("Erro ao verificar inadimplência:", bloqueioError);
@@ -873,7 +899,12 @@ function CheckinPage() {
         </div>
       )}
 
-      <Dialog open={!!cobrancaAlvo} onOpenChange={(o) => { if (!o) setCobrancaAlvo(null); }}>
+      <Dialog
+        open={!!cobrancaAlvo}
+        onOpenChange={(o) => {
+          if (!o) setCobrancaAlvo(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Pagamento pendente</DialogTitle>
@@ -911,7 +942,9 @@ function CheckinPage() {
       {/* Cobrança (Nova Receita) direto no Check-in — ao concluir, faz o check-in */}
       <LancamentoDialog
         open={!!pagamentoAlvo}
-        onOpenChange={(o) => { if (!o) setPagamentoAlvo(null); }}
+        onOpenChange={(o) => {
+          if (!o) setPagamentoAlvo(null);
+        }}
         tipo="receita"
         agendamentoId={pagamentoAlvo?.id ?? null}
         pacienteIdFixo={pagamentoAlvo?.paciente_id ?? null}
@@ -941,7 +974,15 @@ function iniciaisDoNome(nome: string) {
   return (primeira + ultima).toUpperCase();
 }
 
-function AvatarPaciente({ nome, cpf, url }: { nome: string; cpf?: string | null; url: string | null }) {
+function AvatarPaciente({
+  nome,
+  cpf,
+  url,
+}: {
+  nome: string;
+  cpf?: string | null;
+  url: string | null;
+}) {
   const [erro, setErro] = useState(false);
   const [aberto, setAberto] = useState(false);
   const mostrarFoto = !!url && !erro;
@@ -988,12 +1029,17 @@ function AvatarPaciente({ nome, cpf, url }: { nome: string; cpf?: string | null;
                 src={url}
                 alt={`Foto de ${nome}`}
                 className="max-h-[80vh] w-auto object-contain rounded-lg shadow-md"
-                onError={() => { setErro(true); setAberto(false); }}
+                onError={() => {
+                  setErro(true);
+                  setAberto(false);
+                }}
               />
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAberto(false)}>Fechar</Button>
+            <Button variant="outline" onClick={() => setAberto(false)}>
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

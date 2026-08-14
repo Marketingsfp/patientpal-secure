@@ -11,8 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
@@ -29,10 +35,7 @@ function PainelTotemConfigPage() {
   const [loading, setLoading] = useState(true);
   const [rotacionando, setRotacionando] = useState<string | null>(null);
 
-  const clinicaIds = useMemo(
-    () => memberships.map((m) => m.clinica_id),
-    [memberships],
-  );
+  const clinicaIds = useMemo(() => memberships.map((m) => m.clinica_id), [memberships]);
 
   useEffect(() => {
     if (loadingMemberships) return;
@@ -58,7 +61,9 @@ function PainelTotemConfigPage() {
       }
       setLoading(false);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [clinicaIds, loadingMemberships]);
 
   async function rotacionar(id: string) {
@@ -70,7 +75,9 @@ function PainelTotemConfigPage() {
       .update({ token_publico: null })
       .eq("id", id);
     if (eNull) {
-      toast.error("Não foi possível rotacionar o token. Verifique se você tem permissão de gestor.");
+      toast.error(
+        "Não foi possível rotacionar o token. Verifique se você tem permissão de gestor.",
+      );
       setRotacionando(null);
       return;
     }
@@ -102,14 +109,18 @@ function PainelTotemConfigPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Painel & Totem públicos</h1>
         <p className="text-sm text-muted-foreground">
-          Cada clínica tem um token secreto que dá acesso ao painel de senhas e ao totem
-          sem exigir login. Compartilhe apenas com os dispositivos de recepção. Se
-          suspeitar que um link vazou, rotacione o token — o link antigo para de funcionar.
+          Cada clínica tem um token secreto que dá acesso ao painel de senhas e ao totem sem exigir
+          login. Compartilhe apenas com os dispositivos de recepção. Se suspeitar que um link vazou,
+          rotacione o token — o link antigo para de funcionar.
         </p>
       </header>
 
       {rows.length === 0 && (
-        <Card><CardContent className="py-6 text-muted-foreground">Nenhuma clínica encontrada.</CardContent></Card>
+        <Card>
+          <CardContent className="py-6 text-muted-foreground">
+            Nenhuma clínica encontrada.
+          </CardContent>
+        </Card>
       )}
 
       {rows.map((c) => (
@@ -125,8 +136,14 @@ function PainelTotemConfigPage() {
 }
 
 function ClinicaCard({
-  row, rotacionando, onRotacionar,
-}: { row: Row; rotacionando: boolean; onRotacionar: () => void }) {
+  row,
+  rotacionando,
+  onRotacionar,
+}: {
+  row: Row;
+  rotacionando: boolean;
+  onRotacionar: () => void;
+}) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const token = row.token_publico ?? "";
   const painelUrl = token ? `${origin}/painel/t/${token}` : "";
@@ -139,7 +156,11 @@ function ClinicaCard({
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" size="sm" disabled={rotacionando}>
-              {rotacionando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {rotacionando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
               <span className="ml-2">Rotacionar token</span>
             </Button>
           </AlertDialogTrigger>
@@ -147,8 +168,8 @@ function ClinicaCard({
             <AlertDialogHeader>
               <AlertDialogTitle>Rotacionar token de {row.nome}?</AlertDialogTitle>
               <AlertDialogDescription>
-                O link atual do painel e do totem <b>deixará de funcionar imediatamente</b>.
-                Você precisará atualizar os links salvos nos dispositivos da recepção.
+                O link atual do painel e do totem <b>deixará de funcionar imediatamente</b>. Você
+                precisará atualizar os links salvos nos dispositivos da recepção.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -160,7 +181,9 @@ function ClinicaCard({
       </CardHeader>
       <CardContent>
         {!token ? (
-          <div className="text-sm text-destructive">Token não gerado. Clique em "Rotacionar token".</div>
+          <div className="text-sm text-destructive">
+            Token não gerado. Clique em "Rotacionar token".
+          </div>
         ) : (
           <Tabs defaultValue="painel">
             <TabsList>
@@ -193,7 +216,12 @@ function LinkBlock({ url }: { url: string }) {
       <div className="space-y-2 min-w-0">
         <Label className="text-xs text-muted-foreground">URL</Label>
         <div className="flex gap-2">
-          <Input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+          <Input
+            readOnly
+            value={url}
+            onFocus={(e) => e.currentTarget.select()}
+            className="font-mono text-xs"
+          />
           <Button
             type="button"
             variant="secondary"
@@ -202,19 +230,29 @@ function LinkBlock({ url }: { url: string }) {
               try {
                 await navigator.clipboard.writeText(url);
                 toast.success("Link copiado.");
-              } catch { toast.error("Não foi possível copiar."); }
+              } catch {
+                toast.error("Não foi possível copiar.");
+              }
             }}
             title="Copiar link"
           >
             <Copy className="h-4 w-4" />
           </Button>
           <Button asChild variant="secondary" size="icon" title="Abrir em nova aba">
-            <a href={url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
           </Button>
         </div>
       </div>
       <div className="flex flex-col items-center gap-1">
-        {qr ? <img src={qr} alt="QR Code" className="w-40 h-40 rounded border" /> : <div className="w-40 h-40 rounded border flex items-center justify-center text-xs text-muted-foreground">gerando…</div>}
+        {qr ? (
+          <img src={qr} alt="QR Code" className="w-40 h-40 rounded border" />
+        ) : (
+          <div className="w-40 h-40 rounded border flex items-center justify-center text-xs text-muted-foreground">
+            gerando…
+          </div>
+        )}
         <span className="text-[10px] text-muted-foreground">Aponte a câmera</span>
       </div>
     </div>

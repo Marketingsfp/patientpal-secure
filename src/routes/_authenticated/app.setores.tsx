@@ -8,8 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +34,12 @@ export const Route = createFileRoute("/_authenticated/app/setores")({
   head: () => ({ meta: [{ title: "Setores — ClinicaOS" }] }),
 });
 
-interface Setor { id: string; nome: string; descricao: string | null; ativo: boolean }
+interface Setor {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+}
 
 function SetoresPage() {
   const { clinicaAtual } = useClinica();
@@ -35,7 +53,11 @@ function SetoresPage() {
 
   const clinicaId = clinicaAtual?.clinica_id;
   // Catálogo de baixo risco (raramente muda) — cache de 5min via React Query.
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const {
+    data: rows = [],
+    isLoading: loading,
+    error,
+  } = useQuery({
     queryKey: ["setores", clinicaId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,16 +71,35 @@ function SetoresPage() {
     enabled: !!clinicaId,
     staleTime: 5 * 60_000,
   });
-  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  useEffect(() => {
+    if (error) mostrarErro(error);
+  }, [error]);
   const load = () => queryClient.invalidateQueries({ queryKey: ["setores", clinicaId] });
 
-  function openNew() { setEditing(null); setForm({ nome: "", descricao: "", ativo: true }); setOpen(true); }
-  function openEdit(s: Setor) { setEditing(s); setForm({ nome: s.nome, descricao: s.descricao ?? "", ativo: s.ativo }); setOpen(true); }
+  function openNew() {
+    setEditing(null);
+    setForm({ nome: "", descricao: "", ativo: true });
+    setOpen(true);
+  }
+  function openEdit(s: Setor) {
+    setEditing(s);
+    setForm({ nome: s.nome, descricao: s.descricao ?? "", ativo: s.ativo });
+    setOpen(true);
+  }
 
   async function salvar() {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!clinicaAtual) { toast.error("Selecione uma clínica"); return; }
-    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!clinicaAtual) {
+      toast.error("Selecione uma clínica");
+      return;
+    }
+    if (!form.nome.trim()) {
+      toast.error("Informe o nome");
+      return;
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -70,13 +111,16 @@ function SetoresPage() {
       ? await supabase.from("setores").update(payload).eq("id", editing.id)
       : await supabase.from("setores").insert(payload);
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success(editing ? "Setor atualizado" : "Setor criado");
     setOpen(false);
     void load();
   }
 
-  const filtered = rows.filter(r => r.nome.toLowerCase().includes(q.toLowerCase()));
+  const filtered = rows.filter((r) => r.nome.toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="p-6 space-y-4">
@@ -86,13 +130,22 @@ function SetoresPage() {
           <h1 className="text-xl font-bold">Setores</h1>
           <p className="text-sm text-muted-foreground">Departamentos da clínica.</p>
         </div>
-        {podeEscrever && <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
+        {podeEscrever && (
+          <Button onClick={openNew}>
+            <Plus className="h-4 w-4 mr-1" /> Novo
+          </Button>
+        )}
       </div>
 
       <Card className="p-3">
         <div className="relative">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
+          <Input
+            className="pl-9"
+            placeholder="Buscar..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
       </Card>
 
@@ -108,43 +161,79 @@ function SetoresPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Nenhum setor cadastrado.</TableCell></TableRow>
-            ) : filtered.map(r => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.nome}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.descricao ?? "-"}</TableCell>
-                <TableCell><Badge variant={r.ativo ? "default" : "secondary"}>{r.ativo ? "Ativo" : "Inativo"}</Badge></TableCell>
-                <TableCell className="text-right">
-                  {podeEscrever && <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>}
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                  Carregando…
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                  Nenhum setor cadastrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.nome}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {r.descricao ?? "-"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={r.ativo ? "default" : "secondary"}>
+                      {r.ativo ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {podeEscrever && (
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(r)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Editar setor" : "Novo setor"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar setor" : "Novo setor"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Nome *</Label>
-              <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+              <Input
+                value={form.nome}
+                onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              />
             </div>
             <div>
               <Label>Descrição</Label>
-              <Textarea value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} />
+              <Textarea
+                value={form.descricao}
+                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+              />
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={form.ativo}
+                onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
+              />
               Ativo
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvar} disabled={saving}>
+              {saving ? "Salvando…" : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

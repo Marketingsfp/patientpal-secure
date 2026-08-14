@@ -14,9 +14,11 @@ declare module "qz-tray" {
   interface QzSecurity {
     setCertificatePromise(
       cb: (resolve: (v: string) => void, reject: (e: unknown) => void) => void,
-      options?: { rejectOnFailure?: boolean }
+      options?: { rejectOnFailure?: boolean },
     ): void;
-    setSignaturePromise(cb: (toSign: string) => (resolve: (v: string) => void, reject: (e: unknown) => void) => void): void;
+    setSignaturePromise(
+      cb: (toSign: string) => (resolve: (v: string) => void, reject: (e: unknown) => void) => void,
+    ): void;
     setSignatureAlgorithm?(alg: string): void;
   }
   interface QzApi {

@@ -21,7 +21,9 @@ export const A2Onde: React.FC = () => (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22, maxWidth: 1300 }}>
         {LOCAIS.map((l, i) => (
           <Panel key={l} delay={14 + i * 7}>
-            <div style={{ fontFamily: display, color: C.cream, fontSize: 38, fontWeight: 600 }}>{l}</div>
+            <div style={{ fontFamily: display, color: C.cream, fontSize: 38, fontWeight: 600 }}>
+              {l}
+            </div>
             <div style={{ fontFamily: body, color: C.creamDim, fontSize: 24, marginTop: 6 }}>
               mesmo diálogo, mesmo resultado
             </div>

@@ -35,7 +35,10 @@ export const CurrencyInput = forwardRef<HTMLInputElement, Props>(function Curren
       placeholder={`R$ ${placeholder}`}
       onChange={(e) => {
         const digits = e.target.value.replace(/\D/g, "");
-        if (!digits) { onChange(""); return; }
+        if (!digits) {
+          onChange("");
+          return;
+        }
         const c = parseInt(digits, 10);
         onChange((c / 100).toFixed(2));
       }}

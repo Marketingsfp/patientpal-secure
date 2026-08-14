@@ -6,14 +6,27 @@ import { C } from "../theme";
 
 export const A6Close: React.FC = () => {
   const frame = useCurrentFrame();
-  const line = interpolate(frame, [16, 52], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const line = interpolate(frame, [16, 52], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
     <AbsoluteFill>
       <Backdrop tone={0} />
       <AbsoluteFill style={{ padding: "0 150px", justifyContent: "center" }}>
         <Rise delay={4} y={40}>
-          <div style={{ fontFamily: display, color: C.cream, fontSize: 92, fontWeight: 700, lineHeight: 1.05 }}>
-            Caixa livre em<br />poucos cliques
+          <div
+            style={{
+              fontFamily: display,
+              color: C.cream,
+              fontSize: 92,
+              fontWeight: 700,
+              lineHeight: 1.05,
+            }}
+          >
+            Caixa livre em
+            <br />
+            poucos cliques
           </div>
         </Rise>
         <div style={{ height: 26 }} />
@@ -21,7 +34,8 @@ export const A6Close: React.FC = () => {
         <div style={{ height: 26 }} />
         <Rise delay={30} y={28}>
           <div style={{ fontFamily: body, color: C.creamDim, fontSize: 34, maxWidth: 1200 }}>
-            Paciente sem contrato migrado? Use o pagamento avulso e regularize o cadastro depois, com calma.
+            Paciente sem contrato migrado? Use o pagamento avulso e regularize o cadastro depois,
+            com calma.
           </div>
         </Rise>
       </AbsoluteFill>

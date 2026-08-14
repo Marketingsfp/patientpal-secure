@@ -34,7 +34,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeObs: boolean }> = [
   { value: "troca_endereco", label: "Troca de endereço", pedeObs: false },
@@ -46,9 +52,23 @@ const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeOb
   { value: "duplicidade_bd", label: "Duplicidade - Banco de dados", pedeObs: true },
   { value: "outros", label: "Outros", pedeObs: true },
 ];
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -77,7 +97,11 @@ import { ChevronsUpDown } from "lucide-react";
 import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
-import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
+import {
+  printGuiaMensalidade,
+  printGuiaMensalidadeComTaxa,
+  reimprimirGuiaMensalidade,
+} from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -96,7 +120,8 @@ import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Checkbox } from "@/components/ui/checkbox";
-const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = (v: number) =>
+  Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 const fmtDcurto = (s?: string | null) => {
@@ -122,12 +147,22 @@ const fmtTelDisplay = (s?: string | null) => {
   return s || "—";
 };
 const MESES_PT = [
-  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
 const competenciaDe = (s?: string | null): string => {
   if (!s) return "—";
-  const [, m, ] = s.slice(0, 10).split("-").map(Number);
+  const [, m] = s.slice(0, 10).split("-").map(Number);
   if (!m || m < 1 || m > 12) return "—";
   return MESES_PT[m - 1];
 };
@@ -165,7 +200,13 @@ type Convenio = {
   vigencia_meses: number;
   beneficios: string | null;
 };
-type Faixa = { id: string; convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
+type Faixa = {
+  id: string;
+  convenio_id: string;
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
 type Paciente = {
   id: string;
   nome: string;
@@ -226,15 +267,10 @@ const isTaxaInclusao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parc
  *  inclusão de dependente (numero_parcela < 0). Todos os filtros que se
  *  referem a "parcelas mensais" (contador N/M, recálculo por vidas,
  *  renumeração) usam este predicado. */
-const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) =>
-  Number(m.numero_parcela) <= 0;
+const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) <= 0;
 
 const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
-  isAdesao(m)
-    ? "Adesão"
-    : isTaxaInclusao(m)
-      ? "Taxa inclusão"
-      : `Mensalidade ${m.numero_parcela}`;
+  isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa inclusão" : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
@@ -262,7 +298,10 @@ function ProntuarioBadge({ codigo }: { codigo?: string | null }) {
   );
 }
 
-export function ContratosPage({ initialContratoId, modulo = "contratos" }: { initialContratoId?: string; modulo?: string } = {}) {
+export function ContratosPage({
+  initialContratoId,
+  modulo = "contratos",
+}: { initialContratoId?: string; modulo?: string } = {}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   // Esta tela é reaproveitada em duas rotas com módulos de permissão
@@ -275,19 +314,31 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
   const [vendedores, setVendedores] = useState<Record<string, string>>({});
   // Agregado de parcelas por contrato (pagas / total / tem atrasada)
-  const [parcAgg, setParcAgg] = useState<Record<string, { pagas: number; total: number; temAtrasada: boolean }>>({});
+  const [parcAgg, setParcAgg] = useState<
+    Record<string, { pagas: number; total: number; temAtrasada: boolean }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
-  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("dados");
+  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">(
+    "dados",
+  );
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
   // Filtros
   const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
-  const [filtroTermino, setFiltroTermino] = useState<"todos" | "vencidos" | "30d" | "90d" | "sem_data">("todos");
-  const [filtroProgresso, setFiltroProgresso] = useState<"todas" | "sem_pag" | "andamento" | "quitadas">("todas");
-  const [filtroInicio, setFiltroInicio] = useState<"todos" | "30d" | "90d" | "ano" | "anterior">("todos");
-  const [filtroMensal, setFiltroMensal] = useState<"todos" | "zero" | "ate100" | "100a200" | "acima200">("todos");
+  const [filtroTermino, setFiltroTermino] = useState<
+    "todos" | "vencidos" | "30d" | "90d" | "sem_data"
+  >("todos");
+  const [filtroProgresso, setFiltroProgresso] = useState<
+    "todas" | "sem_pag" | "andamento" | "quitadas"
+  >("todas");
+  const [filtroInicio, setFiltroInicio] = useState<"todos" | "30d" | "90d" | "ano" | "anterior">(
+    "todos",
+  );
+  const [filtroMensal, setFiltroMensal] = useState<
+    "todos" | "zero" | "ate100" | "100a200" | "acima200"
+  >("todos");
   const [filtroVendedor, setFiltroVendedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroConvenio, setFiltroConvenio] = useState<string>("todos");
@@ -380,15 +431,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         .select("id, codigo_prontuario")
         .in("id", pacIds);
       prontMap = Object.fromEntries(
-        ((pacs ?? []) as Array<{ id: string; codigo_prontuario: string | null }>).map(
-          (p) => [p.id, p.codigo_prontuario],
-        ),
+        ((pacs ?? []) as Array<{ id: string; codigo_prontuario: string | null }>).map((p) => [
+          p.id,
+          p.codigo_prontuario,
+        ]),
       );
     }
     setList(
       contratosRows.map((c) => ({
         ...c,
-        codigo_prontuario: c.paciente_id ? prontMap[c.paciente_id] ?? null : null,
+        codigo_prontuario: c.paciente_id ? (prontMap[c.paciente_id] ?? null) : null,
       })),
     );
     setConvenios((cv.data ?? []) as Convenio[]);
@@ -412,8 +464,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
         // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
         // contrato representa um período de 12 meses.
-        const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
-        for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
+        const porContrato: Record<
+          string,
+          Array<{ status: string; vencimento: string; numero_parcela: number }>
+        > = {};
+        for (const m of (mens ?? []) as Array<{
+          contrato_id: string;
+          status: string;
+          vencimento: string;
+          numero_parcela: number;
+        }>) {
           if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
           (porContrato[m.contrato_id] ||= []).push(m);
         }
@@ -443,10 +503,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       ),
     );
     if (ids.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id,nome")
-        .in("id", ids);
+      const { data: profs } = await supabase.from("profiles").select("id,nome").in("id", ids);
       const map: Record<string, string> = {};
       for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
         if (p.nome) map[p.id] = p.nome;
@@ -489,8 +546,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         const dias = (dHoje - dIni) / 86400000;
         if (filtroInicio === "30d" && dias > 30) return false;
         if (filtroInicio === "90d" && dias > 90) return false;
-        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual) return false;
-        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual) return false;
+        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual)
+          return false;
+        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual)
+          return false;
       }
       // Mensal
       if (filtroMensal !== "todos") {
@@ -542,7 +601,21 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus, filtroConvenio]);
+  }, [
+    list,
+    q,
+    sortPaciente,
+    parcAgg,
+    vendedores,
+    filtroSituacao,
+    filtroTermino,
+    filtroProgresso,
+    filtroInicio,
+    filtroMensal,
+    filtroVendedor,
+    filtroStatus,
+    filtroConvenio,
+  ]);
 
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
@@ -573,7 +646,17 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     if (filtroVendedor !== "todos") arr.push("Vendedor");
     if (filtroStatus !== "todos") arr.push("Status");
     return arr;
-  }, [q, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
+  }, [
+    q,
+    filtroConvenio,
+    filtroInicio,
+    filtroTermino,
+    filtroMensal,
+    filtroProgresso,
+    filtroSituacao,
+    filtroVendedor,
+    filtroStatus,
+  ]);
   const temFiltroAtivo = filtrosAtivos.length > 0;
 
   const limparFiltros = () => {
@@ -597,7 +680,18 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   // Reset página ao mudar filtros/busca/ordem
   useEffect(() => {
     setPagina(1);
-  }, [q, sortPaciente, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
+  }, [
+    q,
+    sortPaciente,
+    filtroConvenio,
+    filtroInicio,
+    filtroTermino,
+    filtroMensal,
+    filtroProgresso,
+    filtroSituacao,
+    filtroVendedor,
+    filtroStatus,
+  ]);
 
   if (view === "new") {
     return (
@@ -648,10 +742,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         </h1>
         {podeEscrever && (
           <div className="flex items-center gap-2">
-          <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
-            <Plus className="h-4 w-4 mr-2" />
-            Vendas
-          </Button>
+            <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
+              <Plus className="h-4 w-4 mr-2" />
+              Vendas
+            </Button>
           </div>
         )}
       </div>
@@ -675,7 +769,8 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
           ) : temFiltroAtivo ? (
             <span>
-              <strong className="text-foreground">{filtered.length}</strong> resultado{filtered.length === 1 ? "" : "s"}
+              <strong className="text-foreground">{filtered.length}</strong> resultado
+              {filtered.length === 1 ? "" : "s"}
               {" — filtros ativos: "}
               <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
             </span>
@@ -690,7 +785,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           )}
         </div>
         {temFiltroAtivo ? (
-          <Button variant="ghost" size="sm" onClick={limparFiltros}>Limpar filtros</Button>
+          <Button variant="ghost" size="sm" onClick={limparFiltros}>
+            Limpar filtros
+          </Button>
         ) : null}
       </div>
       <div className="rounded-md border bg-card overflow-hidden">
@@ -701,7 +798,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
               <TableHead>
                 <button
                   type="button"
-                  onClick={() => setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
+                  onClick={() =>
+                    setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))
+                  }
                   className="inline-flex items-center gap-1 font-bold uppercase tracking-wide hover:opacity-80"
                   title="Ordenar por paciente"
                 >
@@ -719,24 +818,33 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       TIPO DE CONVÊNIO
-                      {filtroConvenio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroConvenio !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="sem">Sem convênio</SelectItem>
                     {convenios.map((cv) => (
-                      <SelectItem key={cv.id} value={cv.id}>{cv.nome}</SelectItem>
+                      <SelectItem key={cv.id} value={cv.id}>
+                        {cv.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </TableHead>
               <TableHead>
-                <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
+                <Select
+                  value={filtroInicio}
+                  onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}
+                >
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       INÍCIO
-                      {filtroInicio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroInicio !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -749,11 +857,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </Select>
               </TableHead>
               <TableHead>
-                <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
+                <Select
+                  value={filtroTermino}
+                  onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}
+                >
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       TÉRMINO
-                      {filtroTermino !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroTermino !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -766,11 +879,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </Select>
               </TableHead>
               <TableHead>
-                <Select value={filtroMensal} onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}>
+                <Select
+                  value={filtroMensal}
+                  onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}
+                >
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       MENSAL
-                      {filtroMensal !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroMensal !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -783,11 +901,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </Select>
               </TableHead>
               <TableHead>
-                <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
+                <Select
+                  value={filtroProgresso}
+                  onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}
+                >
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       PARCELAS
-                      {filtroProgresso !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroProgresso !== "todas" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -799,11 +922,16 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </Select>
               </TableHead>
               <TableHead>
-                <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
+                <Select
+                  value={filtroSituacao}
+                  onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}
+                >
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       SITUAÇÃO
-                      {filtroSituacao !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroSituacao !== "todas" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -818,14 +946,18 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       VENDEDOR
-                      {filtroVendedor !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroVendedor !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="sem">Sem vendedor</SelectItem>
                     {vendedorOpcoes.map(([id, nome]) => (
-                      <SelectItem key={id} value={id}>{nome}</SelectItem>
+                      <SelectItem key={id} value={id}>
+                        {nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -835,13 +967,17 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
                     <span className="inline-flex items-center gap-1">
                       STATUS
-                      {filtroStatus !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                      {filtroStatus !== "todos" ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      ) : null}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
                     {statusOpcoes.map((s) => (
-                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                      <SelectItem key={s} value={s} className="capitalize">
+                        {s}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -868,67 +1004,77 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
               const agg = parcAgg[c.id];
               const emDia = !agg || !agg.temAtrasada;
               return (
-              <TableRow
-                key={c.id}
-                className={`cursor-pointer ${c.tabela_legada ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50" : ""}`}
-                onClick={() => setDetail(c)}
-              >
-                <TableCell className="font-semibold">{c.numero}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 whitespace-normal break-words">
-                    <span>{c.paciente_nome}</span>
-                    {c.sem_carencia ? (
-                      <Badge
-                        variant="outline"
-                        className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
-                      >
-                        Sem carência
+                <TableRow
+                  key={c.id}
+                  className={`cursor-pointer ${c.tabela_legada ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50" : ""}`}
+                  onClick={() => setDetail(c)}
+                >
+                  <TableCell className="font-semibold">{c.numero}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 whitespace-normal break-words">
+                      <span>{c.paciente_nome}</span>
+                      {c.sem_carencia ? (
+                        <Badge
+                          variant="outline"
+                          className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                        >
+                          Sem carência
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="tabular-nums text-sm">
+                    {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
+                  </TableCell>
+                  <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}
+                  </TableCell>
+                  <TableCell>{BRL(c.valor_mensal)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {agg ? `${agg.pagas} / ${agg.total}` : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {c.status === "cancelado" ? (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        —
                       </Badge>
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell className="tabular-nums text-sm">
-                  {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
-                </TableCell>
-                <TableCell>
-                  {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
-                </TableCell>
-                <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
-                <TableCell className="tabular-nums">{fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
-                <TableCell>{BRL(c.valor_mensal)}</TableCell>
-                <TableCell className="tabular-nums">
-                  {agg ? `${agg.pagas} / ${agg.total}` : "—"}
-                </TableCell>
-                <TableCell>
-                  {c.status === "cancelado" ? (
-                    <Badge variant="outline" className="text-muted-foreground">—</Badge>
-                  ) : emDia ? (
-                    <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Em dia</Badge>
-                  ) : (
-                    <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pendente</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {c.criado_por && vendedores[c.criado_por] ? (
-                    <span>{vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}</span>
-                  ) : (
-                    <span className="text-muted-foreground/60">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={c.status === "ativo" ? "default" : "secondary"}
-                    className={
-                      c.status === "cancelado" ? "bg-red-600 text-black hover:bg-red-600" : undefined
-                    }
-                  >
-                    {c.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </TableCell>
-              </TableRow>
+                    ) : emDia ? (
+                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">
+                        Em dia
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pendente</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {c.criado_por && vendedores[c.criado_por] ? (
+                      <span>
+                        {vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/60">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={c.status === "ativo" ? "default" : "secondary"}
+                      className={
+                        c.status === "cancelado"
+                          ? "bg-red-600 text-black hover:bg-red-600"
+                          : undefined
+                      }
+                    >
+                      {c.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
               );
             })}
           </TableBody>
@@ -938,7 +1084,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             <span>
               {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
               {filtered.length > POR_PAGINA ? (
-                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}</>
+                <>
+                  {" "}
+                  — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}
+                </>
               ) : null}
             </span>
             {totalPaginas > 1 ? (
@@ -968,8 +1117,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         ) : null}
         {filtered.some((c) => c.tabela_legada) ? (
           <div className="flex items-center gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
-            <span className="inline-block h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" aria-hidden />
-            Linhas em amarelo indicam contratos em <strong>tabela antiga</strong> — pendentes de migração.
+            <span
+              className="inline-block h-3 w-3 rounded-sm bg-amber-100 border border-amber-300"
+              aria-hidden
+            />
+            Linhas em amarelo indicam contratos em <strong>tabela antiga</strong> — pendentes de
+            migração.
           </div>
         ) : null}
       </div>
@@ -980,9 +1133,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           <AlertDialogHeader>
             <AlertDialogTitle>Que tipo de operação você quer registrar?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>Renovação</strong>: continua o convênio depois que todas as parcelas foram pagas.
+              <strong>Renovação</strong>: continua o convênio depois que todas as parcelas foram
+              pagas.
               <br />
-              <strong>Troca de convênio</strong>: o paciente desiste do convênio atual antes do fim do ciclo para aderir a outro — cancela o contrato atual e as mensalidades pendentes.
+              <strong>Troca de convênio</strong>: o paciente desiste do convênio atual antes do fim
+              do ciclo para aderir a outro — cancela o contrato atual e as mensalidades pendentes.
               <br />
               Em ambos os casos, não há cobrança de taxa de adesão e a carência não se aplica.
             </AlertDialogDescription>
@@ -1054,12 +1209,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                     .eq("clinica_id", clinicaAtual.clinica_id)
                     .eq("paciente_id", p.id)
                     .order("data_inicio", { ascending: false });
-                  const rows = ((data ?? []) as Contrato[]);
+                  const rows = (data ?? []) as Contrato[];
                   // Na troca de convênio, só contratos ativos podem ser trocados.
                   setContratosPac(
-                    flowType === "troca_convenio"
-                      ? rows.filter((c) => c.status === "ativo")
-                      : rows,
+                    flowType === "troca_convenio" ? rows.filter((c) => c.status === "ativo") : rows,
                   );
                   setLoadingContratosPac(false);
                 }}
@@ -1097,9 +1250,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                         }}
                       >
                         <div className="text-sm">
-                          <div className="font-medium">#{c.numero} — {conv?.nome ?? "Convênio"}</div>
+                          <div className="font-medium">
+                            #{c.numero} — {conv?.nome ?? "Convênio"}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            Início {fmtD(c.data_inicio)} · {BRL(Number(c.valor_mensal ?? 0))} · {c.status}
+                            Início {fmtD(c.data_inicio)} · {BRL(Number(c.valor_mensal ?? 0))} ·{" "}
+                            {c.status}
                           </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -1128,7 +1284,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       {renovInfo ? (
         <RenovarContratoDialog
           open={!!renovInfo}
-          onOpenChange={(o) => { if (!o) setRenovInfo(null); }}
+          onOpenChange={(o) => {
+            if (!o) setRenovInfo(null);
+          }}
           contratoId={renovInfo.contratoId}
           clinicaId={renovInfo.clinicaId}
           convenioAtualId={renovInfo.convenioId}
@@ -1226,8 +1384,10 @@ function NovoContratoForm({
     const d = new Date(dataInicio + "T00:00:00").getTime();
     const hoje = new Date(dataHoje + "T00:00:00").getTime();
     const dias = (d - hoje) / 86400000;
-    if (dias < -7) return `Data de início está ${Math.abs(Math.round(dias))} dias no passado — confirme.`;
-    if (dias > 180) return `Data de início está muito no futuro (${Math.round(dias)} dias). Confirme.`;
+    if (dias < -7)
+      return `Data de início está ${Math.abs(Math.round(dias))} dias no passado — confirme.`;
+    if (dias > 180)
+      return `Data de início está muito no futuro (${Math.round(dias)} dias). Confirme.`;
     return null;
   })();
 
@@ -1294,7 +1454,9 @@ function NovoContratoForm({
     }
     const vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length;
     const inicial =
-      faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ?? faixas[0];
+      faixas.find(
+        (f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate),
+      ) ?? faixas[0];
     setFaixaId(inicial.id);
     setValor(Number(inicial.valor_mensal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1322,7 +1484,9 @@ function NovoContratoForm({
     const max = Number(convenio.max_dependentes ?? 0) || 0;
     if (deps.length >= max) {
       return toast.error(
-        max === 0 ? "Este convênio não permite dependentes." : `Limite de ${max} dependentes atingido.`,
+        max === 0
+          ? "Este convênio não permite dependentes."
+          : `Limite de ${max} dependentes atingido.`,
       );
     }
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
@@ -1391,10 +1555,12 @@ function NovoContratoForm({
     // se qualquer etapa falhar, o Postgres desfaz tudo — antes eram 3
     // inserts separados e uma falha no meio podia deixar contrato sem
     // parcelas ou sem dependentes.
-    const { data: rpcData, error } = await (supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>)("criar_contrato_assinatura", {
+    const { data: rpcData, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("criar_contrato_assinatura", {
       _clinica_id: clinicaId,
       _convenio_id: convenio.id,
       _paciente_id: titular.id,
@@ -1434,20 +1600,21 @@ function NovoContratoForm({
     }
 
     setSaving(false);
-    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 ? " + taxa de adesão" : ""}`);
+    toast.success(
+      `Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 ? " + taxa de adesão" : ""}`,
+    );
 
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
-      Promise.race<T>([
-        p,
-        new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms)),
-      ]);
+      Promise.race<T>([p, new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms))]);
     if (tipoCobranca === "carne") {
       try {
         await withTimeout(gerarCarnePDF(contrato.id), 15000);
       } catch (e) {
         if ((e as Error).message === "TIMEOUT") {
-          toast.info("Geração do carnê demorou mais que o esperado — tente reimprimir na lista de contratos.");
+          toast.info(
+            "Geração do carnê demorou mais que o esperado — tente reimprimir na lista de contratos.",
+          );
         } else {
           mostrarErro(e);
         }
@@ -1458,7 +1625,9 @@ function NovoContratoForm({
         toast.info(res.mensagem);
       } catch (e) {
         if ((e as Error).message === "TIMEOUT") {
-          toast.info("Emissão dos boletos ainda está em processamento — verifique a lista de contratos em instantes.");
+          toast.info(
+            "Emissão dos boletos ainda está em processamento — verifique a lista de contratos em instantes.",
+          );
         } else {
           mostrarErro(e);
         }
@@ -1488,91 +1657,101 @@ function NovoContratoForm({
                 <div className="space-y-1 min-w-0">
                   {titular ? (
                     <>
-                    <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
-                    <span className="font-medium flex items-center gap-2">
-                      {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
-                      <ProntuarioBadge codigo={titular.codigo_prontuario} />
-                      {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
-                        <Badge variant="default" className="gap-1">
-                          <Check className="h-3 w-3" />
-                          Foto
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">
-                          Sem foto
-                        </Badge>
-                      )}
+                      <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                        <span className="font-medium flex items-center gap-2">
+                          {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
+                          <ProntuarioBadge codigo={titular.codigo_prontuario} />
+                          {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
+                            <Badge variant="default" className="gap-1">
+                              <Check className="h-3 w-3" />
+                              Foto
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 text-amber-600 border-amber-400"
+                            >
+                              Sem foto
+                            </Badge>
+                          )}
+                          {!titular.email ? (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 text-amber-600 border-amber-400"
+                            >
+                              <Mail className="h-3 w-3" />
+                              Sem e-mail
+                            </Badge>
+                          ) : !emailValido(titular.email) ? (
+                            <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                              <Mail className="h-3 w-3" />
+                              E-mail inválido
+                            </Badge>
+                          ) : null}
+                          {checkingDup ? (
+                            <Badge variant="outline" className="gap-1 text-muted-foreground">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Verificando…
+                            </Badge>
+                          ) : titularContratoAtivo !== null ? (
+                            <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
+                              <AlertTriangle className="h-3 w-3" />
+                              Já possui contrato #{titularContratoAtivo}
+                            </Badge>
+                          ) : null}
+                        </span>
+                        <div className="flex gap-1">
+                          {podeEscrever && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditarPaciente({ alvo: "titular" })}
+                              title="Editar e-mail e telefone"
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Editar
+                            </Button>
+                          )}
+                          {podeEscrever && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setFaceOpen("titular")}
+                            >
+                              <Camera className="h-3 w-3 mr-1" />
+                              {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setTitular(null);
+                              setTitularApenasFinanceiro(false);
+                            }}
+                          >
+                            Trocar
+                          </Button>
+                        </div>
+                      </div>
                       {!titular.email ? (
-                        <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">
-                          <Mail className="h-3 w-3" />
-                          Sem e-mail
-                        </Badge>
-                      ) : !emailValido(titular.email) ? (
-                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
-                          <Mail className="h-3 w-3" />
-                          E-mail inválido
-                        </Badge>
+                        <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                          <span className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            Titular precisa ter e-mail para acessar o app.
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7"
+                            onClick={() => setEditarPaciente({ alvo: "titular", focus: "email" })}
+                          >
+                            <Mail className="h-3 w-3 mr-1" />
+                            Cadastrar e-mail agora
+                          </Button>
+                        </div>
                       ) : null}
-                      {checkingDup ? (
-                        <Badge variant="outline" className="gap-1 text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Verificando…
-                        </Badge>
-                      ) : titularContratoAtivo !== null ? (
-                        <Badge variant="outline" className="gap-1 text-red-600 border-red-400">
-                          <AlertTriangle className="h-3 w-3" />
-                          Já possui contrato #{titularContratoAtivo}
-                        </Badge>
-                      ) : null}
-                    </span>
-                    <div className="flex gap-1">
-                      {podeEscrever && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditarPaciente({ alvo: "titular" })}
-                          title="Editar e-mail e telefone"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Editar
-                        </Button>
-                      )}
-                      {podeEscrever && (
-                        <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
-                          <Camera className="h-3 w-3 mr-1" />
-                          {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setTitular(null);
-                          setTitularApenasFinanceiro(false);
-                        }}
-                      >
-                        Trocar
-                      </Button>
-                    </div>
-                  </div>
-                  {!titular.email ? (
-                    <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-                      <span className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        Titular precisa ter e-mail para acessar o app.
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7"
-                        onClick={() => setEditarPaciente({ alvo: "titular", focus: "email" })}
-                      >
-                        <Mail className="h-3 w-3 mr-1" />
-                        Cadastrar e-mail agora
-                      </Button>
-                    </div>
-                  ) : null}
-                  </>
+                    </>
                   ) : (
                     <PatientSearchInput
                       clinicaIdsOverride={[clinicaId]}
@@ -1593,33 +1772,36 @@ function NovoContratoForm({
                 <div
                   className={`flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 md:self-stretch md:min-w-[260px] md:max-w-[340px] ${!titular ? "opacity-60" : ""}`}
                 >
-                    <input
-                      id="tit-apenas-fin-novo"
-                      type="checkbox"
-                      className="mt-0.5"
-                      disabled={!titular}
-                      checked={!!titular && titularApenasFinanceiro}
-                      onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
-                    />
-                    <label
-                      htmlFor="tit-apenas-fin-novo"
-                      className={`text-sm ${titular ? "cursor-pointer" : "cursor-not-allowed text-muted-foreground"}`}
+                  <input
+                    id="tit-apenas-fin-novo"
+                    type="checkbox"
+                    className="mt-0.5"
+                    disabled={!titular}
+                    checked={!!titular && titularApenasFinanceiro}
+                    onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="tit-apenas-fin-novo"
+                    className={`text-sm ${titular ? "cursor-pointer" : "cursor-not-allowed text-muted-foreground"}`}
+                  >
+                    <span className="font-medium">Apenas titular financeiro</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — paga o plano, mas não usufrui dos benefícios.
+                    </span>
+                    <span
+                      className="ml-1 inline-flex items-center text-muted-foreground"
+                      title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
                     >
-                      <span className="font-medium">Apenas titular financeiro</span>
-                      <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
-                      <span
-                        className="ml-1 inline-flex items-center text-muted-foreground"
-                        title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
-                      >
-                        <Info className="h-3.5 w-3.5" />
+                      <Info className="h-3.5 w-3.5" />
+                    </span>
+                    {!titular ? (
+                      <span className="block text-xs text-muted-foreground mt-1">
+                        Selecione o paciente titular para habilitar.
                       </span>
-                      {!titular ? (
-                        <span className="block text-xs text-muted-foreground mt-1">
-                          Selecione o paciente titular para habilitar.
-                        </span>
-                      ) : null}
-                    </label>
-                  </div>
+                    ) : null}
+                  </label>
+                </div>
               </div>
             </div>
             {/* Linha 1: Convênio | Nº pessoas | Valor mensal | Taxa de adesão */}
@@ -1665,18 +1847,25 @@ function NovoContratoForm({
                   {BRL(valor)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {faixas.length > 0 ? "Definido pela faixa de pessoas selecionada acima." : "Definido pelo convênio."}
+                  {faixas.length > 0
+                    ? "Definido pela faixa de pessoas selecionada acima."
+                    : "Definido pelo convênio."}
                   {tipoCobranca === "boleto" ? (
                     <span className="block text-amber-600 font-medium">
-                      + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
+                      + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela:{" "}
+                      {BRL(valor + TAXA_BOLETO)}
                     </span>
                   ) : null}
                 </p>
               </div>
               <div>
                 <Label>Taxa de adesão</Label>
-                <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
-                <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
+                <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                  {BRL(taxa)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Cobrança única, definida pelo convênio.
+                </p>
               </div>
             </div>
 
@@ -1741,14 +1930,18 @@ function NovoContratoForm({
                     }}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Use para lançar contratos antigos já em andamento. As primeiras {mensalidadesJaPagas || "N"} parcelas serão registradas como <strong>pagas</strong> e apenas as {convenio.num_parcelas - mensalidadesJaPagas} restantes ficarão em aberto. Sugestão com base na data: {sugestao}.
+                    Use para lançar contratos antigos já em andamento. As primeiras{" "}
+                    {mensalidadesJaPagas || "N"} parcelas serão registradas como{" "}
+                    <strong>pagas</strong> e apenas as {convenio.num_parcelas - mensalidadesJaPagas}{" "}
+                    restantes ficarão em aberto. Sugestão com base na data: {sugestao}.
                   </p>
                 </div>
               );
             })()}
             <div className="col-span-2">
               <Label>
-                Tipo de cobrança <span className="text-muted-foreground font-normal">(opcional)</span>
+                Tipo de cobrança{" "}
+                <span className="text-muted-foreground font-normal">(opcional)</span>
               </Label>
               <div className="grid grid-cols-2 gap-3 mt-1">
                 {[
@@ -1773,10 +1966,14 @@ function NovoContratoForm({
                       key={opt.v}
                       onClick={() => setTipoCobranca(ativo ? null : opt.v)}
                       className={`text-left rounded-md border p-3 transition flex gap-3 items-start ${
-                        ativo ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border hover:bg-muted/50"
+                        ativo
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:bg-muted/50"
                       }`}
                     >
-                      <Icon className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon
+                        className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`}
+                      />
                       <div className="flex-1">
                         <div className="font-semibold text-sm flex items-center gap-2">
                           {opt.title}
@@ -1789,112 +1986,125 @@ function NovoContratoForm({
                 })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na hora de baixar cada
-                parcela.
+                A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na
+                hora de baixar cada parcela.
               </p>
             </div>
 
             {/* ====== SEÇÃO DE DEPENDENTES ====== */}
-<div className="col-span-2 border-t pt-3">
-  {(() => {
-    const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
-    const titularOcupa = titularApenasFinanceiro ? 0 : 1;
-    
-    // 🔥 O número de dependentes É O vidas_de
-    const maxDepWiz = Math.max(0, Number(faixaSel?.vidas_de ?? 0) - (titularApenasFinanceiro ? 1 : 0));
-    
-    const qtdAtual = deps.length;
-    const podeAdicionar = qtdAtual < maxDepWiz;
+            <div className="col-span-2 border-t pt-3">
+              {(() => {
+                const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+                const titularOcupa = titularApenasFinanceiro ? 0 : 1;
 
-    return (
-      <>
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-semibold">
-            Dependentes {maxDepWiz > 0 ? `(${qtdAtual}/${maxDepWiz})` : '(nenhum permitido)'}
-          </Label>
-          {podeAdicionar && maxDepWiz > 0 && (
-            <Button size="sm" variant="outline" onClick={() => setDepOpen(true)}>
-              <Plus className="h-3 w-3 mr-1" /> Adicionar
-            </Button>
-          )}
-        </div>
+                // 🔥 O número de dependentes É O vidas_de
+                const maxDepWiz = Math.max(
+                  0,
+                  Number(faixaSel?.vidas_de ?? 0) - (titularApenasFinanceiro ? 1 : 0),
+                );
 
-        {podeAdicionar && maxDepWiz > 0 && (
-          <div className="mt-1">
-            <PatientSearchInput
-              clinicaIdsOverride={[clinicaId]}
-              placeholder="Adicionar dependente — busque por nome, CPF, prontuário…"
-              onSelect={async (p) => {
-                if (!p) return;
-                if (p.id === titular?.id) {
-                  toast.error("Esse paciente já é o titular.");
-                  return;
-                }
-                if (deps.find((d) => d.id === p.id)) {
-                  toast.error("Dependente já adicionado.");
-                  return;
-                }
-                const full = await carregarPacienteCompleto(p);
-                addDep(full);
-              }}
-              onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
-            />
-          </div>
-        )}
+                const qtdAtual = deps.length;
+                const podeAdicionar = qtdAtual < maxDepWiz;
 
-        {deps.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {deps.map((d, i) => (
-              <div key={d.id || i} className="grid grid-cols-12 gap-2 items-center rounded-md border p-2 bg-muted/20">
-                <span className="col-span-12 sm:col-span-4 text-sm truncate">
-                  {d.nome}
-                </span>
-                <Select
-                  value={d.parentesco}
-                  onValueChange={(v) => setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))}
-                >
-                  <SelectTrigger className="col-span-6 sm:col-span-3 h-8">
-                    <SelectValue placeholder="Parentesco" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Filho(a)">Filho(a)</SelectItem>
-                    <SelectItem value="Cônjuge">Cônjuge</SelectItem>
-                    <SelectItem value="Pai">Pai</SelectItem>
-                    <SelectItem value="Mãe">Mãe</SelectItem>
-                    <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
-                    <SelectItem value="Outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="col-span-3 sm:col-span-1"
-                  onClick={() => setDeps(deps.filter((_, j) => j !== i))}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+                return (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">
+                        Dependentes{" "}
+                        {maxDepWiz > 0 ? `(${qtdAtual}/${maxDepWiz})` : "(nenhum permitido)"}
+                      </Label>
+                      {podeAdicionar && maxDepWiz > 0 && (
+                        <Button size="sm" variant="outline" onClick={() => setDepOpen(true)}>
+                          <Plus className="h-3 w-3 mr-1" /> Adicionar
+                        </Button>
+                      )}
+                    </div>
 
-        {qtdAtual === 0 && maxDepWiz > 0 && (
-          <div className="mt-2 rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              Este convênio permite até <strong>{maxDepWiz} dependente{maxDepWiz > 1 ? 's' : ''}</strong>.
-            </p>
-          </div>
-        )}
+                    {podeAdicionar && maxDepWiz > 0 && (
+                      <div className="mt-1">
+                        <PatientSearchInput
+                          clinicaIdsOverride={[clinicaId]}
+                          placeholder="Adicionar dependente — busque por nome, CPF, prontuário…"
+                          onSelect={async (p) => {
+                            if (!p) return;
+                            if (p.id === titular?.id) {
+                              toast.error("Esse paciente já é o titular.");
+                              return;
+                            }
+                            if (deps.find((d) => d.id === p.id)) {
+                              toast.error("Dependente já adicionado.");
+                              return;
+                            }
+                            const full = await carregarPacienteCompleto(p);
+                            addDep(full);
+                          }}
+                          onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
+                        />
+                      </div>
+                    )}
 
-        {qtdAtual >= maxDepWiz && maxDepWiz > 0 && (
-          <div className="w-full mt-1 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            ✅ Limite de {maxDepWiz} dependente{maxDepWiz > 1 ? 's' : ''} atingido.
-          </div>
-        )}
-      </>
-    );
-  })()}
-</div>
+                    {deps.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        {deps.map((d, i) => (
+                          <div
+                            key={d.id || i}
+                            className="grid grid-cols-12 gap-2 items-center rounded-md border p-2 bg-muted/20"
+                          >
+                            <span className="col-span-12 sm:col-span-4 text-sm truncate">
+                              {d.nome}
+                            </span>
+                            <Select
+                              value={d.parentesco}
+                              onValueChange={(v) =>
+                                setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))
+                              }
+                            >
+                              <SelectTrigger className="col-span-6 sm:col-span-3 h-8">
+                                <SelectValue placeholder="Parentesco" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                                <SelectItem value="Cônjuge">Cônjuge</SelectItem>
+                                <SelectItem value="Pai">Pai</SelectItem>
+                                <SelectItem value="Mãe">Mãe</SelectItem>
+                                <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
+                                <SelectItem value="Outro">Outro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="col-span-3 sm:col-span-1"
+                              onClick={() => setDeps(deps.filter((_, j) => j !== i))}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {qtdAtual === 0 && maxDepWiz > 0 && (
+                      <div className="mt-2 rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          Este convênio permite até{" "}
+                          <strong>
+                            {maxDepWiz} dependente{maxDepWiz > 1 ? "s" : ""}
+                          </strong>
+                          .
+                        </p>
+                      </div>
+                    )}
+
+                    {qtdAtual >= maxDepWiz && maxDepWiz > 0 && (
+                      <div className="w-full mt-1 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                        ✅ Limite de {maxDepWiz} dependente{maxDepWiz > 1 ? "s" : ""} atingido.
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
 
             {/* ====== OBSERVAÇÕES ====== */}
             <div className="col-span-2">
@@ -1905,7 +2115,9 @@ function NovoContratoForm({
                 maxLength={OBS_MAX}
                 onChange={(e) => setObs(e.target.value)}
               />
-              <p className={`text-xs mt-1 text-right ${obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+              <p
+                className={`text-xs mt-1 text-right ${obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"}`}
+              >
                 {obsSanitizedLen} / {OBS_MAX} caracteres
               </p>
             </div>
@@ -1941,7 +2153,10 @@ function NovoContratoForm({
                   : `Foto — ${deps[faceOpen as number]?.nome ?? "Dependente"}`
               }
               onCaptured={async (descriptor) => {
-                if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+                if (!podeEscrever) {
+                  toast.error("Você não tem permissão de edição neste módulo.");
+                  return;
+                }
                 const isTitular = faceOpen === "titular";
                 const idx = typeof faceOpen === "number" ? faceOpen : -1;
                 const alvoId = isTitular ? titular!.id : deps[idx].id;
@@ -1951,7 +2166,10 @@ function NovoContratoForm({
                   .eq("id", alvoId);
                 if (error) throw error;
                 if (isTitular) setTitular({ ...titular!, face_descriptor: descriptor });
-                else setDeps(deps.map((x, j) => (j === idx ? { ...x, face_descriptor: descriptor } : x)));
+                else
+                  setDeps(
+                    deps.map((x, j) => (j === idx ? { ...x, face_descriptor: descriptor } : x)),
+                  );
                 toast.success("Foto registrada");
               }}
             />
@@ -1979,7 +2197,9 @@ function NovoContratoForm({
                 const idx = editarPaciente.alvo;
                 setDeps((prev) =>
                   prev.map((x, j) =>
-                    j === idx ? { ...x, email: atualizado.email, telefone: atualizado.telefone } : x,
+                    j === idx
+                      ? { ...x, email: atualizado.email, telefone: atualizado.telefone }
+                      : x,
                   ),
                 );
               }
@@ -1987,7 +2207,9 @@ function NovoContratoForm({
           />
           <QuickPatientDialog
             open={quickCreate !== null}
-            onOpenChange={(v) => { if (!v) setQuickCreate(null); }}
+            onOpenChange={(v) => {
+              if (!v) setQuickCreate(null);
+            }}
             clinicaId={clinicaId}
             nomeInicial={quickCreate?.nome}
             onCreated={async (p) => {
@@ -2067,7 +2289,10 @@ function DetalheContrato({
       />
       <label htmlFor={`tit-apenas-fin-${_cid}`} className="text-sm cursor-pointer">
         <span className="font-medium">Apenas titular financeiro</span>
-        <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+        <span className="text-muted-foreground">
+          {" "}
+          — paga o plano, mas não usufrui dos benefícios.
+        </span>
         <span
           className="ml-1 inline-flex items-center text-muted-foreground"
           title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
@@ -2091,7 +2316,8 @@ function DetalheContrato({
   const toggleHistSel = (id: string) => {
     setSelectedHistIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -2106,10 +2332,7 @@ function DetalheContrato({
           delete atual.vencimento;
         if (atual.valor !== undefined && Number(atual.valor) === Number(original.valor))
           delete atual.valor;
-        if (
-          atual.pago_em !== undefined &&
-          (atual.pago_em ?? null) === (original.pago_em ?? null)
-        )
+        if (atual.pago_em !== undefined && (atual.pago_em ?? null) === (original.pago_em ?? null))
           delete atual.pago_em;
       }
       const novo = { ...prev };
@@ -2119,31 +2342,38 @@ function DetalheContrato({
     });
   };
   const totalRascunhos = Object.keys(rascunhos).length;
-  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
+  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({
+    total: 0,
+    count: 0,
+  });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
   const [deps, setDeps] = useState<Dep[]>([]);
-  const [contratosAnteriores, setContratosAnteriores] = useState<Array<{
-    id: string;
-    numero: string | number | null;
-    convenio: string | null;
-    data_inicio: string | null;
-    data_termino: string | null;
-    status: string | null;
-    parcelas: number;
-    pagas: number;
-  }>>([]);
+  const [contratosAnteriores, setContratosAnteriores] = useState<
+    Array<{
+      id: string;
+      numero: string | number | null;
+      convenio: string | null;
+      data_inicio: string | null;
+      data_termino: string | null;
+      status: string | null;
+      parcelas: number;
+      pagas: number;
+    }>
+  >([]);
   // Ciclos de renovação por extensão dentro do MESMO contrato. A RPC
   // renovar_contrato_extensao acrescenta N novas mensalidades (numero_parcela
   // continua sequencial: 13..24, 25..36, etc.) no mesmo contrato. Para não
   // inflar o contador N/M, separamos em ciclos.
-  const [renovacoes, setRenovacoes] = useState<Array<{
-    id: string;
-    tipo: string | null;
-    parcelas_geradas: number | null;
-    periodo_inicio: string | null;
-    periodo_fim: string | null;
-    created_at: string | null;
-  }>>([]);
+  const [renovacoes, setRenovacoes] = useState<
+    Array<{
+      id: string;
+      tipo: string | null;
+      parcelas_geradas: number | null;
+      periodo_inicio: string | null;
+      periodo_fim: string | null;
+      created_at: string | null;
+    }>
+  >([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
   const [pacienteFull, setPacienteFull] = useState<any>(null);
@@ -2158,7 +2388,12 @@ function DetalheContrato({
   const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
   const [emitentes, setEmitentes] = useState<Array<{ id: string; nome: string }>>([]);
   const [emitenteId, setEmitenteId] = useState<string>("");
-  const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
+  const [nfsePorLancamento, setNfsePorLancamento] = useState<
+    Record<
+      string,
+      { id: string; numero: string | null; status: string | null; pdf_url: string | null }
+    >
+  >({});
   const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
   const [nfseEmitindoLote, setNfseEmitindoLote] = useState(false);
 
@@ -2174,7 +2409,9 @@ function DetalheContrato({
   // vem de cb_convenios.taxa_inclusao_dependente e permanece editável.
   const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
   const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
-  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -2186,7 +2423,9 @@ function DetalheContrato({
   const [cancelObs, setCancelObs] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
-  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
+  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(
+    contrato.cancelamento_motivo ?? null,
+  );
   const cancelado = !!canceladoEm;
   // Renovação do contrato
   const [renovarOpen, setRenovarOpen] = useState(false);
@@ -2204,9 +2443,12 @@ function DetalheContrato({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!cancelado) setRenovadoEm((data as any)?.created_at ?? (contrato as any).renovado_em ?? null);
+      if (!cancelado)
+        setRenovadoEm((data as any)?.created_at ?? (contrato as any).renovado_em ?? null);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [contrato.id]);
   // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
@@ -2215,7 +2457,9 @@ function DetalheContrato({
   }, [contrato.id]);
 
   // Edição manual de valor mensal e dia de vencimento (revisão contrato a contrato)
-  const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
+  const [editValor, setEditValor] = useState<string>(
+    String(Number(contrato.valor_mensal ?? 0).toFixed(2)),
+  );
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
   useEffect(() => {
@@ -2230,7 +2474,9 @@ function DetalheContrato({
   const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
   const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
   const [admDataInicio, setAdmDataInicio] = useState<string>(contrato.data_inicio ?? "");
-  const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
+  const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(
+    String(Number(contrato.taxa_adesao ?? 0).toFixed(2)),
+  );
   const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
@@ -2244,16 +2490,18 @@ function DetalheContrato({
   );
   const [savingApenasFin, setSavingApenasFin] = useState(false);
   // Isenção manual de carência (Admin/Gestor).
-  const [semCarencia, setSemCarencia] = useState<boolean>(
-    !!(contrato as any).sem_carencia,
-  );
+  const [semCarencia, setSemCarencia] = useState<boolean>(!!(contrato as any).sem_carencia);
   const [semCarenciaMotivo, setSemCarenciaMotivo] = useState<string>(
     (contrato as any).sem_carencia_motivo ?? "",
   );
   const [savingSemCarencia, setSavingSemCarencia] = useState(false);
   const roleAtual = (clinicaAtual?.role ?? "").toLowerCase();
   const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
-  const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
+  const [retroDialog, setRetroDialog] = useState<{
+    open: boolean;
+    parcelasPagas: string;
+    dataInicio: string;
+  } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   const [recalcVencOpen, setRecalcVencOpen] = useState(false);
   useEffect(() => {
@@ -2278,7 +2526,8 @@ function DetalheContrato({
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome");
-      if (!cancelled) setConveniosAdm(((data as any[]) ?? []).map((c) => ({ id: c.id, nome: c.nome })));
+      if (!cancelled)
+        setConveniosAdm(((data as any[]) ?? []).map((c) => ({ id: c.id, nome: c.nome })));
     })();
     return () => {
       cancelled = true;
@@ -2307,7 +2556,10 @@ function DetalheContrato({
   }, [isAdmin, contrato.id]);
 
   const salvarContratoAdmin = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const taxa = Number(String(admTaxaAdesao).replace(",", "."));
     if (!admConvenioId) {
       toast.error("Selecione um convênio");
@@ -2331,11 +2583,8 @@ function DetalheContrato({
     // Só aplica novo valor_mensal se o usuário trocou explicitamente a faixa
     // em relação à sincronização inicial. Sem isso, um fallback silencioso
     // do dropdown rebaixaria o valor do contrato (ver bug #20260945).
-    const faixaFoiTrocada =
-      !!admFaixaId && admFaixaId !== admFaixaIdInicialRef.current;
-    const faixaEscolhida = faixaFoiTrocada
-      ? faixas.find((f) => f.id === admFaixaId)
-      : null;
+    const faixaFoiTrocada = !!admFaixaId && admFaixaId !== admFaixaIdInicialRef.current;
+    const faixaEscolhida = faixaFoiTrocada ? faixas.find((f) => f.id === admFaixaId) : null;
     const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
     const updatePayload: any = {
       convenio_id: admConvenioId,
@@ -2391,7 +2640,9 @@ function DetalheContrato({
       const ini = new Date(admDataInicio + "T00:00:00");
       const iniMes = new Date(ini.getFullYear(), ini.getMonth(), 1);
       if (iniMes < primDoMesAtual) {
-        const mesesCheios = (primDoMesAtual.getFullYear() - iniMes.getFullYear()) * 12 + (primDoMesAtual.getMonth() - iniMes.getMonth());
+        const mesesCheios =
+          (primDoMesAtual.getFullYear() - iniMes.getFullYear()) * 12 +
+          (primDoMesAtual.getMonth() - iniMes.getMonth());
         const sugestao = Math.max(0, Math.min(12, mesesCheios));
         setRetroDialog({ open: true, parcelasPagas: String(sugestao), dataInicio: admDataInicio });
       }
@@ -2447,7 +2698,10 @@ function DetalheContrato({
 
   // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
   const regerarComPagas = async (n: number) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!retroDialog) return;
     const iniStr = retroDialog.dataInicio;
     if (!iniStr) return;
@@ -2509,9 +2763,13 @@ function DetalheContrato({
     id: string,
     patch: Partial<{ vencimento: string; valor: number | string }>,
   ) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const payload: any = { ...patch };
-    if (payload.valor !== undefined) payload.valor = Number(String(payload.valor).replace(",", "."));
+    if (payload.valor !== undefined)
+      payload.valor = Number(String(payload.valor).replace(",", "."));
     const { error } = await supabase.from("contrato_mensalidades").update(payload).eq("id", id);
     if (error) return mostrarErro(error);
     setMens((rows) =>
@@ -2523,10 +2781,18 @@ function DetalheContrato({
   const adicionarParcela = async () => {
     // Alerta se houver rascunhos pendentes — evita perder edições ao recarregar.
     if (totalRascunhos > 0) {
-      if (!await confirmDialog("Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?")) return;
+      if (
+        !(await confirmDialog(
+          "Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?",
+        ))
+      )
+        return;
       setRascunhos({});
     }
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
     const hoje = new Date().toISOString().slice(0, 10);
     const { error } = await supabase.from("contrato_mensalidades").insert({
@@ -2542,12 +2808,19 @@ function DetalheContrato({
     await load();
   };
   const excluirParcela = async (id: string) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (!await confirmDialog("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!(await confirmDialog("Excluir esta parcela? Essa ação não pode ser desfeita."))) return;
     const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Parcela removida.");
-    setRascunhos((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    setRascunhos((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
     await load();
   };
 
@@ -2571,11 +2844,23 @@ function DetalheContrato({
       if (!original) continue;
       const draft = rascunhos[id];
       const parcelaLabel = `parcela ${original.numero_parcela ?? "?"}`;
-      if (draft.vencimento !== undefined && draft.vencimento !== null && draft.vencimento !== "" && !dataOk(String(draft.vencimento))) {
-        toast.error(`Vencimento inválido em ${parcelaLabel} — use o formato completo (dd/mm/aaaa).`);
+      if (
+        draft.vencimento !== undefined &&
+        draft.vencimento !== null &&
+        draft.vencimento !== "" &&
+        !dataOk(String(draft.vencimento))
+      ) {
+        toast.error(
+          `Vencimento inválido em ${parcelaLabel} — use o formato completo (dd/mm/aaaa).`,
+        );
         return;
       }
-      if (draft.pago_em !== undefined && draft.pago_em !== null && draft.pago_em !== "" && !dataOk(String(draft.pago_em))) {
+      if (
+        draft.pago_em !== undefined &&
+        draft.pago_em !== null &&
+        draft.pago_em !== "" &&
+        !dataOk(String(draft.pago_em))
+      ) {
         toast.error(`"Pago em" inválido em ${parcelaLabel} — use o formato completo (dd/mm/aaaa).`);
         return;
       }
@@ -2644,7 +2929,10 @@ function DetalheContrato({
   };
 
   const salvarDadosFinanceiros = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const v = Number(String(editValor).replace(",", "."));
     const dia = Math.max(1, Math.min(31, Number(editDia) || 0));
     if (!Number.isFinite(v) || v < 0) {
@@ -2675,7 +2963,10 @@ function DetalheContrato({
   };
 
   const confirmarCancelamento = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const opcao = MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao);
     if (!opcao) {
       toast.error("Selecione o motivo do cancelamento");
@@ -2744,7 +3035,10 @@ function DetalheContrato({
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
   // Isenção de juros + multa para a mensalidade atualmente em pagamento.
   // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
-  const [isencaoEncargos, setIsencaoEncargos] = useState<{ autorizadoPorNome: string; autorizadoPorUserId: string } | null>(null);
+  const [isencaoEncargos, setIsencaoEncargos] = useState<{
+    autorizadoPorNome: string;
+    autorizadoPorUserId: string;
+  } | null>(null);
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -2758,7 +3052,11 @@ function DetalheContrato({
   const load = async () => {
     setLoading(true);
     const [m, d, cv, cl, pa, fx] = await Promise.all([
-      supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
+      supabase
+        .from("contrato_mensalidades")
+        .select("*")
+        .eq("contrato_id", contrato.id)
+        .order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
         .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
@@ -2766,7 +3064,9 @@ function DetalheContrato({
       contrato.convenio_id
         ? supabase
             .from("cb_convenios")
-            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente")
+            .select(
+              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente",
+            )
             .eq("id", contrato.convenio_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -2777,11 +3077,17 @@ function DetalheContrato({
         .maybeSingle(),
       supabase
         .from("pacientes")
-        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario")
+        .select(
+          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario",
+        )
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),
       contrato.convenio_id
-        ? supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", contrato.convenio_id).order("vidas_de")
+        ? supabase
+            .from("cb_convenio_faixas")
+            .select("*")
+            .eq("convenio_id", contrato.convenio_id)
+            .order("vidas_de")
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
@@ -2861,9 +3167,7 @@ function DetalheContrato({
       const anteriores = (antRows ?? []) as any[];
       if (anteriores.length) {
         const ids = anteriores.map((c) => c.id);
-        const convIds = Array.from(
-          new Set(anteriores.map((c) => c.convenio_id).filter(Boolean)),
-        );
+        const convIds = Array.from(new Set(anteriores.map((c) => c.convenio_id).filter(Boolean)));
         const [{ data: mensAll }, { data: convs }] = await Promise.all([
           supabase
             .from("contrato_mensalidades")
@@ -2888,7 +3192,7 @@ function DetalheContrato({
           anteriores.map((c) => ({
             id: c.id,
             numero: c.numero ?? null,
-            convenio: c.convenio_id ? convMap[c.convenio_id] ?? null : null,
+            convenio: c.convenio_id ? (convMap[c.convenio_id] ?? null) : null,
             data_inicio: c.data_inicio ?? null,
             data_termino: c.data_termino ?? null,
             status: c.status ?? null,
@@ -2911,14 +3215,16 @@ function DetalheContrato({
         .select("id, tipo, parcelas_geradas, periodo_inicio, periodo_fim, created_at")
         .eq("contrato_id", contrato.id)
         .order("created_at", { ascending: true });
-      setRenovacoes(((renRows ?? []) as any[]).map((r) => ({
-        id: r.id,
-        tipo: r.tipo ?? null,
-        parcelas_geradas: r.parcelas_geradas ?? null,
-        periodo_inicio: r.periodo_inicio ?? null,
-        periodo_fim: r.periodo_fim ?? null,
-        created_at: r.created_at ?? null,
-      })));
+      setRenovacoes(
+        ((renRows ?? []) as any[]).map((r) => ({
+          id: r.id,
+          tipo: r.tipo ?? null,
+          parcelas_geradas: r.parcelas_geradas ?? null,
+          periodo_inicio: r.periodo_inicio ?? null,
+          periodo_fim: r.periodo_fim ?? null,
+          created_at: r.created_at ?? null,
+        })),
+      );
     }
     setLoading(false);
   };
@@ -2929,7 +3235,11 @@ function DetalheContrato({
   // Carrega emitentes NFS-e ativos da clínica (para o botão "Emitir NFS-e"
   // nas parcelas). Se não houver emitente cadastrado, o botão avisa o usuário.
   useEffect(() => {
-    if (!clinicaAtual?.clinica_id) { setEmitentes([]); setEmitenteId(""); return; }
+    if (!clinicaAtual?.clinica_id) {
+      setEmitentes([]);
+      setEmitenteId("");
+      return;
+    }
     let cancel = false;
     void supabase
       .from("nfse_emitentes_publico")
@@ -2943,16 +3253,16 @@ function DetalheContrato({
         setEmitentes(list);
         setEmitenteId((prev) => prev || (list[0]?.id ?? ""));
       });
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [clinicaAtual?.clinica_id]);
 
   // Carrega NFS-e já emitidas para as parcelas deste contrato (indexadas por
   // lancamento_id da parcela). Assim conseguimos: (1) esconder o botão de
   // emitir; (2) mostrar o número/link do PDF.
   useEffect(() => {
-    const ids = mens
-      .map((m) => m.lancamento_id)
-      .filter((v): v is string => !!v);
+    const ids = mens.map((m) => m.lancamento_id).filter((v): v is string => !!v);
     if (!ids.length || !clinicaAtual?.clinica_id) {
       setNfsePorLancamento({});
       return;
@@ -2966,11 +3276,24 @@ function DetalheContrato({
       .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
-        const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>) {
-          const linkedIds = (r.pagamento_ids && r.pagamento_ids.length > 0)
-            ? r.pagamento_ids
-            : (r.pagamento_id ? [r.pagamento_id] : []);
+        const map: Record<
+          string,
+          { id: string; numero: string | null; status: string | null; pdf_url: string | null }
+        > = {};
+        for (const r of (data ?? []) as Array<{
+          id: string;
+          numero: string | null;
+          status: string | null;
+          url_pdf: string | null;
+          pagamento_id: string | null;
+          pagamento_ids: string[] | null;
+        }>) {
+          const linkedIds =
+            r.pagamento_ids && r.pagamento_ids.length > 0
+              ? r.pagamento_ids
+              : r.pagamento_id
+                ? [r.pagamento_id]
+                : [];
           for (const pid of linkedIds) {
             if (ids.includes(pid)) {
               map[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
@@ -2979,7 +3302,9 @@ function DetalheContrato({
         }
         setNfsePorLancamento(map);
       });
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [mens, clinicaAtual?.clinica_id]);
 
   // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
@@ -3003,7 +3328,10 @@ function DetalheContrato({
   // pessoas do novo convênio para que o select "Faixa de pessoas" mostre
   // as opções corretas. Sem isso, ficavam as faixas do convênio original.
   useEffect(() => {
-    if (!admConvenioId) { setFaixas([]); return; }
+    if (!admConvenioId) {
+      setFaixas([]);
+      return;
+    }
     if (admConvenioId === contrato.convenio_id) return; // já carregado pelo load()
     let cancelado = false;
     (async () => {
@@ -3012,9 +3340,11 @@ function DetalheContrato({
         .select("*")
         .eq("convenio_id", admConvenioId)
         .order("vidas_de");
-      if (!cancelado) setFaixas(((data ?? []) as Faixa[]));
+      if (!cancelado) setFaixas((data ?? []) as Faixa[]);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [admConvenioId, contrato.convenio_id]);
 
   // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
@@ -3027,7 +3357,10 @@ function DetalheContrato({
     valorPago?: number | null,
     pagoEm?: string | null,
   ) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     // Grava lancamento_id + valor_pago junto com o status: sem isso a
     // mensalidade fica marcada como paga sem ponte confiável para o
     // lançamento financeiro (auditoria/estorno não conseguem localizá-lo).
@@ -3043,7 +3376,13 @@ function DetalheContrato({
           ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
           ...(valorPago != null ? { valor_pago: valorPago } : {}),
         }
-      : { status: "pendente", pago_em: null, forma_pagamento: null, lancamento_id: null, valor_pago: null };
+      : {
+          status: "pendente",
+          pago_em: null,
+          forma_pagamento: null,
+          lancamento_id: null,
+          valor_pago: null,
+        };
     const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
     if (error) return mostrarErro(error);
     load();
@@ -3055,7 +3394,10 @@ function DetalheContrato({
   // Financeiro > Estorno (cancela o lançamento, reverte o caixa e reabre a
   // mensalidade), centralizando os dois pontos de entrada num único fluxo.
   const reverterMensalidade = async (m: Mens) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!m.lancamento_id) {
       // Mensalidade paga antes desta correção, sem lançamento vinculado —
       // não há o que estornar no financeiro/caixa, só reabre a parcela.
@@ -3071,7 +3413,9 @@ function DetalheContrato({
       }
       return;
     }
-    toast.success("Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.");
+    toast.success(
+      "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
+    );
     load();
   };
 
@@ -3080,12 +3424,15 @@ function DetalheContrato({
   // Uso: regularizar contratos cuja 1ª (ou primeiras) mensalidades já
   // foram pagas fora do sistema, sem precisar cancelar e refazer o contrato.
   const marcarPagaHistorica = async (m: Mens) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (m.status === "pago") return;
     const ok = await confirmDialog(
       `Marcar a parcela ${isAdesao(m) ? "de adesão" : m.numero_parcela} como paga historicamente?\n\n` +
-      `Ela ficará como PAGA no contrato, mas NÃO gerará movimento no caixa nem lançamento financeiro. ` +
-      `Use apenas para regularizar pagamentos feitos fora do sistema.`
+        `Ela ficará como PAGA no contrato, mas NÃO gerará movimento no caixa nem lançamento financeiro. ` +
+        `Use apenas para regularizar pagamentos feitos fora do sistema.`,
     );
     if (!ok) return;
     const valor = Number(m.valor) || 0;
@@ -3105,20 +3452,26 @@ function DetalheContrato({
   };
 
   const marcarPagasHistoricasEmLote = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const ids = Array.from(selectedHistIds);
     const alvos = mens.filter((m) => ids.includes(m.id) && m.status !== "pago");
-    if (alvos.length === 0) { toast.error("Selecione ao menos uma parcela em aberto."); return; }
+    if (alvos.length === 0) {
+      toast.error("Selecione ao menos uma parcela em aberto.");
+      return;
+    }
     const total = alvos.reduce((s, m) => s + (Number(m.valor) || 0), 0);
     const nums = alvos
       .map((m) => (isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa" : `#${m.numero_parcela}`))
       .join(", ");
     const ok = await confirmDialog(
       `Marcar ${alvos.length} parcela(s) como paga (histórica)?\n\n` +
-      `Parcelas: ${nums}\n` +
-      `Total: R$ ${total.toFixed(2).replace(".", ",")}\n\n` +
-      `Elas ficarão como PAGAS no contrato, mas NÃO gerarão movimento no caixa nem lançamento financeiro. ` +
-      `Use apenas para regularizar pagamentos feitos fora do sistema.`,
+        `Parcelas: ${nums}\n` +
+        `Total: R$ ${total.toFixed(2).replace(".", ",")}\n\n` +
+        `Elas ficarão como PAGAS no contrato, mas NÃO gerarão movimento no caixa nem lançamento financeiro. ` +
+        `Use apenas para regularizar pagamentos feitos fora do sistema.`,
     );
     if (!ok) return;
     setAplicandoHistLote(true);
@@ -3141,7 +3494,9 @@ function DetalheContrato({
       );
       const erro = results.find((r) => r.error)?.error;
       if (erro) return mostrarErro(erro);
-      toast.success(`${alvos.length} parcela(s) marcada(s) como paga (histórica). Não foram lançadas no caixa.`);
+      toast.success(
+        `${alvos.length} parcela(s) marcada(s) como paga (histórica). Não foram lançadas no caixa.`,
+      );
       limparHistSel();
       load();
     } finally {
@@ -3167,7 +3522,9 @@ function DetalheContrato({
       return;
     }
     if (!m.lancamento_id) {
-      toast.error("Esta parcela foi marcada como paga (histórica) — não há pagamento real, não há GR a reimprimir.");
+      toast.error(
+        "Esta parcela foi marcada como paga (histórica) — não há pagamento real, não há GR a reimprimir.",
+      );
       return;
     }
     setReimprimindoId(m.id);
@@ -3178,11 +3535,18 @@ function DetalheContrato({
         .eq("id", m.lancamento_id)
         .maybeSingle();
       if (error || !lanc) throw new Error(error?.message ?? "Lançamento não encontrado.");
-      const l = lanc as { valor: number | string; forma_pagamento: string | null; parcelas: number | null; bandeira_cartao: string | null; observacoes: string | null };
+      const l = lanc as {
+        valor: number | string;
+        forma_pagamento: string | null;
+        parcelas: number | null;
+        bandeira_cartao: string | null;
+        observacoes: string | null;
+      };
 
       // Reconstrói o detalhe do misto a partir das observações (mesma
       // convenção usada em print-gr.ts para reimpressões de atendimento).
-      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      let detalhe:
+        Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
       if (l.forma_pagamento === "misto" && l.observacoes) {
         const idx = l.observacoes.indexOf("Pagamento misto:");
         if (idx >= 0) {
@@ -3199,7 +3563,10 @@ function DetalheContrato({
             [/^transfer[êe]ncia/i, "transferencia"],
           ];
           const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const partes = trecho
+            .split(";")
+            .map((s) => s.trim())
+            .filter(Boolean);
           const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
           for (const p of partes) {
             const match = LABEL_TO_KEY.find(([re]) => re.test(p));
@@ -3238,10 +3605,15 @@ function DetalheContrato({
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
   const emitirNfseParcela = async (m: Mens) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (!m.lancamento_id) {
-      toast.error("Esta parcela não tem lançamento financeiro vinculado — não é possível emitir NFS-e.");
+      toast.error(
+        "Esta parcela não tem lançamento financeiro vinculado — não é possível emitir NFS-e.",
+      );
       return;
     }
     if (!emitentes.length || !emitenteId) {
@@ -3250,9 +3622,15 @@ function DetalheContrato({
     }
     const pac = pacienteFull ?? {};
     const nomePac = contrato.paciente_nome ?? "";
-    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    if (!nomePac) {
+      toast.error("Contrato sem paciente vinculado.");
+      return;
+    }
     const valorBase = Number(m.valor_pago ?? m.valor) || 0;
-    if (valorBase <= 0) { toast.error("Valor pago da parcela é zero."); return; }
+    if (valorBase <= 0) {
+      toast.error("Valor pago da parcela é zero.");
+      return;
+    }
     setNfseEmitindoId(m.id);
     try {
       const tomador = await pickTomadorNfse({
@@ -3269,9 +3647,14 @@ function DetalheContrato({
         },
         valorBase,
       });
-      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      if (!tomador) {
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const parcial = aplicarValorParcial(valorBase, tomador);
-      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      const convNome = convenio?.nome
+        ? ` — Cartão Benefício ${convenio.nome}`
+        : " — Cartão Benefício";
       const rotulo = isAdesao(m)
         ? `Taxa de adesão${convNome} — Contrato #${contrato.numero} — ${nomePac}`
         : `Mensalidade ${m.numero_parcela}/${mensalidades.length}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
@@ -3280,7 +3663,10 @@ function DetalheContrato({
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
-      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      if (!descFinal) {
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
       const res = await emitirNfseFn({
         data: {
@@ -3306,12 +3692,23 @@ function DetalheContrato({
         .in("pagamento_id", [m.lancamento_id])
         .neq("status", "cancelada");
       const row = (data ?? [])[0] as
-        | { id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }
+        | {
+            id: string;
+            numero: string | null;
+            status: string | null;
+            url_pdf: string | null;
+            pagamento_id: string;
+          }
         | undefined;
       if (row) {
         setNfsePorLancamento((prev) => ({
           ...prev,
-          [row.pagamento_id]: { id: row.id, numero: row.numero, status: row.status, pdf_url: row.url_pdf },
+          [row.pagamento_id]: {
+            id: row.id,
+            numero: row.numero,
+            status: row.status,
+            pdf_url: row.url_pdf,
+          },
         }));
       }
     } catch (e) {
@@ -3331,26 +3728,43 @@ function DetalheContrato({
   // contrato/paciente. Soma valores, monta descrição consolidada e vincula
   // todos os lançamentos via nfse.pagamento_ids.
   const emitirNfseAgrupada = async (parcelas: Mens[]) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
-    if (parcelas.length < 2) { toast.error("Selecione ao menos 2 parcelas pagas."); return; }
+    if (parcelas.length < 2) {
+      toast.error("Selecione ao menos 2 parcelas pagas.");
+      return;
+    }
     if (!emitentes.length || !emitenteId) {
       toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
       return;
     }
     // Validações: todas pagas, com lancamento_id, sem NFS-e ativa.
     const invalida = parcelas.find((m) => m.status !== "pago" || !m.lancamento_id);
-    if (invalida) { toast.error("Selecione apenas parcelas pagas com lançamento financeiro."); return; }
+    if (invalida) {
+      toast.error("Selecione apenas parcelas pagas com lançamento financeiro.");
+      return;
+    }
     const jaEmitida = parcelas.find((m) => m.lancamento_id && nfsePorLancamento[m.lancamento_id]);
-    if (jaEmitida) { toast.error("Uma ou mais parcelas selecionadas já têm NFS-e ativa. Cancele-as antes de reemitir."); return; }
+    if (jaEmitida) {
+      toast.error(
+        "Uma ou mais parcelas selecionadas já têm NFS-e ativa. Cancele-as antes de reemitir.",
+      );
+      return;
+    }
     const pac = pacienteFull ?? {};
     const nomePac = contrato.paciente_nome ?? "";
-    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
-    const valorTotal = parcelas.reduce(
-      (s, m) => s + (Number(m.valor_pago ?? m.valor) || 0),
-      0,
-    );
-    if (valorTotal <= 0) { toast.error("Valor total é zero."); return; }
+    if (!nomePac) {
+      toast.error("Contrato sem paciente vinculado.");
+      return;
+    }
+    const valorTotal = parcelas.reduce((s, m) => s + (Number(m.valor_pago ?? m.valor) || 0), 0);
+    if (valorTotal <= 0) {
+      toast.error("Valor total é zero.");
+      return;
+    }
     setNfseEmitindoLote(true);
     try {
       const tomador = await pickTomadorNfse({
@@ -3367,19 +3781,22 @@ function DetalheContrato({
         },
         valorBase: valorTotal,
       });
-      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      if (!tomador) {
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const parcial = aplicarValorParcial(valorTotal, tomador);
-      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      const convNome = convenio?.nome
+        ? ` — Cartão Benefício ${convenio.nome}`
+        : " — Cartão Benefício";
       // Descrição consolidada, agrupando adesão/taxas separadas das mensalidades.
-      const mensSort = [...parcelas].sort(
-        (a, b) => a.vencimento.localeCompare(b.vencimento),
-      );
+      const mensSort = [...parcelas].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
       const linhasMens = mensSort
         .filter((m) => !isAdesao(m) && !isTaxaInclusao(m))
         .map((m) => `Mensalidade ${m.numero_parcela} (${mesExtenso(m.vencimento)})`);
       const linhasTaxas = mensSort
         .filter((m) => isAdesao(m) || isTaxaInclusao(m))
-        .map((m) => isAdesao(m) ? "Taxa de adesão" : "Taxa de inclusão de dependente");
+        .map((m) => (isAdesao(m) ? "Taxa de adesão" : "Taxa de inclusão de dependente"));
       const itens = [...linhasTaxas, ...linhasMens].join("; ");
       const rotulo = `${itens}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
       const descComDep = tomador.dependenteAtendido
@@ -3387,7 +3804,10 @@ function DetalheContrato({
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
-      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      if (!descFinal) {
+        toast.error("Emissão cancelada.");
+        return;
+      }
       const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
       const pagamentoIds = mensSort.map((m) => m.lancamento_id as string);
       const res = await emitirNfseFn({
@@ -3414,13 +3834,23 @@ function DetalheContrato({
         .eq("clinica_id", clinicaAtual.clinica_id)
         .overlaps("pagamento_ids", pagamentoIds)
         .neq("status", "cancelada");
-      const rows = (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        numero: string | null;
+        status: string | null;
+        url_pdf: string | null;
+        pagamento_id: string | null;
+        pagamento_ids: string[] | null;
+      }>;
       setNfsePorLancamento((prev) => {
         const next = { ...prev };
         for (const r of rows) {
-          const linked = (r.pagamento_ids && r.pagamento_ids.length > 0)
-            ? r.pagamento_ids
-            : (r.pagamento_id ? [r.pagamento_id] : []);
+          const linked =
+            r.pagamento_ids && r.pagamento_ids.length > 0
+              ? r.pagamento_ids
+              : r.pagamento_id
+                ? [r.pagamento_id]
+                : [];
           for (const pid of linked) {
             if (pagamentoIds.includes(pid)) {
               next[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
@@ -3462,11 +3892,15 @@ function DetalheContrato({
   const pagDiasAtraso = pagMens
     ? Math.max(
         0,
-        Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) / 86400000),
+        Math.floor(
+          (new Date().setHours(0, 0, 0, 0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) /
+            86400000,
+        ),
       )
     : 0;
   // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
-  const normalizarForma = (f: string) => (f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f);
+  const normalizarForma = (f: string) =>
+    f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
 
   const escolherForma = (forma: string) => {
     if (!pagMens) return;
@@ -3514,11 +3948,13 @@ function DetalheContrato({
   const primeiraParcela = mensalidades.find((m) => m.numero_parcela === 1);
   const adesaoEmbutida = Boolean(
     primeiraParcela &&
-      primeiraParcela.status !== "pago" &&
-      Number(primeiraParcela.taxa_adesao ?? 0) > 0,
+    primeiraParcela.status !== "pago" &&
+    Number(primeiraParcela.taxa_adesao ?? 0) > 0,
   );
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
-  const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPagoMens = mens
+    .filter((m) => m.status === "pago")
+    .reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
   // Segmenta mensalidades em CICLOS: ciclo 1 = parcelas 1..N0 (contrato
   // original, N0 = contrato.num_parcelas); ciclos seguintes usam
@@ -3528,10 +3964,7 @@ function DetalheContrato({
   const parcelasMensais = mensalidades
     .filter((m) => (m.numero_parcela ?? 0) > 0)
     .sort((a, b) => (a.numero_parcela ?? 0) - (b.numero_parcela ?? 0));
-  const tamanhoOriginal = Math.max(
-    1,
-    Number((contrato as any).num_parcelas) || 12,
-  );
+  const tamanhoOriginal = Math.max(1, Number((contrato as any).num_parcelas) || 12);
   const tamanhosCiclos: number[] = [tamanhoOriginal];
   for (const r of renovacoes) {
     if (r.tipo === "extensao" && Number(r.parcelas_geradas ?? 0) > 0) {
@@ -3624,7 +4057,8 @@ function DetalheContrato({
         ? `${faixaAtual.vidas_de}+ pessoas`
         : faixaAtual.vidas_ate === faixaAtual.vidas_de
           ? `${faixaAtual.vidas_de} ${faixaAtual.vidas_de === 1 ? "pessoa" : "pessoas"}`
-          : `${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate} pessoas`) + ` — ${BRL(Number(faixaAtual.valor_mensal))}`
+          : `${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate} pessoas`) +
+      ` — ${BRL(Number(faixaAtual.valor_mensal))}`
     : "—";
   const formaLabelMap: Record<string, string> = {
     dinheiro: "Dinheiro",
@@ -3635,7 +4069,8 @@ function DetalheContrato({
     carne: "Carnê interno",
     manual: "Manual",
   };
-  const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
+  const formaLabel =
+    formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
   const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
   const faixaSelecionadaEdicao = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : faixaAtual;
   const titularOcupaVaga = apenasFinanceiro ? 0 : 1;
@@ -3681,11 +4116,15 @@ function DetalheContrato({
       TIPO_MOVIMENTO: movimento,
       DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
     };
-    let out = tpl.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m: string, key: string, body: string) =>
-      vars[key] && String(vars[key]).trim() ? body : "",
+    let out = tpl.replace(
+      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? body : "",
     );
-    out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m: string, key: string, body: string) =>
-      vars[key] && String(vars[key]).trim() ? "" : body,
+    out = out.replace(
+      /\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? "" : body,
     );
     return out.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   };
@@ -3696,7 +4135,10 @@ function DetalheContrato({
     const safe = DOMPurify.sanitize(html);
     const titulo = `Termo de ${termoMovimento} — Contrato #${contrato.numero}`;
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
     const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>${esc(titulo)}</title>
 <style>
@@ -3738,16 +4180,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
   // Recalcula o valor das parcelas em aberto conforme a faixa de vidas do convênio
   const recalcularParcelasAbertas = async (totalVidas: number) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!faixas.length) return;
     const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate),
     );
-    const f = elegiveis.length ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a)) : null;
+    const f = elegiveis.length
+      ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
+      : null;
     if (!f) return;
     const novoValor = Number(f.valor_mensal);
     if (novoValor !== Number(valorMensalAtual)) {
-      await supabase.from("contratos_assinatura").update({ valor_mensal: novoValor }).eq("id", contrato.id);
+      await supabase
+        .from("contratos_assinatura")
+        .update({ valor_mensal: novoValor })
+        .eq("id", contrato.id);
       setValorMensalAtual(novoValor);
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
@@ -3761,11 +4211,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
         return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
       }),
     );
-    toast.success(`Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`);
+    toast.success(
+      `Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`,
+    );
   };
 
   const confirmarIncluir = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!incPaciente) {
       toast.error("Selecione um paciente");
       return;
@@ -3801,7 +4256,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
     if (resultado.taxaAviso) {
       toast.error(resultado.taxaAviso);
     } else if (resultado.taxa) {
-      toast.success(`Dependente incluído. Taxa de inclusão de ${BRL(Number(resultado.taxa.valor))} lançada em Mensalidades.`);
+      toast.success(
+        `Dependente incluído. Taxa de inclusão de ${BRL(Number(resultado.taxa.valor))} lançada em Mensalidades.`,
+      );
     } else {
       toast.success("Dependente incluído");
     }
@@ -3828,7 +4285,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const confirmarExcluir = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!excAlvo) return;
     const hoje = new Date().toISOString().slice(0, 10);
     const { error } = await supabase
@@ -3880,7 +4340,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
     const _cl = clinica ?? {};
     const _pa = pacienteFull ?? {};
     const dependentesTxt = deps.length
-      ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
+      ? deps
+          .map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`)
+          .join("\n")
       : "(nenhum)";
     const enderecoPaciente = [
       _pa.logradouro,
@@ -3937,7 +4399,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
         <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap justify-center">
-          <span>Contrato #{contrato.numero} — {contrato.paciente_nome}</span>
+          <span>
+            Contrato #{contrato.numero} — {contrato.paciente_nome}
+          </span>
           <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
         </h1>
         <div>
@@ -3946,8 +4410,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {(() => {
                 const parcelasMensais = mens.filter((m) => !isEncargoAvulso(m));
                 const podeRenovar =
-                  parcelasMensais.length > 0 &&
-                  parcelasMensais.every((m) => m.status === "pago");
+                  parcelasMensais.length > 0 && parcelasMensais.every((m) => m.status === "pago");
                 const contratoJaRenovado = !!renovadoEm || (contrato as any).status === "renovado";
                 if (!podeRenovar && !contratoJaRenovado) return null;
                 if (contratoJaRenovado) {
@@ -4029,12 +4492,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-sm">
                     <div className="font-semibold text-destructive">
                       Contrato Cancelado em{" "}
-                      {new Date(canceladoEm!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                      {new Date(canceladoEm!).toLocaleString("pt-BR", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
                     </div>
                     {cancelMotivoAtual ? (
-                      <div className="text-muted-foreground mt-0.5">Motivo: {cancelMotivoAtual}</div>
+                      <div className="text-muted-foreground mt-0.5">
+                        Motivo: {cancelMotivoAtual}
+                      </div>
                     ) : null}
-                    <div className="text-muted-foreground mt-0.5">O plano e todos os benefícios foram cancelados.</div>
+                    <div className="text-muted-foreground mt-0.5">
+                      O plano e todos os benefícios foram cancelados.
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -4042,7 +4512,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200 flex-wrap">
                   <Info className="h-4 w-4 shrink-0" />
                   <span>
-                    <strong>Titular financeiro</strong> — {contrato.paciente_nome} paga o plano, mas <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do contrato.
+                    <strong>Titular financeiro</strong> — {contrato.paciente_nome} paga o plano, mas{" "}
+                    <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do
+                    contrato.
                   </span>
                   <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                 </div>
@@ -4057,7 +4529,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="font-bold text-lg">
                     {pagasTotal}/{totalParcelas}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -4066,7 +4540,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">Recebido</div>
                   <div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -4075,18 +4551,17 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">A receber</div>
                   <div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
               </div>
               {temCiclosMultiplos ? (
                 <div className="rounded-md border">
                   <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
-                    <div className="text-sm font-medium">
-                      Ciclos anteriores deste contrato
-                    </div>
+                    <div className="text-sm font-medium">Ciclos anteriores deste contrato</div>
                     <div className="text-xs text-muted-foreground">
-                      {ciclosAnteriores.length}{" "}
-                      {ciclosAnteriores.length === 1 ? "ciclo" : "ciclos"}
+                      {ciclosAnteriores.length} {ciclosAnteriores.length === 1 ? "ciclo" : "ciclos"}
                     </div>
                   </div>
                   <div className="overflow-auto max-h-64">
@@ -4114,9 +4589,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 {c.inicio ? fmtD(c.inicio) : "—"} — {c.fim ? fmtD(c.fim) : "—"}
                               </TableCell>
                               <TableCell>
-                                {c.parcelas.length > 0
-                                  ? `${pagasCiclo}/${c.parcelas.length}`
-                                  : "—"}
+                                {c.parcelas.length > 0 ? `${pagasCiclo}/${c.parcelas.length}` : "—"}
                               </TableCell>
                             </TableRow>
                           );
@@ -4125,16 +4598,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </Table>
                   </div>
                   <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
-                    Cada ciclo mantém sua própria contagem de 12 parcelas. O card "Pagas" acima reflete apenas o ciclo atual.
+                    Cada ciclo mantém sua própria contagem de 12 parcelas. O card "Pagas" acima
+                    reflete apenas o ciclo atual.
                   </div>
                 </div>
               ) : null}
               {contratosAnteriores.length > 0 ? (
                 <div className="rounded-md border">
                   <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
-                    <div className="text-sm font-medium">
-                      Contratos anteriores deste paciente
-                    </div>
+                    <div className="text-sm font-medium">Contratos anteriores deste paciente</div>
                     <div className="text-xs text-muted-foreground">
                       {contratosAnteriores.length}{" "}
                       {contratosAnteriores.length === 1 ? "contrato" : "contratos"}
@@ -4155,9 +4627,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <TableBody>
                         {contratosAnteriores.map((c) => (
                           <TableRow key={c.id}>
-                            <TableCell className="font-mono text-xs">
-                              {c.numero ?? "—"}
-                            </TableCell>
+                            <TableCell className="font-mono text-xs">{c.numero ?? "—"}</TableCell>
                             <TableCell>{c.convenio ?? "—"}</TableCell>
                             <TableCell>{c.data_inicio ? fmtD(c.data_inicio) : "—"}</TableCell>
                             <TableCell>{c.data_termino ? fmtD(c.data_termino) : "—"}</TableCell>
@@ -4175,7 +4645,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </Table>
                   </div>
                   <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
-                    Cada contrato mantém sua própria contagem de parcelas. Recebimentos avulsos históricos ficam no card "Recebido".
+                    Cada contrato mantém sua própria contagem de parcelas. Recebimentos avulsos
+                    históricos ficam no card "Recebido".
                   </div>
                 </div>
               ) : null}
@@ -4237,9 +4708,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
               {contrato.tabela_legada ? (
                 <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-100">
-                  <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do Cartão Consulta.
-                  Avisar o titular e migrar para a tabela atual a partir de{" "}
-                  <strong>{contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}</strong>.
+                  <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do
+                  Cartão Consulta. Avisar o titular e migrar para a tabela atual a partir de{" "}
+                  <strong>
+                    {contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}
+                  </strong>
+                  .
                 </div>
               ) : null}
 
@@ -4258,11 +4732,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           >
                             Descartar
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={salvarRascunhos}
-                            disabled={salvandoRascunhos}
-                          >
+                          <Button size="sm" onClick={salvarRascunhos} disabled={salvandoRascunhos}>
                             {salvandoRascunhos ? (
                               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                             ) : (
@@ -4281,72 +4751,83 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </div>
                   ) : null}
                 </div>
-                {podeEscrever && !(cancelado && !isAdmin) ? (() => {
-                  const selecionaveis = mens.filter(
-                    (m) => !(isAdesao(m) && adesaoEmbutida),
-                  );
-                  const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
-                  const total = selecionadas.reduce(
-                    (s, m) => s + (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
-                    0,
-                  );
-                  if (selecionadas.length === 0) return null;
-                  const pendentes = selecionadas.filter((m) => m.status !== "pago");
-                  const pagasComLanc = selecionadas.filter((m) => m.status === "pago" && !!m.lancamento_id);
-                  const pagasSemNfse = pagasComLanc.filter((m) => !nfsePorLancamento[m.lancamento_id!]);
-                  const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
-                  const soPagasElegiveis = pendentes.length === 0 && pagasSemNfse.length === selecionadas.length && selecionadas.length >= 2;
-                  const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
-                  return (
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-                      <div>
-                        <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
-                        <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
-                        {mistura ? (
-                          <span className="ml-2 text-destructive">Separe pagas e pendentes em seleções distintas.</span>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={limparHistSel}
-                          disabled={aplicandoHistLote || nfseEmitindoLote}
-                        >
-                          Limpar seleção
-                        </Button>
-                        {soPendentes ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={marcarPagasHistoricasEmLote}
-                            disabled={aplicandoHistLote}
-                          >
-                            {aplicandoHistLote ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                {podeEscrever && !(cancelado && !isAdmin)
+                  ? (() => {
+                      const selecionaveis = mens.filter((m) => !(isAdesao(m) && adesaoEmbutida));
+                      const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
+                      const total = selecionadas.reduce(
+                        (s, m) =>
+                          s +
+                          (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
+                        0,
+                      );
+                      if (selecionadas.length === 0) return null;
+                      const pendentes = selecionadas.filter((m) => m.status !== "pago");
+                      const pagasComLanc = selecionadas.filter(
+                        (m) => m.status === "pago" && !!m.lancamento_id,
+                      );
+                      const pagasSemNfse = pagasComLanc.filter(
+                        (m) => !nfsePorLancamento[m.lancamento_id!],
+                      );
+                      const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
+                      const soPagasElegiveis =
+                        pendentes.length === 0 &&
+                        pagasSemNfse.length === selecionadas.length &&
+                        selecionadas.length >= 2;
+                      const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
+                      return (
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+                          <div>
+                            <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
+                            <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                            {mistura ? (
+                              <span className="ml-2 text-destructive">
+                                Separe pagas e pendentes em seleções distintas.
+                              </span>
                             ) : null}
-                            Marcar selecionadas como Paga (histórica)
-                          </Button>
-                        ) : null}
-                        {podeEmitirNfse && soPagasElegiveis ? (
-                          <Button
-                            size="sm"
-                            onClick={() => emitirNfseAgrupada(pagasSemNfse)}
-                            disabled={nfseEmitindoLote || !emitenteId}
-                            title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
-                          >
-                            {nfseEmitindoLote ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <FileText className="h-3 w-3 mr-1" />
-                            )}
-                            Emitir NFS-e agrupada ({pagasSemNfse.length})
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })() : null}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={limparHistSel}
+                              disabled={aplicandoHistLote || nfseEmitindoLote}
+                            >
+                              Limpar seleção
+                            </Button>
+                            {soPendentes ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={marcarPagasHistoricasEmLote}
+                                disabled={aplicandoHistLote}
+                              >
+                                {aplicandoHistLote ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : null}
+                                Marcar selecionadas como Paga (histórica)
+                              </Button>
+                            ) : null}
+                            {podeEmitirNfse && soPagasElegiveis ? (
+                              <Button
+                                size="sm"
+                                onClick={() => emitirNfseAgrupada(pagasSemNfse)}
+                                disabled={nfseEmitindoLote || !emitenteId}
+                                title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
+                              >
+                                {nfseEmitindoLote ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <FileText className="h-3 w-3 mr-1" />
+                                )}
+                                Emitir NFS-e agrupada ({pagasSemNfse.length})
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  : null}
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -4361,7 +4842,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 }
                                 return true;
                               });
-                              const allSel = selecionaveis.length > 0 &&
+                              const allSel =
+                                selecionaveis.length > 0 &&
                                 selecionaveis.every((m) => selectedHistIds.has(m.id));
                               const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
                               return (
@@ -4396,7 +4878,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-center py-4 text-muted-foreground">
+                          <TableCell
+                            colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                            className="text-center py-4 text-muted-foreground"
+                          >
                             Carregando…
                           </TableCell>
                         </TableRow>
@@ -4407,236 +4892,259 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         // renovação por extensão (temCiclosMultiplos).
                         let cicloHeader: ReactNode = null;
                         if (temCiclosMultiplos && (m.numero_parcela ?? 0) > 0) {
-                          const ciclo = ciclos.find((c) =>
-                            c.parcelas.some((p) => p.id === m.id),
-                          );
+                          const ciclo = ciclos.find((c) => c.parcelas.some((p) => p.id === m.id));
                           if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
-                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                <TableCell
+                                  colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                                  className="text-xs font-semibold py-2"
+                                >
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a{" "}
+                                  {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
                             );
                           } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
-                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                <TableCell
+                                  colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                                  className="text-xs font-semibold py-2"
+                                >
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a{" "}
+                                  {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
                             );
                           }
                         }
                         return (
-                        <Fragment key={m.id}>
-                        {cicloHeader}
-                        <TableRow>
-                          {podeEscrever && !(cancelado && !isAdmin) ? (
-                            <TableCell className="w-8">
-                              {(() => {
-                                if (isAdesao(m) && adesaoEmbutida) return null;
-                                if (m.status === "pago" && (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])) return null;
-                                return (
-                                  <input
-                                    type="checkbox"
-                                    aria-label="Selecionar parcela"
-                                    checked={selectedHistIds.has(m.id)}
-                                    onChange={() => toggleHistSel(m.id)}
-                                  />
-                                );
-                              })()}
-                            </TableCell>
-                          ) : null}
-                          <TableCell>
-                            {isAdesao(m) ? (
-                              <Badge variant="secondary">Adesão</Badge>
-                            ) : isTaxaInclusao(m) ? (
-                              <Badge
-                                variant="secondary"
-                                title={
-                                  (m as unknown as { observacoes?: string | null }).observacoes ??
-                                  "Taxa de inclusão de dependente"
-                                }
-                              >
-                                Taxa inclusão
-                              </Badge>
-                            ) : (
-                              temCiclosMultiplos && parcelaLocalPorId[m.id]
-                                ? `${parcelaLocalPorId[m.id].pos}/${parcelaLocalPorId[m.id].total}`
-                                : m.numero_parcela
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isAdmin && podeEscrever ? (
-                              <DateInputBR
-                                className="h-8 w-40"
-                                value={rascunhos[m.id]?.vencimento ?? m.vencimento}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  if (v) setRascunho(m.id, { vencimento: v });
-                                }}
-                              />
-                            ) : (
-                              fmtD(m.vencimento)
-                            )}
-                          </TableCell>
-                          <TableCell className="capitalize">
-                            {competenciaDe(rascunhos[m.id]?.vencimento ?? m.vencimento)}
-                          </TableCell>
-                          <TableCell>
-                            {isAdmin && podeEscrever ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                className="h-8 w-28"
-                                key={`valor-${m.id}-${rascunhos[m.id] ? "d" : "o"}`}
-                                defaultValue={Number(
-                                  rascunhos[m.id]?.valor ?? m.valor ?? 0,
-                                ).toFixed(2)}
-                                onChange={(e) => {
-                                  const v = Number(String(e.target.value).replace(",", "."));
-                                  if (Number.isFinite(v)) setRascunho(m.id, { valor: v });
-                                }}
-                              />
-                            ) : (
-                              BRL(m.valor)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                m.status === "pago"
-                                  ? "default"
-                                  : isAtrasado(m.vencimento)
-                                    ? "destructive"
-                                    : "outline"
-                              }
-                            >
-                              {m.status === "pago"
-                                ? "Pago"
-                                : isAtrasado(m.vencimento)
-                                  ? "Atrasado"
-                                  : "Pendente"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {isAdmin && podeEscrever ? (
-                              <DateInputBR
-                                className="h-8 w-40"
-                                value={
-                                  rascunhos[m.id] && "pago_em" in rascunhos[m.id]!
-                                    ? rascunhos[m.id]!.pago_em ?? ""
-                                    : m.pago_em ?? ""
-                                }
-                                onChange={(e) => {
-                                  const v = e.target.value || null;
-                                  setRascunho(m.id, { pago_em: v });
-                                }}
-                              />
-                            ) : (
-                              fmtD(m.pago_em)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 justify-end">
-                              {m.status === "pago" ? (
-                                <>
-                                  {podeEmitirNfse && m.lancamento_id ? (
-                                    nfsePorLancamento[m.lancamento_id] ? (
-                                      <a
-                                        href={nfsePorLancamento[m.lancamento_id].pdf_url ?? "#"}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs inline-flex items-center gap-1 rounded-md border px-2 h-8 hover:bg-muted"
-                                        title={`NFS-e ${nfsePorLancamento[m.lancamento_id].numero ?? "emitida"} — ${nfsePorLancamento[m.lancamento_id].status ?? ""}`}
-                                      >
-                                        <FileText className="h-3 w-3" />
-                                        NFS-e {nfsePorLancamento[m.lancamento_id].numero ?? ""}
-                                      </a>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        title="Emitir NFS-e desta parcela"
-                                        disabled={nfseEmitindoId === m.id}
-                                        onClick={() => emitirNfseParcela(m)}
-                                      >
-                                        {nfseEmitindoId === m.id ? (
-                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                        ) : (
-                                          <FileText className="h-3 w-3 mr-1" />
-                                        )}
-                                        NFS-e
-                                      </Button>
+                          <Fragment key={m.id}>
+                            {cicloHeader}
+                            <TableRow>
+                              {podeEscrever && !(cancelado && !isAdmin) ? (
+                                <TableCell className="w-8">
+                                  {(() => {
+                                    if (isAdesao(m) && adesaoEmbutida) return null;
+                                    if (
+                                      m.status === "pago" &&
+                                      (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])
                                     )
-                                  ) : podeEmitirNfse ? (
-                                    <span className="text-xs text-muted-foreground" title="Parcela paga fora do sistema — não gera NFS-e">—</span>
-                                  ) : null}
-                                  {podeEscrever && (
-                                    <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
-                                      Reverter
-                                    </Button>
-                                  )}
-                                </>
-                              ) : podeEscrever ? (
-                                <>
-                                  {isAdesao(m) && adesaoEmbutida ? (
-                                    <span
-                                      className="text-xs text-muted-foreground italic"
-                                      title="A adesão é cobrada junto com a 1ª mensalidade enquanto ela estiver pendente."
-                                    >
-                                      Cobrada com a 1ª parcela
-                                    </span>
-                                  ) : (
+                                      return null;
+                                    return (
+                                      <input
+                                        type="checkbox"
+                                        aria-label="Selecionar parcela"
+                                        checked={selectedHistIds.has(m.id)}
+                                        onChange={() => toggleHistSel(m.id)}
+                                      />
+                                    );
+                                  })()}
+                                </TableCell>
+                              ) : null}
+                              <TableCell>
+                                {isAdesao(m) ? (
+                                  <Badge variant="secondary">Adesão</Badge>
+                                ) : isTaxaInclusao(m) ? (
+                                  <Badge
+                                    variant="secondary"
+                                    title={
+                                      (m as unknown as { observacoes?: string | null })
+                                        .observacoes ?? "Taxa de inclusão de dependente"
+                                    }
+                                  >
+                                    Taxa inclusão
+                                  </Badge>
+                                ) : temCiclosMultiplos && parcelaLocalPorId[m.id] ? (
+                                  `${parcelaLocalPorId[m.id].pos}/${parcelaLocalPorId[m.id].total}`
+                                ) : (
+                                  m.numero_parcela
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isAdmin && podeEscrever ? (
+                                  <DateInputBR
+                                    className="h-8 w-40"
+                                    value={rascunhos[m.id]?.vencimento ?? m.vencimento}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      if (v) setRascunho(m.id, { vencimento: v });
+                                    }}
+                                  />
+                                ) : (
+                                  fmtD(m.vencimento)
+                                )}
+                              </TableCell>
+                              <TableCell className="capitalize">
+                                {competenciaDe(rascunhos[m.id]?.vencimento ?? m.vencimento)}
+                              </TableCell>
+                              <TableCell>
+                                {isAdmin && podeEscrever ? (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min={0}
+                                    className="h-8 w-28"
+                                    key={`valor-${m.id}-${rascunhos[m.id] ? "d" : "o"}`}
+                                    defaultValue={Number(
+                                      rascunhos[m.id]?.valor ?? m.valor ?? 0,
+                                    ).toFixed(2)}
+                                    onChange={(e) => {
+                                      const v = Number(String(e.target.value).replace(",", "."));
+                                      if (Number.isFinite(v)) setRascunho(m.id, { valor: v });
+                                    }}
+                                  />
+                                ) : (
+                                  BRL(m.valor)
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    m.status === "pago"
+                                      ? "default"
+                                      : isAtrasado(m.vencimento)
+                                        ? "destructive"
+                                        : "outline"
+                                  }
+                                >
+                                  {m.status === "pago"
+                                    ? "Pago"
+                                    : isAtrasado(m.vencimento)
+                                      ? "Atrasado"
+                                      : "Pendente"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {isAdmin && podeEscrever ? (
+                                  <DateInputBR
+                                    className="h-8 w-40"
+                                    value={
+                                      rascunhos[m.id] && "pago_em" in rascunhos[m.id]!
+                                        ? (rascunhos[m.id]!.pago_em ?? "")
+                                        : (m.pago_em ?? "")
+                                    }
+                                    onChange={(e) => {
+                                      const v = e.target.value || null;
+                                      setRascunho(m.id, { pago_em: v });
+                                    }}
+                                  />
+                                ) : (
+                                  fmtD(m.pago_em)
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1 justify-end">
+                                  {m.status === "pago" ? (
                                     <>
-                                      <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
-                                        <Check className="h-3 w-3 mr-1" />
-                                        Pagar
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        title="Marcar como paga historicamente (sem lançar no caixa)"
-                                        disabled={cancelado && !isAdmin}
-                                        onClick={() => marcarPagaHistorica(m)}
-                                      >
-                                        Paga (histórica)
-                                      </Button>
+                                      {podeEmitirNfse && m.lancamento_id ? (
+                                        nfsePorLancamento[m.lancamento_id] ? (
+                                          <a
+                                            href={nfsePorLancamento[m.lancamento_id].pdf_url ?? "#"}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs inline-flex items-center gap-1 rounded-md border px-2 h-8 hover:bg-muted"
+                                            title={`NFS-e ${nfsePorLancamento[m.lancamento_id].numero ?? "emitida"} — ${nfsePorLancamento[m.lancamento_id].status ?? ""}`}
+                                          >
+                                            <FileText className="h-3 w-3" />
+                                            NFS-e {nfsePorLancamento[m.lancamento_id].numero ?? ""}
+                                          </a>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            title="Emitir NFS-e desta parcela"
+                                            disabled={nfseEmitindoId === m.id}
+                                            onClick={() => emitirNfseParcela(m)}
+                                          >
+                                            {nfseEmitindoId === m.id ? (
+                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            ) : (
+                                              <FileText className="h-3 w-3 mr-1" />
+                                            )}
+                                            NFS-e
+                                          </Button>
+                                        )
+                                      ) : podeEmitirNfse ? (
+                                        <span
+                                          className="text-xs text-muted-foreground"
+                                          title="Parcela paga fora do sistema — não gera NFS-e"
+                                        >
+                                          —
+                                        </span>
+                                      ) : null}
+                                      {podeEscrever && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => reverterMensalidade(m)}
+                                        >
+                                          Reverter
+                                        </Button>
+                                      )}
                                     </>
-                                  )}
-                                </>
-                              ) : null}
-                              {m.status === "pago" && m.lancamento_id ? (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Reimprimir 2ª via da GR"
-                                  disabled={reimprimindoId === m.id}
-                                  onClick={() => reimprimirGrMensalidade(m)}
-                                >
-                                  {reimprimindoId === m.id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Printer className="h-3 w-3" />
-                                  )}
-                                </Button>
-                              ) : null}
-                              {isAdmin && podeEscrever ? (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Excluir parcela"
-                                  onClick={() => excluirParcela(m.id)}
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        </Fragment>
+                                  ) : podeEscrever ? (
+                                    <>
+                                      {isAdesao(m) && adesaoEmbutida ? (
+                                        <span
+                                          className="text-xs text-muted-foreground italic"
+                                          title="A adesão é cobrada junto com a 1ª mensalidade enquanto ela estiver pendente."
+                                        >
+                                          Cobrada com a 1ª parcela
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            disabled={cancelado && !isAdmin}
+                                            onClick={() => abrirFormaPag(m)}
+                                          >
+                                            <Check className="h-3 w-3 mr-1" />
+                                            Pagar
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            title="Marcar como paga historicamente (sem lançar no caixa)"
+                                            disabled={cancelado && !isAdmin}
+                                            onClick={() => marcarPagaHistorica(m)}
+                                          >
+                                            Paga (histórica)
+                                          </Button>
+                                        </>
+                                      )}
+                                    </>
+                                  ) : null}
+                                  {m.status === "pago" && m.lancamento_id ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      title="Reimprimir 2ª via da GR"
+                                      disabled={reimprimindoId === m.id}
+                                      onClick={() => reimprimirGrMensalidade(m)}
+                                    >
+                                      {reimprimindoId === m.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Printer className="h-3 w-3" />
+                                      )}
+                                    </Button>
+                                  ) : null}
+                                  {isAdmin && podeEscrever ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      title="Excluir parcela"
+                                      onClick={() => excluirParcela(m.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </Fragment>
                         );
                       })}
                     </TableBody>
@@ -4647,8 +5155,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <TabsContent value="dados" className="mt-4 space-y-4">
               {isAdmin && podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
-                  Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
-                  automaticamente; use o botão “Regerar 12 parcelas” abaixo quando quiser propagar o novo valor/dia.
+                  Modo administrador — você pode alterar todos os campos deste contrato. Alterações
+                  não regeram parcelas automaticamente; use o botão “Regerar 12 parcelas” abaixo
+                  quando quiser propagar o novo valor/dia.
                 </div>
               ) : null}
               {isAdmin && podeEscrever ? (
@@ -4674,24 +5183,26 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         saving={savingApenasFin}
                         disabled={cancelado && !isAdmin}
                         onChange={async (v) => {
-                      setSavingApenasFin(true);
-                      const { error } = await supabase
-                        .from("contratos_assinatura")
-                        .update({ titular_apenas_financeiro: v } as any)
-                        .eq("id", contrato.id);
-                      if (error) {
-                        setSavingApenasFin(false);
-                        mostrarErro(error);
-                        return;
-                      }
-                      (contrato as any).titular_apenas_financeiro = v;
-                      setApenasFinanceiro(v);
-                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
-                      await recalcularParcelasAbertas(novoTotal);
-                      setSavingApenasFin(false);
-                      toast.success(v
-                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
-                        : "Titular passa a usufruir dos benefícios normalmente.");
+                          setSavingApenasFin(true);
+                          const { error } = await supabase
+                            .from("contratos_assinatura")
+                            .update({ titular_apenas_financeiro: v } as any)
+                            .eq("id", contrato.id);
+                          if (error) {
+                            setSavingApenasFin(false);
+                            mostrarErro(error);
+                            return;
+                          }
+                          (contrato as any).titular_apenas_financeiro = v;
+                          setApenasFinanceiro(v);
+                          const novoTotal = (v ? 0 : 1) + depsAtivos.length;
+                          await recalcularParcelasAbertas(novoTotal);
+                          setSavingApenasFin(false);
+                          toast.success(
+                            v
+                              ? "Marcado como Titular financeiro (não utiliza os benefícios)."
+                              : "Titular passa a usufruir dos benefícios normalmente.",
+                          );
                         }}
                       />
                     </div>
@@ -4705,107 +5216,117 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                     </div>
                     <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm flex items-center gap-2 flex-wrap">
-                      <span>{contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}</span>
+                      <span>
+                        {contrato.paciente_nome}
+                        {pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
+                      </span>
                       <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                     </div>
                   </div>
                   {apenasFinanceiro ? (
                     <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
+                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os
+                      benefícios.
                     </div>
                   ) : null}
                 </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {isAdmin && podeEscrever ? (
-                <div className="space-y-1">
-                  <Label>Convênio</Label>
-                  <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o convênio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {conveniosAdm.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
-              )}
-              {isAdmin && podeEscrever && faixas.length > 0 ? (
-                <div className="space-y-1">
-                  <Label>Nº de pessoas no contrato</Label>
-                  <Select
-                    value={admFaixaId}
-                    onValueChange={(id) => {
-                      setAdmFaixaId(id);
-                      // Ao trocar a faixa, reflete o valor no input "Valor mensal"
-                      // para que "Salvar valor e vencimento" persista corretamente.
-                      const f = faixas.find((x) => x.id === id);
-                      if (f) setEditValor(Number(f.valor_mensal).toFixed(2));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a faixa…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {faixas.map((f) => {
-                        const range =
-                          f.vidas_ate == null
-                            ? `${f.vidas_de}+ pessoas`
-                            : f.vidas_ate === f.vidas_de
-                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
-                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
-                        return (
-                          <SelectItem key={f.id} value={f.id}>
-                            {range} — {BRL(Number(f.valor_mensal))}
+                {isAdmin && podeEscrever ? (
+                  <div className="space-y-1">
+                    <Label>Convênio</Label>
+                    <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o convênio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {conveniosAdm.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {admFaixaId === "" && Number(valorMensalAtual) > 0 ? (
-                    <p className="text-xs text-amber-600">
-                      O valor atual ({BRL(Number(valorMensalAtual))}) não corresponde a nenhuma faixa deste convênio (possível tabela antiga). Selecione uma faixa para alinhar o valor ou edite manualmente o campo "Valor mensal" ao lado.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
-              )}
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={editValor}
-                  onChange={(e) => setEditValor(e.target.value)}
-                  disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
-                />
-              </div>
-              {isAdmin && podeEscrever ? (
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+                )}
+                {isAdmin && podeEscrever && faixas.length > 0 ? (
+                  <div className="space-y-1">
+                    <Label>Nº de pessoas no contrato</Label>
+                    <Select
+                      value={admFaixaId}
+                      onValueChange={(id) => {
+                        setAdmFaixaId(id);
+                        // Ao trocar a faixa, reflete o valor no input "Valor mensal"
+                        // para que "Salvar valor e vencimento" persista corretamente.
+                        const f = faixas.find((x) => x.id === id);
+                        if (f) setEditValor(Number(f.valor_mensal).toFixed(2));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a faixa…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {faixas.map((f) => {
+                          const range =
+                            f.vidas_ate == null
+                              ? `${f.vidas_de}+ pessoas`
+                              : f.vidas_ate === f.vidas_de
+                                ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                                : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+                          return (
+                            <SelectItem key={f.id} value={f.id}>
+                              {range} — {BRL(Number(f.valor_mensal))}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {admFaixaId === "" && Number(valorMensalAtual) > 0 ? (
+                      <p className="text-xs text-amber-600">
+                        O valor atual ({BRL(Number(valorMensalAtual))}) não corresponde a nenhuma
+                        faixa deste convênio (possível tabela antiga). Selecione uma faixa para
+                        alinhar o valor ou edite manualmente o campo "Valor mensal" ao lado.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Ao salvar, o valor mensal do contrato e das parcelas em aberto serão
+                        atualizados para a faixa selecionada.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+                )}
                 <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
+                  <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
                   <Input
                     type="number"
                     step="0.01"
                     min={0}
-                    value={admTaxaAdesao}
-                    onChange={(e) => setAdmTaxaAdesao(e.target.value)}
+                    value={editValor}
+                    onChange={(e) => setEditValor(e.target.value)}
+                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
-              ) : (
-                <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
-              )}
+                {isAdmin && podeEscrever ? (
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={admTaxaAdesao}
+                      onChange={(e) => setAdmTaxaAdesao(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <DadosField
+                    label="Taxa de adesão"
+                    value={BRL(Number(contrato.taxa_adesao ?? 0))}
+                  />
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
@@ -4839,7 +5360,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                 <span className="text-xs text-muted-foreground">
-                  A 1ª parcela é gerada no mês seguinte à data de início; as 11 seguintes seguem mês a mês, cobrindo 12 meses até a data de término.
+                  A 1ª parcela é gerada no mês seguinte à data de início; as 11 seguintes seguem mês
+                  a mês, cobrindo 12 meses até a data de término.
                 </span>
                 <div className="ml-auto flex items-center gap-2">
                   <Button
@@ -4854,7 +5376,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Forma de pagamento</Label>
-                  <Select value={admForma || "__none__"} onValueChange={(v) => setAdmForma(v === "__none__" ? "" : v)}>
+                  <Select
+                    value={admForma || "__none__"}
+                    onValueChange={(v) => setAdmForma(v === "__none__" ? "" : v)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a forma de pagamento" />
                     </SelectTrigger>
@@ -4878,7 +5403,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     Dependentes ({depsAtivos.length}/{maxDep})
                     {depsAtivos.length >= maxDep && (
                       <span className="ml-2 text-xs font-normal text-amber-600">
-                        Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas financeiro.
+                        Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas
+                        financeiro.
                       </span>
                     )}
                   </div>
@@ -4941,11 +5467,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               — Incluído: {fmtD(d.incluido_em)}
                             </span>
                             {d.excluido_em ? (
-                              <span className="text-destructive no-underline"> — Excluído: {fmtD(d.excluido_em)}</span>
+                              <span className="text-destructive no-underline">
+                                {" "}
+                                — Excluído: {fmtD(d.excluido_em)}
+                              </span>
                             ) : null}
                           </div>
                           {d.ativo && podeEscrever ? (
-                            <Button size="sm" variant="ghost" disabled={cancelado} onClick={() => setExcAlvo(d)}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={cancelado}
+                              onClick={() => setExcAlvo(d)}
+                            >
                               <Trash2 className="h-3 w-3 text-destructive" />
                             </Button>
                           ) : null}
@@ -4983,9 +5517,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         if (!v) void salvarSemCarencia(false, "");
                       }}
                     />
-                    <label htmlFor={`sem-carencia-${contrato.id}`} className="text-sm cursor-pointer">
+                    <label
+                      htmlFor={`sem-carencia-${contrato.id}`}
+                      className="text-sm cursor-pointer"
+                    >
                       <span className="font-medium">Isento de carência</span>
-                      <span className="text-muted-foreground"> — marcar quando o contrato veio de renovação histórica (tabela antiga) ou migração e o paciente já cumpriu carência em contrato anterior.</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        — marcar quando o contrato veio de renovação histórica (tabela antiga) ou
+                        migração e o paciente já cumpriu carência em contrato anterior.
+                      </span>
                     </label>
                   </div>
                   {semCarencia ? (
@@ -5009,7 +5550,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         </Button>
                         {(contrato as any).sem_carencia_em ? (
                           <span className="text-xs text-muted-foreground">
-                            Marcado em {fmtD(String((contrato as any).sem_carencia_em).slice(0, 10))}
+                            Marcado em{" "}
+                            {fmtD(String((contrato as any).sem_carencia_em).slice(0, 10))}
                           </span>
                         ) : null}
                       </div>
@@ -5055,16 +5597,31 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     {[
                       ["Nome", contrato.paciente_nome],
                       ["CPF", fmtCPFDisplay(pacienteFull?.cpf)],
-                      ["Nascimento", pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—"],
+                      [
+                        "Nascimento",
+                        pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—",
+                      ],
                       ["Prontuário", pacienteFull?.codigo_prontuario ?? "—"],
                       ["Telefone", fmtTelDisplay(pacienteFull?.telefone)],
                       ["E-mail", pacienteFull?.email ?? "—"],
-                      ["Endereço", [pacienteFull?.logradouro, pacienteFull?.numero].filter(Boolean).join(", ") || "—"],
+                      [
+                        "Endereço",
+                        [pacienteFull?.logradouro, pacienteFull?.numero]
+                          .filter(Boolean)
+                          .join(", ") || "—",
+                      ],
                       ["Bairro", pacienteFull?.bairro ?? "—"],
-                      ["Cidade/UF", [pacienteFull?.cidade, pacienteFull?.estado].filter(Boolean).join("/") || "—"],
+                      [
+                        "Cidade/UF",
+                        [pacienteFull?.cidade, pacienteFull?.estado].filter(Boolean).join("/") ||
+                          "—",
+                      ],
                       ["CEP", fmtCEPDisplay(pacienteFull?.cep)],
                     ].map(([label, value]) => (
-                      <div key={label as string} className="grid grid-cols-[9rem_minmax(0,1fr)] items-baseline gap-2 border-b border-dashed border-border/50 py-1">
+                      <div
+                        key={label as string}
+                        className="grid grid-cols-[9rem_minmax(0,1fr)] items-baseline gap-2 border-b border-dashed border-border/50 py-1"
+                      >
                         <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
                         <dd className="min-w-0 truncate font-medium">{(value as string) || "—"}</dd>
                       </div>
@@ -5076,7 +5633,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     Associados / Dependentes ({depsAtivos.length})
                   </div>
                   {depsAtivos.length === 0 ? (
-                    <div className="text-sm text-muted-foreground italic">Nenhum dependente ativo.</div>
+                    <div className="text-sm text-muted-foreground italic">
+                      Nenhum dependente ativo.
+                    </div>
                   ) : (
                     <div className="rounded-md border overflow-x-auto">
                       <Table>
@@ -5141,7 +5700,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {drill === "areceber" && `A receber — ${BRL(aReceber)}`}
             </DialogTitle>
             <DialogDescription>
-              {drill === "areceber" ? "Parcelas em aberto deste contrato." : "Demonstrativo detalhado das parcelas."}
+              {drill === "areceber"
+                ? "Parcelas em aberto deste contrato."
+                : "Demonstrativo detalhado das parcelas."}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border max-h-[60vh] overflow-auto">
@@ -5157,16 +5718,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </TableHeader>
               <TableBody>
                 {(() => {
-                  const idsCicloAtual = new Set(
-                    (cicloAtual?.parcelas ?? []).map((p) => p.id),
-                  );
+                  const idsCicloAtual = new Set((cicloAtual?.parcelas ?? []).map((p) => p.id));
                   const list =
                     drill === "areceber"
                       ? mens.filter((m) => m.status !== "pago")
                       : drill === "pagas"
-                        ? (temCiclosMultiplos
-                            ? mens.filter((m) => m.status === "pago" && idsCicloAtual.has(m.id))
-                            : mens.filter((m) => m.status === "pago"))
+                        ? temCiclosMultiplos
+                          ? mens.filter((m) => m.status === "pago" && idsCicloAtual.has(m.id))
+                          : mens.filter((m) => m.status === "pago")
                         : drill === "recebido"
                           ? mens.filter((m) => m.status === "pago")
                           : mens;
@@ -5194,7 +5753,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 : "outline"
                           }
                         >
-                          {m.status === "pago" ? "Pago" : isAtrasado(m.vencimento) ? "Atrasado" : "Pendente"}
+                          {m.status === "pago"
+                            ? "Pago"
+                            : isAtrasado(m.vencimento)
+                              ? "Atrasado"
+                              : "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell>{m.pago_em ? fmtD(m.pago_em) : "—"}</TableCell>
@@ -5206,8 +5769,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </div>
           {drill === "recebido" && extraRecebido.count > 0 ? (
             <div className="text-xs text-muted-foreground">
-              + {extraRecebido.count} recebimento(s) avulso(s) históricos totalizando {BRL(extraRecebido.total)}.
-              Não são parcelas deste contrato.
+              + {extraRecebido.count} recebimento(s) avulso(s) históricos totalizando{" "}
+              {BRL(extraRecebido.total)}. Não são parcelas deste contrato.
             </div>
           ) : null}
           <DialogFooter>
@@ -5231,7 +5794,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogHeader>
           <p className="text-sm text-muted-foreground -mt-2">
             {contrato.paciente_nome} — Contrato #{contrato.numero}
-            {pagMens ? ` · ${cobrancaLabel(pagMens)}${isAdesao(pagMens) ? "" : `/${mensalidades.length}`}` : ""}
+            {pagMens
+              ? ` · ${cobrancaLabel(pagMens)}${isAdesao(pagMens) ? "" : `/${mensalidades.length}`}`
+              : ""}
             <span className="block text-xs mt-1 opacity-70">
               Dica: use as teclas 1–{formaOpcoes.length + 1} para escolher rapidamente.
             </span>
@@ -5251,7 +5816,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>{BRL(pagTotalCobrar)}</span>
               </div>
               <div className="text-[10px] text-muted-foreground pt-1">
-                Serão emitidas 2 GRs separadas (mensalidade e taxa de adesão) e 2 lançamentos financeiros distintos.
+                Serão emitidas 2 GRs separadas (mensalidade e taxa de adesão) e 2 lançamentos
+                financeiros distintos.
               </div>
             </div>
           ) : null}
@@ -5259,7 +5825,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
               <div className="font-semibold">Dentro da tolerância — sem encargos</div>
               <div className="text-muted-foreground">
-                Parcela vencida há {pagDiasAtraso} dia(s). Até 5 dias corridos após o vencimento não incidem multa nem juros.
+                Parcela vencida há {pagDiasAtraso} dia(s). Até 5 dias corridos após o vencimento não
+                incidem multa nem juros.
               </div>
             </div>
           ) : null}
@@ -5268,7 +5835,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1">
                 <div className="font-semibold">Juros e multa isentados</div>
                 <div className="text-muted-foreground">
-                  Autorizado por <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando o valor original da parcela.
+                  Autorizado por{" "}
+                  <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando
+                  o valor original da parcela.
                 </div>
                 <div className="flex justify-between pt-1 border-t border-amber-500/30">
                   <span>Valor a cobrar</span>
@@ -5287,66 +5856,70 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               </div>
             ) : (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
-              <div className="flex justify-between">
-                <span>Valor original</span>
-                <span>{BRL(Number(pagMens.valor))}</span>
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Valor original</span>
+                  <span>{BRL(Number(pagMens.valor))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Multa (10%)</span>
+                  <span>{BRL(Number(pagMens.valor) * 0.1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Juros (0,33%/dia × {pagDiasAtraso}d)</span>
+                  <span>{BRL(Number(pagMens.valor) * 0.0033 * pagDiasAtraso)}</span>
+                </div>
+                <div className="flex justify-between font-semibold pt-1 border-t border-destructive/30">
+                  <span>Total com encargos</span>
+                  <span>{BRL(pagValorFinal)}</span>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs w-full"
+                    onClick={async () => {
+                      if (!pagMens || !clinicaAtual) return;
+                      const nome = (user?.user_metadata as any)?.nome || user?.email || "Usuário";
+                      const valorOriginal = Number(pagMens.valor) || 0;
+                      const valorComEncargos =
+                        valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
+                      try {
+                        await supabase.from("audit_log").insert({
+                          clinica_id: clinicaAtual.clinica_id,
+                          user_id: user?.id ?? null,
+                          user_email: user?.email ?? null,
+                          table_name: "contrato_mensalidades",
+                          record_id: pagMens.id,
+                          action: "UPDATE",
+                          dados_depois: {
+                            acao: "isentar_juros_multa_mensalidade",
+                            contrato_id: contrato.id,
+                            contrato_numero: contrato.numero,
+                            numero_parcela: pagMens.numero_parcela,
+                            valor_original: valorOriginal,
+                            valor_com_encargos: Number(valorComEncargos.toFixed(2)),
+                            dias_atraso: pagDiasAtraso,
+                            autorizado_por_user_id: user?.id ?? null,
+                            autorizado_por_nome: nome,
+                            autorizado_por_email: user?.email ?? null,
+                          },
+                        });
+                      } catch (e) {
+                        console.error("Falha ao registrar auditoria de isenção", e);
+                      }
+                      setIsencaoEncargos({
+                        autorizadoPorNome: nome,
+                        autorizadoPorUserId: user?.id ?? "",
+                      });
+                      toast.success("Juros e multa isentados.");
+                    }}
+                  >
+                    Isentar juros e multa
+                  </Button>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Multa (10%)</span>
-                <span>{BRL(Number(pagMens.valor) * 0.1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Juros (0,33%/dia × {pagDiasAtraso}d)</span>
-                <span>{BRL(Number(pagMens.valor) * 0.0033 * pagDiasAtraso)}</span>
-              </div>
-              <div className="flex justify-between font-semibold pt-1 border-t border-destructive/30">
-                <span>Total com encargos</span>
-                <span>{BRL(pagValorFinal)}</span>
-              </div>
-            <div className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs w-full"
-                onClick={async () => {
-                  if (!pagMens || !clinicaAtual) return;
-                  const nome = (user?.user_metadata as any)?.nome || user?.email || "Usuário";
-                  const valorOriginal = Number(pagMens.valor) || 0;
-                  const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
-                  try {
-                    await supabase.from("audit_log").insert({
-                      clinica_id: clinicaAtual.clinica_id,
-                      user_id: user?.id ?? null,
-                      user_email: user?.email ?? null,
-                      table_name: "contrato_mensalidades",
-                      record_id: pagMens.id,
-                      action: "UPDATE",
-                      dados_depois: {
-                        acao: "isentar_juros_multa_mensalidade",
-                        contrato_id: contrato.id,
-                        contrato_numero: contrato.numero,
-                        numero_parcela: pagMens.numero_parcela,
-                        valor_original: valorOriginal,
-                        valor_com_encargos: Number(valorComEncargos.toFixed(2)),
-                        dias_atraso: pagDiasAtraso,
-                        autorizado_por_user_id: user?.id ?? null,
-                        autorizado_por_nome: nome,
-                        autorizado_por_email: user?.email ?? null,
-                      },
-                    });
-                  } catch (e) {
-                    console.error("Falha ao registrar auditoria de isenção", e);
-                  }
-                  setIsencaoEncargos({ autorizadoPorNome: nome, autorizadoPorUserId: user?.id ?? "" });
-                  toast.success("Juros e multa isentados.");
-                }}
-              >
-                Isentar juros e multa
-              </Button>
-            </div>
-            </div>
             )
           ) : null}
           <div className="grid gap-2 mt-2">
@@ -5366,7 +5939,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span className="font-semibold">{BRL(pagTotalCobrar)}</span>
               </Button>
             ))}
-            <Button variant="default" className="justify-center h-12 mt-1 bg-primary" onClick={escolherMisto}>
+            <Button
+              variant="default"
+              className="justify-center h-12 mt-1 bg-primary"
+              onClick={escolherMisto}
+            >
               <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">
                 {formaOpcoes.length + 1}
               </kbd>
@@ -5456,34 +6033,40 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // de adesão vinculada vão para 20/07 no financeiro e no caixa.
                 const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
-                const { data: rpcData, error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
-                  p_lancamento: {
-                    clinica_id: clinicaAtual.clinica_id,
-                    tipo: "receita",
-                    descricao: descricaoTaxa,
-                    valor: taxaAdesao,
-                    data: dataLanc,
-                    status: "confirmado",
-                    categoria_id: categoriaTaxaId,
-                    forma_pagamento: dados.forma_pagamento,
-                    bandeira_cartao: dados.bandeira_cartao,
-                    parcelas: dados.parcelas,
-                    paciente_id: (contrato as { paciente_id?: string | null }).paciente_id ?? null,
-                    criado_por: user?.id ?? null,
-                  },
-                  p_movimento: user?.id
-                    ? {
-                        user_id: user.id,
-                        user_nome: user?.user_metadata?.nome ?? user?.email ?? null,
-                        tipo: "recebimento",
-                        valor: taxaAdesao,
-                        descricao: descricaoTaxa,
-                        forma_pagamento: dados.forma_pagamento,
-                      }
-                    : null,
-                } as never);
+                const { data: rpcData, error: rpcErr } = await supabase.rpc(
+                  "fn_registrar_lancamento_e_caixa",
+                  {
+                    p_lancamento: {
+                      clinica_id: clinicaAtual.clinica_id,
+                      tipo: "receita",
+                      descricao: descricaoTaxa,
+                      valor: taxaAdesao,
+                      data: dataLanc,
+                      status: "confirmado",
+                      categoria_id: categoriaTaxaId,
+                      forma_pagamento: dados.forma_pagamento,
+                      bandeira_cartao: dados.bandeira_cartao,
+                      parcelas: dados.parcelas,
+                      paciente_id:
+                        (contrato as { paciente_id?: string | null }).paciente_id ?? null,
+                      criado_por: user?.id ?? null,
+                    },
+                    p_movimento: user?.id
+                      ? {
+                          user_id: user.id,
+                          user_nome: user?.user_metadata?.nome ?? user?.email ?? null,
+                          tipo: "recebimento",
+                          valor: taxaAdesao,
+                          descricao: descricaoTaxa,
+                          forma_pagamento: dados.forma_pagamento,
+                        }
+                      : null,
+                  } as never,
+                );
                 if (rpcErr) {
-                  toast.error(`Taxa de adesão: falha atômica (nada foi gravado). Detalhe: ${rpcErr.message ?? String(rpcErr)}`);
+                  toast.error(
+                    `Taxa de adesão: falha atômica (nada foi gravado). Detalhe: ${rpcErr.message ?? String(rpcErr)}`,
+                  );
                   return;
                 }
 
@@ -5507,10 +6090,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 }
 
                 // 4) Imprime UMA GR única com mensalidade + taxa de adesão.
-                if (dados.imprimir !== false) await printGuiaMensalidadeComTaxa({
+                if (dados.imprimir !== false)
+                  await printGuiaMensalidadeComTaxa({
+                    mensalidadeId: mensId,
+                    clinicaId: clinicaAtual.clinica_id,
+                    valorTaxa: taxaAdesao,
+                    usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+                    usuarioId: user?.id ?? null,
+                    pagamento: {
+                      valor: dados.valor,
+                      forma_pagamento: dados.forma_pagamento,
+                      parcelas: dados.parcelas,
+                      bandeira_cartao: dados.bandeira_cartao,
+                      detalhe: dados.pagamentos_detalhe,
+                    },
+                  });
+                toast.success(
+                  "Pagamento registrado. GR única (mensalidade + taxa de adesão) enviada para impressão.",
+                );
+              } catch (err) {
+                mostrarErro(err);
+              }
+            } else {
+              if (dados.imprimir !== false)
+                await printGuiaMensalidade({
                   mensalidadeId: mensId,
                   clinicaId: clinicaAtual.clinica_id,
-                  valorTaxa: taxaAdesao,
                   usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
                   usuarioId: user?.id ?? null,
                   pagamento: {
@@ -5521,24 +6126,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     detalhe: dados.pagamentos_detalhe,
                   },
                 });
-                toast.success("Pagamento registrado. GR única (mensalidade + taxa de adesão) enviada para impressão.");
-              } catch (err) {
-                mostrarErro(err);
-              }
-            } else {
-              if (dados.imprimir !== false) await printGuiaMensalidade({
-                mensalidadeId: mensId,
-                clinicaId: clinicaAtual.clinica_id,
-                usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
-                usuarioId: user?.id ?? null,
-                pagamento: {
-                  valor: dados.valor,
-                  forma_pagamento: dados.forma_pagamento,
-                  parcelas: dados.parcelas,
-                  bandeira_cartao: dados.bandeira_cartao,
-                  detalhe: dados.pagamentos_detalhe,
-                },
-              });
               toast.success("Pagamento registrado e GR enviado para impressão.");
             }
           } catch (err) {
@@ -5649,7 +6236,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>
                   <span className="font-medium">Cobrar taxa de inclusão de dependente</span>
                   <span className="block text-xs text-muted-foreground">
-                    Cobrança única — aparece em <strong>Mensalidades</strong> mas não conta como parcela.
+                    Cobrança única — aparece em <strong>Mensalidades</strong> mas não conta como
+                    parcela.
                   </span>
                 </span>
               </label>
@@ -5678,7 +6266,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
             {contrato.assinado_em && convenio?.termo_inclusao_html ? (
               <p className="text-xs text-muted-foreground">
-                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para impressão/assinatura.
+                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para
+                impressão/assinatura.
               </p>
             ) : null}
           </div>
@@ -5686,7 +6275,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button variant="ghost" onClick={() => setIncOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={confirmarIncluir} disabled={incSaving || !incPaciente || !podeEscrever}>
+            <Button
+              onClick={confirmarIncluir}
+              disabled={incSaving || !incPaciente || !podeEscrever}
+            >
               {incSaving ? "Incluindo…" : "Incluir"}
             </Button>
           </DialogFooter>
@@ -5708,7 +6300,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </p>
           {contrato.assinado_em && convenio?.termo_inclusao_html ? (
             <p className="text-xs text-muted-foreground">
-              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para impressão/assinatura.
+              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para
+              impressão/assinatura.
             </p>
           ) : null}
           <DialogFooter>
@@ -5733,7 +6326,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
             {termoDep ? (
               <div
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)) }}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)),
+                }}
               />
             ) : null}
           </div>
@@ -5763,7 +6358,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <DialogHeader>
             <DialogTitle>Cancelar contrato</DialogTitle>
             <DialogDescription>
-              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
+              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do
+              cancelamento.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -5775,7 +6371,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </SelectTrigger>
                 <SelectContent>
                   {MOTIVOS_CANCELAMENTO.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -5851,14 +6449,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
       />
       <Dialog
         open={!!retroDialog?.open}
-        onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
+        onOpenChange={(o) => {
+          if (!o && !regerandoRetro) setRetroDialog(null);
+        }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Data de início movida para o passado</DialogTitle>
             <DialogDescription>
-              Já existem parcelas pagas nesse intervalo? Informe quantas para o sistema
-              marcar como pagas e gerar apenas as restantes até completar 12 parcelas.
+              Já existem parcelas pagas nesse intervalo? Informe quantas para o sistema marcar como
+              pagas e gerar apenas as restantes até completar 12 parcelas.
             </DialogDescription>
           </DialogHeader>
           {retroDialog && (
@@ -5870,16 +6470,23 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   min={0}
                   max={12}
                   value={retroDialog.parcelasPagas}
-                  onChange={(e) => setRetroDialog({ ...retroDialog, parcelasPagas: e.target.value })}
+                  onChange={(e) =>
+                    setRetroDialog({ ...retroDialog, parcelasPagas: e.target.value })
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
-                  Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8,10)}/{retroDialog.dataInicio.slice(5,7)}/{retroDialog.dataInicio.slice(0,4)}.
+                  Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8, 10)}/
+                  {retroDialog.dataInicio.slice(5, 7)}/{retroDialog.dataInicio.slice(0, 4)}.
                 </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRetroDialog(null)} disabled={regerandoRetro}>
+            <Button
+              variant="outline"
+              onClick={() => setRetroDialog(null)}
+              disabled={regerandoRetro}
+            >
               Cancelar
             </Button>
             <Button

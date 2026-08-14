@@ -16,14 +16,20 @@ export function useOrcamentosV2Flag() {
     let alive = true;
     void (async () => {
       const v = await getFlagUsuario("orcamentos_v2");
-      if (alive) { setEnabled(Boolean(v)); setLoading(false); }
+      if (alive) {
+        setEnabled(Boolean(v));
+        setLoading(false);
+      }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ orcamentos_v2: boolean }>;
       if (alive && ce.detail) setEnabled(Boolean(ce.detail.orcamentos_v2));
     };
     window.addEventListener(EVT, onChange as EventListener);
-    return () => { alive = false; window.removeEventListener(EVT, onChange as EventListener); };
+    return () => {
+      alive = false;
+      window.removeEventListener(EVT, onChange as EventListener);
+    };
   }, []);
 
   const set = useCallback(async (v: boolean) => {

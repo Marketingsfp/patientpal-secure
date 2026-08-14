@@ -4,7 +4,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 
 export type SearchableOption = { value: string; label: string };
@@ -34,7 +39,12 @@ export function SearchableSelect({
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
 
   return (
-    <Popover open={open} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        if (!disabled) setOpen(o);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -42,17 +52,12 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn(
-            "w-full justify-between font-normal disabled:opacity-100",
-            className,
-          )}
+          className={cn("w-full justify-between font-normal disabled:opacity-100", className)}
         >
           <span
             className={cn(
               "truncate text-left opacity-100",
-              selected
-                ? "text-slate-900 dark:text-slate-50 font-medium"
-                : "text-muted-foreground",
+              selected ? "text-slate-900 dark:text-slate-50 font-medium" : "text-muted-foreground",
             )}
           >
             {selected ? selected.label : placeholder}
@@ -89,10 +94,7 @@ export function SearchableSelect({
                   }}
                 >
                   <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === o.value ? "opacity-100" : "opacity-0",
-                    )}
+                    className={cn("mr-2 h-4 w-4", value === o.value ? "opacity-100" : "opacity-0")}
                   />
                   <span className="truncate">{o.label}</span>
                 </CommandItem>

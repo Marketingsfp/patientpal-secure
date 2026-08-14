@@ -103,9 +103,7 @@ export function getMedicosAgenda(clinicaId: string): Promise<MedicoRef[]> {
   });
 }
 
-export function getMedicoProcedimentosAgenda(
-  clinicaId: string,
-): Promise<MedicoProcedimentoRef[]> {
+export function getMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
   return cMedicoProcs.get(clinicaId, async () => {
     // PostgREST limita a resposta a 1000 linhas por requisição; usar pageSize
     // maior faria o loop parar cedo e "sumir" vínculos de médico na agenda.
@@ -114,9 +112,7 @@ export function getMedicoProcedimentosAgenda(
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
         .from("medico_procedimentos")
-        .select(
-          "medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)",
-        )
+        .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
         .eq("medicos.clinica_id", clinicaId)
         .range(from, from + pageSize - 1);
       if (error) throw error;

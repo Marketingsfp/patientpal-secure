@@ -20,20 +20,31 @@ export function calcularImc(peso: string, altura: string): number | null {
 
 export function classificarImc(imc: number | null) {
   if (imc == null) return null;
-  if (imc < 18.5) return { label: "Abaixo do peso", classe: "bg-blue-500/15 text-blue-700 dark:text-blue-300" };
-  if (imc < 25) return { label: "Peso normal", classe: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" };
-  if (imc < 30) return { label: "Sobrepeso", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" };
-  return { label: "Obesidade", classe: "bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold" };
+  if (imc < 18.5)
+    return { label: "Abaixo do peso", classe: "bg-blue-500/15 text-blue-700 dark:text-blue-300" };
+  if (imc < 25)
+    return {
+      label: "Peso normal",
+      classe: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    };
+  if (imc < 30)
+    return { label: "Sobrepeso", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" };
+  return {
+    label: "Obesidade",
+    classe: "bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold",
+  };
 }
 
 export type Alerta = { nivel: NivelAlerta; texto: string } | null;
 
 export function alertaPressao(sis: string, dia: string): Alerta {
-  const s = numero(sis), d = numero(dia);
+  const s = numero(sis),
+    d = numero(dia);
   if (s == null && d == null) return null;
   if ((s ?? 0) >= 180 || (d ?? 0) >= 120) return { nivel: "critico", texto: "Crise hipertensiva" };
   if ((s ?? 0) >= 140 || (d ?? 0) >= 90) return { nivel: "critico", texto: "Hipertensão" };
-  if ((s != null && s < 90) || (d != null && d < 60)) return { nivel: "atencao", texto: "Hipotensão" };
+  if ((s != null && s < 90) || (d != null && d < 60))
+    return { nivel: "atencao", texto: "Hipotensão" };
   return { nivel: "ok", texto: "Normal" };
 }
 
@@ -88,11 +99,46 @@ export function classeBadge(a: Alerta) {
 }
 
 export const MANCHESTER = [
-  { v: "vermelho", emoji: "🔴", label: "Emergência", tempo: "Atendimento imediato", prioridade: "urgente", classe: "border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300" },
-  { v: "laranja", emoji: "🟠", label: "Muito urgente", tempo: "Até 10 min", prioridade: "urgente", classe: "border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300" },
-  { v: "amarelo", emoji: "🟡", label: "Urgente", tempo: "Até 60 min", prioridade: "prioritario", classe: "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300" },
-  { v: "verde", emoji: "🟢", label: "Pouco urgente", tempo: "Até 120 min", prioridade: "normal", classe: "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  { v: "azul", emoji: "🔵", label: "Não urgente", tempo: "Eletivo", prioridade: "normal", classe: "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300" },
+  {
+    v: "vermelho",
+    emoji: "🔴",
+    label: "Emergência",
+    tempo: "Atendimento imediato",
+    prioridade: "urgente",
+    classe: "border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  },
+  {
+    v: "laranja",
+    emoji: "🟠",
+    label: "Muito urgente",
+    tempo: "Até 10 min",
+    prioridade: "urgente",
+    classe: "border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  },
+  {
+    v: "amarelo",
+    emoji: "🟡",
+    label: "Urgente",
+    tempo: "Até 60 min",
+    prioridade: "prioritario",
+    classe: "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  },
+  {
+    v: "verde",
+    emoji: "🟢",
+    label: "Pouco urgente",
+    tempo: "Até 120 min",
+    prioridade: "normal",
+    classe: "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
+  {
+    v: "azul",
+    emoji: "🔵",
+    label: "Não urgente",
+    tempo: "Eletivo",
+    prioridade: "normal",
+    classe: "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  },
 ] as const;
 
-export type ManchesterCor = typeof MANCHESTER[number]["v"];
+export type ManchesterCor = (typeof MANCHESTER)[number]["v"];

@@ -4,7 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { janelaDiaClinica, hojeBR } from "@/lib/date-utils";
-import { AgendaPorMedicoDia, type AgendaMedicoItem } from "@/components/agenda/agenda-por-medico-dia";
+import {
+  AgendaPorMedicoDia,
+  type AgendaMedicoItem,
+} from "@/components/agenda/agenda-por-medico-dia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -39,7 +42,8 @@ export const Route = createFileRoute("/_authenticated/app/agenda-medicos")({
       { property: "og:title", content: "Escala e Horários — disponibilidade por profissional" },
       {
         property: "og:description",
-        content: "Grade somente leitura com horários livres e ocupados por profissional e sala de exame.",
+        content:
+          "Grade somente leitura com horários livres e ocupados por profissional e sala de exame.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -69,7 +73,11 @@ type AgRow = {
 };
 
 const normalizar = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 const isSlotLivre = (nome: string | null | undefined) => {
   const n = normalizar(nome ?? "");
@@ -127,7 +135,9 @@ function AgendaMedicosPage() {
   const [espFiltro, setEspFiltro] = useState<string>("todas");
   const [tipoFiltro, setTipoFiltro] = useState<"todos" | "consultas" | "exames">("todos");
   const [loading, setLoading] = useState(false);
-  const [medicos, setMedicos] = useState<Array<{ id: string; nome: string; especialidade_nome: string | null }>>([]);
+  const [medicos, setMedicos] = useState<
+    Array<{ id: string; nome: string; especialidade_nome: string | null }>
+  >([]);
   const [ags, setAgs] = useState<AgRow[]>([]);
   const [detalhe, setDetalhe] = useState<AgRow | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -216,7 +226,10 @@ function AgendaMedicosPage() {
       return;
     }
     setSalvando(true);
-    const { error } = await supabase.from("agendamentos").update({ status: novo }).eq("id", detalhe.id);
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ status: novo })
+      .eq("id", detalhe.id);
     setSalvando(false);
     if (error) {
       toast.error("Não foi possível alterar o status.");
@@ -287,7 +300,10 @@ function AgendaMedicosPage() {
               </button>
               <DateInputBR
                 value={dataRef}
-                onChange={(e) => { const v = e.target.value; if (v) setDataRef(v); }}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) setDataRef(v);
+                }}
                 className="h-7 w-[130px] border-0 bg-transparent px-1 text-xs font-semibold shadow-none focus-visible:ring-0"
               />
             </div>
@@ -347,7 +363,11 @@ function AgendaMedicosPage() {
               disabled={loading}
               className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-60"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
               Atualizar
             </button>
           </div>
@@ -379,12 +399,16 @@ function AgendaMedicosPage() {
           <DialogHeader>
             <DialogTitle>{detalhe?.paciente_nome ?? "Agendamento"}</DialogTitle>
             <DialogDescription>
-              {detalhe ? `${fmtHora(detalhe.inicio)} – ${fmtHora(detalhe.fim)} · ${detalhe.procedimento || "Consulta"}` : ""}
+              {detalhe
+                ? `${fmtHora(detalhe.inicio)} – ${fmtHora(detalhe.fim)} · ${detalhe.procedimento || "Consulta"}`
+                : ""}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Alterar status</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Alterar status
+            </p>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPCOES.map((s) => (
                 <Button

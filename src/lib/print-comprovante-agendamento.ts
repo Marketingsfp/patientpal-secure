@@ -32,13 +32,17 @@ export interface PrintComprovanteAgendamentoInput {
   usuarioNome?: string;
 }
 
-export async function printComprovanteAgendamento(
-  { agendamentoId, clinicaId, usuarioNome }: PrintComprovanteAgendamentoInput,
-): Promise<void> {
+export async function printComprovanteAgendamento({
+  agendamentoId,
+  clinicaId,
+  usuarioNome,
+}: PrintComprovanteAgendamentoInput): Promise<void> {
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, especialidade_id")
+      .select(
+        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, especialidade_id",
+      )
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -102,9 +106,13 @@ export async function printComprovanteAgendamento(
     if (nome) espNome = nome.toUpperCase();
   }
   const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
-  const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
+  const procNome =
+    espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado)]
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
     .filter(Boolean)
     .join("<br/>");
 
@@ -220,21 +228,38 @@ function imprimirViaIframe(html: string): void {
   document.body.appendChild(iframe);
   const cw = iframe.contentWindow;
   if (!cw) {
-    try { document.body.removeChild(iframe); } catch { /* noop */ }
+    try {
+      document.body.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
     throw new Error("Não foi possível inicializar a impressão.");
   }
   const doc = cw.document;
   doc.open();
   doc.write(html);
   doc.close();
-  const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  const cleanup = () => {
+    try {
+      document.body.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
+  };
   let jaImprimiu = false;
   const dispararPrint = () => {
     if (jaImprimiu) return;
     jaImprimiu = true;
-    try { cw.focus(); cw.print(); } catch { /* noop */ }
+    try {
+      cw.focus();
+      cw.print();
+    } catch {
+      /* noop */
+    }
     setTimeout(cleanup, 4000);
   };
   iframe.onload = () => setTimeout(dispararPrint, 80);
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+  setTimeout(() => {
+    if (iframe.isConnected) dispararPrint();
+  }, 600);
 }

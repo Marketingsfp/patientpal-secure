@@ -73,11 +73,22 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
 
   const linhas: Array<{ label: string; valor: string; destaque?: boolean }> = [];
   if (isFech) {
-    linhas.push({ label: "Saldo calculado pelo sistema", valor: fmtBRL(input.saldoCalculado ?? 0) });
-    linhas.push({ label: "Valor conferido em caixa", valor: fmtBRL(input.valorInformado ?? input.valor) });
+    linhas.push({
+      label: "Saldo calculado pelo sistema",
+      valor: fmtBRL(input.saldoCalculado ?? 0),
+    });
+    linhas.push({
+      label: "Valor conferido em caixa",
+      valor: fmtBRL(input.valorInformado ?? input.valor),
+    });
     const dif = Number(input.diferenca ?? 0);
     linhas.push({
-      label: Math.abs(dif) < 0.005 ? "Diferença (confere)" : dif > 0 ? "Diferença (SOBRA)" : "Diferença (FALTA)",
+      label:
+        Math.abs(dif) < 0.005
+          ? "Diferença (confere)"
+          : dif > 0
+            ? "Diferença (SOBRA)"
+            : "Diferença (FALTA)",
       valor: (dif >= 0 ? "" : "") + fmtBRL(dif),
       destaque: Math.abs(dif) > 0.009,
     });
@@ -100,29 +111,40 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
   const formaLabel = (k: string) =>
     FORMA_LABEL[k?.toLowerCase?.()] ?? (k ? k.charAt(0).toUpperCase() + k.slice(1) : "Outros");
 
-  const formasEntries = isFech && input.porForma
-    ? Object.entries(input.porForma).filter(([, v]) => Number(v) > 0.0009)
-    : [];
+  const formasEntries =
+    isFech && input.porForma
+      ? Object.entries(input.porForma).filter(([, v]) => Number(v) > 0.0009)
+      : [];
   const totalFormas = formasEntries.reduce((s, [, v]) => s + Number(v || 0), 0);
   const formasBlock = formasEntries.length
     ? `<div class="sep"></div>
        <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Recebimentos por forma</div>
        ${formasEntries
-          .map(([k, v]) => `<div class="row"><span class="k">${esc(formaLabel(k))}</span><span class="v">${esc(fmtBRL(Number(v)))}</span></div>`)
-          .join("")}
+         .map(
+           ([k, v]) =>
+             `<div class="row"><span class="k">${esc(formaLabel(k))}</span><span class="v">${esc(fmtBRL(Number(v)))}</span></div>`,
+         )
+         .join("")}
        <div class="row" style="margin-top:2px;"><span class="k bold">Total recebido</span><span class="v bold">${esc(fmtBRL(totalFormas))}</span></div>`
     : "";
 
   // Turno + linha do tempo de sangrias/suprimentos (somente fechamento).
   const movs = isFech ? (input.movimentos ?? []) : [];
-  const totalSup = movs.filter((m) => m.tipo === "suprimento").reduce((s, m) => s + Number(m.valor || 0), 0);
-  const totalSang = movs.filter((m) => m.tipo === "sangria").reduce((s, m) => s + Number(m.valor || 0), 0);
+  const totalSup = movs
+    .filter((m) => m.tipo === "suprimento")
+    .reduce((s, m) => s + Number(m.valor || 0), 0);
+  const totalSang = movs
+    .filter((m) => m.tipo === "sangria")
+    .reduce((s, m) => s + Number(m.valor || 0), 0);
   const movsBlock = movs.length
     ? `<div class="sep"></div>
        <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Sangrias e suprimentos</div>
        ${movs
-          .map((m) => `<div class="row"><span class="k">${esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }))} ${m.tipo === "sangria" ? "SANGRIA" : "SUPRIMENTO"}${m.descricao ? " — " + esc(m.descricao) : ""}</span><span class="v">${m.tipo === "sangria" ? "-" : "+"} ${esc(fmtBRL(Number(m.valor || 0)))}</span></div>`)
-          .join("")}
+         .map(
+           (m) =>
+             `<div class="row"><span class="k">${esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }))} ${m.tipo === "sangria" ? "SANGRIA" : "SUPRIMENTO"}${m.descricao ? " — " + esc(m.descricao) : ""}</span><span class="v">${m.tipo === "sangria" ? "-" : "+"} ${esc(fmtBRL(Number(m.valor || 0)))}</span></div>`,
+         )
+         .join("")}
        <div class="row" style="margin-top:2px;"><span class="k bold">Total suprimentos</span><span class="v bold">${esc(fmtBRL(totalSup))}</span></div>
        <div class="row"><span class="k bold">Total sangrias</span><span class="v bold">${esc(fmtBRL(totalSang))}</span></div>`
     : "";
@@ -194,13 +216,21 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     <div class="row"><span class="k">Data/Hora</span><span class="v">${esc(dtStr)}</span></div>
     <div class="row"><span class="k">Atendente</span><span class="v">${esc(input.operadorNome)}</span></div>
     ${turnoBlock}
-    ${!isFech && input.destinoNome
-      ? `<div class="row"><span class="k">${input.tipo === "sangria" ? "Entregue a" : "Recebido de"}</span><span class="v bold">${esc(input.destinoNome)}</span></div>`
-      : ""}
+    ${
+      !isFech && input.destinoNome
+        ? `<div class="row"><span class="k">${input.tipo === "sangria" ? "Entregue a" : "Recebido de"}</span><span class="v bold">${esc(input.destinoNome)}</span></div>`
+        : ""
+    }
     <div class="sep"></div>
-    ${isFech
-      ? linhas.map((l) => `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`).join("")
-      : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
+    ${
+      isFech
+        ? linhas
+            .map(
+              (l) =>
+                `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`,
+            )
+            .join("")
+        : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
     }
     ${formasBlock}
     ${movsBlock}
@@ -210,15 +240,19 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
       <div class="nome">${esc(input.operadorNome)}</div>
       <div class="line">Assinatura do Atendente</div>
     </div>
-    ${!isFech && input.destinoNome ? `
+    ${
+      !isFech && input.destinoNome
+        ? `
     <div class="sig">
       <div class="nome">${esc(input.destinoNome)}</div>
       <div class="line">${input.tipo === "sangria" ? "Assinatura de quem recebeu" : "Assinatura de quem entregou"}</div>
-    </div>` : `
+    </div>`
+        : `
     <div class="sig">
       <div class="nome">&nbsp;</div>
       <div class="line">Assinatura da Tesouraria</div>
-    </div>`}
+    </div>`
+    }
     <div class="rodape">${esc(dtStr)} — ClinicaOS</div>
   </div>
 </body></html>`;
@@ -238,13 +272,20 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
 
   const cleanup = () => {
     setTimeout(() => {
-      try { document.body.removeChild(iframe); } catch { /* noop */ }
+      try {
+        document.body.removeChild(iframe);
+      } catch {
+        /* noop */
+      }
     }, 1000);
   };
 
   const doc = iframe.contentDocument;
   const win = iframe.contentWindow;
-  if (!doc || !win) { cleanup(); return; }
+  if (!doc || !win) {
+    cleanup();
+    return;
+  }
   doc.open();
   doc.write(html);
   doc.close();
@@ -253,9 +294,14 @@ export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
     try {
       win.focus();
       win.print();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     // Após diálogo de impressão fechar, removemos o iframe.
-    const onAfter = () => { cleanup(); win.removeEventListener("afterprint", onAfter); };
+    const onAfter = () => {
+      cleanup();
+      win.removeEventListener("afterprint", onAfter);
+    };
     win.addEventListener("afterprint", onAfter);
     // fallback: garante limpeza mesmo sem afterprint
     setTimeout(cleanup, 60000);

@@ -138,26 +138,28 @@ export function SidebarUserMenu({
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium text-white">{userName || email}</span>
+                <span className="block truncate text-xs font-medium text-white">
+                  {userName || email}
+                </span>
                 {userName && email && (
                   <span className="block truncate text-[10px] text-white/60">{email}</span>
                 )}
               </span>
             </button>
           ) : (
-          <button
-            type="button"
-            className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 ring-1 ring-white/20 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/60"
-            style={{ backgroundColor: color }}
-            title={userName || email || "Conta"}
-            aria-label="Conta do usuário"
-          >
-            {avatar ? (
-              <img src={avatar} alt="Foto de perfil" className="h-full w-full object-cover" />
-            ) : (
-              initial
-            )}
-          </button>
+            <button
+              type="button"
+              className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 ring-1 ring-white/20 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/60"
+              style={{ backgroundColor: color }}
+              title={userName || email || "Conta"}
+              aria-label="Conta do usuário"
+            >
+              {avatar ? (
+                <img src={avatar} alt="Foto de perfil" className="h-full w-full object-cover" />
+              ) : (
+                initial
+              )}
+            </button>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="w-56">

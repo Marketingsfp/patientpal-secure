@@ -36,9 +36,7 @@ const fmtBRL = (v: number) =>
  *  meio-dia local para nunca voltar um dia (13/09 virando 12/09). */
 const parseDataSemFuso = (iso: string): Date => {
   const soData = iso.split("T")[0];
-  return /^\d{4}-\d{2}-\d{2}$/.test(soData)
-    ? new Date(`${soData}T12:00:00`)
-    : new Date(iso);
+  return /^\d{4}-\d{2}-\d{2}$/.test(soData) ? new Date(`${soData}T12:00:00`) : new Date(iso);
 };
 
 const fmtData = (iso?: string | null) => {
@@ -50,8 +48,18 @@ const fmtData = (iso?: string | null) => {
 };
 
 const MESES_PT = [
-  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
 ];
 
 export const fmtDataExtenso = (iso?: string | null) => {
@@ -277,7 +285,11 @@ const TEXTO_CONTRATO_HTML = `
 `;
 
 export async function printContrato(contratoId: string) {
-  const { data: c, error } = await supabase.from("contratos_assinatura").select("*").eq("id", contratoId).maybeSingle();
+  const { data: c, error } = await supabase
+    .from("contratos_assinatura")
+    .select("*")
+    .eq("id", contratoId)
+    .maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
 
   const { data: cl } = await supabase
@@ -296,7 +308,9 @@ export async function printContrato(contratoId: string) {
 
   const { data: pa } = await supabase
     .from("pacientes")
-    .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
+    .select(
+      "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep",
+    )
     .eq("id", (c as any).paciente_id)
     .maybeSingle();
 
@@ -316,17 +330,21 @@ export async function printContrato(contratoId: string) {
     _pa.numero,
     _pa.bairro,
     _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade,
-  ].filter(Boolean).join(", ");
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const pids = deps.map((d: any) => d.paciente_id).filter(Boolean);
-  let pacsMap: Record<string, any> = {};
+  const pacsMap: Record<string, any> = {};
   if (pids.length > 0) {
     const { data: pacsData } = await supabase
       .from("pacientes")
       .select("id, cpf, data_nascimento, telefone")
       .in("id", pids);
     if (pacsData) {
-      pacsData.forEach((p: any) => { pacsMap[p.id] = p; });
+      pacsData.forEach((p: any) => {
+        pacsMap[p.id] = p;
+      });
     }
   }
 
@@ -338,12 +356,20 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
     depSlotVars[`DEPENDENTE_${idx}_CPF`] = fmtCPF(pac?.cpf);
-    depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento ? fmtData(pac.data_nascimento) : "";
+    depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento
+      ? fmtData(pac.data_nascimento)
+      : "";
     depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelefone(pac?.telefone ?? d?.telefone);
   }
 
   const cvTpl = (cv as any)?.modelo_contrato;
-  const pick = (v: any) => (v && String(v).replace(/<[^>]+>/g, "").trim().length > 0 ? v : null);
+  const pick = (v: any) =>
+    v &&
+    String(v)
+      .replace(/<[^>]+>/g, "")
+      .trim().length > 0
+      ? v
+      : null;
   const overrideTpl = (c as any).convenio_id
     ? CONVENIO_TEMPLATE_OVERRIDES[(c as any).convenio_id]
     : null;
@@ -567,9 +593,9 @@ export async function printContrato(contratoId: string) {
 </script>`;
 
   const bodyHtml = isFullHtml
-    ? (/<\/head>/i.test(corpo)
-        ? corpo.replace(/<\/head>/i, `${printCss}</head>`)
-        : `${printCss}${corpo}`)
+    ? /<\/head>/i.test(corpo)
+      ? corpo.replace(/<\/head>/i, `${printCss}</head>`)
+      : `${printCss}${corpo}`
     : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
@@ -607,12 +633,19 @@ ${corpo}
   document.body.appendChild(iframe);
 
   const cleanup = () => {
-    try { iframe.parentNode?.removeChild(iframe); } catch { /* noop */ }
+    try {
+      iframe.parentNode?.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
   };
 
   iframe.onload = () => {
     const win = iframe.contentWindow;
-    if (!win) { cleanup(); return; }
+    if (!win) {
+      cleanup();
+      return;
+    }
     // Aguarda o layout/imagens antes de imprimir.
     setTimeout(() => {
       try {
@@ -628,7 +661,10 @@ ${corpo}
   };
 
   const doc = iframe.contentDocument;
-  if (!doc) { cleanup(); throw new Error("Não foi possível preparar a impressão"); }
+  if (!doc) {
+    cleanup();
+    throw new Error("Não foi possível preparar a impressão");
+  }
   doc.open();
   doc.write(cleanHtml);
   doc.close();

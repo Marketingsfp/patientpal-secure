@@ -4,7 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +29,8 @@ export interface ReagendarModalSessao {
   agendamento_id: string;
   paciente_nome: string;
   procedimento: string | null;
-  inicio: string;   // ISO
-  fim: string;      // ISO
+  inicio: string; // ISO
+  fim: string; // ISO
   medico_id: string | null;
   medico_nome: string | null;
 }
@@ -49,7 +56,14 @@ function toTimeInputValue(iso: string): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOptions, onSuccess }: Props) {
+export function ReagendarModal({
+  open,
+  onOpenChange,
+  sessao,
+  clinicaId,
+  medicoOptions,
+  onSuccess,
+}: Props) {
   const reagendarFn = useServerFn(reagendarAgendamento);
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -69,7 +83,10 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
 
   if (!sessao) return null;
 
-  const duracaoMin = Math.max(1, Math.round((new Date(sessao.fim).getTime() - new Date(sessao.inicio).getTime()) / 60000));
+  const duracaoMin = Math.max(
+    1,
+    Math.round((new Date(sessao.fim).getTime() - new Date(sessao.inicio).getTime()) / 60000),
+  );
   const trocouMedico = novoMedicoId && novoMedicoId !== sessao.medico_id;
 
   const handleConfirmar = async () => {
@@ -98,7 +115,9 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
       });
       if (!res.ok) {
         if ("validation_error" in res) {
-          notify.error(res.validation_error.message, { duration: res.validation_error.toast_duration });
+          notify.error(res.validation_error.message, {
+            duration: res.validation_error.toast_duration,
+          });
         } else {
           notify.error(res.pg_error.message);
         }
@@ -136,12 +155,26 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
         <div className="space-y-3 py-2">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="reag-data" className="text-xs">Nova data</Label>
-              <DateInputBR id="reag-data" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
+              <Label htmlFor="reag-data" className="text-xs">
+                Nova data
+              </Label>
+              <DateInputBR
+                id="reag-data"
+                value={novaData}
+                onChange={(e) => setNovaData(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="reag-hora" className="text-xs">Novo horário</Label>
-              <Input id="reag-hora" type="time" step={60 * 5} value={novaHora} onChange={(e) => setNovaHora(e.target.value)} />
+              <Label htmlFor="reag-hora" className="text-xs">
+                Novo horário
+              </Label>
+              <Input
+                id="reag-hora"
+                type="time"
+                step={60 * 5}
+                value={novaHora}
+                onChange={(e) => setNovaHora(e.target.value)}
+              />
             </div>
           </div>
           <div className="space-y-1">
@@ -156,16 +189,28 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
             />
           </div>
           <p className="text-[11px] text-slate-500">
-            Apenas ESTA sessão será movida. Se pertencer a um pacote, os demais itens permanecem no horário original.
+            Apenas ESTA sessão será movida. Se pertencer a um pacote, os demais itens permanecem no
+            horário original.
           </p>
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
             Cancelar
           </Button>
           <Button type="button" onClick={handleConfirmar} disabled={saving}>
-            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Reagendando…</> : "Confirmar reagendamento"}
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Reagendando…
+              </>
+            ) : (
+              "Confirmar reagendamento"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

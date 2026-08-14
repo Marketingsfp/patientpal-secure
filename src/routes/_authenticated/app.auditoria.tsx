@@ -10,8 +10,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
@@ -34,7 +47,11 @@ interface AuditRow {
   created_at: string;
 }
 
-const ACTION_LABEL: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
+const ACTION_LABEL: Record<string, string> = {
+  INSERT: "Criou",
+  UPDATE: "Alterou",
+  DELETE: "Excluiu",
+};
 const ACTION_COLOR: Record<string, string> = {
   INSERT: "bg-emerald-100 text-emerald-700",
   UPDATE: "bg-amber-100 text-amber-700",
@@ -62,24 +79,50 @@ const TABLE_LABEL: Record<string, string> = {
 };
 
 const FIELD_LABEL: Record<string, string> = {
-  inicio: "Início", fim: "Fim", status: "Status", observacoes: "Observações",
-  procedimento: "Procedimento", fluxo_etapa: "Etapa", prioridade: "Prioridade",
-  paciente_id: "Paciente", medico_id: "Médico", agenda_id: "Agenda",
-  clinica_id: "Clínica", pacote_id: "Pacote", ficha_numero: "Ficha",
-  executado_em: "Executado em", orcamento_id: "Orçamento",
-  valor: "Valor", valor_total: "Valor total", valor_pago: "Valor pago",
-  desconto: "Desconto", forma_pagamento: "Forma de pagamento",
-  data_vencimento: "Vencimento", data_pagamento: "Pago em",
-  competencia: "Competência", numero_parcela: "Parcela",
-  ativo: "Ativo", nome: "Nome", cpf: "CPF", telefone: "Telefone",
-  email: "E-mail", data_nascimento: "Nascimento",
-  repasse_pago: "Repasse pago", repasse_valor: "Valor do repasse",
+  inicio: "Início",
+  fim: "Fim",
+  status: "Status",
+  observacoes: "Observações",
+  procedimento: "Procedimento",
+  fluxo_etapa: "Etapa",
+  prioridade: "Prioridade",
+  paciente_id: "Paciente",
+  medico_id: "Médico",
+  agenda_id: "Agenda",
+  clinica_id: "Clínica",
+  pacote_id: "Pacote",
+  ficha_numero: "Ficha",
+  executado_em: "Executado em",
+  orcamento_id: "Orçamento",
+  valor: "Valor",
+  valor_total: "Valor total",
+  valor_pago: "Valor pago",
+  desconto: "Desconto",
+  forma_pagamento: "Forma de pagamento",
+  data_vencimento: "Vencimento",
+  data_pagamento: "Pago em",
+  competencia: "Competência",
+  numero_parcela: "Parcela",
+  ativo: "Ativo",
+  nome: "Nome",
+  cpf: "CPF",
+  telefone: "Telefone",
+  email: "E-mail",
+  data_nascimento: "Nascimento",
+  repasse_pago: "Repasse pago",
+  repasse_valor: "Valor do repasse",
 };
 
 // Campos técnicos que não interessam ao operador
 const CAMPOS_OCULTOS = new Set([
-  "id", "created_at", "updated_at", "criado_por", "atualizado_por",
-  "clinica_id", "search_tsv", "nome_norm",
+  "id",
+  "created_at",
+  "updated_at",
+  "criado_por",
+  "atualizado_por",
+  "clinica_id",
+  "search_tsv",
+  "nome_norm",
 ]);
 
 function labelTabela(t: string): string {
@@ -126,7 +169,11 @@ function formatValorComNome(v: unknown, campo: string, nomes: Record<string, str
   return formatValor(v);
 }
 
-async function resolverNomes(rows: Diff[], tabela: string, rowRecordId: string | null): Promise<Record<string, string>> {
+async function resolverNomes(
+  rows: Diff[],
+  tabela: string,
+  rowRecordId: string | null,
+): Promise<Record<string, string>> {
   const mapa: Record<string, Set<string>> = {};
   const add = (campo: string, val: unknown) => {
     if (typeof val !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(val)) return;
@@ -139,40 +186,79 @@ async function resolverNomes(rows: Diff[], tabela: string, rowRecordId: string |
     add(d.campo, d.depois);
   }
   // Se a própria tabela do registro tem um "nome" ou "paciente_nome", também busca
-  if (rowRecordId && (tabela === "medicos" || tabela === "pacientes" || tabela === "agendamentos")) {
+  if (
+    rowRecordId &&
+    (tabela === "medicos" || tabela === "pacientes" || tabela === "agendamentos")
+  ) {
     (mapa[tabela] ??= new Set()).add(rowRecordId);
   }
   const nomes: Record<string, string> = {};
-  await Promise.all(Object.entries(mapa).map(async ([tab, set]) => {
-    const ids = Array.from(set);
-    if (ids.length === 0) return;
-    if (tab === "medicos") {
-      const { data } = await supabase.from("medicos").select("id, nome").in("id", ids);
-      ((data ?? []) as unknown as Array<{ id: string; nome: string }>).forEach((r) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
-    } else if (tab === "pacientes") {
-      const { data } = await supabase.from("pacientes").select("id, nome, codigo_prontuario").in("id", ids);
-      ((data ?? []) as unknown as Array<{ id: string; nome: string; codigo_prontuario: string | null }>).forEach((r) => {
-        nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
-      });
-    } else if (tab === "agendamentos") {
-      const { data } = await supabase.from("agendamentos").select("id, paciente_nome, inicio").in("id", ids);
-      ((data ?? []) as unknown as Array<{ id: string; paciente_nome: string | null; inicio: string }>).forEach((r) => {
-        const dt = new Date(r.inicio).toLocaleString("pt-BR");
-        nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
-      });
-    } else if (tab === "orcamentos") {
-      const { data } = await supabase.from("orcamentos").select("id, numero").in("id", ids);
-      ((data ?? []) as unknown as Array<{ id: string; numero: number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
-    } else if (tab === "contratos_assinatura") {
-      const { data } = await supabase.from("contratos_assinatura").select("id, numero").in("id", ids);
-      ((data ?? []) as unknown as Array<{ id: string; numero: string | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
-    }
-  }));
+  await Promise.all(
+    Object.entries(mapa).map(async ([tab, set]) => {
+      const ids = Array.from(set);
+      if (ids.length === 0) return;
+      if (tab === "medicos") {
+        const { data } = await supabase.from("medicos").select("id, nome").in("id", ids);
+        ((data ?? []) as unknown as Array<{ id: string; nome: string }>).forEach((r) => {
+          nomes[r.id] = `Dr(a). ${r.nome}`;
+        });
+      } else if (tab === "pacientes") {
+        const { data } = await supabase
+          .from("pacientes")
+          .select("id, nome, codigo_prontuario")
+          .in("id", ids);
+        (
+          (data ?? []) as unknown as Array<{
+            id: string;
+            nome: string;
+            codigo_prontuario: string | null;
+          }>
+        ).forEach((r) => {
+          nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
+        });
+      } else if (tab === "agendamentos") {
+        const { data } = await supabase
+          .from("agendamentos")
+          .select("id, paciente_nome, inicio")
+          .in("id", ids);
+        (
+          (data ?? []) as unknown as Array<{
+            id: string;
+            paciente_nome: string | null;
+            inicio: string;
+          }>
+        ).forEach((r) => {
+          const dt = new Date(r.inicio).toLocaleString("pt-BR");
+          nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
+        });
+      } else if (tab === "orcamentos") {
+        const { data } = await supabase.from("orcamentos").select("id, numero").in("id", ids);
+        ((data ?? []) as unknown as Array<{ id: string; numero: number | null }>).forEach((r) => {
+          nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento";
+        });
+      } else if (tab === "contratos_assinatura") {
+        const { data } = await supabase
+          .from("contratos_assinatura")
+          .select("id, numero")
+          .in("id", ids);
+        ((data ?? []) as unknown as Array<{ id: string; numero: string | null }>).forEach((r) => {
+          nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato";
+        });
+      }
+    }),
+  );
   return nomes;
 }
 
-interface Diff { campo: string; antes: unknown; depois: unknown }
-function computarDiff(antes: Record<string, unknown> | null, depois: Record<string, unknown> | null): Diff[] {
+interface Diff {
+  campo: string;
+  antes: unknown;
+  depois: unknown;
+}
+function computarDiff(
+  antes: Record<string, unknown> | null,
+  depois: Record<string, unknown> | null,
+): Diff[] {
   const a = antes ?? {};
   const d = depois ?? {};
   const keys = new Set([...Object.keys(a), ...Object.keys(d)]);
@@ -202,7 +288,10 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
   const contratos = new Set<string>();
   const orcamentos = new Set<string>();
   for (const r of rows) {
-    const merged = { ...(r.dados_antes ?? {}), ...(r.dados_depois ?? {}) } as Record<string, unknown>;
+    const merged = { ...(r.dados_antes ?? {}), ...(r.dados_depois ?? {}) } as Record<
+      string,
+      unknown
+    >;
     const pick = (k: string, set: Set<string>) => {
       const v = merged[k];
       if (typeof v === "string" && /^[0-9a-f]{8}-/.test(v)) set.add(v);
@@ -222,33 +311,83 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
   }
   const nomes: Record<string, string> = {};
   await Promise.all([
-    medicos.size ? supabase.from("medicos").select("id, nome").in("id", Array.from(medicos)).then(({ data }) => {
-      ((data ?? []) as Array<{ id: string; nome: string }>).forEach((r) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
-    }) : Promise.resolve(),
-    pacientes.size ? supabase.from("pacientes").select("id, nome, codigo_prontuario").in("id", Array.from(pacientes)).then(({ data }) => {
-      ((data ?? []) as Array<{ id: string; nome: string; codigo_prontuario: string | null }>).forEach((r) => {
-        nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
-      });
-    }) : Promise.resolve(),
-    agendamentos.size ? supabase.from("agendamentos").select("id, paciente_nome, inicio, medico_id").in("id", Array.from(agendamentos)).then(({ data }) => {
-      ((data ?? []) as Array<{ id: string; paciente_nome: string | null; inicio: string; medico_id: string | null }>).forEach((r) => {
-        const dt = new Date(r.inicio).toLocaleString("pt-BR");
-        nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
-      });
-    }) : Promise.resolve(),
-    contratos.size ? supabase.from("contratos_assinatura").select("id, numero").in("id", Array.from(contratos)).then(({ data }) => {
-      ((data ?? []) as unknown as Array<{ id: string; numero: string | number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
-    }) : Promise.resolve(),
-    orcamentos.size ? supabase.from("orcamentos").select("id, numero").in("id", Array.from(orcamentos)).then(({ data }) => {
-      ((data ?? []) as Array<{ id: string; numero: number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
-    }) : Promise.resolve(),
+    medicos.size
+      ? supabase
+          .from("medicos")
+          .select("id, nome")
+          .in("id", Array.from(medicos))
+          .then(({ data }) => {
+            ((data ?? []) as Array<{ id: string; nome: string }>).forEach((r) => {
+              nomes[r.id] = `Dr(a). ${r.nome}`;
+            });
+          })
+      : Promise.resolve(),
+    pacientes.size
+      ? supabase
+          .from("pacientes")
+          .select("id, nome, codigo_prontuario")
+          .in("id", Array.from(pacientes))
+          .then(({ data }) => {
+            (
+              (data ?? []) as Array<{ id: string; nome: string; codigo_prontuario: string | null }>
+            ).forEach((r) => {
+              nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
+            });
+          })
+      : Promise.resolve(),
+    agendamentos.size
+      ? supabase
+          .from("agendamentos")
+          .select("id, paciente_nome, inicio, medico_id")
+          .in("id", Array.from(agendamentos))
+          .then(({ data }) => {
+            (
+              (data ?? []) as Array<{
+                id: string;
+                paciente_nome: string | null;
+                inicio: string;
+                medico_id: string | null;
+              }>
+            ).forEach((r) => {
+              const dt = new Date(r.inicio).toLocaleString("pt-BR");
+              nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
+            });
+          })
+      : Promise.resolve(),
+    contratos.size
+      ? supabase
+          .from("contratos_assinatura")
+          .select("id, numero")
+          .in("id", Array.from(contratos))
+          .then(({ data }) => {
+            (
+              (data ?? []) as unknown as Array<{ id: string; numero: string | number | null }>
+            ).forEach((r) => {
+              nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato";
+            });
+          })
+      : Promise.resolve(),
+    orcamentos.size
+      ? supabase
+          .from("orcamentos")
+          .select("id, numero")
+          .in("id", Array.from(orcamentos))
+          .then(({ data }) => {
+            ((data ?? []) as Array<{ id: string; numero: number | null }>).forEach((r) => {
+              nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento";
+            });
+          })
+      : Promise.resolve(),
   ]);
   return nomes;
 }
 
 function RegistroCell({ row, nomes }: { row: AuditRow; nomes: Record<string, string> }) {
   const principal = row.record_id ? nomes[row.record_id] : null;
-  const merged = { ...(row.dados_antes ?? {}), ...(row.dados_depois ?? {}) } as Record<string, unknown>;
+  const merged = { ...(row.dados_antes ?? {}), ...(row.dados_depois ?? {}) } as Record<
+    string,
+    unknown
+  >;
   const medicoId = typeof merged.medico_id === "string" ? merged.medico_id : null;
   const pacienteId = typeof merged.paciente_id === "string" ? merged.paciente_id : null;
   const medico = medicoId ? nomes[medicoId] : null;
@@ -294,18 +433,29 @@ function Page() {
     if (dataFim) q = q.lte("created_at", new Date(`${dataFim}T23:59:59`).toISOString());
     const { data, error } = await q;
     setLoading(false);
-    if (error) { mostrarErro(error); return; }
-    const list = ((data as unknown as AuditRow[]) ?? []);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    const list = (data as unknown as AuditRow[]) ?? [];
     setRows(list);
     void resolverNomesLista(list).then(setNomesLista);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
 
-  const tabelasUnicas = useMemo(() => Array.from(new Set(rows.map((r) => r.table_name))).sort(), [rows]);
+  const tabelasUnicas = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.table_name))).sort(),
+    [rows],
+  );
 
   const exportar = () => {
-    if (rows.length === 0) { toast.error("Sem dados para exportar"); return; }
+    if (rows.length === 0) {
+      toast.error("Sem dados para exportar");
+      return;
+    }
     exportToExcel(
       rows.map((r) => ({
         data: new Date(r.created_at).toLocaleString("pt-BR"),
@@ -335,12 +485,20 @@ function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /> Auditoria de uso</h1>
-          <p className="text-sm text-muted-foreground">Histórico de alterações no sistema — {clinicaAtual.clinica.nome}</p>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-primary" /> Auditoria de uso
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Histórico de alterações no sistema — {clinicaAtual.clinica.nome}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className="h-4 w-4 mr-1" /> Atualizar</Button>
-          <Button onClick={exportar}><Download className="h-4 w-4 mr-1" /> Baixar Excel</Button>
+          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Atualizar
+          </Button>
+          <Button onClick={exportar}>
+            <Download className="h-4 w-4 mr-1" /> Baixar Excel
+          </Button>
         </div>
       </div>
 
@@ -349,17 +507,25 @@ function Page() {
           <div>
             <Label className="text-xs">Tabela</Label>
             <Select value={tabela} onValueChange={setTabela}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {tabelasUnicas.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                {tabelasUnicas.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label className="text-xs">Ação</Label>
             <Select value={acao} onValueChange={setAcao}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="INSERT">Criou</SelectItem>
@@ -370,7 +536,11 @@ function Page() {
           </div>
           <div>
             <Label className="text-xs">Usuário (e-mail)</Label>
-            <Input value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="Buscar e-mail..." />
+            <Input
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
+              placeholder="Buscar e-mail..."
+            />
           </div>
           <div>
             <Label className="text-xs">De</Label>
@@ -400,33 +570,51 @@ function Page() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum registro de auditoria encontrado.</TableCell></TableRow>
-            ) : rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-sm">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
-                <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
-                <TableCell><Badge className={ACTION_COLOR[r.action]}>{ACTION_LABEL[r.action] ?? r.action}</Badge></TableCell>
-                <TableCell className="text-sm">{labelTabela(r.table_name)}</TableCell>
-                <TableCell className="text-sm max-w-[320px]">
-                  <RegistroCell row={r} nomes={nomesLista} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>Ver</Button>
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  Carregando…
                 </TableCell>
               </TableRow>
-            ))}
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  Nenhum registro de auditoria encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-sm">
+                    {new Date(r.created_at).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge className={ACTION_COLOR[r.action]}>
+                      {ACTION_LABEL[r.action] ?? r.action}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">{labelTabela(r.table_name)}</TableCell>
+                  <TableCell className="text-sm max-w-[320px]">
+                    <RegistroCell row={r} nomes={nomesLista} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>
+                      Ver
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
       <Dialog open={!!detalhe} onOpenChange={(o) => !o && setDetalhe(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Detalhes da alteração</DialogTitle></DialogHeader>
-          {detalhe && (
-            <DetalheAlteracao row={detalhe} />
-          )}
+          <DialogHeader>
+            <DialogTitle>Detalhes da alteração</DialogTitle>
+          </DialogHeader>
+          {detalhe && <DetalheAlteracao row={detalhe} />}
         </DialogContent>
       </Dialog>
     </div>
@@ -446,25 +634,30 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
     void resolverNomes(todos, row.table_name, row.record_id).then((n) => {
       if (!cancel) setNomes(n);
     });
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id]);
 
   const contexto = row.record_id ? nomes[row.record_id] : null;
 
-  const resumo = row.action === "INSERT"
-    ? `Criou um registro em ${labelTabela(row.table_name)}.`
-    : row.action === "DELETE"
-    ? `Excluiu um registro de ${labelTabela(row.table_name)}.`
-    : diff.length === 0
-    ? `Alterou um registro em ${labelTabela(row.table_name)} (sem mudanças de campo detectadas).`
-    : `Alterou ${diff.length} ${diff.length === 1 ? "campo" : "campos"} em ${labelTabela(row.table_name)}.`;
+  const resumo =
+    row.action === "INSERT"
+      ? `Criou um registro em ${labelTabela(row.table_name)}.`
+      : row.action === "DELETE"
+        ? `Excluiu um registro de ${labelTabela(row.table_name)}.`
+        : diff.length === 0
+          ? `Alterou um registro em ${labelTabela(row.table_name)} (sem mudanças de campo detectadas).`
+          : `Alterou ${diff.length} ${diff.length === 1 ? "campo" : "campos"} em ${labelTabela(row.table_name)}.`;
 
   return (
     <div className="space-y-4 text-sm">
       <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={ACTION_COLOR[row.action]}>{ACTION_LABEL[row.action] ?? row.action}</Badge>
+          <Badge className={ACTION_COLOR[row.action]}>
+            {ACTION_LABEL[row.action] ?? row.action}
+          </Badge>
           <span className="font-medium">{labelTabela(row.table_name)}</span>
           {contexto && <span className="text-muted-foreground">— {contexto}</span>}
         </div>
@@ -478,13 +671,22 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
       {row.action === "UPDATE" && diff.length > 0 && (
         <div className="rounded-lg border overflow-hidden">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] text-xs uppercase tracking-wide bg-muted/60 px-3 py-2">
-            <div>Campo</div><div>Antes</div><div>Depois</div>
+            <div>Campo</div>
+            <div>Antes</div>
+            <div>Depois</div>
           </div>
           {diff.map((d) => (
-            <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] px-3 py-2 border-t items-start gap-2">
+            <div
+              key={d.campo}
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] px-3 py-2 border-t items-start gap-2"
+            >
               <div className="font-medium">{labelCampo(d.campo)}</div>
-              <div className="text-rose-700 break-words">{formatValorComNome(d.antes, d.campo, nomes)}</div>
-              <div className="text-emerald-700 break-words">{formatValorComNome(d.depois, d.campo, nomes)}</div>
+              <div className="text-rose-700 break-words">
+                {formatValorComNome(d.antes, d.campo, nomes)}
+              </div>
+              <div className="text-emerald-700 break-words">
+                {formatValorComNome(d.depois, d.campo, nomes)}
+              </div>
             </div>
           ))}
         </div>
@@ -493,12 +695,18 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
       {(criados.length > 0 || excluidos.length > 0) && (
         <div className="rounded-lg border overflow-hidden">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] text-xs uppercase tracking-wide bg-muted/60 px-3 py-2">
-            <div>Campo</div><div>Valor</div>
+            <div>Campo</div>
+            <div>Valor</div>
           </div>
           {(criados.length > 0 ? criados : excluidos).map((d) => (
-            <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] px-3 py-2 border-t items-start gap-2">
+            <div
+              key={d.campo}
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] px-3 py-2 border-t items-start gap-2"
+            >
               <div className="font-medium">{labelCampo(d.campo)}</div>
-              <div className="break-words">{formatValorComNome(row.action === "INSERT" ? d.depois : d.antes, d.campo, nomes)}</div>
+              <div className="break-words">
+                {formatValorComNome(row.action === "INSERT" ? d.depois : d.antes, d.campo, nomes)}
+              </div>
             </div>
           ))}
         </div>
@@ -514,13 +722,17 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
           {row.dados_antes && (
             <div>
               <div className="text-xs font-semibold text-muted-foreground mb-1">Antes (bruto)</div>
-              <pre className="bg-muted p-3 rounded text-xs overflow-auto">{JSON.stringify(row.dados_antes, null, 2)}</pre>
+              <pre className="bg-muted p-3 rounded text-xs overflow-auto">
+                {JSON.stringify(row.dados_antes, null, 2)}
+              </pre>
             </div>
           )}
           {row.dados_depois && (
             <div>
               <div className="text-xs font-semibold text-muted-foreground mb-1">Depois (bruto)</div>
-              <pre className="bg-muted p-3 rounded text-xs overflow-auto">{JSON.stringify(row.dados_depois, null, 2)}</pre>
+              <pre className="bg-muted p-3 rounded text-xs overflow-auto">
+                {JSON.stringify(row.dados_depois, null, 2)}
+              </pre>
             </div>
           )}
         </div>

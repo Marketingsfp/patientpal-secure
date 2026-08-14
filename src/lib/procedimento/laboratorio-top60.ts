@@ -74,7 +74,10 @@ export const LABORATORIO_TOP60: ReadonlyArray<LabExamTop60> = [
   { label: "LDH", aliases: ["ldh", "desidrogenase lactica"] },
   { label: "Amilase", aliases: ["amilase"] },
   { label: "Lipase", aliases: ["lipase"] },
-  { label: "Tipagem sanguínea", aliases: ["tipagem", "grupo sanguineo", "grupo sanguíneo", "fator rh", "abo"] },
+  {
+    label: "Tipagem sanguínea",
+    aliases: ["tipagem", "grupo sanguineo", "grupo sanguíneo", "fator rh", "abo"],
+  },
 ];
 
 export function normalizarNome(s: string | null | undefined): string {

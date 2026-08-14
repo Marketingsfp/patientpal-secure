@@ -1,8 +1,20 @@
 import { createFileRoute, Link, Outlet, useLocation, Navigate } from "@tanstack/react-router";
 import {
-  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
-  Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, Stethoscope,
+  LayoutDashboard,
+  ArrowLeftRight,
+  BarChart3,
+  LineChart,
+  Building,
+  FileText,
+  FileBarChart,
+  PieChart,
+  Bell,
+  Tag,
+  Wallet,
+  Sparkles,
+  AlertTriangle,
+  Undo2,
+  Stethoscope,
 } from "lucide-react";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
@@ -66,9 +78,10 @@ function FinLayout() {
       <div className="shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
         <nav className="flex flex-wrap items-center gap-1.5 px-3 py-2.5">
           {visibleSubnav.map((item) => {
-            const active = "exact" in item && item.exact
-              ? location.pathname === item.to
-              : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            const active =
+              "exact" in item && item.exact
+                ? location.pathname === item.to
+                : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
             return (
               <Link
                 key={item.to}
@@ -81,7 +94,12 @@ function FinLayout() {
                     : "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground",
                 )}
               >
-                <item.icon className={cn("h-4 w-4 shrink-0 transition-colors", active ? "" : "text-muted-foreground/70 group-hover:text-primary")} />
+                <item.icon
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-colors",
+                    active ? "" : "text-muted-foreground/70 group-hover:text-primary",
+                  )}
+                />
                 {item.label}
               </Link>
             );

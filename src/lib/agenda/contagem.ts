@@ -32,9 +32,7 @@ export function laboratorioMedicoIdsFrom(
   medicoEspecialidades: MedicoEspecialidadeMin[],
 ): Set<string> {
   const labEspIds = new Set(
-    especialidades
-      .filter((e) => (e.nome ?? "").toLowerCase().includes("laborat"))
-      .map((e) => e.id),
+    especialidades.filter((e) => (e.nome ?? "").toLowerCase().includes("laborat")).map((e) => e.id),
   );
   const set = new Set<string>();
   for (const me of medicoEspecialidades) {

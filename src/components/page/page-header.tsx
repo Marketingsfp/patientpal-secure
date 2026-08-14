@@ -50,7 +50,9 @@ export function PageHeader({
           <h1 className="flex min-w-0 items-baseline gap-2 truncate text-xl font-semibold tracking-tight">
             <span className="truncate">{title}</span>
             {meta && (
-              <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{meta}</span>
+              <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">
+                {meta}
+              </span>
             )}
           </h1>
           {description && (
@@ -73,13 +75,7 @@ export function PageHeader({
  * Faixa de filtros padrão: fundo de cartão, campos em grade responsiva
  * e rótulos pequenos em maiúsculas.
  */
-export function PageFilters({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function PageFilters({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-xl border border-border bg-card p-3 shadow-xs", className)}>
       {children}

@@ -28,7 +28,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const TMP_MARKER = "DISPONÍVEL_REAGENDADO_TMP";
 
 const normalizar = (s: string) =>
-  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
   return nome === "disponivel" || nome === "bloqueio";
@@ -86,7 +89,11 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
     }
 
     // Guard de status — paridade com o reagendar clássico (app.agenda.tsx:820).
-    if (origem.status === "realizado" || origem.status === "cancelado" || origem.status === "faltou") {
+    if (
+      origem.status === "realizado" ||
+      origem.status === "cancelado" ||
+      origem.status === "faltou"
+    ) {
       return {
         ok: false,
         validation_error: {
@@ -114,8 +121,22 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
     if (Number.isNaN(di.getTime()) || Number.isNaN(df.getTime()) || df.getTime() <= di.getTime()) {
       return { ok: false, validation_error: { message: "Novo horário inválido." } };
     }
-    const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
-    const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
+    const inicioDia = new Date(
+      di.getFullYear(),
+      di.getMonth(),
+      di.getDate(),
+      0,
+      0,
+      0,
+    ).toISOString();
+    const fimDia = new Date(
+      di.getFullYear(),
+      di.getMonth(),
+      di.getDate(),
+      23,
+      59,
+      59,
+    ).toISOString();
     const { data: slotsDia, error: eSlots } = await supabase
       .from("agendamentos")
       .select("id,paciente_nome,inicio,fim,agenda_id")
@@ -125,14 +146,21 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
       .lte("inicio", fimDia)
       .limit(500);
     if (eSlots) return { ok: false, pg_error: toPgErrorLike(eSlots) };
-    const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string; agenda_id: string | null }[];
+    const lista = (slotsDia ?? []) as {
+      id: string;
+      paciente_nome: string;
+      inicio: string;
+      fim: string;
+      agenda_id: string | null;
+    }[];
     // Regra C — excluir o próprio id (equivalente ao excludingEditing).
     const outros = lista.filter((x) => x.id !== agendamento_id);
     if (outros.length === 0) {
       return {
         ok: false,
         validation_error: {
-          message: "Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.",
+          message:
+            "Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.",
         },
       };
     }
@@ -148,7 +176,8 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
       return {
         ok: false,
         validation_error: {
-          message: "Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.",
+          message:
+            "Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.",
         },
       };
     }

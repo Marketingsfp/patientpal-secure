@@ -10,15 +10,34 @@ export const S6Close: React.FC = () => {
   return (
     <AbsoluteFill>
       <Backdrop tone={2} />
-      <AbsoluteFill style={{ padding: "0 140px", justifyContent: "center", alignItems: "flex-start" }}>
+      <AbsoluteFill
+        style={{ padding: "0 140px", justifyContent: "center", alignItems: "flex-start" }}
+      >
         <Rise delay={0} y={40}>
-          <div style={{ fontFamily: display, color: C.cream, fontSize: 118, fontWeight: 700, lineHeight: 1, transform: `translateY(${float}px)` }}>
+          <div
+            style={{
+              fontFamily: display,
+              color: C.cream,
+              fontSize: 118,
+              fontWeight: 700,
+              lineHeight: 1,
+              transform: `translateY(${float}px)`,
+            }}
+          >
             4 passos.
           </div>
         </Rise>
         <div style={{ height: 14 }} />
         <Rise delay={12} y={40}>
-          <div style={{ fontFamily: display, color: C.greenSoft, fontSize: 118, fontWeight: 700, lineHeight: 1 }}>
+          <div
+            style={{
+              fontFamily: display,
+              color: C.greenSoft,
+              fontSize: 118,
+              fontWeight: 700,
+              lineHeight: 1,
+            }}
+          >
             Mensalidade paga.
           </div>
         </Rise>
@@ -29,11 +48,25 @@ export const S6Close: React.FC = () => {
           </div>
         </Rise>
       </AbsoluteFill>
-      <div style={{
-        position: "absolute", right: 140, bottom: 110,
-        fontFamily: body, color: C.clay, fontSize: 24, letterSpacing: 6, textTransform: "uppercase", fontWeight: 700,
-        opacity: interpolate(frame, [30, 50], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-      }}>ClinicaOS</div>
+      <div
+        style={{
+          position: "absolute",
+          right: 140,
+          bottom: 110,
+          fontFamily: body,
+          color: C.clay,
+          fontSize: 24,
+          letterSpacing: 6,
+          textTransform: "uppercase",
+          fontWeight: 700,
+          opacity: interpolate(frame, [30, 50], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          }),
+        }}
+      >
+        ClinicaOS
+      </div>
     </AbsoluteFill>
   );
 };

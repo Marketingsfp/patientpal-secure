@@ -104,9 +104,7 @@ export function deveBloquearPorLimitePendente(params: {
   let relevantes: PendenteAviso[];
   if (beneficio.gratuito) {
     const procAtual = normalizarProcedimento(procedimentoNome);
-    relevantes = pendentes.filter(
-      (a) => normalizarProcedimento(a.procedimento) === procAtual,
-    );
+    relevantes = pendentes.filter((a) => normalizarProcedimento(a.procedimento) === procAtual);
   } else {
     relevantes = pendentes;
   }

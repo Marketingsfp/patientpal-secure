@@ -9,7 +9,10 @@ export type ItemPrescricao = {
 export function novoItem(p: Partial<ItemPrescricao> = {}): ItemPrescricao {
   return {
     id: (globalThis.crypto?.randomUUID?.() ?? String(Math.random())).slice(0, 12),
-    nome: "", apresentacao: "", posologia: "", quantidade: "",
+    nome: "",
+    apresentacao: "",
+    posologia: "",
+    quantidade: "",
     ...p,
   };
 }
@@ -38,11 +41,13 @@ export function textoParaPrescricao(texto: string): ItemPrescricao[] {
     if (m) {
       const [cabecalho, qtd] = m[1].split("..........");
       const [nome, apresentacao] = cabecalho.split(" — ");
-      itens.push(novoItem({
-        nome: (nome ?? "").trim(),
-        apresentacao: (apresentacao ?? "").trim(),
-        quantidade: (qtd ?? "").trim(),
-      }));
+      itens.push(
+        novoItem({
+          nome: (nome ?? "").trim(),
+          apresentacao: (apresentacao ?? "").trim(),
+          quantidade: (qtd ?? "").trim(),
+        }),
+      );
     } else if (itens.length) {
       const ultimo = itens[itens.length - 1];
       ultimo.posologia = ultimo.posologia ? `${ultimo.posologia} ${l}` : l;

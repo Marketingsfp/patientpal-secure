@@ -47,20 +47,29 @@ export const HHP_TONE_TEXT: Record<HhpTone, string> = {
 
 /** Atalhos de teclado padrão do Health Hub Pro (para reuso entre módulos). */
 export const HHP_SHORTCUTS = [
-  { group: "Modos", items: [
-    { k: "D", label: "Modo confortável" },
-    { k: "C", label: "Modo compacto" },
-    { k: "F", label: "Modo foco" },
-  ]},
-  { group: "Navegação", items: [
-    { k: "J", label: "Próximo item" },
-    { k: "K", label: "Item anterior" },
-    { k: "Enter", label: "Abrir item selecionado" },
-    { k: "Esc", label: "Fechar drawer / cancelar" },
-  ]},
-  { group: "Ações", items: [
-    { k: "N", label: "Novo (contexto da tela)" },
-    { k: "Ctrl K", label: "Focar busca do módulo" },
-    { k: "?", label: "Abrir este painel" },
-  ]},
+  {
+    group: "Modos",
+    items: [
+      { k: "D", label: "Modo confortável" },
+      { k: "C", label: "Modo compacto" },
+      { k: "F", label: "Modo foco" },
+    ],
+  },
+  {
+    group: "Navegação",
+    items: [
+      { k: "J", label: "Próximo item" },
+      { k: "K", label: "Item anterior" },
+      { k: "Enter", label: "Abrir item selecionado" },
+      { k: "Esc", label: "Fechar drawer / cancelar" },
+    ],
+  },
+  {
+    group: "Ações",
+    items: [
+      { k: "N", label: "Novo (contexto da tela)" },
+      { k: "Ctrl K", label: "Focar busca do módulo" },
+      { k: "?", label: "Abrir este painel" },
+    ],
+  },
 ] as const;

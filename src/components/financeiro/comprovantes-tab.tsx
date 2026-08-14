@@ -7,8 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   calcRepasseFull,
@@ -147,7 +160,11 @@ export function ComprovantesTab() {
       ]);
       const repMap = new Map<
         string,
-        { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
+        {
+          tipo_repasse: string | null;
+          percentual_repasse_padrao: number | null;
+          valor_repasse_padrao: number | null;
+        }
       >();
       for (const r of ((rep.data as unknown[] | null) ?? []) as Array<{
         id: string;
@@ -157,19 +174,21 @@ export function ComprovantesTab() {
       }>) {
         repMap.set(r.id, r);
       }
-      const medicosCtx: RepasseMedico[] = ((meds ?? []) as Array<Record<string, unknown>>).map((x) => {
-        const r = repMap.get(x.id as string);
-        return {
-          id: x.id as string,
-          tipo_repasse: r?.tipo_repasse ?? "percentual",
-          percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
-          valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
-          aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
-          cb_tipo_repasse: (x.cb_tipo_repasse as string) ?? null,
-          cb_valor_repasse: (x.cb_valor_repasse as number) ?? null,
-          cb_percentual_repasse: (x.cb_percentual_repasse as number) ?? null,
-        };
-      });
+      const medicosCtx: RepasseMedico[] = ((meds ?? []) as Array<Record<string, unknown>>).map(
+        (x) => {
+          const r = repMap.get(x.id as string);
+          return {
+            id: x.id as string,
+            tipo_repasse: r?.tipo_repasse ?? "percentual",
+            percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
+            valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+            aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
+            cb_tipo_repasse: (x.cb_tipo_repasse as string) ?? null,
+            cb_valor_repasse: (x.cb_valor_repasse as number) ?? null,
+            cb_percentual_repasse: (x.cb_percentual_repasse as number) ?? null,
+          };
+        },
+      );
       // Convênios por médico — paginado (PostgREST teto 1000).
       const ids = medicosCtx.map((m) => m.id);
       const conveniosCtx: RepasseConvenio[] = [];
@@ -180,7 +199,9 @@ export function ComprovantesTab() {
         for (;;) {
           const { data: cv, error } = await supabase
             .from("medico_convenios")
-            .select("medico_id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor")
+            .select(
+              "medico_id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor",
+            )
             .in("medico_id", ids)
             .eq("ativo", true)
             .range(offset, offset + CHUNK - 1);
@@ -295,11 +316,9 @@ export function ComprovantesTab() {
           repasse_conta_id: (r.repasse_conta_id as string) ?? null,
           repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
           medico_id: (r.medico_id as string) ?? null,
-          medico_nome:
-            (r.medicos as { nome?: string } | null)?.nome ?? null,
+          medico_nome: (r.medicos as { nome?: string } | null)?.nome ?? null,
           paciente_id: (r.paciente_id as string) ?? null,
-          paciente_nome:
-            (r.pacientes as { nome?: string } | null)?.nome ?? null,
+          paciente_nome: (r.pacientes as { nome?: string } | null)?.nome ?? null,
         };
       });
       const mappedLc: Row[] = (lcRes.data ?? []).map((r: Record<string, unknown>) => {
@@ -312,9 +331,11 @@ export function ComprovantesTab() {
           inicio?: string | null;
         } | null;
         const procedimento = agendamento?.procedimento ?? info.procedimento;
-        const medicoId = ((r.medico_id as string | null) ?? agendamento?.medico_id) ?? null;
-        const pacienteId = ((r.paciente_id as string | null) ?? agendamento?.paciente_id) ?? null;
-        const dataAtendimento = agendamento?.inicio ? agendamento.inicio.slice(0, 10) : ((r.data as string) ?? "");
+        const medicoId = (r.medico_id as string | null) ?? agendamento?.medico_id ?? null;
+        const pacienteId = (r.paciente_id as string | null) ?? agendamento?.paciente_id ?? null;
+        const dataAtendimento = agendamento?.inicio
+          ? agendamento.inicio.slice(0, 10)
+          : ((r.data as string) ?? "");
         // Se o lançamento tem override manual, usa direto. Caso contrário
         // recalcula o repasse pela regra do médico/convênio — mesma lógica
         // exibida na aba "Atendimentos". Antes caía no valor cheio (`valor`),
@@ -352,7 +373,9 @@ export function ComprovantesTab() {
           medico_nome: (r.medicos as { nome?: string } | null)?.nome ?? null,
           paciente_id: pacienteId,
           paciente_nome:
-            (r.pacientes as { nome?: string } | null)?.nome ?? agendamento?.paciente_nome ?? info.paciente,
+            (r.pacientes as { nome?: string } | null)?.nome ??
+            agendamento?.paciente_nome ??
+            info.paciente,
         };
       });
       setRows([...mappedAt, ...mappedLc]);
@@ -376,8 +399,7 @@ export function ComprovantesTab() {
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [rows]);
 
-  const contaNomeById = (id: string | null) =>
-    (id && contas.find((c) => c.id === id)?.nome) || "—";
+  const contaNomeById = (id: string | null) => (id && contas.find((c) => c.id === id)?.nome) || "—";
 
   const grupos: Grupo[] = useMemo(() => {
     const filtered = rows.filter((r) => {
@@ -414,7 +436,8 @@ export function ComprovantesTab() {
       g.total += (Number(r.valor_medico) || 0) + (Number(r.valor_laudo) || 0);
     }
     return [...map.values()].sort((a, b) => {
-      if (a.data_pagamento !== b.data_pagamento) return a.data_pagamento < b.data_pagamento ? 1 : -1;
+      if (a.data_pagamento !== b.data_pagamento)
+        return a.data_pagamento < b.data_pagamento ? 1 : -1;
       return a.medico_nome.localeCompare(b.medico_nome);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,7 +447,7 @@ export function ComprovantesTab() {
   const [open, setOpen] = useState(false);
   const [grupoAtual, setGrupoAtual] = useState<Grupo | null>(null);
   const grupoVisualizado = useMemo(
-    () => (grupoAtual ? grupos.find((g) => g.key === grupoAtual.key) ?? grupoAtual : null),
+    () => (grupoAtual ? (grupos.find((g) => g.key === grupoAtual.key) ?? grupoAtual) : null),
     [grupoAtual, grupos],
   );
   const printAreaRef = useRef<HTMLDivElement | null>(null);
@@ -512,8 +535,8 @@ body.resumo-only .rows-full { display: none !important; }
             <ReceiptText className="h-5 w-5" /> Comprovantes de repasse
           </h1>
           <p className="text-sm text-muted-foreground">
-            Histórico de repasses médicos pagos. Clique em visualizar para ver os pacientes
-            e reimprimir a segunda via.
+            Histórico de repasses médicos pagos. Clique em visualizar para ver os pacientes e
+            reimprimir a segunda via.
           </p>
         </div>
       </div>
@@ -620,11 +643,15 @@ body.resumo-only .rows-full { display: none !important; }
             <div
               ref={printAreaRef}
               className="bg-white text-black text-sm max-h-[70vh] overflow-y-auto p-4 rounded-md border"
-              dangerouslySetInnerHTML={{ __html: renderComprovanteHtml(grupoVisualizado, clinicaNome) }}
+              dangerouslySetInnerHTML={{
+                __html: renderComprovanteHtml(grupoVisualizado, clinicaNome),
+              }}
             />
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Fechar
+            </Button>
             <Button variant="secondary" onClick={() => imprimir(true)}>
               <Printer className="h-4 w-4 mr-2" /> Imprimir resumo
             </Button>

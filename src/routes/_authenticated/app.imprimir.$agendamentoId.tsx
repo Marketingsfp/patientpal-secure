@@ -10,10 +10,16 @@ export const Route = createFileRoute("/_authenticated/app/imprimir/$agendamentoI
 });
 
 interface Ag {
-  id: string; paciente_nome: string; inicio: string; procedimento: string | null;
-  observacoes: string | null; clinica_id: string;
+  id: string;
+  paciente_nome: string;
+  inicio: string;
+  procedimento: string | null;
+  observacoes: string | null;
+  clinica_id: string;
 }
-interface Clin { nome: string }
+interface Clin {
+  nome: string;
+}
 
 function PrintPage() {
   const { agendamentoId } = Route.useParams();
@@ -22,12 +28,18 @@ function PrintPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("agendamentos")
+      const { data } = await supabase
+        .from("agendamentos")
         .select("id, paciente_nome, inicio, procedimento, observacoes, clinica_id")
-        .eq("id", agendamentoId).single();
+        .eq("id", agendamentoId)
+        .single();
       if (data) {
         setAg(data as Ag);
-        const { data: c } = await supabase.from("clinicas").select("nome").eq("id", data.clinica_id).single();
+        const { data: c } = await supabase
+          .from("clinicas")
+          .select("nome")
+          .eq("id", data.clinica_id)
+          .single();
         if (c) setClin(c as Clin);
       }
     })();
@@ -50,22 +62,45 @@ function PrintPage() {
         .receipt .lbl { color: #555; }
       `}</style>
       <div className="no-print p-4 flex gap-2 border-b">
-        <Button size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" /> Imprimir 80mm</Button>
-        <Button size="sm" variant="ghost" onClick={() => window.history.back()}>Voltar</Button>
+        <Button size="sm" onClick={() => window.print()}>
+          <Printer className="h-4 w-4 mr-1" /> Imprimir 80mm
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => window.history.back()}>
+          Voltar
+        </Button>
       </div>
       <div className="flex justify-center py-6">
         <div className="receipt bg-white p-2 shadow">
           <h1>{clin?.nome ?? "Comprovante"}</h1>
           <div className="divider" />
-          <div className="row"><span className="lbl">Paciente</span><span>{ag.paciente_nome}</span></div>
-          <div className="row"><span className="lbl">Data</span><span>{new Date(ag.inicio).toLocaleDateString("pt-BR")}</span></div>
-          <div className="row"><span className="lbl">Hora</span><span>{new Date(ag.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
-          <div className="row"><span className="lbl">Procedimento</span><span>{ag.procedimento ?? "—"}</span></div>
-          {ag.observacoes && (<>
-            <div className="divider" />
-            <div className="lbl">Observações:</div>
-            <div>{ag.observacoes}</div>
-          </>)}
+          <div className="row">
+            <span className="lbl">Paciente</span>
+            <span>{ag.paciente_nome}</span>
+          </div>
+          <div className="row">
+            <span className="lbl">Data</span>
+            <span>{new Date(ag.inicio).toLocaleDateString("pt-BR")}</span>
+          </div>
+          <div className="row">
+            <span className="lbl">Hora</span>
+            <span>
+              {new Date(ag.inicio).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+          <div className="row">
+            <span className="lbl">Procedimento</span>
+            <span>{ag.procedimento ?? "—"}</span>
+          </div>
+          {ag.observacoes && (
+            <>
+              <div className="divider" />
+              <div className="lbl">Observações:</div>
+              <div>{ag.observacoes}</div>
+            </>
+          )}
           <div className="divider" />
           <div style={{ textAlign: "center", fontSize: 10 }}>
             Emitido em {new Date().toLocaleString("pt-BR")}

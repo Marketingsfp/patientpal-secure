@@ -81,7 +81,9 @@ export function PortalLauncher({
                 <h2 className="relative mt-5 text-xl font-semibold tracking-tight text-slate-900">
                   {SUBSYSTEMS[portal.id].label}
                 </h2>
-                <p className="relative mt-1.5 text-sm leading-relaxed text-slate-500">{portal.descricao}</p>
+                <p className="relative mt-1.5 text-sm leading-relaxed text-slate-500">
+                  {portal.descricao}
+                </p>
                 <ul className="relative mt-5 flex flex-wrap gap-2">
                   {portal.itens.map((item) => (
                     <li

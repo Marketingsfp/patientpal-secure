@@ -24,14 +24,19 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { hojeBR, formatDatePura } from "@/lib/date-utils";
 
-const BRL = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 type Mode = "extensao" | "troca_plano";
 type ModoDialog = "renovacao" | "troca_convenio";
@@ -114,36 +119,50 @@ const normalizarErro = (erro: unknown): RenovacaoError => {
 
   let codigo = "RENOVACAO_ERRO_GERAL";
   let titulo = "Não foi possível concluir a renovação";
-  let orientacao = "Revise os dados do convênio, dependentes e valores. Se persistir, informe a identificação abaixo para localizar o erro.";
+  let orientacao =
+    "Revise os dados do convênio, dependentes e valores. Se persistir, informe a identificação abaixo para localizar o erro.";
 
   if (lower.includes('column "clinica_id"') && lower.includes("contrato_dependentes")) {
     codigo = "RENOVACAO_DEPENDENTE_COLUNA";
     titulo = "Erro ao gravar dependente";
-    orientacao = "O sistema tentou salvar um campo que não faz parte do cadastro de dependentes. A renovação não foi concluída para evitar dados parciais.";
+    orientacao =
+      "O sistema tentou salvar um campo que não faz parte do cadastro de dependentes. A renovação não foi concluída para evitar dados parciais.";
   } else if (lower.includes('column "descricao"') && lower.includes("contrato_mensalidades")) {
     codigo = "RENOVACAO_TAXA_DESCRICAO";
     titulo = "Erro ao lançar taxa da renovação";
-    orientacao = "A taxa não conseguiu ser registrada na aba de mensalidades. A renovação foi interrompida antes de gerar dados incompletos.";
+    orientacao =
+      "A taxa não conseguiu ser registrada na aba de mensalidades. A renovação foi interrompida antes de gerar dados incompletos.";
   } else if (lower.includes("mensalidades") && lower.includes("pagas")) {
     codigo = "RENOVACAO_MENSALIDADES_ABERTAS";
     titulo = "Ainda existem mensalidades em aberto";
-    orientacao = "A renovação só é permitida quando todas as parcelas anteriores do contrato estiverem pagas.";
-  } else if (lower.includes("sem permissao") || lower.includes("permission") || lower.includes("rls")) {
+    orientacao =
+      "A renovação só é permitida quando todas as parcelas anteriores do contrato estiverem pagas.";
+  } else if (
+    lower.includes("sem permissao") ||
+    lower.includes("permission") ||
+    lower.includes("rls")
+  ) {
     codigo = "RENOVACAO_PERMISSAO";
     titulo = "Usuário sem permissão para renovar";
     orientacao = "O usuário atual não tem autorização para renovar contratos desta clínica.";
   } else if (lower.includes("convenio") && lower.includes("invalido")) {
     codigo = "RENOVACAO_CONVENIO_INVALIDO";
     titulo = "Convênio da renovação inválido";
-    orientacao = "Selecione novamente o convênio da renovação e confirme se ele está ativo para esta clínica.";
+    orientacao =
+      "Selecione novamente o convênio da renovação e confirme se ele está ativo para esta clínica.";
   } else if (lower.includes("contrato nao encontrado")) {
     codigo = "RENOVACAO_CONTRATO_NAO_ENCONTRADO";
     titulo = "Contrato não encontrado";
-    orientacao = "Atualize a tela e tente novamente. O contrato pode ter sido alterado por outro usuário.";
-  } else if (lower.includes("contrato nao esta ativo") || lower.includes("contrato não está ativo")) {
+    orientacao =
+      "Atualize a tela e tente novamente. O contrato pode ter sido alterado por outro usuário.";
+  } else if (
+    lower.includes("contrato nao esta ativo") ||
+    lower.includes("contrato não está ativo")
+  ) {
     codigo = "RENOVACAO_CONTRATO_INATIVO";
     titulo = "Este contrato não pode ser renovado novamente";
-    orientacao = "Este contrato já foi renovado, cancelado ou não está ativo. Use o contrato vigente do paciente para novas movimentações.";
+    orientacao =
+      "Este contrato já foi renovado, cancelado ou não está ativo. Use o contrato vigente do paciente para novas movimentações.";
   }
 
   return {
@@ -151,7 +170,10 @@ const normalizarErro = (erro: unknown): RenovacaoError => {
     titulo,
     orientacao,
     detalheTecnico: mensagem || "Sem detalhe técnico retornado pelo backend.",
-    identificador: `${codigo}-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`,
+    identificador: `${codigo}-${new Date()
+      .toISOString()
+      .replace(/[-:.TZ]/g, "")
+      .slice(0, 14)}`,
   };
 };
 
@@ -190,7 +212,9 @@ export function RenovarContratoDialog({
       const [{ data: conv }, { data: depsData }, { data: faixasData }] = await Promise.all([
         supabase
           .from("cb_convenios")
-          .select("id, nome, valor_mensal, num_parcelas, taxa_adesao, taxa_inclusao_dependente, max_dependentes")
+          .select(
+            "id, nome, valor_mensal, num_parcelas, taxa_adesao, taxa_inclusao_dependente, max_dependentes",
+          )
           .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .order("nome"),
@@ -231,16 +255,16 @@ export function RenovarContratoDialog({
       : "troca_plano";
   const parcelasRenovacao = novoConvenio ? Number(novoConvenio.num_parcelas ?? 12) : 12;
   const taxaAdesaoConvenio = novoConvenio ? Number(novoConvenio.taxa_adesao ?? 0) : 0;
-  const taxaInclusaoConvenio = novoConvenio ? Number(novoConvenio.taxa_inclusao_dependente ?? 0) : 0;
+  const taxaInclusaoConvenio = novoConvenio
+    ? Number(novoConvenio.taxa_inclusao_dependente ?? 0)
+    : 0;
   // Regra fixa: renovação (extensão OU troca de plano) nunca cobra taxa de adesão.
   const taxaAdesaoCobrada = 0;
   const maxDep = novoConvenio ? Number(novoConvenio.max_dependentes ?? 0) : 0;
 
   const depsAtivos = deps.filter((d) => d.manter && (d.id !== null || d.paciente_id));
   const depsPreenchidosCount = depsAtivos.length;
-  const depsIncompletos = deps.some(
-    (d) => d.manter && (!d.paciente_id || !d.parentesco),
-  );
+  const depsIncompletos = deps.some((d) => d.manter && (!d.paciente_id || !d.parentesco));
   const totalPessoas = 1 + depsPreenchidosCount;
 
   const faixasDoConvenio = useMemo(
@@ -277,16 +301,12 @@ export function RenovarContratoDialog({
     }
     const alvo =
       faixasDoConvenio.find(
-        (f) =>
-          totalPessoas >= f.vidas_de &&
-          (f.vidas_ate == null || totalPessoas <= f.vidas_ate),
+        (f) => totalPessoas >= f.vidas_de && (f.vidas_ate == null || totalPessoas <= f.vidas_ate),
       ) ?? faixasDoConvenio[faixasDoConvenio.length - 1];
     setFaixaId(alvo.id);
   }, [faixasDoConvenio, totalPessoas]);
 
-  const novosComTaxa = deps.filter(
-    (d) => d.id === null && d.paciente_id && d.cobrar_taxa_inclusao,
-  );
+  const novosComTaxa = deps.filter((d) => d.id === null && d.paciente_id && d.cobrar_taxa_inclusao);
   const taxaInclusaoTotal = novosComTaxa.length * taxaInclusaoConvenio;
   const dependentesNovos = deps.filter((d) => d.id === null && d.manter && d.paciente_id);
   const dependentesRemovidos = deps.filter((d) => d.id !== null && !d.manter);
@@ -296,10 +316,7 @@ export function RenovarContratoDialog({
   const retroativa = !!dataRenovacao && dataRenovacao < hoje;
 
   const podeConfirmar =
-    !saving &&
-    !!novoConvenioId &&
-    !depsIncompletos &&
-    (faixasDoConvenio.length === 0 || !!faixaId);
+    !saving && !!novoConvenioId && !depsIncompletos && (faixasDoConvenio.length === 0 || !!faixaId);
 
   const updateDep = (key: string, patch: Partial<DepRow>) => {
     setDeps((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
@@ -381,7 +398,10 @@ export function RenovarContratoDialog({
             ? `Convênio trocado — ${canceladas} mensalidade(s) pendente(s) canceladas e novo contrato criado.`
             : "Convênio trocado — novo contrato criado.",
         );
-        onRenovado({ tipo: "troca_convenio", contratoNovoId: (data as any)?.contrato_novo_id ?? null });
+        onRenovado({
+          tipo: "troca_convenio",
+          contratoNovoId: (data as any)?.contrato_novo_id ?? null,
+        });
       } else if (mode === "extensao") {
         const { data, error } = await (supabase.rpc as any)("renovar_contrato_extensao", {
           _contrato_id: contratoId,
@@ -407,7 +427,10 @@ export function RenovarContratoDialog({
         });
         if (error) throw error;
         toast.success("Novo contrato criado a partir da renovação");
-        onRenovado({ tipo: "troca_plano", contratoNovoId: (data as any)?.contrato_novo_id ?? null });
+        onRenovado({
+          tipo: "troca_plano",
+          contratoNovoId: (data as any)?.contrato_novo_id ?? null,
+        });
       }
       setConfirmacaoAberta(false);
       onOpenChange(false);
@@ -444,7 +467,9 @@ export function RenovarContratoDialog({
           {/* 1. Convênio da renovação */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">{isTroca ? "Novo convênio" : "Convênio da renovação"}</Label>
+              <Label className="text-xs">
+                {isTroca ? "Novo convênio" : "Convênio da renovação"}
+              </Label>
               <Select value={novoConvenioId} onValueChange={setNovoConvenioId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o convênio" />
@@ -462,18 +487,15 @@ export function RenovarContratoDialog({
                 {isTroca
                   ? "Sem taxa de adesão e sem carência. O contrato atual será cancelado."
                   : mode === "extensao"
-                  ? "Mesmo convênio: estende este contrato sem cobrar taxa de adesão."
-                  : "Convênio diferente: cria um novo contrato e cobra a taxa de adesão do convênio escolhido."}
+                    ? "Mesmo convênio: estende este contrato sem cobrar taxa de adesão."
+                    : "Convênio diferente: cria um novo contrato e cobra a taxa de adesão do convênio escolhido."}
               </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Nº de pessoas no contrato</Label>
               {faixasDoConvenio.length > 0 ? (
                 <>
-                  <Select
-                    value={faixaId}
-                    onValueChange={(v) => setFaixaId(v)}
-                  >
+                  <Select value={faixaId} onValueChange={(v) => setFaixaId(v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a faixa…" />
                     </SelectTrigger>
@@ -486,13 +508,17 @@ export function RenovarContratoDialog({
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-muted-foreground">
-                    Atualiza automaticamente conforme dependentes são incluídos ou removidos.
-                    {" "}Contrato atual: <strong>{totalPessoas}</strong> pessoa{totalPessoas === 1 ? "" : "s"}.
+                    Atualiza automaticamente conforme dependentes são incluídos ou removidos.{" "}
+                    Contrato atual: <strong>{totalPessoas}</strong> pessoa
+                    {totalPessoas === 1 ? "" : "s"}.
                   </p>
                 </>
               ) : (
                 <>
-                  <Input value={`${totalPessoas} pessoa${totalPessoas === 1 ? "" : "s"} — ${BRL(valorRenovacao)}`} readOnly />
+                  <Input
+                    value={`${totalPessoas} pessoa${totalPessoas === 1 ? "" : "s"} — ${BRL(valorRenovacao)}`}
+                    readOnly
+                  />
                   <p className="text-[11px] text-muted-foreground">
                     Este convênio não possui faixas de preço cadastradas — o valor base é aplicado.
                   </p>
@@ -570,7 +596,9 @@ export function RenovarContratoDialog({
             ) : null}
             {novosComTaxa.length > 0 ? (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Taxa de inclusão ({novosComTaxa.length}× {BRL(taxaInclusaoConvenio)})</span>
+                <span className="text-muted-foreground">
+                  Taxa de inclusão ({novosComTaxa.length}× {BRL(taxaInclusaoConvenio)})
+                </span>
                 <span className="font-mono">{BRL(taxaInclusaoTotal)}</span>
               </div>
             ) : null}
@@ -599,12 +627,14 @@ export function RenovarContratoDialog({
             />
             {retroativa ? (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                {isTroca ? "Troca retroativa" : "Renovação retroativa"} — as novas parcelas serão geradas a partir de {formatDatePura(dataRenovacao)}.
-                Use este campo quando a operação foi feita fora do sistema.
+                {isTroca ? "Troca retroativa" : "Renovação retroativa"} — as novas parcelas serão
+                geradas a partir de {formatDatePura(dataRenovacao)}. Use este campo quando a
+                operação foi feita fora do sistema.
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                Se a {isTroca ? "troca" : "renovação"} já aconteceu em uma data anterior, informe aqui para registrar corretamente.
+                Se a {isTroca ? "troca" : "renovação"} já aconteceu em uma data anterior, informe
+                aqui para registrar corretamente.
               </p>
             )}
           </div>
@@ -614,14 +644,21 @@ export function RenovarContratoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={abrirConfirmacao} disabled={!podeConfirmar} className="bg-red-600 hover:bg-red-700 text-white">
+          <Button
+            onClick={abrirConfirmacao}
+            disabled={!podeConfirmar}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
             <RefreshCw className="h-4 w-4 mr-1" />
             {isTroca ? "Confirmar troca" : "Confirmar renovação"}
           </Button>
         </DialogFooter>
       </DialogContent>
 
-      <AlertDialog open={confirmacaoAberta} onOpenChange={(v) => !saving && setConfirmacaoAberta(v)}>
+      <AlertDialog
+        open={confirmacaoAberta}
+        onOpenChange={(v) => !saving && setConfirmacaoAberta(v)}
+      >
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-700">
@@ -643,24 +680,45 @@ export function RenovarContratoDialog({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="text-muted-foreground">Tipo</span>
-                <span className="font-medium">{isTroca ? "Troca de convênio" : mode === "extensao" ? "Renovar contrato atual" : "Criar novo contrato"}</span>
+                <span className="font-medium">
+                  {isTroca
+                    ? "Troca de convênio"
+                    : mode === "extensao"
+                      ? "Renovar contrato atual"
+                      : "Criar novo contrato"}
+                </span>
                 <span className="text-muted-foreground">Convênio anterior</span>
                 <span className="font-medium">{convenioAtualNome ?? "—"}</span>
-                <span className="text-muted-foreground">{isTroca ? "Novo convênio" : "Convênio da renovação"}</span>
+                <span className="text-muted-foreground">
+                  {isTroca ? "Novo convênio" : "Convênio da renovação"}
+                </span>
                 <span className="font-medium">{novoConvenio?.nome ?? "—"}</span>
                 <span className="text-muted-foreground">Pessoas no contrato</span>
                 <span className="font-medium">{totalPessoas}</span>
                 <span className="text-muted-foreground">Mensalidades</span>
-                <span className="font-medium">{parcelasRenovacao} × {BRL(valorRenovacao)}</span>
+                <span className="font-medium">
+                  {parcelasRenovacao} × {BRL(valorRenovacao)}
+                </span>
               </div>
             </div>
 
             <div className="rounded-md border p-3 space-y-2">
               <div className="font-medium">Dependentes</div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                <ResumoDependentes titulo="Mantidos" nomes={dependentesMantidos.map((d) => d.paciente_nome)} />
-                <ResumoDependentes titulo="Incluídos" nomes={dependentesNovos.map((d) => d.paciente_nome)} destaque="text-emerald-700" />
-                <ResumoDependentes titulo="Removidos" nomes={dependentesRemovidos.map((d) => d.paciente_nome)} destaque="text-red-700" />
+                <ResumoDependentes
+                  titulo="Mantidos"
+                  nomes={dependentesMantidos.map((d) => d.paciente_nome)}
+                />
+                <ResumoDependentes
+                  titulo="Incluídos"
+                  nomes={dependentesNovos.map((d) => d.paciente_nome)}
+                  destaque="text-emerald-700"
+                />
+                <ResumoDependentes
+                  titulo="Removidos"
+                  nomes={dependentesRemovidos.map((d) => d.paciente_nome)}
+                  destaque="text-red-700"
+                />
               </div>
             </div>
 
@@ -668,7 +726,9 @@ export function RenovarContratoDialog({
               <div className="font-medium text-sm">Movimentos financeiros que serão gerados</div>
               <div className="flex justify-between gap-3">
                 <span className="text-muted-foreground">Mensalidades</span>
-                <span className="font-mono">{parcelasRenovacao} × {BRL(valorRenovacao)}</span>
+                <span className="font-mono">
+                  {parcelasRenovacao} × {BRL(valorRenovacao)}
+                </span>
               </div>
               {taxaAdesaoCobrada > 0 ? (
                 <div className="flex justify-between gap-3">
@@ -679,7 +739,9 @@ export function RenovarContratoDialog({
               {taxaInclusaoTotal > 0 ? (
                 <div className="flex justify-between gap-3">
                   <span className="text-muted-foreground">Taxa de inclusão de dependente</span>
-                  <span className="font-mono">{novosComTaxa.length} × {BRL(taxaInclusaoConvenio)} = {BRL(taxaInclusaoTotal)}</span>
+                  <span className="font-mono">
+                    {novosComTaxa.length} × {BRL(taxaInclusaoConvenio)} = {BRL(taxaInclusaoTotal)}
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -707,7 +769,11 @@ export function RenovarContratoDialog({
               disabled={saving}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
               {isTroca ? "Confirmar troca" : "Confirmar renovação"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -728,11 +794,15 @@ function ResumoDependentes({
 }) {
   return (
     <div className="rounded-md bg-muted/30 p-2 min-h-16">
-      <div className="font-medium text-muted-foreground">{titulo} ({nomes.length})</div>
+      <div className="font-medium text-muted-foreground">
+        {titulo} ({nomes.length})
+      </div>
       {nomes.length > 0 ? (
         <ul className={`mt-1 space-y-0.5 ${destaque}`}>
           {nomes.map((nome) => (
-            <li key={`${titulo}-${nome}`} className="truncate">• {nome}</li>
+            <li key={`${titulo}-${nome}`} className="truncate">
+              • {nome}
+            </li>
           ))}
         </ul>
       ) : (
@@ -790,9 +860,7 @@ function DepLinha({
                   size="sm"
                   variant="ghost"
                   className="h-6 text-xs"
-                  onClick={() =>
-                    onChange({ paciente_id: null, paciente_nome: "" })
-                  }
+                  onClick={() => onChange({ paciente_id: null, paciente_nome: "" })}
                 >
                   Trocar
                 </Button>
@@ -850,13 +918,9 @@ function DepLinha({
             <label className="flex items-center gap-2 text-xs cursor-pointer text-muted-foreground">
               <Checkbox
                 checked={row.cobrar_taxa_inclusao}
-                onCheckedChange={(v) =>
-                  onChange({ cobrar_taxa_inclusao: v === true })
-                }
+                onCheckedChange={(v) => onChange({ cobrar_taxa_inclusao: v === true })}
               />
-              <span>
-                Cobrar taxa de inclusão de dependente ({BRL(taxaInclusaoValor)})
-              </span>
+              <span>Cobrar taxa de inclusão de dependente ({BRL(taxaInclusaoValor)})</span>
             </label>
           ) : null}
         </div>

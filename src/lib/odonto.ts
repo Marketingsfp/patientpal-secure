@@ -1,7 +1,20 @@
 export type OdontoStatus =
-  | "higido" | "cariado" | "restaurado" | "ausente" | "extracao_indicada"
-  | "tratamento_canal" | "coroa" | "implante" | "protese" | "fratura"
-  | "selante" | "sangramento" | "mobilidade" | "tartaro" | "aparelho" | "faceta";
+  | "higido"
+  | "cariado"
+  | "restaurado"
+  | "ausente"
+  | "extracao_indicada"
+  | "tratamento_canal"
+  | "coroa"
+  | "implante"
+  | "protese"
+  | "fratura"
+  | "selante"
+  | "sangramento"
+  | "mobilidade"
+  | "tartaro"
+  | "aparelho"
+  | "faceta";
 
 export type OdontoFace = "O" | "M" | "D" | "V" | "L" | "INTEIRO";
 

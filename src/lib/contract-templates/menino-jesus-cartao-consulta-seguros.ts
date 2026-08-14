@@ -1,3 +1,8 @@
+/* eslint-disable no-irregular-whitespace --
+ * Este arquivo é o HTML do contrato extraído do PDF original. Os 307 NBSP
+ * (U+00A0) são conteúdo do documento, não formatação de código: trocá-los por
+ * espaço comum mudaria o texto impresso do contrato. Regra desligada no arquivo.
+ */
 export const CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS = `<!DOCTYPE html>
 <!--[if IE]>  <html class="pdf24_ie"> <![endif]-->
 <html>

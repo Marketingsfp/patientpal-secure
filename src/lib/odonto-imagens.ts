@@ -154,7 +154,10 @@ export async function urlAssinada(path: string, expiresSec = 3600): Promise<stri
   return data.signedUrl;
 }
 
-export async function urlsAssinadas(paths: string[], expiresSec = 3600): Promise<Record<string, string>> {
+export async function urlsAssinadas(
+  paths: string[],
+  expiresSec = 3600,
+): Promise<Record<string, string>> {
   if (paths.length === 0) return {};
   const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, expiresSec);
   const out: Record<string, string> = {};

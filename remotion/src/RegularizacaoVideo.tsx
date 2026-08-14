@@ -17,19 +17,33 @@ const T = springTiming({ config: { damping: 200 }, durationInFrames: 18 });
 export const RegularizacaoVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: C.bgDeep }}>
     <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={125}><R1Hook /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={125}>
+        <R1Hook />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-bottom" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={130}><R2Onde /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={130}>
+        <R2Onde />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={135}><R3SemContrato /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={135}>
+        <R3SemContrato />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={155}><R4Campos /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={155}>
+        <R4Campos />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={175}><R5Parcelas /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={175}>
+        <R5Parcelas />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={150}><R6Cuidados /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={150}>
+        <R6Cuidados />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={fade()} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={120}><R7Close /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={120}>
+        <R7Close />
+      </TransitionSeries.Sequence>
     </TransitionSeries>
   </AbsoluteFill>
 );

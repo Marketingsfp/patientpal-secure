@@ -19,9 +19,7 @@ export const listarBackups = createServerFn({ method: "POST" })
       throw new Error("Somente administradores podem acessar backups");
     }
 
-    const { supabaseAdmin } = await import(
-      "@/integrations/supabase/client.server"
-    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: dias, error } = await supabaseAdmin.storage
       .from(BUCKET)
@@ -56,9 +54,7 @@ export const baixarBackupDoDia = createServerFn({ method: "POST" })
       throw new Error("Somente administradores podem baixar backups");
     }
 
-    const { supabaseAdmin } = await import(
-      "@/integrations/supabase/client.server"
-    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const prefix = `${data.clinica_id}/${data.data}`;
     const { data: files, error } = await supabaseAdmin.storage
       .from(BUCKET)

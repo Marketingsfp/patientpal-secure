@@ -16,17 +16,29 @@ const T = springTiming({ config: { damping: 200 }, durationInFrames: 18 });
 export const AvulsoVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: C.bgDeep }}>
     <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={115}><A1Hook /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={115}>
+        <A1Hook />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-bottom" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={125}><A2Onde /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={125}>
+        <A2Onde />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={145}><A3SemParcela /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={145}>
+        <A3SemParcela />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={150}><A4Preencher /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={150}>
+        <A4Preencher />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={140}><A5Desconto /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={140}>
+        <A5Desconto />
+      </TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={fade()} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={115}><A6Close /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={115}>
+        <A6Close />
+      </TransitionSeries.Sequence>
     </TransitionSeries>
   </AbsoluteFill>
 );

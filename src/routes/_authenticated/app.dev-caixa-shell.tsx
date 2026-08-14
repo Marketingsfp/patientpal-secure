@@ -10,10 +10,7 @@ import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache
 export const Route = createFileRoute("/_authenticated/app/dev-caixa-shell")({
   component: DevCaixaShell,
   head: () => ({
-    meta: [
-      { title: "Preview — Caixa v2 (dev)" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
+    meta: [{ title: "Preview — Caixa v2 (dev)" }, { name: "robots", content: "noindex, nofollow" }],
   }),
 });
 
@@ -41,13 +38,15 @@ function DevCaixaShell() {
     <div className="h-[calc(100vh-56px)] flex flex-col">
       <div className="border-b bg-muted/30 px-4 py-2 flex items-center justify-between gap-4 flex-wrap">
         <div className="text-xs text-muted-foreground">
-          <b>Preview isolado</b> — rota <code>/app/dev-caixa-shell</code> · não altera <code>/app/caixa</code>.
+          <b>Preview isolado</b> — rota <code>/app/dev-caixa-shell</code> · não altera{" "}
+          <code>/app/caixa</code>.
         </div>
         <div className="flex items-center gap-3">
           <Label className="text-xs flex items-center gap-2">
             Flag <code className="bg-muted px-1 rounded">caixa_v2</code>
             <Switch
-              checked={enabled} disabled={loading}
+              checked={enabled}
+              disabled={loading}
               onCheckedChange={(v) => void setEnabled(v)}
               data-testid="flag-caixa-v2"
             />
@@ -62,8 +61,10 @@ function DevCaixaShell() {
           <CaixaShellV2 compactPref={compact} onToggleCompact={(v) => void persistCompact(v)} />
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center p-6">
-            Flag <code className="mx-1">caixa_v2</code> desligada.<br />
-            Ative acima para pré-visualizar o novo Caixa. O caixa de produção continua em <code>/app/caixa</code>.
+            Flag <code className="mx-1">caixa_v2</code> desligada.
+            <br />
+            Ative acima para pré-visualizar o novo Caixa. O caixa de produção continua em{" "}
+            <code>/app/caixa</code>.
           </div>
         )}
       </div>

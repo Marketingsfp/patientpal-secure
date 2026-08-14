@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClinica } from "@/hooks/use-clinica";
 import { getContextoClinica, chatNina } from "@/lib/nina.functions";
@@ -29,7 +35,8 @@ type Procedimento = {
   preparo: string | null;
 };
 
-const money = (n: number) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const money = (n: number) =>
+  Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function InformacoesRapidasCard({ className }: { className?: string }) {
   const [tabela, setTabela] = useState(false);
@@ -63,7 +70,13 @@ export function InformacoesRapidasCard({ className }: { className?: string }) {
   );
 }
 
-function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function TabelaRapidaDrawer({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const { clinicaAtual } = useClinica();
   const getCtx = useServerFn(getContextoClinica);
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -86,14 +99,21 @@ function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
 
   const termo = q.trim().toLowerCase();
   const procsFiltrados = useMemo(
-    () => (!termo ? procs : procs.filter((p) => `${p.nome} ${p.grupo ?? ""} ${p.tipo}`.toLowerCase().includes(termo))),
+    () =>
+      !termo
+        ? procs
+        : procs.filter((p) => `${p.nome} ${p.grupo ?? ""} ${p.tipo}`.toLowerCase().includes(termo)),
     [procs, termo],
   );
   const medicosFiltrados = useMemo(
     () =>
       !termo
         ? medicos
-        : medicos.filter((m) => `${m.nome} ${m.crm ?? ""}`.toLowerCase().includes(termo) || m.horarios.some((h) => h.dia.toLowerCase().includes(termo))),
+        : medicos.filter(
+            (m) =>
+              `${m.nome} ${m.crm ?? ""}`.toLowerCase().includes(termo) ||
+              m.horarios.some((h) => h.dia.toLowerCase().includes(termo)),
+          ),
     [medicos, termo],
   );
 
@@ -102,10 +122,16 @@ function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
       <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
           <SheetTitle>Tabela de preços e horários</SheetTitle>
-          <SheetDescription>Consulta rápida de procedimentos, valores e agenda dos médicos.</SheetDescription>
+          <SheetDescription>
+            Consulta rápida de procedimentos, valores e agenda dos médicos.
+          </SheetDescription>
         </SheetHeader>
         <div className="px-5 py-3">
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar exame, procedimento ou médico..." />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar exame, procedimento ou médico..."
+          />
         </div>
         <Tabs defaultValue="procedimentos" className="flex-1 min-h-0 flex flex-col">
           <div className="px-5">
@@ -114,11 +140,18 @@ function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
               <TabsTrigger value="medicos">Médicos e horários</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="procedimentos" className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2">
+          <TabsContent
+            value="procedimentos"
+            className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2"
+          >
             {loading ? (
-              Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-xl" />
+              ))
             ) : procsFiltrados.length === 0 ? (
-              <p className="text-xs text-slate-500 py-6 text-center">Nenhum procedimento encontrado.</p>
+              <p className="text-xs text-slate-500 py-6 text-center">
+                Nenhum procedimento encontrado.
+              </p>
             ) : (
               procsFiltrados.slice(0, 300).map((p) => (
                 <div key={p.id} className="rounded-xl border border-slate-100 px-3 py-2">
@@ -130,18 +163,29 @@ function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-semibold tabular-nums text-slate-800">{money(p.valor_dinheiro_pix)}</div>
-                      <div className="text-[11px] text-slate-500 tabular-nums">cartão {money(p.valor_cartao)}</div>
+                      <div className="text-sm font-semibold tabular-nums text-slate-800">
+                        {money(p.valor_dinheiro_pix)}
+                      </div>
+                      <div className="text-[11px] text-slate-500 tabular-nums">
+                        cartão {money(p.valor_cartao)}
+                      </div>
                     </div>
                   </div>
-                  {p.preparo && <p className="mt-1 text-[11px] text-amber-700">Preparo: {p.preparo}</p>}
+                  {p.preparo && (
+                    <p className="mt-1 text-[11px] text-amber-700">Preparo: {p.preparo}</p>
+                  )}
                 </div>
               ))
             )}
           </TabsContent>
-          <TabsContent value="medicos" className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2">
+          <TabsContent
+            value="medicos"
+            className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2"
+          >
             {loading ? (
-              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
+              Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))
             ) : medicosFiltrados.length === 0 ? (
               <p className="text-xs text-slate-500 py-6 text-center">Nenhum médico encontrado.</p>
             ) : (
@@ -150,14 +194,22 @@ function TabelaRapidaDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
                   <div className="flex items-center gap-2">
                     <Stethoscope className="h-4 w-4 text-slate-400 shrink-0" />
                     <span className="text-sm font-medium text-slate-800 truncate">{m.nome}</span>
-                    {m.crm && <Badge variant="secondary" className="text-[10px]">CRM {m.crm}{m.crm_uf ? `/${m.crm_uf}` : ""}</Badge>}
+                    {m.crm && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        CRM {m.crm}
+                        {m.crm_uf ? `/${m.crm_uf}` : ""}
+                      </Badge>
+                    )}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {m.horarios.length === 0 ? (
                       <span className="text-[11px] text-slate-500">Sem horários cadastrados.</span>
                     ) : (
                       m.horarios.map((h, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-400"
+                        >
                           <Clock className="h-3 w-3" /> {h.dia} {h.inicio}–{h.fim}
                         </span>
                       ))
@@ -199,17 +251,29 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     setInput("");
     setLoading(true);
     try {
-      const r: any = await enviar({ data: { clinicaId: clinicaAtual.clinica_id, messages: novas.slice(-20) } });
-      setMsgs([...novas, { role: "assistant", content: r?.reply || r?.error || "Não consegui responder agora." }]);
+      const r: any = await enviar({
+        data: { clinicaId: clinicaAtual.clinica_id, messages: novas.slice(-20) },
+      });
+      setMsgs([
+        ...novas,
+        { role: "assistant", content: r?.reply || r?.error || "Não consegui responder agora." },
+      ]);
     } catch {
-      setMsgs([...novas, { role: "assistant", content: "Não foi possível falar com a Nina agora." }]);
+      setMsgs([
+        ...novas,
+        { role: "assistant", content: "Não foi possível falar com a Nina agora." },
+      ]);
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
-  const sugestoes = ["Qual o valor do ultrassom?", "Quais médicos atendem hoje?", "Horários da cardiologia"];
+  const sugestoes = [
+    "Qual o valor do ultrassom?",
+    "Quais médicos atendem hoje?",
+    "Horários da cardiologia",
+  ];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -218,16 +282,26 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
           <SheetTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4" /> Nina — assistente da clínica
           </SheetTitle>
-          <SheetDescription>Pergunte sobre valores, especialidades e horários dos médicos.</SheetDescription>
+          <SheetDescription>
+            Pergunte sobre valores, especialidades e horários dos médicos.
+          </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
           {msgs.length === 0 && (
             <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-center">
               <Sparkles className="h-5 w-5 mx-auto text-slate-400" />
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Comece com uma pergunta rápida:</p>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                Comece com uma pergunta rápida:
+              </p>
               <div className="mt-2 flex flex-wrap justify-center gap-1.5">
                 {sugestoes.map((s) => (
-                  <Button key={s} size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => void perguntar(s)}>
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    onClick={() => void perguntar(s)}
+                  >
                     {s}
                   </Button>
                 ))}
@@ -235,7 +309,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             </div>
           )}
           {msgs.map((m, i) => (
-            <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+            <div
+              key={i}
+              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
+            >
               <div
                 className={cn(
                   "max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed",
@@ -262,7 +339,12 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             void perguntar(input);
           }}
         >
-          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Digite sua pergunta..." />
+          <Input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Digite sua pergunta..."
+          />
           <Button type="submit" size="icon" disabled={loading || !input.trim()}>
             <Send className="h-4 w-4" />
           </Button>

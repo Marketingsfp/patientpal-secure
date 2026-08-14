@@ -51,7 +51,10 @@ const TITULOS: Record<DocA4Tipo, string> = {
 };
 
 const esc = (v: unknown) =>
-  String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
 
 function idade(dataNascimento?: string | null): string {
   if (!dataNascimento) return "";
@@ -68,7 +71,11 @@ function enderecoClinica(c: DadosClinicaA4): string {
   const linha = [c.endereco, [c.cidade, c.estado].filter(Boolean).join("/"), c.cep]
     .filter(Boolean)
     .join(" · ");
-  const contato = [c.telefone ? `Tel: ${c.telefone}` : null, c.email, c.cnpj ? `CNPJ ${c.cnpj}` : null]
+  const contato = [
+    c.telefone ? `Tel: ${c.telefone}` : null,
+    c.email,
+    c.cnpj ? `CNPJ ${c.cnpj}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
   return [linha, contato].filter(Boolean).join("<br/>");
@@ -79,7 +86,9 @@ export function montarHtmlA4(doc: DocumentoA4): string {
   const dataStr = agora.toLocaleDateString("pt-BR");
   const horaStr = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const cidadeData = `${doc.clinica.cidade ? `${doc.clinica.cidade}, ` : ""}${agora.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}`;
-  const crm = doc.medico.crm ? `CRM ${doc.medico.crm}${doc.medico.crmUf ? `/${doc.medico.crmUf}` : ""}` : "";
+  const crm = doc.medico.crm
+    ? `CRM ${doc.medico.crm}${doc.medico.crmUf ? `/${doc.medico.crmUf}` : ""}`
+    : "";
   const idadeStr = idade(doc.paciente.dataNascimento);
   const codigo = doc.codigoValidacao ?? `${agora.getTime().toString(36).toUpperCase()}`;
 
@@ -170,7 +179,13 @@ export function imprimirDocumentoA4(doc: DocumentoA4): boolean {
   const w = window.open("", "_blank", "width=980,height=780");
   if (!w) return false;
   w.document.open();
-  w.document.write(`${html.replace("</body>", "<script>window.onload=()=>{window.focus();window.print();};<\/script></body>")}`);
+  // A barra em `<\/script>` é obrigatória: sem ela a sequência literal
+  // `</script>` fecharia o <script> do documento gerado antes da hora,
+  // quebrando a impressão.
+  w.document.write(
+    // eslint-disable-next-line no-useless-escape
+    `${html.replace("</body>", "<script>window.onload=()=>{window.focus();window.print();};<\/script></body>")}`,
+  );
   w.document.close();
   return true;
 }

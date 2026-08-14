@@ -60,7 +60,9 @@ export function PainelPage() {
     if (typeof window === "undefined") return;
     // Carrega a voz feminina assim que a lista estiver disponível.
     escolherVozFeminina();
-    const onVoicesChanged = () => { escolherVozFeminina(); };
+    const onVoicesChanged = () => {
+      escolherVozFeminina();
+    };
     if ("speechSynthesis" in window) {
       window.speechSynthesis.addEventListener?.("voiceschanged", onVoicesChanged);
     }
@@ -71,8 +73,14 @@ export function PainelPage() {
           u.volume = 0;
           window.speechSynthesis.speak(u);
         }
-        const AC = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-          ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        const AC =
+          (
+            window as unknown as {
+              AudioContext?: typeof AudioContext;
+              webkitAudioContext?: typeof AudioContext;
+            }
+          ).AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
         void audioCtxRef.current?.resume();
         if ("speechSynthesis" in window) window.speechSynthesis.resume();
@@ -88,7 +96,9 @@ export function PainelPage() {
           }
           processarFilaFala();
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
     unlock();
@@ -110,67 +120,70 @@ export function PainelPage() {
     };
   }, []);
 
-  const t = isLight ? {
-    root: "bg-[#f6f7fb] text-slate-900",
-    accent: "text-blue-600",
-    heading: "text-slate-900",
-    clock: "text-slate-500",
-    headerBorder: "border-slate-200",
-    heroCard: "bg-white border border-slate-200 shadow-xl",
-    heroGlow: "bg-blue-500/10",
-    badgeActive: "bg-blue-600 text-white",
-    badgeIdle: "bg-slate-100 border border-slate-200 text-slate-500",
-    ticket: "text-slate-900 drop-shadow-sm",
-    patient: "text-slate-700",
-    guicheLabel: "text-slate-500",
-    guicheValue: "text-blue-600",
-    aside: "bg-white border border-slate-200",
-    asideTitle: "text-slate-500",
-    asideEmpty: "text-slate-400",
-    itemFirst: "bg-blue-50 border border-blue-100",
-    itemRest: "bg-slate-50 border border-slate-100",
-    itemCodeFirst: "text-blue-600",
-    itemCodeRest: "text-slate-500",
-    itemNameFirst: "text-slate-700",
-    itemNameRest: "text-slate-500",
-    itemLabel: "text-slate-400",
-    itemGuicheFirst: "text-slate-900",
-    itemGuicheRest: "text-slate-500",
-    footerBorder: "border-slate-200",
-    footerText: "text-slate-400",
-    idleText: "text-slate-400",
-    toggle: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
-  } : {
-    root: "bg-[#0a0b10] text-white",
-    accent: "text-blue-400",
-    heading: "text-white",
-    clock: "text-slate-400",
-    headerBorder: "border-white/10",
-    heroCard: "bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 shadow-2xl",
-    heroGlow: "bg-blue-600/10",
-    badgeActive: "bg-blue-600 text-white",
-    badgeIdle: "bg-white/5 border border-white/10 text-slate-400",
-    ticket: "text-white drop-shadow-2xl",
-    patient: "text-slate-200",
-    guicheLabel: "text-slate-400",
-    guicheValue: "text-blue-400",
-    aside: "bg-white/[0.03] border border-white/10",
-    asideTitle: "text-slate-500",
-    asideEmpty: "text-slate-600",
-    itemFirst: "bg-white/5 border border-white/5",
-    itemRest: "bg-white/[0.02] border border-white/5",
-    itemCodeFirst: "text-blue-400",
-    itemCodeRest: "text-slate-400",
-    itemNameFirst: "text-slate-300",
-    itemNameRest: "text-slate-500",
-    itemLabel: "text-slate-500",
-    itemGuicheFirst: "text-white",
-    itemGuicheRest: "text-slate-400",
-    footerBorder: "border-white/5",
-    footerText: "text-slate-600",
-    idleText: "text-slate-500",
-    toggle: "bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10",
-  };
+  const t = isLight
+    ? {
+        root: "bg-[#f6f7fb] text-slate-900",
+        accent: "text-blue-600",
+        heading: "text-slate-900",
+        clock: "text-slate-500",
+        headerBorder: "border-slate-200",
+        heroCard: "bg-white border border-slate-200 shadow-xl",
+        heroGlow: "bg-blue-500/10",
+        badgeActive: "bg-blue-600 text-white",
+        badgeIdle: "bg-slate-100 border border-slate-200 text-slate-500",
+        ticket: "text-slate-900 drop-shadow-sm",
+        patient: "text-slate-700",
+        guicheLabel: "text-slate-500",
+        guicheValue: "text-blue-600",
+        aside: "bg-white border border-slate-200",
+        asideTitle: "text-slate-500",
+        asideEmpty: "text-slate-400",
+        itemFirst: "bg-blue-50 border border-blue-100",
+        itemRest: "bg-slate-50 border border-slate-100",
+        itemCodeFirst: "text-blue-600",
+        itemCodeRest: "text-slate-500",
+        itemNameFirst: "text-slate-700",
+        itemNameRest: "text-slate-500",
+        itemLabel: "text-slate-400",
+        itemGuicheFirst: "text-slate-900",
+        itemGuicheRest: "text-slate-500",
+        footerBorder: "border-slate-200",
+        footerText: "text-slate-400",
+        idleText: "text-slate-400",
+        toggle: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+      }
+    : {
+        root: "bg-[#0a0b10] text-white",
+        accent: "text-blue-400",
+        heading: "text-white",
+        clock: "text-slate-400",
+        headerBorder: "border-white/10",
+        heroCard:
+          "bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 shadow-2xl",
+        heroGlow: "bg-blue-600/10",
+        badgeActive: "bg-blue-600 text-white",
+        badgeIdle: "bg-white/5 border border-white/10 text-slate-400",
+        ticket: "text-white drop-shadow-2xl",
+        patient: "text-slate-200",
+        guicheLabel: "text-slate-400",
+        guicheValue: "text-blue-400",
+        aside: "bg-white/[0.03] border border-white/10",
+        asideTitle: "text-slate-500",
+        asideEmpty: "text-slate-600",
+        itemFirst: "bg-white/5 border border-white/5",
+        itemRest: "bg-white/[0.02] border border-white/5",
+        itemCodeFirst: "text-blue-400",
+        itemCodeRest: "text-slate-400",
+        itemNameFirst: "text-slate-300",
+        itemNameRest: "text-slate-500",
+        itemLabel: "text-slate-500",
+        itemGuicheFirst: "text-white",
+        itemGuicheRest: "text-slate-400",
+        footerBorder: "border-white/5",
+        footerText: "text-slate-600",
+        idleText: "text-slate-500",
+        toggle: "bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10",
+      };
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -178,7 +191,7 @@ export function PainelPage() {
 
     const carregar = async () => {
       const { data } = await supabase.rpc("painel_senhas_publicas", { _clinica_id: clinicaId });
-      const lista = ((data ?? []) as Senha[]);
+      const lista = (data ?? []) as Senha[];
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
 
@@ -200,14 +213,17 @@ export function PainelPage() {
         },
       )
       .subscribe((status) => {
-        // eslint-disable-next-line no-console
         console.info("[painel] realtime status:", status);
       });
 
     // Fallback de polling: garante atualização mesmo se o canal de realtime
     // cair silenciosamente (proxy, sleep de aba, RLS bloqueando o socket).
-    const poll = window.setInterval(() => { void carregar(); }, 3000);
-    const onVis = () => { if (document.visibilityState === "visible") void carregar(); };
+    const poll = window.setInterval(() => {
+      void carregar();
+    }, 3000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void carregar();
+    };
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
@@ -236,7 +252,11 @@ export function PainelPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const reagir = () => {
-      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
       // Libera a fila para o próximo processamento com a nova velocidade.
       falandoRef.current = false;
     };
@@ -281,10 +301,13 @@ export function PainelPage() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
     const vozes = window.speechSynthesis.getVoices();
     if (!vozes.length) return null;
-    const ptBR = vozes.filter((v) => /pt(-|_)?BR/i.test(v.lang) || /portuguese.*brazil/i.test(v.name));
+    const ptBR = vozes.filter(
+      (v) => /pt(-|_)?BR/i.test(v.lang) || /portuguese.*brazil/i.test(v.name),
+    );
     const candidatas = ptBR.length ? ptBR : vozes.filter((v) => /^pt/i.test(v.lang));
     // Nomes conhecidos de vozes femininas em pt-BR nos principais SOs/browsers
-    const nomesFemininos = /(luciana|maria|francisca|camila|helena|joana|vitoria|vitória|fernanda|paulina|google.*português|microsoft.*(maria|francisca|heloisa|helo[íi]sa)|female|feminina|mulher)/i;
+    const nomesFemininos =
+      /(luciana|maria|francisca|camila|helena|joana|vitoria|vitória|fernanda|paulina|google.*português|microsoft.*(maria|francisca|heloisa|helo[íi]sa)|female|feminina|mulher)/i;
     const feminina = candidatas.find((v) => nomesFemininos.test(v.name));
     const escolhida = feminina ?? candidatas[0] ?? null;
     vozFemininaRef.current = escolhida;
@@ -317,7 +340,11 @@ export function PainelPage() {
       isUserTtsEnabled() &&
       Date.now() > piperBloqueadoAteRef.current;
     if (usarPiper) {
-      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
       tocarDing();
       // A partir daqui a chamada não está mais "pendente de gesto":
       // evita que qualquer clique na tela reenfileire o mesmo anúncio.
@@ -350,24 +377,28 @@ export function PainelPage() {
     function fallbackSpeechSynth() {
       falandoRef.current = true;
       const item = prox!;
-    try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
-    window.speechSynthesis.resume();
-    tocarDing();
-    const primeira = criarFala(texto, item.key);
-    // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
-    window.speechSynthesis.speak(primeira);
-    window.setTimeout(() => {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
       window.speechSynthesis.resume();
-      // Cria a segunda leitura só agora para pegar a velocidade ATUAL
-      // (caso o usuário tenha alterado o slider entre a 1ª e a 2ª chamada).
-      const segunda = criarFala(texto, item.key);
-      segunda.onend = () => {
-        falandoRef.current = false;
-        processarFilaFala();
-      };
-      segunda.onerror = segunda.onend;
-      window.speechSynthesis.speak(segunda);
-    }, 3800);
+      tocarDing();
+      const primeira = criarFala(texto, item.key);
+      // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
+      window.speechSynthesis.speak(primeira);
+      window.setTimeout(() => {
+        window.speechSynthesis.resume();
+        // Cria a segunda leitura só agora para pegar a velocidade ATUAL
+        // (caso o usuário tenha alterado o slider entre a 1ª e a 2ª chamada).
+        const segunda = criarFala(texto, item.key);
+        segunda.onend = () => {
+          falandoRef.current = false;
+          processarFilaFala();
+        };
+        segunda.onerror = segunda.onend;
+        window.speechSynthesis.speak(segunda);
+      }, 3800);
     }
   }
 
@@ -400,73 +431,124 @@ export function PainelPage() {
     );
   }
 
-  if (!clinicaAtual) return <div className="min-h-screen flex items-center justify-center bg-background">Nenhuma clínica selecionada.</div>;
+  if (!clinicaAtual)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        Nenhuma clínica selecionada.
+      </div>
+    );
 
   return (
-    <div className={`h-screen w-full overflow-hidden ${t.root} p-[clamp(0.75rem,2vw,2rem)] flex flex-col transition-colors`}>
-      <header className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 mb-[clamp(0.5rem,1.5vh,1.5rem)] border-b ${t.headerBorder} pb-[clamp(0.5rem,1.2vh,1.25rem)]`}>
+    <div
+      className={`h-screen w-full overflow-hidden ${t.root} p-[clamp(0.75rem,2vw,2rem)] flex flex-col transition-colors`}
+    >
+      <header
+        className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 mb-[clamp(0.5rem,1.5vh,1.5rem)] border-b ${t.headerBorder} pb-[clamp(0.5rem,1.2vh,1.25rem)]`}
+      >
         <div className="min-w-0">
-          <p className={`${t.accent} font-bold tracking-widest text-[clamp(0.7rem,1.2vw,0.95rem)] uppercase mb-1`}>Painel de Chamada</p>
-          <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
+          <p
+            className={`${t.accent} font-bold tracking-widest text-[clamp(0.7rem,1.2vw,0.95rem)] uppercase mb-1`}
+          >
+            Painel de Chamada
+          </p>
+          <h1
+            className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}
+          >
+            {clinicaAtual.clinica.nome}
+          </h1>
         </div>
         <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
           <TtsStatusBadge status={ttsStatus} />
-          <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}><PainelClock /></div>
+          <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}>
+            <PainelClock />
+          </div>
         </div>
       </header>
 
       <main className="flex flex-1 flex-col lg:flex-row gap-[clamp(0.75rem,1.5vw,2rem)] min-h-0">
-        <div className={`flex-[2] min-h-0 min-w-0 relative overflow-hidden ${t.heroCard} rounded-[clamp(1rem,2vw,2rem)] flex flex-col items-center justify-center p-[clamp(0.75rem,2vw,2.5rem)]`}>
-          <div className={`absolute -top-24 -left-24 w-96 h-96 ${t.heroGlow} blur-[120px] rounded-full pointer-events-none`} />
+        <div
+          className={`flex-[2] min-h-0 min-w-0 relative overflow-hidden ${t.heroCard} rounded-[clamp(1rem,2vw,2rem)] flex flex-col items-center justify-center p-[clamp(0.75rem,2vw,2.5rem)]`}
+        >
+          <div
+            className={`absolute -top-24 -left-24 w-96 h-96 ${t.heroGlow} blur-[120px] rounded-full pointer-events-none`}
+          />
           <div className="relative z-10 text-center w-full">
-            {atual ? (() => {
-              const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
-              const fonte = ehNome
-                ? (atual.codigo.length > 16
+            {atual ? (
+              (() => {
+                const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
+                const fonte = ehNome
+                  ? atual.codigo.length > 16
                     ? "text-[clamp(2rem,min(6vw,9vh),4.5rem)]"
                     : atual.codigo.length > 10
                       ? "text-[clamp(2.5rem,min(7vw,11vh),5.5rem)]"
-                      : "text-[clamp(3rem,min(9vw,14vh),7rem)]")
-                : "text-[clamp(4rem,min(16vw,26vh),14rem)] tabular-nums";
-              return (
-                <>
-                  <span className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeActive} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,min(2vw,2vh),1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}>
-                    Chamando Agora
-                  </span>
-                  <div className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-[clamp(0.5rem,min(1.5vw,1.5vh),1rem)]`}>
-                    {atual.codigo}
-                  </div>
-                  {!ehNome && atual.paciente_nome && (
-                    <h3 className={`font-bold ${t.patient} tracking-tight uppercase break-words max-w-full text-[clamp(1rem,min(3.5vw,5vh),3rem)]`}>
-                      {atual.paciente_nome}
-                    </h3>
-                  )}
-                  <div className="flex items-center justify-center gap-[clamp(0.5rem,1.2vw,1.25rem)] mt-[clamp(0.5rem,min(2vw,2.5vh),1.5rem)]">
-                    {!ehNome && (
-                      <span className={`${t.guicheLabel} font-medium uppercase tracking-widest text-[clamp(0.85rem,min(2vw,3vh),1.75rem)]`}>Guichê</span>
+                      : "text-[clamp(3rem,min(9vw,14vh),7rem)]"
+                  : "text-[clamp(4rem,min(16vw,26vh),14rem)] tabular-nums";
+                return (
+                  <>
+                    <span
+                      className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeActive} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,min(2vw,2vh),1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}
+                    >
+                      Chamando Agora
+                    </span>
+                    <div
+                      className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-[clamp(0.5rem,min(1.5vw,1.5vh),1rem)]`}
+                    >
+                      {atual.codigo}
+                    </div>
+                    {!ehNome && atual.paciente_nome && (
+                      <h3
+                        className={`font-bold ${t.patient} tracking-tight uppercase break-words max-w-full text-[clamp(1rem,min(3.5vw,5vh),3rem)]`}
+                      >
+                        {atual.paciente_nome}
+                      </h3>
                     )}
-                    <span className={`font-black ${t.guicheValue} text-[clamp(2rem,min(6vw,9vh),5rem)]`}>{atual.guiche ?? "—"}</span>
-                  </div>
-                </>
-              );
-            })() : (
+                    <div className="flex items-center justify-center gap-[clamp(0.5rem,1.2vw,1.25rem)] mt-[clamp(0.5rem,min(2vw,2.5vh),1.5rem)]">
+                      {!ehNome && (
+                        <span
+                          className={`${t.guicheLabel} font-medium uppercase tracking-widest text-[clamp(0.85rem,min(2vw,3vh),1.75rem)]`}
+                        >
+                          Guichê
+                        </span>
+                      )}
+                      <span
+                        className={`font-black ${t.guicheValue} text-[clamp(2rem,min(6vw,9vh),5rem)]`}
+                      >
+                        {atual.guiche ?? "—"}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
               <>
-                <span className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeIdle} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,2vh,1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}>
+                <span
+                  className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeIdle} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,2vh,1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}
+                >
                   Chamando Agora
                 </span>
-                <div className={`${t.idleText} font-light text-[clamp(1.25rem,min(3.5vw,5vh),2.5rem)]`}>Aguardando chamada…</div>
+                <div
+                  className={`${t.idleText} font-light text-[clamp(1.25rem,min(3.5vw,5vh),2.5rem)]`}
+                >
+                  Aguardando chamada…
+                </div>
               </>
             )}
           </div>
         </div>
 
-        <aside className={`flex-1 min-h-0 min-w-0 ${t.aside} rounded-[clamp(1rem,2vw,2rem)] p-[clamp(0.75rem,1.5vw,1.75rem)] flex flex-col`}>
-          <h3 className={`font-bold uppercase tracking-widest ${t.asideTitle} mb-[clamp(0.5rem,1.5vh,1.5rem)] pl-2 lg:pl-4 text-[clamp(0.8rem,1.2vw,1.25rem)]`}>
+        <aside
+          className={`flex-1 min-h-0 min-w-0 ${t.aside} rounded-[clamp(1rem,2vw,2rem)] p-[clamp(0.75rem,1.5vw,1.75rem)] flex flex-col`}
+        >
+          <h3
+            className={`font-bold uppercase tracking-widest ${t.asideTitle} mb-[clamp(0.5rem,1.5vh,1.5rem)] pl-2 lg:pl-4 text-[clamp(0.8rem,1.2vw,1.25rem)]`}
+          >
             Anteriores
           </h3>
           <div className="space-y-[clamp(0.4rem,0.8vh,0.85rem)] flex-1 overflow-y-auto min-h-0">
             {historico.length === 0 && (
-              <div className={`${t.asideEmpty} pl-2 lg:pl-4 text-[clamp(0.9rem,1.4vw,1.125rem)]`}>Sem chamadas anteriores</div>
+              <div className={`${t.asideEmpty} pl-2 lg:pl-4 text-[clamp(0.9rem,1.4vw,1.125rem)]`}>
+                Sem chamadas anteriores
+              </div>
             )}
             {historico.map((s, i) => (
               <div
@@ -474,26 +556,40 @@ export function PainelPage() {
                 className={`flex items-center justify-between p-[clamp(0.6rem,min(1.2vw,1.6vh),1.25rem)] rounded-[clamp(0.75rem,1.2vw,1.25rem)] ${i === 0 ? t.itemFirst : t.itemRest}`}
               >
                 <div className="min-w-0">
-                  <p className={`font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest} text-[clamp(1rem,min(2vw,3vh),1.85rem)]`}>
+                  <p
+                    className={`font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest} text-[clamp(1rem,min(2vw,3vh),1.85rem)]`}
+                  >
                     {s.codigo}
                   </p>
                   {s.paciente_nome && (
-                    <p className={`font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest} text-[clamp(0.7rem,1.1vw,1.1rem)]`}>
+                    <p
+                      className={`font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest} text-[clamp(0.7rem,1.1vw,1.1rem)]`}
+                    >
                       {s.paciente_nome}
                     </p>
                   )}
                 </div>
                 <div className="text-right shrink-0 pl-3">
-                  <p className={`${t.itemLabel} uppercase font-bold tracking-widest mb-1 text-[clamp(0.5rem,0.75vw,0.7rem)]`}>Guichê</p>
-                  <p className={`font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest} text-[clamp(1.25rem,min(2.2vw,3vh),1.85rem)]`}>
+                  <p
+                    className={`${t.itemLabel} uppercase font-bold tracking-widest mb-1 text-[clamp(0.5rem,0.75vw,0.7rem)]`}
+                  >
+                    Guichê
+                  </p>
+                  <p
+                    className={`font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest} text-[clamp(1.25rem,min(2.2vw,3vh),1.85rem)]`}
+                  >
                     {s.guiche ?? "—"}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-          <div className={`mt-auto pt-[clamp(0.5rem,1vh,1.25rem)] border-t ${t.footerBorder} text-center`}>
-            <p className={`${t.footerText} font-medium text-[clamp(0.7rem,1vw,0.95rem)]`}>Por favor, dirija-se ao guichê indicado.</p>
+          <div
+            className={`mt-auto pt-[clamp(0.5rem,1vh,1.25rem)] border-t ${t.footerBorder} text-center`}
+          >
+            <p className={`${t.footerText} font-medium text-[clamp(0.7rem,1vw,0.95rem)]`}>
+              Por favor, dirija-se ao guichê indicado.
+            </p>
           </div>
         </aside>
       </main>
@@ -536,10 +632,12 @@ function TtsStatusBadge({
             : "border-muted-foreground/30 bg-muted/20 text-muted-foreground"
       }`}
     >
-      {offline ? <VolumeX className="h-4 w-4 shrink-0" /> : <Volume2 className="h-4 w-4 shrink-0" />}
-      <span className="hidden sm:inline">
-        Voz {offline ? "offline" : online ? "online" : "—"}
-      </span>
+      {offline ? (
+        <VolumeX className="h-4 w-4 shrink-0" />
+      ) : (
+        <Volume2 className="h-4 w-4 shrink-0" />
+      )}
+      <span className="hidden sm:inline">Voz {offline ? "offline" : online ? "online" : "—"}</span>
       {offline && status.erro && (
         <span className="hidden md:inline normal-case tracking-normal font-medium opacity-90">
           · {status.erro}
@@ -552,8 +650,7 @@ function TtsStatusBadge({
 // Transforma o erro do serviço de voz em um texto curto e legível
 // (ex.: "Erro 502 no servidor de voz").
 function descreverErroTts(err: unknown): string {
-  const msg =
-    err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  const msg = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   const status = msg.match(/\b(4\d{2}|5\d{2})\b/)?.[1];
   if (status) return `Erro ${status} no servidor de voz`;
   if (!msg) return "Servidor de voz não respondeu";

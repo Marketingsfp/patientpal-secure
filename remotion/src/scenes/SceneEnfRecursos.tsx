@@ -24,26 +24,55 @@ export const SceneEnfRecursos: React.FC = () => {
           const s = spring({ frame: f - 20 - i * 8, fps, config: { damping: 18 } });
           const active = i === 0;
           return (
-            <div key={i} style={{
-              background: "#fff", border: `1px solid ${active ? C.primary : C.line}`,
-              borderRadius: 16, padding: 22, opacity: s, transform: `translateY(${(1 - s) * 16}px)`,
-              boxShadow: active ? "0 10px 30px rgba(29,78,216,.18)" : "none",
-              display: "flex", alignItems: "center", gap: 16,
-            }}>
-              <div style={{
-                width: 54, height: 54, borderRadius: 12,
-                background: active ? C.primarySoft : "#EEF1F7",
-                color: C.primary, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 28,
-              }}>+</div>
+            <div
+              key={i}
+              style={{
+                background: "#fff",
+                border: `1px solid ${active ? C.primary : C.line}`,
+                borderRadius: 16,
+                padding: 22,
+                opacity: s,
+                transform: `translateY(${(1 - s) * 16}px)`,
+                boxShadow: active ? "0 10px 30px rgba(29,78,216,.18)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 12,
+                  background: active ? C.primarySoft : "#EEF1F7",
+                  color: C.primary,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 28,
+                }}
+              >
+                +
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 26, fontWeight: 600, fontFamily: dm }}>{r.n}</div>
-                <div style={{ fontSize: 18, color: C.sub, marginTop: 2 }}>Duração padrão: {r.d}</div>
+                <div style={{ fontSize: 18, color: C.sub, marginTop: 2 }}>
+                  Duração padrão: {r.d}
+                </div>
               </div>
-              <div style={{
-                fontSize: 14, color: C.accent, fontWeight: 600, fontFamily: dm,
-                padding: "6px 12px", border: `1px solid ${C.accent}`, borderRadius: 999,
-              }}>ATIVO</div>
+              <div
+                style={{
+                  fontSize: 14,
+                  color: C.accent,
+                  fontWeight: 600,
+                  fontFamily: dm,
+                  padding: "6px 12px",
+                  border: `1px solid ${C.accent}`,
+                  borderRadius: 999,
+                }}
+              >
+                ATIVO
+              </div>
             </div>
           );
         })}

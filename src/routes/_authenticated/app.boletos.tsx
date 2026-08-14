@@ -17,9 +17,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
@@ -28,9 +47,15 @@ export const Route = createFileRoute("/_authenticated/app/boletos")({
   head: () => ({
     meta: [
       { title: "Boletos — ClinicaOS" },
-      { name: "description", content: "Emita, acompanhe e concilie boletos bancários dos pacientes." },
+      {
+        name: "description",
+        content: "Emita, acompanhe e concilie boletos bancários dos pacientes.",
+      },
       { property: "og:title", content: "Boletos — ClinicaOS" },
-      { property: "og:description", content: "Emita, acompanhe e concilie boletos bancários dos pacientes." },
+      {
+        property: "og:description",
+        content: "Emita, acompanhe e concilie boletos bancários dos pacientes.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -51,8 +76,12 @@ interface Row {
   observacoes: string | null;
 }
 interface Form {
-  valor: string; vencimento: string; nosso_numero: string;
-  linha_digitavel: string; status: string; observacoes: string;
+  valor: string;
+  vencimento: string;
+  nosso_numero: string;
+  linha_digitavel: string;
+  status: string;
+  observacoes: string;
 }
 
 const STATUS_OPCOES = ["pendente", "pendente_emissao", "emitido", "pago", "vencido", "cancelado"];
@@ -71,7 +100,8 @@ function statusClasses(status: string) {
   if (s.startsWith("pendente")) return "bg-amber-500/15 text-amber-700 border border-amber-500/30";
   if (s === "emitido") return "bg-blue-500/15 text-blue-700 border border-blue-500/30";
   if (s === "pago") return "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30";
-  if (s === "vencido" || s === "cancelado") return "bg-rose-500/15 text-rose-700 border border-rose-500/30";
+  if (s === "vencido" || s === "cancelado")
+    return "bg-rose-500/15 text-rose-700 border border-rose-500/30";
   return "bg-muted text-muted-foreground border border-border";
 }
 
@@ -79,7 +109,12 @@ function StatusBadge({ status }: { status: string }) {
   const s = (status ?? "").toLowerCase();
   const label = STATUS_LABEL[s] ?? s.replace(/_/g, " ");
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", statusClasses(s))}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
+        statusClasses(s),
+      )}
+    >
       {label}
     </span>
   );
@@ -116,7 +151,9 @@ function BoletosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("boletos");
   const [rows, setRows] = useState<Row[]>([]);
-  const [pacientes, setPacientes] = useState<Map<string, { nome: string; cpf: string | null }>>(new Map());
+  const [pacientes, setPacientes] = useState<Map<string, { nome: string; cpf: string | null }>>(
+    new Map(),
+  );
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("todos");
@@ -131,24 +168,36 @@ function BoletosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("boletos")
-      .select("id, paciente_id, contrato_id, valor, vencimento, nosso_numero, linha_digitavel, codigo_barras, url_pdf, status, observacoes")
+      .select(
+        "id, paciente_id, contrato_id, valor, vencimento, nosso_numero, linha_digitavel, codigo_barras, url_pdf, status, observacoes",
+      )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("vencimento", { ascending: false });
-    if (error) { setLoading(false); mostrarErro(error); return; }
+    if (error) {
+      setLoading(false);
+      mostrarErro(error);
+      return;
+    }
     const lista = (data ?? []) as Row[];
     setRows(lista);
     const ids = Array.from(new Set(lista.map((r) => r.paciente_id).filter(Boolean))) as string[];
     if (ids.length > 0) {
       const { data: pacs } = await supabase.from("pacientes").select("id, nome, cpf").in("id", ids);
       const map = new Map<string, { nome: string; cpf: string | null }>();
-      for (const p of pacs ?? []) map.set(p.id as string, { nome: (p as { nome: string }).nome, cpf: (p as { cpf: string | null }).cpf });
+      for (const p of pacs ?? [])
+        map.set(p.id as string, {
+          nome: (p as { nome: string }).nome,
+          cpf: (p as { cpf: string | null }).cpf,
+        });
       setPacientes(map);
     } else {
       setPacientes(new Map());
     }
     setLoading(false);
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -157,14 +206,24 @@ function BoletosPage() {
       if (!q) return true;
       const p = r.paciente_id ? pacientes.get(r.paciente_id) : undefined;
       const alvo = [p?.nome ?? "", p?.cpf ?? "", r.nosso_numero ?? ""].join(" ").toLowerCase();
-      return alvo.includes(q) || (p?.cpf ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "\u0000");
+      return (
+        alvo.includes(q) ||
+        (p?.cpf ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "\u0000")
+      );
     });
   }, [rows, busca, aba, pacientes]);
 
   const contagem = useMemo(() => {
-    const c: Record<Aba, number> = { todos: rows.length, pendentes: 0, emitidos: 0, pagos: 0, vencidos: 0 };
+    const c: Record<Aba, number> = {
+      todos: rows.length,
+      pendentes: 0,
+      emitidos: 0,
+      pagos: 0,
+      vencidos: 0,
+    };
     for (const r of rows) {
-      for (const a of ["pendentes", "emitidos", "pagos", "vencidos"] as Aba[]) if (naAba(r.status, a)) c[a]++;
+      for (const a of ["pendentes", "emitidos", "pagos", "vencidos"] as Aba[])
+        if (naAba(r.status, a)) c[a]++;
     }
     return c;
   }, [rows]);
@@ -172,21 +231,35 @@ function BoletosPage() {
   const kpis = useMemo(() => {
     const hoje = new Date();
     const ym = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
-    let totalPendente = 0; let doMes = 0; let valorMes = 0;
+    let totalPendente = 0;
+    let doMes = 0;
+    let valorMes = 0;
     for (const r of rows) {
       const s = (r.status ?? "").toLowerCase();
-      if (s.startsWith("pendente") || s === "emitido" || s === "vencido") totalPendente += Number(r.valor) || 0;
-      if ((r.vencimento ?? "").startsWith(ym)) { doMes++; valorMes += Number(r.valor) || 0; }
+      if (s.startsWith("pendente") || s === "emitido" || s === "vencido")
+        totalPendente += Number(r.valor) || 0;
+      if ((r.vencimento ?? "").startsWith(ym)) {
+        doMes++;
+        valorMes += Number(r.valor) || 0;
+      }
     }
     return { totalPendente, doMes, valorMes };
   }, [rows]);
 
-  const abrirNovo = () => { setEditing(null); setForm(FORM_VAZIO); setOpen(true); };
+  const abrirNovo = () => {
+    setEditing(null);
+    setForm(FORM_VAZIO);
+    setOpen(true);
+  };
   const abrirEdicao = (r: Row) => {
     setEditing(r);
     setForm({
-      valor: String(r.valor), vencimento: r.vencimento, nosso_numero: r.nosso_numero ?? "",
-      linha_digitavel: r.linha_digitavel ?? "", status: r.status, observacoes: r.observacoes ?? "",
+      valor: String(r.valor),
+      vencimento: r.vencimento,
+      nosso_numero: r.nosso_numero ?? "",
+      linha_digitavel: r.linha_digitavel ?? "",
+      status: r.status,
+      observacoes: r.observacoes ?? "",
     });
     setOpen(true);
   };
@@ -207,7 +280,10 @@ function BoletosPage() {
       ? await supabase.from("boletos").update(payload).eq("id", editing.id)
       : await supabase.from("boletos").insert(payload);
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success(editing ? "Boleto atualizado." : "Boleto cadastrado.");
     setOpen(false);
     void load();
@@ -215,9 +291,20 @@ function BoletosPage() {
 
   const excluir = async (r: Row) => {
     if (!podeEscrever) return;
-    if (!(await confirmDialog({ title: "Excluir boleto?", description: "Esta ação não pode ser desfeita.", tone: "danger", confirmText: "Excluir" }))) return;
+    if (
+      !(await confirmDialog({
+        title: "Excluir boleto?",
+        description: "Esta ação não pode ser desfeita.",
+        tone: "danger",
+        confirmText: "Excluir",
+      }))
+    )
+      return;
     const { error } = await supabase.from("boletos").delete().eq("id", r.id);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Boleto excluído.");
     void load();
   };
@@ -225,7 +312,9 @@ function BoletosPage() {
   const emitir = async (r: Row) => {
     if (!podeEscrever) return;
     if (!r.contrato_id) {
-      toast.info("Emissão automática disponível apenas para boletos de contrato. Configure a integração bancária para emitir avulsos.");
+      toast.info(
+        "Emissão automática disponível apenas para boletos de contrato. Configure a integração bancária para emitir avulsos.",
+      );
       return;
     }
     setEmitindo(r.id);
@@ -243,7 +332,10 @@ function BoletosPage() {
 
   const copiar = async (r: Row) => {
     const codigo = r.codigo_barras || r.linha_digitavel;
-    if (!codigo) { toast.info("Boleto ainda sem código de barras."); return; }
+    if (!codigo) {
+      toast.info("Boleto ainda sem código de barras.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(codigo);
       toast.success("Código de barras copiado.");
@@ -263,21 +355,31 @@ function BoletosPage() {
           </div>
         </div>
         {podeEscrever && (
-          <Button onClick={abrirNovo} className="gap-2"><Plus className="h-4 w-4" /> Novo</Button>
+          <Button onClick={abrirNovo} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo
+          </Button>
         )}
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Total pendente</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-amber-700">{brl(kpis.totalPendente)}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Total pendente
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-amber-700">
+            {brl(kpis.totalPendente)}
+          </p>
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Boletos do mês</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Boletos do mês
+          </p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{kpis.doMes}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Valor do mês</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Valor do mês
+          </p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{brl(kpis.valorMes)}</p>
         </div>
       </div>
@@ -288,13 +390,18 @@ function BoletosPage() {
             {ABAS.map((a) => (
               <TabsTrigger key={a.value} value={a.value} className="text-xs gap-1.5">
                 {a.label}
-                <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">{contagem[a.value]}</span>
+                <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
+                  {contagem[a.value]}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+            aria-hidden
+          />
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
@@ -307,9 +414,15 @@ function BoletosPage() {
 
       <div className="rounded-xl border bg-card overflow-hidden">
         {loading ? (
-          <div className="p-3 space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          <div className="p-3 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
         ) : filtrados.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">Nenhum boleto encontrado.</div>
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            Nenhum boleto encontrado.
+          </div>
         ) : (
           <Table>
             <TableHeader>
@@ -330,7 +443,11 @@ function BoletosPage() {
                   <TableRow key={r.id}>
                     <TableCell className="min-w-0">
                       <div className="font-medium truncate">{p?.nome ?? "—"}</div>
-                      {p?.cpf && <div className="text-xs text-muted-foreground tabular-nums">{formatarCPF(p.cpf)}</div>}
+                      {p?.cpf && (
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {formatarCPF(p.cpf)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {r.nosso_numero ? (
@@ -343,31 +460,62 @@ function BoletosPage() {
                     </TableCell>
                     <TableCell className="tabular-nums text-sm">{fmtDate(r.vencimento)}</TableCell>
                     <TableCell className="text-right tabular-nums">{brl(r.valor)}</TableCell>
-                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
                         {podeEscrever && s.startsWith("pendente") && (
-                          <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" disabled={emitindo === r.id} onClick={() => void emitir(r)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 text-xs"
+                            disabled={emitindo === r.id}
+                            onClick={() => void emitir(r)}
+                          >
                             <Send className="h-3.5 w-3.5" /> Emitir
                           </Button>
                         )}
                         {(r.codigo_barras || r.linha_digitavel) && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8" title="Copiar código de barras" onClick={() => void copiar(r)}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            title="Copiar código de barras"
+                            onClick={() => void copiar(r)}
+                          >
                             <Copy className="h-4 w-4" />
                           </Button>
                         )}
                         {r.url_pdf && (
-                          <a href={r.url_pdf} target="_blank" rel="noreferrer" title="Abrir PDF"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted">
+                          <a
+                            href={r.url_pdf}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Abrir PDF"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+                          >
                             <FileDown className="h-4 w-4" />
                           </a>
                         )}
                         {podeEscrever && (
                           <>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" title="Editar" onClick={() => abrirEdicao(r)}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              title="Editar"
+                              onClick={() => abrirEdicao(r)}
+                            >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Excluir" onClick={() => void excluir(r)}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive"
+                              title="Excluir"
+                              onClick={() => void excluir(r)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
@@ -384,25 +532,72 @@ function BoletosPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editing ? "Editar boleto" : "Novo boleto"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar boleto" : "Novo boleto"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} /></div>
-              <div className="space-y-1"><Label>Vencimento *</Label><DateInputBR required value={form.vencimento} onChange={(e) => setForm({ ...form, vencimento: e.target.value })} /></div>
-              <div className="space-y-1"><Label>Status</Label>
+              <div className="space-y-1">
+                <Label>Valor *</Label>
+                <CurrencyInput
+                  value={form.valor}
+                  onChange={(v) => setForm({ ...form, valor: v })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Vencimento *</Label>
+                <DateInputBR
+                  required
+                  value={form.vencimento}
+                  onChange={(e) => setForm({ ...form, vencimento: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STATUS_OPCOES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}</SelectContent>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPCOES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nosso número</Label><Input value={form.nosso_numero} onChange={(e) => setForm({ ...form, nosso_numero: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Linha digitável</Label><Input value={form.linha_digitavel} onChange={(e) => setForm({ ...form, linha_digitavel: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Observações</Label><Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
+            <div className="space-y-1">
+              <Label>Nosso número</Label>
+              <Input
+                value={form.nosso_numero}
+                onChange={(e) => setForm({ ...form, nosso_numero: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Linha digitável</Label>
+              <Input
+                value={form.linha_digitavel}
+                onChange={(e) => setForm({ ...form, linha_digitavel: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Observações</Label>
+              <Textarea
+                rows={2}
+                value={form.observacoes}
+                onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => void salvar()} disabled={saving || !podeEscrever}>{saving ? "Salvando…" : "Salvar"}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvar()} disabled={saving || !podeEscrever}>
+              {saving ? "Salvando…" : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

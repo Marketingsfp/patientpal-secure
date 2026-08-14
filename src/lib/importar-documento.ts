@@ -15,9 +15,7 @@ function textoParaHtml(texto: string) {
     .map((bloco) => bloco.trim())
     .filter(Boolean);
   if (!paragrafos.length) return "<p></p>";
-  return paragrafos
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
-    .join("");
+  return paragrafos.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br />")}</p>`).join("");
 }
 
 const BORDA = "1px solid #111827";
@@ -118,9 +116,7 @@ export async function extrairHtmlDeArquivo(file: File): Promise<string> {
     // quando o arquivo for um documento completo.
     const bruto = await file.text();
     const corpo = bruto.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const html = (corpo ? corpo[1] : bruto)
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .trim();
+    const html = (corpo ? corpo[1] : bruto).replace(/<script[\s\S]*?<\/script>/gi, "").trim();
     return html || "<p></p>";
   }
 
@@ -183,7 +179,9 @@ export async function extrairHtmlDeArquivo(file: File): Promise<string> {
   }
 
   if (nome.endsWith(".doc")) {
-    throw new Error("Arquivos .doc antigos não são suportados. Salve como .docx e tente novamente.");
+    throw new Error(
+      "Arquivos .doc antigos não são suportados. Salve como .docx e tente novamente.",
+    );
   }
 
   throw new Error("Formato não suportado. Use .docx, .pdf ou .txt.");

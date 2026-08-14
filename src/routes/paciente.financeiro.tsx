@@ -17,8 +17,23 @@ export const Route = createFileRoute("/paciente/financeiro")({
   }),
 });
 
-interface Mensalidade { id: string; numero_parcela: number; vencimento: string; valor: number; status: string; contrato_numero: number | null; plano_nome: string | null; dias_atraso: number; }
-interface Lancamento { id: string; descricao: string; vencimento: string | null; valor: number; dias_atraso: number; }
+interface Mensalidade {
+  id: string;
+  numero_parcela: number;
+  vencimento: string;
+  valor: number;
+  status: string;
+  contrato_numero: number | null;
+  plano_nome: string | null;
+  dias_atraso: number;
+}
+interface Lancamento {
+  id: string;
+  descricao: string;
+  vencimento: string | null;
+  valor: number;
+  dias_atraso: number;
+}
 interface Resumo {
   mensalidades: Mensalidade[];
   lancamentos: Lancamento[];
@@ -37,13 +52,18 @@ function PortalFinanceiroPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         navigate({ to: "/login", search: { redirect: "/paciente/financeiro" } as never });
         return;
       }
       const email = session.user.email?.toLowerCase();
-      if (!email) { setLoading(false); return; }
+      if (!email) {
+        setLoading(false);
+        return;
+      }
       const { data: pacs, error } = await supabase
         .from("pacientes")
         .select("id")
@@ -57,7 +77,9 @@ function PortalFinanceiroPage() {
       setPacienteIds(ids);
       const results: Resumo[] = [];
       for (const id of ids) {
-        const { data, error: rpcErr } = await supabase.rpc("pendencias_paciente", { _paciente_id: id });
+        const { data, error: rpcErr } = await supabase.rpc("pendencias_paciente", {
+          _paciente_id: id,
+        });
         if (rpcErr) continue;
         if (data) results.push(data as unknown as Resumo);
       }
@@ -73,8 +95,8 @@ function PortalFinanceiroPage() {
 
   const totalAberto = resumos.reduce((s, r) => s + (Number(r.total_aberto) || 0), 0);
   const totalAtrasado = resumos.reduce((s, r) => s + (Number(r.total_atrasado) || 0), 0);
-  const todasMensalidades = resumos.flatMap(r => r.mensalidades ?? []);
-  const todosLancamentos = resumos.flatMap(r => r.lancamentos ?? []);
+  const todasMensalidades = resumos.flatMap((r) => r.mensalidades ?? []);
+  const todosLancamentos = resumos.flatMap((r) => r.lancamentos ?? []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,11 +111,33 @@ function PortalFinanceiroPage() {
           </Button>
         </div>
         <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm overflow-x-auto">
-          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Início</Link>
-          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Consultas</Link>
-          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Cartões</Link>
-          <Link to="/paciente/financeiro" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap">Financeiro</Link>
-          <Link to="/paciente/perfil" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Perfil</Link>
+          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">
+            Início
+          </Link>
+          <Link
+            to="/paciente/consultas"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Consultas
+          </Link>
+          <Link
+            to="/paciente/cartoes"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Cartões
+          </Link>
+          <Link
+            to="/paciente/financeiro"
+            className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap"
+          >
+            Financeiro
+          </Link>
+          <Link
+            to="/paciente/perfil"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Perfil
+          </Link>
         </nav>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-4 space-y-4">
@@ -114,7 +158,11 @@ function PortalFinanceiroPage() {
               </Card>
               <Card className={`p-4 ${totalAtrasado > 0 ? "border-rose-300 bg-rose-50" : ""}`}>
                 <p className="text-xs text-muted-foreground">Em atraso</p>
-                <p className={`text-2xl font-bold mt-1 ${totalAtrasado > 0 ? "text-rose-600" : ""}`}>{fmt(totalAtrasado)}</p>
+                <p
+                  className={`text-2xl font-bold mt-1 ${totalAtrasado > 0 ? "text-rose-600" : ""}`}
+                >
+                  {fmt(totalAtrasado)}
+                </p>
               </Card>
             </div>
 
@@ -122,22 +170,29 @@ function PortalFinanceiroPage() {
               <h2 className="font-semibold mb-2">Mensalidades</h2>
               {todasMensalidades.length === 0 ? (
                 <Card className="p-4 text-sm text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Nenhuma mensalidade em aberto.
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Nenhuma mensalidade em
+                  aberto.
                 </Card>
               ) : (
                 <div className="space-y-2">
-                  {todasMensalidades.map(m => (
+                  {todasMensalidades.map((m) => (
                     <Card key={m.id} className="p-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{m.plano_nome ?? "Mensalidade"} — parcela {m.numero_parcela}</p>
+                        <p className="font-medium text-sm truncate">
+                          {m.plano_nome ?? "Mensalidade"} — parcela {m.numero_parcela}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Venc. {new Date(m.vencimento).toLocaleDateString("pt-BR")}
-                          {m.dias_atraso > 0 && <span className="text-rose-600 ml-1">• {m.dias_atraso}d atraso</span>}
+                          {m.dias_atraso > 0 && (
+                            <span className="text-rose-600 ml-1">• {m.dias_atraso}d atraso</span>
+                          )}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-sm">{fmt(Number(m.valor))}</p>
-                        {m.dias_atraso > 0 && <AlertTriangle className="h-4 w-4 text-rose-600 ml-auto" />}
+                        {m.dias_atraso > 0 && (
+                          <AlertTriangle className="h-4 w-4 text-rose-600 ml-auto" />
+                        )}
                       </div>
                     </Card>
                   ))}
@@ -153,14 +208,16 @@ function PortalFinanceiroPage() {
                 </Card>
               ) : (
                 <div className="space-y-2">
-                  {todosLancamentos.map(l => (
+                  {todosLancamentos.map((l) => (
                     <Card key={l.id} className="p-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{l.descricao}</p>
                         {l.vencimento && (
                           <p className="text-xs text-muted-foreground">
                             Venc. {new Date(l.vencimento).toLocaleDateString("pt-BR")}
-                            {l.dias_atraso > 0 && <span className="text-rose-600 ml-1">• {l.dias_atraso}d atraso</span>}
+                            {l.dias_atraso > 0 && (
+                              <span className="text-rose-600 ml-1">• {l.dias_atraso}d atraso</span>
+                            )}
                           </p>
                         )}
                       </div>

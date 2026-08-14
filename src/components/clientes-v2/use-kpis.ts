@@ -22,9 +22,16 @@ export interface ClientesKpiTotais {
  */
 export function useClientesKpis(clinicaId: string | null): ClientesKpiTotais {
   const [state, setState] = useState<Omit<ClientesKpiTotais, "refresh">>({
-    total: null, ativos: null, inativos: null, novos30d: null,
-    incompletos: null, semTelefone: null, semCpf: null,
-    aniversariantes: null, associados: null, particulares: null,
+    total: null,
+    ativos: null,
+    inativos: null,
+    novos30d: null,
+    incompletos: null,
+    semTelefone: null,
+    semCpf: null,
+    aniversariantes: null,
+    associados: null,
+    particulares: null,
     loading: true,
   });
 
@@ -37,10 +44,19 @@ export function useClientesKpis(clinicaId: string | null): ClientesKpiTotais {
       return;
     }
     const r = (Array.isArray(data) ? data[0] : data) as {
-      total: number; ativos: number; inativos: number; novos30d: number;
-      sem_telefone: number; sem_cpf: number; aniversariantes: number; associados: number;
+      total: number;
+      ativos: number;
+      inativos: number;
+      novos30d: number;
+      sem_telefone: number;
+      sem_cpf: number;
+      aniversariantes: number;
+      associados: number;
     } | null;
-    if (!r) { setState((s) => ({ ...s, loading: false })); return; }
+    if (!r) {
+      setState((s) => ({ ...s, loading: false }));
+      return;
+    }
     const t = Number(r.total);
     const asc = Number(r.associados);
     setState({
@@ -58,7 +74,9 @@ export function useClientesKpis(clinicaId: string | null): ClientesKpiTotais {
     });
   }, [clinicaId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return { ...state, refresh: () => void load() };
 }

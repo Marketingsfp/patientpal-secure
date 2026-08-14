@@ -25,20 +25,49 @@ export const S4Parcelas: React.FC = () => {
         </Rise>
         <div style={{ height: 32 }} />
         <Panel delay={14} style={{ maxWidth: 1300, padding: 26 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr", fontFamily: body, color: C.creamDim, fontSize: 20, letterSpacing: 2, textTransform: "uppercase", paddingBottom: 12 }}>
-            <div>Competência</div><div>Vencimento</div><div>Valor base</div><div>Total a pagar</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.1fr 1fr 1fr 1fr",
+              fontFamily: body,
+              color: C.creamDim,
+              fontSize: 20,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              paddingBottom: 12,
+            }}
+          >
+            <div>Competência</div>
+            <div>Vencimento</div>
+            <div>Valor base</div>
+            <div>Total a pagar</div>
           </div>
           {rows.map((r, i) => {
-            const o = interpolate(frame, [20 + i * 9, 34 + i * 9], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            const o = interpolate(frame, [20 + i * 9, 34 + i * 9], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
             return (
-              <div key={r.p} style={{
-                opacity: o, transform: `translateX(${interpolate(o, [0, 1], [30, 0])}px)`,
-                display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr 1fr", alignItems: "center",
-                fontFamily: body, color: C.cream, fontSize: 30, padding: "18px 0",
-                borderTop: `1px solid ${C.greenSoft}33`,
-              }}>
+              <div
+                key={r.p}
+                style={{
+                  opacity: o,
+                  transform: `translateX(${interpolate(o, [0, 1], [30, 0])}px)`,
+                  display: "grid",
+                  gridTemplateColumns: "1.1fr 1fr 1fr 1fr",
+                  alignItems: "center",
+                  fontFamily: body,
+                  color: C.cream,
+                  fontSize: 30,
+                  padding: "18px 0",
+                  borderTop: `1px solid ${C.greenSoft}33`,
+                }}
+              >
                 <div>{r.p}</div>
-                <div style={{ color: r.late ? C.clay : C.creamDim }}>{r.venc}{r.late ? " · atrasada" : ""}</div>
+                <div style={{ color: r.late ? C.clay : C.creamDim }}>
+                  {r.venc}
+                  {r.late ? " · atrasada" : ""}
+                </div>
                 <div style={{ color: C.creamDim }}>R$ {r.base}</div>
                 <div style={{ fontWeight: 700 }}>R$ {r.tot}</div>
               </div>

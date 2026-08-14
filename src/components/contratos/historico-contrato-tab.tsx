@@ -100,7 +100,9 @@ function fmtValor(v: unknown): string {
   if (/^\d{4}-\d{2}-\d{2}(T|$)/.test(s)) {
     try {
       return new Date(s).toLocaleDateString("pt-BR");
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
   return s;
 }
@@ -115,10 +117,7 @@ function diffCampos(
   labels: Record<string, string>,
 ): { campo: string; label: string; de: string; para: string }[] {
   const out: { campo: string; label: string; de: string; para: string }[] = [];
-  const chaves = new Set([
-    ...Object.keys(antes ?? {}),
-    ...Object.keys(depois ?? {}),
-  ]);
+  const chaves = new Set([...Object.keys(antes ?? {}), ...Object.keys(depois ?? {})]);
   for (const k of chaves) {
     if (IGNORAR.has(k)) continue;
     const a = antes?.[k] ?? null;
@@ -192,12 +191,24 @@ function CorpoEvento({ evento }: { evento: Evento }) {
     const d = dados_depois ?? {};
     return (
       <div className="text-xs text-muted-foreground grid gap-1 sm:grid-cols-2">
-        <div>Valor mensal: <strong>{fmtDinheiro(d.valor_mensalidade)}</strong></div>
-        <div>Taxa de adesão: <strong>{fmtDinheiro(d.taxa_adesao)}</strong></div>
-        <div>Início: <strong>{fmtValor(d.data_inicio)}</strong></div>
-        <div>Término: <strong>{fmtValor(d.data_fim)}</strong></div>
-        <div>Dia de vencimento: <strong>{String(d.dia_vencimento ?? "—")}</strong></div>
-        <div>Status: <strong>{fmtValor(d.status)}</strong></div>
+        <div>
+          Valor mensal: <strong>{fmtDinheiro(d.valor_mensalidade)}</strong>
+        </div>
+        <div>
+          Taxa de adesão: <strong>{fmtDinheiro(d.taxa_adesao)}</strong>
+        </div>
+        <div>
+          Início: <strong>{fmtValor(d.data_inicio)}</strong>
+        </div>
+        <div>
+          Término: <strong>{fmtValor(d.data_fim)}</strong>
+        </div>
+        <div>
+          Dia de vencimento: <strong>{String(d.dia_vencimento ?? "—")}</strong>
+        </div>
+        <div>
+          Status: <strong>{fmtValor(d.status)}</strong>
+        </div>
       </div>
     );
   }
@@ -219,14 +230,17 @@ function CorpoEvento({ evento }: { evento: Evento }) {
           · Parcelas geradas: <strong>{String(d.parcelas_geradas ?? 0)}</strong>
         </div>
         <div>
-          Período: <strong>{fmtValor(d.periodo_inicio)}</strong> → <strong>{fmtValor(d.periodo_fim)}</strong>
+          Período: <strong>{fmtValor(d.periodo_inicio)}</strong> →{" "}
+          <strong>{fmtValor(d.periodo_fim)}</strong>
         </div>
         <div>
           Valor: <strong>{fmtDinheiro(d.valor_anterior)}</strong> →{" "}
           <strong>{fmtDinheiro(d.valor_novo)}</strong>
         </div>
         {deps.length > 0 && (
-          <div>Dependentes incluídos no ato: <strong>{deps.length}</strong></div>
+          <div>
+            Dependentes incluídos no ato: <strong>{deps.length}</strong>
+          </div>
         )}
         {d.observacao ? <div>Obs.: {String(d.observacao)}</div> : null}
       </div>
@@ -237,8 +251,8 @@ function CorpoEvento({ evento }: { evento: Evento }) {
     const d = dados_depois ?? {};
     return (
       <div className="text-xs text-muted-foreground">
-        Parentesco: <strong>{fmtValor(d.parentesco) || "—"}</strong> ·
-        Tipo: <strong>{fmtValor(d.tipo)}</strong>
+        Parentesco: <strong>{fmtValor(d.parentesco) || "—"}</strong> · Tipo:{" "}
+        <strong>{fmtValor(d.tipo)}</strong>
         {tipo.endsWith("_legado") && (
           <div className="italic mt-1">Registro anterior à auditoria — usuário não disponível.</div>
         )}
@@ -313,9 +327,12 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.rpc("contrato_historico" as never, {
-        _contrato_id: contratoId,
-      } as never);
+      const { data, error } = await supabase.rpc(
+        "contrato_historico" as never,
+        {
+          _contrato_id: contratoId,
+        } as never,
+      );
       if (cancel) return;
       if (error) {
         mostrarErro(error);
@@ -336,12 +353,16 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
       const g = grupoDe(e.tipo);
       if (!filtros[g]) return false;
       // Oculta eventos de alteração sem diff relevante (ruído de auditoria).
-      if (e.tipo === "contrato_alterado" &&
-          diffCampos(e.dados_antes, e.dados_depois, LABELS_CONTRATO).length === 0) {
+      if (
+        e.tipo === "contrato_alterado" &&
+        diffCampos(e.dados_antes, e.dados_depois, LABELS_CONTRATO).length === 0
+      ) {
         return false;
       }
-      if (e.tipo === "mensalidade_alterada" &&
-          diffCampos(e.dados_antes, e.dados_depois, LABELS_MENS).length === 0) {
+      if (
+        e.tipo === "mensalidade_alterada" &&
+        diffCampos(e.dados_antes, e.dados_depois, LABELS_MENS).length === 0
+      ) {
         return false;
       }
       if (!q) return true;
@@ -430,15 +451,16 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
                   <UserIcon className="h-3 w-3" />
                   {(() => {
                     const nome = e.user_nome || e.user_email || "Sistema";
-                    const ehSistema = !e.user_id && (
-                      !e.user_nome || /^sistema(\s*\(|$)/i.test(e.user_nome)
-                    );
+                    const ehSistema =
+                      !e.user_id && (!e.user_nome || /^sistema(\s*\(|$)/i.test(e.user_nome));
                     if (ehSistema) {
                       return (
                         <>
                           <span className="font-medium text-foreground">Sistema</span>
                           {e.user_email && /\(/.test(e.user_email) && (
-                            <span className="text-[10px] opacity-70">{e.user_email.replace(/^sistema\s*/i, "")}</span>
+                            <span className="text-[10px] opacity-70">
+                              {e.user_email.replace(/^sistema\s*/i, "")}
+                            </span>
                           )}
                         </>
                       );

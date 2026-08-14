@@ -41,7 +41,13 @@ interface Dependente {
  * Funcionário" da clínica — sem taxa e sem mensalidade —, para que médico e
  * dependentes sejam reconhecidos como associados na agenda.
  */
-export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNome, podeEscrever }: Props) {
+export function ConvenioMedicoTab({
+  medicoId,
+  clinicaId,
+  pacienteId,
+  pacienteNome,
+  podeEscrever,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [contrato, setContrato] = useState<ConvenioContrato | null>(null);
@@ -57,7 +63,8 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
       .select("convenio_contrato_id" as any)
       .eq("id", medicoId)
       .maybeSingle();
-    const contratoId = (m as { convenio_contrato_id: string | null } | null)?.convenio_contrato_id ?? null;
+    const contratoId =
+      (m as { convenio_contrato_id: string | null } | null)?.convenio_contrato_id ?? null;
     if (!contratoId) {
       setContrato(null);
       setDependentes([]);
@@ -65,18 +72,32 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
       return;
     }
     const [{ data: c }, { data: deps }] = await Promise.all([
-      supabase.from("contratos_assinatura").select("id,status,paciente_id,paciente_nome,convenio_id").eq("id", contratoId).maybeSingle(),
-      supabase.from("contrato_dependentes").select("id,paciente_id,paciente_nome,parentesco,incluido_em,ativo").eq("contrato_id", contratoId).eq("ativo", true).order("paciente_nome"),
+      supabase
+        .from("contratos_assinatura")
+        .select("id,status,paciente_id,paciente_nome,convenio_id")
+        .eq("id", contratoId)
+        .maybeSingle(),
+      supabase
+        .from("contrato_dependentes")
+        .select("id,paciente_id,paciente_nome,parentesco,incluido_em,ativo")
+        .eq("contrato_id", contratoId)
+        .eq("ativo", true)
+        .order("paciente_nome"),
     ]);
     setContrato((c as ConvenioContrato | null) ?? null);
-    setDependentes(((deps ?? []) as Dependente[]));
+    setDependentes((deps ?? []) as Dependente[]);
     setLoading(false);
   }, [medicoId]);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
 
   async function habilitar() {
-    if (!pacienteId) { toast.error("Vincule o médico a um cliente na aba \"Dados\" antes de habilitar o convênio."); return; }
+    if (!pacienteId) {
+      toast.error('Vincule o médico a um cliente na aba "Dados" antes de habilitar o convênio.');
+      return;
+    }
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.rpc as any)("medico_toggle_convenio_funcionario", {
@@ -85,13 +106,21 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
       _habilitar: true,
     });
     setBusy(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Convênio Funcionário habilitado");
     void carregar();
   }
 
   async function desabilitar() {
-    if (!await confirmDialog("Deseja realmente desligar o Convênio Funcionário deste médico? Os dependentes também serão desativados.")) return;
+    if (
+      !(await confirmDialog(
+        "Deseja realmente desligar o Convênio Funcionário deste médico? Os dependentes também serão desativados.",
+      ))
+    )
+      return;
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.rpc as any)("medico_toggle_convenio_funcionario", {
@@ -100,14 +129,23 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
       _habilitar: false,
     });
     setBusy(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Convênio Funcionário desligado");
     void carregar();
   }
 
   async function adicionarDependente() {
-    if (!novoDep) { toast.error("Selecione o dependente (deve estar cadastrado como cliente)."); return; }
-    if (!novoParentesco.trim()) { toast.error("Informe o grau de parentesco."); return; }
+    if (!novoDep) {
+      toast.error("Selecione o dependente (deve estar cadastrado como cliente).");
+      return;
+    }
+    if (!novoParentesco.trim()) {
+      toast.error("Informe o grau de parentesco.");
+      return;
+    }
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.rpc as any)("medico_convenio_add_dependente", {
@@ -116,7 +154,10 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
       _parentesco: novoParentesco.trim(),
     });
     setBusy(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Dependente incluído");
     setNovoDep(null);
     setNovoParentesco("");
@@ -124,18 +165,28 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
   }
 
   async function removerDependente(depId: string) {
-    if (!await confirmDialog("Remover este dependente do convênio?")) return;
+    if (!(await confirmDialog("Remover este dependente do convênio?"))) return;
     setBusy(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.rpc as any)("medico_convenio_remove_dependente", { _dependente_id: depId });
+    const { error } = await (supabase.rpc as any)("medico_convenio_remove_dependente", {
+      _dependente_id: depId,
+    });
     setBusy(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Dependente removido");
     void carregar();
   }
 
   if (loading) {
-    return <div className="py-10 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 inline animate-spin" />Carregando…</div>;
+    return (
+      <div className="py-10 text-center text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 mr-2 inline animate-spin" />
+        Carregando…
+      </div>
+    );
   }
 
   const habilitado = contrato && contrato.status === "ativo";
@@ -146,11 +197,15 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-primary" />
           <div className="font-medium">Convênio Funcionário</div>
-          {habilitado && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">Ativo</span>}
+          {habilitado && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">
+              Ativo
+            </span>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Ao habilitar, o médico e seus dependentes passam a usar o convênio de funcionários da clínica na agenda —
-          sem cobrança de mensalidade nem taxa de inclusão.
+          Ao habilitar, o médico e seus dependentes passam a usar o convênio de funcionários da
+          clínica na agenda — sem cobrança de mensalidade nem taxa de inclusão.
         </p>
 
         {!habilitado ? (
@@ -176,9 +231,18 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
           </div>
         ) : (
           <div className="space-y-2 text-sm">
-            <div><span className="text-muted-foreground">Titular:</span> <span className="font-medium">{contrato?.paciente_nome}</span></div>
+            <div>
+              <span className="text-muted-foreground">Titular:</span>{" "}
+              <span className="font-medium">{contrato?.paciente_nome}</span>
+            </div>
             {podeEscrever && (
-              <Button type="button" variant="outline" size="sm" onClick={desabilitar} disabled={busy}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={desabilitar}
+                disabled={busy}
+              >
                 Desligar convênio
               </Button>
             )}
@@ -204,11 +268,18 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
                 <div>
                   <div className="font-medium">{d.paciente_nome}</div>
                   <div className="text-xs text-muted-foreground">
-                    {d.parentesco || "sem parentesco"} · desde {new Date(d.incluido_em).toLocaleDateString("pt-BR")}
+                    {d.parentesco || "sem parentesco"} · desde{" "}
+                    {new Date(d.incluido_em).toLocaleDateString("pt-BR")}
                   </div>
                 </div>
                 {podeEscrever && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removerDependente(d.id)} disabled={busy}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removerDependente(d.id)}
+                    disabled={busy}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
@@ -232,13 +303,23 @@ export function ConvenioMedicoTab({ medicoId, clinicaId, pacienteId, pacienteNom
               </div>
               <div>
                 <Label>Parentesco *</Label>
-                <Input value={novoParentesco} onChange={(e) => setNovoParentesco(e.target.value)} placeholder="Cônjuge, Filho(a)…" />
+                <Input
+                  value={novoParentesco}
+                  onChange={(e) => setNovoParentesco(e.target.value)}
+                  placeholder="Cônjuge, Filho(a)…"
+                />
               </div>
-              <Button type="button" onClick={adicionarDependente} disabled={busy || !novoDep || !novoParentesco.trim()}>
+              <Button
+                type="button"
+                onClick={adicionarDependente}
+                disabled={busy || !novoDep || !novoParentesco.trim()}
+              >
                 {busy ? "Incluindo…" : "Incluir"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">O dependente precisa estar cadastrado como cliente antes.</p>
+            <p className="text-xs text-muted-foreground">
+              O dependente precisa estar cadastrado como cliente antes.
+            </p>
           </div>
         )}
       </Card>

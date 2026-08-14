@@ -80,7 +80,7 @@ const fmtDataSimples = (iso: string | null) => {
 };
 
 const esc = (s: string | null | undefined) =>
-  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+  (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 const FORMA_LABEL: Record<string, string> = {
   dinheiro: "DINHEIRO",
@@ -98,18 +98,17 @@ const FORMA_LABEL: Record<string, string> = {
 // - dinheiro / boleto / convênio / transferência → 1 via
 // - cartão crédito / débito / pix → 2 vias (1ª médico, 2ª financeiro)
 // - misto → 2 vias se houver qualquer parcela em cartão/pix; senão 1
-function numViasGR(pag?: {
-  forma_pagamento: string | null;
-  detalhe?: Array<{ forma: string }>;
-} | null): number {
+function numViasGR(
+  pag?: {
+    forma_pagamento: string | null;
+    detalhe?: Array<{ forma: string }>;
+  } | null,
+): number {
   if (!pag) return 1;
   const eletronico = (f: string | null | undefined) =>
     f === "cartao_credito" || f === "cartao_debito" || f === "pix";
   if (eletronico(pag.forma_pagamento)) return 2;
-  if (
-    pag.forma_pagamento === "misto" &&
-    (pag.detalhe ?? []).some((d) => eletronico(d.forma))
-  ) {
+  if (pag.forma_pagamento === "misto" && (pag.detalhe ?? []).some((d) => eletronico(d.forma))) {
     return 2;
   }
   return 1;
@@ -151,7 +150,9 @@ async function resolveConvLabel(
       .map((d) => d.contratos_assinatura)
       .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
     if (cand?.cb_convenios?.nome) return String(cand.cb_convenios.nome).toUpperCase();
-  } catch { /* fallback */ }
+  } catch {
+    /* fallback */
+  }
   return "CONVÊNIO";
 }
 
@@ -164,7 +165,11 @@ async function resolveConvLabel(
 async function resolveVinculoConvenio(
   pacienteId: string | null | undefined,
   clinicaId: string,
-): Promise<{ convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null> {
+): Promise<{
+  convenioNome: string;
+  vinculo: "titular" | "dependente";
+  titularNome?: string;
+} | null> {
   if (!pacienteId) return null;
   try {
     const { data: titular } = await supabase
@@ -195,7 +200,9 @@ async function resolveVinculoConvenio(
         titularNome: cand?.paciente_nome ? String(cand.paciente_nome).toUpperCase() : undefined,
       };
     }
-  } catch { /* ignora e retorna null */ }
+  } catch {
+    /* ignora e retorna null */
+  }
   return null;
 }
 
@@ -225,10 +232,15 @@ async function agendamentoUsouConvenio(
       .replace(/[\u0300-\u036f]/g, "")
       .toUpperCase();
     for (const r of (data ?? []) as Array<{ descricao: string | null }>) {
-      const d = (r.descricao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      const d = (r.descricao ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
       if (d.includes(alvo)) return true;
     }
-  } catch { /* ignora */ }
+  } catch {
+    /* ignora */
+  }
   return false;
 }
 
@@ -244,10 +256,7 @@ function multiplicarVias(ticketsHtml: string, nVias: number): string {
     const label = VIA_LABELS[i] ?? `VIA ${i + 1}`;
     const banner = `<div class="via-label">${label}</div>`;
     // Injeta o banner logo após a abertura do primeiro ticket da via.
-    const bloco = ticketsHtml.replace(
-      '<div class="ticket">',
-      `<div class="ticket">${banner}`,
-    );
+    const bloco = ticketsHtml.replace('<div class="ticket">', `<div class="ticket">${banner}`);
     const wrapper = `<div class="via-wrap"${i < nVias - 1 ? ' style="page-break-after: always"' : ""}>${bloco}</div>`;
     parts.push(wrapper);
   }
@@ -396,10 +405,20 @@ function imprimirViaIframe(html: string): void {
   document.body.appendChild(iframe);
   const cw = iframe.contentWindow;
   if (!cw) {
-    try { document.body.removeChild(iframe); } catch { /* noop */ }
+    try {
+      document.body.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
     throw new Error("Não foi possível inicializar a impressão.");
   }
-  const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  const cleanup = () => {
+    try {
+      document.body.removeChild(iframe);
+    } catch {
+      /* noop */
+    }
+  };
   let jaImprimiu = false;
   const dispararPrint = () => {
     if (jaImprimiu) return;
@@ -407,7 +426,9 @@ function imprimirViaIframe(html: string): void {
     try {
       cw.focus();
       cw.print();
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     // Remove o iframe depois que o diálogo deve ter sido tratado.
     setTimeout(cleanup, 4000);
   };
@@ -418,9 +439,15 @@ function imprimirViaIframe(html: string): void {
   iframe.onload = () => {
     const imgs = Array.from(cw.document.images ?? []);
     const pendentes = imgs.filter((im) => !im.complete);
-    if (pendentes.length === 0) { dispararPrint(); return; }
+    if (pendentes.length === 0) {
+      dispararPrint();
+      return;
+    }
     let restantes = pendentes.length;
-    const done = () => { restantes -= 1; if (restantes <= 0) dispararPrint(); };
+    const done = () => {
+      restantes -= 1;
+      if (restantes <= 0) dispararPrint();
+    };
     pendentes.forEach((im) => {
       im.addEventListener("load", done);
       im.addEventListener("error", done);
@@ -433,14 +460,24 @@ function imprimirViaIframe(html: string): void {
   doc.write(html);
   doc.close();
   // Fallback caso o onload não dispare (navegadores com document.write).
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
+  setTimeout(() => {
+    if (iframe.isConnected) dispararPrint();
+  }, 1200);
 }
 
 export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
+async function printGuiaAtendimentoCore({
+  agendamentoId,
+  clinicaId,
+  usuarioNome,
+  usuarioId,
+  reimpressao,
+  pagamento,
+  fichaNumero,
+}: PrintGRInput) {
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -448,7 +485,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     .eq("agendamento_id", agendamentoId)
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -484,14 +522,18 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       const nome = (prof as { nome: string | null } | null)?.nome;
       if (nome) usuarioFinalNome = nome;
     }
-  } catch { /* segue para fallback */ }
+  } catch {
+    /* segue para fallback */
+  }
   if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor")
+      .select(
+        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor",
+      )
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -543,35 +585,75 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       : Promise.resolve({ data: null }),
   ]);
 
-  const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
+  const paciente = pac.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+    codigo_prontuario: string | null;
+    numero_pasta: string | null;
+  } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
   // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
   // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
   // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
   let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
-  let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
+  let medicoData: {
+    tipo_repasse: string | null;
+    percentual_repasse_padrao: number | null;
+    valor_repasse_padrao: number | null;
+  } | null = null;
   if (a.medico_id) {
     try {
-      const { data: sens } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: a.medico_id });
+      const { data: sens } = await supabase.rpc("medico_dados_sensiveis", {
+        _medico_id: a.medico_id,
+      });
       const s = (sens as any) ?? {};
-      medicoData = { tipo_repasse: s.tipo_repasse ?? null, percentual_repasse_padrao: s.percentual_repasse_padrao ?? null, valor_repasse_padrao: s.valor_repasse_padrao ?? null };
-    } catch { medicoData = null; }
+      medicoData = {
+        tipo_repasse: s.tipo_repasse ?? null,
+        percentual_repasse_padrao: s.percentual_repasse_padrao ?? null,
+        valor_repasse_padrao: s.valor_repasse_padrao ?? null,
+      };
+    } catch {
+      medicoData = null;
+    }
   }
   // Dados do Cartão de Benefícios do médico (não vêm em medico_dados_sensiveis)
-  let medicoCb: { aceita: boolean; tipo: string | null; valor: number | null; percentual: number | null } | null = null;
+  let medicoCb: {
+    aceita: boolean;
+    tipo: string | null;
+    valor: number | null;
+    percentual: number | null;
+  } | null = null;
   if (a.medico_id) {
     try {
       const { data: mcb } = await supabase
         .from("medicos")
-        .select("aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
+        .select(
+          "aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
+        )
         .eq("id", a.medico_id)
         .maybeSingle();
       const m = (mcb as any) ?? null;
-      if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
-    } catch { medicoCb = null; }
+      if (m)
+        medicoCb = {
+          aceita: !!m.aceita_cartao_beneficios,
+          tipo: m.cb_tipo_repasse ?? null,
+          valor: m.cb_valor_repasse ?? null,
+          percentual: m.cb_percentual_repasse ?? null,
+        };
+    } catch {
+      medicoCb = null;
+    }
   }
-  let procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  let procData = proc.data as {
+    id: string;
+    nome: string;
+    valor_dinheiro_pix: number | null;
+    valor_cartao: number | null;
+    tipo: string | null;
+  } | null;
   // Fallback: a.procedimento pode vir com sufixos como "(ECG) (CARDIOLOGIA)"
   // que não existem exatamente na tabela `procedimentos`. Tenta variantes
   // progressivamente mais curtas (removendo parênteses do fim) para achar o
@@ -588,7 +670,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         cur = m[1].trim();
         if (cur) out.push(cur);
       }
-      const semParens = s.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      const semParens = s
+        .replace(/\s*\([^()]*\)\s*/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
       if (semParens && !out.includes(semParens)) out.push(semParens);
       return out;
     };
@@ -639,7 +724,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
         if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
       }
-    } catch { /* mantém o fallback da especialidade principal do médico */ }
+    } catch {
+      /* mantém o fallback da especialidade principal do médico */
+    }
   }
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
@@ -677,11 +764,14 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      for (const l of ((lancs ?? []) as Array<{
-        valor: number | string; descricao: string | null;
-        forma_pagamento: string | null; parcelas: number | null;
-        bandeira_cartao: string | null; observacoes: string | null;
-      }>)) {
+      for (const l of (lancs ?? []) as Array<{
+        valor: number | string;
+        descricao: string | null;
+        forma_pagamento: string | null;
+        parcelas: number | null;
+        bandeira_cartao: string | null;
+        observacoes: string | null;
+      }>) {
         valorPago += Number(l.valor);
         if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
         // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
@@ -693,11 +783,14 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
           obsResolvida = l.observacoes;
         }
       }
-    } catch { /* segue para fallback */ }
+    } catch {
+      /* segue para fallback */
+    }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
     if (formaResolvida) {
       // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
-      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      let detalhe:
+        Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
       if (formaResolvida === "misto" && obsResolvida) {
         const idx = obsResolvida.indexOf("Pagamento misto:");
         if (idx >= 0) {
@@ -714,7 +807,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
             [/^transfer[êe]ncia/i, "transferencia"],
           ];
           const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const partes = trecho
+            .split(";")
+            .map((s) => s.trim())
+            .filter(Boolean);
           const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
           for (const p of partes) {
             const match = LABEL_TO_KEY.find(([re]) => re.test(p));
@@ -745,10 +841,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .neq("status", "cancelado");
-      for (const l of ((lancs ?? []) as Array<{ descricao: string | null }>)) {
-        if (detectCartaoConsulta(l.descricao)) { isCartaoConsulta = true; break; }
+      for (const l of (lancs ?? []) as Array<{ descricao: string | null }>) {
+        if (detectCartaoConsulta(l.descricao)) {
+          isCartaoConsulta = true;
+          break;
+        }
       }
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = formatServicoLinha(procNomeBase, espNome);
@@ -760,8 +861,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // lista. Sem ele, recalcula aqui como fallback particionando por (dia,
   // profissional, agenda).
   const inicioDt = new Date(a.inicio);
-  const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
-  const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
+  const diaIni = new Date(inicioDt);
+  diaIni.setHours(0, 0, 0, 0);
+  const diaFim = new Date(inicioDt);
+  diaFim.setHours(23, 59, 59, 999);
   let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
   if (fichaNum === 0) {
     try {
@@ -771,21 +874,28 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .eq("clinica_id", clinicaId)
         .gte("inicio", diaIni.toISOString())
         .lte("inicio", diaFim.toISOString());
-      if (a.medico_id) q.eq("medico_id", a.medico_id); else q.is("medico_id", null);
-      if (a.agenda_id) q.eq("agenda_id", a.agenda_id); else q.is("agenda_id", null);
+      if (a.medico_id) q.eq("medico_id", a.medico_id);
+      else q.is("medico_id", null);
+      if (a.agenda_id) q.eq("agenda_id", a.agenda_id);
+      else q.is("agenda_id", null);
       const { data: lista } = await q;
       const ordenados = [...(lista ?? [])].sort((x: any, y: any) => {
         const t = String(x.inicio).localeCompare(String(y.inicio));
         if (t !== 0) return t;
-        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", {
+          sensitivity: "base",
+        });
       });
       const idx = ordenados.findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
-    } catch { fichaNum = 0; }
+    } catch {
+      fichaNum = 0;
+    }
   }
-  const ficha = fichaNum > 0
-    ? String(fichaNum).padStart(3, "0")
-    : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
+  const ficha =
+    fichaNum > 0
+      ? String(fichaNum).padStart(3, "0")
+      : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
   const prontuario = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
@@ -809,7 +919,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       cur = m[1].trim();
       if (cur) out.add(cur);
     }
-    const semParens = base.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    const semParens = base
+      .replace(/\s*\([^()]*\)\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (semParens) out.add(semParens);
     return Array.from(out).filter(Boolean);
   };
@@ -831,7 +944,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       // limitar pelo valor pago.
       repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
-      prestador = +(valorBase * Number(medicoCb.percentual) / 100).toFixed(2);
+      prestador = +((valorBase * Number(medicoCb.percentual)) / 100).toFixed(2);
     }
   } else if (a.medico_id) {
     const { data: convs } = await supabase
@@ -840,7 +953,14 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
     const variants = variantsOf(procNomeBase);
-    let conv: { nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null } | undefined;
+    let conv:
+      | {
+          nome: string;
+          tipo_repasse: string | null;
+          percentual: number | null;
+          valor: number | null;
+        }
+      | undefined;
     for (const alvo of variants) {
       conv = (convs ?? []).find((c) => norm(c.nome) === alvo) as typeof conv;
       if (conv) break;
@@ -857,20 +977,26 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
         if (valor <= 0) repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-        prestador = +(valorBase * Number(conv.percentual) / 100).toFixed(2);
+        prestador = +((valorBase * Number(conv.percentual)) / 100).toFixed(2);
       } else if (medicoData) {
         // sem tipo/valor cadastrado para o serviço → usa padrão do médico
         if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
           prestador = Number(medicoData.valor_repasse_padrao);
         } else {
-          prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          prestador = +(
+            (valorBase * Number(medicoData.percentual_repasse_padrao ?? 0)) /
+            100
+          ).toFixed(2);
         }
       }
     } else if (medicoData) {
       if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
         prestador = Number(medicoData.valor_repasse_padrao);
       } else {
-        prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        prestador = +(
+          (valorBase * Number(medicoData.percentual_repasse_padrao ?? 0)) /
+          100
+        ).toFixed(2);
       }
     }
   }
@@ -879,36 +1005,51 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   if (!repasseFixoConvenio) {
     prestador = Math.min(prestador, valorBase);
   }
-  const clinica = +(Math.max(0, valorBase - prestador)).toFixed(2);
+  const clinica = +Math.max(0, valorBase - prestador).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
   // fallback silencioso para dinheiro já causou guias mostrando forma errada
   // para pagamentos reais em débito/pix/etc.
-  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
-  const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
-    ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
-    : "À VISTA";
-  const bandeiraTxt = pagResolvido?.bandeira_cartao ? pagResolvido.bandeira_cartao.toUpperCase() : "";
-  const isMisto = pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
+  const formaLbl = pagResolvido?.forma_pagamento
+    ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
+  const parcelasTxt =
+    pagResolvido &&
+    pagResolvido.forma_pagamento === "cartao_credito" &&
+    pagResolvido.parcelas &&
+    pagResolvido.parcelas > 1
+      ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
+      : "À VISTA";
+  const bandeiraTxt = pagResolvido?.bandeira_cartao
+    ? pagResolvido.bandeira_cartao.toUpperCase()
+    : "";
+  const isMisto =
+    pagResolvido?.forma_pagamento === "misto" && (pagResolvido.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
-    ? pagResolvido!.detalhe!
-        .map((d) => {
+    ? pagResolvido!
+        .detalhe!.map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
-          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          const trocoTxt =
+            d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
           return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   // Odontologia (e demais serviços com cobrança em duas etapas): quando o
   // atendimento está vinculado a itens de orçamento com SINAL, a guia mostra
   // SINAL / SALDO FINAL / TOTAL. Sem itens com sinal, nada muda na guia.
-  let sinalBloco = { sinal: 0, saldo: 0, total: 0, pago: 0 };
+  const sinalBloco = { sinal: 0, saldo: 0, total: 0, pago: 0 };
   try {
     const { data: links } = await supabase
       .from("agendamento_orcamento_itens")
@@ -922,10 +1063,13 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .from("orcamento_itens")
         .select("quantidade, valor_unitario, valor_total, sinal_valor, valor_pago")
         .in("id", itemIds);
-      for (const it of ((itensOrc ?? []) as Array<{
-        quantidade: number | null; valor_unitario: number | null;
-        valor_total: number | null; sinal_valor: number | null; valor_pago: number | null;
-      }>)) {
+      for (const it of (itensOrc ?? []) as Array<{
+        quantidade: number | null;
+        valor_unitario: number | null;
+        valor_total: number | null;
+        sinal_valor: number | null;
+        valor_pago: number | null;
+      }>) {
         const sinalIt = Number(it.sinal_valor ?? 0);
         if (sinalIt <= 0) continue;
         const q = Number(it.quantidade ?? 1) || 1;
@@ -936,17 +1080,22 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         sinalBloco.pago += Number(it.valor_pago ?? 0);
       }
     }
-  } catch { /* sem bloco de sinal */ }
+  } catch {
+    /* sem bloco de sinal */
+  }
   const temSinal = sinalBloco.sinal > 0;
   // O que já estava pago ANTES desta guia = total pago registrado menos o valor
   // recebido agora. "Falta pagar" considera todos os pagamentos do item.
   const pagoTotalSinal = Math.round(Math.min(sinalBloco.total, sinalBloco.pago) * 100) / 100;
-  const pagoAnteriorSinal = Math.round(Math.max(0, pagoTotalSinal - Number(valor || 0)) * 100) / 100;
+  const pagoAnteriorSinal =
+    Math.round(Math.max(0, pagoTotalSinal - Number(valor || 0)) * 100) / 100;
   const faltaPagarSinal = Math.round(Math.max(0, sinalBloco.total - pagoTotalSinal) * 100) / 100;
   // Se o único pagamento anterior foi o próprio sinal, as duas linhas seriam
   // idênticas — nesse caso imprime uma linha só: "SINAL (JÁ PAGO)".
-  const sinalJaPago = pagoAnteriorSinal > 0 && Math.abs(pagoAnteriorSinal - sinalBloco.sinal) <= 0.004;
-  const sinalHtml = temSinal ? `
+  const sinalJaPago =
+    pagoAnteriorSinal > 0 && Math.abs(pagoAnteriorSinal - sinalBloco.sinal) <= 0.004;
+  const sinalHtml = temSinal
+    ? `
     <div class="sep"></div>
     <table>
       <tr><td class="label">SINAL${sinalJaPago ? " (JÁ PAGO)" : ""}:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
@@ -954,7 +1103,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">PAGAMENTO ATUAL:</td><td class="v right">${fmtBRL(Number(valor || 0))}</td></tr>
       <tr><td class="label">FALTA PAGAR:</td><td class="v right">${faltaPagarSinal <= 0.004 ? "QUITADO" : fmtBRL(faltaPagarSinal)}</td></tr>
       <tr class="bold"><td class="label">TOTAL:</td><td class="v right">${fmtBRL(sinalBloco.total)}</td></tr>
-    </table>` : "";
+    </table>`
+    : "";
 
   let convLabel = await resolveConvLabel(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
@@ -1001,20 +1151,26 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         if (!(externoValorTabela > 0)) externoValorTabela = Number(f.valor_total ?? 0);
         externoRepasse = Number(f.valor_medico ?? 0);
       }
-    } catch { /* guia sai mesmo sem o financeiro */ }
+    } catch {
+      /* guia sai mesmo sem o financeiro */
+    }
   }
-  const externoSeloHtml = ehExterno ? `
+  const externoSeloHtml = ehExterno
+    ? `
     ${agExt.origem_clinica_nome ? `<div class="center sm">ORIGEM: <span class="v">${esc(String(agExt.origem_clinica_nome).toUpperCase())}</span></div>` : ""}
     <div class="center sm">SEM COBRANCA NESTA UNIDADE</div>
-    <div class="sep"></div>` : "";
-  const externoValoresHtml = ehExterno ? `
+    <div class="sep"></div>`
+    : "";
+  const externoValoresHtml = ehExterno
+    ? `
     <div class="box-total">
       <div class="row"><div class="label">VALOR TABELA</div><div class="v right">${fmtBRL(externoValorTabela)}</div></div>
       <div class="divisao">
         <div class="row"><div class="label">CLÍNICA</div><div class="v right">${fmtBRL(0)}</div></div>
         <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(externoRepasse)}</div></div>
       </div>
-    </div>` : "";
+    </div>`
+    : "";
 
   const ticketHtml = `
   <div class="ticket">
@@ -1054,7 +1210,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     </table>
     ${sinalHtml}
 
-    ${ehExterno ? externoValoresHtml : valor > 0 ? `
+    ${
+      ehExterno
+        ? externoValoresHtml
+        : valor > 0
+          ? `
     <div class="box-total">
       <div class="linha-principal">
         <div>
@@ -1066,19 +1226,25 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
       ${isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
 
-      ${pagResolvido?.forma_pagamento === "cartao_credito" ? `
+      ${
+        pagResolvido?.forma_pagamento === "cartao_credito"
+          ? `
       <table style="margin-top:2px">
         ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
         <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
       </table>
-      ` : ""}
+      `
+          : ""
+      }
 
       <div class="divisao">
         <div class="row"><div class="label">CLÍNICA</div><div class="v right">${fmtBRL(clinica)}</div></div>
         <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(prestador)}</div></div>
       </div>
     </div>
-    ` : (isGratuidade && (clinica > 0 || prestador > 0) ? `
+    `
+          : isGratuidade && (clinica > 0 || prestador > 0)
+            ? `
     <div class="box-total">
       <div class="center bold lg" style="letter-spacing:2px">GRATUIDADE</div>
       <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
@@ -1087,7 +1253,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         <div class="row"><div class="label">PRESTADOR</div><div class="v right">${fmtBRL(prestador)}</div></div>
       </div>
     </div>
-    ` : "")}
+    `
+            : ""
+    }
 
     <div class="rodape-guia">
       <div>DATA</div>
@@ -1121,7 +1289,9 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         impresso_por_nome: usuarioNome ?? null,
         ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
-    } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
+    } catch (_) {
+      /* falha silenciosa: registro de via não deve bloquear impressão */
+    }
     // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
     // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
     // antes da paciente). O gr_impressoes acima guarda o número de cada via só
@@ -1154,7 +1324,11 @@ export interface PrintGRAgrupadaInput {
 }
 
 const normalizar = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
   const ids = Array.from(new Set((input.agendamentoIds ?? []).filter(Boolean)));
@@ -1191,7 +1365,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     .eq("agendamento_id", chaveVia)
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -1223,14 +1398,18 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const nome = (prof as { nome: string | null } | null)?.nome;
       if (nome) usuarioFinalNome = nome;
     }
-  } catch { /* segue para fallback */ }
+  } catch {
+    /* segue para fallback */
+  }
   if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento")
+      .select(
+        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento",
+      )
       .in("id", ids),
     supabase
       .from("clinicas")
@@ -1254,16 +1433,27 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
   const ags = agsRes.data;
   const c = cliRes.data;
-  const procs = (procsRes.data ?? []) as Array<{ nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null }>;
+  const procs = (procsRes.data ?? []) as Array<{
+    nome: string;
+    valor_dinheiro_pix: number | null;
+    valor_cartao: number | null;
+    tipo: string | null;
+  }>;
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
   // Agendamentos que têm lançamento confirmado mas com valor total 0 →
   // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
   const gratuidadeByAg = new Map<string, boolean>();
-  for (const l of ((lancsRes.data ?? []) as Array<{ agendamento_id: string | null; valor: number | string }>)) {
+  for (const l of (lancsRes.data ?? []) as Array<{
+    agendamento_id: string | null;
+    valor: number | string;
+  }>) {
     if (!l.agendamento_id) continue;
-    valorPagoByAg.set(l.agendamento_id, (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor));
+    valorPagoByAg.set(
+      l.agendamento_id,
+      (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor),
+    );
     gratuidadeByAg.set(l.agendamento_id, true);
   }
   // Depois de somar, mantém true só quando o total é 0.
@@ -1280,48 +1470,137 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .eq("id", pacIdRef)
         .maybeSingle()
     : { data: null };
-  const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
+  const paciente = pacienteRes.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+    codigo_prontuario: string | null;
+    numero_pasta: string | null;
+  } | null;
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
   const prontuarioPac = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Busca dados de todos os médicos envolvidos + seus convênios
-  const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
+  const medicoIds = Array.from(
+    new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)),
+  );
   const [medsRes, convsRes, repRes] = await Promise.all([
     medicoIds.length > 0
       ? supabase
           .from("medicos")
           .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
           .in("id", medicoIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }> }),
+      : Promise.resolve({
+          data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>,
+        }),
     medicoIds.length > 0
       ? supabase
           .from("medico_convenios")
           .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
           .in("medico_id", medicoIds)
           .eq("ativo", true)
-      : Promise.resolve({ data: [] as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }> }),
+      : Promise.resolve({
+          data: [] as Array<{
+            medico_id: string;
+            nome: string;
+            tipo_repasse: string | null;
+            percentual: number | null;
+            valor: number | null;
+          }>,
+        }),
     medicoIds.length > 0
       ? supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId })
-      : Promise.resolve({ data: [] as Array<{ id: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }> }),
+      : Promise.resolve({
+          data: [] as Array<{
+            id: string;
+            tipo_repasse: string | null;
+            percentual_repasse_padrao: number | null;
+            valor_repasse_padrao: number | null;
+          }>,
+        }),
   ]);
-  const repMap = new Map<string, { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
-  for (const r of ((repRes as any).data ?? []) as Array<{ id: string; tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>) {
+  const repMap = new Map<
+    string,
+    {
+      tipo_repasse: string | null;
+      percentual_repasse_padrao: number | null;
+      valor_repasse_padrao: number | null;
+    }
+  >();
+  for (const r of ((repRes as any).data ?? []) as Array<{
+    id: string;
+    tipo_repasse: string | null;
+    percentual_repasse_padrao: number | null;
+    valor_repasse_padrao: number | null;
+  }>) {
     repMap.set(r.id, r);
   }
-  const medById = new Map(((medsRes.data ?? []) as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>).map((m) => {
-    const r = repMap.get(m.id);
-    return [m.id, { id: m.id, nome: m.nome, especialidadeNome: m.especialidade?.nome ?? null, tipo_repasse: r?.tipo_repasse ?? null, percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null, valor_repasse_padrao: r?.valor_repasse_padrao ?? null }] as const;
-  }));
-  const convsByMedico = new Map<string, Array<{ nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>>();
-  for (const cv of (convsRes.data ?? []) as Array<{ medico_id: string; nome: string; tipo_repasse: string | null; percentual: number | null; valor: number | null }>) {
+  const medById = new Map(
+    (
+      (medsRes.data ?? []) as Array<{
+        id: string;
+        nome: string;
+        especialidade: { nome: string } | null;
+      }>
+    ).map((m) => {
+      const r = repMap.get(m.id);
+      return [
+        m.id,
+        {
+          id: m.id,
+          nome: m.nome,
+          especialidadeNome: m.especialidade?.nome ?? null,
+          tipo_repasse: r?.tipo_repasse ?? null,
+          percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null,
+          valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+        },
+      ] as const;
+    }),
+  );
+  const convsByMedico = new Map<
+    string,
+    Array<{
+      nome: string;
+      tipo_repasse: string | null;
+      percentual: number | null;
+      valor: number | null;
+    }>
+  >();
+  for (const cv of (convsRes.data ?? []) as Array<{
+    medico_id: string;
+    nome: string;
+    tipo_repasse: string | null;
+    percentual: number | null;
+    valor: number | null;
+  }>) {
     const arr = convsByMedico.get(cv.medico_id) ?? [];
     arr.push(cv);
     convsByMedico.set(cv.medico_id, arr);
   }
 
   // Agrupa por médico
-  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string; gratuidade: boolean };
-  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string; allGratuidade: boolean; anyPago: boolean };
+  type Item = {
+    procNome: string;
+    valor: number;
+    prestador: number;
+    clinica: number;
+    inicio: string;
+    gratuidade: boolean;
+  };
+  type Grupo = {
+    medicoId: string | null;
+    agendaId: string | null;
+    agIdRef: string;
+    medicoNome: string;
+    itens: Item[];
+    subtotal: number;
+    prestador: number;
+    clinica: number;
+    inicioRef: string;
+    allGratuidade: boolean;
+    anyPago: boolean;
+  };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
@@ -1331,9 +1610,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const procNome = formatServicoLinha(procNomeBase, espNome);
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
     const valorPago = valorPagoByAg.get(a.id);
-    const valor = valorPago != null && valorPago > 0
-      ? valorPago
-      : Number(proc?.valor_dinheiro_pix ?? 0);
+    const valor =
+      valorPago != null && valorPago > 0 ? valorPago : Number(proc?.valor_dinheiro_pix ?? 0);
 
     // Repasse: convenio por nome do procedimento → senão padrão do médico
     let prestador = 0;
@@ -1349,9 +1627,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         cur = m[1].trim();
         if (cur) variants.add(cur);
       }
-      const semParens = baseNorm.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      const semParens = baseNorm
+        .replace(/\s*\([^()]*\)\s*/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
       if (semParens) variants.add(semParens);
-      let conv: typeof convs[number] | undefined;
+      let conv: (typeof convs)[number] | undefined;
       for (const alvo of variants) {
         conv = convs.find((cv) => normalizar(cv.nome) === alvo);
         if (conv) break;
@@ -1364,19 +1645,19 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         if (conv.tipo_repasse === "valor" && conv.valor != null) {
           prestador = Number(conv.valor);
         } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-          prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+          prestador = +((valor * Number(conv.percentual)) / 100).toFixed(2);
         } else if (med) {
           if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
             prestador = Number(med.valor_repasse_padrao);
           } else {
-            prestador = +(valor * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+            prestador = +((valor * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
           }
         }
       } else if (med) {
         if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
           prestador = Number(med.valor_repasse_padrao);
         } else {
-          prestador = +(valor * Number(med.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          prestador = +((valor * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
         }
       }
     }
@@ -1390,11 +1671,26 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
     const gratuidade = gratuidadeByAg.get(a.id) === true;
-    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio, allGratuidade: true, anyPago: false };
+    const g: Grupo = grupos.get(key) ?? {
+      medicoId: a.medico_id ?? null,
+      agendaId: (a as any).agenda_id ?? null,
+      agIdRef: a.id,
+      medicoNome,
+      itens: [] as Item[],
+      subtotal: 0,
+      prestador: 0,
+      clinica: 0,
+      inicioRef: a.inicio,
+      allGratuidade: true,
+      anyPago: false,
+    };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
     if (!gratuidade) g.anyPago = true;
     if (!gratuidade) g.allGratuidade = false;
-    if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
+    if (a.inicio < g.inicioRef) {
+      g.inicioRef = a.inicio;
+      g.agIdRef = a.id;
+    }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
     g.clinica = +(g.clinica + clin).toFixed(2);
@@ -1405,45 +1701,66 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: cada
   // (dia, profissional, agenda) tem sua própria sequência 001, 002, 003…
   const fichaByGrupo = new Map<string, number>();
-  await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
-    try {
-      const dt = new Date(g.inicioRef);
-      const ini = new Date(dt); ini.setHours(0,0,0,0);
-      const fim = new Date(dt); fim.setHours(23,59,59,999);
-      const q = supabase.from("agendamentos")
-        .select("id, inicio, paciente_nome, medico_id, agenda_id")
-        .eq("clinica_id", clinicaId)
-        .gte("inicio", ini.toISOString())
-        .lte("inicio", fim.toISOString());
-      if (g.medicoId) q.eq("medico_id", g.medicoId); else q.is("medico_id", null);
-      if (g.agendaId) q.eq("agenda_id", g.agendaId); else q.is("agenda_id", null);
-      const { data } = await q;
-      const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
-        const t = String(x.inicio).localeCompare(String(y.inicio));
-        if (t !== 0) return t;
-        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
-      });
-      const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
-      fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
-    } catch { fichaByGrupo.set(key, 0); }
-  }));
+  await Promise.all(
+    Array.from(grupos.entries()).map(async ([key, g]) => {
+      try {
+        const dt = new Date(g.inicioRef);
+        const ini = new Date(dt);
+        ini.setHours(0, 0, 0, 0);
+        const fim = new Date(dt);
+        fim.setHours(23, 59, 59, 999);
+        const q = supabase
+          .from("agendamentos")
+          .select("id, inicio, paciente_nome, medico_id, agenda_id")
+          .eq("clinica_id", clinicaId)
+          .gte("inicio", ini.toISOString())
+          .lte("inicio", fim.toISOString());
+        if (g.medicoId) q.eq("medico_id", g.medicoId);
+        else q.is("medico_id", null);
+        if (g.agendaId) q.eq("agenda_id", g.agendaId);
+        else q.is("agenda_id", null);
+        const { data } = await q;
+        const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
+          const t = String(x.inicio).localeCompare(String(y.inicio));
+          if (t !== 0) return t;
+          return String(x.paciente_nome ?? "").localeCompare(
+            String(y.paciente_nome ?? ""),
+            "pt-BR",
+            { sensitivity: "base" },
+          );
+        });
+        const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
+        fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
+      } catch {
+        fichaByGrupo.set(key, 0);
+      }
+    }),
+  );
 
   // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
   // "DINHEIRO" quando a forma real é desconhecida.
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const formaLbl = pagamento.forma_pagamento
+    ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
-    ? pagamento.detalhe!
-        .map((d) => {
+    ? pagamento
+        .detalhe!.map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
-          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          const trocoTxt =
+            d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
           return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   let convLabelAgrupada = await resolveConvLabel(
@@ -1480,27 +1797,31 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const dataImpressao = fmtData(new Date().toISOString());
 
   // Uma GR completa por médico, separadas por linha tracejada bem visível
-  const grsHtml = gruposArr.map((g, idx) => {
-    const isLast = idx === gruposArr.length - 1;
-    const key = g.agIdRef;
-    const ficha = (() => {
-      const num = fichaByGrupo.get(key) ?? 0;
-      if (num > 0) return String(num).padStart(3, "0");
-      const d = new Date(g.inicioRef);
-      return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
-    })();
-    const linhas = g.itens
-      .map(
-        (it) => `<tr>
+  const grsHtml = gruposArr
+    .map((g, idx) => {
+      const isLast = idx === gruposArr.length - 1;
+      const key = g.agIdRef;
+      const ficha = (() => {
+        const num = fichaByGrupo.get(key) ?? 0;
+        if (num > 0) return String(num).padStart(3, "0");
+        const d = new Date(g.inicioRef);
+        return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
+      })();
+      const linhas = g.itens
+        .map(
+          (it) => `<tr>
           <td style="width:14mm">1</td>
           <td>${esc(it.procNome)}</td>
-        </tr>`
-      )
-      .join("");
-    const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-      ? `${pagamento.parcelas}x DE ${fmtBRL(g.subtotal / pagamento.parcelas)}`
-      : "À VISTA";
-    return `
+        </tr>`,
+        )
+        .join("");
+      const parcelasTxt =
+        pagamento.forma_pagamento === "cartao_credito" &&
+        pagamento.parcelas &&
+        pagamento.parcelas > 1
+          ? `${pagamento.parcelas}x DE ${fmtBRL(g.subtotal / pagamento.parcelas)}`
+          : "À VISTA";
+      return `
       <div class="ticket">
         ${headerClinica}
         <div class="sep"></div>
@@ -1522,34 +1843,48 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           </tr>
           ${linhas}
         </table>
-        ${g.allGratuidade ? `
+        ${
+          g.allGratuidade
+            ? `
         <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
         <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
-        ${(g.clinica > 0 || g.prestador > 0) ? `
+        ${
+          g.clinica > 0 || g.prestador > 0
+            ? `
         <div class="sep"></div>
         <table>
           <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
           <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
         </table>
-        ` : ""}
-        ` : g.subtotal > 0 ? `
+        `
+            : ""
+        }
+        `
+            : g.subtotal > 0
+              ? `
         <div class="row" style="margin-top:8px">
           <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
           <div class="bold lg">${fmtBRL(g.subtotal)}</div>
         </div>
         ${isLast && isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
-        ${pagamento.forma_pagamento === "cartao_credito" ? `
+        ${
+          pagamento.forma_pagamento === "cartao_credito"
+            ? `
         <table>
           ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
           <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
         </table>
-        ` : ""}
+        `
+            : ""
+        }
         <div class="sep"></div>
         <table>
           <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
           <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
         </table>
-        ` : ""}
+        `
+              : ""
+        }
         <div class="sep"></div>
         <div class="row sm">
           <div>DATA</div>
@@ -1558,7 +1893,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       </div>
       ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">- - - - - - - - - - - - CORTE AQUI - - - - - - - - - - - -</div><div class="cut-line"></div></div>` : ""}
     `;
-  }).join("");
+    })
+    .join("");
 
   const nVias = numViasGR(pagamento);
   const corpoVias = multiplicarVias(grsHtml, nVias);
@@ -1589,7 +1925,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         impresso_por_nome: usuarioNome ?? null,
       }));
       await supabase.from("gr_impressoes" as never).insert(rows as never);
-    } catch (_) { /* falha silenciosa */ }
+    } catch (_) {
+      /* falha silenciosa */
+    }
   }
 }
 
@@ -1615,7 +1953,6 @@ export interface PrintGRMensalidadeInput {
   };
 }
 
-
 // ============================================================================
 // NUMERAÇÃO PRÓPRIA DA GR DE MENSALIDADE (Cartão Consulta / Cartão Desconto)
 // ----------------------------------------------------------------------------
@@ -1627,7 +1964,14 @@ export interface PrintGRMensalidadeInput {
 async function proximoNumeroGRMensalidade(clinicaId: string): Promise<number> {
   const hoje = new Date();
   const ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0).toISOString();
-  const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59).toISOString();
+  const fim = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate(),
+    23,
+    59,
+    59,
+  ).toISOString();
   const { data } = await supabase
     .from("gr_impressoes" as never)
     .select("ficha_numero")
@@ -1649,7 +1993,16 @@ export async function reimprimirGuiaMensalidade(input: PrintGRMensalidadeInput) 
   return printGuiaMensalidadeCore({ ...input, reimpressao: true });
 }
 
-async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao, reimpressoPorNome, reimpressoPorId, pagamento }: PrintGRMensalidadeInput) {
+async function printGuiaMensalidadeCore({
+  mensalidadeId,
+  clinicaId,
+  usuarioNome,
+  usuarioId,
+  reimpressao,
+  reimpressoPorNome,
+  reimpressoPorId,
+  pagamento,
+}: PrintGRMensalidadeInput) {
   // Controle de vias 1ª/2ª via por mensalidade
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -1658,7 +2011,8 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     .eq("tipo", "mensalidade")
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -1676,8 +2030,10 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     .not("ficha_numero", "is", null)
     .order("via_numero", { ascending: true })
     .limit(1);
-  const grNumeroExistente = ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
-  const grNumero = grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
+  const grNumeroExistente =
+    ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
+  const grNumero =
+    grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
   // "USUÁRIO:" = quem faturou (criador do lançamento), sempre — 1ª via e
   // reimpressões. Resolvido abaixo após carregar a mensalidade; caller fica
   // como último fallback.
@@ -1695,9 +2051,25 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       .eq("id", clinicaId)
       .maybeSingle(),
   ]);
-  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
-  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null; lancamento_id: string | null };
-  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+  if (mensRes.error || !mensRes.data)
+    throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as {
+    id: string;
+    contrato_id: string;
+    numero_parcela: number;
+    vencimento: string;
+    valor: number;
+    pago_em: string | null;
+    lancamento_id: string | null;
+  };
+  const c = cliRes.data as {
+    nome: string;
+    endereco: string | null;
+    cidade: string | null;
+    estado: string | null;
+    telefone: string | null;
+    cnpj: string | null;
+  } | null;
 
   // Resolve o usuário SEMPRE via fin_lancamentos.criado_por → profiles.nome.
   // Não usa o operador logado; o "USUÁRIO:" tem que ser quem faturou.
@@ -1718,7 +2090,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         const nome = (prof as { nome: string | null } | null)?.nome;
         if (nome) usuarioFinalNome = nome;
       }
-    } catch { /* mantém oculto se não conseguir resolver */ }
+    } catch {
+      /* mantém oculto se não conseguir resolver */
+    }
   }
   if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
@@ -1728,18 +2102,34 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as {
+    id: string;
+    numero: number;
+    paciente_id: string | null;
+    paciente_nome: string;
+    convenio_id: string | null;
+    num_parcelas: number | null;
+  };
 
   const [planoRes, pacRes] = await Promise.all([
     contrato.convenio_id
       ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
-      ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
+      ? supabase
+          .from("pacientes")
+          .select("nome, cpf, telefone, data_nascimento")
+          .eq("id", contrato.paciente_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const plano = planoRes.data as { nome: string } | null;
-  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pacRes.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+  } | null;
 
   const isAdesao = Number(m.numero_parcela) === 0;
   const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
@@ -1747,23 +2137,32 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
   // "DINHEIRO" quando a forma real é desconhecida.
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const formaLbl = pagamento.forma_pagamento
+    ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
-  const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
-    : "À VISTA";
+  const parcelasTxt =
+    pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+      ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+      : "À VISTA";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const detalheRows = isMisto
-    ? pagamento.detalhe!
-        .map((d) => {
+    ? pagamento
+        .detalhe!.map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
-          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          const trocoTxt =
+            d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
           return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
   const descricao = isAdesao
     ? `TAXA DE ADESAO - CONTRATO #${contrato.numero}${plano?.nome ? ` - ${plano.nome.toUpperCase()}` : ""}`
@@ -1814,30 +2213,42 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
 
-    ${isMisto ? `
+    ${
+      isMisto
+        ? `
     <table style="margin-top:4px">
       ${detalheRows}
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    ${
+      pagamento.forma_pagamento === "cartao_credito"
+        ? `
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="sep"></div>
     <div class="row sm">
       <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
-    ${reimpressao && reimpressoPorNome ? `
+    ${
+      reimpressao && reimpressoPorNome
+        ? `
     <div class="sep"></div>
     <div class="center sm">*** 2ª VIA — REIMPRESSÃO ***</div>
     <div class="center sm">REIMPRESSO POR: <span class="v">${esc(reimpressoPorNome)}</span></div>
     <div class="center sm">EM ${fmtData(new Date().toISOString())}</div>
-    ` : ""}
+    `
+        : ""
+    }
   </div>`;
 
   const nVias = numViasGR(pagamento);
@@ -1866,7 +2277,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         tipo: "mensalidade",
         ficha_numero: grNumero,
       } as never);
-    } catch (_) { /* falha silenciosa */ }
+    } catch (_) {
+      /* falha silenciosa */
+    }
   } else if (reimpressoPorNome) {
     // Registra também as reimpressões, para auditoria (não afeta a 1ª via original).
     try {
@@ -1879,7 +2292,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         tipo: "mensalidade",
         ficha_numero: grNumero,
       } as never);
-    } catch (_) { /* falha silenciosa */ }
+    } catch (_) {
+      /* falha silenciosa */
+    }
   }
 }
 
@@ -1910,7 +2325,15 @@ export async function reimprimirGuiaTaxaAdesao(input: PrintGRTaxaAdesaoInput) {
   return printGuiaTaxaAdesaoCore({ ...input, reimpressao: true });
 }
 
-async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRTaxaAdesaoInput) {
+async function printGuiaTaxaAdesaoCore({
+  mensalidadeId,
+  clinicaId,
+  valorTaxa,
+  usuarioNome,
+  usuarioId,
+  reimpressao,
+  pagamento,
+}: PrintGRTaxaAdesaoInput) {
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
     .select("via_numero, impresso_por_nome, tipo")
@@ -1918,7 +2341,8 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
     .eq("tipo", "taxa_adesao")
     .order("via_numero", { ascending: false });
   if (errVias) throw new Error(errVias.message);
-  const existentes = (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
   const ultimaVia = existentes[0]?.via_numero ?? 0;
   let viaNumero: number;
   if (reimpressao) {
@@ -1941,9 +2365,22 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
       .eq("id", clinicaId)
       .maybeSingle(),
   ]);
-  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
-  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string };
-  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+  if (mensRes.error || !mensRes.data)
+    throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as {
+    id: string;
+    contrato_id: string;
+    numero_parcela: number;
+    vencimento: string;
+  };
+  const c = cliRes.data as {
+    nome: string;
+    endereco: string | null;
+    cidade: string | null;
+    estado: string | null;
+    telefone: string | null;
+    cnpj: string | null;
+  } | null;
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
@@ -1951,37 +2388,60 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null };
+  const contrato = contratoRow as {
+    id: string;
+    numero: number;
+    paciente_id: string | null;
+    paciente_nome: string;
+    convenio_id: string | null;
+  };
 
   const [planoRes, pacRes] = await Promise.all([
     contrato.convenio_id
       ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
-      ? supabase.from("pacientes").select("nome, cpf, telefone").eq("id", contrato.paciente_id).maybeSingle()
+      ? supabase
+          .from("pacientes")
+          .select("nome, cpf, telefone")
+          .eq("id", contrato.paciente_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const plano = planoRes.data as { nome: string } | null;
-  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null } | null;
+  const paciente = pacRes.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+  } | null;
 
   const valor = Number(valorTaxa ?? 0);
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const formaLbl = pagamento.forma_pagamento
+    ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
-  const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
-    : "À VISTA";
+  const parcelasTxt =
+    pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+      ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`
+      : "À VISTA";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const detalheRows = isMisto
-    ? pagamento.detalhe!
-        .map((d) => {
+    ? pagamento
+        .detalhe!.map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
-          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          const trocoTxt =
+            d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
           return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
   const descricao = `TAXA DE ADESÃO — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
@@ -2028,18 +2488,26 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
       <div class="bold lg">${fmtBRL(valor)}</div>
     </div>
 
-    ${isMisto ? `
+    ${
+      isMisto
+        ? `
     <table style="margin-top:4px">
       ${detalheRows}
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    ${
+      pagamento.forma_pagamento === "cartao_credito"
+        ? `
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="sep"></div>
     <div class="row sm">
@@ -2073,7 +2541,9 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
         impresso_por_nome: usuarioNome ?? null,
         tipo: "taxa_adesao",
       } as never);
-    } catch (_) { /* falha silenciosa */ }
+    } catch (_) {
+      /* falha silenciosa */
+    }
   }
 }
 
@@ -2100,13 +2570,22 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
     .eq("mensalidade_id", mensalidadeId)
     .in("tipo", ["mensalidade", "taxa_adesao"])
     .order("via_numero", { ascending: false });
-  const visExistentes = (visRows as Array<{ via_numero: number; impresso_por_nome: string | null; tipo: string }> | null) ?? [];
+  const visExistentes =
+    (visRows as Array<{
+      via_numero: number;
+      impresso_por_nome: string | null;
+      tipo: string;
+    }> | null) ?? [];
   const viasMens = visExistentes.filter((r) => r.tipo === "mensalidade");
   const viasTaxa = visExistentes.filter((r) => r.tipo === "taxa_adesao");
   const viaNumeroMens = (viasMens[0]?.via_numero ?? 0) + 1;
   const viaNumeroTaxa = (viasTaxa[0]?.via_numero ?? 0) + 1;
-  const usuarioMensPrimeiro = viasMens.length ? viasMens[viasMens.length - 1].impresso_por_nome : null;
-  const usuarioTaxaPrimeiro = viasTaxa.length ? viasTaxa[viasTaxa.length - 1].impresso_por_nome : null;
+  const usuarioMensPrimeiro = viasMens.length
+    ? viasMens[viasMens.length - 1].impresso_por_nome
+    : null;
+  const usuarioTaxaPrimeiro = viasTaxa.length
+    ? viasTaxa[viasTaxa.length - 1].impresso_por_nome
+    : null;
   const usuarioMensNome = usuarioMensPrimeiro ?? usuarioNome;
   const usuarioTaxaNome = usuarioTaxaPrimeiro ?? usuarioNome;
 
@@ -2125,9 +2604,24 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
       .eq("id", clinicaId)
       .maybeSingle(),
   ]);
-  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
-  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null };
-  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+  if (mensRes.error || !mensRes.data)
+    throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as {
+    id: string;
+    contrato_id: string;
+    numero_parcela: number;
+    vencimento: string;
+    valor: number;
+    pago_em: string | null;
+  };
+  const c = cliRes.data as {
+    nome: string;
+    endereco: string | null;
+    cidade: string | null;
+    estado: string | null;
+    telefone: string | null;
+    cnpj: string | null;
+  } | null;
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
@@ -2135,18 +2629,34 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as {
+    id: string;
+    numero: number;
+    paciente_id: string | null;
+    paciente_nome: string;
+    convenio_id: string | null;
+    num_parcelas: number | null;
+  };
 
   const [planoRes, pacRes] = await Promise.all([
     contrato.convenio_id
       ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
-      ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
+      ? supabase
+          .from("pacientes")
+          .select("nome, cpf, telefone, data_nascimento")
+          .eq("id", contrato.paciente_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const plano = planoRes.data as { nome: string } | null;
-  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pacRes.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+  } | null;
 
   // -----------------------------------------------------------------
   // 3) Formatação comum de pagamento.
@@ -2154,26 +2664,36 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
   const valorMens = Number(pagamento.valor ?? m.valor ?? 0);
   const valorTax = Number(valorTaxa ?? 0);
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const formaLbl = pagamento.forma_pagamento
+    ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
-  const parcelasTxtMens = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valorMens / pagamento.parcelas)}`
-    : "À VISTA";
-  const parcelasTxtTaxa = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
-    ? `${pagamento.parcelas}x DE ${fmtBRL(valorTax / pagamento.parcelas)}`
-    : "À VISTA";
+  const parcelasTxtMens =
+    pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+      ? `${pagamento.parcelas}x DE ${fmtBRL(valorMens / pagamento.parcelas)}`
+      : "À VISTA";
+  const parcelasTxtTaxa =
+    pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+      ? `${pagamento.parcelas}x DE ${fmtBRL(valorTax / pagamento.parcelas)}`
+      : "À VISTA";
   const detalheRows = isMisto
-    ? pagamento.detalhe!
-        .map((d) => {
+    ? pagamento
+        .detalhe!.map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
-          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          const trocoTxt =
+            d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
           return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [
+    c?.endereco,
+    c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : (c?.cidade ?? c?.estado),
+  ]
+    .filter(Boolean)
+    .join("<br/>");
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
   // -----------------------------------------------------------------
@@ -2224,18 +2744,26 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
       <div class="bold lg">${fmtBRL(valorMens)}</div>
     </div>
 
-    ${isMisto ? `
+    ${
+      isMisto
+        ? `
     <table style="margin-top:4px">
       ${detalheRows}
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    ${
+      pagamento.forma_pagamento === "cartao_credito"
+        ? `
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtMens}</td></tr>
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="sep"></div>
     <div class="row sm">
@@ -2291,18 +2819,26 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
       <div class="bold lg">${fmtBRL(valorTax)}</div>
     </div>
 
-    ${isMisto ? `
+    ${
+      isMisto
+        ? `
     <table style="margin-top:4px">
       ${detalheRows}
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
-    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    ${
+      pagamento.forma_pagamento === "cartao_credito"
+        ? `
     <table>
       ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
       <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtTaxa}</td></tr>
     </table>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="sep"></div>
     <div class="row sm">
@@ -2357,5 +2893,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
         tipo: "taxa_adesao",
       },
     ] as never);
-  } catch (_) { /* falha silenciosa */ }
+  } catch (_) {
+    /* falha silenciosa */
+  }
 }

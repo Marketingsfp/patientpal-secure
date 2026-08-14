@@ -29,8 +29,7 @@ export type MarcarExternoInput = {
 };
 
 export type MarcarExternoResult =
-  | { ok: true; fin_atendimento_id: string | null }
-  | { ok: false; message: string };
+  { ok: true; fin_atendimento_id: string | null } | { ok: false; message: string };
 
 export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -62,7 +61,8 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
     // Repasse do médico: vem calculado do cliente pelo cadastro de repasse.
     // Sem informação, mantém o comportamento antigo (valor cheio da tabela).
     const repasseInformado = Number(data.repasse_medico ?? NaN);
-    const repasse = Number.isFinite(repasseInformado) && repasseInformado >= 0 ? repasseInformado : valor;
+    const repasse =
+      Number.isFinite(repasseInformado) && repasseInformado >= 0 ? repasseInformado : valor;
 
     const { error: upErr } = await supabase
       .from("agendamentos")
@@ -138,9 +138,7 @@ export const limparAtendimentoExterno = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { agendamento_id: string }) => d)
   .handler(async ({ data, context }): Promise<LimparExternoResult> => {
-    const claims = context.claims as
-      | { email?: string; user_metadata?: { nome?: string } }
-      | null;
+    const claims = context.claims as { email?: string; user_metadata?: { nome?: string } } | null;
     return limparExternoCore(context.supabase as never, data.agendamento_id, {
       email: claims?.email ?? null,
       nome: claims?.user_metadata?.nome ?? null,

@@ -107,14 +107,14 @@ export function AgendaPorMedicoDia({
   return (
     <div className="space-y-3">
       {mostrarResumo && (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
-          {dataLabel}
-        </span>
-        <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-          {colunas.length} profissiona{colunas.length === 1 ? "l" : "is"}
-        </span>
-      </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
+            {dataLabel}
+          </span>
+          <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+            {colunas.length} profissiona{colunas.length === 1 ? "l" : "is"}
+          </span>
+        </div>
       )}
 
       <div className="w-full max-w-full overflow-x-hidden pb-10">
@@ -172,10 +172,22 @@ export function AgendaPorMedicoDia({
                       >
                         {livre ? (
                           <>
-                            <p className={somenteLeitura ? "text-[11px] font-semibold text-emerald-900" : "text-[11px] font-medium text-slate-400"}>
+                            <p
+                              className={
+                                somenteLeitura
+                                  ? "text-[11px] font-semibold text-emerald-900"
+                                  : "text-[11px] font-medium text-slate-400"
+                              }
+                            >
                               {fmtHora(a.inicio)} – {fmtHora(a.fim)}
                             </p>
-                            <p className={somenteLeitura ? "text-[10px] font-semibold text-emerald-700" : "text-[10px] font-semibold text-slate-400"}>
+                            <p
+                              className={
+                                somenteLeitura
+                                  ? "text-[10px] font-semibold text-emerald-700"
+                                  : "text-[10px] font-semibold text-slate-400"
+                              }
+                            >
                               {somenteLeitura ? "Livre" : "+ Agendar"}
                             </p>
                           </>

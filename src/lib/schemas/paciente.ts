@@ -11,10 +11,12 @@ import { LIMITES, limparLinha, limparTexto, somenteDigitos } from "@/lib/seguran
 import { validarCPF } from "@/lib/validators";
 
 const linha = (max: number) =>
-  z.string().transform(limparLinha).pipe(z.string().max(max, `Máximo de ${max} caracteres`));
+  z
+    .string()
+    .transform(limparLinha)
+    .pipe(z.string().max(max, `Máximo de ${max} caracteres`));
 
-const opcional = (max: number) =>
-  linha(max).transform((v) => (v === "" ? null : v));
+const opcional = (max: number) => linha(max).transform((v) => (v === "" ? null : v));
 
 const cpfOpcional = z
   .string()

@@ -2,19 +2,35 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Building2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { printGuiaAtendimento } from "@/lib/print-gr";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { buscarVinculoConvenio, type ModalidadeConvenio } from "@/lib/convenio/modalidade";
-import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
+import {
+  calcularRepasseExterno,
+  listarConveniosClinica,
+} from "@/lib/agenda/atendimento-externo-repasse";
 
 type Props = {
   open: boolean;
@@ -66,8 +82,9 @@ export function AtendimentoExternoDialog({
     .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
-  const modalidade: ModalidadeConvenio | null =
-    temConvenio ? convenios.find((c) => c.id === convenioId)?.modalidade ?? null : null;
+  const modalidade: ModalidadeConvenio | null = temConvenio
+    ? (convenios.find((c) => c.id === convenioId)?.modalidade ?? null)
+    : null;
 
   useEffect(() => {
     if (open) {
@@ -97,18 +114,26 @@ export function AtendimentoExternoDialog({
       if (cancelado) return;
       setMedicoId((ag?.medico_id as string | null) ?? null);
       setConvenios(lista);
-      const vinculo = await buscarVinculoConvenio(clinicaId, (ag?.paciente_id as string | null) ?? null);
+      const vinculo = await buscarVinculoConvenio(
+        clinicaId,
+        (ag?.paciente_id as string | null) ?? null,
+      );
       if (cancelado || !vinculo) return;
       setTemConvenio(true);
       setConvenioId(vinculo.convenioId);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [open, clinicaId, agendamentoId]);
 
   // Repasse do médico conforme o cadastro (muda com a flag/convênio).
   useEffect(() => {
     if (!open || !clinicaId || !procedimento?.trim()) return;
-    if (temConvenio && !convenioId) { setRepasse(null); return; }
+    if (temConvenio && !convenioId) {
+      setRepasse(null);
+      return;
+    }
     let cancelado = false;
     setCalculando(true);
     void (async () => {
@@ -123,7 +148,9 @@ export function AtendimentoExternoDialog({
       setRepasse(r.repasse);
       setCalculando(false);
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [open, clinicaId, procedimento, medicoId, temConvenio, convenioId, modalidade]);
 
   const salvar = async () => {
@@ -151,12 +178,15 @@ export function AtendimentoExternoDialog({
       await printGuiaAtendimento({
         agendamentoId,
         clinicaId,
-        usuarioNome: (user?.user_metadata as { nome?: string } | undefined)?.nome ?? user?.email ?? undefined,
+        usuarioNome:
+          (user?.user_metadata as { nome?: string } | undefined)?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
         fichaNumero: fichaNumero ?? undefined,
       });
     } catch {
-      toast.warning("Registro salvo, mas a GR não pôde ser impressa. Use o botão Imprimir GR na agenda.");
+      toast.warning(
+        "Registro salvo, mas a GR não pôde ser impressa. Use o botão Imprimir GR na agenda.",
+      );
     }
     onOpenChange(false);
     onDone?.();
@@ -170,8 +200,8 @@ export function AtendimentoExternoDialog({
             <Building2 className="h-4 w-4 text-orange-600" /> Atendimento externo
           </DialogTitle>
           <DialogDescription>
-            Paciente atendido aqui, mas faturado em outra clínica. Não entra no caixa
-            nem gera nota fiscal — apenas alimenta o repasse do médico e o acerto entre clínicas.
+            Paciente atendido aqui, mas faturado em outra clínica. Não entra no caixa nem gera nota
+            fiscal — apenas alimenta o repasse do médico e o acerto entre clínicas.
           </DialogDescription>
         </DialogHeader>
 
@@ -190,7 +220,9 @@ export function AtendimentoExternoDialog({
               </SelectTrigger>
               <SelectContent>
                 {unidades.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.nome}
+                  </SelectItem>
                 ))}
                 <SelectItem value="outra">Outra clínica (digitar)</SelectItem>
               </SelectContent>
@@ -224,7 +256,9 @@ export function AtendimentoExternoDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {convenios.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -234,13 +268,19 @@ export function AtendimentoExternoDialog({
           <div>
             <Label>Repasse do médico</Label>
             <div className="mt-1 rounded-md border bg-muted/40 px-3 py-2 text-lg font-semibold tabular-nums">
-              {calculando
-                ? <span className="text-sm font-normal text-muted-foreground">Calculando…</span>
-                : temConvenio && !convenioId
-                ? <span className="text-sm font-normal text-muted-foreground">Selecione o convênio</span>
-                : repasse != null && repasse > 0
-                ? brl(repasse)
-                : <span className="text-sm font-normal text-muted-foreground">Sem regra de repasse cadastrada (R$ 0,00)</span>}
+              {calculando ? (
+                <span className="text-sm font-normal text-muted-foreground">Calculando…</span>
+              ) : temConvenio && !convenioId ? (
+                <span className="text-sm font-normal text-muted-foreground">
+                  Selecione o convênio
+                </span>
+              ) : repasse != null && repasse > 0 ? (
+                brl(repasse)
+              ) : (
+                <span className="text-sm font-normal text-muted-foreground">
+                  Sem regra de repasse cadastrada (R$ 0,00)
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Calculado pelo cadastro de repasse do médico
@@ -249,16 +289,20 @@ export function AtendimentoExternoDialog({
             <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no
-                movimento de caixa da atendente e não gera nota fiscal.
+                Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no movimento de
+                caixa da atendente e não gera nota fiscal.
               </span>
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={salvando}>Cancelar</Button>
-          <Button onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Registrar externo"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={salvando}>
+            Cancelar
+          </Button>
+          <Button onClick={salvar} disabled={salvando}>
+            {salvando ? "Salvando…" : "Registrar externo"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

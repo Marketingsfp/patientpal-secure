@@ -34,11 +34,7 @@ export function AgendaEmptyState({
 }: Props) {
   // Sem contexto de "apenas a data": mensagem genérica (compatível com padrão anterior)
   if (!apenasData || !info) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        Nenhum agendamento encontrado.
-      </div>
-    );
+    return <div className="text-sm text-muted-foreground">Nenhum agendamento encontrado.</div>;
   }
 
   const dataFmt = formatBR(dataRef);
@@ -47,8 +43,8 @@ export function AgendaEmptyState({
     return (
       <div className="space-y-2 text-sm">
         <div className="text-foreground">
-          Existem horários em <strong>{dataFmt}</strong>, mas os filtros atuais
-          estão escondendo os resultados.
+          Existem horários em <strong>{dataFmt}</strong>, mas os filtros atuais estão escondendo os
+          resultados.
         </div>
         <div className="flex items-center justify-center gap-2">
           <Button size="sm" variant="outline" onClick={onLimparFiltros}>
@@ -63,8 +59,7 @@ export function AgendaEmptyState({
     return (
       <div className="space-y-2 text-sm">
         <div className="text-foreground">
-          Não há horários cadastrados para <strong>{dataFmt}</strong> com esses
-          filtros.
+          Não há horários cadastrados para <strong>{dataFmt}</strong> com esses filtros.
         </div>
         <div className="text-muted-foreground">
           Próximo dia com agenda: <strong>{formatBR(info.proximaData)}</strong>

@@ -22,8 +22,10 @@ function EditarMedicoPage() {
 
   const voltar = () => navigate({ to: "/app/equipe", search: { tab: "medicos" } });
 
-  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
-  if (!podeEscrever) return <p className="text-muted-foreground">Você não tem permissão de edição neste módulo.</p>;
+  if (!clinicaAtual)
+    return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  if (!podeEscrever)
+    return <p className="text-muted-foreground">Você não tem permissão de edição neste módulo.</p>;
 
   return (
     <div className="space-y-4">
@@ -40,7 +42,9 @@ function EditarMedicoPage() {
           <MedicoFormDialog
             asPage
             open
-            onOpenChange={(o) => { if (!o) voltar(); }}
+            onOpenChange={(o) => {
+              if (!o) voltar();
+            }}
             clinicaId={clinicaAtual.clinica_id}
             editingMedicoId={medicoId}
             onSaved={voltar}

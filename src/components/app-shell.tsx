@@ -1,6 +1,15 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import {
   Activity,
   Building2,
@@ -58,10 +67,21 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, rotaSomenteAdmin, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
+import {
+  ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
+  moduloDaRota,
+  rotaSomenteAdmin,
+  SUBMODULE_PARENT,
+} from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
-import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS, type SubsystemId } from "@/lib/subsystem";
+import {
+  getSubsystem,
+  setSubsystem,
+  subscribeSubsystem,
+  SUBSYSTEMS,
+  type SubsystemId,
+} from "@/lib/subsystem";
 import {
   PortalLauncher,
   abrirSeletorPortais,
@@ -104,7 +124,13 @@ function logoDaClinica(nome?: string): string | null {
   if (n.includes("consulta hoje")) return logoConsultaHoje;
   return null;
 }
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -118,7 +144,9 @@ import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
+const VoiceInput = lazy(() =>
+  import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })),
+);
 const ChangePasswordDialog = lazy(() =>
   import("@/components/change-password-dialog").then((m) => ({ default: m.ChangePasswordDialog })),
 );
@@ -298,7 +326,9 @@ function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   // atendimentos), mesmo sem acesso ao pai. O submenu do Financeiro já
   // filtra as abas individuais e a rota-pai redireciona para a primeira
   // aba visível.
-  const temSub = Object.entries(SUBMODULE_PARENT).some(([sub, parent]) => parent === mod && allowed.has(sub));
+  const temSub = Object.entries(SUBMODULE_PARENT).some(
+    ([sub, parent]) => parent === mod && allowed.has(sub),
+  );
   return temSub;
 }
 
@@ -394,16 +424,56 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           { to: "/app/nina", hash: "treinada", label: "Nina treinada", icon: Brain },
           { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
           { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-          { to: "/app/nina", hash: "atend-supervisor", label: "Atendimento — Supervisão (live)", icon: Eye },
-          { to: "/app/nina", hash: "atend-relatorios", label: "Atendimento — Relatórios", icon: FileText },
-          { to: "/app/nina", hash: "atend-roteamento", label: "Atendimento — Roteamento", icon: ArrowRightLeft },
-          { to: "/app/nina", hash: "atend-dashboard", label: "Atendimento — Painel", icon: BarChart3 },
-          { to: "/app/nina", hash: "atend-status", label: "Atendimento — Meu Status (filas + pausa)", icon: Play },
-          { to: "/app/nina", hash: "atend-depto", label: "Atendimento — Departamentos", icon: Users },
+          {
+            to: "/app/nina",
+            hash: "atend-supervisor",
+            label: "Atendimento — Supervisão (live)",
+            icon: Eye,
+          },
+          {
+            to: "/app/nina",
+            hash: "atend-relatorios",
+            label: "Atendimento — Relatórios",
+            icon: FileText,
+          },
+          {
+            to: "/app/nina",
+            hash: "atend-roteamento",
+            label: "Atendimento — Roteamento",
+            icon: ArrowRightLeft,
+          },
+          {
+            to: "/app/nina",
+            hash: "atend-dashboard",
+            label: "Atendimento — Painel",
+            icon: BarChart3,
+          },
+          {
+            to: "/app/nina",
+            hash: "atend-status",
+            label: "Atendimento — Meu Status (filas + pausa)",
+            icon: Play,
+          },
+          {
+            to: "/app/nina",
+            hash: "atend-depto",
+            label: "Atendimento — Departamentos",
+            icon: Users,
+          },
           { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
-          { to: "/app/nina", hash: "atend-kb", label: "Atendimento — Base de Conhecimento", icon: BookOpen },
+          {
+            to: "/app/nina",
+            hash: "atend-kb",
+            label: "Atendimento — Base de Conhecimento",
+            icon: BookOpen,
+          },
           { to: "/app/nina", hash: "atend-pausas", label: "Atendimento — Pausas", icon: Coffee },
-          { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
+          {
+            to: "/app/nina",
+            hash: "templates",
+            label: "Templates aprovados (Meta)",
+            icon: FileText,
+          },
           { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
         ],
       },
@@ -448,7 +518,9 @@ function MobileNavParent({
       >
         <item.icon className="h-[18px] w-[18px] shrink-0" />
         <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
-        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+        />
       </button>
       <div
         className={`grid transition-all duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
@@ -480,8 +552,13 @@ function MobileNavParent({
 
 function AppShellInner() {
   const { user, signOut, loading } = useAuth();
-  const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
-  const { allowed: allowedModules, configured: configuredModules, loading: permsLoading } = usePermissoes();
+  const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } =
+    useClinica();
+  const {
+    allowed: allowedModules,
+    configured: configuredModules,
+    loading: permsLoading,
+  } = usePermissoes();
   // Efeito "expandir ao passar o mouse" nos itens do menu clássico — ligado
   // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
   const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");
@@ -819,7 +896,10 @@ function AppShellInner() {
   const searchedNavRows = useMemo(() => {
     if (!buscandoMenu) return visibleNavRows;
     const norm = (s: string) =>
-      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
     const alvo = norm(termoMenu);
     return visibleNavRows
       .map((row) => {
@@ -882,7 +962,10 @@ function AppShellInner() {
   // alvo atual ganha um anel.
   const dragCls = (key: string) =>
     uxMelhorias && dragMenu
-      ? cn(dragMenu.key === key && "opacity-50", dragOverKey === key && dragMenu.key !== key && "ring-1 ring-white/70")
+      ? cn(
+          dragMenu.key === key && "opacity-50",
+          dragOverKey === key && dragMenu.key !== key && "ring-1 ring-white/70",
+        )
       : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
@@ -899,8 +982,10 @@ function AppShellInner() {
       const tgt = e.target as HTMLElement | null;
       if (tgt) {
         const tag = tgt.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
-        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable)
+          return;
+        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]'))
+          return;
       }
       // Só age quando o foco (ou o clique atual) está dentro de um menu lateral,
       // ou quando o mouse está sobre a sidebar (hover).
@@ -925,7 +1010,11 @@ function AppShellInner() {
       if (e.key === "Home") next = 0;
       else if (e.key === "End") next = items.length - 1;
       else if (idx < 0) next = e.key === "ArrowDown" ? 0 : items.length - 1;
-      else next = e.key === "ArrowDown" ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+      else
+        next =
+          e.key === "ArrowDown"
+            ? (idx + 1) % items.length
+            : (idx - 1 + items.length) % items.length;
 
       e.preventDefault();
       // Apenas move o foco — o Enter (padrão do link) é que abre a página.
@@ -990,14 +1079,19 @@ function AppShellInner() {
 
   if (isEmbed) {
     return (
-      <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
+      <div
+        className="h-screen w-full overflow-auto bg-background"
+        style={{ background: "var(--surface-cream)" }}
+      >
         {guardedOutlet}
       </div>
     );
   }
 
   return (
-    <div className={cn("flex bg-background overflow-hidden", uxMelhorias ? "h-[100dvh]" : "h-screen")}>
+    <div
+      className={cn("flex bg-background overflow-hidden", uxMelhorias ? "h-[100dvh]" : "h-screen")}
+    >
       {!isChooser && (
         <aside
           className={cn(
@@ -1010,9 +1104,14 @@ function AppShellInner() {
         >
           <div className="shrink-0 w-full h-14 border-b border-white/10">
             <div className="flex h-full w-full items-center gap-1.5 px-4 min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5 cursor-default select-none" title="ClinicaOS">
+              <div
+                className="flex min-w-0 items-center gap-1.5 cursor-default select-none"
+                title="ClinicaOS"
+              >
                 <Activity className="h-4 w-4 shrink-0 text-white" />
-                <span className="truncate text-sm font-bold tracking-tight text-white">ClinicaOS</span>
+                <span className="truncate text-sm font-bold tracking-tight text-white">
+                  ClinicaOS
+                </span>
               </div>
               {!isChooser && (
                 <button
@@ -1092,28 +1191,33 @@ function AppShellInner() {
                 return (location.hash ?? "").replace(/^#/, "") === hash;
               };
               const itemHasActive = (it: NavItem): boolean =>
-                isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
+                isParent(it)
+                  ? it.children.some((c) => leafIsActive(c.to, c.hash))
+                  : leafIsActive(it.to);
               const groupHasActive = row.items.some(itemHasActive);
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-              const open = collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
+              const open =
+                collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
               return (
-                <div
-                  key={row.label}
-                  className={cn("space-y-1")}
-                >
+                <div key={row.label} className={cn("space-y-1")}>
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }));
+                        setOpenGroups((prev) => ({
+                          ...prev,
+                          [row.label]: !(prev[row.label] ?? true),
+                        }));
                       }}
                       className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
                       aria-expanded={open}
                     >
                       <span>{row.label}</span>
-                      <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
+                      <ChevronDown
+                        className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+                      />
                     </button>
                   )}
                   {open &&
@@ -1121,7 +1225,8 @@ function AppShellInner() {
                       if (isParent(item)) {
                         const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                         const subKey = `${row.label}::${item.label}`;
-                        const subOpen = collapsed || buscandoMenu ? true : (openGroups[subKey] ?? false);
+                        const subOpen =
+                          collapsed || buscandoMenu ? true : (openGroups[subKey] ?? false);
                         return (
                           <div
                             key={subKey}
@@ -1138,13 +1243,18 @@ function AppShellInner() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }));
+                                  setOpenGroups((prev) => ({
+                                    ...prev,
+                                    [subKey]: !(prev[subKey] ?? false),
+                                  }));
                                 }}
                                 className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-[18px] w-[18px] shrink-0" />
-                                <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
+                                <span className="flex-1 text-left leading-snug break-words">
+                                  {item.label}
+                                </span>
                                 <ChevronDown
                                   className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
                                 />
@@ -1168,7 +1278,11 @@ function AppShellInner() {
                                       className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                      {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
+                                      {!collapsed && (
+                                        <span className="leading-snug break-words">
+                                          {child.label}
+                                        </span>
+                                      )}
                                     </a>
                                   );
                                 }
@@ -1200,7 +1314,11 @@ function AppShellInner() {
                                     }${hoverScaleCls}`}
                                   >
                                     <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                    {!collapsed && <span className="leading-snug break-words">{child.label}</span>}
+                                    {!collapsed && (
+                                      <span className="leading-snug break-words">
+                                        {child.label}
+                                      </span>
+                                    )}
                                   </a>
                                 );
                               })}
@@ -1222,7 +1340,13 @@ function AppShellInner() {
                           aria-current={uxMelhorias && active ? "page" : undefined}
                           onMouseEnter={() => preCarregar(item.to)}
                           onClick={(event) => {
-                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+                            if (
+                              event.metaKey ||
+                              event.ctrlKey ||
+                              event.shiftKey ||
+                              event.altKey ||
+                              event.button !== 0
+                            )
                               return;
                             event.preventDefault();
                             irPara(href);
@@ -1238,7 +1362,9 @@ function AppShellInner() {
                           )}
                         >
                           <item.icon className="h-[18px] w-[18px] shrink-0" />
-                          {!collapsed && <span className="leading-snug break-words">{item.label}</span>}
+                          {!collapsed && (
+                            <span className="leading-snug break-words">{item.label}</span>
+                          )}
                         </a>
                       );
                     })}
@@ -1264,100 +1390,106 @@ function AppShellInner() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
         {!isChooser && (
-        <header className="sticky top-0 z-30 h-14 bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
-          {!isChooser && (
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
-              aria-label="Abrir menu"
-              title="Menu"
-            >
-              <MenuIcon className="h-5 w-5" />
-            </button>
-          )}
-          <Link to="/app" className="lg:hidden flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
-            <Activity className="h-5 w-5 shrink-0 text-slate-800" />
-          </Link>
-          {!isChooser && (
-            <button
-              type="button"
-              onClick={() => abrirSeletorPortais()}
-              className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
-              title="Trocar de portal"
-            >
-              <LayoutGrid className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline truncate max-w-[140px]">{subsystemLabel ?? "Portais"}</span>
-            </button>
-          )}
-          </div>
-
-          <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
-          {clinicaAtual && (
-            <img
-              src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
-              alt={clinicaAtual.clinica.nome}
-              className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
-            />
-          )}
-          {memberships.length > 0 && (
-            <Select
-              value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
-              onValueChange={(v) => {
-                if (v === "__todas__") setModoTodas(true);
-                else setClinicaAtual(v);
-              }}
-            >
-              <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
-                <SelectValue placeholder="Selecione a clínica" />
-              </SelectTrigger>
-              <SelectContent>
-                {memberships.length > 1 && (
-                  <SelectItem value="__todas__">
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                      Todas as clínicas
-                    </span>
-                  </SelectItem>
-                )}
-                {memberships.map((m) => (
-                  <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: corDaClinica(m.clinica.nome) }}
-                      />
-                      {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          </div>
-
-          <div className="flex items-center justify-end gap-1.5 min-w-0">
-            <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
-              <UniversalSearchBar />
+          <header className="sticky top-0 z-30 h-14 bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
+              {!isChooser && (
+                <button
+                  type="button"
+                  onClick={() => setMobileNavOpen(true)}
+                  className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+                  aria-label="Abrir menu"
+                  title="Menu"
+                >
+                  <MenuIcon className="h-5 w-5" />
+                </button>
+              )}
+              <Link
+                to="/app"
+                className="lg:hidden flex items-center gap-2 min-w-0 shrink-0"
+                title="ClinicaOS"
+              >
+                <Activity className="h-5 w-5 shrink-0 text-slate-800" />
+              </Link>
+              {!isChooser && (
+                <button
+                  type="button"
+                  onClick={() => abrirSeletorPortais()}
+                  className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
+                  title="Trocar de portal"
+                >
+                  <LayoutGrid className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline truncate max-w-[140px]">
+                    {subsystemLabel ?? "Portais"}
+                  </span>
+                </button>
+              )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-              title="Atalhos de teclado (?)"
-              onClick={() => {
-                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
-              }}
-            >
-              <span className="text-base font-semibold">?</span>
-            </Button>
-            <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
-              <EstornosBell />
-              <TTSToggle />
+
+            <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
+              {clinicaAtual && (
+                <img
+                  src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
+                  alt={clinicaAtual.clinica.nome}
+                  className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
+                />
+              )}
+              {memberships.length > 0 && (
+                <Select
+                  value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
+                  onValueChange={(v) => {
+                    if (v === "__todas__") setModoTodas(true);
+                    else setClinicaAtual(v);
+                  }}
+                >
+                  <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+                    <SelectValue placeholder="Selecione a clínica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {memberships.length > 1 && (
+                      <SelectItem value="__todas__">
+                        <span className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                          Todas as clínicas
+                        </span>
+                      </SelectItem>
+                    )}
+                    {memberships.map((m) => (
+                      <SelectItem key={m.clinica_id} value={m.clinica_id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: corDaClinica(m.clinica.nome) }}
+                          />
+                          {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          </div>
-        </header>
+
+            <div className="flex items-center justify-end gap-1.5 min-w-0">
+              <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
+                <UniversalSearchBar />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                title="Atalhos de teclado (?)"
+                onClick={() => {
+                  window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+                }}
+              >
+                <span className="text-base font-semibold">?</span>
+              </Button>
+              <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
+                <EstornosBell />
+                <TTSToggle />
+              </div>
+            </div>
+          </header>
         )}
         <main
           key={uxMelhorias ? location.pathname : "static"}

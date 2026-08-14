@@ -34,6 +34,11 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Dívida técnica conhecida: ~638 ocorrências herdadas, concentradas em
+      // contratos-page.tsx, app.agenda.tsx e atendimento.functions.ts. Fica
+      // como "warn" para não reprovar o CI enquanto a tipagem é feita de forma
+      // incremental — a contagem continua visível em `bun run lint`.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   eslintPluginPrettier,

@@ -2,7 +2,17 @@ import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Users,
+  Download,
+  Eye,
+  IdCard,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -14,10 +24,19 @@ import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { ClienteForm } from "@/components/clientes/cliente-form";
 import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
@@ -69,7 +88,9 @@ function ClientesV2Wrapper() {
       const p = prefs as { clientes?: { compact?: boolean } };
       if (alive && typeof p.clientes?.compact === "boolean") setCompact(p.clientes.compact);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
   const persistCompact = async (v: boolean) => {
     setCompact(v);
@@ -97,7 +118,9 @@ function IdadeCell({ nascimento }: { nascimento: string | null }) {
   if (idade === null || idade < 0) return <>—</>;
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span>{idade} {idade === 1 ? "ano" : "anos"}</span>
+      <span>
+        {idade} {idade === 1 ? "ano" : "anos"}
+      </span>
       <IdadeIcon nascimento={nascimento} size={20} />
     </span>
   );
@@ -142,8 +165,6 @@ function formatPhone(valor: string | null | undefined): string {
   return valor ?? "—";
 }
 
-
-
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
@@ -186,14 +207,26 @@ function ClientesPage() {
       const countRequest = q
         ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
-          .from("pacientes")
-          .select("id", { count: "exact", head: true })
-          .eq("clinica_id", clinicaAtual.clinica_id);
-      const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
+            .from("pacientes")
+            .select("id", { count: "exact", head: true })
+            .eq("clinica_id", clinicaAtual.clinica_id);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        dataRequest,
+        countRequest,
+      ]);
       if (requestId !== loadSeq.current) return;
       setLoadingManual(false);
-      if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
-      if (countError) { mostrarErro(countError); } else { setTotalPacientesManual(count ?? 0); }
+      if (error) {
+        toast.error(
+          "Não foi possível concluir esta busca. Tente novamente com mais letras do nome.",
+        );
+        return;
+      }
+      if (countError) {
+        mostrarErro(countError);
+      } else {
+        setTotalPacientesManual(count ?? 0);
+      }
       const rows = (data ?? []) as any[];
       setItemsManual(rows as any);
       setAtingiuTetoManual(rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA));
@@ -216,7 +249,9 @@ function ClientesPage() {
   // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
   // filtro roda no banco todo em uma página só.
   const [pagina, setPagina] = useState(0);
-  useEffect(() => { setPagina(0); }, [debouncedBusca]);
+  useEffect(() => {
+    setPagina(0);
+  }, [debouncedBusca]);
 
   // Caminho manual (sem a flag): idêntico ao comportamento anterior.
   useEffect(() => {
@@ -264,7 +299,8 @@ function ClientesPage() {
     placeholderData: keepPreviousData,
   });
   useEffect(() => {
-    if (listaQuery.error) toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
+    if (listaQuery.error)
+      toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
   }, [listaQuery.error]);
   useEffect(() => {
     if (totalQuery.error) mostrarErro(totalQuery.error);
@@ -294,7 +330,10 @@ function ClientesPage() {
     .filter(Boolean)
     .join("|");
   useEffect(() => {
-    if (!fotoPathsKey) { setFotoSigned({}); return; }
+    if (!fotoPathsKey) {
+      setFotoSigned({});
+      return;
+    }
     const entries = fotoPathsKey.split("|").map((s) => {
       const [id, ...rest] = s.split("::");
       return { id, path: rest.join("::") };
@@ -311,7 +350,9 @@ function ClientesPage() {
       });
       setFotoSigned(map);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fotoPathsKey]);
 
   const filtrados = items;
@@ -332,7 +373,9 @@ function ClientesPage() {
     setExcluindoId(null);
     if (error) {
       if ((error as { code?: string }).code === "23503") {
-        toast.error("Este cliente possui registros vinculados (agendamentos, financeiro ou prontuário) e não pode ser excluído.");
+        toast.error(
+          "Este cliente possui registros vinculados (agendamentos, financeiro ou prontuário) e não pode ser excluído.",
+        );
       } else {
         mostrarErro(error);
       }
@@ -360,7 +403,10 @@ function ClientesPage() {
       const { error } = await supabase.from("pacientes").delete().eq("id", id);
       if (error) {
         if ((error as { code?: string }).code === "23503") bloqueados++;
-        else { mostrarErro(error); break; }
+        else {
+          mostrarErro(error);
+          break;
+        }
       } else {
         excluidos.push(id);
       }
@@ -371,7 +417,9 @@ function ClientesPage() {
       toast.success(`${excluidos.length} cliente(s) excluído(s).`);
     }
     if (bloqueados > 0) {
-      toast.error(`${bloqueados} cliente(s) possuem registros vinculados e não puderam ser excluídos.`);
+      toast.error(
+        `${bloqueados} cliente(s) possuem registros vinculados e não puderam ser excluídos.`,
+      );
     }
     setSelecionados([]);
     refrescar();
@@ -379,13 +427,16 @@ function ClientesPage() {
 
   // Convênios ativos dos pacientes visíveis (Cartão Benefícios).
   // Exibimos um badge ao lado do nome, no mesmo padrão da busca da agenda.
-  const idsKey = filtrados.map(p => p.id).sort().join(",");
+  const idsKey = filtrados
+    .map((p) => p.id)
+    .sort()
+    .join(",");
   const conveniosQuery = useQuery({
     queryKey: ["clientes-convenios", clinicaId, idsKey],
     enabled: !!clinicaId && filtrados.length > 0,
     staleTime: 60_000,
     queryFn: async () => {
-      const ids = filtrados.map(p => p.id);
+      const ids = filtrados.map((p) => p.id);
       const map = new Map<string, { tipo: "titular" | "dependente"; convenio: string }>();
       const [titRes, depRes] = await Promise.all([
         supabase
@@ -396,15 +447,21 @@ function ClientesPage() {
           .in("paciente_id", ids),
         supabase
           .from("contrato_dependentes")
-          .select("paciente_id, contrato:contratos_assinatura!inner(convenio_id, status, clinica_id)")
+          .select(
+            "paciente_id, contrato:contratos_assinatura!inner(convenio_id, status, clinica_id)",
+          )
           .eq("ativo", true)
           .eq("contrato.status", "ativo")
           .eq("contrato.clinica_id", clinicaId!)
           .in("paciente_id", ids),
       ]);
       const convenioIds = new Set<string>();
-      (titRes.data ?? []).forEach((r: any) => { if (r.convenio_id) convenioIds.add(r.convenio_id); });
-      (depRes.data ?? []).forEach((r: any) => { if (r.contrato?.convenio_id) convenioIds.add(r.contrato.convenio_id); });
+      (titRes.data ?? []).forEach((r: any) => {
+        if (r.convenio_id) convenioIds.add(r.convenio_id);
+      });
+      (depRes.data ?? []).forEach((r: any) => {
+        if (r.contrato?.convenio_id) convenioIds.add(r.contrato.convenio_id);
+      });
       const planos = new Map<string, string>();
       if (convenioIds.size > 0) {
         const { data: pls } = await supabase
@@ -441,7 +498,8 @@ function ClientesPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Clientes</h1>
           {totalPacientes !== null && (
             <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap">
-              {totalPacientes.toLocaleString("pt-BR")} {totalPacientes === 1 ? "paciente" : "pacientes"}
+              {totalPacientes.toLocaleString("pt-BR")}{" "}
+              {totalPacientes === 1 ? "paciente" : "pacientes"}
             </span>
           )}
         </div>
@@ -468,11 +526,17 @@ function ClientesPage() {
                 for (let from = 0; ; from += PAGE) {
                   const { data, error } = await supabase
                     .from("pacientes")
-                    .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,numero_pasta")
+                    .select(
+                      "nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,numero_pasta",
+                    )
                     .eq("clinica_id", clinicaAtual.clinica_id)
                     .order("nome")
                     .range(from, from + PAGE - 1);
-                  if (error) { toast.dismiss(toastId); mostrarErro(error); return; }
+                  if (error) {
+                    toast.dismiss(toastId);
+                    mostrarErro(error);
+                    return;
+                  }
                   const rows = data ?? [];
                   all.push(...rows);
                   toast.loading(`Exportando clientes… (${all.length})`, { id: toastId });
@@ -484,7 +548,10 @@ function ClientesPage() {
                 return;
               }
               toast.dismiss(toastId);
-              if (!all.length) { toast.info("Sem dados para exportar."); return; }
+              if (!all.length) {
+                toast.info("Sem dados para exportar.");
+                return;
+              }
               exportToExcel(
                 all.map((p: any) => ({
                   prontuario: p.codigo_prontuario ?? "",
@@ -547,7 +614,8 @@ function ClientesPage() {
 
       {atingiuTeto && !(uxMelhorias && !debouncedBusca.trim()) && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
-          Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
+          Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca
+          (nome completo, CPF ou telefone) para ver mais.
         </div>
       )}
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
@@ -557,10 +625,16 @@ function ClientesPage() {
               <TableHead className="w-10">
                 <Checkbox
                   aria-label="Selecionar todos"
-                  checked={filtrados.length > 0 && selecionados.length === filtrados.length
-                    ? true
-                    : selecionados.length > 0 ? "indeterminate" : false}
-                  onCheckedChange={(v: boolean | "indeterminate") => setSelecionados(v ? filtrados.map((p) => p.id) : [])}
+                  checked={
+                    filtrados.length > 0 && selecionados.length === filtrados.length
+                      ? true
+                      : selecionados.length > 0
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(v: boolean | "indeterminate") =>
+                    setSelecionados(v ? filtrados.map((p) => p.id) : [])
+                  }
                 />
               </TableHead>
               <TableHead className="w-28">Prontuário</TableHead>
@@ -577,104 +651,154 @@ function ClientesPage() {
             {loading ? (
               <TableSkeletonRows
                 cols={9}
-                fallback={<TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
+                fallback={
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Carregando…
+                    </TableCell>
+                  </TableRow>
+                }
               />
             ) : !clinicaAtual ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  Selecione uma clínica.
+                </TableCell>
+              </TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="p-0">
                   <EmptyState
                     icon={<Users className="h-10 w-10" />}
                     titulo="Nenhum cliente encontrado."
-                    descricao={busca.trim() ? "Tente refinar a busca — nome completo, CPF ou telefone." : "Cadastre o primeiro cliente desta clínica."}
-                    acao={podeEscrever && !busca.trim() ? (
-                      <Button size="sm" onClick={() => setOpenNovo(true)}>
-                        <Plus className="h-4 w-4 mr-1" /> Novo cliente
-                      </Button>
-                    ) : undefined}
-                    fallback={<div className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</div>}
+                    descricao={
+                      busca.trim()
+                        ? "Tente refinar a busca — nome completo, CPF ou telefone."
+                        : "Cadastre o primeiro cliente desta clínica."
+                    }
+                    acao={
+                      podeEscrever && !busca.trim() ? (
+                        <Button size="sm" onClick={() => setOpenNovo(true)}>
+                          <Plus className="h-4 w-4 mr-1" /> Novo cliente
+                        </Button>
+                      ) : undefined
+                    }
+                    fallback={
+                      <div className="text-center py-8 text-muted-foreground">
+                        Nenhum cliente encontrado.
+                      </div>
+                    }
                   />
                 </TableCell>
               </TableRow>
-            ) : filtrados.map(p => (
-              <TableRow key={p.id} className="h-12 hover:bg-slate-50/60 transition-colors border-b border-slate-100" data-state={selecionados.includes(p.id) ? "selected" : undefined}>
-                <TableCell className="w-10">
-                  <Checkbox
-                    aria-label={`Selecionar ${p.nome}`}
-                    checked={selecionados.includes(p.id)}
-                    onCheckedChange={(v: boolean | "indeterminate") => setSelecionados((cur) => v ? [...cur, p.id] : cur.filter((id) => id !== p.id))}
-                  />
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
-                    {p.numero_pasta || p.codigo_prontuario || "—"}
-                  </span>
-                </TableCell>
-                <TableCell className="max-w-[320px] text-sm font-semibold text-slate-800">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
-                      {fotoSigned[p.id] ? (
-                        <img src={fotoSigned[p.id]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                      ) : (
-                        <Users className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              filtrados.map((p) => (
+                <TableRow
+                  key={p.id}
+                  className="h-12 hover:bg-slate-50/60 transition-colors border-b border-slate-100"
+                  data-state={selecionados.includes(p.id) ? "selected" : undefined}
+                >
+                  <TableCell className="w-10">
+                    <Checkbox
+                      aria-label={`Selecionar ${p.nome}`}
+                      checked={selecionados.includes(p.id)}
+                      onCheckedChange={(v: boolean | "indeterminate") =>
+                        setSelecionados((cur) =>
+                          v ? [...cur, p.id] : cur.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
+                      {p.numero_pasta || p.codigo_prontuario || "—"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-[320px] text-sm font-semibold text-slate-800">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
+                        {fotoSigned[p.id] ? (
+                          <img
+                            src={fotoSigned[p.id]}
+                            alt={p.nome}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <span className="truncate" title={p.nome}>
+                        {p.nome}
+                      </span>
+                      {convenios?.get(p.id) && (
+                        <IdCard
+                          className="h-4 w-4 text-emerald-600 shrink-0"
+                          aria-label={`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}
+                        >
+                          <title>{`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}</title>
+                        </IdCard>
                       )}
                     </div>
-                    <span className="truncate" title={p.nome}>{p.nome}</span>
-                    {convenios?.get(p.id) && (
-                      <IdCard
-                        className="h-4 w-4 text-emerald-600 shrink-0"
-                        aria-label={`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}
-                      >
-                        <title>{`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}</title>
-                      </IdCard>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{formatCPF(p.cpf)}</TableCell>
-                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{fmtNasc(p.data_nascimento)}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap text-slate-600 font-medium"><span className="flex items-center gap-1"><IdadeCell nascimento={p.data_nascimento} /></span></TableCell>
-                <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">{formatPhone(p.telefone)}</TableCell>
-                <TableCell>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.ativo ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
-                    {p.ativo ? "Ativo" : "Inativo"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Link
-                      to="/app/clientes/$pacienteId/visualizar"
-                      params={{ pacienteId: p.id }}
-                      title="Visualizar cliente"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                  </TableCell>
+                  <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">
+                    {formatCPF(p.cpf)}
+                  </TableCell>
+                  <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">
+                    {fmtNasc(p.data_nascimento)}
+                  </TableCell>
+                  <TableCell className="text-xs whitespace-nowrap text-slate-600 font-medium">
+                    <span className="flex items-center gap-1">
+                      <IdadeCell nascimento={p.data_nascimento} />
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs tabular-nums whitespace-nowrap text-slate-600 font-medium">
+                    {formatPhone(p.telefone)}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${p.ativo ? "bg-emerald-50 text-emerald-700 border-emerald-200/60" : "bg-slate-100 text-slate-500 border-slate-200"}`}
                     >
-                      <Eye className="h-4 w-4" />
-                    </Link>
-                    {podeEscrever && (
-                      <button
-                        type="button"
-                        onClick={() => setEditarId(p.id)}
-                        title="Editar cliente"
+                      {p.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        to="/app/clientes/$pacienteId/visualizar"
+                        params={{ pacienteId: p.id }}
+                        title="Visualizar cliente"
                         className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
                       >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    )}
-                    {podeEscrever && (
-                      <button
-                        type="button"
-                        title="Excluir cliente"
-                        disabled={excluindoId === p.id}
-                        onClick={() => void excluirCliente(p)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                      {podeEscrever && (
+                        <button
+                          type="button"
+                          onClick={() => setEditarId(p.id)}
+                          title="Editar cliente"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {podeEscrever && (
+                        <button
+                          type="button"
+                          title="Excluir cliente"
+                          disabled={excluindoId === p.id}
+                          onClick={() => void excluirCliente(p)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -685,7 +809,12 @@ function ClientesPage() {
             <span className="text-sm font-medium whitespace-nowrap">
               {selecionados.length} selecionado{selecionados.length > 1 ? "s" : ""}
             </span>
-            <Button variant="ghost" size="sm" onClick={() => setSelecionados([])} disabled={excluindoLote}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelecionados([])}
+              disabled={excluindoLote}
+            >
               Limpar
             </Button>
             {podeEscrever && (
@@ -704,52 +833,61 @@ function ClientesPage() {
         </div>
       )}
 
-      {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
-        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
-          <div className="text-muted-foreground">
-            Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
-            <span className="font-medium text-foreground">{Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}</span>
-            {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length} de{" "}
-            {totalPacientes.toLocaleString("pt-BR")}
+      {uxMelhorias &&
+        !debouncedBusca.trim() &&
+        totalPacientes !== null &&
+        totalPacientes > LIMITE_LISTA && (
+          <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+            <div className="text-muted-foreground">
+              Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
+              <span className="font-medium text-foreground">
+                {Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}
+              </span>
+              {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–
+              {pagina * LIMITE_LISTA + filtrados.length} de {totalPacientes.toLocaleString("pt-BR")}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagina === 0 || loading}
+                onClick={() => setPagina(0)}
+                title="Primeira página"
+              >
+                Primeira
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagina === 0 || loading}
+                onClick={() => setPagina((p) => Math.max(0, p - 1))}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  loading ||
+                  (pagina + 1) * LIMITE_LISTA >= totalPacientes ||
+                  filtrados.length < LIMITE_LISTA
+                }
+                onClick={() => setPagina((p) => p + 1)}
+              >
+                Próxima
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes}
+                onClick={() => setPagina(Math.max(0, Math.ceil(totalPacientes / LIMITE_LISTA) - 1))}
+                title="Última página"
+              >
+                Última
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina === 0 || loading}
-              onClick={() => setPagina(0)}
-              title="Primeira página"
-            >
-              Primeira
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina === 0 || loading}
-              onClick={() => setPagina((p) => Math.max(0, p - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes || filtrados.length < LIMITE_LISTA}
-              onClick={() => setPagina((p) => p + 1)}
-            >
-              Próxima
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes}
-              onClick={() => setPagina(Math.max(0, Math.ceil(totalPacientes / LIMITE_LISTA) - 1))}
-              title="Última página"
-            >
-              Última
-            </Button>
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
@@ -757,7 +895,8 @@ function ClientesPage() {
           <DialogHeader className="flex-shrink-0 border-b border-border p-6 pb-4">
             <DialogTitle>Novo cliente</DialogTitle>
             <DialogDescription>
-              Preencha os dados do paciente. Use o microfone ao lado de cada campo para ditar por voz (quando disponível).
+              Preencha os dados do paciente. Use o microfone ao lado de cada campo para ditar por
+              voz (quando disponível).
             </DialogDescription>
           </DialogHeader>
           {clinicaAtual && (
@@ -766,7 +905,10 @@ function ClientesPage() {
               paciente={null}
               stickyFooter
               onCancel={() => setOpenNovo(false)}
-              onSaved={() => { setOpenNovo(false); refrescar(); }}
+              onSaved={() => {
+                setOpenNovo(false);
+                refrescar();
+              }}
             />
           )}
         </DialogContent>

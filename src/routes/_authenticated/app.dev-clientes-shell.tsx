@@ -41,13 +41,15 @@ function DevClientesShell() {
     <div className="h-[calc(100vh-56px)] flex flex-col">
       <div className="border-b bg-muted/30 px-4 py-2 flex items-center justify-between gap-4 flex-wrap">
         <div className="text-xs text-muted-foreground">
-          <b>Preview isolado</b> — rota <code>/app/dev-clientes-shell</code> · não altera <code>/app/clientes</code>.
+          <b>Preview isolado</b> — rota <code>/app/dev-clientes-shell</code> · não altera{" "}
+          <code>/app/clientes</code>.
         </div>
         <div className="flex items-center gap-3">
           <Label className="text-xs flex items-center gap-2">
             Flag <code className="bg-muted px-1 rounded">clientes_v2</code>
             <Switch
-              checked={enabled} disabled={loading}
+              checked={enabled}
+              disabled={loading}
               onCheckedChange={(v) => void setEnabled(v)}
               data-testid="flag-clientes-v2"
             />
@@ -62,7 +64,8 @@ function DevClientesShell() {
           <ClientesShellV2 compactPref={compact} onToggleCompact={(v) => void persistCompact(v)} />
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center p-6">
-            Flag <code className="mx-1">clientes_v2</code> desligada.<br />
+            Flag <code className="mx-1">clientes_v2</code> desligada.
+            <br />
             Ative acima para pré-visualizar. A rota <code>/app/clientes</code> continua idêntica.
           </div>
         )}

@@ -37,7 +37,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // -------- Types (mirrors get_orcamento_conversao JSONB output) --------
 
@@ -112,29 +118,51 @@ type UIState = {
 
 // -------- Small helpers --------
 
-const BRL = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = (v: number) =>
+  (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 
 function labelOp(s: StatusOp): { label: string; className: string } {
   switch (s) {
-    case "pendente": return { label: "Pendente", className: "bg-slate-100 text-slate-700 border-slate-300" };
-    case "aguardando_agendamento": return { label: "Aguardando agenda", className: "bg-amber-100 text-amber-800 border-amber-300" };
-    case "agendado": return { label: "Agendado", className: "bg-blue-100 text-blue-800 border-blue-300" };
-    case "em_atendimento": return { label: "Em atendimento", className: "bg-indigo-100 text-indigo-800 border-indigo-300" };
-    case "concluido": return { label: "Concluído", className: "bg-emerald-100 text-emerald-800 border-emerald-300" };
-    case "cancelado": return { label: "Cancelado", className: "bg-rose-100 text-rose-800 border-rose-300" };
-    case "nao_aplicavel": return { label: "Não aplicável", className: "bg-zinc-100 text-zinc-600 border-zinc-300" };
+    case "pendente":
+      return { label: "Pendente", className: "bg-slate-100 text-slate-700 border-slate-300" };
+    case "aguardando_agendamento":
+      return {
+        label: "Aguardando agenda",
+        className: "bg-amber-100 text-amber-800 border-amber-300",
+      };
+    case "agendado":
+      return { label: "Agendado", className: "bg-blue-100 text-blue-800 border-blue-300" };
+    case "em_atendimento":
+      return {
+        label: "Em atendimento",
+        className: "bg-indigo-100 text-indigo-800 border-indigo-300",
+      };
+    case "concluido":
+      return {
+        label: "Concluído",
+        className: "bg-emerald-100 text-emerald-800 border-emerald-300",
+      };
+    case "cancelado":
+      return { label: "Cancelado", className: "bg-rose-100 text-rose-800 border-rose-300" };
+    case "nao_aplicavel":
+      return { label: "Não aplicável", className: "bg-zinc-100 text-zinc-600 border-zinc-300" };
   }
 }
 
 function labelFin(s: StatusFin): { label: string; className: string } {
   switch (s) {
-    case "pendente": return { label: "Pendente", className: "bg-slate-100 text-slate-700 border-slate-300" };
-    case "pago": return { label: "Pago", className: "bg-emerald-100 text-emerald-800 border-emerald-300" };
-    case "estornado": return { label: "Estornado", className: "bg-rose-100 text-rose-800 border-rose-300" };
-    case "isento": return { label: "Isento", className: "bg-sky-100 text-sky-800 border-sky-300" };
-    case "nao_aplicavel": return { label: "Não aplicável", className: "bg-zinc-100 text-zinc-600 border-zinc-300" };
+    case "pendente":
+      return { label: "Pendente", className: "bg-slate-100 text-slate-700 border-slate-300" };
+    case "pago":
+      return { label: "Pago", className: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+    case "estornado":
+      return { label: "Estornado", className: "bg-rose-100 text-rose-800 border-rose-300" };
+    case "isento":
+      return { label: "Isento", className: "bg-sky-100 text-sky-800 border-sky-300" };
+    case "nao_aplicavel":
+      return { label: "Não aplicável", className: "bg-zinc-100 text-zinc-600 border-zinc-300" };
   }
 }
 
@@ -145,7 +173,11 @@ type ActionState =
   | { kind: "venda"; item: ItemConversao }
   | { kind: "agendar"; item: ItemConversao }
   | { kind: "nao_aplicavel"; item: ItemConversao }
-  | { kind: "cancelar"; item: ItemConversao; flags?: { tem_agendamento: boolean; tem_pagamento: boolean } };
+  | {
+      kind: "cancelar";
+      item: ItemConversao;
+      flags?: { tem_agendamento: boolean; tem_pagamento: boolean };
+    };
 
 // ---------------- Main component ----------------
 
@@ -168,10 +200,20 @@ export function ConversaoOrcamentoDialog({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_orcamento_conversao", { p_orcamento_id: orcamentoId });
-    if (error) { setLoading(false); mostrarErro(error); return; }
+    const { data, error } = await supabase.rpc("get_orcamento_conversao", {
+      p_orcamento_id: orcamentoId,
+    });
+    if (error) {
+      setLoading(false);
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as Resp;
-    if (!resp?.ok) { setLoading(false); toast.error(resp?.mensagem ?? "Falha ao carregar conversão"); return; }
+    if (!resp?.ok) {
+      setLoading(false);
+      toast.error(resp?.mensagem ?? "Falha ao carregar conversão");
+      return;
+    }
     const clinicaId = resp.orcamento?.clinica_id ?? null;
 
     // buscar nfse_modo_emissao da clínica + sessão de caixa aberta do usuário
@@ -180,9 +222,17 @@ export function ConversaoOrcamentoDialog({
     if (clinicaId) {
       const [{ data: clin }, { data: sess }] = await Promise.all([
         supabase.from("clinicas").select("nfse_modo_emissao").eq("id", clinicaId).maybeSingle(),
-        supabase.from("caixa_sessoes").select("id").eq("clinica_id", clinicaId).eq("status", "aberto").order("aberto_em", { ascending: false }).limit(1).maybeSingle(),
+        supabase
+          .from("caixa_sessoes")
+          .select("id")
+          .eq("clinica_id", clinicaId)
+          .eq("status", "aberto")
+          .order("aberto_em", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
-      if (clin && (clin as { nfse_modo_emissao?: string }).nfse_modo_emissao === "agrupada") nfseModo = "agrupada";
+      if (clin && (clin as { nfse_modo_emissao?: string }).nfse_modo_emissao === "agrupada")
+        nfseModo = "agrupada";
       caixaSessaoId = (sess as { id?: string } | null)?.id ?? null;
     }
     setPayload({
@@ -197,25 +247,40 @@ export function ConversaoOrcamentoDialog({
     setLoading(false);
   }, [orcamentoId]);
 
-  useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
 
-  const refresh = async () => { await load(); onChanged?.(); };
+  const refresh = async () => {
+    await load();
+    onChanged?.();
+  };
 
   const podeEmitirAgrupada = useMemo(() => {
     if (!payload) return false;
     if (payload.nfse_modo_emissao !== "agrupada") return false;
     const itens = payload.itens ?? [];
     if (itens.length === 0) return false;
-    return itens.every((i) => i.status_financeiro === "pago" || i.status_financeiro === "nao_aplicavel");
+    return itens.every(
+      (i) => i.status_financeiro === "pago" || i.status_financeiro === "nao_aplicavel",
+    );
   }, [payload]);
 
   const emitirNfseAgrupada = async () => {
     setEmitindoNfse(true);
-    const { data, error } = await supabase.rpc("emitir_nfse_orcamento", { p_orcamento_id: orcamentoId });
+    const { data, error } = await supabase.rpc("emitir_nfse_orcamento", {
+      p_orcamento_id: orcamentoId,
+    });
     setEmitindoNfse(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string };
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
+    if (!resp?.ok) {
+      toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
+      return;
+    }
     toast.success("NFS-e agrupada emitida.");
     await refresh();
   };
@@ -227,7 +292,8 @@ export function ConversaoOrcamentoDialog({
           <DialogHeader>
             <DialogTitle>Conversão do orçamento</DialogTitle>
             <DialogDescription>
-              Cada item é tratado conforme a regra configurada no procedimento / unidade. Financeiro e operacional evoluem de forma independente.
+              Cada item é tratado conforme a regra configurada no procedimento / unidade. Financeiro
+              e operacional evoluem de forma independente.
             </DialogDescription>
           </DialogHeader>
 
@@ -237,7 +303,9 @@ export function ConversaoOrcamentoDialog({
             <>
               <div className="flex items-center justify-between gap-3 flex-wrap border rounded-md p-3 bg-muted/30">
                 <div className="flex items-center gap-3 text-sm">
-                  <Badge variant="outline" className="capitalize">Orçamento: {payload.orcamento_status ?? "—"}</Badge>
+                  <Badge variant="outline" className="capitalize">
+                    Orçamento: {payload.orcamento_status ?? "—"}
+                  </Badge>
                   <Badge variant="outline">
                     NFS-e: {payload.nfse_modo_emissao === "agrupada" ? "agrupada" : "por item"}
                   </Badge>
@@ -255,7 +323,11 @@ export function ConversaoOrcamentoDialog({
                       onClick={emitirNfseAgrupada}
                       disabled={!podeEmitirAgrupada || emitindoNfse}
                       className="gap-1"
-                      title={podeEmitirAgrupada ? "Emitir 1 NFS-e para o orçamento inteiro" : "Todos os itens precisam estar pagos"}
+                      title={
+                        podeEmitirAgrupada
+                          ? "Emitir 1 NFS-e para o orçamento inteiro"
+                          : "Todos os itens precisam estar pagos"
+                      }
                     >
                       <FileText className="h-3.5 w-3.5" />
                       {emitindoNfse ? "Emitindo…" : "Emitir NFS-e agrupada"}
@@ -283,7 +355,9 @@ export function ConversaoOrcamentoDialog({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            <Button variant="outline" onClick={onClose}>
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -293,21 +367,30 @@ export function ConversaoOrcamentoDialog({
           item={action.item}
           caixaSessaoId={payload?.caixa_sessao_id ?? null}
           onClose={() => setAction({ kind: "none" })}
-          onDone={() => { setAction({ kind: "none" }); void refresh(); }}
+          onDone={() => {
+            setAction({ kind: "none" });
+            void refresh();
+          }}
         />
       )}
       {action.kind === "agendar" && (
         <AgendarSheet
           item={action.item}
           onClose={() => setAction({ kind: "none" })}
-          onDone={() => { setAction({ kind: "none" }); void refresh(); }}
+          onDone={() => {
+            setAction({ kind: "none" });
+            void refresh();
+          }}
         />
       )}
       {action.kind === "nao_aplicavel" && (
         <NaoAplicavelSheet
           item={action.item}
           onClose={() => setAction({ kind: "none" })}
-          onDone={() => { setAction({ kind: "none" }); void refresh(); }}
+          onDone={() => {
+            setAction({ kind: "none" });
+            void refresh();
+          }}
         />
       )}
       {action.kind === "cancelar" && (
@@ -316,7 +399,10 @@ export function ConversaoOrcamentoDialog({
           flags={action.flags}
           onFlags={(f) => setAction({ kind: "cancelar", item: action.item, flags: f })}
           onClose={() => setAction({ kind: "none" })}
-          onDone={() => { setAction({ kind: "none" }); void refresh(); }}
+          onDone={() => {
+            setAction({ kind: "none" });
+            void refresh();
+          }}
         />
       )}
     </>
@@ -344,7 +430,9 @@ function ItemCard({
       key={label}
       className={
         "px-1.5 py-0.5 rounded text-[10px] border " +
-        (ativa ? "border-primary/50 text-primary bg-primary/5" : "border-muted-foreground/30 text-muted-foreground")
+        (ativa
+          ? "border-primary/50 text-primary bg-primary/5"
+          : "border-muted-foreground/30 text-muted-foreground")
       }
     >
       {label}
@@ -361,8 +449,12 @@ function ItemCard({
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Badge variant="outline" className={op.className}>Op: {op.label}</Badge>
-          <Badge variant="outline" className={fin.className}>Fin: {fin.label}</Badge>
+          <Badge variant="outline" className={op.className}>
+            Op: {op.label}
+          </Badge>
+          <Badge variant="outline" className={fin.className}>
+            Fin: {fin.label}
+          </Badge>
         </div>
       </div>
 
@@ -449,7 +541,10 @@ function VendaSheet({
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (!caixaSessaoId) { toast.error("Nenhuma sessão de caixa aberta."); return; }
+    if (!caixaSessaoId) {
+      toast.error("Nenhuma sessão de caixa aberta.");
+      return;
+    }
     setSaving(true);
     const { data, error } = await supabase.rpc("converter_item_venda", {
       p_item_id: item.id,
@@ -458,9 +553,15 @@ function VendaSheet({
       p_desconto: Number(desconto) || 0,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as Resp;
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
+    if (!resp?.ok) {
+      toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
+      return;
+    }
     toast.success("Venda registrada.");
     onDone();
   };
@@ -476,20 +577,36 @@ function VendaSheet({
           <div>
             <Label>Forma de pagamento</Label>
             <Select value={forma} onValueChange={setForma}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {FORMAS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                {FORMAS.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label>Desconto (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={desconto} onChange={(e) => setDesconto(e.target.value)} />
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={desconto}
+              onChange={(e) => setDesconto(e.target.value)}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? "Registrando…" : "Confirmar venda"}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "Registrando…" : "Confirmar venda"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -514,15 +631,16 @@ function AgendarSheet({
   const submit = async () => {
     setSaving(true);
     // Fluxo simplificado: sem agenda obrigatória, marca "aguardando_agendamento"; com agenda obrigatória, envia para tela de agenda.
-    const payload = agendaObrig
-      ? { redirect_para_agenda: true }
-      : {}; // RPC decide via fn_regras_procedimento
+    const payload = agendaObrig ? { redirect_para_agenda: true } : {}; // RPC decide via fn_regras_procedimento
     const { data, error } = await supabase.rpc("converter_item_agendamento", {
       p_item_id: item.id,
       p_payload: payload,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as Resp;
     if (!resp?.ok) {
       toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
@@ -531,7 +649,11 @@ function AgendarSheet({
       }
       return;
     }
-    toast.success(agendaObrig ? "Item pronto para agendamento na Agenda." : "Item marcado como aguardando agendamento.");
+    toast.success(
+      agendaObrig
+        ? "Item pronto para agendamento na Agenda."
+        : "Item marcado como aguardando agendamento.",
+    );
     onDone();
   };
 
@@ -545,19 +667,24 @@ function AgendarSheet({
         <div className="text-sm space-y-2">
           {agendaObrig ? (
             <p>
-              Este procedimento exige agenda formal. O agendamento completo (médico, sala, horário) é feito na tela
+              Este procedimento exige agenda formal. O agendamento completo (médico, sala, horário)
+              é feito na tela
               <b> Orçamentos → Agendar</b>. Confirme para preparar o item.
             </p>
           ) : (
             <p>
-              Este procedimento não exige agenda formal. Vamos marcá-lo como <b>aguardando atendimento</b>,
-              disponível para execução direta.
+              Este procedimento não exige agenda formal. Vamos marcá-lo como{" "}
+              <b>aguardando atendimento</b>, disponível para execução direta.
             </p>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "Salvando…" : "Confirmar"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -579,16 +706,25 @@ function NaoAplicavelSheet({
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
+    if (motivo.trim().length < 3) {
+      toast.error("Descreva o motivo.");
+      return;
+    }
     setSaving(true);
     const { data, error } = await supabase.rpc("marcar_item_nao_aplicavel", {
       p_item_id: item.id,
       p_motivo: motivo.trim(),
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as Resp;
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
+    if (!resp?.ok) {
+      toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
+      return;
+    }
     toast.success("Item marcado como não aplicável.");
     onDone();
   };
@@ -602,11 +738,20 @@ function NaoAplicavelSheet({
         </DialogHeader>
         <div>
           <Label>Motivo</Label>
-          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} placeholder="Ex.: venda balcão sem atendimento." />
+          <Textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={3}
+            placeholder="Ex.: venda balcão sem atendimento."
+          />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} disabled={saving}>
+            {saving ? "Salvando…" : "Confirmar"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -633,7 +778,10 @@ function CancelarSheet({
   const [step2, setStep2] = useState(false);
 
   const prever = async () => {
-    if (motivo.trim().length < 3) { toast.error("Descreva o motivo."); return; }
+    if (motivo.trim().length < 3) {
+      toast.error("Descreva o motivo.");
+      return;
+    }
     setSaving(true);
     const { data, error } = await supabase.rpc("cancelar_item", {
       p_item_id: item.id,
@@ -641,12 +789,22 @@ function CancelarSheet({
       p_confirmar_cascata: false,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     const resp = data as unknown as {
-      ok: boolean; codigo?: string; mensagem?: string;
-      requer_confirmacao?: boolean; tem_agendamento?: boolean; tem_pagamento?: boolean;
+      ok: boolean;
+      codigo?: string;
+      mensagem?: string;
+      requer_confirmacao?: boolean;
+      tem_agendamento?: boolean;
+      tem_pagamento?: boolean;
     };
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
+    if (!resp?.ok) {
+      toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
+      return;
+    }
     if (resp.requer_confirmacao) {
       onFlags({
         tem_agendamento: !!resp.tem_agendamento,
@@ -667,11 +825,25 @@ function CancelarSheet({
       p_confirmar_cascata: true,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    const resp = data as unknown as { ok: boolean; codigo?: string; mensagem?: string; aviso_pagamento?: boolean };
-    if (!resp?.ok) { toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    const resp = data as unknown as {
+      ok: boolean;
+      codigo?: string;
+      mensagem?: string;
+      aviso_pagamento?: boolean;
+    };
+    if (!resp?.ok) {
+      toast.error(resp?.mensagem ?? `Erro: ${resp?.codigo ?? "?"}`);
+      return;
+    }
     if (resp.aviso_pagamento) {
-      toast.warning("Item cancelado. O pagamento não foi estornado automaticamente — verifique no Caixa/Financeiro.", { duration: 8000 });
+      toast.warning(
+        "Item cancelado. O pagamento não foi estornado automaticamente — verifique no Caixa/Financeiro.",
+        { duration: 8000 },
+      );
     } else {
       toast.success("Item cancelado.");
     }
@@ -692,8 +864,12 @@ function CancelarSheet({
               <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={onClose} disabled={saving}>Voltar</Button>
-              <Button variant="destructive" onClick={prever} disabled={saving}>{saving ? "Verificando…" : "Prosseguir"}</Button>
+              <Button variant="outline" onClick={onClose} disabled={saving}>
+                Voltar
+              </Button>
+              <Button variant="destructive" onClick={prever} disabled={saving}>
+                {saving ? "Verificando…" : "Prosseguir"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -707,19 +883,29 @@ function CancelarSheet({
                 <div className="space-y-2 text-sm">
                   <p>Ao confirmar, o item será cancelado com os efeitos abaixo:</p>
                   <ul className="list-disc pl-5 space-y-1">
-                    {flags?.tem_agendamento && <li>O agendamento vinculado será <b>cancelado</b> e o horário liberado.</li>}
-                    {flags?.tem_pagamento && (
-                      <li className="text-amber-700">
-                        Existe pagamento registrado. <b>O valor NÃO será estornado automaticamente.</b> Abra o estorno manualmente no Caixa/Financeiro.
+                    {flags?.tem_agendamento && (
+                      <li>
+                        O agendamento vinculado será <b>cancelado</b> e o horário liberado.
                       </li>
                     )}
-                    {!flags?.tem_agendamento && !flags?.tem_pagamento && <li>Nenhum efeito colateral detectado.</li>}
+                    {flags?.tem_pagamento && (
+                      <li className="text-amber-700">
+                        Existe pagamento registrado.{" "}
+                        <b>O valor NÃO será estornado automaticamente.</b> Abra o estorno
+                        manualmente no Caixa/Financeiro.
+                      </li>
+                    )}
+                    {!flags?.tem_agendamento && !flags?.tem_pagamento && (
+                      <li>Nenhum efeito colateral detectado.</li>
+                    )}
                   </ul>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setStep2(false)} disabled={saving}>Voltar</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setStep2(false)} disabled={saving}>
+                Voltar
+              </AlertDialogCancel>
               <AlertDialogAction onClick={confirmar} disabled={saving}>
                 {saving ? "Cancelando…" : "Confirmar cancelamento"}
               </AlertDialogAction>

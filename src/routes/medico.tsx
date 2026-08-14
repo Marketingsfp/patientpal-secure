@@ -85,11 +85,18 @@ function MedicoHome() {
       // Deduplica preservando o último atendimento
       const mapa = new Map<string, PacienteRow>();
       for (const a of ags ?? []) {
-        const p = (a as unknown as {
-          paciente_id: string;
-          data_hora: string;
-          pacientes: { id: string; nome: string; cpf: string | null; telefone: string | null } | null;
-        }).pacientes;
+        const p = (
+          a as unknown as {
+            paciente_id: string;
+            data_hora: string;
+            pacientes: {
+              id: string;
+              nome: string;
+              cpf: string | null;
+              telefone: string | null;
+            } | null;
+          }
+        ).pacientes;
         if (!p) continue;
         if (!mapa.has(p.id)) {
           mapa.set(p.id, {
@@ -97,8 +104,7 @@ function MedicoHome() {
             nome: p.nome,
             cpf: p.cpf,
             telefone: p.telefone,
-            ultimo_atendimento:
-              (a as unknown as { data_hora: string }).data_hora ?? null,
+            ultimo_atendimento: (a as unknown as { data_hora: string }).data_hora ?? null,
           });
         }
       }

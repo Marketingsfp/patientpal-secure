@@ -44,7 +44,7 @@ type ItemRow = {
 };
 
 const totalItem = (i: ItemRow) =>
-  Number(i.valor_total ?? (Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0)));
+  Number(i.valor_total ?? Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0));
 
 /**
  * Itens do orçamento vinculados a ESTE agendamento.
@@ -58,11 +58,15 @@ async function itensComSinal(agendamentoId: string): Promise<ItemRow[]> {
     .from("agendamento_orcamento_itens")
     .select("orcamento_item_id")
     .eq("agendamento_id", agendamentoId);
-  const ids = ((links ?? []) as Array<{ orcamento_item_id: string }>).map((r) => r.orcamento_item_id);
+  const ids = ((links ?? []) as Array<{ orcamento_item_id: string }>).map(
+    (r) => r.orcamento_item_id,
+  );
   if (!ids.length) return [];
   const { data } = await supabase
     .from("orcamento_itens")
-    .select("id, descricao, quantidade, valor_unitario, valor_total, sinal_valor, valor_pago, status_financeiro")
+    .select(
+      "id, descricao, quantidade, valor_unitario, valor_total, sinal_valor, valor_pago, status_financeiro",
+    )
     .in("id", ids);
   const itens = (data ?? []) as ItemRow[];
   const temSinal = itens.some((i) => Number(i.sinal_valor ?? 0) > 0);
@@ -91,7 +95,15 @@ export async function obterEtapaSinal(agendamentoId: string): Promise<EtapaSinal
     };
   });
   if (pago < sinal - 0.004) {
-    return { etapa: "sinal", valor: Math.round((sinal - pago) * 100) / 100, total, pago, restante, itemIds, itens: detalhe };
+    return {
+      etapa: "sinal",
+      valor: Math.round((sinal - pago) * 100) / 100,
+      total,
+      pago,
+      restante,
+      itemIds,
+      itens: detalhe,
+    };
   }
   if (pago < total - 0.004) {
     return { etapa: "saldo", valor: restante, total, pago, restante, itemIds, itens: detalhe };
@@ -172,7 +184,8 @@ export async function registrarPagamentoEtapaSinal(
   const saldoTotal = saldos.reduce((s, x) => s + x.saldo, 0);
   if (saldoTotal <= 0.004) return;
   // Sem valor informado (compatibilidade): quita o saldo restante.
-  const bruto = valorPago == null || !isFinite(valorPago) || valorPago <= 0 ? saldoTotal : valorPago;
+  const bruto =
+    valorPago == null || !isFinite(valorPago) || valorPago <= 0 ? saldoTotal : valorPago;
   let restanteDistribuir = Math.round(Math.min(bruto, saldoTotal) * 100) / 100;
 
   for (let idx = 0; idx < saldos.length; idx++) {
@@ -181,7 +194,7 @@ export async function registrarPagamentoEtapaSinal(
     const ultimo = idx === saldos.length - 1;
     const cota = ultimo
       ? Math.min(s.saldo, restanteDistribuir)
-      : Math.min(s.saldo, Math.round((restanteDistribuir * (s.saldo / saldoTotal)) * 100) / 100);
+      : Math.min(s.saldo, Math.round(restanteDistribuir * (s.saldo / saldoTotal) * 100) / 100);
     const aplicar = Math.round(cota * 100) / 100;
     if (aplicar <= 0) continue;
     // Converte a cota recebida (com desconto) de volta para o valor
@@ -195,7 +208,10 @@ export async function registrarPagamentoEtapaSinal(
     };
     if (s.pagoAtual <= 0.004) patch.sinal_pago_em = agora;
     if (quitado) patch.saldo_pago_em = agora;
-    await supabase.from("orcamento_itens").update(patch as never).eq("id", s.item.id);
+    await supabase
+      .from("orcamento_itens")
+      .update(patch as never)
+      .eq("id", s.item.id);
     restanteDistribuir = Math.round((restanteDistribuir - aplicar) * 100) / 100;
   }
 }

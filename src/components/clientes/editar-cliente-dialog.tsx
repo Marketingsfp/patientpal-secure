@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Loader2, Users } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -20,17 +24,30 @@ interface Props {
  * Edição de cliente em modal centralizado — substitui a navegação para a
  * página /app/clientes/$id/editar, preservando busca e rolagem da tabela.
  */
-export function EditarClienteDialog({ pacienteId, clinicaId, readOnly = false, onClose, onSaved }: Props) {
+export function EditarClienteDialog({
+  pacienteId,
+  clinicaId,
+  readOnly = false,
+  onClose,
+  onSaved,
+}: Props) {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState(false);
 
   useEffect(() => {
-    if (!pacienteId) { setPaciente(null); return; }
+    if (!pacienteId) {
+      setPaciente(null);
+      return;
+    }
     let active = true;
     setLoading(true);
     setErro(false);
-    void supabase.from("pacientes").select("*").eq("id", pacienteId).single()
+    void supabase
+      .from("pacientes")
+      .select("*")
+      .eq("id", pacienteId)
+      .single()
       .then(({ data, error }) => {
         if (!active) return;
         if (error || !data) {
@@ -41,13 +58,21 @@ export function EditarClienteDialog({ pacienteId, clinicaId, readOnly = false, o
         }
         setLoading(false);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [pacienteId]);
 
-  const prontuario = (paciente as any)?.codigo_prontuario || (paciente as any)?.numero_pasta || null;
+  const prontuario =
+    (paciente as any)?.codigo_prontuario || (paciente as any)?.numero_pasta || null;
 
   return (
-    <Dialog open={!!pacienteId} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={!!pacienteId}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0">
         <DialogHeader className="flex-shrink-0 border-b border-border p-6 pb-4">
           <DialogTitle className="flex items-center gap-2 pr-8">
@@ -79,7 +104,10 @@ export function EditarClienteDialog({ pacienteId, clinicaId, readOnly = false, o
             stickyFooter
             readOnly={readOnly}
             onCancel={onClose}
-            onSaved={() => { onSaved?.(); onClose(); }}
+            onSaved={() => {
+              onSaved?.();
+              onClose();
+            }}
           />
         )}
       </DialogContent>

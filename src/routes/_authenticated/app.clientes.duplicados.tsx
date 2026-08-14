@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
@@ -104,29 +110,30 @@ function DuplicadosPage() {
   const groupKey = (g: Grupo, i: number) => `${g.tipo}-${g.chave}-${i}`;
 
   const norm = (s: string) =>
-    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
   const gruposFiltrados = (() => {
     const q = norm(filtroNome);
     if (!q) return grupos;
-    return grupos.filter((g) =>
-      g.pacientes.some((p) => norm(p.nome ?? "").includes(q)),
-    );
+    return grupos.filter((g) => g.pacientes.some((p) => norm(p.nome ?? "").includes(q)));
   })();
 
   const toggle = (gk: string, id: string) => {
     setSel((prev) => {
       const cur = new Set(prev[gk] ?? []);
-      if (cur.has(id)) cur.delete(id); else cur.add(id);
+      if (cur.has(id)) cur.delete(id);
+      else cur.add(id);
       return { ...prev, [gk]: cur };
     });
   };
 
   const grupoAtual = confirmKey
-    ? grupos.find((g, i) => groupKey(g, i) === confirmKey) ?? null
+    ? (grupos.find((g, i) => groupKey(g, i) === confirmKey) ?? null)
     : null;
-  const selecionadosAtuais = confirmKey
-    ? Array.from(sel[confirmKey] ?? [])
-    : [];
+  const selecionadosAtuais = confirmKey ? Array.from(sel[confirmKey] ?? []) : [];
   const pacientesSelecionados = grupoAtual
     ? grupoAtual.pacientes.filter((p) => selecionadosAtuais.includes(p.id))
     : [];
@@ -158,7 +165,8 @@ function DuplicadosPage() {
       pacientesSelecionados.map((p) => p.data_nascimento).filter(Boolean) as string[],
     );
     const lista: string[] = [];
-    if (cpfs.size > 1) lista.push(`CPFs diferentes: ${Array.from(cpfs).map(formatCPF).join(" · ")}`);
+    if (cpfs.size > 1)
+      lista.push(`CPFs diferentes: ${Array.from(cpfs).map(formatCPF).join(" · ")}`);
     if (dns.size > 1)
       lista.push(
         `Datas de nascimento diferentes: ${Array.from(dns)
@@ -197,8 +205,8 @@ function DuplicadosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Possíveis pacientes duplicados</h1>
           <p className="text-sm text-muted-foreground">
-            Somente alerta. O sistema não faz merge automático — abra cada cadastro
-            para conferir e ajustar manualmente.
+            Somente alerta. O sistema não faz merge automático — abra cada cadastro para conferir e
+            ajustar manualmente.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -229,27 +237,27 @@ function DuplicadosPage() {
           <Card key={groupKey(g, i)} className="rounded-2xl border-border/50 shadow-2xs">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="bg-primary/10 text-primary font-medium px-3 py-1 rounded-full text-xs">
-                  {TIPO_LABEL[g.tipo]}
-                </span>
-                <CardTitle className="text-base font-semibold tracking-tight">
-                  {formatChave(g)}
-                </CardTitle>
-                <span className="text-xs text-muted-foreground">{g.qtd} cadastros</span>
-              </div>
-              <button
-                type="button"
-                disabled={(sel[groupKey(g, i)]?.size ?? 0) < 2}
-                onClick={() => setConfirmKey(groupKey(g, i))}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Merge className="h-3.5 w-3.5" />
-                Mesclar selecionados
-                <span className="bg-primary-foreground/20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
-                  {sel[groupKey(g, i)]?.size ?? 0}
-                </span>
-              </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-primary/10 text-primary font-medium px-3 py-1 rounded-full text-xs">
+                    {TIPO_LABEL[g.tipo]}
+                  </span>
+                  <CardTitle className="text-base font-semibold tracking-tight">
+                    {formatChave(g)}
+                  </CardTitle>
+                  <span className="text-xs text-muted-foreground">{g.qtd} cadastros</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={(sel[groupKey(g, i)]?.size ?? 0) < 2}
+                  onClick={() => setConfirmKey(groupKey(g, i))}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Merge className="h-3.5 w-3.5" />
+                  Mesclar selecionados
+                  <span className="bg-primary-foreground/20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                    {sel[groupKey(g, i)]?.size ?? 0}
+                  </span>
+                </button>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -260,18 +268,18 @@ function DuplicadosPage() {
                     className="bg-card border border-border/50 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-4 mb-3"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                    <Checkbox
-                      checked={sel[groupKey(g, i)]?.has(p.id) ?? false}
-                      onCheckedChange={() => toggle(groupKey(g, i), p.id)}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-base font-bold text-foreground truncate">{p.nome}</div>
-                      <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                        CPF: {formatCPF(p.cpf)} · Tel: {formatPhone(p.telefone)} · Nasc.:{" "}
-                        {p.data_nascimento?.split("-").reverse().join("/") ?? "—"}
-                        {p.codigo_prontuario ? ` · Prontuário: ${p.codigo_prontuario}` : ""}
+                      <Checkbox
+                        checked={sel[groupKey(g, i)]?.has(p.id) ?? false}
+                        onCheckedChange={() => toggle(groupKey(g, i), p.id)}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-base font-bold text-foreground truncate">{p.nome}</div>
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                          CPF: {formatCPF(p.cpf)} · Tel: {formatPhone(p.telefone)} · Nasc.:{" "}
+                          {p.data_nascimento?.split("-").reverse().join("/") ?? "—"}
+                          {p.codigo_prontuario ? ` · Prontuário: ${p.codigo_prontuario}` : ""}
+                        </div>
                       </div>
-                    </div>
                     </div>
                     <Link
                       to="/app/clientes/$pacienteId/editar"
@@ -304,10 +312,10 @@ function DuplicadosPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
                 <p>
-                  Esta ação é <strong>irreversível</strong>. Todos os vínculos
-                  (agenda, atendimentos, financeiro, contratos, prontuários,
-                  cartões) dos cadastros perdedores serão movidos para o
-                  vencedor, e os cadastros perdedores serão apagados.
+                  Esta ação é <strong>irreversível</strong>. Todos os vínculos (agenda,
+                  atendimentos, financeiro, contratos, prontuários, cartões) dos cadastros
+                  perdedores serão movidos para o vencedor, e os cadastros perdedores serão
+                  apagados.
                 </p>
                 {conflitos.length > 0 && (
                   <div className="rounded border border-destructive/40 bg-destructive/10 p-2 space-y-2">
@@ -333,13 +341,15 @@ function DuplicadosPage() {
                     <div className="font-medium">Vencedor (menor prontuário):</div>
                     <div>{vencedorPrevisto.nome}</div>
                     <div className="text-xs text-muted-foreground">
-                      Prontuário {vencedorPrevisto.codigo_prontuario ?? "—"} •
-                      CPF {vencedorPrevisto.cpf ?? "—"} • Tel {vencedorPrevisto.telefone ?? "—"}
+                      Prontuário {vencedorPrevisto.codigo_prontuario ?? "—"} • CPF{" "}
+                      {vencedorPrevisto.cpf ?? "—"} • Tel {vencedorPrevisto.telefone ?? "—"}
                     </div>
                   </div>
                 )}
                 <div>
-                  <div className="font-medium">Perdedores ({pacientesSelecionados.length - 1}):</div>
+                  <div className="font-medium">
+                    Perdedores ({pacientesSelecionados.length - 1}):
+                  </div>
                   <ul className="list-disc pl-5">
                     {pacientesSelecionados
                       .filter((p) => p.id !== vencedorPrevisto?.id)
@@ -351,9 +361,9 @@ function DuplicadosPage() {
                   </ul>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Campos vazios do vencedor (CPF, telefone, e-mail, data de nascimento)
-                  serão preenchidos com dados dos perdedores. Números de prontuário
-                  e demais identificadores legados não são alterados.
+                  Campos vazios do vencedor (CPF, telefone, e-mail, data de nascimento) serão
+                  preenchidos com dados dos perdedores. Números de prontuário e demais
+                  identificadores legados não são alterados.
                 </p>
               </div>
             </AlertDialogDescription>

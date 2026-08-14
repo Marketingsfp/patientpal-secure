@@ -2,8 +2,26 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, Undo2, Printer, CalendarIcon, X, Search,
+  Wallet,
+  PlusCircle,
+  MinusCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Lock,
+  Unlock,
+  Eye,
+  FileDown,
+  Users,
+  Receipt,
+  ChevronRight,
+  Trash2,
+  Plus,
+  HandCoins,
+  Undo2,
+  Printer,
+  CalendarIcon,
+  X,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -22,10 +40,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -34,7 +61,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
@@ -45,8 +77,11 @@ import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 import { ResumoFormas } from "@/components/caixa/resumo-formas";
 import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
 import {
-  saldoEsperadoGaveta, classificarDiferenca, statusCaixa,
-  STATUS_CAIXA_LABEL, STATUS_CAIXA_CLASS,
+  saldoEsperadoGaveta,
+  classificarDiferenca,
+  statusCaixa,
+  STATUS_CAIXA_LABEL,
+  STATUS_CAIXA_CLASS,
 } from "@/lib/caixa/fechamento";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -63,15 +98,33 @@ export const Route = createFileRoute("/_authenticated/app/caixa")({
  * (que são decompostos depois consultando `fin_lancamentos.observacoes`) e
  * `outros` como residual.
  */
-const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
-type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros" | "indeterminado";
+const FORMA_BUCKETS = [
+  "dinheiro",
+  "pix",
+  "debito",
+  "credito",
+  "boleto",
+  "transferencia",
+  "convenio",
+] as const;
+type FormaBucket = (typeof FORMA_BUCKETS)[number] | "misto" | "outros" | "indeterminado";
 
 function normalizarForma(f: string | null | undefined): FormaBucket {
   const k = (f ?? "").toLowerCase().trim();
   if (!k) return "outros";
-  if (k === "dinheiro" || k === "pix" || k === "boleto" || k === "transferencia" || k === "convenio" || k === "misto") return k;
-  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito") return "credito";
-  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito") return "debito";
+  if (
+    k === "dinheiro" ||
+    k === "pix" ||
+    k === "boleto" ||
+    k === "transferencia" ||
+    k === "convenio" ||
+    k === "misto"
+  )
+    return k;
+  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito")
+    return "credito";
+  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito")
+    return "debito";
   return "outros";
 }
 
@@ -84,7 +137,10 @@ function normalizarForma(f: string | null | undefined): FormaBucket {
  */
 function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
   const bruto = normalizarForma(m.forma_pagamento);
-  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
+  if (
+    bruto === "outros" &&
+    (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")
+  ) {
     return "dinheiro";
   }
   return bruto;
@@ -100,10 +156,11 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
   if (!obs) return out;
   const marker = obs.match(/pagamento\s+misto\s*:/i);
   if (!marker || marker.index == null) return out;
-  const trecho = obs
-    .slice(marker.index + marker[0].length)
-    .split(/\s+\|\s+/)[0];
-  const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+  const trecho = obs.slice(marker.index + marker[0].length).split(/\s+\|\s+/)[0];
+  const partes = trecho
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
     [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
     [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
@@ -115,8 +172,7 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
     [/^conv[êe]nio/i, "convenio"],
     [/^transfer[êe]ncia/i, "transferencia"],
   ];
-  const parseBRL = (s: string) =>
-    Number(s.replace(/[.\s\u00a0]/g, "").replace(",", ".")) || 0;
+  const parseBRL = (s: string) => Number(s.replace(/[.\s\u00a0]/g, "").replace(",", ".")) || 0;
   for (const p of partes) {
     const match = LABEL_TO_KEY.find(([re]) => re.test(p));
     if (!match) continue;
@@ -135,9 +191,16 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
  * ainda em cache, retorna um aviso temporário sem usar o rótulo misto.
  */
 const FORMA_LABEL: Record<FormaBucket, string> = {
-  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
-  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
-  misto: "Misto", outros: "Outros", indeterminado: "Indeterminado (conferir)",
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  debito: "Cartão débito",
+  credito: "Cartão crédito",
+  boleto: "Boleto",
+  transferencia: "Transferência",
+  convenio: "Convênio",
+  misto: "Misto",
+  outros: "Outros",
+  indeterminado: "Indeterminado (conferir)",
 };
 
 /**
@@ -170,7 +233,10 @@ function formatarFormaPagamento(
   const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
   if (entradas.length === 0) return "Aguardando formas";
   return entradas
-    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+    .map(
+      ([k, v]) =>
+        `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+    )
     .join(" · ");
 }
 
@@ -190,8 +256,9 @@ function CaixaRouteDispatcher() {
   // `?classico=1` força a tela clássica (usado pelos botões do caixa novo
   // que delegam ações ao clássico). Sem isso, navegar para /app/caixa
   // continuava caindo no caixa novo e "nada acontecia".
-  const forcaClassico = typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("classico") === "1";
+  const forcaClassico =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("classico") === "1";
   // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
   // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
   useAutoReloadOnNewBuild(true);
@@ -201,17 +268,37 @@ function CaixaRouteDispatcher() {
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
+type MovTipo =
+  | "abertura"
+  | "sangria"
+  | "suprimento"
+  | "recebimento"
+  | "despesa"
+  | "fechamento"
+  | "estorno"
+  | "reabertura";
 interface Sessao {
-  id: string; clinica_id: string; user_id: string; user_nome: string | null;
-  aberto_em: string; valor_abertura: number;
-  fechado_em: string | null; valor_fechamento_informado: number | null;
-  valor_fechamento_calculado: number | null; diferenca: number | null;
-  status: "aberto" | "fechado"; observacoes: string | null;
+  id: string;
+  clinica_id: string;
+  user_id: string;
+  user_nome: string | null;
+  aberto_em: string;
+  valor_abertura: number;
+  fechado_em: string | null;
+  valor_fechamento_informado: number | null;
+  valor_fechamento_calculado: number | null;
+  diferenca: number | null;
+  status: "aberto" | "fechado";
+  observacoes: string | null;
 }
 interface Mov {
-  id: string; sessao_id: string; user_id: string; tipo: MovTipo;
-  valor: number; descricao: string | null; forma_pagamento: string | null;
+  id: string;
+  sessao_id: string;
+  user_id: string;
+  tipo: MovTipo;
+  valor: number;
+  descricao: string | null;
+  forma_pagamento: string | null;
   created_at: string;
   lancamento_id?: string | null;
 }
@@ -263,27 +350,48 @@ const fmtDT = (s: string | null) =>
   s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 const TIPO_LABEL: Record<MovTipo, string> = {
-  abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
-  recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
-  estorno: "Estorno", reabertura: "Reabertura",
+  abertura: "Abertura",
+  sangria: "Sangria",
+  suprimento: "Suprimento",
+  recebimento: "Recebimento",
+  despesa: "Despesa",
+  fechamento: "Fechamento",
+  estorno: "Estorno",
+  reabertura: "Reabertura",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
-  abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0, estorno: -1, reabertura: 0,
+  abertura: 1,
+  suprimento: 1,
+  recebimento: 1,
+  sangria: -1,
+  despesa: -1,
+  fechamento: 0,
+  estorno: -1,
+  reabertura: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
-  abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
-  suprimento: "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
-  recebimento: "bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
-  sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
-  despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
-  fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
-  estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
-  reabertura: "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
+  abertura:
+    "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
+  suprimento:
+    "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  recebimento:
+    "bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+  sangria:
+    "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+  despesa:
+    "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
+  fechamento:
+    "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
+  estorno:
+    "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
+  reabertura:
+    "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
-const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
-const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
+const SESSAO_FIELDS =
+  "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
+const MOV_FIELDS =
+  "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
 /** "YYYY-MM-DD" no fuso local a partir de um ISO. */
 function localYMDStr(iso: string): string {
@@ -303,7 +411,12 @@ function servicoFromDescricao(desc: string | null): string | null {
   // Padrão 2: separado por " — " ou " · "
   const idx = Math.max(clean.lastIndexOf(" — "), clean.lastIndexOf(" · "));
   if (idx > 0) {
-    return clean.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+    return (
+      clean
+        .slice(idx + 3)
+        .replace(/\s*\(.*\)\s*$/, "")
+        .trim() || null
+    );
   }
   return null;
 }
@@ -321,7 +434,12 @@ function pacienteFromDescricao(desc: string | null): string | null {
   const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
   if (mens) return mens[1].trim() || null;
   // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(desc)) return null;
+  if (
+    /^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(
+      desc,
+    )
+  )
+    return null;
   if (/^\s*\[caixa\]/i.test(desc)) return null;
   const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
   // Nome vem antes do PRIMEIRO separador " — " ou " · "
@@ -364,7 +482,13 @@ function formatFichaCaixa(ficha: number | null | undefined): string {
 }
 
 const BANDEIRAS_CARTAO = [
-  "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
+  "Visa",
+  "Mastercard",
+  "Elo",
+  "Hipercard",
+  "American Express",
+  "Diners",
+  "Outra",
 ];
 
 function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): string {
@@ -388,13 +512,25 @@ function Page() {
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
-  const [caixaDrill, setCaixaDrill] = useState<null | "saldo" | "abertura" | "entradas" | "saidas">(null);
+  const [caixaDrill, setCaixaDrill] = useState<null | "saldo" | "abertura" | "entradas" | "saidas">(
+    null,
+  );
 
   // ====== Resumo de repasse do dia (para a aba "Repasse") ======
-  const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
-    pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
+  const [repHoje, setRepHoje] = useState<{
+    pendente: number;
+    pago: number;
+    medicos: number;
+    qtd_pend: number;
+  }>({
+    pendente: 0,
+    pago: 0,
+    medicos: 0,
+    qtd_pend: 0,
   });
-  const [repPagosHoje, setRepPagosHoje] = useState<Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>>([]);
+  const [repPagosHoje, setRepPagosHoje] = useState<
+    Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>
+  >([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -407,13 +543,23 @@ function Page() {
       .lte("data", hoje)
       .not("agendamento_id", "is", null);
     if (error) return;
-    const rows = (data ?? []) as Array<{ valor: number | null; medico_id: string | null; repasse_pago: boolean | null }>;
-    let pendente = 0, pago = 0, qtd_pend = 0;
+    const rows = (data ?? []) as Array<{
+      valor: number | null;
+      medico_id: string | null;
+      repasse_pago: boolean | null;
+    }>;
+    let pendente = 0,
+      pago = 0,
+      qtd_pend = 0;
     const medSet = new Set<string>();
     for (const r of rows) {
       const v = Number(r.valor) || 0;
       if (r.repasse_pago) pago += v;
-      else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
+      else {
+        pendente += v;
+        qtd_pend++;
+        if (r.medico_id) medSet.add(r.medico_id);
+      }
     }
     setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
     // Lista de pagamentos de repasse realizados hoje (despesas "Repasse médico — ...")
@@ -425,22 +571,42 @@ function Page() {
       .eq("data", hoje)
       .ilike("descricao", "Repasse médico%")
       .order("created_at", { ascending: false });
-    const pagosRows = (pagos ?? []) as Array<{ id: string; valor: number | null; medico_id: string | null; descricao: string | null; forma_pagamento: string | null; created_at: string | null }>;
-    const medIds = Array.from(new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]));
+    const pagosRows = (pagos ?? []) as Array<{
+      id: string;
+      valor: number | null;
+      medico_id: string | null;
+      descricao: string | null;
+      forma_pagamento: string | null;
+      created_at: string | null;
+    }>;
+    const medIds = Array.from(
+      new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]),
+    );
     const medMap = new Map<string, string>();
     if (medIds.length) {
       const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
       for (const m of (meds ?? []) as Array<{ id: string; nome: string }>) medMap.set(m.id, m.nome);
     }
-    setRepPagosHoje(pagosRows.map((p) => ({
-      id: p.id,
-      medico: p.medico_id ? (medMap.get(p.medico_id) ?? "—") : (p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—"),
-      valor: Number(p.valor) || 0,
-      forma: p.forma_pagamento,
-      hora: p.created_at ? new Date(p.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
-    })));
+    setRepPagosHoje(
+      pagosRows.map((p) => ({
+        id: p.id,
+        medico: p.medico_id
+          ? (medMap.get(p.medico_id) ?? "—")
+          : p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—",
+        valor: Number(p.valor) || 0,
+        forma: p.forma_pagamento,
+        hora: p.created_at
+          ? new Date(p.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+      })),
+    );
   }, [clinicaAtual]);
-  useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
+  useEffect(() => {
+    if (tab === "repasse") void loadRepasseHoje();
+  }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
@@ -455,10 +621,14 @@ function Page() {
   // (chave = lancamento_id, valor = status). Usado para trocar o botão
   // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
   // "Estornado" (aprovado) conforme a decisão do financeiro.
-  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(
+    new Map(),
+  );
   // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
-  const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(
+    new Map(),
+  );
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
   // Mapa user_id → nome de exibição. Alimenta a coluna "Usuário" (quem
   // faturou) em Movimentos, no Detalhe de sessão, no drill-down do saldo
@@ -502,7 +672,9 @@ function Page() {
         const parseIso = (s: string): [number, number, number] | null => {
           const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
           if (!m) return null;
-          const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3]);
+          const y = Number(m[1]);
+          const mo = Number(m[2]);
+          const d = Number(m[3]);
           if (!y || !mo || !d) return null;
           return [y, mo, d];
         };
@@ -597,7 +769,12 @@ function Page() {
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
   type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
-  const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
+  const linhaVazia = (): LinhaPag => ({
+    forma: "dinheiro",
+    valor: "0",
+    bandeira: "",
+    parcelas: "1",
+  });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
   // Edição inline da "Forma" nas tabelas de Movimentos. Só liberada para
@@ -626,9 +803,16 @@ function Page() {
     autorizacao: string;
     valorLiquido: string;
   };
-  const [cartaoEditFor, setCartaoEditFor] = useState<{ mov: Mov; forma: "cartao_credito" | "cartao_debito" } | null>(null);
+  const [cartaoEditFor, setCartaoEditFor] = useState<{
+    mov: Mov;
+    forma: "cartao_credito" | "cartao_debito";
+  } | null>(null);
   const [cartaoEdit, setCartaoEdit] = useState<CartaoDetalhes>({
-    bandeira: "", parcelas: "1", data: "", autorizacao: "", valorLiquido: "",
+    bandeira: "",
+    parcelas: "1",
+    data: "",
+    autorizacao: "",
+    valorLiquido: "",
   });
   const [salvandoCartao, setSalvandoCartao] = useState(false);
 
@@ -641,19 +825,29 @@ function Page() {
       if (m.lancamento_id) {
         const { data } = await supabase
           .from("fin_lancamentos")
-          .select("bandeira_cartao, parcelas, data_cartao, autorizacao_cartao, valor_liquido_cartao, valor")
+          .select(
+            "bandeira_cartao, parcelas, data_cartao, autorizacao_cartao, valor_liquido_cartao, valor",
+          )
           .eq("id", m.lancamento_id)
           .maybeSingle();
-        const row = (data ?? null) as
-          | { bandeira_cartao: string | null; parcelas: number | null; data_cartao: string | null; autorizacao_cartao: string | null; valor_liquido_cartao: number | null; valor: number | null }
-          | null;
+        const row = (data ?? null) as {
+          bandeira_cartao: string | null;
+          parcelas: number | null;
+          data_cartao: string | null;
+          autorizacao_cartao: string | null;
+          valor_liquido_cartao: number | null;
+          valor: number | null;
+        } | null;
         if (row) {
           prefill = {
             bandeira: row.bandeira_cartao ?? "",
             parcelas: String(row.parcelas ?? 1),
             data: row.data_cartao ?? "",
             autorizacao: row.autorizacao_cartao ?? "",
-            valorLiquido: row.valor_liquido_cartao != null ? String(row.valor_liquido_cartao) : String(row.valor ?? m.valor ?? ""),
+            valorLiquido:
+              row.valor_liquido_cartao != null
+                ? String(row.valor_liquido_cartao)
+                : String(row.valor ?? m.valor ?? ""),
           };
         }
       }
@@ -703,8 +897,11 @@ function Page() {
       toast.error("Selecione a bandeira do cartão.");
       return;
     }
-    const parcelasNum = nova === "cartao_credito" ? Math.max(1, Number(cartaoEdit.parcelas) || 1) : 1;
-    const liquidoNum = cartaoEdit.valorLiquido ? Number(String(cartaoEdit.valorLiquido).replace(",", ".")) : null;
+    const parcelasNum =
+      nova === "cartao_credito" ? Math.max(1, Number(cartaoEdit.parcelas) || 1) : 1;
+    const liquidoNum = cartaoEdit.valorLiquido
+      ? Number(String(cartaoEdit.valorLiquido).replace(",", "."))
+      : null;
     setSalvandoCartao(true);
     try {
       const { error: eMov } = await supabase
@@ -746,8 +943,7 @@ function Page() {
 
   function FormaCellEditavel({ m }: { m: Mov }) {
     const bucket = normalizarForma(m.forma_pagamento);
-    const editavel =
-      podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
+    const editavel = podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
     if (!editavel) {
       return <span className="text-xs">{formatarFormaPagamento(m, mistoObs)}</span>;
     }
@@ -756,7 +952,9 @@ function Page() {
     return (
       <Select
         value={known ? atual : ""}
-        onValueChange={(v) => { void alterarFormaMov(m, v); }}
+        onValueChange={(v) => {
+          void alterarFormaMov(m, v);
+        }}
         disabled={salvandoFormaId === m.id}
       >
         <SelectTrigger className="h-7 text-xs w-[150px]">
@@ -764,11 +962,11 @@ function Page() {
         </SelectTrigger>
         <SelectContent>
           {FORMAS_EDITAVEIS.map((f) => (
-            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+            <SelectItem key={f.value} value={f.value}>
+              {f.label}
+            </SelectItem>
           ))}
-          {atual && !known && (
-            <SelectItem value={atual}>{atual}</SelectItem>
-          )}
+          {atual && !known && <SelectItem value={atual}>{atual}</SelectItem>}
         </SelectContent>
       </Select>
     );
@@ -784,10 +982,14 @@ function Page() {
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
   const [movDestinoUserId, setMovDestinoUserId] = useState("");
-  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
+  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>(
+    [],
+  );
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
-  const [dataFechamento, setDataFechamento] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [dataFechamento, setDataFechamento] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [saving, setSaving] = useState(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
   const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
@@ -796,7 +998,9 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
-  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
@@ -813,12 +1017,13 @@ function Page() {
     const formas = ["dinheiro", "pix", "debito", "credito"] as const;
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
+        return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key >= "1" && e.key <= "4") {
         e.preventDefault();
         const forma = formas[Number(e.key) - 1];
-        setCobrancaLinhas(prev => {
+        setCobrancaLinhas((prev) => {
           const next = [...prev];
           const i = next.length - 1;
           next[i] = { ...next[i], forma, bandeira: "", parcelas: "1" };
@@ -826,7 +1031,7 @@ function Page() {
         });
       } else if (e.key === "5") {
         e.preventDefault();
-        setCobrancaLinhas(prev => {
+        setCobrancaLinhas((prev) => {
           if (!openCobranca) return [...prev, linhaVazia()];
           const next = [...prev];
           if (prev.length === 1) {
@@ -850,14 +1055,14 @@ function Page() {
     // Sessao aberta do usuario
     const [abertaRes, histRes] = await Promise.all([
       supabase
-      .from("caixa_sessoes")
-      .select(SESSAO_FIELDS)
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("user_id", user.id)
-      .eq("status", "aberto")
-      .order("aberto_em", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+        .from("caixa_sessoes")
+        .select(SESSAO_FIELDS)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("user_id", user.id)
+        .eq("status", "aberto")
+        .order("aberto_em", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       supabase
         .from("caixa_sessoes")
         .select(SESSAO_FIELDS)
@@ -881,7 +1086,9 @@ function Page() {
     }> => {
       const enrich = new Map<string, MovEnrich>();
       const cancelados = new Set<string>();
-      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
+      const lancIds = Array.from(
+        new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)),
+      );
       if (lancIds.length === 0) return { enrich, cancelados };
       const lancRows: LancamentoEnrichRow[] = [];
       for (const ids of chunkArray(lancIds, 200)) {
@@ -899,7 +1106,9 @@ function Page() {
         if (l.status === "cancelado") cancelados.add(l.id);
       }
       const medIds = new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x));
-      const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
+      const agIds = Array.from(
+        new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)),
+      );
       const pacIds = new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x));
 
       const agChunks = chunkArray(agIds, 200);
@@ -907,7 +1116,9 @@ function Page() {
         agChunks.map((ids) =>
           supabase
             .from("agendamentos")
-            .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
+            .select(
+              "id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome",
+            )
             .in("id", ids),
         ),
       );
@@ -933,19 +1144,29 @@ function Page() {
       const medChunks = chunkArray(Array.from(medIds), 200);
       const pacChunks = chunkArray(Array.from(pacIds), 200);
       const [medResults, pacResults] = await Promise.all([
-        Promise.all(medChunks.map((ids) => supabase.from("medicos").select("id, nome").in("id", ids))),
-        Promise.all(pacChunks.map((ids) => supabase.from("pacientes").select("id, nome").in("id", ids))),
+        Promise.all(
+          medChunks.map((ids) => supabase.from("medicos").select("id, nome").in("id", ids)),
+        ),
+        Promise.all(
+          pacChunks.map((ids) => supabase.from("pacientes").select("id, nome").in("id", ids)),
+        ),
       ]);
       const medMap = new Map<string, string>();
       for (const r of medResults) {
-        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por médico", r.error); continue; }
+        if (r.error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por médico", r.error);
+          continue;
+        }
         for (const m of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (m.nome) medMap.set(m.id, m.nome);
         }
       }
       const pacMap = new Map<string, string>();
       for (const r of pacResults) {
-        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por paciente", r.error); continue; }
+        if (r.error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por paciente", r.error);
+          continue;
+        }
         for (const p of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
@@ -977,9 +1198,18 @@ function Page() {
               .range(0, 9999);
           }),
         );
-        type FichaRow = { id: string; inicio: string | null; paciente_nome: string | null; medico_id: string | null; agenda_id: string | null };
+        type FichaRow = {
+          id: string;
+          inicio: string | null;
+          paciente_nome: string | null;
+          medico_id: string | null;
+          agenda_id: string | null;
+        };
         for (const r of diaResults) {
-          if (r.error) { console.warn("Falha ao calcular ficha no caixa", r.error); continue; }
+          if (r.error) {
+            console.warn("Falha ao calcular ficha no caixa", r.error);
+            continue;
+          }
           const rows = (r.data ?? []) as FichaRow[];
           const porGrupo = new Map<string, FichaRow[]>();
           for (const row of rows) {
@@ -992,7 +1222,11 @@ function Page() {
             arr.sort((a, b) => {
               const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
               if (t !== 0) return t;
-              return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+              return String(a.paciente_nome ?? "").localeCompare(
+                String(b.paciente_nome ?? ""),
+                "pt-BR",
+                { sensitivity: "base" },
+              );
             });
             arr.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
           }
@@ -1007,20 +1241,27 @@ function Page() {
         if (!servico && l.descricao) {
           const desc = l.descricao;
           const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
-          if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+          if (idx > 0)
+            servico =
+              desc
+                .slice(idx + 3)
+                .replace(/\s*\(.*\)\s*$/, "")
+                .trim() || null;
         }
         // Paciente: prioriza fin_lancamentos.paciente_id; fallback via
         // agendamento.paciente_id; se nada disso existir, fica null e a
         // linha usará pacienteFromDescricao() no render.
         const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
-        const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
+        const pacienteNome = pacIdEfetivo ? (pacMap.get(pacIdEfetivo) ?? null) : null;
         const medIdEfetivo = l.medico_id ?? agInfo?.medico_id ?? null;
         enrich.set(l.id, {
           servico,
-          medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
+          medico: medIdEfetivo ? (medMap.get(medIdEfetivo) ?? null) : null,
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
-          ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
+          ficha: agInfo
+            ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null)
+            : null,
           faturado_por_id: l.criado_por ?? null,
         });
       }
@@ -1084,12 +1325,12 @@ function Page() {
       setEstornosPorMov(new Map());
       return;
     }
-    const ids = Array.from(new Set(
-      minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
-    ));
-    const sangriaIds = Array.from(new Set(
-      minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id),
-    ));
+    const ids = Array.from(
+      new Set(minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x)),
+    );
+    const sangriaIds = Array.from(
+      new Set(minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id)),
+    );
     if (ids.length === 0 && sangriaIds.length === 0) {
       setEstornosPorLanc(new Map());
       setEstornosPorMov(new Map());
@@ -1107,8 +1348,12 @@ function Page() {
     q = q.or(parts.join(","));
     const { data } = await q;
     const mapLanc = new Map<string, "pendente" | "aprovado">();
-    const mapMov  = new Map<string, "pendente" | "aprovado">();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; caixa_movimento_id: string | null; status: string }>) {
+    const mapMov = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{
+      lancamento_id: string | null;
+      caixa_movimento_id: string | null;
+      status: string;
+    }>) {
       const st = r.status === "pendente" || r.status === "aprovado" ? r.status : null;
       if (!st) continue;
       if (r.lancamento_id) {
@@ -1142,16 +1387,22 @@ function Page() {
           table: "estorno_solicitacoes",
           filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
         },
-        () => { void reloadEstornosPendentes(); },
+        () => {
+          void reloadEstornosPendentes();
+        },
       )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual, reloadEstornosPendentes]);
 
   // Se o usuário voltar para a aba após o financeiro decidir e o evento
   // realtime tiver sido perdido, ressincroniza ao ganhar foco.
   useEffect(() => {
-    const onFocus = () => { void reloadEstornosPendentes(); };
+    const onFocus = () => {
+      void reloadEstornosPendentes();
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     return () => {
@@ -1188,22 +1439,26 @@ function Page() {
       ja_pago: boolean;
       desconto_origem: string | null;
     }>;
-    setFilaCaixa(rows.map((r) => ({
-      id: r.id,
-      paciente_id: r.paciente_id,
-      paciente_nome: r.paciente_nome,
-      procedimento: r.desconto_origem
-        ? `${r.procedimento} (${r.desconto_origem})`
-        : r.procedimento,
-      inicio: r.inicio,
-      medico_nome: r.medico_nome,
-      valor: Number(r.valor ?? 0),
-      valor_cartao: Number(r.valor_cartao ?? 0),
-      ja_pago: r.ja_pago,
-    })));
+    setFilaCaixa(
+      rows.map((r) => ({
+        id: r.id,
+        paciente_id: r.paciente_id,
+        paciente_nome: r.paciente_nome,
+        procedimento: r.desconto_origem
+          ? `${r.procedimento} (${r.desconto_origem})`
+          : r.procedimento,
+        inicio: r.inicio,
+        medico_nome: r.medico_nome,
+        valor: Number(r.valor ?? 0),
+        valor_cartao: Number(r.valor_cartao ?? 0),
+        ja_pago: r.ja_pago,
+      })),
+    );
   }, [clinicaAtual]);
 
-  useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
+  useEffect(() => {
+    if (minhaSessao) void loadFilaCaixa();
+  }, [minhaSessao, loadFilaCaixa]);
 
   // Consome ?receber=<agendamentoId> vindo do CaixaShellV2:
   // abre a cobrança do paciente correto assim que a fila carregar.
@@ -1229,18 +1484,31 @@ function Page() {
       return;
     }
     setOpenCobranca(item);
-    setCobrancaLinhas([{ forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" }]);
+    setCobrancaLinhas([
+      { forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" },
+    ]);
   }, [minhaSessao, filaCaixa]);
 
   useEffect(() => {
     if (!clinicaAtual || !minhaSessao) return;
     const ch = supabase
       .channel(`caixa-fila-${clinicaAtual.clinica_id}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => { void loadFilaCaixa(); })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agendamentos",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => {
+          void loadFilaCaixa();
+        },
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual, minhaSessao, loadFilaCaixa]);
 
   // Executa cobrança: insere movimento caixa + lançamento financeiro + avança fluxo
@@ -1248,16 +1516,33 @@ function Page() {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
     // Valida cada linha
-    const linhasValidadas: Array<{ forma: string; valor: number; bandeira: string; parcelas: string }> = [];
+    const linhasValidadas: Array<{
+      forma: string;
+      valor: number;
+      bandeira: string;
+      parcelas: string;
+    }> = [];
     for (const l of cobrancaLinhas) {
       const v = Number(l.valor) || 0;
-      if (v <= 0) { toast.error("Cada forma de pagamento precisa ter valor maior que zero"); return; }
-      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
-        toast.error("Selecione a bandeira do cartão em todas as linhas"); return;
+      if (v <= 0) {
+        toast.error("Cada forma de pagamento precisa ter valor maior que zero");
+        return;
       }
-      linhasValidadas.push({ forma: l.forma, valor: v, bandeira: l.bandeira, parcelas: l.parcelas });
+      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas");
+        return;
+      }
+      linhasValidadas.push({
+        forma: l.forma,
+        valor: v,
+        bandeira: l.bandeira,
+        parcelas: l.parcelas,
+      });
     }
-    if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
+    if (linhasValidadas.length === 0) {
+      toast.error("Adicione ao menos uma forma de pagamento");
+      return;
+    }
     setSaving(true);
     // Escopo externo ao try para permitir rollback inter-linhas no catch.
     // Cada par (lançamento + movimento) é atômico via RPC no banco
@@ -1329,14 +1614,16 @@ function Page() {
         if (ids.lancamento_id) lancamentosInseridos.push(ids.lancamento_id);
         if (ids.movimento_id) movimentosInseridos.push(ids.movimento_id);
       }
-      const { error: e3 } = await supabase.from("agendamentos")
+      const { error: e3 } = await supabase
+        .from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
         .eq("id", openCobranca.id);
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
       setOpenCobranca(null);
       setCobrancaLinhas([linhaVazia()]);
-      void load(); void loadFilaCaixa();
+      void load();
+      void loadFilaCaixa();
     } catch (err) {
       // Rollback dos inserts já feitos neste ciclo para evitar orfãos
       // (caixa sem lançamento ou lançamento sem caixa).
@@ -1354,7 +1641,9 @@ function Page() {
         );
       }
       mostrarErro(err);
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadTodos = useCallback(async () => {
@@ -1386,20 +1675,29 @@ function Page() {
 
     // Lista de operadores que abriram caixa
     const nomes = new Map<string, string>();
-    sess.forEach((s) => { if (s.user_id) nomes.set(s.user_id, s.user_nome || s.user_id.slice(0, 8)); });
+    sess.forEach((s) => {
+      if (s.user_id) nomes.set(s.user_id, s.user_nome || s.user_id.slice(0, 8));
+    });
     setUsersList(Array.from(nomes.entries()).map(([user_id, nome]) => ({ user_id, nome })));
   }, [clinicaAtual, isManager, fIni, fFim, fUserId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
   // Sincronia em tempo real: qualquer despesa/receita lançada no Financeiro
   // (ou movimento de caixa de outro operador) atualiza na hora o resumo do dia,
   // as Saídas e o saldo atual.
   useRealtimeRefresh(["fin_lancamentos", "caixa_movimentos"], load);
-  useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
+  useEffect(() => {
+    if (tab === "todos") void loadTodos();
+  }, [tab, loadTodos]);
 
   // Membros da clínica para o seletor de destino de sangria/suprimento
   useEffect(() => {
-    if (!clinicaAtual) { setMembrosClinica([]); return; }
+    if (!clinicaAtual) {
+      setMembrosClinica([]);
+      return;
+    }
     let alive = true;
     void (async () => {
       const { data: memb } = await supabase
@@ -1408,17 +1706,19 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true);
       const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
-      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, nome")
-        .in("id", ids);
+      if (!ids.length) {
+        if (alive) setMembrosClinica([]);
+        return;
+      }
+      const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
       const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
         .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       if (alive) setMembrosClinica(list);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [clinicaAtual?.clinica_id]);
 
   // Calculos
@@ -1432,10 +1732,7 @@ function Page() {
       if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
         if (m.tipo === "recebimento") return acc;
         if (m.tipo === "estorno") return acc;
-        if (
-          m.tipo === "sangria" &&
-          (m.descricao ?? "").toLowerCase().startsWith("estorno")
-        ) {
+        if (m.tipo === "sangria" && (m.descricao ?? "").toLowerCase().startsWith("estorno")) {
           return acc;
         }
       }
@@ -1445,10 +1742,18 @@ function Page() {
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
-      abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0, reabertura: 0,
+      abertura: 0,
+      sangria: 0,
+      suprimento: 0,
+      recebimento: 0,
+      despesa: 0,
+      fechamento: 0,
+      estorno: 0,
+      reabertura: 0,
     };
-    minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
+    minhasMovs.forEach((m) => {
+      r[m.tipo] += Number(m.valor || 0);
+    });
     return r;
   }, [minhasMovs]);
 
@@ -1456,29 +1761,39 @@ function Page() {
   // vinculados às movimentações da sessão atual. Chave = lancamento_id.
   const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
   // Composição estruturada por lançamento (falha 2.8). `null` = legado/sem dado.
-  const [mistoComp, setMistoComp] = useState<Record<string, Partial<Record<FormaBucket, number>> | null>>({});
+  const [mistoComp, setMistoComp] = useState<
+    Record<string, Partial<Record<FormaBucket, number>> | null>
+  >({});
   // Flag por clínica: quando ligada, a decomposição usa o dado estruturado e
   // o resíduo sem fonte confiável vai para "Indeterminado" em vez de Dinheiro.
   // Desligar a flag restaura o comportamento antigo (rollback sem deploy).
   const { enabled: mistoEstruturado } = useClinicFeatureFlag("caixa_misto_estruturado");
   const residualBucket: FormaBucket = mistoEstruturado ? "indeterminado" : "dinheiro";
   /** Partes decompostas de um movimento "misto": estruturado → observação. */
-  const partesDoMov = useCallback((m: { lancamento_id?: string | null }): Partial<Record<FormaBucket, number>> => {
-    const id = m.lancamento_id ?? undefined;
-    if (!id) return {};
-    if (mistoEstruturado) {
-      const est = mistoComp[id];
-      if (est) return est;
-    }
-    return decomporMistoObs(mistoObs[id]);
-  }, [mistoComp, mistoObs, mistoEstruturado]);
+  const partesDoMov = useCallback(
+    (m: { lancamento_id?: string | null }): Partial<Record<FormaBucket, number>> => {
+      const id = m.lancamento_id ?? undefined;
+      if (!id) return {};
+      if (mistoEstruturado) {
+        const est = mistoComp[id];
+        if (est) return est;
+      }
+      return decomporMistoObs(mistoObs[id]);
+    },
+    [mistoComp, mistoObs, mistoEstruturado],
+  );
   const mistoLancIds = useMemo(() => {
     const ids = new Set<string>();
-    const scan = (arr: Mov[]) => arr.forEach((m) => {
-      if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
-        ids.add(m.lancamento_id);
-      }
-    });
+    const scan = (arr: Mov[]) =>
+      arr.forEach((m) => {
+        if (
+          m.tipo === "recebimento" &&
+          normalizarForma(m.forma_pagamento) === "misto" &&
+          m.lancamento_id
+        ) {
+          ids.add(m.lancamento_id);
+        }
+      });
     scan(minhasMovs);
     scan(detalheMovs);
     scan(todosMovs);
@@ -1489,8 +1804,10 @@ function Page() {
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
     if (pendentes.length === 0) return;
     (async () => {
-      const { data } = await supabase.from("fin_lancamentos")
-        .select("id, observacoes, composicao_pagamento").in("id", pendentes);
+      const { data } = await supabase
+        .from("fin_lancamentos")
+        .select("id, observacoes, composicao_pagamento")
+        .in("id", pendentes);
       if (!alive || !data) return;
       setMistoComp((prev) => {
         const next = { ...prev };
@@ -1508,7 +1825,9 @@ function Page() {
         return next;
       });
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [mistoLancIds, mistoObs]);
 
   // Resolve nomes de usuários referenciados por movimentos e enriquecimentos
@@ -1516,12 +1835,17 @@ function Page() {
   // e cacheia no state para evitar refetch a cada re-render.
   useEffect(() => {
     const alvo = new Set<string>();
-    const scanMovs = (arr: Mov[]) => arr.forEach((m) => { if (m.user_id) alvo.add(m.user_id); });
+    const scanMovs = (arr: Mov[]) =>
+      arr.forEach((m) => {
+        if (m.user_id) alvo.add(m.user_id);
+      });
     scanMovs(minhasMovs);
     scanMovs(minhasMovsHist);
     scanMovs(detalheMovs);
     scanMovs(todosMovs);
-    enrichPorLanc.forEach((e) => { if (e.faturado_por_id) alvo.add(e.faturado_por_id); });
+    enrichPorLanc.forEach((e) => {
+      if (e.faturado_por_id) alvo.add(e.faturado_por_id);
+    });
     const pendentes = Array.from(alvo).filter((id) => !userNamesById.has(id));
     if (pendentes.length === 0) return;
     let alive = true;
@@ -1529,7 +1853,7 @@ function Page() {
       const acc = new Map<string, string>();
       for (const ids of chunkArray(pendentes, 200)) {
         const { data } = await supabase.from("profiles").select("id, nome").in("id", ids);
-        for (const p of ((data ?? []) as Array<{ id: string; nome: string | null }>)) {
+        for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
           acc.set(p.id, (p.nome ?? "").trim() || p.id.slice(0, 8));
         }
         // marca também os não retornados para não refazer o fetch em loop
@@ -1542,26 +1866,39 @@ function Page() {
         return next;
       });
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [minhasMovs, minhasMovsHist, detalheMovs, todosMovs, enrichPorLanc, userNamesById]);
 
   /** Retorna o nome de quem faturou o movimento (prioriza
    *  fin_lancamentos.criado_por → autor real do lançamento; fallback para
    *  caixa_movimentos.user_id → operador do caixa que registrou o mov). */
-  const usuarioNomeFor = useCallback((m: Mov): string => {
-    const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-    const uid = enr?.faturado_por_id ?? m.user_id ?? null;
-    if (!uid) return "—";
-    return userNamesById.get(uid) ?? "…";
-  }, [enrichPorLanc, userNamesById]);
+  const usuarioNomeFor = useCallback(
+    (m: Mov): string => {
+      const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+      const uid = enr?.faturado_por_id ?? m.user_id ?? null;
+      if (!uid) return "—";
+      return userNamesById.get(uid) ?? "…";
+    },
+    [enrichPorLanc, userNamesById],
+  );
 
   // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
   // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
   // "misto" são decompostos pelas observações do fin_lancamento.
   const entradasPorForma = useMemo(() => {
     const r: Record<string, number> & { total: number } = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0, total: 0,
+      dinheiro: 0,
+      pix: 0,
+      debito: 0,
+      credito: 0,
+      boleto: 0,
+      transferencia: 0,
+      convenio: 0,
+      outros: 0,
+      indeterminado: 0,
+      total: 0,
     };
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
@@ -1590,8 +1927,8 @@ function Page() {
   // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
   // entradas agrupadas por forma de pagamento.
   interface DiaResumo {
-    dia: string;                // YYYY-MM-DD
-    label: string;              // dd/mm/yyyy
+    dia: string; // YYYY-MM-DD
+    label: string; // dd/mm/yyyy
     entradas: number;
     saidas: number;
     saldo: number;
@@ -1600,15 +1937,29 @@ function Page() {
   const resumoPorDia = useMemo<DiaResumo[]>(() => {
     const mapa = new Map<string, DiaResumo>();
     const bucketInit = (): Record<string, number> => ({
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
+      dinheiro: 0,
+      pix: 0,
+      debito: 0,
+      credito: 0,
+      boleto: 0,
+      transferencia: 0,
+      convenio: 0,
+      outros: 0,
+      indeterminado: 0,
     });
     for (const m of minhasMovs) {
       const d = new Date(m.created_at);
       const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       let r = mapa.get(dia);
       if (!r) {
-        r = { dia, label: d.toLocaleDateString("pt-BR"), entradas: 0, saidas: 0, saldo: 0, porForma: bucketInit() };
+        r = {
+          dia,
+          label: d.toLocaleDateString("pt-BR"),
+          entradas: 0,
+          saidas: 0,
+          saldo: 0,
+          porForma: bucketInit(),
+        };
         mapa.set(dia, r);
       }
       const v = Number(m.valor || 0);
@@ -1625,7 +1976,8 @@ function Page() {
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma[residualBucket] = (r.porForma[residualBucket] ?? 0) + resto;
+          if (Math.abs(resto) > 0.005)
+            r.porForma[residualBucket] = (r.porForma[residualBucket] ?? 0) + resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
@@ -1655,13 +2007,21 @@ function Page() {
   }, [minhasMovs, dataFechamento]);
   const saldoDoDiaFechamento = useMemo(() => {
     return movsDoDiaFechamento.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0,
+      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
+      0,
     );
   }, [movsDoDiaFechamento]);
   const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
+      dinheiro: 0,
+      pix: 0,
+      debito: 0,
+      credito: 0,
+      boleto: 0,
+      transferencia: 0,
+      convenio: 0,
+      outros: 0,
+      indeterminado: 0,
     };
     movsDoDiaFechamento.forEach((m) => {
       // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
@@ -1674,9 +2034,9 @@ function Page() {
         m.tipo !== "estorno" &&
         m.tipo !== "sangria" &&
         m.tipo !== "despesa"
-      ) return;
-      const sinal =
-        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
+      )
+        return;
+      const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
@@ -1699,35 +2059,53 @@ function Page() {
   }, [movsDoDiaFechamento, partesDoMov, residualBucket]);
 
   // Calculo por sessao (todos)
-  const calcSaldoSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid)
-      .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
-  }, [todosMovs]);
+  const calcSaldoSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid)
+        .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
 
   // Totais auxiliares por sessao
-  const calcSangriaSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
-      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-  }, [todosMovs]);
-  const calcEstornoSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
-      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-  }, [todosMovs]);
+  const calcSangriaSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
+        .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
+  const calcEstornoSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
+        .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
 
   // ============ Agrupamento por operador × dia ============
   // Um mesmo turno pode atravessar a meia-noite; a listagem mostra uma linha
   // por dia, com os movimentos, sangrias, informado e diferença daquele dia
   // específico. Cada dia = "um caixa" com abertura e fechamento próprios.
   type LinhaDia = {
-    key: string; user_id: string; user_nome: string; data: string;
-    primeiraAbertura: string | null; ultimoFechamento: string | null;
+    key: string;
+    user_id: string;
+    user_nome: string;
+    data: string;
+    primeiraAbertura: string | null;
+    ultimoFechamento: string | null;
     statusDia: "aberto" | "fechado";
-    valorAbertura: number; calculado: number; informado: number;
-    sangria: number; estorno: number; diferenca: number;
-    sessoes: Sessao[]; sessaoAbertaId: string | null;
+    valorAbertura: number;
+    calculado: number;
+    informado: number;
+    sangria: number;
+    estorno: number;
+    diferenca: number;
+    sessoes: Sessao[];
+    sessaoAbertaId: string | null;
   };
   const localDate = (iso: string | null | undefined): string | null => {
     if (!iso) return null;
@@ -1750,12 +2128,21 @@ function Page() {
       let b = buckets.get(k);
       if (!b) {
         b = {
-          key: k, user_id: uid, user_nome: nome, data,
-          primeiraAbertura: null, ultimoFechamento: null,
+          key: k,
+          user_id: uid,
+          user_nome: nome,
+          data,
+          primeiraAbertura: null,
+          ultimoFechamento: null,
           statusDia: "fechado",
-          valorAbertura: 0, calculado: 0, informado: 0,
-          sangria: 0, estorno: 0, diferenca: 0,
-          sessoes: [], sessaoAbertaId: null,
+          valorAbertura: 0,
+          calculado: 0,
+          informado: 0,
+          sangria: 0,
+          estorno: 0,
+          diferenca: 0,
+          sessoes: [],
+          sessaoAbertaId: null,
         };
         buckets.set(k, b);
       }
@@ -1768,7 +2155,8 @@ function Page() {
         const b = get(s.user_id, nome, dAb);
         b.sessoes.push(s);
         b.valorAbertura += Number(s.valor_abertura || 0);
-        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura) b.primeiraAbertura = s.aberto_em;
+        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura)
+          b.primeiraAbertura = s.aberto_em;
         if (s.status === "aberto") {
           b.statusDia = "aberto";
           if (!b.sessaoAbertaId) b.sessaoAbertaId = s.id;
@@ -1780,7 +2168,8 @@ function Page() {
         if (!b.sessoes.some((x) => x.id === s.id)) b.sessoes.push(s);
         b.informado += Number(s.valor_fechamento_informado || 0);
         b.diferenca += Number(s.diferenca || 0);
-        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento) b.ultimoFechamento = s.fechado_em;
+        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento)
+          b.ultimoFechamento = s.fechado_em;
       }
     }
     for (const m of movs) {
@@ -1812,41 +2201,51 @@ function Page() {
   // Total recebido/suprido por forma de pagamento em uma sessão qualquer
   // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
   // lançamento já foram carregadas via `mistoObs`.
-  const entradasPorFormaSessao = useCallback((sid: string) => {
-    const r: Record<string, number> = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
-    };
-    todosMovs.forEach((m) => {
-      if (m.sessao_id !== sid) return;
-      // Saldo líquido por forma na sessão (usado nos modais de fechamento):
-      // entradas − saídas por forma, para bater com o saldo do caixa.
-      if (
-        m.tipo !== "recebimento" &&
-        m.tipo !== "suprimento" &&
-        m.tipo !== "estorno" &&
-        m.tipo !== "sangria" &&
-        m.tipo !== "despesa"
-      ) return;
-      const sinal =
-        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-      const v = Number(m.valor || 0) * sinal;
-      const bucket = bucketDeMov(m);
-      if (bucket === "misto") {
-        const partes = partesDoMov(m);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-          somado += (val ?? 0) * sinal;
+  const entradasPorFormaSessao = useCallback(
+    (sid: string) => {
+      const r: Record<string, number> = {
+        dinheiro: 0,
+        pix: 0,
+        debito: 0,
+        credito: 0,
+        boleto: 0,
+        transferencia: 0,
+        convenio: 0,
+        outros: 0,
+        indeterminado: 0,
+      };
+      todosMovs.forEach((m) => {
+        if (m.sessao_id !== sid) return;
+        // Saldo líquido por forma na sessão (usado nos modais de fechamento):
+        // entradas − saídas por forma, para bater com o saldo do caixa.
+        if (
+          m.tipo !== "recebimento" &&
+          m.tipo !== "suprimento" &&
+          m.tipo !== "estorno" &&
+          m.tipo !== "sangria" &&
+          m.tipo !== "despesa"
+        )
+          return;
+        const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
+        const v = Number(m.valor || 0) * sinal;
+        const bucket = bucketDeMov(m);
+        if (bucket === "misto") {
+          const partes = partesDoMov(m);
+          let somado = 0;
+          for (const [k, val] of Object.entries(partes)) {
+            r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+            somado += (val ?? 0) * sinal;
+          }
+          const resto = v - somado;
+          if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
+        } else {
+          r[bucket] = (r[bucket] ?? 0) + v;
         }
-        const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-      } else {
-        r[bucket] = (r[bucket] ?? 0) + v;
-      }
-    });
-    return r;
-  }, [todosMovs, partesDoMov, residualBucket]);
+      });
+      return r;
+    },
+    [todosMovs, partesDoMov, residualBucket],
+  );
 
   // ===== Resumo do turno atual (cartões por forma + gaveta física) =====
   // Base: movimentos reais da minha sessão (exclui despesas virtuais do
@@ -1858,8 +2257,15 @@ function Page() {
   /** Saldo líquido por forma de pagamento no turno atual. */
   const porFormaSessaoAtual = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
+      dinheiro: 0,
+      pix: 0,
+      debito: 0,
+      credito: 0,
+      boleto: 0,
+      transferencia: 0,
+      convenio: 0,
+      outros: 0,
+      indeterminado: 0,
     };
     movsSessaoAtual.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "estorno") return;
@@ -1906,16 +2312,17 @@ function Page() {
 
   /** Linha do tempo de sangrias e suprimentos do turno atual. */
   const movsGaveta = useMemo(
-    () => movsSessaoAtual
-      .filter((m) => m.tipo === "sangria" || m.tipo === "suprimento")
-      .map((m) => ({
-        id: m.id,
-        tipo: m.tipo as "sangria" | "suprimento",
-        valor: Number(m.valor || 0),
-        descricao: m.descricao ?? null,
-        created_at: m.created_at,
-      }))
-      .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    () =>
+      movsSessaoAtual
+        .filter((m) => m.tipo === "sangria" || m.tipo === "suprimento")
+        .map((m) => ({
+          id: m.id,
+          tipo: m.tipo as "sangria" | "suprimento",
+          valor: Number(m.valor || 0),
+          descricao: m.descricao ?? null,
+          created_at: m.created_at,
+        }))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
     [movsSessaoAtual],
   );
 
@@ -1979,65 +2386,91 @@ function Page() {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
     const v = Number(movValor) || 0;
-    if (v <= 0) { toast.error("Informe um valor"); return; }
+    if (v <= 0) {
+      toast.error("Informe um valor");
+      return;
+    }
     const ehPagto = openMov.tipo === "recebimento" || openMov.tipo === "despesa";
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
-      toast.error("Selecione a bandeira do cartão"); return;
+      toast.error("Selecione a bandeira do cartão");
+      return;
     }
     const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
     if (ehTransfer && !movDestinoUserId) {
-      toast.error(openMov.tipo === "sangria"
-        ? "Selecione a quem o dinheiro está sendo entregue"
-        : "Selecione de quem o dinheiro está sendo recebido");
+      toast.error(
+        openMov.tipo === "sangria"
+          ? "Selecione a quem o dinheiro está sendo entregue"
+          : "Selecione de quem o dinheiro está sendo recebido",
+      );
       return;
     }
     // A descrição é o registro do motivo/referência do lançamento manual e é
     // obrigatória em todos os tipos (mínimo de 3 caracteres).
     if (movDesc.trim().length < 3) {
       setMovDescTouched(true);
-      toast.error(openMov.tipo === "estorno"
-        ? "Descreva o motivo/paciente do estorno"
-        : "Descrição é obrigatória (mínimo 3 caracteres)");
+      toast.error(
+        openMov.tipo === "estorno"
+          ? "Descreva o motivo/paciente do estorno"
+          : "Descrição é obrigatória (mínimo 3 caracteres)",
+      );
       return;
     }
     const destinoNome = ehTransfer
       ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
       : null;
-    const sufixoDestino = ehTransfer && destinoNome
-      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
-      : "";
+    const sufixoDestino =
+      ehTransfer && destinoNome
+        ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
+        : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
-    const { data: movRow, error } = await supabase.from("caixa_movimentos").insert({
-      sessao_id: minhaSessao.id,
-      clinica_id: clinicaAtual.clinica_id,
-      user_id: user.id,
-      tipo: openMov.tipo,
-      valor: v,
-      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
-      forma_pagamento: ehPagto ? movForma : null,
-      destino_user_id: ehTransfer ? movDestinoUserId : null,
-      destino_nome: ehTransfer ? destinoNome : null,
-    }).select("id").single();
-    if (error || !movRow) { setSaving(false); mostrarErro(error); return; }
+    const { data: movRow, error } = await supabase
+      .from("caixa_movimentos")
+      .insert({
+        sessao_id: minhaSessao.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: openMov.tipo,
+        valor: v,
+        descricao: (movDesc || "") + sufixoCartao + sufixoDestino || null,
+        forma_pagamento: ehPagto ? movForma : null,
+        destino_user_id: ehTransfer ? movDestinoUserId : null,
+        destino_nome: ehTransfer ? destinoNome : null,
+      })
+      .select("id")
+      .single();
+    if (error || !movRow) {
+      setSaving(false);
+      mostrarErro(error);
+      return;
+    }
     // Recebimento/despesa manuais são receita/despesa real (diferente de
     // sangria/suprimento, que só transferem dinheiro dentro do caixa) — sem um
     // fin_lancamentos vinculado, o valor nunca aparecia em Financeiro >
     // Movimento (que só importa sangria/suprimento de caixa_movimentos).
     if (openMov.tipo === "recebimento" || openMov.tipo === "despesa") {
-      const { data: lanc, error: eLanc } = await supabase.from("fin_lancamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        tipo: openMov.tipo === "recebimento" ? "receita" : "despesa",
-        valor: v,
-        descricao: `[Caixa] ${(movDesc || TIPO_LABEL[openMov.tipo]) + sufixoCartao}`,
-        forma_pagamento: movForma,
-        status: "confirmado",
-        criado_por: user.id,
-      }).select("id").single();
+      const { data: lanc, error: eLanc } = await supabase
+        .from("fin_lancamentos")
+        .insert({
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: openMov.tipo === "recebimento" ? "receita" : "despesa",
+          valor: v,
+          descricao: `[Caixa] ${(movDesc || TIPO_LABEL[openMov.tipo]) + sufixoCartao}`,
+          forma_pagamento: movForma,
+          status: "confirmado",
+          criado_por: user.id,
+        })
+        .select("id")
+        .single();
       if (eLanc) {
-        toast.warning("Movimento de caixa registrado, mas falhou ao vincular ao financeiro — registre manualmente em Financeiro > Movimento.");
+        toast.warning(
+          "Movimento de caixa registrado, mas falhou ao vincular ao financeiro — registre manualmente em Financeiro > Movimento.",
+        );
       } else if (lanc) {
-        await supabase.from("caixa_movimentos").update({ lancamento_id: lanc.id }).eq("id", movRow.id);
+        await supabase
+          .from("caixa_movimentos")
+          .update({ lancamento_id: lanc.id })
+          .eq("id", movRow.id);
       }
     }
     setSaving(false);
@@ -2045,14 +2478,19 @@ function Page() {
     setMovDescTouched(false);
     const tipoLancado = openMov.tipo;
     const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
-    setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
+    setMovValor("");
+    setMovDesc("");
+    setMovForma("dinheiro");
+    setMovBandeira("");
+    setMovParcelas("1");
+    setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
     if (tipoLancado === "sangria" || tipoLancado === "suprimento" || tipoLancado === "estorno") {
       printComprovanteCaixa({
         tipo: tipoLancado,
         clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
-        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
+        operadorNome:
+          minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
         valor: v,
         descricao: descLancada || null,
         destinoNome,
@@ -2070,9 +2508,10 @@ function Page() {
     const diff = informado - saldoRef;
     // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
     const hoje = new Date().toISOString().slice(0, 10);
-    const fechadoEmISO = dataFechamento && dataFechamento !== hoje
-      ? new Date(`${dataFechamento}T23:59:59`).toISOString()
-      : new Date().toISOString();
+    const fechadoEmISO =
+      dataFechamento && dataFechamento !== hoje
+        ? new Date(`${dataFechamento}T23:59:59`).toISOString()
+        : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
@@ -2099,10 +2538,15 @@ function Page() {
       });
     }
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setOpenFechar(false);
     const obsFinal = obsFechamento;
-    setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
+    setValorInformado("");
+    setObsFechamento("");
+    setConferidoOwn({});
     setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
     // Comprovante escopado ao dia selecionado.
@@ -2125,7 +2569,10 @@ function Page() {
       saldoInicial: Number(minhaSessao.valor_abertura || 0),
       esperadoGaveta,
       movimentos: movsGaveta.map((m) => ({
-        tipo: m.tipo, valor: m.valor, descricao: m.descricao, created_at: m.created_at,
+        tipo: m.tipo,
+        valor: m.valor,
+        descricao: m.descricao,
+        created_at: m.created_at,
       })),
     });
     void load();
@@ -2142,16 +2589,17 @@ function Page() {
       const n = Number(v) || 0;
       if (Math.abs(n) > 0.005) conferidoNum[k] = n;
     }
-    const informado = Object.values(conferidoNum).reduce((a, x) => a + x, 0)
-      || (Number(informadoTerceiro) || 0);
+    const informado =
+      Object.values(conferidoNum).reduce((a, x) => a + x, 0) || Number(informadoTerceiro) || 0;
     const diff = informado - calc;
     const breakdownStr = Object.entries(conferidoNum)
       .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
       .join("; ");
     const hoje = new Date().toISOString().slice(0, 10);
-    const fechadoEmISO = dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
-      ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
-      : new Date().toISOString();
+    const fechadoEmISO =
+      dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
+        ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
+        : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
@@ -2178,7 +2626,10 @@ function Page() {
       });
     }
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setOpenFecharTerceiro(null);
     setInformadoTerceiro("");
     setObsTerceiro("");
@@ -2207,7 +2658,10 @@ function Page() {
     const alvo = openReabrir;
     if (!alvo || !clinicaAtual || !user) return;
     const motivo = motivoReabrir.trim();
-    if (!motivo) { toast.error("Informe o motivo da reabertura."); return; }
+    if (!motivo) {
+      toast.error("Informe o motivo da reabertura.");
+      return;
+    }
     const executorNome = user.user_metadata?.nome || user.email || "gestor";
     const agora = new Date();
     const marcador = `[Reaberto por ${executorNome} em ${agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} — ${motivo}]`;
@@ -2236,7 +2690,10 @@ function Page() {
         .eq("tipo", "fechamento");
     }
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setOpenReabrir(null);
     setMotivoReabrir("");
     toast.success("Fechamento desfeito. O caixa foi reaberto.");
@@ -2249,9 +2706,7 @@ function Page() {
   // fechamento como feito pelo gestor.
   const fecharLote = async () => {
     if (!clinicaAtual || !user) return;
-    const alvos = todasSessoes.filter(
-      (s) => s.status === "aberto" && loteSelecionados[s.id],
-    );
+    const alvos = todasSessoes.filter((s) => s.status === "aberto" && loteSelecionados[s.id]);
     if (alvos.length === 0) {
       toast.error("Selecione ao menos um caixa aberto para fechar.");
       return;
@@ -2273,7 +2728,10 @@ function Page() {
           observacoes: `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado em lote por ${gestorNome}]${obsLote ? " " + obsLote : ""}`,
         })
         .eq("id", alvo.id);
-      if (error) { fail += 1; continue; }
+      if (error) {
+        fail += 1;
+        continue;
+      }
       await supabase.from("caixa_movimentos").insert({
         sessao_id: alvo.id,
         clinica_id: clinicaAtual.clinica_id,
@@ -2307,24 +2765,45 @@ function Page() {
 
   const imprimirRelatorioMovs = (movs: Mov[], periodo: string, subtitulo?: string) => {
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
     type Cat = { label: string; pagamento: number; recebimento: number };
     const cats = new Map<string, Cat>();
-    let totPag = 0, totReceb = 0;
+    let totPag = 0,
+      totReceb = 0;
     for (const m of movs) {
       if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const key = TIPO_LABEL[m.tipo];
       const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
-      if (TIPO_SINAL[m.tipo] < 0) { cat.pagamento += v; totPag += v; }
-      else if (TIPO_SINAL[m.tipo] > 0) { cat.recebimento += v; totReceb += v; }
+      if (TIPO_SINAL[m.tipo] < 0) {
+        cat.pagamento += v;
+        totPag += v;
+      } else if (TIPO_SINAL[m.tipo] > 0) {
+        cat.recebimento += v;
+        totReceb += v;
+      }
       cats.set(key, cat);
     }
     let acc = 0;
-    const linhasCat = Array.from(cats.values()).map((c) => {
-      acc += c.recebimento - c.pagamento;
-      return '<tr><td>' + esc(c.label) + '</td><td style="text-align:right;">' + fmt(c.pagamento) + '</td><td style="text-align:right;">' + fmt(c.recebimento) + '</td><td style="text-align:right;">' + fmt(acc) + '</td></tr>';
-    }).join("");
+    const linhasCat = Array.from(cats.values())
+      .map((c) => {
+        acc += c.recebimento - c.pagamento;
+        return (
+          "<tr><td>" +
+          esc(c.label) +
+          '</td><td style="text-align:right;">' +
+          fmt(c.pagamento) +
+          '</td><td style="text-align:right;">' +
+          fmt(c.recebimento) +
+          '</td><td style="text-align:right;">' +
+          fmt(acc) +
+          "</td></tr>"
+        );
+      })
+      .join("");
     type Forma = { label: string; pagamento: number; recebimento: number };
     const formas = new Map<string, Forma>();
     for (const m of movs) {
@@ -2338,7 +2817,9 @@ function Page() {
       // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
       // de agrupar tudo em "MISTO".
       const partes = bucket === "misto" ? partesDoMov(m) : {};
-      const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
+      const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<
+        [FormaBucket, number]
+      >;
       const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
       if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
         for (const [k, val] of entradas) {
@@ -2360,33 +2841,88 @@ function Page() {
       }
     }
     let accF = 0;
-    const linhasForma = Array.from(formas.values()).map((f) => {
-      accF += f.recebimento - f.pagamento;
-      return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
-    }).join("");
-    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura").length;
+    const linhasForma = Array.from(formas.values())
+      .map((f) => {
+        accF += f.recebimento - f.pagamento;
+        return (
+          "<tr><td>" +
+          esc(f.label) +
+          '</td><td style="text-align:right;">' +
+          fmt(f.pagamento) +
+          '</td><td style="text-align:right;">' +
+          fmt(f.recebimento) +
+          '</td><td style="text-align:right;">' +
+          fmt(accF) +
+          "</td></tr>"
+        );
+      })
+      .join("");
+    const qtd = movs.filter(
+      (m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura",
+    ).length;
     const reaberturas = movs.filter((m) => m.tipo === "reabertura");
-    const linhasReabertura = reaberturas.length === 0 ? "" :
-      '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
-      reaberturas.map((m) => '<li>' + esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })) + ' — ' + esc(m.descricao || "sem detalhes") + '</li>').join("") +
-      '</ul></div>';
+    const linhasReabertura =
+      reaberturas.length === 0
+        ? ""
+        : '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
+          reaberturas
+            .map(
+              (m) =>
+                "<li>" +
+                esc(
+                  new Date(m.created_at).toLocaleString("pt-BR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  }),
+                ) +
+                " — " +
+                esc(m.descricao || "sem detalhes") +
+                "</li>",
+            )
+            .join("") +
+          "</ul></div>";
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-    const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
-    const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
+    const style =
+      "body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}";
+    const empty =
+      '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
     const html =
-      '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' + style + '</style></head><body>' +
-      '<div class="meta"><span>Emitido: ' + esc(emissao) + '</span></div>' +
-      '<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>' +
-      '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' + esc(periodo) + '</span><span>Agrupar: CATEGORIA</span></div>' +
-      (subtitulo ? '<div class="meta"><span>' + esc(subtitulo) + '</span></div>' : '') +
-      '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasCat || empty) + '</tbody></table>' +
-      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
-      '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
-      '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
+      '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' +
+      style +
+      "</style></head><body>" +
+      '<div class="meta"><span>Emitido: ' +
+      esc(emissao) +
+      "</span></div>" +
+      "<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>" +
+      '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' +
+      esc(periodo) +
+      "</span><span>Agrupar: CATEGORIA</span></div>" +
+      (subtitulo ? '<div class="meta"><span>' + esc(subtitulo) + "</span></div>" : "") +
+      '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
+      (linhasCat || empty) +
+      "</tbody></table>" +
+      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
+      (linhasForma || empty) +
+      "</tbody>" +
+      '<tfoot><tr><td>TOTAL</td><td class="right">' +
+      fmt(totPag) +
+      '</td><td class="right">' +
+      fmt(totReceb) +
+      '</td><td class="right">' +
+      fmt(totReceb - totPag) +
+      "</td></tr></tfoot></table>" +
+      '<div class="meta"><span>' +
+      qtd +
+      " registro" +
+      (qtd === 1 ? "" : "s") +
+      "</span></div>" +
       linhasReabertura +
-      '<script>window.onload=function(){window.print();}</script></body></html>';
+      "<script>window.onload=function(){window.print();}</script></body></html>";
     const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    if (!w) {
+      toast.error("Bloqueador de pop-up impediu a impressão");
+      return;
+    }
     w.document.write(html);
     w.document.close();
   };
@@ -2412,7 +2948,10 @@ function Page() {
     if (!openDetalhe) return;
     const rows = detalheMovs.map((m) => ({
       Data: new Date(m.created_at).toLocaleDateString("pt-BR"),
-      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
@@ -2427,8 +2966,13 @@ function Page() {
     if (!openDetalhe) return;
     const s = openDetalhe;
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-    const linhas = detalheMovs.map((m) => `
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
+    const linhas = detalheMovs
+      .map(
+        (m) => `
       <tr>
         <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
         <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
@@ -2437,7 +2981,9 @@ function Page() {
         <td>${esc(m.forma_pagamento ?? "—")}</td>
         <td>${esc(usuarioNomeFor(m))}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
-      </tr>`).join("");
+      </tr>`,
+      )
+      .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
       <title>Sessão de caixa</title>
       <style>
@@ -2464,7 +3010,10 @@ function Page() {
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
     const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    if (!w) {
+      toast.error("Bloqueador de pop-up impediu a impressão");
+      return;
+    }
     w.document.write(html);
     w.document.close();
   };
@@ -2508,7 +3057,12 @@ function Page() {
 
         {/* ===================== MEU CAIXA ===================== */}
         <TabsContent value="meu" className="space-y-4 pt-4">
-          {loading && <ListSkeleton rows={4} fallback={<p className="text-sm text-muted-foreground">Carregando…</p>} />}
+          {loading && (
+            <ListSkeleton
+              rows={4}
+              fallback={<p className="text-sm text-muted-foreground">Carregando…</p>}
+            />
+          )}
 
           {!loading && (
             <Tabs defaultValue="saldo" className="w-full">
@@ -2543,124 +3097,196 @@ function Page() {
                   </Card>
                 ) : (
                   <>
-              {/* Barra de ações — sangria/suprimento em destaque no topo */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "suprimento" })}>
-                    <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "sangria" })}>
-                    <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
-                  </button>
-                  <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "estorno" })}>
-                    <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
-                  </button>
-                  {podeLancarRecebDespesa && (
-                    <>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "recebimento" })}>
-                        <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors" onClick={() => setOpenMov({ tipo: "despesa" })}>
-                        <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
-                      </button>
-                    </>
-                  )}
-                </div>
-                <button type="button" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer" onClick={() => {
-                  setValorInformado(esperadoGaveta.toFixed(2));
-                  if (minhaSessao) {
-                    const inicial: Record<string, string> = {};
-                    for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
-                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                    }
-                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                    setConferidoOwn(inicial);
-                  }
-                  setOpenFechar(true);
-                }}>
-                  <Lock className="h-4 w-4" /> Conferir e fechar caixa
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { key: "saldo", label: "Saldo atual", value: saldoAtual, cls: "text-indigo-950" },
-                  { key: "abertura", label: "Abertura", value: minhaSessao.valor_abertura, cls: "text-slate-800" },
-                  { key: "entradas", label: "Entradas", value: resumoTipos.suprimento + resumoTipos.recebimento, cls: "text-emerald-600" },
-                  { key: "saidas", label: "Saídas", value: resumoTipos.sangria + resumoTipos.despesa, cls: "text-rose-600" },
-                ].map((kpi) => (
-                  <button
-                    key={kpi.key}
-                    type="button"
-                    onClick={() => setCaixaDrill(kpi.key as "saldo" | "abertura" | "entradas" | "saidas")}
-                    className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex flex-col justify-between gap-2 text-left hover:border-slate-300 transition-colors cursor-pointer"
-                  >
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{kpi.label}</span>
-                    <span className={`text-2xl font-bold tabular-nums ${kpi.cls}`}>{fmt(kpi.value)}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Quebra por forma de pagamento + memória de cálculo da gaveta */}
-              <ResumoFormas porForma={porFormaSessaoAtual} gaveta={gavetaSessaoAtual} />
-
-              {/* Linha do tempo de sangrias e suprimentos do turno */}
-              <TimelineGaveta
-                movimentos={movsGaveta}
-                onNovaSangria={() => setOpenMov({ tipo: "sangria" })}
-                onNovoSuprimento={() => setOpenMov({ tipo: "suprimento" })}
-              />
-
-              <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs mt-4 space-y-3">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Movimentação por dia</div>
-                <div className="space-y-4">
-                  {resumoPorDia.length === 0 ? (
-                    <p className="text-sm text-slate-400">Sem movimentações nesta sessão.</p>
-                  ) : resumoPorDia.map((d) => {
-                    const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
-                      { label: "Dinheiro", value: d.porForma.dinheiro ?? 0, sempre: true },
-                      { label: "PIX", value: d.porForma.pix ?? 0, sempre: true },
-                      { label: "Débito", value: d.porForma.debito ?? 0, sempre: true },
-                      { label: "Crédito", value: d.porForma.credito ?? 0, sempre: true },
-                      { label: "Boleto", value: d.porForma.boleto ?? 0 },
-                      { label: "Transferência", value: d.porForma.transferencia ?? 0 },
-                      { label: "Convênio", value: d.porForma.convenio ?? 0 },
-                      { label: "Outros", value: d.porForma.outros ?? 0 },
-                    ];
-                    const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
-                    return (
-                      <div key={d.dia} className="rounded-lg border border-slate-200/70 p-3 space-y-3 bg-white">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <div className="font-semibold text-sm text-slate-800 flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 text-slate-400" />
-                            {d.label}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 text-xs tabular-nums">
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700">
-                              Entradas: {fmt(d.entradas)}
-                            </span>
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-rose-50 text-rose-700">
-                              Saídas: {fmt(d.saidas)}
-                            </span>
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${d.saldo >= 0 ? "bg-indigo-50 text-indigo-700" : "bg-rose-50 text-rose-700"}`}>
-                              Saldo do dia: {fmt(d.saldo)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {visiveis.map((it) => (
-                            <div key={it.label} className="bg-slate-50/70 border border-slate-200/60 rounded-lg p-3">
-                              <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">{it.label}</div>
-                              <div className="text-base font-bold tabular-nums text-slate-800">{fmt(it.value)}</div>
-                            </div>
-                          ))}
-                        </div>
+                    {/* Barra de ações — sangria/suprimento em destaque no topo */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                          onClick={() => setOpenMov({ tipo: "suprimento" })}
+                        >
+                          <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                          onClick={() => setOpenMov({ tipo: "sangria" })}
+                        >
+                          <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                          onClick={() => setOpenMov({ tipo: "estorno" })}
+                        >
+                          <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
+                        </button>
+                        {podeLancarRecebDespesa && (
+                          <>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                              onClick={() => setOpenMov({ tipo: "recebimento" })}
+                            >
+                              <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                              onClick={() => setOpenMov({ tipo: "despesa" })}
+                            >
+                              <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
+                            </button>
+                          </>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                        onClick={() => {
+                          setValorInformado(esperadoGaveta.toFixed(2));
+                          if (minhaSessao) {
+                            const inicial: Record<string, string> = {};
+                            for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
+                              if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                            }
+                            if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                            setConferidoOwn(inicial);
+                          }
+                          setOpenFechar(true);
+                        }}
+                      >
+                        <Lock className="h-4 w-4" /> Conferir e fechar caixa
+                      </button>
+                    </div>
 
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        {
+                          key: "saldo",
+                          label: "Saldo atual",
+                          value: saldoAtual,
+                          cls: "text-indigo-950",
+                        },
+                        {
+                          key: "abertura",
+                          label: "Abertura",
+                          value: minhaSessao.valor_abertura,
+                          cls: "text-slate-800",
+                        },
+                        {
+                          key: "entradas",
+                          label: "Entradas",
+                          value: resumoTipos.suprimento + resumoTipos.recebimento,
+                          cls: "text-emerald-600",
+                        },
+                        {
+                          key: "saidas",
+                          label: "Saídas",
+                          value: resumoTipos.sangria + resumoTipos.despesa,
+                          cls: "text-rose-600",
+                        },
+                      ].map((kpi) => (
+                        <button
+                          key={kpi.key}
+                          type="button"
+                          onClick={() =>
+                            setCaixaDrill(kpi.key as "saldo" | "abertura" | "entradas" | "saidas")
+                          }
+                          className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex flex-col justify-between gap-2 text-left hover:border-slate-300 transition-colors cursor-pointer"
+                        >
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            {kpi.label}
+                          </span>
+                          <span className={`text-2xl font-bold tabular-nums ${kpi.cls}`}>
+                            {fmt(kpi.value)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Quebra por forma de pagamento + memória de cálculo da gaveta */}
+                    <ResumoFormas porForma={porFormaSessaoAtual} gaveta={gavetaSessaoAtual} />
+
+                    {/* Linha do tempo de sangrias e suprimentos do turno */}
+                    <TimelineGaveta
+                      movimentos={movsGaveta}
+                      onNovaSangria={() => setOpenMov({ tipo: "sangria" })}
+                      onNovoSuprimento={() => setOpenMov({ tipo: "suprimento" })}
+                    />
+
+                    <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs mt-4 space-y-3">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Movimentação por dia
+                      </div>
+                      <div className="space-y-4">
+                        {resumoPorDia.length === 0 ? (
+                          <p className="text-sm text-slate-400">Sem movimentações nesta sessão.</p>
+                        ) : (
+                          resumoPorDia.map((d) => {
+                            const cards: Array<{ label: string; value: number; sempre?: boolean }> =
+                              [
+                                {
+                                  label: "Dinheiro",
+                                  value: d.porForma.dinheiro ?? 0,
+                                  sempre: true,
+                                },
+                                { label: "PIX", value: d.porForma.pix ?? 0, sempre: true },
+                                { label: "Débito", value: d.porForma.debito ?? 0, sempre: true },
+                                { label: "Crédito", value: d.porForma.credito ?? 0, sempre: true },
+                                { label: "Boleto", value: d.porForma.boleto ?? 0 },
+                                { label: "Transferência", value: d.porForma.transferencia ?? 0 },
+                                { label: "Convênio", value: d.porForma.convenio ?? 0 },
+                                { label: "Outros", value: d.porForma.outros ?? 0 },
+                              ];
+                            const visiveis = cards.filter(
+                              (c) => c.sempre || (c.value ?? 0) > 0.005,
+                            );
+                            return (
+                              <div
+                                key={d.dia}
+                                className="rounded-lg border border-slate-200/70 p-3 space-y-3 bg-white"
+                              >
+                                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                  <div className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                                    <CalendarIcon className="h-4 w-4 text-slate-400" />
+                                    {d.label}
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5 text-xs tabular-nums">
+                                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                                      Entradas: {fmt(d.entradas)}
+                                    </span>
+                                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-rose-50 text-rose-700">
+                                      Saídas: {fmt(d.saidas)}
+                                    </span>
+                                    <span
+                                      className={`text-xs font-semibold px-2.5 py-1 rounded-md ${d.saldo >= 0 ? "bg-indigo-50 text-indigo-700" : "bg-rose-50 text-rose-700"}`}
+                                    >
+                                      Saldo do dia: {fmt(d.saldo)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  {visiveis.map((it) => (
+                                    <div
+                                      key={it.label}
+                                      className="bg-slate-50/70 border border-slate-200/60 rounded-lg p-3"
+                                    >
+                                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
+                                        {it.label}
+                                      </div>
+                                      <div className="text-base font-bold tabular-nums text-slate-800">
+                                        {fmt(it.value)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
               </TabsContent>
@@ -2674,89 +3300,116 @@ function Page() {
                     </CardContent>
                   </Card>
                 ) : (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-primary" />
-                    Cobrança de pacientes ({filaCaixa.filter((f) => !f.ja_pago).length} aguardando)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {filaCaixa.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum paciente aguardando cobrança hoje.</p>
-                  ) : (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[32rem] overflow-auto pr-1">
-                      {filaCaixa.map((f) => {
-                        const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                        return (
-                          <div key={f.id} className={`rounded-md border p-2.5 text-sm space-y-1 ${f.ja_pago ? "opacity-60" : ""}`}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground tabular-nums">{hora}</span>
-                              {f.ja_pago ? (
-                                <Badge variant="secondary" className="text-[10px]">PAGO</Badge>
-                              ) : (
-                                <span className="font-semibold text-primary">{fmt(f.valor)}</span>
-                              )}
-                            </div>
-                            <div className="font-medium uppercase leading-tight line-clamp-1">{f.paciente_nome}</div>
-                            <div className="text-[11px] text-muted-foreground line-clamp-1">
-                              {f.procedimento ?? "—"}{f.medico_nome ? ` · ${f.medico_nome}` : ""}
-                            </div>
-                            {!f.ja_pago && (
-                              <Button
-                                size="sm"
-                                className="w-full h-7 text-xs"
-                                onClick={() => {
-                                  setOpenCobranca(f);
-                                  setCobrancaLinhas([{ forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" }]);
-                                }}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-primary" />
+                        Cobrança de pacientes ({filaCaixa.filter((f) => !f.ja_pago).length}{" "}
+                        aguardando)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {filaCaixa.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum paciente aguardando cobrança hoje.
+                        </p>
+                      ) : (
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[32rem] overflow-auto pr-1">
+                          {filaCaixa.map((f) => {
+                            const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                            return (
+                              <div
+                                key={f.id}
+                                className={`rounded-md border p-2.5 text-sm space-y-1 ${f.ja_pago ? "opacity-60" : ""}`}
                               >
-                                <Receipt className="h-3 w-3 mr-1" /> Cobrar <ChevronRight className="h-3 w-3 ml-auto" />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground tabular-nums">
+                                    {hora}
+                                  </span>
+                                  {f.ja_pago ? (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      PAGO
+                                    </Badge>
+                                  ) : (
+                                    <span className="font-semibold text-primary">
+                                      {fmt(f.valor)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-medium uppercase leading-tight line-clamp-1">
+                                  {f.paciente_nome}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground line-clamp-1">
+                                  {f.procedimento ?? "—"}
+                                  {f.medico_nome ? ` · ${f.medico_nome}` : ""}
+                                </div>
+                                {!f.ja_pago && (
+                                  <Button
+                                    size="sm"
+                                    className="w-full h-7 text-xs"
+                                    onClick={() => {
+                                      setOpenCobranca(f);
+                                      setCobrancaLinhas([
+                                        {
+                                          forma: "dinheiro",
+                                          valor: String(f.valor || 0),
+                                          bandeira: "",
+                                          parcelas: "1",
+                                        },
+                                      ]);
+                                    }}
+                                  >
+                                    <Receipt className="h-3 w-3 mr-1" /> Cobrar{" "}
+                                    <ChevronRight className="h-3 w-3 ml-auto" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
               </TabsContent>
 
               {/* ---------- Movimentos ---------- */}
               <TabsContent value="movimentos" className="space-y-4 pt-4">
-              <Card>
-                <CardHeader className="gap-3">
-                  <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-base">
-                      Meus movimentos
-                      {filtrosAtivos && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
-                        </span>
-                      )}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => imprimirRelatorioMovs(
-                          minhasMovsFiltrados,
-                          periodoLabel,
+                <Card>
+                  <CardHeader className="gap-3">
+                    <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                      <CardTitle className="text-base">
+                        Meus movimentos
+                        {filtrosAtivos && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
+                          </span>
                         )}
-                        disabled={minhasMovsFiltrados.length === 0}
-                      >
-                        <Printer className="h-4 w-4 mr-1" /> Relatório
-                      </Button>
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => imprimirRelatorioMovs(minhasMovsFiltrados, periodoLabel)}
+                          disabled={minhasMovsFiltrados.length === 0}
+                        >
+                          <Printer className="h-4 w-4 mr-1" /> Relatório
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-end gap-2 flex-wrap">
-                    <div>
+                    <div className="flex items-end gap-2 flex-wrap">
+                      <div>
                         <Label className="text-xs">Período</Label>
                         <Popover open={openCal} onOpenChange={setOpenCal}>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 justify-start font-normal min-w-[220px]">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 justify-start font-normal min-w-[220px]"
+                            >
                               <CalendarIcon className="h-3.5 w-3.5 mr-2" />
                               {periodoLabel}
                             </Button>
@@ -2764,20 +3417,25 @@ function Page() {
                           <PopoverContent className="w-auto p-0" align="start">
                             <div className="flex flex-col sm:flex-row">
                               <div className="flex sm:flex-col gap-1 p-2 border-b sm:border-b-0 sm:border-r bg-muted/30">
-                                {([
-                                  ["hoje", "Hoje"],
-                                  ["semana", "Última semana"],
-                                  ["quinzena", "Última quinzena"],
-                                  ["mes", "Último mês"],
-                                  ["todos", "Todos"],
-                                ] as const).map(([v, lbl]) => (
+                                {(
+                                  [
+                                    ["hoje", "Hoje"],
+                                    ["semana", "Última semana"],
+                                    ["quinzena", "Última quinzena"],
+                                    ["mes", "Último mês"],
+                                    ["todos", "Todos"],
+                                  ] as const
+                                ).map(([v, lbl]) => (
                                   <Button
                                     key={v}
                                     type="button"
                                     variant={meuPeriodo === v ? "default" : "ghost"}
                                     size="sm"
                                     className="justify-start text-xs h-7"
-                                    onClick={() => { setMeuPeriodo(v); setOpenCal(false); }}
+                                    onClick={() => {
+                                      setMeuPeriodo(v);
+                                      setOpenCal(false);
+                                    }}
                                   >
                                     {lbl}
                                   </Button>
@@ -2809,218 +3467,300 @@ function Page() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                    <div>
-                      <Label className="text-xs">Médico</Label>
-                      <Select value={meuMedico} onValueChange={setMeuMedico}>
-                        <SelectTrigger className="h-8 w-[200px]">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos os médicos</SelectItem>
-                          {medicosDisponiveis.map((n) => (
-                            <SelectItem key={n} value={n}>{n}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Paciente</Label>
-                      <div className="relative">
-                        <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          value={meuPaciente}
-                          onChange={(e) => setMeuPaciente(e.target.value)}
-                          placeholder="Buscar paciente..."
-                          className="h-8 w-[200px] pl-7"
-                        />
+                      <div>
+                        <Label className="text-xs">Médico</Label>
+                        <Select value={meuMedico} onValueChange={setMeuMedico}>
+                          <SelectTrigger className="h-8 w-[200px]">
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">Todos os médicos</SelectItem>
+                            {medicosDisponiveis.map((n) => (
+                              <SelectItem key={n} value={n}>
+                                {n}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+                      <div>
+                        <Label className="text-xs">Paciente</Label>
+                        <div className="relative">
+                          <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={meuPaciente}
+                            onChange={(e) => setMeuPaciente(e.target.value)}
+                            placeholder="Buscar paciente..."
+                            className="h-8 w-[200px] pl-7"
+                          />
+                        </div>
+                      </div>
+                      {filtrosAtivos && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={limparFiltros}
+                          className="h-8 text-xs"
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Limpar
+                        </Button>
+                      )}
                     </div>
-                    {filtrosAtivos && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={limparFiltros}
-                        className="h-8 text-xs"
-                      >
-                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Hora</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Paciente</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Serviço</TableHead>
-                        <TableHead>Médico</TableHead>
-                        <TableHead>Ficha</TableHead>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead>Forma</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead className="text-right w-[1%]">Ação</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                       {minhasMovsFiltrados.length === 0 ? (
-                         <TableRow>
-                           <TableCell colSpan={12} className="text-center text-muted-foreground">
-                            {filtrosAtivos
-                              ? "Nenhum movimento corresponde aos filtros"
-                              : "Sem movimentos no período"}
-                          </TableCell>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Hora</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Paciente</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Serviço</TableHead>
+                          <TableHead>Médico</TableHead>
+                          <TableHead>Ficha</TableHead>
+                          <TableHead>Usuário</TableHead>
+                          <TableHead>Forma</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead className="text-right w-[1%]">Ação</TableHead>
                         </TableRow>
-                      ) : minhasMovsFiltrados.flatMap((m) => {
-                         const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-                         const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
-                         const medico = enr?.medico ?? null;
-                         const ficha = enr?.ficha ?? null;
-                         const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
-                         const usuario = usuarioNomeFor(m);
-                         const bucket = bucketDeMov(m);
-                         const partes = bucket === "misto" ? partesDoMov(m) : {};
-                         const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
-                         if (bucket === "misto" && entradas.length > 0) {
-                           return entradas.map(([k, v], idx) => (
-                             <TableRow key={`${m.id}-${k}`}>
-                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
-                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
-                               <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                               <TableCell className="text-xs uppercase font-medium max-w-[220px] truncate" title={paciente ?? undefined}>{idx === 0 ? (paciente || "—") : ""}</TableCell>
-                               <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
-                               <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
-                               <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
-                                <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
-                               <TableCell className="text-xs uppercase" title={usuario}>{idx === 0 ? usuario : ""}</TableCell>
-                               <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
-                               <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                                 {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
-                               </TableCell>
-                               <TableCell className="text-right"></TableCell>
-                             </TableRow>
-                           ));
-                         }
-                         return [(
-                         <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell
-                            className="text-xs uppercase font-medium max-w-[220px] truncate"
-                            title={paciente ?? undefined}
-                          >
-                            {paciente || "—"}
-                          </TableCell>
-                          <TableCell
-                            className="max-w-[320px] truncate"
-                            title={m.descricao ?? undefined}
-                          >
-                            {m.descricao || "—"}
-                          </TableCell>
-                          <TableCell className="text-xs">{servico || "—"}</TableCell>
-                          <TableCell className="text-xs">{medico || "—"}</TableCell>
-                           <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
-                          <TableCell className="text-xs uppercase" title={usuario}>{usuario}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
-                          <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {m.tipo === "recebimento" && podeEscrever && (
-                              (() => {
-                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
-                                if (st === "pendente") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                    </Button>
-                                  );
-                                }
-                                if (st === "aprovado") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                      title="Este lançamento já foi estornado"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
-                                    </Button>
-                                  );
-                                }
-                                return (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                title="Solicitar estorno ao financeiro"
-                                onClick={() => setEstornoFor(m)}
-                              >
-                                <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                              </Button>
-                                );
-                              })()
-                            )}
-                            {m.tipo === "sangria" && podeEscrever && (
-                              (() => {
-                                const st = estornosPorMov.get(m.id);
-                                if (st === "pendente") {
-                                  return (
-                                    <Button
-                                      type="button" size="sm" variant="outline" disabled
-                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                    </Button>
-                                  );
-                                }
-                                if (st === "aprovado") {
-                                  return (
-                                    <Button
-                                      type="button" size="sm" variant="outline" disabled
-                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                      title="Esta sangria já foi estornada"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Estornada
-                                    </Button>
-                                  );
-                                }
-                                return (
-                                  <Button
-                                    type="button" size="sm" variant="outline"
-                                    className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                    title="Solicitar estorno da sangria ao financeiro"
-                                    onClick={() => setEstornoFor(m)}
+                      </TableHeader>
+                      <TableBody>
+                        {minhasMovsFiltrados.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={12} className="text-center text-muted-foreground">
+                              {filtrosAtivos
+                                ? "Nenhum movimento corresponde aos filtros"
+                                : "Sem movimentos no período"}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          minhasMovsFiltrados.flatMap((m) => {
+                            const enr = m.lancamento_id
+                              ? enrichPorLanc.get(m.lancamento_id)
+                              : undefined;
+                            const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                            const medico = enr?.medico ?? null;
+                            const ficha = enr?.ficha ?? null;
+                            const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                            const usuario = usuarioNomeFor(m);
+                            const bucket = bucketDeMov(m);
+                            const partes = bucket === "misto" ? partesDoMov(m) : {};
+                            const entradas = Object.entries(partes).filter(
+                              ([, v]) => (v ?? 0) > 0.005,
+                            ) as Array<[FormaBucket, number]>;
+                            if (bucket === "misto" && entradas.length > 0) {
+                              return entradas.map(([k, v], idx) => (
+                                <TableRow key={`${m.id}-${k}`}>
+                                  <TableCell className="whitespace-nowrap">
+                                    {idx === 0
+                                      ? new Date(m.created_at).toLocaleDateString("pt-BR")
+                                      : ""}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {idx === 0
+                                      ? new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })
+                                      : ""}
+                                  </TableCell>
+                                  <TableCell>
+                                    {idx === 0 ? (
+                                      <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                        {TIPO_LABEL[m.tipo]}
+                                      </Badge>
+                                    ) : null}
+                                  </TableCell>
+                                  <TableCell
+                                    className="text-xs uppercase font-medium max-w-[220px] truncate"
+                                    title={paciente ?? undefined}
                                   >
-                                    <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                                  </Button>
-                                );
-                              })()
-                            )}
-                          </TableCell>
-                        </TableRow>
-                         )];
-                       })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                                    {idx === 0 ? paciente || "—" : ""}
+                                  </TableCell>
+                                  <TableCell
+                                    className="max-w-[320px] truncate"
+                                    title={m.descricao ?? undefined}
+                                  >
+                                    {idx === 0 ? (
+                                      m.descricao || "—"
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs pl-2">
+                                        ↳ parcela
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {idx === 0 ? servico || "—" : ""}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {idx === 0 ? medico || "—" : ""}
+                                  </TableCell>
+                                  <TableCell className="text-xs tabular-nums">
+                                    {idx === 0 ? formatFichaCaixa(ficha) : ""}
+                                  </TableCell>
+                                  <TableCell className="text-xs uppercase" title={usuario}>
+                                    {idx === 0 ? usuario : ""}
+                                  </TableCell>
+                                  <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
+                                  <TableCell
+                                    className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                                  >
+                                    {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                                    {fmt(v)}
+                                  </TableCell>
+                                  <TableCell className="text-right"></TableCell>
+                                </TableRow>
+                              ));
+                            }
+                            return [
+                              <TableRow key={m.id}>
+                                <TableCell className="whitespace-nowrap">
+                                  {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                    {TIPO_LABEL[m.tipo]}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell
+                                  className="text-xs uppercase font-medium max-w-[220px] truncate"
+                                  title={paciente ?? undefined}
+                                >
+                                  {paciente || "—"}
+                                </TableCell>
+                                <TableCell
+                                  className="max-w-[320px] truncate"
+                                  title={m.descricao ?? undefined}
+                                >
+                                  {m.descricao || "—"}
+                                </TableCell>
+                                <TableCell className="text-xs">{servico || "—"}</TableCell>
+                                <TableCell className="text-xs">{medico || "—"}</TableCell>
+                                <TableCell className="text-xs tabular-nums">
+                                  {formatFichaCaixa(ficha)}
+                                </TableCell>
+                                <TableCell className="text-xs uppercase" title={usuario}>
+                                  {usuario}
+                                </TableCell>
+                                <TableCell>
+                                  <FormaCellEditavel m={m} />
+                                </TableCell>
+                                <TableCell
+                                  className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                                >
+                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                                  {fmt(m.valor)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {m.tipo === "recebimento" &&
+                                    podeEscrever &&
+                                    (() => {
+                                      const st = m.lancamento_id
+                                        ? estornosPorLanc.get(m.lancamento_id)
+                                        : undefined;
+                                      if (st === "pendente") {
+                                        return (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled
+                                            className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                            title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                          >
+                                            <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                          </Button>
+                                        );
+                                      }
+                                      if (st === "aprovado") {
+                                        return (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled
+                                            className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                            title="Este lançamento já foi estornado"
+                                          >
+                                            <Undo2 className="h-3 w-3 mr-1" /> Estornado
+                                          </Button>
+                                        );
+                                      }
+                                      return (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                          title="Solicitar estorno ao financeiro"
+                                          onClick={() => setEstornoFor(m)}
+                                        >
+                                          <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                        </Button>
+                                      );
+                                    })()}
+                                  {m.tipo === "sangria" &&
+                                    podeEscrever &&
+                                    (() => {
+                                      const st = estornosPorMov.get(m.id);
+                                      if (st === "pendente") {
+                                        return (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled
+                                            className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                            title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                          >
+                                            <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                          </Button>
+                                        );
+                                      }
+                                      if (st === "aprovado") {
+                                        return (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled
+                                            className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                            title="Esta sangria já foi estornada"
+                                          >
+                                            <Undo2 className="h-3 w-3 mr-1" /> Estornada
+                                          </Button>
+                                        );
+                                      }
+                                      return (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                          title="Solicitar estorno da sangria ao financeiro"
+                                          onClick={() => setEstornoFor(m)}
+                                        >
+                                          <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                        </Button>
+                                      );
+                                    })()}
+                                </TableCell>
+                              </TableRow>,
+                            ];
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* ---------- Histórico ---------- */}
@@ -3032,53 +3772,69 @@ function Page() {
                     </CardContent>
                   </Card>
                 ) : (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Caixas anteriores</CardTitle></CardHeader>
-              <CardContent className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dia</TableHead>
-                      <TableHead>Abertura</TableHead>
-                      <TableHead>Fechamento</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Abertura</TableHead>
-                      <TableHead className="text-right">Informado</TableHead>
-                      <TableHead className="text-right">Diferença</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {linhasMinhasPorDia.map((l) => {
-                      const sPrincipal = l.sessoes[0];
-                      const st = statusCaixa(l.statusDia === "aberto" ? "aberto" : "fechado", l.diferenca);
-                      return (
-                        <TableRow key={l.key}>
-                          <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
-                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
-                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`text-[11px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}>
-                              {STATUS_CAIXA_LABEL[st]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
-                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(l.diferenca)}
-                          </TableCell>
-                          <TableCell>
-                            {sPrincipal && (
-                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)}><Eye className="h-4 w-4" /></Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Caixas anteriores</CardTitle>
+                    </CardHeader>
+                    <CardContent className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Dia</TableHead>
+                            <TableHead>Abertura</TableHead>
+                            <TableHead>Fechamento</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Abertura</TableHead>
+                            <TableHead className="text-right">Informado</TableHead>
+                            <TableHead className="text-right">Diferença</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {linhasMinhasPorDia.map((l) => {
+                            const sPrincipal = l.sessoes[0];
+                            const st = statusCaixa(
+                              l.statusDia === "aberto" ? "aberto" : "fechado",
+                              l.diferenca,
+                            );
+                            return (
+                              <TableRow key={l.key}>
+                                <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
+                                <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                                <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[11px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}
+                                  >
+                                    {STATUS_CAIXA_LABEL[st]}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                                <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                                <TableCell
+                                  className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}
+                                >
+                                  {fmt(l.diferenca)}
+                                </TableCell>
+                                <TableCell>
+                                  {sPrincipal && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => verDetalhe(sPrincipal)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
                 )}
               </TabsContent>
             </Tabs>
@@ -3100,12 +3856,19 @@ function Page() {
                 </div>
                 <div className="min-w-[200px]">
                   <Label className="text-xs">Operador</Label>
-                  <Select value={fUserId || "all"} onValueChange={(v) => setFUserId(v === "all" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <Select
+                    value={fUserId || "all"}
+                    onValueChange={(v) => setFUserId(v === "all" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {usersList.map((u) => (
-                        <SelectItem key={u.user_id} value={u.user_id} className="uppercase">{u.nome?.toUpperCase()}</SelectItem>
+                        <SelectItem key={u.user_id} value={u.user_id} className="uppercase">
+                          {u.nome?.toUpperCase()}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -3122,7 +3885,9 @@ function Page() {
                 >
                   Hoje
                 </Button>
-                <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
+                <Button variant="outline" onClick={exportarTodos}>
+                  <FileDown className="h-4 w-4 mr-2" /> Excel
+                </Button>
                 {(() => {
                   const abertos = todasSessoes.filter((s) => s.status === "aberto").length;
                   if (abertos === 0) return null;
@@ -3167,7 +3932,11 @@ function Page() {
                   </TableHeader>
                   <TableBody>
                     {linhasTodosPorDia.length === 0 && (
-                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                      <TableRow>
+                        <TableCell colSpan={12} className="text-center text-muted-foreground">
+                          Sem sessões no período
+                        </TableCell>
+                      </TableRow>
                     )}
                     {linhasTodosPorDia.map((l) => {
                       const sAberta = l.sessaoAbertaId
@@ -3176,22 +3945,43 @@ function Page() {
                       const sPrincipal = sAberta ?? l.sessoes[0];
                       return (
                         <TableRow key={l.key}>
-                          <TableCell className="font-medium uppercase">{l.user_nome.toUpperCase()}</TableCell>
+                          <TableCell className="font-medium uppercase">
+                            {l.user_nome.toUpperCase()}
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">{fmtDia(l.data)}</TableCell>
                           <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
                           <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
-                          <TableCell><Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>
+                              {l.statusDia}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
                           <TableCell className="text-right">{fmt(l.calculado)}</TableCell>
                           <TableCell className="text-right">{fmt(l.informado)}</TableCell>
-                          <TableCell className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(l.sangria)}</TableCell>
-                          <TableCell className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(l.estorno)}</TableCell>
-                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                          <TableCell
+                            className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}
+                          >
+                            {fmt(l.sangria)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}
+                          >
+                            {fmt(l.estorno)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}
+                          >
                             {fmt(l.diferenca)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {sPrincipal && (
-                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)} title="Ver detalhes">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => verDetalhe(sPrincipal)}
+                                title="Ver detalhes"
+                              >
                                 <Eye className="h-4 w-4" />
                               </Button>
                             )}
@@ -3220,22 +4010,30 @@ function Page() {
                                 <Lock className="h-4 w-4" />
                               </Button>
                             )}
-                            {!sAberta && l.statusDia === "fechado" && podeLancarRecebDespesa && (() => {
-                              const sFechada = [...l.sessoes]
-                                .filter((x) => x.status === "fechado" && x.fechado_em)
-                                .sort((a, b) => (b.fechado_em || "").localeCompare(a.fechado_em || ""))[0];
-                              if (!sFechada) return null;
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Desfazer fechamento (reabrir caixa)"
-                                  onClick={() => { setOpenReabrir(sFechada); setMotivoReabrir(""); }}
-                                >
-                                  <Undo2 className="h-4 w-4 text-amber-700" />
-                                </Button>
-                              );
-                            })()}
+                            {!sAberta &&
+                              l.statusDia === "fechado" &&
+                              podeLancarRecebDespesa &&
+                              (() => {
+                                const sFechada = [...l.sessoes]
+                                  .filter((x) => x.status === "fechado" && x.fechado_em)
+                                  .sort((a, b) =>
+                                    (b.fechado_em || "").localeCompare(a.fechado_em || ""),
+                                  )[0];
+                                if (!sFechada) return null;
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    title="Desfazer fechamento (reabrir caixa)"
+                                    onClick={() => {
+                                      setOpenReabrir(sFechada);
+                                      setMotivoReabrir("");
+                                    }}
+                                  >
+                                    <Undo2 className="h-4 w-4 text-amber-700" />
+                                  </Button>
+                                );
+                              })()}
                           </TableCell>
                         </TableRow>
                       );
@@ -3260,34 +4058,53 @@ function Page() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border bg-rose-50 dark:bg-rose-950/30 p-4">
                   <p className="text-xs text-muted-foreground">A repassar hoje</p>
-                  <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">{fmt(repHoje.pendente)}</p>
+                  <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">
+                    {fmt(repHoje.pendente)}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {repHoje.qtd_pend} atendimento{repHoje.qtd_pend === 1 ? "" : "s"} · {repHoje.medicos} médico{repHoje.medicos === 1 ? "" : "s"}
+                    {repHoje.qtd_pend} atendimento{repHoje.qtd_pend === 1 ? "" : "s"} ·{" "}
+                    {repHoje.medicos} médico{repHoje.medicos === 1 ? "" : "s"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-4">
                   <p className="text-xs text-muted-foreground">Já repassado hoje</p>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmt(repHoje.pago)}</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                    {fmt(repHoje.pago)}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-4">
                   <p className="text-xs text-muted-foreground">Total movimentado</p>
-                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{fmt(repHoje.pendente + repHoje.pago)}</p>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">
+                    {fmt(repHoje.pendente + repHoje.pago)}
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                 <h4 className="font-medium">Como funciona</h4>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
-                  <li>O sistema calcula o repasse automaticamente para cada atendimento pago (% ou valor fixo do cadastro do médico).</li>
-                  <li>Selecione vários atendimentos e use <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e gera <strong>uma despesa por médico</strong>.</li>
-                  <li>O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro, vinculado ao seu caixa do dia.</li>
+                  <li>
+                    O sistema calcula o repasse automaticamente para cada atendimento pago (% ou
+                    valor fixo do cadastro do médico).
+                  </li>
+                  <li>
+                    Selecione vários atendimentos e use{" "}
+                    <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e
+                    gera <strong>uma despesa por médico</strong>.
+                  </li>
+                  <li>
+                    O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro,
+                    vinculado ao seu caixa do dia.
+                  </li>
                 </ul>
               </div>
 
               <div className="rounded-lg border">
                 <div className="px-4 py-3 border-b bg-muted/30">
                   <h4 className="font-medium">Repasses realizados hoje</h4>
-                  <p className="text-xs text-muted-foreground">Lista de pagamentos efetuados no dia, por médico.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Lista de pagamentos efetuados no dia, por médico.
+                  </p>
                 </div>
                 {repPagosHoje.length === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">
@@ -3309,12 +4126,18 @@ function Page() {
                           <TableCell className="text-muted-foreground">{r.hora ?? "—"}</TableCell>
                           <TableCell className="font-medium">{r.medico}</TableCell>
                           <TableCell className="capitalize">{r.forma ?? "—"}</TableCell>
-                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{fmt(r.valor)}</TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                            {fmt(r.valor)}
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow>
-                        <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
-                        <TableCell className="text-right font-bold">{fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}</TableCell>
+                        <TableCell colSpan={3} className="text-right font-medium">
+                          Total
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}
+                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -3334,7 +4157,9 @@ function Page() {
       {/* === Modal Abrir === */}
       <Dialog open={openAbrir} onOpenChange={setOpenAbrir}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Abrir caixa</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Abrir caixa</DialogTitle>
+          </DialogHeader>
           <form onSubmit={abrirCaixa} className="space-y-3">
             <div>
               <Label>Valor de abertura (fundo de troco)</Label>
@@ -3345,23 +4170,37 @@ function Page() {
               <Textarea value={obsAbertura} onChange={(e) => setObsAbertura(e.target.value)} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Abrir</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving} data-primary>
+                Abrir
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* === Modal Movimento === */}
-      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) { setOpenMov(null); setMovDescTouched(false); } }}>
+      <Dialog
+        open={!!openMov}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenMov(null);
+            setMovDescTouched(false);
+          }
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
             <DialogDescription>
               {openMov?.tipo === "sangria" && "Retirada de dinheiro do caixa."}
               {openMov?.tipo === "suprimento" && "Adição de dinheiro ao caixa."}
               {openMov?.tipo === "recebimento" && "Entrada de pagamento avulsa."}
               {openMov?.tipo === "despesa" && "Pagamento avulso de despesa pelo caixa."}
-              {openMov?.tipo === "estorno" && "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
+              {openMov?.tipo === "estorno" &&
+                "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={lancarMov} className="space-y-3">
@@ -3370,7 +4209,9 @@ function Page() {
               <CurrencyInput value={movValor} onChange={setMovValor} />
             </div>
             <div>
-              <Label>Descrição <span className="text-destructive">*</span></Label>
+              <Label>
+                Descrição <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={movDesc}
                 onChange={(e) => setMovDesc(e.target.value)}
@@ -3380,17 +4221,23 @@ function Page() {
                 aria-required="true"
               />
               {movDescTouched && movDesc.trim().length < 3 && (
-                <p className="mt-1 text-xs text-destructive">Descrição é obrigatória (mínimo 3 caracteres).</p>
+                <p className="mt-1 text-xs text-destructive">
+                  Descrição é obrigatória (mínimo 3 caracteres).
+                </p>
               )}
             </div>
             {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
               <div>
                 <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
                 <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o usuário..." />
+                  </SelectTrigger>
                   <SelectContent>
                     {membrosClinica.map((m) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        {m.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -3405,7 +4252,9 @@ function Page() {
               <div>
                 <Label>Forma de pagamento</Label>
                 <Select value={movForma} onValueChange={setMovForma}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dinheiro">Dinheiro</SelectItem>
                     <SelectItem value="pix">PIX</SelectItem>
@@ -3417,35 +4266,62 @@ function Page() {
                 </Select>
               </div>
             )}
-            {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (movForma === "credito" || movForma === "debito") && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Bandeira *</Label>
-                  <Select value={movBandeira} onValueChange={setMovBandeira}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {movForma === "credito" && (
+            {openMov &&
+              (openMov.tipo === "recebimento" || openMov.tipo === "despesa") &&
+              (movForma === "credito" || movForma === "debito") && (
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label>Parcelas</Label>
-                    <Select value={movParcelas} onValueChange={setMovParcelas}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Label>Bandeira *</Label>
+                    <Select value={movBandeira} onValueChange={setMovBandeira}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        {BANDEIRAS_CARTAO.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-              </div>
-            )}
+                  {movForma === "credito" && (
+                    <div>
+                      <Label>Parcelas</Label>
+                      <Select value={movParcelas} onValueChange={setMovParcelas}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}x
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => { setOpenMov(null); setMovDescTouched(false); }}>Cancelar</Button>
-              <Button type="submit" disabled={saving || movDesc.trim().length < 3 || !(Number(movValor) > 0)} data-primary>Lançar</Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setOpenMov(null);
+                  setMovDescTouched(false);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving || movDesc.trim().length < 3 || !(Number(movValor) > 0)}
+                data-primary
+              >
+                Lançar
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -3454,11 +4330,18 @@ function Page() {
       {/* === Modal Fechar === */}
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Fechar caixa</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa</DialogTitle>
             <DialogDescription>
-              Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
+              Fechando o dia{" "}
+              <strong>
+                {dataFechamento
+                  ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR")
+                  : "—"}
+              </strong>
               {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
-              {" · "}Esperado em espécie: <strong>{fmt(porFormaDoDiaFechamento.dinheiro ?? 0)}</strong>
+              {" · "}Esperado em espécie:{" "}
+              <strong>{fmt(porFormaDoDiaFechamento.dinheiro ?? 0)}</strong>
             </DialogDescription>
             {Math.abs(porFormaDoDiaFechamento.indeterminado ?? 0) > 0.005 && (
               <p className="text-xs text-destructive">
@@ -3484,7 +4367,8 @@ function Page() {
                     : minhasMovs;
                   const pf: Record<string, number> = {};
                   filtrados.forEach((m) => {
-                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
+                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno")
+                      return;
                     const sinal = m.tipo === "estorno" ? -1 : 1;
                     const v = Number(m.valor || 0) * sinal;
                     const bucket = bucketDeMov(m);
@@ -3492,10 +4376,12 @@ function Page() {
                       const partes = partesDoMov(m);
                       let somado = 0;
                       for (const [k, val] of Object.entries(partes)) {
-                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
+                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal;
+                        somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005)
+                        pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
@@ -3514,49 +4400,72 @@ function Page() {
                 Só os movimentos deste dia serão considerados no fechamento.
               </p>
             </div>
-            {minhaSessao && (() => {
-              const porForma = porFormaDoDiaFechamento;
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
-              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
-              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
-              // agora contam em "Dinheiro" via bucketDeMov.
-              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
-              const totalConferido = Object.values(conferidoOwn)
-                .reduce((acc, v) => acc + (Number(v) || 0), 0);
-              return (
-                <div className="space-y-2">
-                  <Label>Conferência por forma de pagamento</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {chaves.map((k) => {
-                      const esperado = porForma[k] ?? 0;
-                      return (
-                        <div key={k} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
-                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+            {minhaSessao &&
+              (() => {
+                const porForma = porFormaDoDiaFechamento;
+                const ordem = [
+                  "dinheiro",
+                  "pix",
+                  "debito",
+                  "credito",
+                  "boleto",
+                  "transferencia",
+                  "convenio",
+                  "outros",
+                  "indeterminado",
+                ];
+                // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
+                // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
+                // agora contam em "Dinheiro" via bucketDeMov.
+                const chaves = ordem.filter(
+                  (k) =>
+                    (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005,
+                );
+                const totalConferido = Object.values(conferidoOwn).reduce(
+                  (acc, v) => acc + (Number(v) || 0),
+                  0,
+                );
+                return (
+                  <div className="space-y-2">
+                    <Label>Conferência por forma de pagamento</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {chaves.map((k) => {
+                        const esperado = porForma[k] ?? 0;
+                        return (
+                          <div key={k} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium">
+                                {FORMA_LABEL[k as FormaBucket] ?? k}
+                              </span>
+                              <span className="text-muted-foreground">
+                                Esperado: {fmt(esperado)}
+                              </span>
+                            </div>
+                            <CurrencyInput
+                              value={conferidoOwn[k] ?? ""}
+                              onChange={(v) => {
+                                setConferidoOwn((prev) => {
+                                  const next = { ...prev, [k]: v };
+                                  const soma = Object.values(next).reduce(
+                                    (a, x) => a + (Number(x) || 0),
+                                    0,
+                                  );
+                                  setValorInformado(soma.toFixed(2));
+                                  return next;
+                                });
+                              }}
+                            />
                           </div>
-                          <CurrencyInput
-                            value={conferidoOwn[k] ?? ""}
-                            onChange={(v) => {
-                              setConferidoOwn((prev) => {
-                                const next = { ...prev, [k]: v };
-                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
-                                setValorInformado(soma.toFixed(2));
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between text-sm pt-1 border-t">
+                      <span className="text-muted-foreground">Total conferido</span>
+                      <strong>{fmt(totalConferido)}</strong>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm pt-1 border-t">
-                    <span className="text-muted-foreground">Total conferido</span>
-                    <strong>{fmt(totalConferido)}</strong>
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
@@ -3564,7 +4473,10 @@ function Page() {
             {(() => {
               const contadoDinheiro = Number(conferidoOwn.dinheiro ?? 0) || 0;
               const difGaveta = classificarDiferenca(contadoDinheiro, esperadoGaveta);
-              const difTotal = classificarDiferenca(Number(valorInformado) || 0, saldoDoDiaFechamento);
+              const difTotal = classificarDiferenca(
+                Number(valorInformado) || 0,
+                saldoDoDiaFechamento,
+              );
               return (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className={`rounded-lg border p-3 ${difGaveta.cls}`}>
@@ -3575,7 +4487,8 @@ function Page() {
                       Esperado {fmt(esperadoGaveta)} · Contado {fmt(contadoDinheiro)}
                     </div>
                     <div className="text-lg font-bold tabular-nums mt-1">
-                      {difGaveta.label}{difGaveta.tipo !== "exato" ? `: ${fmt(Math.abs(difGaveta.valor))}` : ""}
+                      {difGaveta.label}
+                      {difGaveta.tipo !== "exato" ? `: ${fmt(Math.abs(difGaveta.valor))}` : ""}
                     </div>
                   </div>
                   <div className={`rounded-lg border p-3 ${difTotal.cls}`}>
@@ -3583,10 +4496,12 @@ function Page() {
                       Total do dia (todas as formas)
                     </div>
                     <div className="text-xs mt-0.5">
-                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido {fmt(Number(valorInformado) || 0)}
+                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido{" "}
+                      {fmt(Number(valorInformado) || 0)}
                     </div>
                     <div className="text-lg font-bold tabular-nums mt-1">
-                      {difTotal.label}{difTotal.tipo !== "exato" ? `: ${fmt(Math.abs(difTotal.valor))}` : ""}
+                      {difTotal.label}
+                      {difTotal.tipo !== "exato" ? `: ${fmt(Math.abs(difTotal.valor))}` : ""}
                     </div>
                   </div>
                 </div>
@@ -3598,8 +4513,13 @@ function Page() {
             </div>
             <div>
               <Label>Comprovante</Label>
-              <Select value={formatoFechamento} onValueChange={(v) => setFormatoFechamento(v as "80mm" | "a4")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={formatoFechamento}
+                onValueChange={(v) => setFormatoFechamento(v as "80mm" | "a4")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="80mm">Bobina térmica 80mm</SelectItem>
                   <SelectItem value="a4">Folha A4</SelectItem>
@@ -3607,7 +4527,9 @@ function Page() {
               </Select>
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>
+                Cancelar
+              </Button>
               <Button type="submit" variant="destructive" disabled={saving} data-primary>
                 <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
               </Button>
@@ -3617,22 +4539,34 @@ function Page() {
       </Dialog>
 
       {/* === Modal Desfazer fechamento (admin/gestor/financeiro) === */}
-      <Dialog open={!!openReabrir} onOpenChange={(o) => { if (!o) { setOpenReabrir(null); setMotivoReabrir(""); } }}>
+      <Dialog
+        open={!!openReabrir}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenReabrir(null);
+            setMotivoReabrir("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Desfazer fechamento do caixa</DialogTitle>
             {openReabrir && (
               <DialogDescription>
-                Operador: <strong className="uppercase">{openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}</strong>
+                Operador:{" "}
+                <strong className="uppercase">
+                  {openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}
+                </strong>
                 <br />
-                Calculado: <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
-                {" · "}Informado: <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
+                Calculado:{" "}
+                <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
+                {" · "}Informado:{" "}
+                <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
                 {" · "}Diferença: <strong>{fmt(Number(openReabrir.diferenca || 0))}</strong>
                 <br />
                 <span className="text-xs text-muted-foreground">
-                  O caixa voltará ao status "aberto". O histórico de fechamento
-                  fica registrado e uma linha de reabertura será adicionada aos
-                  movimentos do operador.
+                  O caixa voltará ao status "aberto". O histórico de fechamento fica registrado e
+                  uma linha de reabertura será adicionada aos movimentos do operador.
                 </span>
               </DialogDescription>
             )}
@@ -3648,8 +4582,20 @@ function Page() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setOpenReabrir(null); setMotivoReabrir(""); }}>Cancelar</Button>
-            <Button variant="destructive" disabled={saving || !motivoReabrir.trim()} onClick={() => void desfazerFechamento()}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpenReabrir(null);
+                setMotivoReabrir("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={saving || !motivoReabrir.trim()}
+              onClick={() => void desfazerFechamento()}
+            >
               <Undo2 className="h-4 w-4 mr-2" /> Reabrir caixa
             </Button>
           </DialogFooter>
@@ -3657,59 +4603,90 @@ function Page() {
       </Dialog>
 
       {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
-      <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
+      <Dialog
+        open={!!openFecharTerceiro}
+        onOpenChange={(o) => {
+          if (!o) setOpenFecharTerceiro(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Fechar caixa de outro operador</DialogTitle>
             {openFecharTerceiro && (
               <DialogDescription>
-                Operador: <strong className="uppercase">{openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}</strong>
+                Operador:{" "}
+                <strong className="uppercase">
+                  {openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}
+                </strong>
                 <br />
                 Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
               </DialogDescription>
             )}
           </DialogHeader>
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
-            {openFecharTerceiro && (() => {
-              const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
-              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
-              const totalConferido = Object.values(conferidoTerceiro)
-                .reduce((acc, v) => acc + (Number(v) || 0), 0);
-              return (
-                <div className="space-y-2">
-                  <Label>Conferência por forma de pagamento</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {chaves.map((k) => {
-                      const esperado = porForma[k] ?? 0;
-                      return (
-                        <div key={k} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
-                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+            {openFecharTerceiro &&
+              (() => {
+                const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
+                const ordem = [
+                  "dinheiro",
+                  "pix",
+                  "debito",
+                  "credito",
+                  "boleto",
+                  "transferencia",
+                  "convenio",
+                  "outros",
+                  "indeterminado",
+                ];
+                const chaves = ordem.filter(
+                  (k) =>
+                    (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005,
+                );
+                const totalConferido = Object.values(conferidoTerceiro).reduce(
+                  (acc, v) => acc + (Number(v) || 0),
+                  0,
+                );
+                return (
+                  <div className="space-y-2">
+                    <Label>Conferência por forma de pagamento</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {chaves.map((k) => {
+                        const esperado = porForma[k] ?? 0;
+                        return (
+                          <div key={k} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium">
+                                {FORMA_LABEL[k as FormaBucket] ?? k}
+                              </span>
+                              <span className="text-muted-foreground">
+                                Esperado: {fmt(esperado)}
+                              </span>
+                            </div>
+                            <CurrencyInput
+                              value={conferidoTerceiro[k] ?? ""}
+                              onChange={(v) => {
+                                setConferidoTerceiro((prev) => {
+                                  const next = { ...prev, [k]: v };
+                                  const soma = Object.values(next).reduce(
+                                    (a, x) => a + (Number(x) || 0),
+                                    0,
+                                  );
+                                  setInformadoTerceiro(soma.toFixed(2));
+                                  return next;
+                                });
+                              }}
+                            />
                           </div>
-                          <CurrencyInput
-                            value={conferidoTerceiro[k] ?? ""}
-                            onChange={(v) => {
-                              setConferidoTerceiro((prev) => {
-                                const next = { ...prev, [k]: v };
-                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
-                                setInformadoTerceiro(soma.toFixed(2));
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between text-sm pt-1 border-t">
+                      <span className="text-muted-foreground">Total conferido</span>
+                      <strong>{fmt(totalConferido)}</strong>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm pt-1 border-t">
-                    <span className="text-muted-foreground">Total conferido</span>
-                    <strong>{fmt(totalConferido)}</strong>
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
             <div>
               <Label>Data do fechamento</Label>
               <DateInputBR
@@ -3730,8 +4707,12 @@ function Page() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+                Confirmar fechamento
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -3743,7 +4724,8 @@ function Page() {
           <DialogHeader>
             <DialogTitle>Fechar caixas abertos no período</DialogTitle>
             <DialogDescription>
-              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
+              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença
+              = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -3765,25 +4747,34 @@ function Page() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {todasSessoes.filter((s) => s.status === "aberto").map((s) => {
-                    const calc = calcSaldoSessao(s.id);
-                    const checked = !!loteSelecionados[s.id];
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => setLoteSelecionados((prev) => ({ ...prev, [s.id]: e.target.checked }))}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                        <TableCell className="uppercase font-medium">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
-                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                        <TableCell className="text-right">{fmt(calc)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {todasSessoes
+                    .filter((s) => s.status === "aberto")
+                    .map((s) => {
+                      const calc = calcSaldoSessao(s.id);
+                      const checked = !!loteSelecionados[s.id];
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setLoteSelecionados((prev) => ({
+                                  ...prev,
+                                  [s.id]: e.target.checked,
+                                }))
+                              }
+                              className="h-4 w-4"
+                            />
+                          </TableCell>
+                          <TableCell className="uppercase font-medium">
+                            {(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}
+                          </TableCell>
+                          <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                          <TableCell className="text-right">{fmt(calc)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </TableBody>
               </Table>
             </div>
@@ -3797,7 +4788,9 @@ function Page() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>
+              Cancelar
+            </Button>
             <Button
               type="button"
               variant="destructive"
@@ -3813,7 +4806,12 @@ function Page() {
       </Dialog>
 
       {/* === Modal Cobrança === */}
-      <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
+      <Dialog
+        open={!!openCobranca}
+        onOpenChange={(o) => {
+          if (!o) setOpenCobranca(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cobrar paciente</DialogTitle>
@@ -3826,20 +4824,34 @@ function Page() {
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
             <p className="text-[11px] text-muted-foreground -mt-2">
-              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro · <kbd className="px-1 border rounded">2</kbd> PIX · <kbd className="px-1 border rounded">3</kbd> débito · <kbd className="px-1 border rounded">4</kbd> crédito · <kbd className="px-1 border rounded">5</kbd> adicionar forma · <kbd className="px-1 border rounded">Enter</kbd> confirmar
+              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro ·{" "}
+              <kbd className="px-1 border rounded">2</kbd> PIX ·{" "}
+              <kbd className="px-1 border rounded">3</kbd> débito ·{" "}
+              <kbd className="px-1 border rounded">4</kbd> crédito ·{" "}
+              <kbd className="px-1 border rounded">5</kbd> adicionar forma ·{" "}
+              <kbd className="px-1 border rounded">Enter</kbd> confirmar
             </p>
             {(() => {
               const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
               const multi = cobrancaLinhas.length > 1;
-              const sugerido = openCobranca ? (multi ? openCobranca.valor_cartao : openCobranca.valor) : 0;
+              const sugerido = openCobranca
+                ? multi
+                  ? openCobranca.valor_cartao
+                  : openCobranca.valor
+                : 0;
               const dif = total - sugerido;
               return (
                 <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex items-center justify-between">
                   <span className="text-muted-foreground">
-                    Sugerido <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>: <b>{fmt(sugerido)}</b>
+                    Sugerido{" "}
+                    <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>:{" "}
+                    <b>{fmt(sugerido)}</b>
                   </span>
                   <span>
-                    Soma: <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>{fmt(total)}</b>
+                    Soma:{" "}
+                    <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>
+                      {fmt(total)}
+                    </b>
                   </span>
                 </div>
               );
@@ -3848,10 +4860,19 @@ function Page() {
               {cobrancaLinhas.map((l, idx) => (
                 <div key={idx} className="rounded-md border p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Pagamento {idx + 1}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Pagamento {idx + 1}
+                    </span>
                     {cobrancaLinhas.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-rose-600"
-                        onClick={() => setCobrancaLinhas(prev => prev.filter((_, i) => i !== idx))}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-rose-600"
+                        onClick={() =>
+                          setCobrancaLinhas((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -3859,8 +4880,19 @@ function Page() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label>Forma</Label>
-                      <Select value={l.forma} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                      <Select
+                        value={l.forma}
+                        onValueChange={(v) =>
+                          setCobrancaLinhas((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="dinheiro">Dinheiro</SelectItem>
                           <SelectItem value="pix">PIX</SelectItem>
@@ -3872,28 +4904,59 @@ function Page() {
                     </div>
                     <div>
                       <Label>Valor</Label>
-                      <CurrencyInput value={l.valor} onChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x))} />
+                      <CurrencyInput
+                        value={l.valor}
+                        onChange={(v) =>
+                          setCobrancaLinhas((prev) =>
+                            prev.map((x, i) => (i === idx ? { ...x, valor: v } : x)),
+                          )
+                        }
+                      />
                     </div>
                   </div>
                   {(l.forma === "credito" || l.forma === "debito") && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label>Bandeira *</Label>
-                        <Select value={l.bandeira} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, bandeira: v } : x))}>
-                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <Select
+                          value={l.bandeira}
+                          onValueChange={(v) =>
+                            setCobrancaLinhas((prev) =>
+                              prev.map((x, i) => (i === idx ? { ...x, bandeira: v } : x)),
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
                           <SelectContent>
-                            {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                            {BANDEIRAS_CARTAO.map((b) => (
+                              <SelectItem key={b} value={b}>
+                                {b}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
                       {l.forma === "credito" && (
                         <div>
                           <Label>Parcelas</Label>
-                          <Select value={l.parcelas} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, parcelas: v } : x))}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                          <Select
+                            value={l.parcelas}
+                            onValueChange={(v) =>
+                              setCobrancaLinhas((prev) =>
+                                prev.map((x, i) => (i === idx ? { ...x, parcelas: v } : x)),
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                                <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}x
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -3904,9 +4967,12 @@ function Page() {
                 </div>
               ))}
               <Button
-                type="button" variant="outline" size="sm" className="w-full"
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
                 onClick={() => {
-                  setCobrancaLinhas(prev => {
+                  setCobrancaLinhas((prev) => {
                     // ao passar para multi-forma, ajusta a primeira linha (se ainda no valor original em dinheiro)
                     // para usar o valor de cartão sugerido, e adiciona linha nova com valor 0
                     if (!openCobranca) return [...prev, linhaVazia()];
@@ -3926,18 +4992,31 @@ function Page() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
+              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança
+              para <b>triagem</b>.
             </p>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Confirmar cobrança</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving} data-primary>
+                Confirmar cobrança
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* === Modal Detalhe === */}
-      <Dialog open={!!openDetalhe} onOpenChange={(o) => { if (!o) { setOpenDetalhe(null); setDetalheMovs([]); } }}>
+      <Dialog
+        open={!!openDetalhe}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenDetalhe(null);
+            setDetalheMovs([]);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <div className="flex items-center justify-between gap-2 pr-8">
@@ -3950,11 +5029,13 @@ function Page() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => imprimirRelatorioMovs(
-                      detalheMovs,
-                      `${new Date(openDetalhe.aberto_em).toLocaleDateString("pt-BR")}${openDetalhe.fechado_em ? ` — ${new Date(openDetalhe.fechado_em).toLocaleDateString("pt-BR")}` : ""}`,
-                      openDetalhe.user_nome ?? undefined,
-                    )}
+                    onClick={() =>
+                      imprimirRelatorioMovs(
+                        detalheMovs,
+                        `${new Date(openDetalhe.aberto_em).toLocaleDateString("pt-BR")}${openDetalhe.fechado_em ? ` — ${new Date(openDetalhe.fechado_em).toLocaleDateString("pt-BR")}` : ""}`,
+                        openDetalhe.user_nome ?? undefined,
+                      )
+                    }
                     disabled={detalheMovs.length === 0}
                   >
                     <Printer className="h-4 w-4 mr-1" /> Relatório
@@ -3967,7 +5048,8 @@ function Page() {
             </div>
             {openDetalhe && (
               <DialogDescription>
-                {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} → {fmtDT(openDetalhe.fechado_em)}
+                {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} →{" "}
+                {fmtDT(openDetalhe.fechado_em)}
               </DialogDescription>
             )}
           </DialogHeader>
@@ -3979,10 +5061,18 @@ function Page() {
                 let qtdEstornoReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
-                  if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
-                  else if (m.tipo === "sangria") tot.sangria += v;
-                  else if (m.tipo === "estorno") { tot.estorno += v; qtdEstornoReceb++; }
-                  if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
+                  if (m.tipo === "recebimento") {
+                    tot.recebimento += v;
+                    qtdReceb++;
+                  } else if (m.tipo === "sangria") tot.sangria += v;
+                  else if (m.tipo === "estorno") {
+                    tot.estorno += v;
+                    qtdEstornoReceb++;
+                  }
+                  if (
+                    m.tipo !== "estorno" &&
+                    (m.descricao ?? "").toLowerCase().includes("estorno")
+                  ) {
                     tot.estorno += v;
                     qtdEstornoReceb++;
                   }
@@ -3999,37 +5089,71 @@ function Page() {
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                       <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Abertura</p>
-                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">{fmt(openDetalhe.valor_abertura)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Abertura
+                        </p>
+                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">
+                          {fmt(openDetalhe.valor_abertura)}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(recebLiquido)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Recebimentos
+                        </p>
+                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">
+                          {fmt(recebLiquido)}
+                        </p>
                         <p className="text-[11px] text-muted-foreground">
                           {qtdRecebLiquido} lançamento{qtdRecebLiquido === 1 ? "" : "s"}
-                          {qtdEstornoReceb > 0 ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}` : ""}
+                          {qtdEstornoReceb > 0
+                            ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}`
+                            : ""}
                         </p>
                       </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
-                        <p className="text-base font-bold text-amber-700 dark:text-amber-400">{fmt(tot.sangria)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Sangrias
+                        </p>
+                        <p className="text-base font-bold text-amber-700 dark:text-amber-400">
+                          {fmt(tot.sangria)}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
-                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Média / atendimento
+                        </p>
+                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">
+                          {fmt(media)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
-                        <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">{fmt(tot.estorno)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Estornos
+                        </p>
+                        <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">
+                          {fmt(tot.estorno)}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm rounded-lg border bg-muted/30 p-3">
-                      <div><span className="text-muted-foreground">Calculado:</span> <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong></div>
-                      <div><span className="text-muted-foreground">Informado:</span> <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong></div>
+                      <div>
+                        <span className="text-muted-foreground">Calculado:</span>{" "}
+                        <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Informado:</span>{" "}
+                        <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong>
+                      </div>
                       <div>
                         <span className="text-muted-foreground">Diferença:</span>{" "}
-                        <strong className={diff < 0 ? "text-rose-600" : diff > 0 ? "text-amber-600" : ""}>{fmt(diff)}</strong>
+                        <strong
+                          className={diff < 0 ? "text-rose-600" : diff > 0 ? "text-amber-600" : ""}
+                        >
+                          {fmt(diff)}
+                        </strong>
                       </div>
                     </div>
                   </>
@@ -4052,35 +5176,81 @@ function Page() {
                     {detalheMovs.flatMap((m) => {
                       const bucket = bucketDeMov(m);
                       const partes = bucket === "misto" ? partesDoMov(m) : {};
-                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      const entradas = Object.entries(partes).filter(
+                        ([, v]) => (v ?? 0) > 0.005,
+                      ) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (
                           <TableRow key={`${m.id}-${k}`}>
-                            <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
-                            <TableCell>{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
-                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                            <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}
+                            </TableCell>
+                            <TableCell>
+                              {idx === 0
+                                ? new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : ""}
+                            </TableCell>
+                            <TableCell>
+                              {idx === 0 ? (
+                                <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                  {TIPO_LABEL[m.tipo]}
+                                </Badge>
+                              ) : null}
+                            </TableCell>
+                            <TableCell>
+                              {idx === 0 ? (
+                                m.descricao || "—"
+                              ) : (
+                                <span className="text-muted-foreground text-xs pl-2">
+                                  ↳ parcela
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
-                            <TableCell className="text-xs uppercase">{idx === 0 ? usuarioNomeFor(m) : ""}</TableCell>
-                            <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            <TableCell className="text-xs uppercase">
+                              {idx === 0 ? usuarioNomeFor(m) : ""}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                            >
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                              {fmt(v)}
                             </TableCell>
                           </TableRow>
                         ));
                       }
-                      return [(
+                      return [
                         <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
-                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
-                          <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(m.created_at).toLocaleDateString("pt-BR")}
                           </TableCell>
-                        </TableRow>
-                      )];
+                          <TableCell>
+                            {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                              {TIPO_LABEL[m.tipo]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell>
+                            <FormaCellEditavel m={m} />
+                          </TableCell>
+                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
+                          <TableCell
+                            className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                          >
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                            {fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>,
+                      ];
                     })}
                   </TableBody>
                 </Table>
@@ -4091,7 +5261,9 @@ function Page() {
       </Dialog>
       <SolicitarEstornoDialog
         open={!!estornoFor}
-        onOpenChange={(v) => { if (!v) setEstornoFor(null); }}
+        onOpenChange={(v) => {
+          if (!v) setEstornoFor(null);
+        }}
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
@@ -4103,9 +5275,16 @@ function Page() {
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
-        onCreated={() => { void reloadEstornosPendentes(); }}
+        onCreated={() => {
+          void reloadEstornosPendentes();
+        }}
       />
-      <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
+      <Dialog
+        open={!!caixaDrill}
+        onOpenChange={(v) => {
+          if (!v) setCaixaDrill(null);
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -4123,10 +5302,24 @@ function Page() {
           </DialogHeader>
           {caixaDrill === "abertura" && minhaSessao && (
             <div className="space-y-2 text-sm">
-              <div><span className="text-muted-foreground">Aberto em:</span> {fmtDT(minhaSessao.aberto_em)}</div>
-              <div><span className="text-muted-foreground">Valor de abertura:</span> <span className="font-semibold">{fmt(minhaSessao.valor_abertura)}</span></div>
-              <div><span className="text-muted-foreground">Operador:</span> {minhaSessao.user_nome ?? "—"}</div>
-              {minhaSessao.observacoes && <div><span className="text-muted-foreground">Observações:</span> {minhaSessao.observacoes}</div>}
+              <div>
+                <span className="text-muted-foreground">Aberto em:</span>{" "}
+                {fmtDT(minhaSessao.aberto_em)}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Valor de abertura:</span>{" "}
+                <span className="font-semibold">{fmt(minhaSessao.valor_abertura)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Operador:</span>{" "}
+                {minhaSessao.user_nome ?? "—"}
+              </div>
+              {minhaSessao.observacoes && (
+                <div>
+                  <span className="text-muted-foreground">Observações:</span>{" "}
+                  {minhaSessao.observacoes}
+                </div>
+              )}
             </div>
           )}
           {caixaDrill && caixaDrill !== "abertura" && (
@@ -4144,38 +5337,70 @@ function Page() {
                 <TableBody>
                   {minhasMovs
                     .filter((m) => {
-                      if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
-                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
+                      if (caixaDrill === "entradas")
+                        return m.tipo === "suprimento" || m.tipo === "recebimento";
+                      if (caixaDrill === "saidas")
+                        return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
                       return true;
                     })
                     .flatMap((m) => {
                       const bucket = bucketDeMov(m);
                       const partes = bucket === "misto" ? partesDoMov(m) : {};
-                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      const entradas = Object.entries(partes).filter(
+                        ([, v]) => (v ?? 0) > 0.005,
+                      ) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (
                           <TableRow key={`${m.id}-${k}`}>
-                            <TableCell className="whitespace-nowrap">{idx === 0 ? fmtDT(m.created_at) : ""}</TableCell>
-                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                            <TableCell>{idx === 0 ? (m.descricao ?? "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {idx === 0 ? fmtDT(m.created_at) : ""}
+                            </TableCell>
+                            <TableCell>
+                              {idx === 0 ? (
+                                <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                  {TIPO_LABEL[m.tipo]}
+                                </Badge>
+                              ) : null}
+                            </TableCell>
+                            <TableCell>
+                              {idx === 0 ? (
+                                (m.descricao ?? "—")
+                              ) : (
+                                <span className="text-muted-foreground text-xs pl-2">
+                                  ↳ parcela
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
-                            <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            <TableCell
+                              className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}
+                            >
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                              {fmt(v)}
                             </TableCell>
                           </TableRow>
                         ));
                       }
-                      return [(
+                      return [
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao ?? "—"}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
-                          <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          <TableCell>
+                            <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                              {TIPO_LABEL[m.tipo]}
+                            </Badge>
                           </TableCell>
-                        </TableRow>
-                      )];
+                          <TableCell>{m.descricao ?? "—"}</TableCell>
+                          <TableCell>
+                            <FormaCellEditavel m={m} />
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}
+                          >
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                            {fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>,
+                      ];
                     })}
                 </TableBody>
               </Table>
@@ -4185,14 +5410,22 @@ function Page() {
       </Dialog>
 
       {/* Diálogo para dados do cartão (crédito/débito) ao editar a Forma inline. */}
-      <Dialog open={!!cartaoEditFor} onOpenChange={(v) => { if (!v) setCartaoEditFor(null); }}>
+      <Dialog
+        open={!!cartaoEditFor}
+        onOpenChange={(v) => {
+          if (!v) setCartaoEditFor(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {cartaoEditFor?.forma === "cartao_credito" ? "Dados do cartão de crédito" : "Dados do cartão de débito"}
+              {cartaoEditFor?.forma === "cartao_credito"
+                ? "Dados do cartão de crédito"
+                : "Dados do cartão de débito"}
             </DialogTitle>
             <DialogDescription>
-              Informe os dados da transação no cartão. Eles ficam vinculados ao lançamento financeiro.
+              Informe os dados da transação no cartão. Eles ficam vinculados ao lançamento
+              financeiro.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
@@ -4202,10 +5435,14 @@ function Page() {
                 value={cartaoEdit.bandeira}
                 onValueChange={(v) => setCartaoEdit((s) => ({ ...s, bandeira: v }))}
               >
-                <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a bandeira" />
+                </SelectTrigger>
                 <SelectContent>
                   {BANDEIRAS_CARTAO.map((b) => (
-                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -4217,10 +5454,14 @@ function Page() {
                   value={cartaoEdit.parcelas}
                   onValueChange={(v) => setCartaoEdit((s) => ({ ...s, parcelas: v }))}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                      <SelectItem key={n} value={String(n)}>
+                        {n}x
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -4251,7 +5492,11 @@ function Page() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setCartaoEditFor(null)} disabled={salvandoCartao}>
+            <Button
+              variant="ghost"
+              onClick={() => setCartaoEditFor(null)}
+              disabled={salvandoCartao}
+            >
               Cancelar
             </Button>
             <Button onClick={() => void confirmarCartaoEdit()} disabled={salvandoCartao}>
