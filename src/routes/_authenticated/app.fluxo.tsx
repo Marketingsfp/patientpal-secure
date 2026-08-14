@@ -59,7 +59,13 @@ export const Route = createFileRoute("/_authenticated/app/fluxo")({
 });
 
 type Etapa =
-  "aguardando_recepcao" | "recepcao" | "caixa" | "triagem" | "atendimento" | "exame" | "finalizado";
+  | "aguardando_recepcao"
+  | "recepcao"
+  | "caixa"
+  | "triagem"
+  | "atendimento"
+  | "exame"
+  | "finalizado";
 
 const ETAPAS: {
   id: Etapa;

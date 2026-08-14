@@ -16,7 +16,12 @@
  */
 
 export type CategoriaProc =
-  "laboratorio" | "imagem" | "consulta" | "procedimento" | "cirurgia" | "outro";
+  | "laboratorio"
+  | "imagem"
+  | "consulta"
+  | "procedimento"
+  | "cirurgia"
+  | "outro";
 
 export function categoriaDoProcedimento(tipo: string | null | undefined): CategoriaProc {
   const t = (tipo ?? "").trim().toLowerCase();

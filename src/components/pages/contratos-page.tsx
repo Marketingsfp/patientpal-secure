@@ -3546,7 +3546,8 @@ function DetalheContrato({
       // Reconstrói o detalhe do misto a partir das observações (mesma
       // convenção usada em print-gr.ts para reimpressões de atendimento).
       let detalhe:
-        Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+        | Array<{ forma: string; pago: number; troco: number; recebido: number }>
+        | undefined;
       if (l.forma_pagamento === "misto" && l.observacoes) {
         const idx = l.observacoes.indexOf("Pagamento misto:");
         if (idx >= 0) {

@@ -790,7 +790,8 @@ async function printGuiaAtendimentoCore({
     if (formaResolvida) {
       // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
       let detalhe:
-        Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+        | Array<{ forma: string; pago: number; troco: number; recebido: number }>
+        | undefined;
       if (formaResolvida === "misto" && obsResolvida) {
         const idx = obsResolvida.indexOf("Pagamento misto:");
         if (idx >= 0) {

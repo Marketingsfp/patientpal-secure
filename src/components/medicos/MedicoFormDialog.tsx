@@ -2043,7 +2043,8 @@ export function MedicoFormDialog({
                                       ? {
                                           ...x,
                                           convenio_tipo_repasse: e.target.value as
-                                            "percentual" | "valor",
+                                            | "percentual"
+                                            | "valor",
                                         }
                                       : x,
                                   ),

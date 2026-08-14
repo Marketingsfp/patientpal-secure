@@ -565,14 +565,14 @@ function RelatoriosPage() {
       const rows = [
         ...pagas.map((m) => ({
           data: fmtDate(m.pago_em ?? ""),
-          descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`,
+          descricao: `${Number(m.numero_parcela) === 0 ? "Adesão" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "—"}`,
           valor: BRL(m.valor),
         })),
         ...contratos
           .filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id))
           .map((c) => ({
             data: fmtDate(c.data_inicio),
-            descricao: `Ades�o - ${c.paciente_nome}`,
+            descricao: `Adesão - ${c.paciente_nome}`,
             valor: BRL(c.taxa_adesao),
           })),
       ];
@@ -641,7 +641,7 @@ function RelatoriosPage() {
         ...pagas.map((m) => ({
           data: fmtDate(m.pago_em ?? ""),
           tipo: "Receita",
-          descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`,
+          descricao: `${Number(m.numero_parcela) === 0 ? "Adesão" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "—"}`,
           valor: BRL(m.valor),
         })),
         ...contratos
@@ -649,7 +649,7 @@ function RelatoriosPage() {
           .map((c) => ({
             data: fmtDate(c.data_inicio),
             tipo: "Receita",
-            descricao: `Ades�o - ${c.paciente_nome}`,
+            descricao: `Adesão - ${c.paciente_nome}`,
             valor: BRL(c.taxa_adesao),
           })),
         ...despesas.map((l) => ({

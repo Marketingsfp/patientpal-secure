@@ -29,7 +29,8 @@ export function useCrud<T extends TableName>(table: T, options: UseCrudOptions =
   const insert = useCallback(
     async (
       values:
-        Database["public"]["Tables"][T]["Insert"] | Database["public"]["Tables"][T]["Insert"][],
+        | Database["public"]["Tables"][T]["Insert"]
+        | Database["public"]["Tables"][T]["Insert"][],
     ) => {
       setLoading(true);
       try {

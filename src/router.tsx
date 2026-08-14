@@ -14,8 +14,6 @@ export const getRouter = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        // Cache padr o: dados frescos por 1 min, mantidos em mem ria por 10 min.
-        // Evita refetch a cada navega o entre telas (agenda, financeiro, m dicos).
         // Dados ficam frescos por 5 min e em memória por 30 min.
         // Reduz drasticamente refetches ao navegar entre telas.
         staleTime: 5 * 60_000,

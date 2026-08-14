@@ -261,7 +261,10 @@ function OdontologiaPage() {
   }
 
   type CampoProntuario =
-    "queixa_principal" | "historia_dental" | "plano_tratamento" | "observacoes";
+    | "queixa_principal"
+    | "historia_dental"
+    | "plano_tratamento"
+    | "observacoes";
   async function salvarProntuario(campo: CampoProntuario, valor: string) {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");

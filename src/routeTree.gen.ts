@@ -9,182 +9,143 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
-import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as MedicoRouteImport } from './routes/medico'
-import { Route as PainelRouteImport } from './routes/painel'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TotemRouteImport } from './routes/totem'
-import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
-import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
-import { Route as LpSlugRouteImport } from './routes/lp.$slug'
-import { Route as PTokenRouteImport } from './routes/p.$token'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PainelRouteImport } from './routes/painel'
+import { Route as MedicoRouteImport } from './routes/medico'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
+import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
-import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
-import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
-import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
-import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
-import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
-import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
+import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
+import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
+import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
+import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
+import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
+import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
+import { Route as PTokenRouteImport } from './routes/p.$token'
+import { Route as LpSlugRouteImport } from './routes/lp.$slug'
+import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
-import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
-import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
-import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
-import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
-import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
-import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
-import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
-import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
-import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
-import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
-import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
-import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
-import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
-import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
-import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
-import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
-import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
-import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
-import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
-import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
-import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
-import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
-import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
-import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
-import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
-import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
-import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
-import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
-import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
-import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
-import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
-import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
-import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
-import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
-import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
-import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
-import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
-import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
-import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
-import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
-import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
-import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
-import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
-import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
-import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
-import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
-import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
-import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
-import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_authenticated/app.orcamentos-agenda'
-import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
-import { Route as AuthenticatedAppPainelExecutivoRouteImport } from './routes/_authenticated/app.painel-executivo'
-import { Route as AuthenticatedAppPerfisRouteImport } from './routes/_authenticated/app.perfis'
-import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
-import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
-import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
-import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
-import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
-import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
-import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
-import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
-import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
-import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
-import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
-import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
-import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
-import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
-import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
-import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
-import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
-import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
-import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from './routes/_authenticated/app.cartao-beneficios.convenios'
-import { Route as AuthenticatedAppCartaoBeneficiosDependentesRouteImport } from './routes/_authenticated/app.cartao-beneficios.dependentes'
-import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
-import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
-import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
-import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
-import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
-import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
-import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
-import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
-import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
-import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
-import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
-import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
-import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos-externos'
-import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
-import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
-import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
-import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
-import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
-import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
-import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
-import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
-import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
-import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
-import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
-import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
-import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_authenticated/app.hr-contratos.$id'
-import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
-import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
+import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
+import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
+import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
+import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
+import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
+import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
+import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
+import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
+import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
+import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
+import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
+import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
+import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
+import { Route as AuthenticatedAppPerfisRouteImport } from './routes/_authenticated/app.perfis'
+import { Route as AuthenticatedAppPainelExecutivoRouteImport } from './routes/_authenticated/app.painel-executivo'
+import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
+import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_authenticated/app.orcamentos-agenda'
+import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
+import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
+import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
+import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
+import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
+import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
+import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
+import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
+import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
+import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
+import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
+import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
+import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
+import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
+import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
+import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
+import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
+import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
+import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
+import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
+import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
+import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
+import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
+import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
+import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
+import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
+import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
+import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
+import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
+import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
+import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
+import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
+import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
+import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
+import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
+import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
+import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
+import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
+import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
+import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
+import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
+import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
+import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
+import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
+import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
+import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
+import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
+import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
-import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
-import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
-import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
+import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
+import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
+import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
+import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
+import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
-import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
+import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
+import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
+import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
+import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
+import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
+import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_authenticated/app.hr-contratos.$id'
+import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
+import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
+import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
+import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
+import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
+import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
+import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
+import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
+import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
+import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
+import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
+import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos-externos'
+import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
+import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
+import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
+import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
+import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
+import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
+import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
+import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
+import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
+import { Route as AuthenticatedAppCartaoBeneficiosDependentesRouteImport } from './routes/_authenticated/app.cartao-beneficios.dependentes'
+import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from './routes/_authenticated/app.cartao-beneficios.convenios'
+import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
+import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
+import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
+import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AutoatendimentoRoute = AutoatendimentoRouteImport.update({
-  id: '/autoatendimento',
-  path: '/autoatendimento',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiagnosticoRoute = DiagnosticoRouteImport.update({
-  id: '/diagnostico',
-  path: '/diagnostico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MedicoRoute = MedicoRouteImport.update({
-  id: '/medico',
-  path: '/medico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PainelRoute = PainelRouteImport.update({
-  id: '/painel',
-  path: '/painel',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const TotemRoute = TotemRouteImport.update({
+  id: '/totem',
+  path: '/totem',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -192,29 +153,48 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TotemRoute = TotemRouteImport.update({
-  id: '/totem',
-  path: '/totem',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const CheckinTokenRoute = CheckinTokenRouteImport.update({
-  id: '/checkin/$token',
-  path: '/checkin/$token',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LpSlugRoute = LpSlugRouteImport.update({
-  id: '/lp/$slug',
-  path: '/lp/$slug',
+const PainelRoute = PainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PTokenRoute = PTokenRouteImport.update({
-  id: '/p/$token',
-  path: '/p/$token',
+const MedicoRoute = MedicoRouteImport.update({
+  id: '/medico',
+  path: '/medico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiagnosticoRoute = DiagnosticoRouteImport.update({
+  id: '/diagnostico',
+  path: '/diagnostico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AutoatendimentoRoute = AutoatendimentoRouteImport.update({
+  id: '/autoatendimento',
+  path: '/autoatendimento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PacienteIndexRoute = PacienteIndexRouteImport.update({
@@ -222,24 +202,14 @@ const PacienteIndexRoute = PacienteIndexRouteImport.update({
   path: '/paciente/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
-  id: '/paciente/cartoes',
-  path: '/paciente/cartoes',
+const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
+  id: '/verificar/$codigo',
+  path: '/verificar/$codigo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
-  id: '/paciente/consultas',
-  path: '/paciente/consultas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
-  id: '/paciente/financeiro',
-  path: '/paciente/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacientePerfilRoute = PacientePerfilRouteImport.update({
-  id: '/paciente/perfil',
-  path: '/paciente/perfil',
+const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
+  id: '/totem_/$clinicaId',
+  path: '/totem/$clinicaId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
@@ -247,365 +217,75 @@ const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
   path: '/$clinicaId',
   getParentRoute: () => PainelRoute,
 } as any)
-const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
-  id: '/totem_/$clinicaId',
-  path: '/totem/$clinicaId',
+const PacientePerfilRoute = PacientePerfilRouteImport.update({
+  id: '/paciente/perfil',
+  path: '/paciente/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
-  id: '/verificar/$codigo',
-  path: '/verificar/$codigo',
+const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
+  id: '/paciente/financeiro',
+  path: '/paciente/financeiro',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
+  id: '/paciente/consultas',
+  path: '/paciente/consultas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
+  id: '/paciente/cartoes',
+  path: '/paciente/cartoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PTokenRoute = PTokenRouteImport.update({
+  id: '/p/$token',
+  path: '/p/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LpSlugRoute = LpSlugRouteImport.update({
+  id: '/lp/$slug',
+  path: '/lp/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckinTokenRoute = CheckinTokenRouteImport.update({
+  id: '/checkin/$token',
+  path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
-  id: '/agenda',
-  path: '/agenda',
-  getParentRoute: () => AuthenticatedAppRoute,
+const TotemTTokenRoute = TotemTTokenRouteImport.update({
+  id: '/totem_/t/$token',
+  path: '/totem/t/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppAgendaMedicosRoute =
-  AuthenticatedAppAgendaMedicosRouteImport.update({
-    id: '/agenda-medicos',
-    path: '/agenda-medicos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAgendaV2Route =
-  AuthenticatedAppAgendaV2RouteImport.update({
-    id: '/agenda-v2',
-    path: '/agenda-v2',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAlertasEnfermagemRoute =
-  AuthenticatedAppAlertasEnfermagemRouteImport.update({
-    id: '/alertas-enfermagem',
-    path: '/alertas-enfermagem',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAnamnesesRoute =
-  AuthenticatedAppAnamnesesRouteImport.update({
-    id: '/anamneses',
-    path: '/anamneses',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAtendimentoIaRoute =
-  AuthenticatedAppAtendimentoIaRouteImport.update({
-    id: '/atendimento-ia',
-    path: '/atendimento-ia',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAtendimentoMultiploRoute =
-  AuthenticatedAppAtendimentoMultiploRouteImport.update({
-    id: '/atendimento-multiplo',
-    path: '/atendimento-multiplo',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppAuditoriaRoute =
-  AuthenticatedAppAuditoriaRouteImport.update({
-    id: '/auditoria',
-    path: '/auditoria',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppBackupsRoute = AuthenticatedAppBackupsRouteImport.update({
-  id: '/backups',
-  path: '/backups',
-  getParentRoute: () => AuthenticatedAppRoute,
+const PainelTTokenRoute = PainelTTokenRouteImport.update({
+  id: '/painel_/t/$token',
+  path: '/painel/t/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
-  id: '/boletos',
-  path: '/boletos',
-  getParentRoute: () => AuthenticatedAppRoute,
+const PContratoTokenRoute = PContratoTokenRouteImport.update({
+  id: '/p/contrato/$token',
+  path: '/p/contrato/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppCaixaRoute = AuthenticatedAppCaixaRouteImport.update({
-  id: '/caixa',
-  path: '/caixa',
-  getParentRoute: () => AuthenticatedAppRoute,
+const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
+  id: '/api/public/tts',
+  path: '/api/public/tts',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppCampanhasRoute =
-  AuthenticatedAppCampanhasRouteImport.update({
-    id: '/campanhas',
-    path: '/campanhas',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppCargosRoute = AuthenticatedAppCargosRouteImport.update({
-  id: '/cargos',
-  path: '/cargos',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppCartaoBeneficiosRoute =
-  AuthenticatedAppCartaoBeneficiosRouteImport.update({
-    id: '/cartao-beneficios',
-    path: '/cartao-beneficios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppChatRoute = AuthenticatedAppChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppCheckinRoute = AuthenticatedAppCheckinRouteImport.update({
-  id: '/checkin',
-  path: '/checkin',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppClinicasRoute =
-  AuthenticatedAppClinicasRouteImport.update({
-    id: '/clinicas',
-    path: '/clinicas',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppConsultaRapidaRoute =
-  AuthenticatedAppConsultaRapidaRouteImport.update({
-    id: '/consulta-rapida',
-    path: '/consulta-rapida',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppContratosRoute =
-  AuthenticatedAppContratosRouteImport.update({
-    id: '/contratos',
-    path: '/contratos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
-  id: '/crm',
-  path: '/crm',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppDevCaixaShellRoute =
-  AuthenticatedAppDevCaixaShellRouteImport.update({
-    id: '/dev-caixa-shell',
-    path: '/dev-caixa-shell',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppDevClientesShellRoute =
-  AuthenticatedAppDevClientesShellRouteImport.update({
-    id: '/dev-clientes-shell',
-    path: '/dev-clientes-shell',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppDevHhpRoute = AuthenticatedAppDevHhpRouteImport.update({
-  id: '/dev-hhp',
-  path: '/dev-hhp',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppDevListShellRoute =
-  AuthenticatedAppDevListShellRouteImport.update({
-    id: '/dev-list-shell',
-    path: '/dev-list-shell',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppDevOrcamentosShellRoute =
-  AuthenticatedAppDevOrcamentosShellRouteImport.update({
-    id: '/dev-orcamentos-shell',
-    path: '/dev-orcamentos-shell',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppDisponibilidadesRoute =
-  AuthenticatedAppDisponibilidadesRouteImport.update({
-    id: '/disponibilidades',
-    path: '/disponibilidades',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppDocumentosRoute =
-  AuthenticatedAppDocumentosRouteImport.update({
-    id: '/documentos',
-    path: '/documentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
-  id: '/equipe',
-  path: '/equipe',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppEspecialidadesRoute =
-  AuthenticatedAppEspecialidadesRouteImport.update({
-    id: '/especialidades',
-    path: '/especialidades',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppEstoqueRoute = AuthenticatedAppEstoqueRouteImport.update({
-  id: '/estoque',
-  path: '/estoque',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppExamesResultadosRoute =
-  AuthenticatedAppExamesResultadosRouteImport.update({
-    id: '/exames-resultados',
-    path: '/exames-resultados',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppFinanceiroRoute =
-  AuthenticatedAppFinanceiroRouteImport.update({
-    id: '/financeiro',
-    path: '/financeiro',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
-  id: '/fluxo',
-  path: '/fluxo',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppHrFeriasRoute =
-  AuthenticatedAppHrFeriasRouteImport.update({
-    id: '/hr-ferias',
-    path: '/hr-ferias',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppHrHoleritesRoute =
-  AuthenticatedAppHrHoleritesRouteImport.update({
-    id: '/hr-holerites',
-    path: '/hr-holerites',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppHrPontoRoute = AuthenticatedAppHrPontoRouteImport.update({
-  id: '/hr-ponto',
-  path: '/hr-ponto',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppIntegrationSecretsRoute =
-  AuthenticatedAppIntegrationSecretsRouteImport.update({
-    id: '/integration-secrets',
-    path: '/integration-secrets',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
-  id: '/lgpd',
-  path: '/lgpd',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppLmsAdminRoute =
-  AuthenticatedAppLmsAdminRouteImport.update({
-    id: '/lms-admin',
-    path: '/lms-admin',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
-  id: '/medicos',
-  path: '/medicos',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppMktEnviosRoute =
-  AuthenticatedAppMktEnviosRouteImport.update({
-    id: '/mkt-envios',
-    path: '/mkt-envios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktLandingRoute =
-  AuthenticatedAppMktLandingRouteImport.update({
-    id: '/mkt-landing',
-    path: '/mkt-landing',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktLeadsRoute =
-  AuthenticatedAppMktLeadsRouteImport.update({
-    id: '/mkt-leads',
-    path: '/mkt-leads',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktSegmentosRoute =
-  AuthenticatedAppMktSegmentosRouteImport.update({
-    id: '/mkt-segmentos',
-    path: '/mkt-segmentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppModelosDocumentosRoute =
-  AuthenticatedAppModelosDocumentosRouteImport.update({
-    id: '/modelos-documentos',
-    path: '/modelos-documentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppNinaRoute = AuthenticatedAppNinaRouteImport.update({
-  id: '/nina',
-  path: '/nina',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppOdontologiaRoute =
-  AuthenticatedAppOdontologiaRouteImport.update({
-    id: '/odontologia',
-    path: '/odontologia',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppOrcamentosRoute =
-  AuthenticatedAppOrcamentosRouteImport.update({
-    id: '/orcamentos',
-    path: '/orcamentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppOrcamentosAgendaRoute =
-  AuthenticatedAppOrcamentosAgendaRouteImport.update({
-    id: '/orcamentos-agenda',
-    path: '/orcamentos-agenda',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppPainelRoute = AuthenticatedAppPainelRouteImport.update({
-  id: '/painel',
-  path: '/painel',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppPainelExecutivoRoute =
-  AuthenticatedAppPainelExecutivoRouteImport.update({
-    id: '/painel-executivo',
-    path: '/painel-executivo',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppPerfisRoute = AuthenticatedAppPerfisRouteImport.update({
-  id: '/perfis',
-  path: '/perfis',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppPlanosRoute = AuthenticatedAppPlanosRouteImport.update({
-  id: '/planos',
-  path: '/planos',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppProcedimentosRoute =
-  AuthenticatedAppProcedimentosRouteImport.update({
-    id: '/procedimentos',
-    path: '/procedimentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppProntuarioModelosRoute =
-  AuthenticatedAppProntuarioModelosRouteImport.update({
-    id: '/prontuario-modelos',
-    path: '/prontuario-modelos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppProntuariosRoute =
-  AuthenticatedAppProntuariosRouteImport.update({
-    id: '/prontuarios',
-    path: '/prontuarios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppRecepcaoRoute =
-  AuthenticatedAppRecepcaoRouteImport.update({
-    id: '/recepcao',
-    path: '/recepcao',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppRelatoriosRoute =
-  AuthenticatedAppRelatoriosRouteImport.update({
-    id: '/relatorios',
-    path: '/relatorios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
-  id: '/setores',
-  path: '/setores',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppTiposServicoRoute =
-  AuthenticatedAppTiposServicoRouteImport.update({
-    id: '/tipos-servico',
-    path: '/tipos-servico',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppTreinamentosRoute =
-  AuthenticatedAppTreinamentosRouteImport.update({
-    id: '/treinamentos',
-    path: '/treinamentos',
+const AuthenticatedAppUnidadesRoute =
+  AuthenticatedAppUnidadesRouteImport.update({
+    id: '/unidades',
+    path: '/unidades',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppTriagemEnfermagemRoute =
@@ -614,211 +294,357 @@ const AuthenticatedAppTriagemEnfermagemRoute =
     path: '/triagem-enfermagem',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppUnidadesRoute =
-  AuthenticatedAppUnidadesRouteImport.update({
-    id: '/unidades',
-    path: '/unidades',
+const AuthenticatedAppTreinamentosRoute =
+  AuthenticatedAppTreinamentosRouteImport.update({
+    id: '/treinamentos',
+    path: '/treinamentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
-  id: '/api/public/tts',
-  path: '/api/public/tts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PContratoTokenRoute = PContratoTokenRouteImport.update({
-  id: '/p/contrato/$token',
-  path: '/p/contrato/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PainelTTokenRoute = PainelTTokenRouteImport.update({
-  id: '/painel_/t/$token',
-  path: '/painel/t/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TotemTTokenRoute = TotemTTokenRouteImport.update({
-  id: '/totem_/t/$token',
-  path: '/totem/t/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedAppAtendimentoIaIndexRoute =
-  AuthenticatedAppAtendimentoIaIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
+const AuthenticatedAppTiposServicoRoute =
+  AuthenticatedAppTiposServicoRouteImport.update({
+    id: '/tipos-servico',
+    path: '/tipos-servico',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
-  AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport.update({
-    id: '/$agendamentoId',
-    path: '/$agendamentoId',
-    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
+const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
+  id: '/setores',
+  path: '/setores',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppRelatoriosRoute =
+  AuthenticatedAppRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppCartaoBeneficiosBeneficiosRoute =
-  AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport.update({
-    id: '/beneficios',
-    path: '/beneficios',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+const AuthenticatedAppRecepcaoRoute =
+  AuthenticatedAppRecepcaoRouteImport.update({
+    id: '/recepcao',
+    path: '/recepcao',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppCartaoBeneficiosContratosRoute =
-  AuthenticatedAppCartaoBeneficiosContratosRouteImport.update({
+const AuthenticatedAppProntuariosRoute =
+  AuthenticatedAppProntuariosRouteImport.update({
+    id: '/prontuarios',
+    path: '/prontuarios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppProntuarioModelosRoute =
+  AuthenticatedAppProntuarioModelosRouteImport.update({
+    id: '/prontuario-modelos',
+    path: '/prontuario-modelos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppProcedimentosRoute =
+  AuthenticatedAppProcedimentosRouteImport.update({
+    id: '/procedimentos',
+    path: '/procedimentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppPlanosRoute = AuthenticatedAppPlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppPerfisRoute = AuthenticatedAppPerfisRouteImport.update({
+  id: '/perfis',
+  path: '/perfis',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppPainelExecutivoRoute =
+  AuthenticatedAppPainelExecutivoRouteImport.update({
+    id: '/painel-executivo',
+    path: '/painel-executivo',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppPainelRoute = AuthenticatedAppPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppOrcamentosAgendaRoute =
+  AuthenticatedAppOrcamentosAgendaRouteImport.update({
+    id: '/orcamentos-agenda',
+    path: '/orcamentos-agenda',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppOrcamentosRoute =
+  AuthenticatedAppOrcamentosRouteImport.update({
+    id: '/orcamentos',
+    path: '/orcamentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppOdontologiaRoute =
+  AuthenticatedAppOdontologiaRouteImport.update({
+    id: '/odontologia',
+    path: '/odontologia',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppNinaRoute = AuthenticatedAppNinaRouteImport.update({
+  id: '/nina',
+  path: '/nina',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppModelosDocumentosRoute =
+  AuthenticatedAppModelosDocumentosRouteImport.update({
+    id: '/modelos-documentos',
+    path: '/modelos-documentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktSegmentosRoute =
+  AuthenticatedAppMktSegmentosRouteImport.update({
+    id: '/mkt-segmentos',
+    path: '/mkt-segmentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLeadsRoute =
+  AuthenticatedAppMktLeadsRouteImport.update({
+    id: '/mkt-leads',
+    path: '/mkt-leads',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLandingRoute =
+  AuthenticatedAppMktLandingRouteImport.update({
+    id: '/mkt-landing',
+    path: '/mkt-landing',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktEnviosRoute =
+  AuthenticatedAppMktEnviosRouteImport.update({
+    id: '/mkt-envios',
+    path: '/mkt-envios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
+  id: '/medicos',
+  path: '/medicos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppLmsAdminRoute =
+  AuthenticatedAppLmsAdminRouteImport.update({
+    id: '/lms-admin',
+    path: '/lms-admin',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
+  id: '/lgpd',
+  path: '/lgpd',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppIntegrationSecretsRoute =
+  AuthenticatedAppIntegrationSecretsRouteImport.update({
+    id: '/integration-secrets',
+    path: '/integration-secrets',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppHrPontoRoute = AuthenticatedAppHrPontoRouteImport.update({
+  id: '/hr-ponto',
+  path: '/hr-ponto',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppHrHoleritesRoute =
+  AuthenticatedAppHrHoleritesRouteImport.update({
+    id: '/hr-holerites',
+    path: '/hr-holerites',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppHrFeriasRoute =
+  AuthenticatedAppHrFeriasRouteImport.update({
+    id: '/hr-ferias',
+    path: '/hr-ferias',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
+  id: '/fluxo',
+  path: '/fluxo',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppFinanceiroRoute =
+  AuthenticatedAppFinanceiroRouteImport.update({
+    id: '/financeiro',
+    path: '/financeiro',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppExamesResultadosRoute =
+  AuthenticatedAppExamesResultadosRouteImport.update({
+    id: '/exames-resultados',
+    path: '/exames-resultados',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppEstoqueRoute = AuthenticatedAppEstoqueRouteImport.update({
+  id: '/estoque',
+  path: '/estoque',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppEspecialidadesRoute =
+  AuthenticatedAppEspecialidadesRouteImport.update({
+    id: '/especialidades',
+    path: '/especialidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppDocumentosRoute =
+  AuthenticatedAppDocumentosRouteImport.update({
+    id: '/documentos',
+    path: '/documentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDisponibilidadesRoute =
+  AuthenticatedAppDisponibilidadesRouteImport.update({
+    id: '/disponibilidades',
+    path: '/disponibilidades',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDevOrcamentosShellRoute =
+  AuthenticatedAppDevOrcamentosShellRouteImport.update({
+    id: '/dev-orcamentos-shell',
+    path: '/dev-orcamentos-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDevListShellRoute =
+  AuthenticatedAppDevListShellRouteImport.update({
+    id: '/dev-list-shell',
+    path: '/dev-list-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDevHhpRoute = AuthenticatedAppDevHhpRouteImport.update({
+  id: '/dev-hhp',
+  path: '/dev-hhp',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppDevClientesShellRoute =
+  AuthenticatedAppDevClientesShellRouteImport.update({
+    id: '/dev-clientes-shell',
+    path: '/dev-clientes-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDevCaixaShellRoute =
+  AuthenticatedAppDevCaixaShellRouteImport.update({
+    id: '/dev-caixa-shell',
+    path: '/dev-caixa-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppContratosRoute =
+  AuthenticatedAppContratosRouteImport.update({
     id: '/contratos',
     path: '/contratos',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
-const AuthenticatedAppCartaoBeneficiosConveniosRoute =
-  AuthenticatedAppCartaoBeneficiosConveniosRouteImport.update({
-    id: '/convenios',
-    path: '/convenios',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
-const AuthenticatedAppCartaoBeneficiosDependentesRoute =
-  AuthenticatedAppCartaoBeneficiosDependentesRouteImport.update({
-    id: '/dependentes',
-    path: '/dependentes',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
-const AuthenticatedAppCartaoBeneficiosModelosRoute =
-  AuthenticatedAppCartaoBeneficiosModelosRouteImport.update({
-    id: '/modelos',
-    path: '/modelos',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
-const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
-  AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
-    id: '/relatorios',
-    path: '/relatorios',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
-const AuthenticatedAppClientesIndexRoute =
-  AuthenticatedAppClientesIndexRouteImport.update({
-    id: '/clientes/',
-    path: '/clientes/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppClientesDuplicadosRoute =
-  AuthenticatedAppClientesDuplicadosRouteImport.update({
-    id: '/clientes/duplicados',
-    path: '/clientes/duplicados',
+const AuthenticatedAppConsultaRapidaRoute =
+  AuthenticatedAppConsultaRapidaRouteImport.update({
+    id: '/consulta-rapida',
+    path: '/consulta-rapida',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppConfiguracoesNfseRoute =
-  AuthenticatedAppConfiguracoesNfseRouteImport.update({
-    id: '/configuracoes/nfse',
-    path: '/configuracoes/nfse',
+const AuthenticatedAppClinicasRoute =
+  AuthenticatedAppClinicasRouteImport.update({
+    id: '/clinicas',
+    path: '/clinicas',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppConfiguracoesPainelTotemRoute =
-  AuthenticatedAppConfiguracoesPainelTotemRouteImport.update({
-    id: '/configuracoes/painel-totem',
-    path: '/configuracoes/painel-totem',
+const AuthenticatedAppCheckinRoute = AuthenticatedAppCheckinRouteImport.update({
+  id: '/checkin',
+  path: '/checkin',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppChatRoute = AuthenticatedAppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppCartaoBeneficiosRoute =
+  AuthenticatedAppCartaoBeneficiosRouteImport.update({
+    id: '/cartao-beneficios',
+    path: '/cartao-beneficios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppConfiguracoesVozRoute =
-  AuthenticatedAppConfiguracoesVozRouteImport.update({
-    id: '/configuracoes/voz',
-    path: '/configuracoes/voz',
+const AuthenticatedAppCargosRoute = AuthenticatedAppCargosRouteImport.update({
+  id: '/cargos',
+  path: '/cargos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppCampanhasRoute =
+  AuthenticatedAppCampanhasRouteImport.update({
+    id: '/campanhas',
+    path: '/campanhas',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppEquipeIndexRoute =
-  AuthenticatedAppEquipeIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAppEquipeRoute,
+const AuthenticatedAppCaixaRoute = AuthenticatedAppCaixaRouteImport.update({
+  id: '/caixa',
+  path: '/caixa',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
+  id: '/boletos',
+  path: '/boletos',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppBackupsRoute = AuthenticatedAppBackupsRouteImport.update({
+  id: '/backups',
+  path: '/backups',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppAuditoriaRoute =
+  AuthenticatedAppAuditoriaRouteImport.update({
+    id: '/auditoria',
+    path: '/auditoria',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroIndexRoute =
-  AuthenticatedAppFinanceiroIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAtendimentoMultiploRoute =
+  AuthenticatedAppAtendimentoMultiploRouteImport.update({
+    id: '/atendimento-multiplo',
+    path: '/atendimento-multiplo',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroAlertasRoute =
-  AuthenticatedAppFinanceiroAlertasRouteImport.update({
-    id: '/alertas',
-    path: '/alertas',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAtendimentoIaRoute =
+  AuthenticatedAppAtendimentoIaRouteImport.update({
+    id: '/atendimento-ia',
+    path: '/atendimento-ia',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroAnaliticoRoute =
-  AuthenticatedAppFinanceiroAnaliticoRouteImport.update({
-    id: '/analitico',
-    path: '/analitico',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAnamnesesRoute =
+  AuthenticatedAppAnamnesesRouteImport.update({
+    id: '/anamneses',
+    path: '/anamneses',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroAtendimentosRoute =
-  AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
-    id: '/atendimentos',
-    path: '/atendimentos',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAlertasEnfermagemRoute =
+  AuthenticatedAppAlertasEnfermagemRouteImport.update({
+    id: '/alertas-enfermagem',
+    path: '/alertas-enfermagem',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroAtendimentosExternosRoute =
-  AuthenticatedAppFinanceiroAtendimentosExternosRouteImport.update({
-    id: '/atendimentos-externos',
-    path: '/atendimentos-externos',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAgendaV2Route =
+  AuthenticatedAppAgendaV2RouteImport.update({
+    id: '/agenda-v2',
+    path: '/agenda-v2',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroBiRoute =
-  AuthenticatedAppFinanceiroBiRouteImport.update({
-    id: '/bi',
-    path: '/bi',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAgendaMedicosRoute =
+  AuthenticatedAppAgendaMedicosRouteImport.update({
+    id: '/agenda-medicos',
+    path: '/agenda-medicos',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppFinanceiroCategoriasRoute =
-  AuthenticatedAppFinanceiroCategoriasRouteImport.update({
-    id: '/categorias',
-    path: '/categorias',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroContasRoute =
-  AuthenticatedAppFinanceiroContasRouteImport.update({
-    id: '/contas',
-    path: '/contas',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroEmpresasRoute =
-  AuthenticatedAppFinanceiroEmpresasRouteImport.update({
-    id: '/empresas',
-    path: '/empresas',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroEstatisticasRoute =
-  AuthenticatedAppFinanceiroEstatisticasRouteImport.update({
-    id: '/estatisticas',
-    path: '/estatisticas',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroEstornoRoute =
-  AuthenticatedAppFinanceiroEstornoRouteImport.update({
-    id: '/estorno',
-    path: '/estorno',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroLembretesRoute =
-  AuthenticatedAppFinanceiroLembretesRouteImport.update({
-    id: '/lembretes',
-    path: '/lembretes',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroMovimentoRoute =
-  AuthenticatedAppFinanceiroMovimentoRouteImport.update({
-    id: '/movimento',
-    path: '/movimento',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroNotasRoute =
-  AuthenticatedAppFinanceiroNotasRouteImport.update({
-    id: '/notas',
-    path: '/notas',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroRegrasIaRoute =
-  AuthenticatedAppFinanceiroRegrasIaRouteImport.update({
-    id: '/regras-ia',
-    path: '/regras-ia',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppFinanceiroRelatoriosRoute =
-  AuthenticatedAppFinanceiroRelatoriosRouteImport.update({
-    id: '/relatorios',
-    path: '/relatorios',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppNfseIndexRoute =
+  AuthenticatedAppNfseIndexRouteImport.update({
+    id: '/nfse/',
+    path: '/nfse/',
+    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppHrContratosIndexRoute =
   AuthenticatedAppHrContratosIndexRouteImport.update({
@@ -826,40 +652,34 @@ const AuthenticatedAppHrContratosIndexRoute =
     path: '/hr-contratos/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppHrContratosIdRoute =
-  AuthenticatedAppHrContratosIdRouteImport.update({
-    id: '/hr-contratos/$id',
-    path: '/hr-contratos/$id',
+const AuthenticatedAppFinanceiroIndexRoute =
+  AuthenticatedAppFinanceiroIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppEquipeIndexRoute =
+  AuthenticatedAppEquipeIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
+const AuthenticatedAppClientesIndexRoute =
+  AuthenticatedAppClientesIndexRouteImport.update({
+    id: '/clientes/',
+    path: '/clientes/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppImprimirAgendamentoIdRoute =
-  AuthenticatedAppImprimirAgendamentoIdRouteImport.update({
-    id: '/imprimir/$agendamentoId',
-    path: '/imprimir/$agendamentoId',
-    getParentRoute: () => AuthenticatedAppRoute,
+const AuthenticatedAppAtendimentoIaIndexRoute =
+  AuthenticatedAppAtendimentoIaIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
   } as any)
-const AuthenticatedAppMedicoMedicoIdRoute =
-  AuthenticatedAppMedicoMedicoIdRouteImport.update({
-    id: '/medico/$medicoId',
-    path: '/medico/$medicoId',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppNfseIndexRoute =
-  AuthenticatedAppNfseIndexRouteImport.update({
-    id: '/nfse/',
-    path: '/nfse/',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppNfseTestarRoute =
-  AuthenticatedAppNfseTestarRouteImport.update({
-    id: '/nfse/testar',
-    path: '/nfse/testar',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const ApiPublicFocusnfeWebhookRoute =
-  ApiPublicFocusnfeWebhookRouteImport.update({
-    id: '/api/public/focusnfe/webhook',
-    path: '/api/public/focusnfe/webhook',
+const ApiPublicWhatsappClinicaIdRoute =
+  ApiPublicWhatsappClinicaIdRouteImport.update({
+    id: '/api/public/whatsapp/$clinicaId',
+    path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksBackupDiarioRoute =
@@ -868,22 +688,202 @@ const ApiPublicHooksBackupDiarioRoute =
     path: '/api/public/hooks/backup-diario',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicWhatsappClinicaIdRoute =
-  ApiPublicWhatsappClinicaIdRouteImport.update({
-    id: '/api/public/whatsapp/$clinicaId',
-    path: '/api/public/whatsapp/$clinicaId',
+const ApiPublicFocusnfeWebhookRoute =
+  ApiPublicFocusnfeWebhookRouteImport.update({
+    id: '/api/public/focusnfe/webhook',
+    path: '/api/public/focusnfe/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedAppClientesPacienteIdEditarRoute =
-  AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
-    id: '/clientes/$pacienteId/editar',
-    path: '/clientes/$pacienteId/editar',
+const AuthenticatedAppNfseTestarRoute =
+  AuthenticatedAppNfseTestarRouteImport.update({
+    id: '/nfse/testar',
+    path: '/nfse/testar',
     getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMedicoMedicoIdRoute =
+  AuthenticatedAppMedicoMedicoIdRouteImport.update({
+    id: '/medico/$medicoId',
+    path: '/medico/$medicoId',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppImprimirAgendamentoIdRoute =
+  AuthenticatedAppImprimirAgendamentoIdRouteImport.update({
+    id: '/imprimir/$agendamentoId',
+    path: '/imprimir/$agendamentoId',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppHrContratosIdRoute =
+  AuthenticatedAppHrContratosIdRouteImport.update({
+    id: '/hr-contratos/$id',
+    path: '/hr-contratos/$id',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFinanceiroRelatoriosRoute =
+  AuthenticatedAppFinanceiroRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroRegrasIaRoute =
+  AuthenticatedAppFinanceiroRegrasIaRouteImport.update({
+    id: '/regras-ia',
+    path: '/regras-ia',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroNotasRoute =
+  AuthenticatedAppFinanceiroNotasRouteImport.update({
+    id: '/notas',
+    path: '/notas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroMovimentoRoute =
+  AuthenticatedAppFinanceiroMovimentoRouteImport.update({
+    id: '/movimento',
+    path: '/movimento',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroLembretesRoute =
+  AuthenticatedAppFinanceiroLembretesRouteImport.update({
+    id: '/lembretes',
+    path: '/lembretes',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroEstornoRoute =
+  AuthenticatedAppFinanceiroEstornoRouteImport.update({
+    id: '/estorno',
+    path: '/estorno',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroEstatisticasRoute =
+  AuthenticatedAppFinanceiroEstatisticasRouteImport.update({
+    id: '/estatisticas',
+    path: '/estatisticas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroEmpresasRoute =
+  AuthenticatedAppFinanceiroEmpresasRouteImport.update({
+    id: '/empresas',
+    path: '/empresas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroContasRoute =
+  AuthenticatedAppFinanceiroContasRouteImport.update({
+    id: '/contas',
+    path: '/contas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroCategoriasRoute =
+  AuthenticatedAppFinanceiroCategoriasRouteImport.update({
+    id: '/categorias',
+    path: '/categorias',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroBiRoute =
+  AuthenticatedAppFinanceiroBiRouteImport.update({
+    id: '/bi',
+    path: '/bi',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAtendimentosExternosRoute =
+  AuthenticatedAppFinanceiroAtendimentosExternosRouteImport.update({
+    id: '/atendimentos-externos',
+    path: '/atendimentos-externos',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAtendimentosRoute =
+  AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
+    id: '/atendimentos',
+    path: '/atendimentos',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAnaliticoRoute =
+  AuthenticatedAppFinanceiroAnaliticoRouteImport.update({
+    id: '/analitico',
+    path: '/analitico',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppFinanceiroAlertasRoute =
+  AuthenticatedAppFinanceiroAlertasRouteImport.update({
+    id: '/alertas',
+    path: '/alertas',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesVozRoute =
+  AuthenticatedAppConfiguracoesVozRouteImport.update({
+    id: '/configuracoes/voz',
+    path: '/configuracoes/voz',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesPainelTotemRoute =
+  AuthenticatedAppConfiguracoesPainelTotemRouteImport.update({
+    id: '/configuracoes/painel-totem',
+    path: '/configuracoes/painel-totem',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesNfseRoute =
+  AuthenticatedAppConfiguracoesNfseRouteImport.update({
+    id: '/configuracoes/nfse',
+    path: '/configuracoes/nfse',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppClientesDuplicadosRoute =
+  AuthenticatedAppClientesDuplicadosRouteImport.update({
+    id: '/clientes/duplicados',
+    path: '/clientes/duplicados',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
+  AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosModelosRoute =
+  AuthenticatedAppCartaoBeneficiosModelosRouteImport.update({
+    id: '/modelos',
+    path: '/modelos',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosDependentesRoute =
+  AuthenticatedAppCartaoBeneficiosDependentesRouteImport.update({
+    id: '/dependentes',
+    path: '/dependentes',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosConveniosRoute =
+  AuthenticatedAppCartaoBeneficiosConveniosRouteImport.update({
+    id: '/convenios',
+    path: '/convenios',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosContratosRoute =
+  AuthenticatedAppCartaoBeneficiosContratosRouteImport.update({
+    id: '/contratos',
+    path: '/contratos',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppCartaoBeneficiosBeneficiosRoute =
+  AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport.update({
+    id: '/beneficios',
+    path: '/beneficios',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
+const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
+  AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport.update({
+    id: '/$agendamentoId',
+    path: '/$agendamentoId',
+    getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
   } as any)
 const AuthenticatedAppClientesPacienteIdVisualizarRoute =
   AuthenticatedAppClientesPacienteIdVisualizarRouteImport.update({
     id: '/clientes/$pacienteId/visualizar',
     path: '/clientes/$pacienteId/visualizar',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppClientesPacienteIdEditarRoute =
+  AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
+    id: '/clientes/$pacienteId/editar',
+    path: '/clientes/$pacienteId/editar',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppEquipeMedicoMedicoIdEditarRoute =
@@ -1728,67 +1728,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/autoatendimento': {
-      id: '/autoatendimento'
-      path: '/autoatendimento'
-      fullPath: '/autoatendimento'
-      preLoaderRoute: typeof AutoatendimentoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/diagnostico': {
-      id: '/diagnostico'
-      path: '/diagnostico'
-      fullPath: '/diagnostico'
-      preLoaderRoute: typeof DiagnosticoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/medico': {
-      id: '/medico'
-      path: '/medico'
-      fullPath: '/medico'
-      preLoaderRoute: typeof MedicoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/painel': {
-      id: '/painel'
-      path: '/painel'
-      fullPath: '/painel'
-      preLoaderRoute: typeof PainelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
+    '/totem': {
+      id: '/totem'
+      path: '/totem'
+      fullPath: '/totem'
+      preLoaderRoute: typeof TotemRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -1798,39 +1742,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/totem': {
-      id: '/totem'
-      path: '/totem'
-      fullPath: '/totem'
-      preLoaderRoute: typeof TotemRouteImport
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app': {
-      id: '/_authenticated/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AuthenticatedAppRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/checkin/$token': {
-      id: '/checkin/$token'
-      path: '/checkin/$token'
-      fullPath: '/checkin/$token'
-      preLoaderRoute: typeof CheckinTokenRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lp/$slug': {
-      id: '/lp/$slug'
-      path: '/lp/$slug'
-      fullPath: '/lp/$slug'
-      preLoaderRoute: typeof LpSlugRouteImport
+    '/painel': {
+      id: '/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof PainelRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/p/$token': {
-      id: '/p/$token'
-      path: '/p/$token'
-      fullPath: '/p/$token'
-      preLoaderRoute: typeof PTokenRouteImport
+    '/medico': {
+      id: '/medico'
+      path: '/medico'
+      fullPath: '/medico'
+      preLoaderRoute: typeof MedicoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/diagnostico': {
+      id: '/diagnostico'
+      path: '/diagnostico'
+      fullPath: '/diagnostico'
+      preLoaderRoute: typeof DiagnosticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/autoatendimento': {
+      id: '/autoatendimento'
+      path: '/autoatendimento'
+      fullPath: '/autoatendimento'
+      preLoaderRoute: typeof AutoatendimentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/paciente/': {
@@ -1840,32 +1812,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PacienteIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/cartoes': {
-      id: '/paciente/cartoes'
-      path: '/paciente/cartoes'
-      fullPath: '/paciente/cartoes'
-      preLoaderRoute: typeof PacienteCartoesRouteImport
+    '/verificar/$codigo': {
+      id: '/verificar/$codigo'
+      path: '/verificar/$codigo'
+      fullPath: '/verificar/$codigo'
+      preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/consultas': {
-      id: '/paciente/consultas'
-      path: '/paciente/consultas'
-      fullPath: '/paciente/consultas'
-      preLoaderRoute: typeof PacienteConsultasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/financeiro': {
-      id: '/paciente/financeiro'
-      path: '/paciente/financeiro'
-      fullPath: '/paciente/financeiro'
-      preLoaderRoute: typeof PacienteFinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/perfil': {
-      id: '/paciente/perfil'
-      path: '/paciente/perfil'
-      fullPath: '/paciente/perfil'
-      preLoaderRoute: typeof PacientePerfilRouteImport
+    '/totem_/$clinicaId': {
+      id: '/totem_/$clinicaId'
+      path: '/totem/$clinicaId'
+      fullPath: '/totem/$clinicaId'
+      preLoaderRoute: typeof TotemClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel/$clinicaId': {
@@ -1875,19 +1833,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PainelClinicaIdRouteImport
       parentRoute: typeof PainelRoute
     }
-    '/totem_/$clinicaId': {
-      id: '/totem_/$clinicaId'
-      path: '/totem/$clinicaId'
-      fullPath: '/totem/$clinicaId'
-      preLoaderRoute: typeof TotemClinicaIdRouteImport
+    '/paciente/perfil': {
+      id: '/paciente/perfil'
+      path: '/paciente/perfil'
+      fullPath: '/paciente/perfil'
+      preLoaderRoute: typeof PacientePerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verificar/$codigo': {
-      id: '/verificar/$codigo'
-      path: '/verificar/$codigo'
-      fullPath: '/verificar/$codigo'
-      preLoaderRoute: typeof VerificarCodigoRouteImport
+    '/paciente/financeiro': {
+      id: '/paciente/financeiro'
+      path: '/paciente/financeiro'
+      fullPath: '/paciente/financeiro'
+      preLoaderRoute: typeof PacienteFinanceiroRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/paciente/consultas': {
+      id: '/paciente/consultas'
+      path: '/paciente/consultas'
+      fullPath: '/paciente/consultas'
+      preLoaderRoute: typeof PacienteConsultasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/cartoes': {
+      id: '/paciente/cartoes'
+      path: '/paciente/cartoes'
+      fullPath: '/paciente/cartoes'
+      preLoaderRoute: typeof PacienteCartoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/$token': {
+      id: '/p/$token'
+      path: '/p/$token'
+      fullPath: '/p/$token'
+      preLoaderRoute: typeof PTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lp/$slug': {
+      id: '/lp/$slug'
+      path: '/lp/$slug'
+      fullPath: '/lp/$slug'
+      preLoaderRoute: typeof LpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkin/$token': {
+      id: '/checkin/$token'
+      path: '/checkin/$token'
+      fullPath: '/checkin/$token'
+      preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/app': {
+      id: '/_authenticated/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AuthenticatedAppRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/app/': {
       id: '/_authenticated/app/'
@@ -1896,459 +1896,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/agenda': {
-      id: '/_authenticated/app/agenda'
-      path: '/agenda'
-      fullPath: '/app/agenda'
-      preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/agenda-medicos': {
-      id: '/_authenticated/app/agenda-medicos'
-      path: '/agenda-medicos'
-      fullPath: '/app/agenda-medicos'
-      preLoaderRoute: typeof AuthenticatedAppAgendaMedicosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/agenda-v2': {
-      id: '/_authenticated/app/agenda-v2'
-      path: '/agenda-v2'
-      fullPath: '/app/agenda-v2'
-      preLoaderRoute: typeof AuthenticatedAppAgendaV2RouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/alertas-enfermagem': {
-      id: '/_authenticated/app/alertas-enfermagem'
-      path: '/alertas-enfermagem'
-      fullPath: '/app/alertas-enfermagem'
-      preLoaderRoute: typeof AuthenticatedAppAlertasEnfermagemRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/anamneses': {
-      id: '/_authenticated/app/anamneses'
-      path: '/anamneses'
-      fullPath: '/app/anamneses'
-      preLoaderRoute: typeof AuthenticatedAppAnamnesesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/atendimento-ia': {
-      id: '/_authenticated/app/atendimento-ia'
-      path: '/atendimento-ia'
-      fullPath: '/app/atendimento-ia'
-      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/atendimento-multiplo': {
-      id: '/_authenticated/app/atendimento-multiplo'
-      path: '/atendimento-multiplo'
-      fullPath: '/app/atendimento-multiplo'
-      preLoaderRoute: typeof AuthenticatedAppAtendimentoMultiploRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/auditoria': {
-      id: '/_authenticated/app/auditoria'
-      path: '/auditoria'
-      fullPath: '/app/auditoria'
-      preLoaderRoute: typeof AuthenticatedAppAuditoriaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/backups': {
-      id: '/_authenticated/app/backups'
-      path: '/backups'
-      fullPath: '/app/backups'
-      preLoaderRoute: typeof AuthenticatedAppBackupsRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/boletos': {
-      id: '/_authenticated/app/boletos'
-      path: '/boletos'
-      fullPath: '/app/boletos'
-      preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/caixa': {
-      id: '/_authenticated/app/caixa'
-      path: '/caixa'
-      fullPath: '/app/caixa'
-      preLoaderRoute: typeof AuthenticatedAppCaixaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/campanhas': {
-      id: '/_authenticated/app/campanhas'
-      path: '/campanhas'
-      fullPath: '/app/campanhas'
-      preLoaderRoute: typeof AuthenticatedAppCampanhasRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/cargos': {
-      id: '/_authenticated/app/cargos'
-      path: '/cargos'
-      fullPath: '/app/cargos'
-      preLoaderRoute: typeof AuthenticatedAppCargosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/cartao-beneficios': {
-      id: '/_authenticated/app/cartao-beneficios'
-      path: '/cartao-beneficios'
-      fullPath: '/app/cartao-beneficios'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/chat': {
-      id: '/_authenticated/app/chat'
-      path: '/chat'
-      fullPath: '/app/chat'
-      preLoaderRoute: typeof AuthenticatedAppChatRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/checkin': {
-      id: '/_authenticated/app/checkin'
-      path: '/checkin'
-      fullPath: '/app/checkin'
-      preLoaderRoute: typeof AuthenticatedAppCheckinRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/clinicas': {
-      id: '/_authenticated/app/clinicas'
-      path: '/clinicas'
-      fullPath: '/app/clinicas'
-      preLoaderRoute: typeof AuthenticatedAppClinicasRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/consulta-rapida': {
-      id: '/_authenticated/app/consulta-rapida'
-      path: '/consulta-rapida'
-      fullPath: '/app/consulta-rapida'
-      preLoaderRoute: typeof AuthenticatedAppConsultaRapidaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/contratos': {
-      id: '/_authenticated/app/contratos'
-      path: '/contratos'
-      fullPath: '/app/contratos'
-      preLoaderRoute: typeof AuthenticatedAppContratosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/crm': {
-      id: '/_authenticated/app/crm'
-      path: '/crm'
-      fullPath: '/app/crm'
-      preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-caixa-shell': {
-      id: '/_authenticated/app/dev-caixa-shell'
-      path: '/dev-caixa-shell'
-      fullPath: '/app/dev-caixa-shell'
-      preLoaderRoute: typeof AuthenticatedAppDevCaixaShellRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-clientes-shell': {
-      id: '/_authenticated/app/dev-clientes-shell'
-      path: '/dev-clientes-shell'
-      fullPath: '/app/dev-clientes-shell'
-      preLoaderRoute: typeof AuthenticatedAppDevClientesShellRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-hhp': {
-      id: '/_authenticated/app/dev-hhp'
-      path: '/dev-hhp'
-      fullPath: '/app/dev-hhp'
-      preLoaderRoute: typeof AuthenticatedAppDevHhpRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-list-shell': {
-      id: '/_authenticated/app/dev-list-shell'
-      path: '/dev-list-shell'
-      fullPath: '/app/dev-list-shell'
-      preLoaderRoute: typeof AuthenticatedAppDevListShellRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-orcamentos-shell': {
-      id: '/_authenticated/app/dev-orcamentos-shell'
-      path: '/dev-orcamentos-shell'
-      fullPath: '/app/dev-orcamentos-shell'
-      preLoaderRoute: typeof AuthenticatedAppDevOrcamentosShellRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/disponibilidades': {
-      id: '/_authenticated/app/disponibilidades'
-      path: '/disponibilidades'
-      fullPath: '/app/disponibilidades'
-      preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/documentos': {
-      id: '/_authenticated/app/documentos'
-      path: '/documentos'
-      fullPath: '/app/documentos'
-      preLoaderRoute: typeof AuthenticatedAppDocumentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/equipe': {
-      id: '/_authenticated/app/equipe'
-      path: '/equipe'
-      fullPath: '/app/equipe'
-      preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/especialidades': {
-      id: '/_authenticated/app/especialidades'
-      path: '/especialidades'
-      fullPath: '/app/especialidades'
-      preLoaderRoute: typeof AuthenticatedAppEspecialidadesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/estoque': {
-      id: '/_authenticated/app/estoque'
-      path: '/estoque'
-      fullPath: '/app/estoque'
-      preLoaderRoute: typeof AuthenticatedAppEstoqueRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/exames-resultados': {
-      id: '/_authenticated/app/exames-resultados'
-      path: '/exames-resultados'
-      fullPath: '/app/exames-resultados'
-      preLoaderRoute: typeof AuthenticatedAppExamesResultadosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/financeiro': {
-      id: '/_authenticated/app/financeiro'
-      path: '/financeiro'
-      fullPath: '/app/financeiro'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/fluxo': {
-      id: '/_authenticated/app/fluxo'
-      path: '/fluxo'
-      fullPath: '/app/fluxo'
-      preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/hr-ferias': {
-      id: '/_authenticated/app/hr-ferias'
-      path: '/hr-ferias'
-      fullPath: '/app/hr-ferias'
-      preLoaderRoute: typeof AuthenticatedAppHrFeriasRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/hr-holerites': {
-      id: '/_authenticated/app/hr-holerites'
-      path: '/hr-holerites'
-      fullPath: '/app/hr-holerites'
-      preLoaderRoute: typeof AuthenticatedAppHrHoleritesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/hr-ponto': {
-      id: '/_authenticated/app/hr-ponto'
-      path: '/hr-ponto'
-      fullPath: '/app/hr-ponto'
-      preLoaderRoute: typeof AuthenticatedAppHrPontoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/integration-secrets': {
-      id: '/_authenticated/app/integration-secrets'
-      path: '/integration-secrets'
-      fullPath: '/app/integration-secrets'
-      preLoaderRoute: typeof AuthenticatedAppIntegrationSecretsRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/lgpd': {
-      id: '/_authenticated/app/lgpd'
-      path: '/lgpd'
-      fullPath: '/app/lgpd'
-      preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/lms-admin': {
-      id: '/_authenticated/app/lms-admin'
-      path: '/lms-admin'
-      fullPath: '/app/lms-admin'
-      preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/medicos': {
-      id: '/_authenticated/app/medicos'
-      path: '/medicos'
-      fullPath: '/app/medicos'
-      preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-envios': {
-      id: '/_authenticated/app/mkt-envios'
-      path: '/mkt-envios'
-      fullPath: '/app/mkt-envios'
-      preLoaderRoute: typeof AuthenticatedAppMktEnviosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-landing': {
-      id: '/_authenticated/app/mkt-landing'
-      path: '/mkt-landing'
-      fullPath: '/app/mkt-landing'
-      preLoaderRoute: typeof AuthenticatedAppMktLandingRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-leads': {
-      id: '/_authenticated/app/mkt-leads'
-      path: '/mkt-leads'
-      fullPath: '/app/mkt-leads'
-      preLoaderRoute: typeof AuthenticatedAppMktLeadsRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-segmentos': {
-      id: '/_authenticated/app/mkt-segmentos'
-      path: '/mkt-segmentos'
-      fullPath: '/app/mkt-segmentos'
-      preLoaderRoute: typeof AuthenticatedAppMktSegmentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/modelos-documentos': {
-      id: '/_authenticated/app/modelos-documentos'
-      path: '/modelos-documentos'
-      fullPath: '/app/modelos-documentos'
-      preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/nina': {
-      id: '/_authenticated/app/nina'
-      path: '/nina'
-      fullPath: '/app/nina'
-      preLoaderRoute: typeof AuthenticatedAppNinaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/odontologia': {
-      id: '/_authenticated/app/odontologia'
-      path: '/odontologia'
-      fullPath: '/app/odontologia'
-      preLoaderRoute: typeof AuthenticatedAppOdontologiaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/orcamentos': {
-      id: '/_authenticated/app/orcamentos'
-      path: '/orcamentos'
-      fullPath: '/app/orcamentos'
-      preLoaderRoute: typeof AuthenticatedAppOrcamentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/orcamentos-agenda': {
-      id: '/_authenticated/app/orcamentos-agenda'
-      path: '/orcamentos-agenda'
-      fullPath: '/app/orcamentos-agenda'
-      preLoaderRoute: typeof AuthenticatedAppOrcamentosAgendaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/painel': {
-      id: '/_authenticated/app/painel'
-      path: '/painel'
-      fullPath: '/app/painel'
-      preLoaderRoute: typeof AuthenticatedAppPainelRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/painel-executivo': {
-      id: '/_authenticated/app/painel-executivo'
-      path: '/painel-executivo'
-      fullPath: '/app/painel-executivo'
-      preLoaderRoute: typeof AuthenticatedAppPainelExecutivoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/perfis': {
-      id: '/_authenticated/app/perfis'
-      path: '/perfis'
-      fullPath: '/app/perfis'
-      preLoaderRoute: typeof AuthenticatedAppPerfisRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/planos': {
-      id: '/_authenticated/app/planos'
-      path: '/planos'
-      fullPath: '/app/planos'
-      preLoaderRoute: typeof AuthenticatedAppPlanosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/procedimentos': {
-      id: '/_authenticated/app/procedimentos'
-      path: '/procedimentos'
-      fullPath: '/app/procedimentos'
-      preLoaderRoute: typeof AuthenticatedAppProcedimentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/prontuario-modelos': {
-      id: '/_authenticated/app/prontuario-modelos'
-      path: '/prontuario-modelos'
-      fullPath: '/app/prontuario-modelos'
-      preLoaderRoute: typeof AuthenticatedAppProntuarioModelosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/prontuarios': {
-      id: '/_authenticated/app/prontuarios'
-      path: '/prontuarios'
-      fullPath: '/app/prontuarios'
-      preLoaderRoute: typeof AuthenticatedAppProntuariosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/recepcao': {
-      id: '/_authenticated/app/recepcao'
-      path: '/recepcao'
-      fullPath: '/app/recepcao'
-      preLoaderRoute: typeof AuthenticatedAppRecepcaoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/relatorios': {
-      id: '/_authenticated/app/relatorios'
-      path: '/relatorios'
-      fullPath: '/app/relatorios'
-      preLoaderRoute: typeof AuthenticatedAppRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/setores': {
-      id: '/_authenticated/app/setores'
-      path: '/setores'
-      fullPath: '/app/setores'
-      preLoaderRoute: typeof AuthenticatedAppSetoresRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/tipos-servico': {
-      id: '/_authenticated/app/tipos-servico'
-      path: '/tipos-servico'
-      fullPath: '/app/tipos-servico'
-      preLoaderRoute: typeof AuthenticatedAppTiposServicoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/treinamentos': {
-      id: '/_authenticated/app/treinamentos'
-      path: '/treinamentos'
-      fullPath: '/app/treinamentos'
-      preLoaderRoute: typeof AuthenticatedAppTreinamentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/triagem-enfermagem': {
-      id: '/_authenticated/app/triagem-enfermagem'
-      path: '/triagem-enfermagem'
-      fullPath: '/app/triagem-enfermagem'
-      preLoaderRoute: typeof AuthenticatedAppTriagemEnfermagemRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/unidades': {
-      id: '/_authenticated/app/unidades'
-      path: '/unidades'
-      fullPath: '/app/unidades'
-      preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/api/public/tts': {
-      id: '/api/public/tts'
-      path: '/api/public/tts'
-      fullPath: '/api/public/tts'
-      preLoaderRoute: typeof ApiPublicTtsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/p/contrato/$token': {
-      id: '/p/contrato/$token'
-      path: '/p/contrato/$token'
-      fullPath: '/p/contrato/$token'
-      preLoaderRoute: typeof PContratoTokenRouteImport
+    '/totem_/t/$token': {
+      id: '/totem_/t/$token'
+      path: '/totem/t/$token'
+      fullPath: '/totem/t/$token'
+      preLoaderRoute: typeof TotemTTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel_/t/$token': {
@@ -2358,249 +1910,459 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PainelTTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/totem_/t/$token': {
-      id: '/totem_/t/$token'
-      path: '/totem/t/$token'
-      fullPath: '/totem/t/$token'
-      preLoaderRoute: typeof TotemTTokenRouteImport
+    '/p/contrato/$token': {
+      id: '/p/contrato/$token'
+      path: '/p/contrato/$token'
+      fullPath: '/p/contrato/$token'
+      preLoaderRoute: typeof PContratoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app/atendimento-ia/': {
-      id: '/_authenticated/app/atendimento-ia/'
-      path: '/'
-      fullPath: '/app/atendimento-ia/'
-      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaIndexRouteImport
-      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
+    '/api/public/tts': {
+      id: '/api/public/tts'
+      path: '/api/public/tts'
+      fullPath: '/api/public/tts'
+      preLoaderRoute: typeof ApiPublicTtsRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app/atendimento-ia/$agendamentoId': {
-      id: '/_authenticated/app/atendimento-ia/$agendamentoId'
-      path: '/$agendamentoId'
-      fullPath: '/app/atendimento-ia/$agendamentoId'
-      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
-      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
+    '/_authenticated/app/unidades': {
+      id: '/_authenticated/app/unidades'
+      path: '/unidades'
+      fullPath: '/app/unidades'
+      preLoaderRoute: typeof AuthenticatedAppUnidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/cartao-beneficios/beneficios': {
-      id: '/_authenticated/app/cartao-beneficios/beneficios'
-      path: '/beneficios'
-      fullPath: '/app/cartao-beneficios/beneficios'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    '/_authenticated/app/triagem-enfermagem': {
+      id: '/_authenticated/app/triagem-enfermagem'
+      path: '/triagem-enfermagem'
+      fullPath: '/app/triagem-enfermagem'
+      preLoaderRoute: typeof AuthenticatedAppTriagemEnfermagemRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/cartao-beneficios/contratos': {
-      id: '/_authenticated/app/cartao-beneficios/contratos'
+    '/_authenticated/app/treinamentos': {
+      id: '/_authenticated/app/treinamentos'
+      path: '/treinamentos'
+      fullPath: '/app/treinamentos'
+      preLoaderRoute: typeof AuthenticatedAppTreinamentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/tipos-servico': {
+      id: '/_authenticated/app/tipos-servico'
+      path: '/tipos-servico'
+      fullPath: '/app/tipos-servico'
+      preLoaderRoute: typeof AuthenticatedAppTiposServicoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/setores': {
+      id: '/_authenticated/app/setores'
+      path: '/setores'
+      fullPath: '/app/setores'
+      preLoaderRoute: typeof AuthenticatedAppSetoresRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/relatorios': {
+      id: '/_authenticated/app/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/recepcao': {
+      id: '/_authenticated/app/recepcao'
+      path: '/recepcao'
+      fullPath: '/app/recepcao'
+      preLoaderRoute: typeof AuthenticatedAppRecepcaoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/prontuarios': {
+      id: '/_authenticated/app/prontuarios'
+      path: '/prontuarios'
+      fullPath: '/app/prontuarios'
+      preLoaderRoute: typeof AuthenticatedAppProntuariosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/prontuario-modelos': {
+      id: '/_authenticated/app/prontuario-modelos'
+      path: '/prontuario-modelos'
+      fullPath: '/app/prontuario-modelos'
+      preLoaderRoute: typeof AuthenticatedAppProntuarioModelosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/procedimentos': {
+      id: '/_authenticated/app/procedimentos'
+      path: '/procedimentos'
+      fullPath: '/app/procedimentos'
+      preLoaderRoute: typeof AuthenticatedAppProcedimentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/planos': {
+      id: '/_authenticated/app/planos'
+      path: '/planos'
+      fullPath: '/app/planos'
+      preLoaderRoute: typeof AuthenticatedAppPlanosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/perfis': {
+      id: '/_authenticated/app/perfis'
+      path: '/perfis'
+      fullPath: '/app/perfis'
+      preLoaderRoute: typeof AuthenticatedAppPerfisRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/painel-executivo': {
+      id: '/_authenticated/app/painel-executivo'
+      path: '/painel-executivo'
+      fullPath: '/app/painel-executivo'
+      preLoaderRoute: typeof AuthenticatedAppPainelExecutivoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/painel': {
+      id: '/_authenticated/app/painel'
+      path: '/painel'
+      fullPath: '/app/painel'
+      preLoaderRoute: typeof AuthenticatedAppPainelRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/orcamentos-agenda': {
+      id: '/_authenticated/app/orcamentos-agenda'
+      path: '/orcamentos-agenda'
+      fullPath: '/app/orcamentos-agenda'
+      preLoaderRoute: typeof AuthenticatedAppOrcamentosAgendaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/orcamentos': {
+      id: '/_authenticated/app/orcamentos'
+      path: '/orcamentos'
+      fullPath: '/app/orcamentos'
+      preLoaderRoute: typeof AuthenticatedAppOrcamentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/odontologia': {
+      id: '/_authenticated/app/odontologia'
+      path: '/odontologia'
+      fullPath: '/app/odontologia'
+      preLoaderRoute: typeof AuthenticatedAppOdontologiaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/nina': {
+      id: '/_authenticated/app/nina'
+      path: '/nina'
+      fullPath: '/app/nina'
+      preLoaderRoute: typeof AuthenticatedAppNinaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/modelos-documentos': {
+      id: '/_authenticated/app/modelos-documentos'
+      path: '/modelos-documentos'
+      fullPath: '/app/modelos-documentos'
+      preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-segmentos': {
+      id: '/_authenticated/app/mkt-segmentos'
+      path: '/mkt-segmentos'
+      fullPath: '/app/mkt-segmentos'
+      preLoaderRoute: typeof AuthenticatedAppMktSegmentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-leads': {
+      id: '/_authenticated/app/mkt-leads'
+      path: '/mkt-leads'
+      fullPath: '/app/mkt-leads'
+      preLoaderRoute: typeof AuthenticatedAppMktLeadsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-landing': {
+      id: '/_authenticated/app/mkt-landing'
+      path: '/mkt-landing'
+      fullPath: '/app/mkt-landing'
+      preLoaderRoute: typeof AuthenticatedAppMktLandingRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-envios': {
+      id: '/_authenticated/app/mkt-envios'
+      path: '/mkt-envios'
+      fullPath: '/app/mkt-envios'
+      preLoaderRoute: typeof AuthenticatedAppMktEnviosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/medicos': {
+      id: '/_authenticated/app/medicos'
+      path: '/medicos'
+      fullPath: '/app/medicos'
+      preLoaderRoute: typeof AuthenticatedAppMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/lms-admin': {
+      id: '/_authenticated/app/lms-admin'
+      path: '/lms-admin'
+      fullPath: '/app/lms-admin'
+      preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/lgpd': {
+      id: '/_authenticated/app/lgpd'
+      path: '/lgpd'
+      fullPath: '/app/lgpd'
+      preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/integration-secrets': {
+      id: '/_authenticated/app/integration-secrets'
+      path: '/integration-secrets'
+      fullPath: '/app/integration-secrets'
+      preLoaderRoute: typeof AuthenticatedAppIntegrationSecretsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-ponto': {
+      id: '/_authenticated/app/hr-ponto'
+      path: '/hr-ponto'
+      fullPath: '/app/hr-ponto'
+      preLoaderRoute: typeof AuthenticatedAppHrPontoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-holerites': {
+      id: '/_authenticated/app/hr-holerites'
+      path: '/hr-holerites'
+      fullPath: '/app/hr-holerites'
+      preLoaderRoute: typeof AuthenticatedAppHrHoleritesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-ferias': {
+      id: '/_authenticated/app/hr-ferias'
+      path: '/hr-ferias'
+      fullPath: '/app/hr-ferias'
+      preLoaderRoute: typeof AuthenticatedAppHrFeriasRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/fluxo': {
+      id: '/_authenticated/app/fluxo'
+      path: '/fluxo'
+      fullPath: '/app/fluxo'
+      preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/financeiro': {
+      id: '/_authenticated/app/financeiro'
+      path: '/financeiro'
+      fullPath: '/app/financeiro'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/exames-resultados': {
+      id: '/_authenticated/app/exames-resultados'
+      path: '/exames-resultados'
+      fullPath: '/app/exames-resultados'
+      preLoaderRoute: typeof AuthenticatedAppExamesResultadosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/estoque': {
+      id: '/_authenticated/app/estoque'
+      path: '/estoque'
+      fullPath: '/app/estoque'
+      preLoaderRoute: typeof AuthenticatedAppEstoqueRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/especialidades': {
+      id: '/_authenticated/app/especialidades'
+      path: '/especialidades'
+      fullPath: '/app/especialidades'
+      preLoaderRoute: typeof AuthenticatedAppEspecialidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/equipe': {
+      id: '/_authenticated/app/equipe'
+      path: '/equipe'
+      fullPath: '/app/equipe'
+      preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/documentos': {
+      id: '/_authenticated/app/documentos'
+      path: '/documentos'
+      fullPath: '/app/documentos'
+      preLoaderRoute: typeof AuthenticatedAppDocumentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/disponibilidades': {
+      id: '/_authenticated/app/disponibilidades'
+      path: '/disponibilidades'
+      fullPath: '/app/disponibilidades'
+      preLoaderRoute: typeof AuthenticatedAppDisponibilidadesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-orcamentos-shell': {
+      id: '/_authenticated/app/dev-orcamentos-shell'
+      path: '/dev-orcamentos-shell'
+      fullPath: '/app/dev-orcamentos-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevOrcamentosShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-list-shell': {
+      id: '/_authenticated/app/dev-list-shell'
+      path: '/dev-list-shell'
+      fullPath: '/app/dev-list-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevListShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-hhp': {
+      id: '/_authenticated/app/dev-hhp'
+      path: '/dev-hhp'
+      fullPath: '/app/dev-hhp'
+      preLoaderRoute: typeof AuthenticatedAppDevHhpRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-clientes-shell': {
+      id: '/_authenticated/app/dev-clientes-shell'
+      path: '/dev-clientes-shell'
+      fullPath: '/app/dev-clientes-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevClientesShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-caixa-shell': {
+      id: '/_authenticated/app/dev-caixa-shell'
+      path: '/dev-caixa-shell'
+      fullPath: '/app/dev-caixa-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevCaixaShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/crm': {
+      id: '/_authenticated/app/crm'
+      path: '/crm'
+      fullPath: '/app/crm'
+      preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/contratos': {
+      id: '/_authenticated/app/contratos'
       path: '/contratos'
-      fullPath: '/app/cartao-beneficios/contratos'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
-    '/_authenticated/app/cartao-beneficios/convenios': {
-      id: '/_authenticated/app/cartao-beneficios/convenios'
-      path: '/convenios'
-      fullPath: '/app/cartao-beneficios/convenios'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosConveniosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
-    '/_authenticated/app/cartao-beneficios/dependentes': {
-      id: '/_authenticated/app/cartao-beneficios/dependentes'
-      path: '/dependentes'
-      fullPath: '/app/cartao-beneficios/dependentes'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosDependentesRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
-    '/_authenticated/app/cartao-beneficios/modelos': {
-      id: '/_authenticated/app/cartao-beneficios/modelos'
-      path: '/modelos'
-      fullPath: '/app/cartao-beneficios/modelos'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosModelosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
-    '/_authenticated/app/cartao-beneficios/relatorios': {
-      id: '/_authenticated/app/cartao-beneficios/relatorios'
-      path: '/relatorios'
-      fullPath: '/app/cartao-beneficios/relatorios'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
-    '/_authenticated/app/clientes/': {
-      id: '/_authenticated/app/clientes/'
-      path: '/clientes'
-      fullPath: '/app/clientes/'
-      preLoaderRoute: typeof AuthenticatedAppClientesIndexRouteImport
+      fullPath: '/app/contratos'
+      preLoaderRoute: typeof AuthenticatedAppContratosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/clientes/duplicados': {
-      id: '/_authenticated/app/clientes/duplicados'
-      path: '/clientes/duplicados'
-      fullPath: '/app/clientes/duplicados'
-      preLoaderRoute: typeof AuthenticatedAppClientesDuplicadosRouteImport
+    '/_authenticated/app/consulta-rapida': {
+      id: '/_authenticated/app/consulta-rapida'
+      path: '/consulta-rapida'
+      fullPath: '/app/consulta-rapida'
+      preLoaderRoute: typeof AuthenticatedAppConsultaRapidaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/configuracoes/nfse': {
-      id: '/_authenticated/app/configuracoes/nfse'
-      path: '/configuracoes/nfse'
-      fullPath: '/app/configuracoes/nfse'
-      preLoaderRoute: typeof AuthenticatedAppConfiguracoesNfseRouteImport
+    '/_authenticated/app/clinicas': {
+      id: '/_authenticated/app/clinicas'
+      path: '/clinicas'
+      fullPath: '/app/clinicas'
+      preLoaderRoute: typeof AuthenticatedAppClinicasRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/configuracoes/painel-totem': {
-      id: '/_authenticated/app/configuracoes/painel-totem'
-      path: '/configuracoes/painel-totem'
-      fullPath: '/app/configuracoes/painel-totem'
-      preLoaderRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRouteImport
+    '/_authenticated/app/checkin': {
+      id: '/_authenticated/app/checkin'
+      path: '/checkin'
+      fullPath: '/app/checkin'
+      preLoaderRoute: typeof AuthenticatedAppCheckinRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/configuracoes/voz': {
-      id: '/_authenticated/app/configuracoes/voz'
-      path: '/configuracoes/voz'
-      fullPath: '/app/configuracoes/voz'
-      preLoaderRoute: typeof AuthenticatedAppConfiguracoesVozRouteImport
+    '/_authenticated/app/chat': {
+      id: '/_authenticated/app/chat'
+      path: '/chat'
+      fullPath: '/app/chat'
+      preLoaderRoute: typeof AuthenticatedAppChatRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/equipe/': {
-      id: '/_authenticated/app/equipe/'
-      path: '/'
-      fullPath: '/app/equipe/'
-      preLoaderRoute: typeof AuthenticatedAppEquipeIndexRouteImport
-      parentRoute: typeof AuthenticatedAppEquipeRoute
-    }
-    '/_authenticated/app/financeiro/': {
-      id: '/_authenticated/app/financeiro/'
-      path: '/'
-      fullPath: '/app/financeiro/'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/alertas': {
-      id: '/_authenticated/app/financeiro/alertas'
-      path: '/alertas'
-      fullPath: '/app/financeiro/alertas'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/analitico': {
-      id: '/_authenticated/app/financeiro/analitico'
-      path: '/analitico'
-      fullPath: '/app/financeiro/analitico'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAnaliticoRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/atendimentos': {
-      id: '/_authenticated/app/financeiro/atendimentos'
-      path: '/atendimentos'
-      fullPath: '/app/financeiro/atendimentos'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/atendimentos-externos': {
-      id: '/_authenticated/app/financeiro/atendimentos-externos'
-      path: '/atendimentos-externos'
-      fullPath: '/app/financeiro/atendimentos-externos'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/bi': {
-      id: '/_authenticated/app/financeiro/bi'
-      path: '/bi'
-      fullPath: '/app/financeiro/bi'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/categorias': {
-      id: '/_authenticated/app/financeiro/categorias'
-      path: '/categorias'
-      fullPath: '/app/financeiro/categorias'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroCategoriasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/contas': {
-      id: '/_authenticated/app/financeiro/contas'
-      path: '/contas'
-      fullPath: '/app/financeiro/contas'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroContasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/empresas': {
-      id: '/_authenticated/app/financeiro/empresas'
-      path: '/empresas'
-      fullPath: '/app/financeiro/empresas'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroEmpresasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/estatisticas': {
-      id: '/_authenticated/app/financeiro/estatisticas'
-      path: '/estatisticas'
-      fullPath: '/app/financeiro/estatisticas'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstatisticasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/estorno': {
-      id: '/_authenticated/app/financeiro/estorno'
-      path: '/estorno'
-      fullPath: '/app/financeiro/estorno'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstornoRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/lembretes': {
-      id: '/_authenticated/app/financeiro/lembretes'
-      path: '/lembretes'
-      fullPath: '/app/financeiro/lembretes'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroLembretesRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/movimento': {
-      id: '/_authenticated/app/financeiro/movimento'
-      path: '/movimento'
-      fullPath: '/app/financeiro/movimento'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroMovimentoRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/notas': {
-      id: '/_authenticated/app/financeiro/notas'
-      path: '/notas'
-      fullPath: '/app/financeiro/notas'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroNotasRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/regras-ia': {
-      id: '/_authenticated/app/financeiro/regras-ia'
-      path: '/regras-ia'
-      fullPath: '/app/financeiro/regras-ia'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroRegrasIaRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/financeiro/relatorios': {
-      id: '/_authenticated/app/financeiro/relatorios'
-      path: '/relatorios'
-      fullPath: '/app/financeiro/relatorios'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/hr-contratos/': {
-      id: '/_authenticated/app/hr-contratos/'
-      path: '/hr-contratos'
-      fullPath: '/app/hr-contratos/'
-      preLoaderRoute: typeof AuthenticatedAppHrContratosIndexRouteImport
+    '/_authenticated/app/cartao-beneficios': {
+      id: '/_authenticated/app/cartao-beneficios'
+      path: '/cartao-beneficios'
+      fullPath: '/app/cartao-beneficios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/hr-contratos/$id': {
-      id: '/_authenticated/app/hr-contratos/$id'
-      path: '/hr-contratos/$id'
-      fullPath: '/app/hr-contratos/$id'
-      preLoaderRoute: typeof AuthenticatedAppHrContratosIdRouteImport
+    '/_authenticated/app/cargos': {
+      id: '/_authenticated/app/cargos'
+      path: '/cargos'
+      fullPath: '/app/cargos'
+      preLoaderRoute: typeof AuthenticatedAppCargosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/imprimir/$agendamentoId': {
-      id: '/_authenticated/app/imprimir/$agendamentoId'
-      path: '/imprimir/$agendamentoId'
-      fullPath: '/app/imprimir/$agendamentoId'
-      preLoaderRoute: typeof AuthenticatedAppImprimirAgendamentoIdRouteImport
+    '/_authenticated/app/campanhas': {
+      id: '/_authenticated/app/campanhas'
+      path: '/campanhas'
+      fullPath: '/app/campanhas'
+      preLoaderRoute: typeof AuthenticatedAppCampanhasRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/medico/$medicoId': {
-      id: '/_authenticated/app/medico/$medicoId'
-      path: '/medico/$medicoId'
-      fullPath: '/app/medico/$medicoId'
-      preLoaderRoute: typeof AuthenticatedAppMedicoMedicoIdRouteImport
+    '/_authenticated/app/caixa': {
+      id: '/_authenticated/app/caixa'
+      path: '/caixa'
+      fullPath: '/app/caixa'
+      preLoaderRoute: typeof AuthenticatedAppCaixaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/boletos': {
+      id: '/_authenticated/app/boletos'
+      path: '/boletos'
+      fullPath: '/app/boletos'
+      preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/backups': {
+      id: '/_authenticated/app/backups'
+      path: '/backups'
+      fullPath: '/app/backups'
+      preLoaderRoute: typeof AuthenticatedAppBackupsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/auditoria': {
+      id: '/_authenticated/app/auditoria'
+      path: '/auditoria'
+      fullPath: '/app/auditoria'
+      preLoaderRoute: typeof AuthenticatedAppAuditoriaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/atendimento-multiplo': {
+      id: '/_authenticated/app/atendimento-multiplo'
+      path: '/atendimento-multiplo'
+      fullPath: '/app/atendimento-multiplo'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoMultiploRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/atendimento-ia': {
+      id: '/_authenticated/app/atendimento-ia'
+      path: '/atendimento-ia'
+      fullPath: '/app/atendimento-ia'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/anamneses': {
+      id: '/_authenticated/app/anamneses'
+      path: '/anamneses'
+      fullPath: '/app/anamneses'
+      preLoaderRoute: typeof AuthenticatedAppAnamnesesRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/alertas-enfermagem': {
+      id: '/_authenticated/app/alertas-enfermagem'
+      path: '/alertas-enfermagem'
+      fullPath: '/app/alertas-enfermagem'
+      preLoaderRoute: typeof AuthenticatedAppAlertasEnfermagemRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/agenda-v2': {
+      id: '/_authenticated/app/agenda-v2'
+      path: '/agenda-v2'
+      fullPath: '/app/agenda-v2'
+      preLoaderRoute: typeof AuthenticatedAppAgendaV2RouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/agenda-medicos': {
+      id: '/_authenticated/app/agenda-medicos'
+      path: '/agenda-medicos'
+      fullPath: '/app/agenda-medicos'
+      preLoaderRoute: typeof AuthenticatedAppAgendaMedicosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/agenda': {
+      id: '/_authenticated/app/agenda'
+      path: '/agenda'
+      fullPath: '/app/agenda'
+      preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/nfse/': {
@@ -2610,18 +2372,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppNfseIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/nfse/testar': {
-      id: '/_authenticated/app/nfse/testar'
-      path: '/nfse/testar'
-      fullPath: '/app/nfse/testar'
-      preLoaderRoute: typeof AuthenticatedAppNfseTestarRouteImport
+    '/_authenticated/app/hr-contratos/': {
+      id: '/_authenticated/app/hr-contratos/'
+      path: '/hr-contratos'
+      fullPath: '/app/hr-contratos/'
+      preLoaderRoute: typeof AuthenticatedAppHrContratosIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/api/public/focusnfe/webhook': {
-      id: '/api/public/focusnfe/webhook'
-      path: '/api/public/focusnfe/webhook'
-      fullPath: '/api/public/focusnfe/webhook'
-      preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
+    '/_authenticated/app/financeiro/': {
+      id: '/_authenticated/app/financeiro/'
+      path: '/'
+      fullPath: '/app/financeiro/'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroIndexRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/equipe/': {
+      id: '/_authenticated/app/equipe/'
+      path: '/'
+      fullPath: '/app/equipe/'
+      preLoaderRoute: typeof AuthenticatedAppEquipeIndexRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
+    '/_authenticated/app/clientes/': {
+      id: '/_authenticated/app/clientes/'
+      path: '/clientes'
+      fullPath: '/app/clientes/'
+      preLoaderRoute: typeof AuthenticatedAppClientesIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/atendimento-ia/': {
+      id: '/_authenticated/app/atendimento-ia/'
+      path: '/'
+      fullPath: '/app/atendimento-ia/'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaIndexRouteImport
+      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
+    }
+    '/api/public/whatsapp/$clinicaId': {
+      id: '/api/public/whatsapp/$clinicaId'
+      path: '/api/public/whatsapp/$clinicaId'
+      fullPath: '/api/public/whatsapp/$clinicaId'
+      preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/backup-diario': {
@@ -2631,25 +2421,235 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBackupDiarioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/whatsapp/$clinicaId': {
-      id: '/api/public/whatsapp/$clinicaId'
-      path: '/api/public/whatsapp/$clinicaId'
-      fullPath: '/api/public/whatsapp/$clinicaId'
-      preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
+    '/api/public/focusnfe/webhook': {
+      id: '/api/public/focusnfe/webhook'
+      path: '/api/public/focusnfe/webhook'
+      fullPath: '/api/public/focusnfe/webhook'
+      preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app/clientes/$pacienteId/editar': {
-      id: '/_authenticated/app/clientes/$pacienteId/editar'
-      path: '/clientes/$pacienteId/editar'
-      fullPath: '/app/clientes/$pacienteId/editar'
-      preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdEditarRouteImport
+    '/_authenticated/app/nfse/testar': {
+      id: '/_authenticated/app/nfse/testar'
+      path: '/nfse/testar'
+      fullPath: '/app/nfse/testar'
+      preLoaderRoute: typeof AuthenticatedAppNfseTestarRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/medico/$medicoId': {
+      id: '/_authenticated/app/medico/$medicoId'
+      path: '/medico/$medicoId'
+      fullPath: '/app/medico/$medicoId'
+      preLoaderRoute: typeof AuthenticatedAppMedicoMedicoIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/imprimir/$agendamentoId': {
+      id: '/_authenticated/app/imprimir/$agendamentoId'
+      path: '/imprimir/$agendamentoId'
+      fullPath: '/app/imprimir/$agendamentoId'
+      preLoaderRoute: typeof AuthenticatedAppImprimirAgendamentoIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-contratos/$id': {
+      id: '/_authenticated/app/hr-contratos/$id'
+      path: '/hr-contratos/$id'
+      fullPath: '/app/hr-contratos/$id'
+      preLoaderRoute: typeof AuthenticatedAppHrContratosIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/financeiro/relatorios': {
+      id: '/_authenticated/app/financeiro/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/financeiro/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/regras-ia': {
+      id: '/_authenticated/app/financeiro/regras-ia'
+      path: '/regras-ia'
+      fullPath: '/app/financeiro/regras-ia'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroRegrasIaRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/notas': {
+      id: '/_authenticated/app/financeiro/notas'
+      path: '/notas'
+      fullPath: '/app/financeiro/notas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroNotasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/movimento': {
+      id: '/_authenticated/app/financeiro/movimento'
+      path: '/movimento'
+      fullPath: '/app/financeiro/movimento'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroMovimentoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/lembretes': {
+      id: '/_authenticated/app/financeiro/lembretes'
+      path: '/lembretes'
+      fullPath: '/app/financeiro/lembretes'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroLembretesRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/estorno': {
+      id: '/_authenticated/app/financeiro/estorno'
+      path: '/estorno'
+      fullPath: '/app/financeiro/estorno'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstornoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/estatisticas': {
+      id: '/_authenticated/app/financeiro/estatisticas'
+      path: '/estatisticas'
+      fullPath: '/app/financeiro/estatisticas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstatisticasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/empresas': {
+      id: '/_authenticated/app/financeiro/empresas'
+      path: '/empresas'
+      fullPath: '/app/financeiro/empresas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEmpresasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/contas': {
+      id: '/_authenticated/app/financeiro/contas'
+      path: '/contas'
+      fullPath: '/app/financeiro/contas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroContasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/categorias': {
+      id: '/_authenticated/app/financeiro/categorias'
+      path: '/categorias'
+      fullPath: '/app/financeiro/categorias'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroCategoriasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/bi': {
+      id: '/_authenticated/app/financeiro/bi'
+      path: '/bi'
+      fullPath: '/app/financeiro/bi'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/atendimentos-externos': {
+      id: '/_authenticated/app/financeiro/atendimentos-externos'
+      path: '/atendimentos-externos'
+      fullPath: '/app/financeiro/atendimentos-externos'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/atendimentos': {
+      id: '/_authenticated/app/financeiro/atendimentos'
+      path: '/atendimentos'
+      fullPath: '/app/financeiro/atendimentos'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/analitico': {
+      id: '/_authenticated/app/financeiro/analitico'
+      path: '/analitico'
+      fullPath: '/app/financeiro/analitico'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAnaliticoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/financeiro/alertas': {
+      id: '/_authenticated/app/financeiro/alertas'
+      path: '/alertas'
+      fullPath: '/app/financeiro/alertas'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
+    '/_authenticated/app/configuracoes/voz': {
+      id: '/_authenticated/app/configuracoes/voz'
+      path: '/configuracoes/voz'
+      fullPath: '/app/configuracoes/voz'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesVozRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/configuracoes/painel-totem': {
+      id: '/_authenticated/app/configuracoes/painel-totem'
+      path: '/configuracoes/painel-totem'
+      fullPath: '/app/configuracoes/painel-totem'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/configuracoes/nfse': {
+      id: '/_authenticated/app/configuracoes/nfse'
+      path: '/configuracoes/nfse'
+      fullPath: '/app/configuracoes/nfse'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesNfseRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/clientes/duplicados': {
+      id: '/_authenticated/app/clientes/duplicados'
+      path: '/clientes/duplicados'
+      fullPath: '/app/clientes/duplicados'
+      preLoaderRoute: typeof AuthenticatedAppClientesDuplicadosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/cartao-beneficios/relatorios': {
+      id: '/_authenticated/app/cartao-beneficios/relatorios'
+      path: '/relatorios'
+      fullPath: '/app/cartao-beneficios/relatorios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/cartao-beneficios/modelos': {
+      id: '/_authenticated/app/cartao-beneficios/modelos'
+      path: '/modelos'
+      fullPath: '/app/cartao-beneficios/modelos'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosModelosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/cartao-beneficios/dependentes': {
+      id: '/_authenticated/app/cartao-beneficios/dependentes'
+      path: '/dependentes'
+      fullPath: '/app/cartao-beneficios/dependentes'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosDependentesRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/cartao-beneficios/convenios': {
+      id: '/_authenticated/app/cartao-beneficios/convenios'
+      path: '/convenios'
+      fullPath: '/app/cartao-beneficios/convenios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosConveniosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/cartao-beneficios/contratos': {
+      id: '/_authenticated/app/cartao-beneficios/contratos'
+      path: '/contratos'
+      fullPath: '/app/cartao-beneficios/contratos'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/cartao-beneficios/beneficios': {
+      id: '/_authenticated/app/cartao-beneficios/beneficios'
+      path: '/beneficios'
+      fullPath: '/app/cartao-beneficios/beneficios'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
+    '/_authenticated/app/atendimento-ia/$agendamentoId': {
+      id: '/_authenticated/app/atendimento-ia/$agendamentoId'
+      path: '/$agendamentoId'
+      fullPath: '/app/atendimento-ia/$agendamentoId'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
+      parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
     }
     '/_authenticated/app/clientes/$pacienteId/visualizar': {
       id: '/_authenticated/app/clientes/$pacienteId/visualizar'
       path: '/clientes/$pacienteId/visualizar'
       fullPath: '/app/clientes/$pacienteId/visualizar'
       preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/clientes/$pacienteId/editar': {
+      id: '/_authenticated/app/clientes/$pacienteId/editar'
+      path: '/clientes/$pacienteId/editar'
+      fullPath: '/app/clientes/$pacienteId/editar'
+      preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdEditarRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/equipe/medico/$medicoId/editar': {

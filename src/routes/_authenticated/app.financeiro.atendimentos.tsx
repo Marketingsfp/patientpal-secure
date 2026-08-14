@@ -1358,7 +1358,8 @@ function AtendimentosPage() {
       // em novos inserts; aqui blindamos registros históricos.
       if (r.lancamento_id && lancAgendIds.size > 0) {
         const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
-          { agendamento_id?: string | null } | undefined;
+          | { agendamento_id?: string | null }
+          | undefined;
         if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
       }
       return true;

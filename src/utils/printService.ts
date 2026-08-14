@@ -11,8 +11,30 @@
 // `pdfBase64` deve ser somente o conteúdo base64 do PDF
 // (sem o prefixo "data:application/pdf;base64,").
 
-import qz from "qz-tray";
 import { assinarQzMessage } from "@/lib/qz/sign.functions";
+
+// O pacote qz-tray faz `require("node:path")` no topo do módulo. Com import
+// estático, o Vite arrastava esse polyfill para o bundle do browser (aviso
+// "externalized for browser compatibility" no build). Carregando sob demanda,
+// o módulo só entra no chunk de quem imprime de fato — hoje só a rota /totem.
+type QzApi = (typeof import("qz-tray"))["default"];
+
+let qzPromise: Promise<QzApi> | null = null;
+// Referência resolvida, para os caminhos síncronos (ver `descartarConexao`).
+let qzCarregado: QzApi | null = null;
+
+async function carregarQz(): Promise<QzApi> {
+  if (typeof window === "undefined") {
+    throw new Error("QZ Tray só funciona no navegador.");
+  }
+  if (!qzPromise) {
+    qzPromise = import("qz-tray").then((m) => {
+      qzCarregado = m.default;
+      return m.default;
+    });
+  }
+  return qzPromise;
+}
 
 // Certificado público auto-assinado (par da chave QZ_PRIVATE_KEY guardada no
 // backend). Enviado ao QZ Tray para que ele confie neste site e execute os
@@ -61,7 +83,7 @@ const QZ_INDISPONIVEL_MS = 60_000;
 let qzIndisponivelAte = 0;
 
 let qzConfigurado = false;
-function configurarQzUmaVez() {
+function configurarQzUmaVez(qz: QzApi) {
   if (qzConfigurado) return;
   qzConfigurado = true;
 
@@ -88,8 +110,9 @@ async function garantirConexao(): Promise<void> {
   if (Date.now() < qzIndisponivelAte) {
     throw new Error("QZ Tray indisponível (verificado há pouco).");
   }
+  const qz = await carregarQz();
   // Registra certificado e assinatura antes de conectar.
-  configurarQzUmaVez();
+  configurarQzUmaVez(qz);
   if (qz.websocket.isActive()) return;
   try {
     await qz.websocket.connect();
@@ -103,6 +126,7 @@ async function garantirConexao(): Promise<void> {
 function obterImpressoraPadrao(): Promise<string> {
   if (!impressoraPadraoPromise) {
     impressoraPadraoPromise = (async () => {
+      const qz = await carregarQz();
       const impressora = await qz.printers.getDefault();
       if (!impressora) {
         throw new Error("Nenhuma impressora padrão configurada no sistema.");
@@ -119,8 +143,10 @@ function obterImpressoraPadrao(): Promise<string> {
 /** Derruba o estado do QZ para que a próxima tentativa comece limpa. */
 function descartarConexao(): void {
   impressoraPadraoPromise = null;
+  // Se o módulo nunca chegou a carregar, não há socket para derrubar.
+  if (!qzCarregado) return;
   try {
-    if (qz.websocket.isActive()) void qz.websocket.disconnect();
+    if (qzCarregado.websocket.isActive()) void qzCarregado.websocket.disconnect();
   } catch {
     // Silencia falhas de disconnect — a impressão já foi tentada.
   }
@@ -158,6 +184,7 @@ export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<vo
     const impressora = await obterImpressoraPadrao();
 
     // 3) Configuração do trabalho de impressão.
+    const qz = await carregarQz();
     const config = qz.configs.create(impressora);
 
     // 4) Payload no formato esperado pelo QZ Tray para PDF em base64.

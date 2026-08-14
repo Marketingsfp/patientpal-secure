@@ -2,7 +2,13 @@
 // Define os módulos do sistema e os acessos padrão por perfil.
 
 export type PerfilKey =
-  "admin" | "gestor" | "medico" | "recepcao" | "caixa" | "financeiro" | "enfermeiro";
+  | "admin"
+  | "gestor"
+  | "medico"
+  | "recepcao"
+  | "caixa"
+  | "financeiro"
+  | "enfermeiro";
 
 export type Acesso = "none" | "read" | "write";
 

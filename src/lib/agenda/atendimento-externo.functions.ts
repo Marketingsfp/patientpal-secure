@@ -29,7 +29,8 @@ export type MarcarExternoInput = {
 };
 
 export type MarcarExternoResult =
-  { ok: true; fin_atendimento_id: string | null } | { ok: false; message: string };
+  | { ok: true; fin_atendimento_id: string | null }
+  | { ok: false; message: string };
 
 export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

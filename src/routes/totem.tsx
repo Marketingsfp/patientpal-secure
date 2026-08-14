@@ -481,7 +481,8 @@ export function TotemPage() {
         return;
       }
       const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
-        { paciente_id: string; nome: string } | undefined;
+        | { paciente_id: string; nome: string }
+        | undefined;
       if (!match?.paciente_id) {
         toast.error("Não reconhecemos seu rosto. Digite o CPF.");
         setStep("checkin");
