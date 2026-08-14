@@ -10,7 +10,6 @@ import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
-import { HiperdiaIAChat } from "@/components/hiperdia/hiperdia-ia-chat";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
@@ -118,7 +117,6 @@ function VisualizarClientePage() {
           readOnly={!podeHiperdia}
         />
       )}
-      {!loading && paciente && clinicaAtual && <HiperdiaIAChat pacienteId={paciente.id} />}
     </div>
   );
 }

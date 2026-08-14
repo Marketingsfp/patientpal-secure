@@ -6,7 +6,6 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Label } from "@/components/ui/label";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
-import { HiperdiaIAChat } from "@/components/hiperdia/hiperdia-ia-chat";
 
 export const Route = createFileRoute("/_authenticated/app/hiperdia")({
   component: HiperdiaPage,
@@ -60,7 +59,6 @@ function HiperdiaPage() {
             clinicaId={clinicaAtual.clinica_id}
             readOnly={!podeEscrever}
           />
-          <HiperdiaIAChat pacienteId={paciente.id} />
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
