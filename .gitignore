@@ -20,6 +20,12 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# O gerenciador de pacotes deste projeto é o bun (ver bunfig.toml e o CI,
+# que roda `bun install --frozen-lockfile`). Um package-lock.json paralelo
+# fica obsoleto sem ninguém notar e faz o `npm install` resolver versões
+# antigas — foi o que quebrou a instalação com npm. Só bun.lock é versionado.
+package-lock.json
+
 # Segredos locais — nunca versionar. Use .env.example como referência.
 .env
 .env.local
