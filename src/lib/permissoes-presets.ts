@@ -38,6 +38,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "prontuarios",
   "anamneses",
   "exames-resultados",
+  "hiperdia",
   // Marketing
   "mkt-leads",
   "campanhas",

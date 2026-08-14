@@ -352,6 +352,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
       { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
       { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
+      { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
     ],
   },
   {
