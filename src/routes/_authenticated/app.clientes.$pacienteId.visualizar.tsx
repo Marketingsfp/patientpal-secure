@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
+import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
@@ -20,6 +21,7 @@ function VisualizarClientePage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
+  const podeHiperdia = usePodeEscrever("hiperdia");
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
@@ -107,6 +109,13 @@ function VisualizarClientePage() {
       )}
       {!loading && paciente && clinicaAtual && (
         <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
+      )}
+      {!loading && paciente && clinicaAtual && (
+        <HiperdiaPanel
+          pacienteId={paciente.id}
+          clinicaId={clinicaAtual.clinica_id}
+          readOnly={!podeHiperdia}
+        />
       )}
     </div>
   );
