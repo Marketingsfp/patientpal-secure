@@ -39,6 +39,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "anamneses",
   "exames-resultados",
   "hiperdia",
+  "consulta-ia",
   // Marketing
   "mkt-leads",
   "campanhas",
@@ -138,6 +139,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     anamneses: "write",
     hiperdia: "write",
     documentos: "write",
+    "consulta-ia": "write",
     clientes: "read",
     chat: "write",
     "atendimento-multiplo": "write",
@@ -203,6 +205,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     anamneses: "write",
     prontuarios: "read",
     hiperdia: "write",
+    "consulta-ia": "write",
     estoque: "read",
     documentos: "read",
     chat: "write",

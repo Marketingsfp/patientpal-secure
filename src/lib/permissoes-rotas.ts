@@ -54,6 +54,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/prontuarios": "prontuarios",
   "/app/anamneses": "anamneses",
   "/app/hiperdia": "hiperdia",
+  "/app/consulta-ia": "consulta-ia",
   "/app/exames-resultados": "exames-resultados",
 
   // Marketing
