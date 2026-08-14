@@ -29,9 +29,8 @@ export const Route = createFileRoute("/_authenticated/app/agenda-v2")({
 function AgendaV2Page() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading, setEnabled } = useAgendaV2Flag();
-  const { enabled: disabledForClinic, loading: flagLoading } = useClinicFeatureFlag(
-    "agenda_v2_disabled",
-  );
+  const { enabled: disabledForClinic, loading: flagLoading } =
+    useClinicFeatureFlag("agenda_v2_disabled");
   const navigate = useNavigate();
   const [toggleMs, setToggleMs] = useState<number | null>(null);
   const toggleStartRef = useRef<number>(0);
@@ -45,21 +44,20 @@ function AgendaV2Page() {
     }
   }, [flagLoading, disabledForClinic, navigate]);
 
-  if (flagLoading || disabledForClinic) {
-    return null;
-  }
-
   // Modo full-bleed no mobile: recolhe o menu externo do app-shell e o padding
   // do <main>, dando 100% da largura útil para a Agenda V2. Só ativa quando a
   // flag está ligada (para não afetar a tela de aviso "Agenda V2 desligada").
   useEffect(() => {
     if (typeof document === "undefined") return;
+    // Enquanto a feature flag da clínica carrega, ou se a V2 está desligada
+    // aqui, a página não renderiza nada — não aplicar o full-bleed.
+    if (flagLoading || disabledForClinic) return;
     if (!enabled) return;
     document.documentElement.classList.add("agenda-v2-fullbleed");
     return () => {
       document.documentElement.classList.remove("agenda-v2-fullbleed");
     };
-  }, [enabled]);
+  }, [enabled, flagLoading, disabledForClinic]);
 
   useEffect(() => {
     if (enabled && toggleStartRef.current > 0) {
@@ -71,6 +69,15 @@ function AgendaV2Page() {
     }
   }, [enabled]);
 
+  // IMPORTANTE: este early return precisa ficar DEPOIS de todos os hooks.
+  // Quando estava acima dos dois useEffect anteriores, o primeiro render
+  // (flagLoading=true) registrava 1 effect e o render seguinte registrava 3,
+  // quebrando a ordem dos hooks com "Rendered more hooks than during the
+  // previous render" e derrubando a tela.
+  if (flagLoading || disabledForClinic) {
+    return null;
+  }
+
   const role = clinicaAtual?.role ?? null;
   const podeVer = role === "admin" || role === "gestor";
 
@@ -81,8 +88,8 @@ function AgendaV2Page() {
           <Shield className="h-10 w-10 mx-auto text-muted-foreground" />
           <h1 className="text-lg font-semibold">Agenda V2 — Piloto restrito</h1>
           <p className="text-sm text-muted-foreground">
-            O piloto da Agenda V2 está liberado apenas para <b>admin</b> e <b>gestor</b>.
-            A agenda clássica continua disponível normalmente.
+            O piloto da Agenda V2 está liberado apenas para <b>admin</b> e <b>gestor</b>. A agenda
+            clássica continua disponível normalmente.
           </p>
           <Button asChild variant="outline">
             <Link to="/app/agenda">Voltar para /app/agenda</Link>
@@ -102,7 +109,9 @@ function AgendaV2Page() {
             <code>/app/agenda</code> continua intacta.
           </span>
           {toggleMs !== null && (
-            <span className="ml-2 text-[10px] text-slate-600 dark:text-slate-400 tabular-nums">toggle {toggleMs}ms</span>
+            <span className="ml-2 text-[10px] text-slate-600 dark:text-slate-400 tabular-nums">
+              toggle {toggleMs}ms
+            </span>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -134,12 +143,12 @@ function AgendaV2Page() {
             <div className="max-w-md text-center space-y-3">
               <h2 className="text-lg font-semibold">Agenda V2 desligada</h2>
               <p className="text-sm text-muted-foreground">
-                Ative a flag <code>agenda_v2</code> acima para pré-visualizar. Isso não afeta
-                nenhum outro usuário nem a rota <code>/app/agenda</code>.
+                Ative a flag <code>agenda_v2</code> acima para pré-visualizar. Isso não afeta nenhum
+                outro usuário nem a rota <code>/app/agenda</code>.
               </p>
               <p className="text-xs text-muted-foreground">
-                Fase 1 — visual e operacional (Timeline · Lista · Cards · KPIs · Filtros ·
-                Drawer de linha do tempo · Sessão de Coleta agrupada · Sem migration).
+                Fase 1 — visual e operacional (Timeline · Lista · Cards · KPIs · Filtros · Drawer de
+                linha do tempo · Sessão de Coleta agrupada · Sem migration).
               </p>
             </div>
           </div>
