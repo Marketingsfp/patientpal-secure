@@ -6,6 +6,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Label } from "@/components/ui/label";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
+import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
 
 export const Route = createFileRoute("/_authenticated/app/hiperdia")({
   component: HiperdiaPage,
@@ -59,11 +60,15 @@ function HiperdiaPage() {
             clinicaId={clinicaAtual.clinica_id}
             readOnly={!podeEscrever}
           />
+          <CriteriosSbd2025 />
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Selecione um paciente para ver o histórico de aferições.
-        </p>
+        <>
+          <p className="text-sm text-muted-foreground">
+            Selecione um paciente para ver o histórico de aferições.
+          </p>
+          <CriteriosSbd2025 />
+        </>
       )}
     </div>
   );
