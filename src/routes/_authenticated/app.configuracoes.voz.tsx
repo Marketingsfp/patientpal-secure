@@ -266,8 +266,8 @@ function VozConfigPage() {
           </div>
 
           <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-            A voz é gerada pelo servidor local Piper via <code>/api/tts</code>. A velocidade é
-            aplicada no navegador mantendo o tom natural (<code>preservesPitch</code>). Quando o
+            A voz é gerada pelo servidor local Piper via <code>/api/public/tts</code>. A velocidade
+            é aplicada no navegador mantendo o tom natural (<code>preservesPitch</code>). Quando o
             Piper estiver indisponível, o painel usa a voz nativa do navegador na mesma velocidade.
           </div>
         </CardContent>
@@ -278,7 +278,9 @@ function VozConfigPage() {
   );
 }
 
-const TTS_ENDPOINT = "/api/tts-proxy";
+// Mesma rota usada por src/lib/tts-service.ts. Valida tamanho do texto,
+// restringe o formato de `voice` e tem fallback quando o Piper cai.
+const TTS_ENDPOINT = "/api/public/tts";
 const VOZES = [
   { value: "faber", label: "Faber (Masculino)" },
   { value: "feminina", label: "Feminina" },
