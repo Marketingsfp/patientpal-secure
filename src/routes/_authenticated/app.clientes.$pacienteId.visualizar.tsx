@@ -5,6 +5,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
@@ -25,6 +26,10 @@ function VisualizarClientePage() {
   // prontuários. Se o Hiperdia virar um módulo próprio em `perfil_permissoes`,
   // trocar para usePodeEscrever("hiperdia").
   const podeEscreverClinico = usePodeEscrever("prontuarios");
+  // Feature flag por clínica: o Hiperdia nasce DESLIGADO em todas as clínicas e
+  // só aparece onde a flag `hiperdia` for ligada em `clinica_feature_flags`.
+  // `loading` evita o card piscar na tela antes da resposta do banco.
+  const { enabled: hiperdiaAtivo, loading: hiperdiaFlagLoading } = useClinicFeatureFlag("hiperdia");
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
@@ -113,7 +118,7 @@ function VisualizarClientePage() {
       {!loading && paciente && clinicaAtual && (
         <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
       )}
-      {!loading && paciente && clinicaAtual && (
+      {!loading && paciente && clinicaAtual && hiperdiaAtivo && !hiperdiaFlagLoading && (
         <PacienteHiperdia
           pacienteId={paciente.id}
           clinicaId={clinicaAtual.clinica_id}
