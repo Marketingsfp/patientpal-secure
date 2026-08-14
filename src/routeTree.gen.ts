@@ -84,6 +84,7 @@ import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
+import { Route as AuthenticatedAppConsultaIaRouteImport } from './routes/_authenticated/app.consulta-ia'
 import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenticated/app.clinicas'
 import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authenticated/app.checkin'
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
@@ -552,6 +553,12 @@ const AuthenticatedAppConsultaRapidaRoute =
     path: '/consulta-rapida',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppConsultaIaRoute =
+  AuthenticatedAppConsultaIaRouteImport.update({
+    id: '/consulta-ia',
+    path: '/consulta-ia',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppClinicasRoute =
   AuthenticatedAppClinicasRouteImport.update({
     id: '/clinicas',
@@ -940,6 +947,7 @@ export interface FileRoutesByFullPath {
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/consulta-ia': typeof AuthenticatedAppConsultaIaRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
@@ -1073,6 +1081,7 @@ export interface FileRoutesByTo {
   '/app/chat': typeof AuthenticatedAppChatRoute
   '/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/app/consulta-ia': typeof AuthenticatedAppConsultaIaRoute
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
@@ -1208,6 +1217,7 @@ export interface FileRoutesById {
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
   '/_authenticated/app/checkin': typeof AuthenticatedAppCheckinRoute
   '/_authenticated/app/clinicas': typeof AuthenticatedAppClinicasRoute
+  '/_authenticated/app/consulta-ia': typeof AuthenticatedAppConsultaIaRoute
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
@@ -1345,6 +1355,7 @@ export interface FileRouteTypes {
     | '/app/chat'
     | '/app/checkin'
     | '/app/clinicas'
+    | '/app/consulta-ia'
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
@@ -1478,6 +1489,7 @@ export interface FileRouteTypes {
     | '/app/chat'
     | '/app/checkin'
     | '/app/clinicas'
+    | '/app/consulta-ia'
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
@@ -1612,6 +1624,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/chat'
     | '/_authenticated/app/checkin'
     | '/_authenticated/app/clinicas'
+    | '/_authenticated/app/consulta-ia'
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
@@ -2266,6 +2279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppConsultaRapidaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/consulta-ia': {
+      id: '/_authenticated/app/consulta-ia'
+      path: '/consulta-ia'
+      fullPath: '/app/consulta-ia'
+      preLoaderRoute: typeof AuthenticatedAppConsultaIaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/clinicas': {
       id: '/_authenticated/app/clinicas'
       path: '/clinicas'
@@ -2822,6 +2842,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
   AuthenticatedAppCheckinRoute: typeof AuthenticatedAppCheckinRoute
   AuthenticatedAppClinicasRoute: typeof AuthenticatedAppClinicasRoute
+  AuthenticatedAppConsultaIaRoute: typeof AuthenticatedAppConsultaIaRoute
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
@@ -2907,6 +2928,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppChatRoute: AuthenticatedAppChatRoute,
   AuthenticatedAppCheckinRoute: AuthenticatedAppCheckinRoute,
   AuthenticatedAppClinicasRoute: AuthenticatedAppClinicasRoute,
+  AuthenticatedAppConsultaIaRoute: AuthenticatedAppConsultaIaRoute,
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,

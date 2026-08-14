@@ -353,6 +353,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
       { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
       { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
+      { to: "/app/consulta-ia", label: "Consultar com IA", icon: Brain },
     ],
   },
   {
