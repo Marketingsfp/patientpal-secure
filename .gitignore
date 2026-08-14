@@ -20,6 +20,18 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Segredos locais — nunca versionar. Use .env.example como referência.
+.env
+.env.local
+.env.*.local
+
+# Lixo de sincronização do Google Drive despejado na raiz.
+.tmp.driveupload/
+
+# Dumps de schema gerados manualmente na raiz (parte1.sql, schema_completo.sql...).
+# Não afeta supabase/migrations/*.sql nem docs/*.sql, que continuam versionados.
+/*.sql
+
 # Scratch/geração local — nunca deve ser versionado nem entrar no lint/CI
 /tmp/
 /output/
