@@ -120,7 +120,9 @@ function Sparkline({
         <polyline
           points={pontos.join(" ")}
           fill="none"
-          stroke={cor}
+          // `style` e não o atributo `stroke`: atributo de apresentação SVG não
+          // resolve `var(--...)`, e a cor viria de um token do design system.
+          style={{ stroke: cor }}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -274,22 +276,22 @@ export function HiperdiaPanel({
         <Sparkline
           titulo="Pressão sistólica"
           unidade="mmHg"
-          cor="hsl(var(--primary))"
+          cor="var(--primary)"
           valores={serie("pressao_sistolica")}
         />
         <Sparkline
           titulo="Pressão diastólica"
           unidade="mmHg"
-          cor="hsl(var(--muted-foreground))"
+          cor="var(--muted-foreground)"
           valores={serie("pressao_diastolica")}
         />
         <Sparkline
           titulo="Glicemia em jejum"
           unidade="mg/dL"
-          cor="hsl(var(--primary))"
+          cor="var(--primary)"
           valores={serie("glicemia_jejum")}
         />
-        <Sparkline titulo="Peso" unidade="kg" cor="hsl(var(--primary))" valores={serie("peso")} />
+        <Sparkline titulo="Peso" unidade="kg" cor="var(--primary)" valores={serie("peso")} />
       </div>
 
       <div className="rounded-xl border border-border/60 overflow-hidden">

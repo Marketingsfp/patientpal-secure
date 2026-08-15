@@ -1757,7 +1757,10 @@ function AgendaPage() {
     if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d";
     if (n.includes("menino jesus")) return "#172554";
     if (n.includes("consulta hoje")) return "#5b21b6";
-    return "hsl(var(--border))";
+    // `var(--border)` e não `hsl(var(--border))`: os tokens do design system
+    // são oklch, então envolver em hsl() gera cor inválida e o navegador
+    // descarta a borda inteira.
+    return "var(--border)";
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();

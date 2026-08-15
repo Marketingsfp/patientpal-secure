@@ -8,8 +8,21 @@ const Table = React.forwardRef<
 >(({ className, containerClassName, ...props }, ref) => {
   // Padrão global de UI: a tabela rola na horizontal em vez de cortar colunas
   // (as ações da última coluna ficavam inacessíveis em telas estreitas).
+  //
+  // A altura máxima é obrigatória para o cabeçalho fixo (`sticky` no `th`)
+  // funcionar. `overflow-x-auto` já faz desta div um contêiner de rolagem nos
+  // DOIS eixos, então é contra ela que o `sticky` se resolve — e não contra a
+  // área de conteúdo da página. Sem altura, a div cresce junto com a tabela, o
+  // cabeçalho nunca tem onde grudar e sobe junto com as linhas. Telas curtas
+  // não são afetadas (é `max-height`), e a página pode sobrescrever passando
+  // outra altura em `containerClassName`.
   return (
-    <div className={cn("relative w-full overflow-x-auto", containerClassName)}>
+    <div
+      className={cn(
+        "relative w-full overflow-x-auto overflow-y-auto max-h-[70vh]",
+        containerClassName,
+      )}
+    >
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   );
@@ -22,8 +35,12 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
+    // O fundo fica no `th`, não no `thead`: as células cobrem toda a área do
+    // cabeçalho, então qualquer cor no `thead` é pintada por cima e nunca
+    // aparece. Antes havia `bg-primary/10` aqui e `bg-muted` no `th` — o cinza
+    // vencia e o tom institucional nunca foi exibido.
     className={cn(
-      "bg-primary/10 border-b-2 border-primary/30 [&_tr]:border-b-0 [&_tr:hover]:bg-primary/10 [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_hsl(var(--border))]",
+      "border-b-2 border-primary/30 [&_tr]:border-b-0 [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-(--table-head-bg) [&_th]:shadow-[inset_0_-1px_0_var(--border)]",
       className,
     )}
     {...props}

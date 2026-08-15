@@ -106,7 +106,12 @@ function corDaClinica(nome?: string): string {
   if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634"; // verde São Francisco
   if (n.includes("menino jesus")) return "#00008B"; // azul Menino Jesus
   if (n.includes("consulta hoje")) return "#6D28D9"; // roxo Consulta Hoje
-  return "hsl(var(--muted-foreground))";
+  // Precisa ser uma cor literal, não `var(--...)`: o retorno vira `clinicColor`,
+  // que é gravado em `--primary` e `--ring` no <html> e também é lido pelo
+  // cálculo de contraste (que só entende hexadecimal). Um `var()` aqui deixaria
+  // `--primary` inválido e TODO `bg-primary`/`text-primary` do app ficaria sem
+  // cor. Mesmo neutro usado no modo "todas as clínicas".
+  return "#0f172a";
 }
 
 function corHoverDaClinica(nome?: string): string {

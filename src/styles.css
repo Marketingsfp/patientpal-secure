@@ -125,6 +125,12 @@
   --sidebar-accent-foreground: oklch(0.99 0 0);
   --sidebar-border: oklch(0.48 0.10 258);
   --sidebar-ring: oklch(0.86 0.10 240);
+  /* Fundo do cabeçalho de tabela. Precisa ser OPACO: o `th` é sticky e, se
+   * tivesse transparência, as linhas passariam visíveis por baixo dele ao
+   * rolar. É o tom institucional (--primary) mesclado com a
+   * superfície do card, em vez de um `bg-primary/10` semitransparente.
+   * Deriva de --primary e --card, então acompanha tema e cor da clínica. */
+  --table-head-bg: color-mix(in oklch, var(--primary) 10%, var(--card));
   /* Status tokens (Caixa v2 painel operacional) */
   --status-paid: oklch(0.72 0.17 145);
   --status-waiting: oklch(0.82 0.16 90);
@@ -282,7 +288,7 @@
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: hsl(var(--primary) / 0.6);
+  background-color: color-mix(in oklch, var(--primary) 60%, transparent);
   pointer-events: auto;
   cursor: col-resize;
   z-index: 20;
@@ -291,8 +297,8 @@
 .rt-editor.resize-cursor,
 .rt-editor.resize-cursor * { cursor: col-resize !important; }
 .rt-editor .selectedCell {
-  background: hsl(var(--primary) / 0.35);
-  box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.65);
+  background: color-mix(in oklch, var(--primary) 35%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--primary) 65%, transparent);
 }
 
 /* Imagens dentro do editor: alinhamento + estado selecionado */
