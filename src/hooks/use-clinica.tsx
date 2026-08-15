@@ -65,15 +65,41 @@ function readCachedMemberships(userId?: string): ClinicaMembership[] {
   }
 }
 
+/**
+ * Leitura e escrita defensivas do armazenamento do navegador.
+ *
+ * Este provider envolve TODO o app logado, e as chamadas abaixo rodam durante a
+ * renderização. Em máquina com armazenamento bloqueado por política do
+ * navegador, `localStorage` lança em vez de devolver vazio — e aí o sistema
+ * inteiro caía na tela de erro a cada acesso, sem nada que a clínica pudesse
+ * fazer. A escolha da clínica é uma preferência: perdê-la é aceitável, derrubar
+ * o sistema não é.
+ */
+function lerPreferencia(chave: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(chave);
+  } catch {
+    return null;
+  }
+}
+
+function gravarPreferencia(chave: string, valor: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(chave, valor);
+  } catch {
+    /* sem armazenamento: a escolha vale nesta sessão e não persiste */
+  }
+}
+
 export function ClinicaProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [memberships, setMemberships] = useState<ClinicaMembership[]>([]);
-  const [clinicaAtualId, setClinicaAtualId] = useState<string | null>(
-    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null,
+  const [clinicaAtualId, setClinicaAtualId] = useState<string | null>(() =>
+    lerPreferencia(STORAGE_KEY),
   );
-  const [modoTodas, setModoTodasState] = useState<boolean>(
-    typeof window !== "undefined" ? localStorage.getItem(TODAS_KEY) === "1" : false,
-  );
+  const [modoTodas, setModoTodasState] = useState<boolean>(() => lerPreferencia(TODAS_KEY) === "1");
   const [loading, setLoading] = useState(true);
 
   const load = async (showLoading = memberships.length === 0) => {
@@ -143,13 +169,13 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
   const setClinicaAtual = (id: string) => {
     setClinicaAtualId(id);
     setModoTodasState(false);
-    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, id);
-    if (typeof window !== "undefined") localStorage.setItem(TODAS_KEY, "0");
+    gravarPreferencia(STORAGE_KEY, id);
+    gravarPreferencia(TODAS_KEY, "0");
   };
 
   const setModoTodas = (v: boolean) => {
     setModoTodasState(v);
-    if (typeof window !== "undefined") localStorage.setItem(TODAS_KEY, v ? "1" : "0");
+    gravarPreferencia(TODAS_KEY, v ? "1" : "0");
   };
 
   const clinicaAtual =

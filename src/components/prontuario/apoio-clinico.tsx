@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NinaMessage } from "@/components/nina/NinaMessage";
 import { consultarIA } from "@/lib/consulta-ia.functions";
+import { comTempoLimite } from "@/lib/tempo-limite";
 import { cn } from "@/lib/utils";
 
 export type MensagemApoio = { role: "user" | "assistant"; content: string };
@@ -101,14 +102,19 @@ export function ApoioClinico({
     setPergunta("");
     setCarregando(true);
     try {
-      const r = await chamar({
-        data: {
-          clinicaId,
-          contexto: contexto.trim(),
-          especialidade: especialidade?.trim() || undefined,
-          messages: novas.slice(-20),
-        },
-      });
+      const r = await comTempoLimite(
+        (signal) =>
+          chamar({
+            data: {
+              clinicaId,
+              contexto: contexto.trim(),
+              especialidade: especialidade?.trim() || undefined,
+              messages: novas.slice(-20),
+            },
+            signal,
+          }),
+        "A análise do caso",
+      );
       setMensagens((m) => [...m, { role: "assistant", content: r.resposta }]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao obter a análise do caso";

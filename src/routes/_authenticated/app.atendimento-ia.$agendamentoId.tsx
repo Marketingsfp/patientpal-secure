@@ -42,6 +42,7 @@ import {
 } from "@/lib/prontuario/prescricao";
 import { macrosPorCampo, type Macro } from "@/lib/prontuario/macros";
 import { ApoioClinico } from "@/components/prontuario/apoio-clinico";
+import { comTempoLimite } from "@/lib/tempo-limite";
 import { imprimirDocumentoA4, type DadosClinicaA4 } from "@/lib/print-a4-medico";
 import type { Cid10 } from "@/data/cid10";
 import { toast } from "sonner";
@@ -144,6 +145,11 @@ function AtendimentoEditorPage() {
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
+  // Distingue "não houve triagem" de "a triagem não carregou". Sem isso as duas
+  // situações se pareciam na tela — e a segunda esconde as ALERGIAS, que só
+  // aparecem a partir da triagem. Um médico concluir que não há alergia porque
+  // uma consulta falhou é risco assistencial, não detalhe de interface.
+  const [triagemIndisponivel, setTriagemIndisponivel] = useState(false);
   const [pagamento, setPagamento] = useState<StatusPagamento | null>(null);
 
   const [transcricao, setTranscricao] = useState("");
@@ -206,13 +212,22 @@ function AtendimentoEditorPage() {
     setPagamento(status);
 
     if (ag.medico_id) {
-      const { data: med } = await supabase
+      const { data: med, error: erroMedico } = await supabase
         .from("medicos")
         .select(
           "id, nome, email, user_id, especialidade_id, crm, crm_uf, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
         )
         .eq("id", ag.medico_id)
         .maybeSingle();
+      if (erroMedico) {
+        console.error("[atendimento] falha ao carregar o profissional", erroMedico);
+        // Sem estes dados o cabeçalho fica preso em "Carregando…" e os
+        // documentos A4 saem sem CRM — nada disso se explica sozinho na tela.
+        toast.warning("Não foi possível carregar os dados do profissional.", {
+          id: "atendimento-dados-medico",
+          description: "O CRM pode faltar nos documentos impressos. Recarregue a página.",
+        });
+      }
       if (med) {
         let sens: any = {};
         try {
@@ -252,12 +267,15 @@ function AtendimentoEditorPage() {
   useEffect(() => {
     if (!clinicaAtual) return;
     (async () => {
-      const { data: mds } = await supabase
+      const { data: mds, error } = await supabase
         .from("prontuario_modelos")
         .select("id, nome, prompt_ia")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome");
+      // Só console: sem modelo a estruturação usa o prompt padrão, então o
+      // atendimento segue normal e não vale interromper o médico por isso.
+      if (error) console.error("[atendimento] falha ao carregar modelos de prontuário", error);
       const list = (mds ?? []) as Modelo[];
       const espNome = (medico?.especialidades?.nome ?? "").toLowerCase().trim();
       const match = espNome ? list.find((x) => x.nome.toLowerCase().trim() === espNome) : null;
@@ -268,7 +286,7 @@ function AtendimentoEditorPage() {
   // Carrega triagem (usado no mount e no realtime).
   const carregarTriagem = useCallback(async () => {
     if (!agendamentoId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("triagens_enfermagem")
       .select(
         "id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes",
@@ -277,6 +295,15 @@ function AtendimentoEditorPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (error) {
+      console.error("[atendimento] falha ao carregar a triagem", error);
+      // Preserva a triagem já carregada, se houver: esta função também roda no
+      // realtime, e uma falha momentânea não pode apagar da tela dados que o
+      // médico está lendo.
+      setTriagemIndisponivel(true);
+      return;
+    }
+    setTriagemIndisponivel(false);
     setTriagem((data as unknown as Triagem) ?? null);
   }, [agendamentoId]);
 
@@ -301,11 +328,21 @@ function AtendimentoEditorPage() {
     const pid = agendamento?.paciente_id;
     if (!pid) return;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("pacientes")
         .select("cpf, data_nascimento")
         .eq("id", pid)
         .maybeSingle();
+      if (error) {
+        console.error("[atendimento] falha ao carregar dados do paciente", error);
+        // `id` fixo: se a consulta falhar de novo (realtime, remontagem), o
+        // aviso é substituído em vez de empilhar na tela.
+        toast.warning("Não foi possível carregar CPF e data de nascimento do paciente.", {
+          id: "atendimento-dados-paciente",
+          description: "Confira os documentos impressos antes de entregar.",
+        });
+        return;
+      }
       setPaciente((data as never) ?? null);
     })();
   }, [agendamento?.paciente_id]);
@@ -314,11 +351,23 @@ function AtendimentoEditorPage() {
   useEffect(() => {
     if (!clinicaAtual) return;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("clinicas")
         .select("nome, cnpj, endereco, cidade, estado, cep, telefone, email, branding")
         .eq("id", clinicaAtual.clinica_id)
         .maybeSingle();
+      if (error) {
+        console.error("[atendimento] falha ao carregar dados da clínica", error);
+        // Esta é a que tem consequência física: sem estes dados a receita, o
+        // atestado e o pedido de exames saem impressos sem cabeçalho, e o
+        // médico só descobre com o papel na mão.
+        toast.warning("Não foi possível carregar os dados da clínica.", {
+          id: "atendimento-dados-clinica",
+          description: "Receitas e atestados podem sair sem o cabeçalho. Recarregue a página.",
+          duration: 12000,
+        });
+        return;
+      }
       if (!data) return;
       const branding = (data.branding ?? {}) as Record<string, unknown>;
       setClinicaDados({
@@ -504,9 +553,18 @@ function AtendimentoEditorPage() {
     }
     setLoading("estruturar");
     try {
-      const out = await estruturar({
-        data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined },
-      });
+      const out = await comTempoLimite(
+        (signal) =>
+          estruturar({
+            data: {
+              transcricao: texto,
+              especialidade,
+              promptExtra: modelo?.prompt_ia ?? undefined,
+            },
+            signal,
+          }),
+        "A estruturação do prontuário",
+      );
       const nextSoap = {
         queixa_principal: out.queixa_principal || soap.queixa_principal,
         historia_doenca: out.historia_doenca || soap.historia_doenca,
@@ -518,12 +576,18 @@ function AtendimentoEditorPage() {
       setSoap(nextSoap);
       if (out.prescricao) setPrescItens(textoParaPrescricao(out.prescricao));
       toast.success("Prontuário preenchido como sugestão — revise antes de finalizar");
-      // Gera CIDs/exames/prescrição sugerida na sequência
+      // Gera CIDs/exames/prescrição sugerida na sequência. Falha aqui não
+      // derruba o preenchimento que já deu certo — mas avisa, em vez de morrer
+      // só no console: sem isso o médico ficava sem as sugestões e sem motivo.
       try {
-        const sug = await sugerir({ data: { ...nextSoap, especialidade } });
+        const sug = await comTempoLimite(
+          (signal) => sugerir({ data: { ...nextSoap, especialidade }, signal }),
+          "A geração de sugestões",
+        );
         setSugestoes(sug);
       } catch (err) {
         console.error("sugerir falhou", err);
+        toast.warning("Prontuário preenchido, mas não foi possível gerar as sugestões de CID.");
       }
     } catch (e) {
       mostrarErro(e);
@@ -535,7 +599,10 @@ function AtendimentoEditorPage() {
   async function handleSugerir() {
     setLoading("sugerir");
     try {
-      const out = await sugerir({ data: { ...soap, especialidade } });
+      const out = await comTempoLimite(
+        (signal) => sugerir({ data: { ...soap, especialidade }, signal }),
+        "A geração de sugestões",
+      );
       setSugestoes(out);
       toast.success("Sugestões geradas");
     } catch (e) {
@@ -552,7 +619,10 @@ function AtendimentoEditorPage() {
     }
     setLoading("resumir");
     try {
-      const out = await resumir({ data: { pacienteId } });
+      const out = await comTempoLimite(
+        (signal) => resumir({ data: { pacienteId }, signal }),
+        "O resumo do histórico",
+      );
       setResumo(out.resumo);
       setResumoOpen(true);
       if (out.total === 0) toast.info("Sem prontuários anteriores");
@@ -598,16 +668,32 @@ function AtendimentoEditorPage() {
       } as never);
       if (error) throw error;
 
+      // Falhas de rede daqui em diante NÃO desfazem o prontuário (ele já está
+      // gravado e é o registro clínico que importa), mas precisam aparecer para
+      // o médico. Antes o erro era descartado e a tela dizia "Prontuário salvo"
+      // mesmo com o paciente seguindo na fila e o repasse fora do financeiro.
+      const falhas: string[] = [];
+
       const procNome = agendamento?.procedimento ?? "";
       let valorTotal = 0;
+      let valorConhecido = true;
       let lancamentoId: string | null = null;
       if (procNome) {
-        const { data: proc } = await supabase
+        const { data: proc, error: erroProc } = await supabase
           .from("procedimentos")
           .select("valor_padrao, valor_dinheiro")
           .eq("clinica_id", cid)
           .ilike("nome", procNome)
           .maybeSingle();
+        if (erroProc) {
+          // Sem o valor do procedimento o repasse sairia calculado como zero e
+          // o registro financeiro simplesmente não seria criado — em silêncio.
+          console.error("[atendimento] falha ao buscar valor do procedimento", erroProc);
+          valorConhecido = false;
+          falhas.push(
+            "o valor do procedimento não pôde ser consultado, e o repasse não foi gerado",
+          );
+        }
         valorTotal = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
       }
       let valorMedico = 0;
@@ -620,11 +706,22 @@ function AtendimentoEditorPage() {
       }
       const valorClinica = Math.max(0, valorTotal - valorMedico);
 
-      const { data: lancExist } = await supabase
+      const { data: lancExist, error: erroLanc } = await supabase
         .from("fin_lancamentos")
         .select("id, valor")
         .eq("agendamento_id", agendamentoId)
         .maybeSingle();
+      if (erroLanc) {
+        // Esta consulta decide se JÁ existe cobrança para o agendamento. Sem a
+        // resposta não dá para saber, e criar assim duplicaria o lançamento no
+        // Financeiro. Melhor não criar e avisar — duplicidade é bem mais cara
+        // de desfazer do que uma inclusão manual.
+        console.error("[atendimento] falha ao verificar lançamento existente", erroLanc);
+        valorConhecido = false;
+        falhas.push(
+          "não foi possível verificar a cobrança do agendamento, e o repasse não foi gerado",
+        );
+      }
       if (lancExist) {
         lancamentoId = lancExist.id;
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
@@ -633,8 +730,8 @@ function AtendimentoEditorPage() {
       // Só cria fin_atendimentos quando NÃO houver fin_lancamentos vinculado
       // ao agendamento — caso contrário duplicaria o registro no Financeiro
       // (o repasse já vive em fin_lancamentos gerado no caixa).
-      if (valorTotal > 0 && !lancExist) {
-        await supabase.from("fin_atendimentos").insert({
+      if (valorConhecido && valorTotal > 0 && !lancExist) {
+        const { error: erroFin } = await supabase.from("fin_atendimentos").insert({
           clinica_id: cid,
           paciente_id: pacienteId,
           medico_id: medico?.id ?? null,
@@ -650,9 +747,13 @@ function AtendimentoEditorPage() {
           status: "realizado",
           lancamento_id: lancamentoId,
         } as never);
+        if (erroFin) {
+          console.error("[atendimento] falha ao registrar no financeiro", erroFin);
+          falhas.push("o lançamento no financeiro não foi registrado");
+        }
       }
 
-      await supabase
+      const { error: erroAgendamento } = await supabase
         .from("agendamentos")
         .update({
           fluxo_etapa: "finalizado",
@@ -660,12 +761,23 @@ function AtendimentoEditorPage() {
           fluxo_atualizado_em: new Date().toISOString(),
         } as never)
         .eq("id", agendamentoId);
+      if (erroAgendamento) {
+        console.error("[atendimento] falha ao finalizar o agendamento", erroAgendamento);
+        falhas.push("o atendimento não foi marcado como finalizado (o paciente segue na fila)");
+      }
 
-      toast.success(
-        valorMedico > 0
-          ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
-          : "Prontuário salvo",
-      );
+      if (falhas.length) {
+        toast.warning("Prontuário salvo, mas com pendências", {
+          description: `Não foi possível concluir: ${falhas.join("; ")}. Avise a recepção e confira antes de encerrar.`,
+          duration: 15000,
+        });
+      } else {
+        toast.success(
+          valorMedico > 0
+            ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
+            : "Prontuário salvo",
+        );
+      }
       try {
         localStorage.removeItem(draftKey);
       } catch {
@@ -770,6 +882,27 @@ function AtendimentoEditorPage() {
 
   return (
     <div className="space-y-4 p-1">
+      {/* Aviso fixo, não um toast: some da tela é justamente o que não pode
+          acontecer aqui — enquanto a triagem não carrega, o bloco de alergias
+          não aparece, e o médico precisa saber que a ausência é falha de
+          carregamento, não ausência de alergia. */}
+      {triagemIndisponivel && (
+        <Card className="border-destructive/50 bg-destructive/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <div className="font-semibold text-destructive">
+                Triagem da enfermagem não carregou
+              </div>
+              <p className="text-sm text-foreground/80">
+                Alergias, sinais vitais e comorbidades podem não estar sendo exibidos. Não considere
+                que o paciente não tem alergias — recarregue a página ou confirme com a enfermagem
+                antes de prescrever.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
       {pagamento && !pagamento.pago && (
         <Card className="p-4 border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
           <div className="flex items-start gap-3">

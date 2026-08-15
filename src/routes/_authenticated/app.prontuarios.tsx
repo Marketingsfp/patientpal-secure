@@ -109,6 +109,14 @@ function ProntuariosPage() {
         exame_fisico: r.exame_fisico ?? "",
         observacoes: r.observacoes ?? "",
       })}
+      validate={(f) => {
+        // O campo Data pode ser apagado na tela, e sem data `toPayload` estoura
+        // ao converter. Barrar aqui dá a mensagem certa em vez de um erro genérico.
+        if (!f.data || Number.isNaN(new Date(f.data).getTime()))
+          return "Informe a data e a hora do atendimento.";
+        if (!f.paciente_id) return "Selecione o paciente.";
+        return null;
+      }}
       toPayload={(f) => ({
         data: new Date(f.data).toISOString(),
         paciente_id: f.paciente_id,

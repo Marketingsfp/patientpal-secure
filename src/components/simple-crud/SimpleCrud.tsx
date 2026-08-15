@@ -166,28 +166,41 @@ export function SimpleCrud<T extends { id: string }, F>({
       }
     }
     setSaving(true);
-    const payload = { ...toPayload(form), clinica_id: clinicaAtual.clinica_id };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const q = supabase.from(table as any) as any;
-    const { data: ret, error } = editing
-      ? await q.update(payload).eq("id", editing.id).select("id")
-      : await q.insert(payload).select("id");
-    setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
+    // O `finally` é obrigatório aqui: `toPayload` é escrito por cada tela e
+    // pode lançar antes de qualquer ida ao banco — uma data em branco vira
+    // `new Date("")` e estoura. Sem ele o botão ficava travado em "Salvando…"
+    // para sempre, e a única saída era recarregar a página perdendo o que
+    // tinha sido digitado.
+    try {
+      const payload = { ...toPayload(form), clinica_id: clinicaAtual.clinica_id };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const q = supabase.from(table as any) as any;
+      const { data: ret, error } = editing
+        ? await q.update(payload).eq("id", editing.id).select("id")
+        : await q.insert(payload).select("id");
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      if (!ret || (Array.isArray(ret) && ret.length === 0)) {
+        toast.error(
+          editing
+            ? "Sem permissão para alterar este registro. Verifique se você é admin/gestor desta clínica."
+            : "Cadastro não foi salvo. Verifique se você tem permissão de admin/gestor nesta clínica.",
+        );
+        return;
+      }
+      toast.success(editing ? "Atualizado." : "Cadastrado.");
+      setOpen(false);
+      void load();
+    } catch (e) {
+      // Falha ao montar os dados do formulário. Não é erro do banco, então
+      // `mostrarErro` diria algo sem sentido para quem está na recepção.
+      console.error("[SimpleCrud] falha ao preparar o cadastro", e);
+      toast.error("Não foi possível salvar. Confira os campos preenchidos, principalmente datas.");
+    } finally {
+      setSaving(false);
     }
-    if (!ret || (Array.isArray(ret) && ret.length === 0)) {
-      toast.error(
-        editing
-          ? "Sem permissão para alterar este registro. Verifique se você é admin/gestor desta clínica."
-          : "Cadastro não foi salvo. Verifique se você tem permissão de admin/gestor nesta clínica.",
-      );
-      return;
-    }
-    toast.success(editing ? "Atualizado." : "Cadastrado.");
-    setOpen(false);
-    void load();
   };
 
   const onDelete = async (r: T) => {

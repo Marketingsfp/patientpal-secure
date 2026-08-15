@@ -186,6 +186,12 @@ export function HiperdiaPanel({
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
+    // Sem esta checagem, uma data em branco fazia a conversão logo abaixo
+    // estourar: o botão simplesmente não respondia, sem erro nem aviso.
+    if (!form.data_registro || Number.isNaN(new Date(form.data_registro).getTime())) {
+      toast.error("Informe a data e a hora da aferição.");
+      return;
+    }
     const payload = {
       clinica_id: clinicaId,
       paciente_id: pacienteId,
