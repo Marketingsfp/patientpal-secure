@@ -21,6 +21,7 @@ import {
   DollarSign,
   CalendarDays,
   ClipboardList,
+  ClipboardCheck,
   MessageCircle,
   Target,
   Clock,
@@ -358,7 +359,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
       { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
       { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
-      { to: "/app/consulta-ia", label: "Consultar com IA", icon: Brain },
+      { to: "/app/consulta-ia", label: "Apoio Clínico", icon: ClipboardCheck },
     ],
   },
   {
@@ -420,7 +421,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Inteligência",
     items: [
-      { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
+      { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Stethoscope },
       { to: "/app/crm", label: "CRM", icon: Target },
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },

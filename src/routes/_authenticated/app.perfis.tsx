@@ -162,7 +162,11 @@ const GRUPOS_BASE: Grupo[] = [
         descricao: "Alertas automáticos",
       },
       { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
-      { key: "consulta-ia", nome: "Consultar com IA", descricao: "Perguntas ao assistente de IA" },
+      {
+        key: "consulta-ia",
+        nome: "Apoio Clínico",
+        descricao: "Análise de caso e suporte à decisão clínica",
+      },
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
       {

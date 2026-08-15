@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { Brain, Eraser, Loader2, Send, Sparkles, Stethoscope } from "lucide-react";
+import { ClipboardCheck, Eraser, Loader2, MessagesSquare, Send, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,19 +12,19 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/app/consulta-ia")({
-  component: ConsultarComIA,
+  component: ApoioClinicoPage,
   head: () => ({
     meta: [
-      { title: "Consultar com IA — ClinicaOS" },
+      { title: "Apoio Clínico — ClinicaOS" },
       {
         name: "description",
         content:
-          "Assistente clínico de IA para resumo, hipóteses diagnósticas e conduta a partir de uma anamnese livre.",
+          "Apoio à decisão clínica: resumo, hipóteses diagnósticas e conduta a partir de uma anamnese livre.",
       },
-      { property: "og:title", content: "Consultar com IA — ClinicaOS" },
+      { property: "og:title", content: "Apoio Clínico — ClinicaOS" },
       {
         property: "og:description",
-        content: "Resumo clínico, hipóteses e conduta sugeridos por IA a partir da anamnese livre.",
+        content: "Resumo clínico, hipóteses e conduta sugeridos a partir da anamnese livre.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -42,7 +42,7 @@ const SUGESTOES = [
   "Quais sinais de alarme devo investigar?",
 ];
 
-function ConsultarComIA() {
+function ApoioClinicoPage() {
   const [contexto, setContexto] = useState("");
   const [especialidade, setEspecialidade] = useState("");
   const [pergunta, setPergunta] = useState("");
@@ -66,7 +66,7 @@ function ConsultarComIA() {
       return;
     }
     if (!clinicaAtual?.clinica_id) {
-      toast.error("Selecione uma clínica antes de consultar a IA.");
+      toast.error("Selecione uma clínica para usar o apoio clínico.");
       return;
     }
     const novas: Msg[] = [...messages, { role: "user", content: q }];
@@ -84,7 +84,7 @@ function ConsultarComIA() {
       });
       setMessages((m) => [...m, { role: "assistant", content: r.resposta }]);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao consultar a IA";
+      const msg = e instanceof Error ? e.message : "Falha ao obter a análise do caso";
       toast.error(msg);
       setMessages((m) => m.slice(0, -1));
       setPergunta(q);
@@ -99,15 +99,15 @@ function ConsultarComIA() {
         <header className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-600/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
-              <Brain className="h-5 w-5" />
+              <ClipboardCheck className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
-                Consultar com IA
+                Apoio Clínico
               </h1>
               <p className="mt-0.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                Apoio clínico sob julgamento médico — descreva o caso à esquerda e converse com a IA
-                à direita.
+                Suporte à decisão sob julgamento médico — descreva o caso à esquerda e faça suas
+                perguntas à direita.
               </p>
             </div>
           </div>
@@ -174,12 +174,12 @@ function ConsultarComIA() {
             </div>
           </section>
 
-          {/* Coluna direita — resposta da IA */}
+          {/* Coluna direita — análise do caso */}
           <section className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-4">
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              <Sparkles className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <MessagesSquare className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Resposta da IA
+                Análise do caso
               </h2>
             </div>
 
@@ -187,10 +187,10 @@ function ConsultarComIA() {
               {messages.length === 0 && !loading && (
                 <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-3 text-center">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800">
-                    <Sparkles className="h-5 w-5" />
+                    <Stethoscope className="h-5 w-5" />
                   </span>
                   <p className="max-w-xs text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                    Descreva o caso ao lado e envie uma pergunta. As respostas aparecem aqui,
+                    Descreva o caso ao lado e envie uma pergunta. As análises aparecem aqui,
                     formatadas para leitura clínica.
                   </p>
                 </div>
@@ -228,7 +228,8 @@ function ConsultarComIA() {
                   aria-live="polite"
                 >
                   <div className="mb-3 flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />A IA está analisando o caso…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Analisando o caso…
                   </div>
                   <div className="h-3 w-11/12 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
                   <div className="h-3 w-full animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />

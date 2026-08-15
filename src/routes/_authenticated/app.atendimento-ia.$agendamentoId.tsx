@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Brain,
-  Sparkles,
+  ClipboardCheck,
+  ListChecks,
+  MessagesSquare,
   FileHeart,
   Stethoscope,
   Loader2,
   History,
-  Wand2,
   ArrowLeft,
   HeartPulse,
   CheckCircle2,
@@ -41,6 +41,7 @@ import {
   type ItemPrescricao,
 } from "@/lib/prontuario/prescricao";
 import { macrosPorCampo, type Macro } from "@/lib/prontuario/macros";
+import { ApoioClinico } from "@/components/prontuario/apoio-clinico";
 import { imprimirDocumentoA4, type DadosClinicaA4 } from "@/lib/print-a4-medico";
 import type { Cid10 } from "@/data/cid10";
 import { toast } from "sonner";
@@ -122,6 +123,11 @@ function AtendimentoEditorPage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("atendimento-ia");
+  // O apoio à decisão usa o módulo "consulta-ia", que tem permissão própria na
+  // tela de Perfis de Acesso. Quem tem o atendimento liberado não tem
+  // necessariamente este — e a função de servidor recusa. Consultamos aqui para
+  // avisar em vez de deixar o médico clicar e receber erro.
+  const podeApoioClinico = usePodeEscrever("consulta-ia");
   const estruturar = useServerFn(gerarAnamneseEstruturada);
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
@@ -447,6 +453,49 @@ function AtendimentoEditorPage() {
   const pacienteId = agendamento?.paciente_id ?? "";
   const pacienteNome = agendamento?.paciente_nome ?? "";
 
+  /**
+   * Reúne, num texto corrido, tudo que já está preenchido nesta tela para
+   * alimentar o apoio à decisão: sinais vitais da triagem, transcrição da
+   * consulta e os campos do prontuário.
+   *
+   * Não inclui nome, CPF nem data de nascimento do paciente — nada disso muda a
+   * análise clínica, e esse texto sai da clínica rumo ao provedor do modelo.
+   * Mandar identificação seria expor dado pessoal sem necessidade.
+   */
+  const montarContextoClinico = useCallback(() => {
+    const partes: string[] = [];
+    if (especialidade) partes.push(`Especialidade: ${especialidade}`);
+
+    if (triagem) {
+      const vitais = [
+        triagem.pa_sistolica && triagem.pa_diastolica
+          ? `PA ${triagem.pa_sistolica}/${triagem.pa_diastolica} mmHg`
+          : null,
+        triagem.freq_cardiaca ? `FC ${triagem.freq_cardiaca} bpm` : null,
+        triagem.temperatura ? `Tax ${triagem.temperatura} °C` : null,
+        triagem.saturacao ? `SatO2 ${triagem.saturacao}%` : null,
+        triagem.glicemia ? `Glicemia ${triagem.glicemia} mg/dL` : null,
+        triagem.peso_kg ? `Peso ${triagem.peso_kg} kg` : null,
+        triagem.altura_cm ? `Altura ${triagem.altura_cm} cm` : null,
+        triagem.imc ? `IMC ${triagem.imc}` : null,
+      ].filter(Boolean);
+      if (vitais.length) partes.push(`Triagem: ${vitais.join(", ")}`);
+      if (triagem.alergias) partes.push(`Alergias: ${triagem.alergias}`);
+      if (triagem.doencas?.length) partes.push(`Comorbidades: ${triagem.doencas.join(", ")}`);
+      if (triagem.medicamentos) partes.push(`Medicamentos em uso: ${triagem.medicamentos}`);
+    }
+
+    for (const [chave, rotulo] of SOAP_KEYS) {
+      const valor = soap[chave]?.trim();
+      if (valor) partes.push(`${rotulo}: ${valor}`);
+    }
+
+    const transcrito = transcricao.trim();
+    if (transcrito) partes.push(`Transcrição da consulta:\n${transcrito}`);
+
+    return partes.join("\n");
+  }, [especialidade, triagem, soap, transcricao]);
+
   async function handleEstruturar(textoOverride?: string) {
     const texto = (textoOverride ?? transcricao).trim();
     if (!texto) {
@@ -468,7 +517,7 @@ function AtendimentoEditorPage() {
       };
       setSoap(nextSoap);
       if (out.prescricao) setPrescItens(textoParaPrescricao(out.prescricao));
-      toast.success("Prontuário preenchido pela IA como sugestão");
+      toast.success("Prontuário preenchido como sugestão — revise antes de finalizar");
       // Gera CIDs/exames/prescrição sugerida na sequência
       try {
         const sug = await sugerir({ data: { ...nextSoap, especialidade } });
@@ -747,7 +796,7 @@ function AtendimentoEditorPage() {
       )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Brain className="h-6 w-6 text-primary" />
+          <Stethoscope className="h-6 w-6 text-primary" />
           <div>
             <h1 className="text-xl font-semibold">
               Atendimento — <span className="uppercase">{pacienteNome || "…"}</span>
@@ -791,8 +840,8 @@ function AtendimentoEditorPage() {
           <Collapsible open={resumoOpen} onOpenChange={setResumoOpen} className="mt-3">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-start">
-                <Sparkles className="h-4 w-4 mr-2 text-amber-500" />
-                Resumo IA do histórico {resumoOpen ? "▲" : "▼"}
+                <FileText className="h-4 w-4 mr-2 text-primary" />
+                Resumo do histórico {resumoOpen ? "▲" : "▼"}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -944,9 +993,9 @@ function AtendimentoEditorPage() {
             {loading === "estruturar" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Wand2 className="h-4 w-4" />
+              <ListChecks className="h-4 w-4" />
             )}
-            Estruturar prontuário com IA
+            Estruturar prontuário
           </Button>
         </Card>
 
@@ -1163,92 +1212,129 @@ function AtendimentoEditorPage() {
       </div>
 
       <Card className="p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            <h2 className="font-semibold">Sugestões clínicas</h2>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSugerir}
-            disabled={loading === "sugerir"}
-          >
-            {loading === "sugerir" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Wand2 className="h-4 w-4" />
-            )}
-            Sugerir CID, exames e prescrição
-          </Button>
+        <div className="flex items-center gap-2">
+          <ClipboardCheck className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold">Apoio Clínico</h2>
+          <span className="text-[11px] text-muted-foreground">Sugestões sob julgamento médico</span>
         </div>
-        {!sugestoes ? (
-          <p className="text-sm text-muted-foreground">
-            Preencha o prontuário e clique em "Sugerir" para a IA propor CIDs, exames e prescrição.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs uppercase text-muted-foreground">
-                CIDs sugeridos (clique para adicionar)
-              </Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {sugestoes.cids.length === 0 && (
-                  <span className="text-xs text-muted-foreground">—</span>
+
+        {/* Duas frentes do mesmo apoio à decisão, lado a lado em vez de
+            espalhadas pela tela: sugestões estruturadas a partir do prontuário
+            já preenchido, e análise conversacional sobre a anamnese livre. */}
+        <Tabs defaultValue="sugestoes">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="sugestoes" className="gap-1.5">
+              <ListChecks className="h-3.5 w-3.5" />
+              Sugestões estruturadas
+            </TabsTrigger>
+            <TabsTrigger value="analise" className="gap-1.5">
+              <MessagesSquare className="h-3.5 w-3.5" />
+              Análise do caso
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sugestoes" className="space-y-3 pt-3">
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSugerir}
+                disabled={loading === "sugerir"}
+              >
+                {loading === "sugerir" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ListChecks className="h-4 w-4" />
                 )}
-                {sugestoes.cids.map((c, i) => (
-                  <Badge
-                    key={i}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}
-                  >
-                    {c.codigo} · {c.descricao}
-                  </Badge>
-                ))}
+                Sugerir CID, exames e prescrição
+              </Button>
+            </div>
+            {!sugestoes ? (
+              <p className="text-sm text-muted-foreground">
+                Preencha o prontuário e clique em "Sugerir" para receber propostas de CID, exames e
+                prescrição.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs uppercase text-muted-foreground">
+                    CIDs sugeridos (clique para adicionar)
+                  </Label>
+                  <div className="flex gap-2 flex-wrap mt-1">
+                    {sugestoes.cids.length === 0 && (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                    {sugestoes.cids.map((c, i) => (
+                      <Badge
+                        key={i}
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                        onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}
+                      >
+                        {c.codigo} · {c.descricao}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs uppercase text-muted-foreground">
+                    Exames sugeridos
+                  </Label>
+                  <ul className="list-disc pl-5 text-sm space-y-0.5 mt-1">
+                    {sugestoes.exames.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                  {sugestoes.exames.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() =>
+                        setSoap((s) => ({
+                          ...s,
+                          conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.`,
+                        }))
+                      }
+                    >
+                      Adicionar à conduta
+                    </Button>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs uppercase text-muted-foreground">
+                    Prescrição sugerida
+                  </Label>
+                  <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">
+                    {sugestoes.prescricao || "—"}
+                  </pre>
+                  {sugestoes.prescricao && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}
+                    >
+                      Usar como prescrição
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-            <div>
-              <Label className="text-xs uppercase text-muted-foreground">Exames sugeridos</Label>
-              <ul className="list-disc pl-5 text-sm space-y-0.5 mt-1">
-                {sugestoes.exames.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-              {sugestoes.exames.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() =>
-                    setSoap((s) => ({
-                      ...s,
-                      conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.`,
-                    }))
-                  }
-                >
-                  Adicionar à conduta
-                </Button>
-              )}
-            </div>
-            <div>
-              <Label className="text-xs uppercase text-muted-foreground">Prescrição sugerida</Label>
-              <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">
-                {sugestoes.prescricao || "—"}
-              </pre>
-              {sugestoes.prescricao && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}
-                >
-                  Usar como prescrição
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
+            )}
+          </TabsContent>
+
+          {/* forceMount: sem ele o Radix desmonta a aba inativa, e o médico
+              perderia a análise inteira só de olhar as sugestões estruturadas.
+              O `hidden` do próprio Radix cuida de esconder. */}
+          <TabsContent value="analise" forceMount className="pt-3 data-[state=inactive]:hidden">
+            <ApoioClinico
+              clinicaId={clinicaAtual?.clinica_id ?? null}
+              especialidade={especialidade}
+              montarContexto={montarContextoClinico}
+              habilitado={podeApoioClinico}
+            />
+          </TabsContent>
+        </Tabs>
       </Card>
 
       <div className="flex justify-end gap-2 flex-wrap">
