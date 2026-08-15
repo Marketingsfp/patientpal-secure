@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NinaMessage } from "@/components/nina/NinaMessage";
+import { useClinica } from "@/hooks/use-clinica";
 import { consultarIA } from "@/lib/consulta-ia.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,9 @@ function ConsultarComIA() {
   const [loading, setLoading] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const chamar = useServerFn(consultarIA);
+  // A clínica vai junto na requisição porque o servidor agora confere vínculo
+  // e permissão do módulo antes de mandar a anamnese para a IA.
+  const { clinicaAtual } = useClinica();
 
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -61,6 +65,10 @@ function ConsultarComIA() {
       toast.error("Descreva primeiro a queixa/anamnese do paciente.");
       return;
     }
+    if (!clinicaAtual?.clinica_id) {
+      toast.error("Selecione uma clínica antes de consultar a IA.");
+      return;
+    }
     const novas: Msg[] = [...messages, { role: "user", content: q }];
     setMessages(novas);
     setPergunta("");
@@ -68,6 +76,7 @@ function ConsultarComIA() {
     try {
       const r = await chamar({
         data: {
+          clinicaId: clinicaAtual.clinica_id,
           contexto: contexto.trim(),
           especialidade: especialidade.trim() || undefined,
           messages: novas.slice(-20),
@@ -219,8 +228,7 @@ function ConsultarComIA() {
                   aria-live="polite"
                 >
                   <div className="mb-3 flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    A IA está analisando o caso…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />A IA está analisando o caso…
                   </div>
                   <div className="h-3 w-11/12 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
                   <div className="h-3 w-full animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
