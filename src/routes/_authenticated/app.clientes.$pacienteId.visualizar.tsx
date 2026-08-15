@@ -10,12 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
-<<<<<<< HEAD
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
-=======
-import { PacienteHiperdia } from "@/components/hiperdia/paciente-hiperdia";
->>>>>>> feat/modulo-hiperdia
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
@@ -27,18 +23,7 @@ function VisualizarClientePage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-<<<<<<< HEAD
   const podeHiperdia = usePodeEscrever("hiperdia");
-=======
-  // Aferição do Hiperdia é dado clínico, não cadastral: usa a permissão de
-  // prontuários. Se o Hiperdia virar um módulo próprio em `perfil_permissoes`,
-  // trocar para usePodeEscrever("hiperdia").
-  const podeEscreverClinico = usePodeEscrever("prontuarios");
-  // Feature flag por clínica: o Hiperdia nasce DESLIGADO em todas as clínicas e
-  // só aparece onde a flag `hiperdia` for ligada em `clinica_feature_flags`.
-  // `loading` evita o card piscar na tela antes da resposta do banco.
-  const { enabled: hiperdiaAtivo, loading: hiperdiaFlagLoading } = useClinicFeatureFlag("hiperdia");
->>>>>>> feat/modulo-hiperdia
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
@@ -127,7 +112,6 @@ function VisualizarClientePage() {
       {!loading && paciente && clinicaAtual && (
         <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
       )}
-<<<<<<< HEAD
       {!loading && paciente && clinicaAtual && (
         <HiperdiaPanel
           pacienteId={paciente.id}
@@ -136,15 +120,6 @@ function VisualizarClientePage() {
         />
       )}
       {!loading && paciente && clinicaAtual && <CriteriosSbd2025 />}
-=======
-      {!loading && paciente && clinicaAtual && hiperdiaAtivo && !hiperdiaFlagLoading && (
-        <PacienteHiperdia
-          pacienteId={paciente.id}
-          clinicaId={clinicaAtual.clinica_id}
-          podeEscrever={podeEscreverClinico}
-        />
-      )}
->>>>>>> feat/modulo-hiperdia
     </div>
   );
 }
