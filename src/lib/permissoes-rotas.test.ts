@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { readdirSync } from "node:fs";
-import { moduloDaRota, rotaSomenteAdmin } from "./permissoes-rotas";
+import { readdirSync, readFileSync } from "node:fs";
+import {
+  moduloDaRota,
+  rotaSomenteAdmin,
+  ROUTE_TO_MODULE,
+  SUBMODULE_PARENT,
+} from "./permissoes-rotas";
 
 // Trava de regressão da Guarda de Rotas: toda rota privada precisa ser
 // reconhecida pelo mapa rota → módulo consumido pelo AppShell. Rota nova
@@ -43,5 +48,37 @@ describe("guarda de rotas privadas", () => {
 
   it("rota desconhecida é tratada como bloqueada", () => {
     expect(moduloDaRota("/app/rota-que-nao-existe")).toBeUndefined();
+  });
+});
+
+// Segunda trava, do outro lado do mesmo problema: não basta a rota ter um
+// módulo, esse módulo precisa existir na tela "Perfis de Acesso". Quando ele
+// não existe lá, o gestor salva os perfis, o upsert grava linha só para os
+// módulos que a tela conhece e o módulo órfão fica sem linha nenhuma — some
+// do menu e responde "Sem permissão" para todo perfil não-admin, sem que o
+// admin tenha onde liberar. Foi exatamente o que ocorreu com "hiperdia" e
+// "consulta-ia".
+const PERFIS_TSX = readFileSync("src/routes/_authenticated/app.perfis.tsx", "utf8");
+const MODULOS_DA_TELA = new Set(
+  [...PERFIS_TSX.matchAll(/key:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]!),
+);
+
+const MODULOS_DAS_ROTAS = [
+  ...new Set(Object.values(ROUTE_TO_MODULE).filter((m): m is string => typeof m === "string")),
+];
+
+describe("tela Perfis de Acesso cobre os módulos usados nas rotas", () => {
+  it("leu a lista de módulos da tela", () => {
+    expect(MODULOS_DA_TELA.size).toBeGreaterThan(50);
+  });
+
+  it("todo módulo de rota aparece na tela de perfis", () => {
+    const orfaos = MODULOS_DAS_ROTAS.filter((m) => !MODULOS_DA_TELA.has(m));
+    expect(orfaos).toEqual([]);
+  });
+
+  it("submódulos declarados têm pai válido", () => {
+    const paisInvalidos = Object.values(SUBMODULE_PARENT).filter((p) => !MODULOS_DA_TELA.has(p));
+    expect(paisInvalidos).toEqual([]);
   });
 });

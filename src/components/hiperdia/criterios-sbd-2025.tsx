@@ -28,11 +28,16 @@ export function CriteriosSbd2025() {
             <span className="block text-sm font-semibold text-slate-800">
               Critérios laboratoriais: normal, pré-diabetes e diabetes (Diretriz SBD 2025)
             </span>
-            <span className="block text-xs text-slate-500">Referência rápida para o atendimento.</span>
+            <span className="block text-xs text-slate-500">
+              Referência rápida para o atendimento.
+            </span>
           </span>
         </span>
         <ChevronDown
-          className={cn("h-4 w-4 text-slate-500 shrink-0 transition-transform", aberto && "rotate-180")}
+          className={cn(
+            "h-4 w-4 text-slate-500 shrink-0 transition-transform",
+            aberto && "rotate-180",
+          )}
         />
       </button>
 
@@ -42,8 +47,12 @@ export function CriteriosSbd2025() {
             <table className="w-full min-w-[560px] border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 text-slate-600">
-                  <th className="text-left font-semibold px-4 py-2.5 border-b border-slate-200">Critério</th>
-                  <th className="text-center font-semibold px-4 py-2.5 border-b border-slate-200">Normal</th>
+                  <th className="text-left font-semibold px-4 py-2.5 border-b border-slate-200">
+                    Critério
+                  </th>
+                  <th className="text-center font-semibold px-4 py-2.5 border-b border-slate-200">
+                    Normal
+                  </th>
                   <th className="text-center font-semibold px-4 py-2.5 border-b border-slate-200 bg-yellow-50">
                     Pré-diabetes
                   </th>
@@ -56,7 +65,9 @@ export function CriteriosSbd2025() {
                 {LINHAS.map((l) => (
                   <tr key={l.criterio} className="border-b border-slate-200 last:border-0">
                     <td className="px-4 py-2.5 text-slate-700">{l.criterio}</td>
-                    <td className="px-4 py-2.5 text-center tabular-nums text-slate-700">{l.normal}</td>
+                    <td className="px-4 py-2.5 text-center tabular-nums text-slate-700">
+                      {l.normal}
+                    </td>
                     <td className="px-4 py-2.5 text-center tabular-nums text-slate-800 bg-yellow-50">
                       {l.pre}
                     </td>
@@ -69,8 +80,8 @@ export function CriteriosSbd2025() {
             </table>
           </div>
           <p className="text-sm text-slate-500">
-            Nota: se apenas um exame estiver alterado, o resultado deve ser repetido para confirmação
-            diagnóstica. TTGO: teste de tolerância à glicose oral (sobrecarga de 75g).
+            Nota: se apenas um exame estiver alterado, o resultado deve ser repetido para
+            confirmação diagnóstica. TTGO: teste de tolerância à glicose oral (sobrecarga de 75g).
           </p>
         </div>
       )}

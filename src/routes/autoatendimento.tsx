@@ -16,11 +16,7 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
-import {
-  detectDescriptor,
-  ensureFaceModels,
-  FACE_MATCH_THRESHOLD,
-} from "@/lib/face-recognition";
+import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 
 export const Route = createFileRoute("/autoatendimento")({

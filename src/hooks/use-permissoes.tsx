@@ -105,6 +105,19 @@ export function usePermissoes(): {
             if (p.acesso === "read" || p.acesso === "write") nvl.set(p.modulo, p.acesso);
           }
         }
+        // Módulos criados DEPOIS da última vez que o gestor salvou a tela de
+        // Perfis não têm linha nenhuma em `perfil_permissoes`. Sem este
+        // fallback eles ficariam permanentemente bloqueados para todo perfil
+        // não-admin, e nem o admin conseguiria liberar (foi o que aconteceu
+        // com "hiperdia" e "consulta-ia"). Um módulo desligado de propósito
+        // TEM linha, com acesso "none", e continua sendo respeitado acima —
+        // aqui só entram chaves ausentes, que caem no padrão do perfil.
+        const padrao = nivelDoPreset(role);
+        for (const [modulo, acesso] of padrao) {
+          if (cfg.has(modulo)) continue;
+          set.add(modulo);
+          nvl.set(modulo, acesso);
+        }
         setAllowed(set);
         setNivel(nvl);
         setConfigured(cfg);

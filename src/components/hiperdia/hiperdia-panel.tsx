@@ -229,12 +229,7 @@ export function HiperdiaPanel({
     void carregar();
   };
 
-  const campoNum = (
-    key: keyof Form,
-    label: string,
-    placeholder: string,
-    step?: string,
-  ) => (
+  const campoNum = (key: keyof Form, label: string, placeholder: string, step?: string) => (
     <div className="space-y-1">
       <Label>{label}</Label>
       <Input

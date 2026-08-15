@@ -162,8 +162,14 @@ const GRUPOS_BASE: Grupo[] = [
         descricao: "Alertas automáticos",
       },
       { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
+      { key: "consulta-ia", nome: "Consultar com IA", descricao: "Perguntas ao assistente de IA" },
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
+      {
+        key: "hiperdia",
+        nome: "Hiperdia",
+        descricao: "Acompanhamento de hipertensos e diabéticos",
+      },
       { key: "exames-resultados", nome: "Resultados de Exames", descricao: "Laudos e resultados" },
       { key: "prontuarios", nome: "Prontuários", descricao: "Prontuários clínicos" },
       { key: "anamneses", nome: "Anamneses", descricao: "Modelos e respostas de anamnese" },
@@ -225,11 +231,10 @@ const GRUPOS_BASE: Grupo[] = [
         nome: "Financeiro",
         descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
       },
-      {
-        key: "funcionarios",
-        nome: "Funcionários",
-        descricao: "Listagem operacional de funcionários",
-      },
+      // "funcionarios" foi removido daqui: era uma chave sem rota nenhuma no
+      // ROUTE_TO_MODULE, então ligar/desligar não mudava nada. A listagem de
+      // funcionários é governada por "hr-contratos" (grupo RH). Linhas antigas
+      // dessa chave em `perfil_permissoes` são inertes e podem ficar.
       { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
       { key: "relatorios", nome: "Relatórios", descricao: "Relatórios e BI" },
       { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria, logs e LGPD" },
@@ -385,8 +390,13 @@ function PerfisPage() {
               const chave = idToChave[row.perfil_id];
               if (!chave) continue;
               if (!seen[chave]) {
-                // Reseta módulos "normais" para "none"; submódulos ficam com
-                // o default herdado do pai (via buildInitialState) para que
+                // Base antes de aplicar as linhas do banco. Módulos que TÊM
+                // linha salva são sobrescritos logo abaixo; os que não têm
+                // ficam com o padrão do perfil (preset), espelhando o que o
+                // `usePermissoes` concede em tempo de execução. Antes esta
+                // base era "none", então um módulo novo (ex.: Hiperdia)
+                // aparecia como "Sem" aqui mesmo estando liberado no padrão.
+                // Submódulos do financeiro seguem herdando do pai para que
                 // ativar a granularidade não retire acesso já concedido.
                 const preset = PRESETS[chave];
                 const parentFin = (preset["financeiro"] ?? "none") as Acesso;
@@ -395,7 +405,7 @@ function PerfisPage() {
                     k,
                     k.startsWith("financeiro-")
                       ? ((preset[k] ?? parentFin) as Acesso)
-                      : ("none" as Acesso),
+                      : ((preset[k] ?? "none") as Acesso),
                   ]),
                 );
                 seen[chave] = true;
