@@ -19,7 +19,6 @@ import {
 import {
   detectDescriptor,
   ensureFaceModels,
-  euclidean,
   FACE_MATCH_THRESHOLD,
 } from "@/lib/face-recognition";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
@@ -177,20 +176,6 @@ function AutoatendimentoPage() {
       setScanMsg("Posicione seu rosto e fique parado…");
       await ensureFaceModels();
 
-      const { data: bios } = await supabase
-        .from("paciente_biometria")
-        .select("paciente_id, descriptor, pacientes!inner(nome)")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .is("revogado_em", null);
-
-      const ativas: { paciente_id: string; nome: string; descriptor: number[] }[] = (bios ?? [])
-        .map((b: any) => ({
-          paciente_id: b.paciente_id,
-          nome: b.pacientes?.nome ?? "",
-          descriptor: Array.isArray(b.descriptor) ? b.descriptor : [],
-        }))
-        .filter((b) => b.descriptor.length === 128);
-
       let descritor: Float32Array | null = null;
       for (let i = 0; i < 12; i++) {
         if (!videoRef.current || !streamRef.current) return;
@@ -203,16 +188,26 @@ function AutoatendimentoPage() {
         stopCamera();
         return;
       }
-      let melhor: { paciente_id: string; nome: string; dist: number } | null = null;
-      for (const bio of ativas) {
-        const d = euclidean(descritor, bio.descriptor);
-        if (!melhor || d < melhor.dist)
-          melhor = { paciente_id: bio.paciente_id, nome: bio.nome, dist: d };
-      }
+      // O casamento é feito no servidor (RPC), para que os descritores
+      // biométricos nunca sejam baixados para o navegador.
+      setScanMsg("Verificando…");
+      const { data: matchData } = await (
+        supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>
+      )("totem_match_biometria", {
+        _clinica_id: clinicaAtual.clinica_id,
+        _descriptor: Array.from(descritor),
+        _threshold: FACE_MATCH_THRESHOLD,
+      });
       stopCamera();
-      if (melhor && melhor.dist <= FACE_MATCH_THRESHOLD) {
-        setScanMsg(`Olá, ${melhor.nome}!`);
-        const p = { id: melhor.paciente_id, nome: melhor.nome };
+      const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
+        | { paciente_id: string; nome: string }
+        | undefined;
+      if (match?.paciente_id) {
+        setScanMsg(`Olá, ${match.nome}!`);
+        const p = { id: match.paciente_id, nome: match.nome };
         setPacienteAtual(p);
         onMatch(p);
       } else {
