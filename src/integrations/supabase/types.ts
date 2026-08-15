@@ -9513,6 +9513,14 @@ export type Database = {
           procedimento: string
         }[]
       }
+      has_any_role: {
+        Args: {
+          _clinica_id: string
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_module_access: {
         Args: {
           _clinica_id: string
