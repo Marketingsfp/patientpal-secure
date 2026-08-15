@@ -32,6 +32,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 
 export type CriarAgendamentoInput = {
   clinica_id: string;
@@ -232,9 +233,12 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // um agendamento numa data já passada — em nenhuma das telas, porque
     // essa checagem nunca existiu neste ponto único e compartilhado.
     if (horarioMudou) {
-      const hojeInicio = new Date();
-      hojeInicio.setHours(0, 0, 0, 0);
-      if (new Date(payload.inicio).getTime() < hojeInicio.getTime()) {
+      // Início do dia civil da CLÍNICA (America/Sao_Paulo). Este código roda
+      // no Worker do Cloudflare, em UTC: com `new Date()` + `setHours(0,0,0)`
+      // a fronteira ficava 3h deslocada, ora bloqueando horários válidos do
+      // próprio dia, ora liberando o fim da tarde de ontem.
+      const { inicio: inicioDiaClinica } = janelaDiaClinica(hojeBR());
+      if (new Date(payload.inicio).getTime() < new Date(inicioDiaClinica).getTime()) {
         return {
           ok: false,
           validation_error: {

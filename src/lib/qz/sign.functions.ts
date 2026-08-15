@@ -3,14 +3,21 @@
 // impressão silenciosa sem o popup de autorização do QZ.
 import { createServerFn } from "@tanstack/react-start";
 import { createSign } from "node:crypto";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Este endpoint assina com a chave privada do QZ Tray, e uma assinatura
+// válida dispensa o popup de autorização na estação. Sem middleware ele era
+// um oráculo de assinatura aberto à internet: qualquer um obtinha comandos
+// de impressão assinados. Exigir sessão é o mínimo — só quem está logado no
+// sistema pode pedir assinatura.
 export const assinarQzMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { toSign: string }) => {
     if (!input || typeof input.toSign !== "string") {
       throw new Error("Payload inválido para assinatura QZ.");
     }
     // Limite defensivo: a assinatura QZ recebe apenas o payload de comando,
-    // nunca documentos inteiros. Evita abuso do endpoint público.
+    // nunca documentos inteiros.
     if (input.toSign.length === 0 || input.toSign.length > 8000) {
       throw new Error("Payload de assinatura QZ fora do tamanho permitido.");
     }

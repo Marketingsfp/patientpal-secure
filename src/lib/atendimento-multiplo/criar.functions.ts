@@ -7,6 +7,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 
 export type ItemAtendimentoMultiplo = {
   procedimento: string;
@@ -72,9 +73,11 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
     // passa por criarAgendamento), então tinha as mesmas duas lacunas —
     // nada checava se o paciente já tinha outro agendamento no mesmo
     // horário, nem bloqueava data já passada.
-    const hojeInicio = new Date();
-    hojeInicio.setHours(0, 0, 0, 0);
-    const passado = itens.find((it) => new Date(it.inicio).getTime() < hojeInicio.getTime());
+    // Início do dia civil da CLÍNICA (America/Sao_Paulo) — o Worker roda em
+    // UTC, então `new Date()` + `setHours(0,0,0)` deslocava a fronteira em 3h.
+    const { inicio: inicioDiaClinica } = janelaDiaClinica(hojeBR());
+    const limitePassado = new Date(inicioDiaClinica).getTime();
+    const passado = itens.find((it) => new Date(it.inicio).getTime() < limitePassado);
     if (passado) {
       return {
         ok: false,
