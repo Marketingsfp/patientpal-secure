@@ -1,0 +1,334 @@
+--- a/src/lib/qz/sign.functions.ts
++++ b/src/lib/qz/sign.functions.ts
+@@ -3,14 +3,21 @@
+ // impressão silenciosa sem o popup de autorização do QZ.
+ import { createServerFn } from "@tanstack/react-start";
+ import { createSign } from "node:crypto";
++import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+ 
++// Este endpoint assina com a chave privada do QZ Tray, e uma assinatura
++// válida dispensa o popup de autorização na estação. Sem middleware ele era
++// um oráculo de assinatura aberto à internet: qualquer um obtinha comandos
++// de impressão assinados. Exigir sessão é o mínimo — só quem está logado no
++// sistema pode pedir assinatura.
+ export const assinarQzMessage = createServerFn({ method: "POST" })
++  .middleware([requireSupabaseAuth])
+   .inputValidator((input: { toSign: string }) => {
+     if (!input || typeof input.toSign !== "string") {
+       throw new Error("Payload inválido para assinatura QZ.");
+     }
+     // Limite defensivo: a assinatura QZ recebe apenas o payload de comando,
+-    // nunca documentos inteiros. Evita abuso do endpoint público.
++    // nunca documentos inteiros.
+     if (input.toSign.length === 0 || input.toSign.length > 8000) {
+       throw new Error("Payload de assinatura QZ fora do tamanho permitido.");
+     }
+--- a/src/integrations/supabase/env.ts
++++ b/src/integrations/supabase/env.ts
+@@ -92,12 +92,41 @@
+   return undefined;
+ }
+ 
++/**
++ * O fallback existe por causa do preview do Lovable, que não injeta variável
++ * nenhuma no browser. Mas ele aponta para um projeto Supabase específico —
++ * se um build de produção subir sem VITE_SUPABASE_URL, o app funciona
++ * normalmente falando com o projeto ERRADO, gravando dados reais de paciente
++ * lá, sem nenhum sinal de erro. Silêncio é o pior comportamento possível
++ * aqui.
++ *
++ * Por isso o fallback fica restrito a dev e aos hosts de preview do Lovable.
++ * Em produção (domínio próprio, workers.dev) e no servidor, a ausência da
++ * variável passa a ser erro explícito — via missingSupabaseEnvMessage, que
++ * volta a disparar porque estas funções passam a devolver undefined.
++ */
++function fallbackPermitido(): boolean {
++  try {
++    if (import.meta.env.DEV) return true;
++  } catch {
++    /* runtime sem import.meta.env */
++  }
++  if (typeof window === "undefined") return false;
++  const host = window.location.hostname;
++  return (
++    host === "localhost" ||
++    host === "127.0.0.1" ||
++    host.endsWith(".lovable.app") ||
++    host.endsWith(".lovableproject.com")
++  );
++}
++
+ export function getSupabaseUrl(): string | undefined {
+-  return pick(URL_KEYS) ?? FALLBACK_URL;
++  return pick(URL_KEYS) ?? (fallbackPermitido() ? FALLBACK_URL : undefined);
+ }
+ 
+ export function getSupabasePublishableKey(): string | undefined {
+-  return pick(PUBLISHABLE_KEYS) ?? FALLBACK_PUBLISHABLE_KEY;
++  return pick(PUBLISHABLE_KEYS) ?? (fallbackPermitido() ? FALLBACK_PUBLISHABLE_KEY : undefined);
+ }
+ 
+ /**
+--- a/src/hooks/use-auth.tsx
++++ b/src/hooks/use-auth.tsx
+@@ -29,6 +29,29 @@
+   return null;
+ }
+ 
++/**
++ * Apaga o estado local que sobrevive ao signOut do Supabase: cache de
++ * memberships/clínica atual (de onde sai o `role` usado pela UI) e rascunhos
++ * de prontuário do atendimento com IA.
++ *
++ * Sem isto, em terminal compartilhado (recepção, consultório) o próximo
++ * usuário herda o contexto do anterior.
++ */
++function limparEstadoLocal() {
++  if (typeof window === "undefined") return;
++  try {
++    const remover: string[] = [];
++    for (let i = 0; i < window.localStorage.length; i += 1) {
++      const key = window.localStorage.key(i);
++      if (!key) continue;
++      if (key.startsWith("clinica_") || key.startsWith("pep:")) remover.push(key);
++    }
++    for (const key of remover) window.localStorage.removeItem(key);
++  } catch {
++    /* localStorage indisponível — nada a limpar */
++  }
++}
++
+ export function AuthProvider({ children }: { children: ReactNode }) {
+   const [session, setSession] = useState<Session | null>(null);
+   const [loading, setLoading] = useState(typeof window !== "undefined");
+@@ -84,7 +107,19 @@
+         session,
+         loading,
+         signOut: async () => {
+-          await supabase.auth.signOut();
++          try {
++            await supabase.auth.signOut();
++          } finally {
++            limparEstadoLocal();
++            // Recarga completa em vez de navegação SPA: descarta o cache do
++            // React Query (staleTime de 5 min, gcTime de 30 min, sem
++            // refetchOnMount), que de outro modo serviria os dados do usuário
++            // anterior — lista de pacientes, financeiro, prontuário aberto —
++            // para quem logar em seguida na mesma máquina.
++            if (typeof window !== "undefined") {
++              window.location.replace("/login");
++            }
++          }
+         },
+       }}
+     >
+--- a/src/components/app-shell.tsx
++++ b/src/components/app-shell.tsx
+@@ -748,9 +748,11 @@
+     }
+   };
+ 
++  // O redirecionamento acontece dentro de signOut (recarga completa da
++  // página, para descartar o cache do React Query). Não use navigate aqui:
++  // navegação SPA mantém o cache em memória.
+   const handleSignOut = async () => {
+     await signOut();
+-    navigate({ to: "/login", replace: true });
+   };
+ 
+   const clinicColor = useMemo(
+@@ -809,9 +811,6 @@
+ 
+   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
+ 
+-  // Bypass exclusivo do Rodrigo: vê todas as telas criadas, sem filtro de
+-  // permissão nem de subsystem. Não afeta nenhum outro usuário.
+-  const isRodrigoFullAccess = (user?.email ?? "").toLowerCase() === "rodrigorss2301@gmail.com";
+   // Admin também ignora o filtro de subsystem: um admin já tem allowed=null em
+   // usePermissoes, então não faz sentido esconder grupos inteiros porque ele
+   // clicou uma vez em "Gestor Clínico" / "Gestão de Pessoas" no seletor /app.
+@@ -836,25 +835,28 @@
+       return { ...row, items };
+     })
+     .filter((row) => row.items.length > 0);
+-  const permissionFilteredRows = isRodrigoFullAccess
+-    ? scopedNavRows
+-    : scopedNavRows
+-        .map((row) => {
+-          const items = row.items
+-            .map((item) => {
+-              if (isParent(item)) {
+-                // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
+-                // dos filhos. Atualmente Nina compartilha o módulo "nina".
+-                const baseTo = item.children[0]?.to;
+-                if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
+-                return item;
+-              }
+-              return leafAllowed(item.to, allowedModules) ? item : null;
+-            })
+-            .filter((it): it is NavItem => it !== null);
+-          return { ...row, items };
++  // Antes havia aqui um bypass por e-mail fixo ("isRodrigoFullAccess"), que
++  // liberava o menu inteiro para um endereço específico. Autorização baseada
++  // em string de e-mail é trocável no painel do Supabase e não deixa rastro
++  // de auditoria — quem precisar de acesso amplo deve receber o papel/perfil
++  // correspondente em Perfis de Acesso.
++  const permissionFilteredRows = scopedNavRows
++    .map((row) => {
++      const items = row.items
++        .map((item) => {
++          if (isParent(item)) {
++            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
++            // dos filhos. Atualmente Nina compartilha o módulo "nina".
++            const baseTo = item.children[0]?.to;
++            if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
++            return item;
++          }
++          return leafAllowed(item.to, allowedModules) ? item : null;
+         })
+-        .filter((row) => row.items.length > 0);
++        .filter((it): it is NavItem => it !== null);
++      return { ...row, items };
++    })
++    .filter((row) => row.items.length > 0);
+   // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
+   // "Atendimento Múltiplo" do menu para a clínica atual.
+   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+--- a/src/lib/agenda/status-agendamento.functions.ts
++++ b/src/lib/agenda/status-agendamento.functions.ts
+@@ -24,6 +24,7 @@
+ import { createServerFn } from "@tanstack/react-start";
+ import { z } from "zod";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
++import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+ import { limparExternoCore } from "./atendimento-externo.server";
+ 
+ export const STATUS_AGENDAMENTO = [
+@@ -77,10 +78,13 @@
+       if (!podeRealizar) {
+         throw new Error("Sem permissão para marcar como 'Realizado'.");
+       }
+-      const inicio = new Date(ag.inicio);
+-      const hojeFim = new Date();
+-      hojeFim.setHours(23, 59, 59, 999);
+-      if (inicio.getTime() > hojeFim.getTime()) {
++      // Fim do dia civil da CLÍNICA (America/Sao_Paulo), não do fuso do
++      // runtime. Este código roda no Worker do Cloudflare, que está em UTC:
++      // com `new Date()` + `setHours(23,59,...)` o limite caía às 20:59 de
++      // Brasília, e a partir das 21h ficava impossível baixar como Realizado
++      // um atendimento da própria noite.
++      const { fimExclusivo } = janelaDiaClinica(hojeBR());
++      if (new Date(ag.inicio).getTime() >= new Date(fimExclusivo).getTime()) {
+         throw new Error("Não é possível baixar como Realizado um atendimento de data futura.");
+       }
+     }
+--- a/src/lib/agenda/criar-agendamento.functions.ts
++++ b/src/lib/agenda/criar-agendamento.functions.ts
+@@ -32,6 +32,7 @@
+ 
+ import { createServerFn } from "@tanstack/react-start";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
++import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+ 
+ export type CriarAgendamentoInput = {
+   clinica_id: string;
+@@ -232,9 +233,12 @@
+     // um agendamento numa data já passada — em nenhuma das telas, porque
+     // essa checagem nunca existiu neste ponto único e compartilhado.
+     if (horarioMudou) {
+-      const hojeInicio = new Date();
+-      hojeInicio.setHours(0, 0, 0, 0);
+-      if (new Date(payload.inicio).getTime() < hojeInicio.getTime()) {
++      // Início do dia civil da CLÍNICA (America/Sao_Paulo). Este código roda
++      // no Worker do Cloudflare, em UTC: com `new Date()` + `setHours(0,0,0)`
++      // a fronteira ficava 3h deslocada, ora bloqueando horários válidos do
++      // próprio dia, ora liberando o fim da tarde de ontem.
++      const { inicio: inicioDiaClinica } = janelaDiaClinica(hojeBR());
++      if (new Date(payload.inicio).getTime() < new Date(inicioDiaClinica).getTime()) {
+         return {
+           ok: false,
+           validation_error: {
+--- a/src/lib/atendimento-multiplo/criar.functions.ts
++++ b/src/lib/atendimento-multiplo/criar.functions.ts
+@@ -7,6 +7,7 @@
+ 
+ import { createServerFn } from "@tanstack/react-start";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
++import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+ 
+ export type ItemAtendimentoMultiplo = {
+   procedimento: string;
+@@ -72,9 +73,11 @@
+     // passa por criarAgendamento), então tinha as mesmas duas lacunas —
+     // nada checava se o paciente já tinha outro agendamento no mesmo
+     // horário, nem bloqueava data já passada.
+-    const hojeInicio = new Date();
+-    hojeInicio.setHours(0, 0, 0, 0);
+-    const passado = itens.find((it) => new Date(it.inicio).getTime() < hojeInicio.getTime());
++    // Início do dia civil da CLÍNICA (America/Sao_Paulo) — o Worker roda em
++    // UTC, então `new Date()` + `setHours(0,0,0)` deslocava a fronteira em 3h.
++    const { inicio: inicioDiaClinica } = janelaDiaClinica(hojeBR());
++    const limitePassado = new Date(inicioDiaClinica).getTime();
++    const passado = itens.find((it) => new Date(it.inicio).getTime() < limitePassado);
+     if (passado) {
+       return {
+         ok: false,
+--- a/src/lib/atendimento.functions.ts
++++ b/src/lib/atendimento.functions.ts
+@@ -1,6 +1,7 @@
+ import { createServerFn } from "@tanstack/react-start";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+ import { supabaseAdmin } from "@/integrations/supabase/client.server";
++import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+ import { z } from "zod";
+ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
+ 
+@@ -1048,9 +1049,10 @@
+   .inputValidator((i: unknown) => clinIdSchema.parse(i))
+   .handler(async ({ data, context }) => {
+     await assertMember(context.userId, data.clinicaId);
+-    const hoje = new Date();
+-    hoje.setHours(0, 0, 0, 0);
+-    const isoHoje = hoje.toISOString();
++    // Início do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC),
++    // `new Date()` + `setHours(0,0,0)` fazia as métricas "de hoje" incluírem
++    // as 3 últimas horas de ontem.
++    const isoHoje = janelaDiaClinica(hojeBR()).inicio;
+     const [
+       { count: hojeCount },
+       { count: ativas },
+--- a/src/lib/nina.functions.ts
++++ b/src/lib/nina.functions.ts
+@@ -1,5 +1,6 @@
+ import { createServerFn } from "@tanstack/react-start";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
++import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+ import { z } from "zod";
+ 
+ const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+@@ -216,10 +217,10 @@
+ 
+     const { supabase, userId } = context;
+     await assertMembership(supabase, userId, data.clinicaId);
+-    const inicioDia = new Date();
+-    inicioDia.setHours(0, 0, 0, 0);
+-    const fimDia = new Date();
+-    fimDia.setHours(23, 59, 59, 999);
++    // Janela do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC), o
++    // par `new Date()` + `setHours` fazia a Nina enxergar a agenda do dia
++    // deslocada em 3 horas.
++    const { inicio: inicioDia, fimExclusivo: fimDia } = janelaDiaClinica(hojeBR());
+ 
+     const carregarProcedimentos = async () => {
+       const pageSize = 1000;
+@@ -266,8 +267,8 @@
+         .from("agendamentos")
+         .select("medico_id, status")
+         .eq("clinica_id", data.clinicaId)
+-        .gte("inicio", inicioDia.toISOString())
+-        .lte("inicio", fimDia.toISOString()),
++        .gte("inicio", inicioDia)
++        .lt("inicio", fimDia),
+       supabase.from("medico_especialidades").select("medico_id, especialidade_id"),
+     ]);
+ 

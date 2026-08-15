@@ -1,0 +1,49 @@
+-- BLOQUEADOR 2 — a view de duplicados devolve CPF de pacientes de todas as clínicas.
+--
+-- PROBLEMA
+-- `v_pacientes_duplicados_suspeitos` recebeu `security_invoker = true` em
+-- 20260706172745. As migrations 20260811153120 e 20260812133348 recriaram a
+-- view com CREATE OR REPLACE VIEW sem repetir a cláusula WITH (...) — e no
+-- PostgreSQL isso substitui as reloptions da view, apagando a opção. Sem
+-- security_invoker, a view executa com os privilégios do dono e ignora o RLS
+-- de public.pacientes.
+--
+-- Como o GRANT SELECT ... TO authenticated de 20260704174654 nunca foi
+-- revogado, qualquer usuário logado — de qualquer clínica — consegue:
+--
+--   GET /rest/v1/v_pacientes_duplicados_suspeitos?select=*
+--
+-- e receber, de todo o sistema: clinica_id, CPF em dígitos, telefone,
+-- nome + data de nascimento e a lista de ids dos pacientes. Vazamento entre
+-- clínicas de dado pessoal sensível (LGPD art. 46).
+--
+-- CORREÇÃO
+-- A view sempre foi feita para ser consumida pela função
+-- `listar_duplicados_pacientes(uuid[], text, int)`, que é SECURITY DEFINER e
+-- valida clinica_memberships antes de devolver qualquer linha. O cliente deve
+-- usar a função; o acesso direto à view não tem motivo para existir.
+--
+-- Aplicamos as duas coisas: tirar o acesso direto (correção do vazamento) e
+-- restaurar security_invoker (defesa em profundidade, caso alguém volte a
+-- conceder SELECT no futuro).
+--
+-- CONFERIR ANTES (para saber se o banco de produção está mesmo no estado ruim)
+--   select relname, reloptions from pg_class
+--    where relname = 'v_pacientes_duplicados_suspeitos';
+--   -- reloptions NULL ou sem security_invoker=true  -> problema confirmado
+--
+--   select grantee, privilege_type from information_schema.role_table_grants
+--    where table_name = 'v_pacientes_duplicados_suspeitos';
+--
+-- IMPACTO ESPERADO
+-- Nenhum na aplicação: nenhum arquivo de src/ consulta a view diretamente
+-- (a tela de duplicados chama a RPC listar_duplicados_pacientes).
+--
+-- REGRA PERMANENTE
+-- Toda CREATE OR REPLACE VIEW neste projeto precisa repetir
+-- `WITH (security_invoker = true)`. A cláusula não é herdada da definição
+-- anterior.
+
+REVOKE ALL ON public.v_pacientes_duplicados_suspeitos FROM authenticated, anon, PUBLIC;
+
+ALTER VIEW public.v_pacientes_duplicados_suspeitos SET (security_invoker = true);

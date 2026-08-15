@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -216,10 +217,10 @@ export const chatNina = createServerFn({ method: "POST" })
 
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const inicioDia = new Date();
-    inicioDia.setHours(0, 0, 0, 0);
-    const fimDia = new Date();
-    fimDia.setHours(23, 59, 59, 999);
+    // Janela do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC), o
+    // par `new Date()` + `setHours` fazia a Nina enxergar a agenda do dia
+    // deslocada em 3 horas.
+    const { inicio: inicioDia, fimExclusivo: fimDia } = janelaDiaClinica(hojeBR());
 
     const carregarProcedimentos = async () => {
       const pageSize = 1000;
@@ -266,8 +267,8 @@ export const chatNina = createServerFn({ method: "POST" })
         .from("agendamentos")
         .select("medico_id, status")
         .eq("clinica_id", data.clinicaId)
-        .gte("inicio", inicioDia.toISOString())
-        .lte("inicio", fimDia.toISOString()),
+        .gte("inicio", inicioDia)
+        .lt("inicio", fimDia),
       supabase.from("medico_especialidades").select("medico_id, especialidade_id"),
     ]);
 

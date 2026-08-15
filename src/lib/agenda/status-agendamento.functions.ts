@@ -24,6 +24,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { limparExternoCore } from "./atendimento-externo.server";
 
 export const STATUS_AGENDAMENTO = [
@@ -77,10 +78,13 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
       if (!podeRealizar) {
         throw new Error("Sem permissão para marcar como 'Realizado'.");
       }
-      const inicio = new Date(ag.inicio);
-      const hojeFim = new Date();
-      hojeFim.setHours(23, 59, 59, 999);
-      if (inicio.getTime() > hojeFim.getTime()) {
+      // Fim do dia civil da CLÍNICA (America/Sao_Paulo), não do fuso do
+      // runtime. Este código roda no Worker do Cloudflare, que está em UTC:
+      // com `new Date()` + `setHours(23,59,...)` o limite caía às 20:59 de
+      // Brasília, e a partir das 21h ficava impossível baixar como Realizado
+      // um atendimento da própria noite.
+      const { fimExclusivo } = janelaDiaClinica(hojeBR());
+      if (new Date(ag.inicio).getTime() >= new Date(fimExclusivo).getTime()) {
         throw new Error("Não é possível baixar como Realizado um atendimento de data futura.");
       }
     }

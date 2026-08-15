@@ -3,6 +3,33 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const BUCKET = "backups-diarios";
 
+/**
+ * Descobre o "project ref" do Supabase — o `<ref>` de `https://<ref>.supabase.co`
+ * — usado para montar a URL do webhook de backup.
+ *
+ * O Lovable Cloud não deixa criar secrets com o prefixo `SUPABASE_`, então
+ * `SUPABASE_PROJECT_ID` pode não existir lá. Por isso o ref é derivado primeiro
+ * da `SUPABASE_URL` (injetada pela própria plataforma), com
+ * `SUPABASE_PROJECT_ID` mantido como fallback para ambientes que ainda a
+ * definam. Se nenhum dos dois resolver, é melhor falhar com uma mensagem clara
+ * do que disparar um POST para uma URL com "undefined" no meio.
+ */
+function resolverProjectRef(): string {
+  const url = process.env.SUPABASE_URL?.trim();
+  if (url) {
+    const match = /^https?:\/\/([a-z0-9-]+)\.supabase\.[a-z.]+/i.exec(url);
+    if (match) return match[1];
+  }
+
+  const projectId = process.env.SUPABASE_PROJECT_ID?.trim();
+  if (projectId) return projectId;
+
+  throw new Error(
+    "Não foi possível descobrir o project ref do Supabase: defina SUPABASE_URL " +
+      "(no formato https://<ref>.supabase.co) ou SUPABASE_PROJECT_ID no servidor.",
+  );
+}
+
 /** Lista os dias com backup salvo para a clínica do usuário. */
 export const listarBackups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -91,8 +118,8 @@ export const dispararBackupAgora = createServerFn({ method: "POST" })
     if (!mems || mems.length === 0) {
       throw new Error("Somente administradores podem disparar backup");
     }
-    const projectId = process.env.SUPABASE_PROJECT_ID!;
-    const url = `https://project--${projectId}.lovable.app/api/public/hooks/backup-diario`;
+    const projectRef = resolverProjectRef();
+    const url = `https://project--${projectRef}.lovable.app/api/public/hooks/backup-diario`;
     const backupToken = process.env.BACKUP_WEBHOOK_TOKEN;
     if (!backupToken) {
       throw new Error("BACKUP_WEBHOOK_TOKEN não configurado no servidor");

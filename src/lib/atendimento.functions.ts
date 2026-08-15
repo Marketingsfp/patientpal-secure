@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 
@@ -22,6 +23,29 @@ async function assertManager(userId: string, clinicaId: string) {
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Apenas gestores/admins podem alterar isto");
+}
+
+/**
+ * Confere que a conversa realmente pertence à clínica informada.
+ *
+ * Necessário porque este arquivo usa `supabaseAdmin` (service_role), que IGNORA
+ * o RLS. `assertMember` prova apenas que o usuário pertence à clínica X — não
+ * que o `conversaId` vindo do cliente também pertença. Sem esta checagem, um
+ * usuário autenticado de qualquer clínica alcança conversas de outra só
+ * enviando o id, o que expõe dado de saúde entre clínicas (LGPD, art. 11).
+ *
+ * Use isto sempre que o id do registro vier do cliente e a consulta não puder
+ * ser filtrada direto por `clinica_id`.
+ */
+async function assertConversaDaClinica(conversaId: string, clinicaId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("id")
+    .eq("id", conversaId)
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Conversa não encontrada nesta clínica");
 }
 
 const clinIdSchema = z.object({ clinicaId: z.string().uuid() });
@@ -120,8 +144,10 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")
       .eq("id", data.conversaId)
-      .single();
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
     if (e1) throw new Error(e1.message);
+    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
     await supabaseAdmin.from("atend_transferencias").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
@@ -138,7 +164,8 @@ export const transferirConversa = createServerFn({ method: "POST" })
         departamento_id: data.paraDepartamentoId ?? conv.departamento_id,
         status: data.paraUserId ? "active" : "waiting",
       })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     if (e2) throw new Error(e2.message);
     return { ok: true };
   });
@@ -165,7 +192,8 @@ export const fecharConversa = createServerFn({ method: "POST" })
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
       })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
     return { ok: true, protocol: prot as string };
   });
@@ -180,7 +208,8 @@ export const marcarLida = createServerFn({ method: "POST" })
     await supabaseAdmin
       .from("atend_conversas")
       .update({ unread_count: 0 })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     return { ok: true };
   });
 
@@ -198,6 +227,7 @@ export const listarNotas = createServerFn({ method: "POST" })
       .from("atend_notas_internas")
       .select("*")
       .eq("conversa_id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -216,6 +246,9 @@ export const criarNota = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    // Sem isto, a nota entraria na conversa de outra clínica: o INSERT grava
+    // `clinica_id` da clínica do autor, mas `conversa_id` vem do cliente.
+    await assertConversaDaClinica(data.conversaId, data.clinicaId);
     const { data: prof } = await supabaseAdmin
       .from("profiles")
       .select("nome")
@@ -277,7 +310,8 @@ export const salvarDepartamento = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("atend_departamentos")
         .update(row)
-        .eq("id", data.id);
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -349,6 +383,15 @@ export const adicionarMembro = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    // `departamentoId` vem do cliente: sem conferir, um gestor vincularia um
+    // usuário a um departamento de outra clínica.
+    const { data: dep } = await supabaseAdmin
+      .from("atend_departamentos")
+      .select("id")
+      .eq("id", data.departamentoId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!dep) throw new Error("Departamento não encontrado nesta clínica");
     const { error } = await supabaseAdmin.from("atend_departamento_membros").upsert(
       {
         clinica_id: data.clinicaId,
@@ -453,7 +496,11 @@ export const salvarKb = createServerFn({ method: "POST" })
       publicado: data.publicado,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_kb").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_kb")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -528,7 +575,11 @@ export const salvarMacro = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_macros").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_macros")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -609,7 +660,8 @@ export const salvarPauseReason = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("atend_pause_reasons")
         .update(row)
-        .eq("id", data.id);
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -645,6 +697,14 @@ export const iniciarPausa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    // `reasonId` vem do cliente: confere que o motivo é desta clínica.
+    const { data: motivo } = await supabaseAdmin
+      .from("atend_pause_reasons")
+      .select("id")
+      .eq("id", data.reasonId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!motivo) throw new Error("Motivo de pausa não encontrado nesta clínica");
     // fecha pausas abertas
     await supabaseAdmin
       .from("atend_pausas_log")
@@ -738,7 +798,11 @@ export const salvarHorario = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_horarios").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_horarios")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -934,7 +998,11 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin.from("atend_bot_configs").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin
+        .from("atend_bot_configs")
+        .update(row)
+        .eq("id", data.id)
+        .eq("clinica_id", data.clinicaId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
@@ -981,9 +1049,10 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const isoHoje = hoje.toISOString();
+    // Início do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC),
+    // `new Date()` + `setHours(0,0,0)` fazia as métricas "de hoje" incluírem
+    // as 3 últimas horas de ontem.
+    const isoHoje = janelaDiaClinica(hojeBR()).inicio;
     const [
       { count: hojeCount },
       { count: ativas },
@@ -1078,8 +1147,10 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .select("id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id")
       .eq("id", data.conversaId)
-      .single();
-    if (cErr || !conv) throw new Error("Conversa não encontrada");
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (cErr) throw new Error(cErr.message);
+    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
 
     const to = conv.contato_telefone.startsWith("+")
@@ -1120,7 +1191,11 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         );
       }
     }
-    await supabaseAdmin.from("atend_conversas").update(patch).eq("id", data.conversaId);
+    await supabaseAdmin
+      .from("atend_conversas")
+      .update(patch)
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
 
     return { ok: true, wa_message_id };
   });
@@ -1136,8 +1211,9 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
       .eq("id", data.conversaId)
-      .single();
-    if (!conv) throw new Error("Conversa não encontrada");
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
 
     let paciente: any = null;
     let agendamentos: any[] = [];
@@ -1223,7 +1299,8 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
         .from("atend_conversas")
         .select("departamento_id")
         .eq("id", data.conversaId)
-        .single();
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle();
       deptId = c?.departamento_id ?? undefined;
     }
     if (!deptId) throw new Error("Conversa sem departamento — configure roteamento.");
@@ -1244,7 +1321,8 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
           status: "waiting",
           aguardando_desde: new Date().toISOString(),
         })
-        .eq("id", data.conversaId);
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Sem agentes disponíveis" };
     }
 
@@ -1267,7 +1345,8 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
           status: "waiting",
           aguardando_desde: agora,
         })
-        .eq("id", data.conversaId);
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Todos em pausa" };
     }
     const { data: cargas } = await supabaseAdmin
@@ -1302,7 +1381,8 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
           status: "waiting",
           aguardando_desde: agora,
         })
-        .eq("id", data.conversaId);
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Capacidade lotada" };
     }
     await supabaseAdmin
@@ -1312,7 +1392,8 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
         atribuida_user_id: best,
         status: "active",
       })
-      .eq("id", data.conversaId);
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     return { ok: true, user_id: best };
   });
 

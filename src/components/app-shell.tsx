@@ -748,9 +748,11 @@ function AppShellInner() {
     }
   };
 
+  // O redirecionamento acontece dentro de signOut (recarga completa da
+  // página, para descartar o cache do React Query). Não use navigate aqui:
+  // navegação SPA mantém o cache em memória.
   const handleSignOut = async () => {
     await signOut();
-    navigate({ to: "/login", replace: true });
   };
 
   const clinicColor = useMemo(
@@ -809,9 +811,6 @@ function AppShellInner() {
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
-  // Bypass exclusivo do Rodrigo: vê todas as telas criadas, sem filtro de
-  // permissão nem de subsystem. Não afeta nenhum outro usuário.
-  const isRodrigoFullAccess = (user?.email ?? "").toLowerCase() === "rodrigorss2301@gmail.com";
   // Admin também ignora o filtro de subsystem: um admin já tem allowed=null em
   // usePermissoes, então não faz sentido esconder grupos inteiros porque ele
   // clicou uma vez em "Gestor Clínico" / "Gestão de Pessoas" no seletor /app.
@@ -836,25 +835,28 @@ function AppShellInner() {
       return { ...row, items };
     })
     .filter((row) => row.items.length > 0);
-  const permissionFilteredRows = isRodrigoFullAccess
-    ? scopedNavRows
-    : scopedNavRows
-        .map((row) => {
-          const items = row.items
-            .map((item) => {
-              if (isParent(item)) {
-                // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
-                // dos filhos. Atualmente Nina compartilha o módulo "nina".
-                const baseTo = item.children[0]?.to;
-                if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
-                return item;
-              }
-              return leafAllowed(item.to, allowedModules) ? item : null;
-            })
-            .filter((it): it is NavItem => it !== null);
-          return { ...row, items };
+  // Antes havia aqui um bypass por e-mail fixo ("isRodrigoFullAccess"), que
+  // liberava o menu inteiro para um endereço específico. Autorização baseada
+  // em string de e-mail é trocável no painel do Supabase e não deixa rastro
+  // de auditoria — quem precisar de acesso amplo deve receber o papel/perfil
+  // correspondente em Perfis de Acesso.
+  const permissionFilteredRows = scopedNavRows
+    .map((row) => {
+      const items = row.items
+        .map((item) => {
+          if (isParent(item)) {
+            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
+            // dos filhos. Atualmente Nina compartilha o módulo "nina".
+            const baseTo = item.children[0]?.to;
+            if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
+            return item;
+          }
+          return leafAllowed(item.to, allowedModules) ? item : null;
         })
-        .filter((row) => row.items.length > 0);
+        .filter((it): it is NavItem => it !== null);
+      return { ...row, items };
+    })
+    .filter((row) => row.items.length > 0);
   // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
   // "Atendimento Múltiplo" do menu para a clínica atual.
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
