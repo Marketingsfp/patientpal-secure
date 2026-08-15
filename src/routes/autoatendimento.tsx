@@ -19,7 +19,6 @@ import {
 import {
   detectDescriptor,
   ensureFaceModels,
-  euclidean,
   FACE_MATCH_THRESHOLD,
 } from "@/lib/face-recognition";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
