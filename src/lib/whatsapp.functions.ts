@@ -9,6 +9,7 @@ import {
   metaListTemplates,
   metaCreateTemplate,
   metaDeleteTemplate,
+  metaSendTemplate,
   type WaTemplateComponent,
 } from "./whatsapp.server";
 
@@ -186,6 +187,54 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
 /* =========================================================================
  * Templates (HSM) — listar / criar / excluir na Meta
  * ========================================================================= */
+
+/** Homologação: envia um template aprovado (abre janela de 24h). */
+export const enviarTemplateWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        to: z
+          .string()
+          .trim()
+          .min(8)
+          .max(20)
+          .regex(/^\+?\d+$/),
+        name: z.string().trim().min(1).max(512),
+        language: z.string().trim().min(2).max(10).default("pt_BR"),
+        params: z.array(z.string().trim().max(400)).max(10).default([]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    if (!cfg?.phone_number_id || !cfg?.access_token) {
+      throw new Error("WhatsApp não está configurado para esta clínica.");
+    }
+    const { wa_message_id } = await metaSendTemplate(
+      cfg.phone_number_id,
+      cfg.access_token,
+      data.to,
+      data.name,
+      data.language,
+      data.params,
+    );
+    await supabaseAdmin.from("whatsapp_mensagens").insert({
+      clinica_id: data.clinicaId,
+      wa_message_id,
+      direction: "out",
+      from_number: cfg.display_phone_number,
+      to_number: data.to,
+      body: `[template] ${data.name} (${data.language})${data.params.length ? " • " + data.params.join(" | ") : ""}`,
+      tipo: "template",
+      status: "sent",
+      enviada_por: "humano",
+    });
+    return { ok: true, wa_message_id };
+  });
+
 async function getWabaCreds(clinicaId: string) {
   const cfg = await loadWhatsAppConfig(clinicaId);
   if (!cfg?.waba_id) throw new Error("WABA ID não configurado. Preencha em Configuração.");
