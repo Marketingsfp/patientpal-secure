@@ -38,7 +38,6 @@ import {
   BarChart3,
   Wallet,
   ChevronDown,
-  Search,
   X,
   HeartPulse,
   Contact,
@@ -653,34 +652,11 @@ function AppShellInner() {
       window.localStorage.setItem("appshell:sidebarCollapsed", collapsed ? "1" : "0");
     }
   }, [collapsed]);
-  // Busca dentro do menu lateral: input que abre/fecha pela lupa e filtra
-  // os itens (e sub-itens) conforme o usuário digita.
-  const [buscaMenuAberta, setBuscaMenuAberta] = useState(false);
-  const [buscaMenu, setBuscaMenu] = useState("");
-  const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Foca (e seleciona) o campo assim que a busca do menu fica visível.
-  useEffect(() => {
-    if (!buscaMenuAberta) return;
-    const id = requestAnimationFrame(() => {
-      const el = buscaMenuInputRef.current;
-      if (!el) return;
-      el.focus();
-      el.select();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [buscaMenuAberta]);
-
-  // Recolher/expandir o menu. Ao recolher, fecha a busca do menu junto: o
-  // campo de texto não cabe na faixa estreita de ícones.
+  // A busca do menu lateral (lupa + campo "Buscar no menu...") foi removida:
+  // deixava o topo da barra apertado a ponto de cortar o nome do sistema, e a
+  // busca global do cabeçalho já cobre o dia a dia.
   const alternarSidebar = useCallback(() => {
-    setCollapsed((v) => {
-      if (!v) {
-        setBuscaMenuAberta(false);
-        setBuscaMenu("");
-      }
-      return !v;
-    });
+    setCollapsed((v) => !v);
   }, []);
 
   // Ctrl+B (ou ⌘B) alterna o menu, padrão da maioria dos editores. Ignorado
@@ -942,32 +918,6 @@ function AppShellInner() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
-  // Resultado da busca do menu lateral (sem acento, case-insensitive).
-  const termoMenu = buscaMenu.trim();
-  const buscandoMenu = termoMenu.length > 0;
-  const searchedNavRows = useMemo(() => {
-    if (!buscandoMenu) return visibleNavRows;
-    const norm = (s: string) =>
-      s
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
-    const alvo = norm(termoMenu);
-    return visibleNavRows
-      .map((row) => {
-        const items = row.items
-          .map((it) => {
-            if (!isParent(it)) return norm(it.label).includes(alvo) ? it : null;
-            if (norm(it.label).includes(alvo)) return it;
-            const children = it.children.filter((c) => norm(c.label).includes(alvo));
-            return children.length > 0 ? { ...it, children } : null;
-          })
-          .filter((it): it is NavItem => it !== null);
-        return { ...row, items };
-      })
-      .filter((row) => row.items.length > 0);
-  }, [visibleNavRows, buscandoMenu, termoMenu]);
-
   // Solta um item do menu sobre outro do MESMO grupo: insere na posição do
   // alvo e salva a lista completa de chaves do grupo no perfil do usuário.
   const soltarItemMenu = (rowLabel: string, targetKey: string) => {
@@ -1175,73 +1125,21 @@ function AppShellInner() {
                 <MenuIcon className="h-4 w-4" />
               </button>
               {!collapsed && (
-                <div
-                  className="flex min-w-0 items-center gap-1.5 cursor-default select-none"
-                  title="ClinicaOS"
-                >
-                  <Activity className="h-4 w-4 shrink-0 text-white" />
-                  <span className="truncate text-sm font-bold tracking-tight text-white">
-                    ClinicaOS
-                  </span>
-                </div>
+                <span className="text-sm font-bold tracking-tight text-white whitespace-nowrap select-none">
+                  ClinicaOS
+                </span>
               )}
               {!collapsed && !isChooser && (
                 <button
                   type="button"
                   onClick={() => abrirSeletorPortais()}
                   title="Trocar de portal"
-                  className="inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
+                  className="ml-auto inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
                 >
                   <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
                   <span className="whitespace-nowrap">Portal</span>
                 </button>
               )}
-              {!collapsed && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBuscaMenuAberta((v) => {
-                      if (v) setBuscaMenu("");
-                      return !v;
-                    });
-                  }}
-                  className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
-                  aria-expanded={buscaMenuAberta}
-                  title="Buscar no menu"
-                >
-                  {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className={cn("px-3", collapsed && "hidden")}>
-            <div
-              className={cn(
-                "grid transition-all duration-200 ease-out motion-reduce:transition-none",
-                buscaMenuAberta ? "grid-rows-[1fr] opacity-100 pt-2" : "grid-rows-[0fr] opacity-0",
-              )}
-            >
-              <div className="overflow-hidden">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
-                  <input
-                    ref={buscaMenuInputRef}
-                    value={buscaMenu}
-                    onChange={(e) => setBuscaMenu(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setBuscaMenu("");
-                        setBuscaMenuAberta(false);
-                      }
-                    }}
-                    tabIndex={buscaMenuAberta ? 0 : -1}
-                    placeholder="Buscar no menu..."
-                    aria-label="Buscar no menu"
-                    className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
-                  />
-                </div>
-              </div>
             </div>
           </div>
           <nav
@@ -1254,10 +1152,7 @@ function AppShellInner() {
             }}
             className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
           >
-            {buscandoMenu && searchedNavRows.length === 0 && (
-              <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
-            )}
-            {searchedNavRows.map((row) => {
+            {visibleNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = itemDeMenuAtivo(location.pathname, to);
                 if (!pathOk) return false;
@@ -1270,8 +1165,7 @@ function AppShellInner() {
                   : leafIsActive(it.to);
               const groupHasActive = row.items.some(itemHasActive);
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-              const open =
-                collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
+              const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
               return (
                 <div
                   key={row.label}
@@ -1311,11 +1205,7 @@ function AppShellInner() {
                         // Recolhido: os filhos ficam escondidos (14 ícones
                         // soltos do "Nina" não diriam nada ao usuário). O
                         // ícone do grupo reabre o menu já com ele expandido.
-                        const subOpen = collapsed
-                          ? false
-                          : buscandoMenu
-                            ? true
-                            : (openGroups[subKey] ?? false);
+                        const subOpen = collapsed ? false : (openGroups[subKey] ?? false);
                         return (
                           <div
                             key={subKey}
