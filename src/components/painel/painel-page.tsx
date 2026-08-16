@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Loader2, Volume2, VolumeX } from "lucide-react";
@@ -37,6 +37,18 @@ export function PainelPage() {
     em: number | null;
   }>({ estado: "desconhecido", erro: null, em: null });
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
+  // O navegador só deixa tocar som depois de um toque/clique na tela. Enquanto
+  // isso não acontece mostramos um convite discreto ("Clique para iniciar"),
+  // nunca uma tarja de erro — a TV da recepção fica limpa para os pacientes.
+  const [audioLiberado, setAudioLiberado] = useState(false);
+  const destravarAudioRef = useRef<(() => void) | null>(null);
+  // O indicador técnico de voz (online/offline + erro) fica escondido do
+  // público. Para conferir o serviço, abra o painel com "?diagnostico=1".
+  const mostrarDiagnostico = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("diagnostico") === "1" || params.get("debug") === "1";
+  }, []);
   // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
   // Sem botão manual — a troca acontece sozinha ao longo do dia.
   const [isLight, setIsLight] = useState<boolean>(() => {
@@ -82,7 +94,19 @@ export function PainelPage() {
           ).AudioContext ??
           (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
-        void audioCtxRef.current?.resume();
+        const ctx = audioCtxRef.current;
+        if (!ctx) {
+          // Navegador sem AudioContext: não temos como testar o bloqueio,
+          // então não deixamos o convite preso na tela.
+          setAudioLiberado(true);
+        } else {
+          void ctx
+            .resume()
+            .then(() => setAudioLiberado(ctx.state === "running"))
+            .catch(() => {
+              /* segue bloqueado até o próximo gesto */
+            });
+        }
         if ("speechSynthesis" in window) window.speechSynthesis.resume();
 
         // Se o navegador bloqueou a voz antes de qualquer interação, qualquer
@@ -101,6 +125,7 @@ export function PainelPage() {
       }
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
+    destravarAudioRef.current = unlock;
     unlock();
     // Mantém sempre ativo: reexecuta o unlock a cada gesto e quando a aba
     // volta a ficar visível (kiosque que fica horas aberto sem foco).
@@ -362,6 +387,15 @@ export function PainelPage() {
           }, 800);
         },
         onError: (err) => {
+          if (ehBloqueioDeAutoplay(err)) {
+            // Não é falha do servidor de voz: o navegador só está esperando um
+            // toque na tela. Mantém a chamada pendente (qualquer clique a
+            // repete), não pune o Piper e mostra apenas o convite discreto.
+            setAudioLiberado(false);
+            chamadaPendenteRef.current = { key: prox.key, senha: prox.senha };
+            liberar();
+            return;
+          }
           // Piper indisponível: pausa as tentativas por 5 minutos e faz UMA
           // leitura pelo SpeechSynthesis nativo (sem reenfileirar — reenfileirar
           // causava anúncio em loop infinito quando o servidor estava fora).
@@ -420,6 +454,13 @@ export function PainelPage() {
     });
   }
 
+  // Toque no botão de início: destrava o áudio e some com o convite, mesmo
+  // que o navegador ainda recuse o som (aí o aviso volta na próxima chamada).
+  function liberarAudio() {
+    destravarAudioRef.current?.();
+    setAudioLiberado(true);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -458,7 +499,17 @@ export function PainelPage() {
           </h1>
         </div>
         <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
-          <TtsStatusBadge status={ttsStatus} />
+          {!audioLiberado && atual && (
+            <button
+              type="button"
+              onClick={liberarAudio}
+              className={`flex items-center gap-2 rounded-full px-[clamp(0.6rem,1vw,1rem)] py-[clamp(0.2rem,0.4vw,0.4rem)] text-[clamp(0.6rem,0.9vw,0.8rem)] font-semibold uppercase tracking-widest transition-colors ${t.toggle}`}
+            >
+              <VolumeX className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Ativar som</span>
+            </button>
+          )}
+          {mostrarDiagnostico && <TtsStatusBadge status={ttsStatus} />}
           <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}>
             <PainelClock />
           </div>
@@ -593,6 +644,32 @@ export function PainelPage() {
           </div>
         </aside>
       </main>
+
+      {/* Convite de abertura: aparece só enquanto não houver chamada na tela e
+          o navegador ainda não liberou o som. Um toque em qualquer lugar já
+          resolve, mas o botão deixa isso claro para quem liga a TV. */}
+      {!audioLiberado && !atual && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={liberarAudio}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") liberarAudio();
+          }}
+          className={`fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1.5rem)] backdrop-blur-sm ${
+            isLight ? "bg-white/85" : "bg-[#0a0b10]/90"
+          }`}
+        >
+          <span
+            className={`rounded-full ${t.badgeActive} px-[clamp(1.5rem,4vw,3rem)] py-[clamp(0.75rem,1.6vw,1.25rem)] font-bold uppercase tracking-widest text-[clamp(0.9rem,1.8vw,1.5rem)] shadow-lg`}
+          >
+            Clique para iniciar o painel
+          </span>
+          <span className={`${t.idleText} text-[clamp(0.8rem,1.2vw,1.1rem)]`}>
+            O som das chamadas é liberado no primeiro toque da tela.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -647,9 +724,20 @@ function TtsStatusBadge({
   );
 }
 
+// True quando o navegador recusou tocar o áudio por falta de interação do
+// usuário (política de autoplay). Não é falha do servidor de voz.
+function ehBloqueioDeAutoplay(err: unknown): boolean {
+  if (typeof DOMException !== "undefined" && err instanceof DOMException) {
+    if (err.name === "NotAllowedError") return true;
+  }
+  const msg = err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  return /notallowed|interact with the document|user gesture|play\(\) failed/i.test(msg);
+}
+
 // Transforma o erro do serviço de voz em um texto curto e legível
 // (ex.: "Erro 502 no servidor de voz").
 function descreverErroTts(err: unknown): string {
+  if (ehBloqueioDeAutoplay(err)) return "Som bloqueado até tocar na tela";
   const msg = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   const status = msg.match(/\b(4\d{2}|5\d{2})\b/)?.[1];
   if (status) return `Erro ${status} no servidor de voz`;
