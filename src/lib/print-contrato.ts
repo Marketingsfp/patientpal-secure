@@ -15,6 +15,43 @@ const fmtCEP = (s?: string | null) => {
   return `${d.slice(0, 5)}-${d.slice(5)}`;
 };
 
+// Preposições e artigos que continuam em minúscula no meio de um endereço.
+const PALAVRAS_MINUSCULAS = new Set([
+  "a",
+  "as",
+  "o",
+  "os",
+  "e",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "em",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "com",
+  "nº",
+  "n°",
+]);
+
+/** O cadastro grava endereços quase sempre em CAIXA ALTA ("RUA MARIA LOPES"),
+ *  o que destoa dos demais campos do contrato. Normalizamos para "Rua Maria
+ *  Lopes", mantendo preposições em minúscula e números intactos. */
+const toTitleCase = (s?: string | null) => {
+  const raw = (s ?? "").trim();
+  if (!raw) return "";
+  return raw
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[\p{L}\p{N}][\p{L}\p{N}'’]*/gu, (palavra: string, offset: number) =>
+      offset > 0 && PALAVRAS_MINUSCULAS.has(palavra)
+        ? palavra
+        : palavra.charAt(0).toLocaleUpperCase("pt-BR") + palavra.slice(1),
+    );
+};
+
 const fmtTelefone = (s?: string | null) => {
   const d = soDig(s);
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -325,11 +362,20 @@ export async function printContrato(contratoId: string) {
   const _cl: any = cl ?? {};
   const _pa: any = pa ?? {};
 
-  const enderecoPaciente = [
-    _pa.logradouro,
-    _pa.numero,
-    _pa.bairro,
-    _pa.cidade && _pa.estado ? `${_pa.cidade}-${_pa.estado}` : _pa.cidade,
+  const ufPaciente = String(_pa.estado ?? "")
+    .trim()
+    .toUpperCase();
+
+  // Só rua e número — usado quando o modelo já tem campos próprios de bairro,
+  // cidade e estado.
+  const enderecoRuaNumero = [toTitleCase(_pa.logradouro), _pa.numero].filter(Boolean).join(", ");
+
+  // Endereço completo numa linha só — usado quando o modelo não tem os campos
+  // separados, senão bairro e cidade não sairiam impressos em lugar nenhum.
+  const enderecoCompleto = [
+    enderecoRuaNumero,
+    toTitleCase(_pa.bairro),
+    _pa.cidade && ufPaciente ? `${toTitleCase(_pa.cidade)}-${ufPaciente}` : toTitleCase(_pa.cidade),
   ]
     .filter(Boolean)
     .join(", ");
@@ -375,16 +421,24 @@ export async function printContrato(contratoId: string) {
     : null;
   const templateBody = overrideTpl ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
 
+  // Quando o modelo imprime bairro/cidade/estado em campos próprios (caso do
+  // "Cartão Consulta + Seguros"), o campo Endereço recebe apenas rua e número:
+  // repetir a mesma informação duas vezes alongava a linha a ponto de o texto
+  // ter de ser reduzido para caber na coluna.
+  const temCamposDeEnderecoSeparados = /\{\{PACIENTE_(BAIRRO|CIDADE|ESTADO)\}\}/.test(templateBody);
+  const enderecoPaciente = temCamposDeEnderecoSeparados ? enderecoRuaNumero : enderecoCompleto;
+
   const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
     PACIENTE_CPF: fmtCPF(_pa.cpf),
     PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
     PACIENTE_ENDERECO: enderecoPaciente,
-    PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+    PACIENTE_ENDERECO_COMPLETO: enderecoCompleto,
+    PACIENTE_LOGRADOURO: toTitleCase(_pa.logradouro),
     PACIENTE_NUMERO: _pa.numero ?? "",
-    PACIENTE_BAIRRO: _pa.bairro ?? "",
-    PACIENTE_CIDADE: _pa.cidade ?? "",
-    PACIENTE_ESTADO: _pa.estado ?? "",
+    PACIENTE_BAIRRO: toTitleCase(_pa.bairro),
+    PACIENTE_CIDADE: toTitleCase(_pa.cidade),
+    PACIENTE_ESTADO: ufPaciente,
     PACIENTE_CEP: fmtCEP(_pa.cep),
     PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
     PACIENTE_EMAIL: _pa.email ?? "",
@@ -592,10 +646,48 @@ export async function printContrato(contratoId: string) {
 })();
 </script>`;
 
+  // Modelos convertidos do PDF original (PDF24) não têm fluxo de texto: cada
+  // página é um <div> de 49.58333em × 70.16666em posicionado em coordenadas
+  // absolutas — exatamente A4 quando 1em = 16px. Com as margens de impressão
+  // padrão (12mm × 14mm) a folha fica MAIOR que a área imprimível, e o
+  // navegador corta a lateral direita (a numeração "1/6" saía como "1/") e o
+  // rodapé, empurrando as últimas linhas para uma página extra. Reduzimos a
+  // base de fonte para a folha inteira caber dentro de margens de 6mm,
+  // preservando a diagramação original.
+  const isPdf24 = /class="pdf24_/.test(corpo);
+  const pdf24Css = `<style id="pdf24-page-fit">
+  @page { size: A4 portrait; margin: 6mm; }
+  @media print {
+    @page { size: A4 portrait; margin: 6mm; }
+    html { font-size: 15px !important; }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: auto !important;
+      max-width: none !important;
+    }
+    body > div.pdf24_02 {
+      margin: 0 auto !important;
+      box-shadow: none !important;
+      overflow: hidden !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    body > div.pdf24_02:last-of-type {
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
+    .pdf24_01 { page-break-inside: avoid !important; break-inside: avoid !important; }
+  }
+</style>`;
+  const cssFinal = isPdf24 ? `${printCss}${pdf24Css}` : printCss;
+
   const bodyHtml = isFullHtml
     ? /<\/head>/i.test(corpo)
-      ? corpo.replace(/<\/head>/i, `${printCss}</head>`)
-      : `${printCss}${corpo}`
+      ? corpo.replace(/<\/head>/i, `${cssFinal}</head>`)
+      : `${cssFinal}${corpo}`
     : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
@@ -609,7 +701,7 @@ export async function printContrato(contratoId: string) {
   th { background: #e8e8e8; }
   ul { margin-left: 4em; text-align: justify; }
 </style>
-${printCss}
+${cssFinal}
 </head><body>
 ${corpo}
 </body></html>`;
