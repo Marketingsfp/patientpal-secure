@@ -149,7 +149,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const VoiceInput = lazy(() =>
   import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })),
@@ -505,60 +504,6 @@ export function AppShell() {
   return <AppShellInner />;
 }
 
-function MobileNavParent({
-  item,
-  onNavigate,
-}: {
-  item: NavParent;
-  onNavigate: (href: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="space-y-0.5">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        aria-expanded={open}
-        className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium tracking-tight text-white rounded-lg hover:bg-white/10"
-      >
-        <item.icon className="h-[18px] w-[18px] shrink-0" />
-        <span className="flex-1 text-left leading-snug break-words">{item.label}</span>
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
-        />
-      </button>
-      <div
-        className={`grid transition-all duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-      >
-        <div className="overflow-hidden space-y-0.5">
-          {item.children.map((child) => {
-            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
-            return (
-              <a
-                key={`${child.to}#${child.hash ?? ""}`}
-                href={href}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                  e.preventDefault();
-                  onNavigate(href);
-                }}
-                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white hover:bg-white/10 hover:text-white"
-              >
-                <child.icon className="h-[18px] w-[18px] shrink-0" />
-                <span className="leading-snug break-words">{child.label}</span>
-              </a>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AppShellInner() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } =
@@ -641,69 +586,41 @@ function AppShellInner() {
         .catch(() => {});
     }
   };
-  // Desktop: a sidebar pode ficar recolhida (só ícones) para sobrar área de
-  // trabalho. A escolha é lembrada entre sessões. Em telas menores ela some e
-  // é aberta pelo botão hamburguer do cabeçalho (drawer).
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("appshell:sidebarCollapsed") === "1";
-  });
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:sidebarCollapsed", collapsed ? "1" : "0");
-    }
-  }, [collapsed]);
-  // Busca/filtro das telas dentro do menu lateral. O campo fica sempre
-  // visível quando a barra está aberta; recolhida, sobra só o ícone da lupa.
+  // O menu lateral é uma gaveta sobreposta (overlay drawer) em TODAS as
+  // larguras de tela: fechada, fica inteiramente fora da tela e não ocupa
+  // espaço nenhum no layout — o conteúdo usa 100% da largura. Aberta, desliza
+  // por cima de tudo, com um fundo escuro atrás.
+  const [sidebarAberta, setSidebarAberta] = useState(false);
+  // Busca/filtro das telas dentro do menu lateral.
   const [buscaMenu, setBuscaMenu] = useState("");
   const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
-  const [focarBuscaMenu, setFocarBuscaMenu] = useState(false);
 
-  // Foco no campo depois que a barra termina de expandir (o input só existe
-  // no estado aberto).
-  useEffect(() => {
-    if (collapsed || !focarBuscaMenu) return;
-    const id = requestAnimationFrame(() => {
-      buscaMenuInputRef.current?.focus();
-      setFocarBuscaMenu(false);
-    });
-    return () => cancelAnimationFrame(id);
-  }, [collapsed, focarBuscaMenu]);
-
-  // Enquanto a largura anima, os rótulos ficam em linha única. Sem isso, num
-  // instante a barra está estreita e textos longos quebram em várias linhas,
-  // esticando e encolhendo as alturas — é o "pulo" que se vê na tela.
-  const [animandoSidebar, setAnimandoSidebar] = useState(false);
-  const animacaoTimerRef = useRef<number | null>(null);
-  useEffect(
-    () => () => {
-      if (animacaoTimerRef.current !== null) window.clearTimeout(animacaoTimerRef.current);
-    },
-    [],
-  );
-  const marcarAnimacao = useCallback(() => {
-    setAnimandoSidebar(true);
-    if (animacaoTimerRef.current !== null) window.clearTimeout(animacaoTimerRef.current);
-    animacaoTimerRef.current = window.setTimeout(() => setAnimandoSidebar(false), 320);
+  // Fechar limpa o termo: na próxima abertura, um filtro esquecido esconderia
+  // itens do menu sem o usuário entender o porquê.
+  const fecharSidebar = useCallback(() => {
+    setSidebarAberta(false);
+    setBuscaMenu("");
   }, []);
 
-  // Recolher limpa o termo: com o campo escondido, um filtro esquecido
-  // sumiria com itens do menu sem o usuário entender o porquê.
   const alternarSidebar = useCallback(() => {
-    marcarAnimacao();
-    setCollapsed((v) => {
-      if (!v) setBuscaMenu("");
+    setSidebarAberta((v) => {
+      if (v) setBuscaMenu("");
       return !v;
     });
-  }, [marcarAnimacao]);
+  }, []);
 
-  const expandirSidebar = useCallback(() => {
-    marcarAnimacao();
-    setCollapsed(false);
-  }, [marcarAnimacao]);
-
-  // Classe dos rótulos do menu: quebra de linha só fora da animação.
-  const labelCls = animandoSidebar ? "leading-snug whitespace-nowrap" : "leading-snug break-words";
+  // Esc fecha a gaveta, como em qualquer painel sobreposto. Exceção: com o
+  // cursor na busca e algo digitado, o primeiro Esc só limpa a busca.
+  useEffect(() => {
+    if (!sidebarAberta) return;
+    const aoEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (e.target === buscaMenuInputRef.current && buscaMenu) return;
+      fecharSidebar();
+    };
+    window.addEventListener("keydown", aoEsc);
+    return () => window.removeEventListener("keydown", aoEsc);
+  }, [sidebarAberta, fecharSidebar, buscaMenu]);
 
   // Ctrl+B (ou ⌘B) alterna o menu, padrão da maioria dos editores. Ignorado
   // enquanto o usuário digita, para não atrapalhar campos de texto.
@@ -740,10 +657,10 @@ function AppShellInner() {
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  // Fecha o drawer mobile ao navegar
+  // Fecha a gaveta ao navegar (inclusive por atalho de teclado ou voltar do
+  // navegador, não só pelo clique no item do menu).
   useEffect(() => {
-    setMobileNavOpen(false);
+    setSidebarAberta(false);
   }, [location.pathname, location.hash]);
   useEffect(() => {
     if (!user?.id) {
@@ -1165,31 +1082,19 @@ function AppShellInner() {
         uxMelhorias ? "h-[100dvh]" : "h-screen",
       )}
     >
-      {/* Cabeçalho branco: ocupa 100% da largura no topo. O menu hambúrguer,
-          o ícone do sistema e o botão de portal moram aqui — a barra azul
-          começa abaixo dele, sem sobrepor. */}
+      {/* Cabeçalho branco: ocupa 100% da largura no topo e é o único lugar do
+          hambúrguer, em qualquer tamanho de tela. */}
       {!isChooser && (
-        <header className="shrink-0 relative z-40 h-14 w-full bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
+        <header className="shrink-0 relative z-30 h-14 w-full bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
-            {/* Telas pequenas: abre a gaveta do menu. */}
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
-              aria-label="Abrir menu"
-              title="Menu"
-            >
-              <MenuIcon className="h-5 w-5" />
-            </button>
-            {/* Desktop: recolhe/expande a barra azul. */}
             <button
               type="button"
               onClick={alternarSidebar}
-              className="hidden lg:flex h-9 w-9 -ml-1 rounded-md items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
-              aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-              aria-expanded={!collapsed}
+              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+              aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
+              aria-expanded={sidebarAberta}
               aria-controls="menu-lateral"
-              title={collapsed ? "Expandir menu (Ctrl+B)" : "Recolher menu (Ctrl+B)"}
+              title={sidebarAberta ? "Fechar menu (Ctrl+B)" : "Abrir menu (Ctrl+B)"}
             >
               <MenuIcon className="h-5 w-5" />
             </button>
@@ -1277,51 +1182,68 @@ function AppShellInner() {
       )}
 
       <div className="flex flex-1 min-h-0 min-w-0">
+        {/* Fundo escuro da gaveta: cobre o sistema inteiro, cabeçalho
+            incluído. Clicar nele fecha. */}
+        {!isChooser && (
+          <div
+            aria-hidden
+            onClick={fecharSidebar}
+            className={cn(
+              "fixed inset-0 z-40 bg-black/50",
+              "transition-opacity duration-300 ease-in-out motion-reduce:transition-none",
+              sidebarAberta ? "opacity-100" : "opacity-0 pointer-events-none",
+            )}
+          />
+        )}
         {!isChooser && (
           <aside
             id="menu-lateral"
+            aria-hidden={!sidebarAberta}
             className={cn(
-              "shrink-0 h-full text-white overflow-hidden hidden lg:flex flex-col border-r border-white/10",
-              "relative z-30",
-              "transition-all duration-300 ease-in-out motion-reduce:transition-none",
-              collapsed ? "w-16" : "w-60 2xl:w-64",
+              // Gaveta flutuante: presa à janela, fora do fluxo do layout —
+              // fechada não ocupa espaço nenhum e o conteúdo fica com 100%
+              // da largura.
+              "fixed inset-y-0 left-0 z-50 w-60 2xl:w-64 max-w-[85vw]",
+              "flex flex-col text-white overflow-hidden border-r border-white/10 shadow-2xl",
+              // `visibility` entra no transition para tirar a gaveta fechada
+              // da ordem do Tab sem cortar a animação de saída.
+              "transition-[transform,visibility] duration-300 ease-in-out motion-reduce:transition-none",
+              sidebarAberta ? "visible translate-x-0" : "invisible -translate-x-full",
             )}
             style={{ backgroundColor: corSidebar }}
           >
-            {/* Busca das telas do menu. Aberta: campo de texto. Recolhida:
-                só a lupa, que expande a barra e já foca o campo. */}
-            <div
-              className={cn("shrink-0 pt-3 pb-1", collapsed ? "flex justify-center px-2" : "px-3")}
-            >
-              {collapsed ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    expandirSidebar();
-                    setFocarBuscaMenu(true);
+            {/* Título da gaveta + botão de fechar. */}
+            <div className="shrink-0 flex items-center gap-2 px-4 h-14 border-b border-white/10">
+              <Activity className="h-5 w-5 shrink-0 text-white" />
+              <span className="text-base font-bold tracking-tight text-white whitespace-nowrap">
+                ClinicaOS
+              </span>
+              <button
+                type="button"
+                onClick={fecharSidebar}
+                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                aria-label="Fechar menu lateral"
+                title="Fechar menu (Esc)"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {/* Busca das telas do menu. */}
+            <div className="shrink-0 px-3 pt-3 pb-1">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
+                <input
+                  ref={buscaMenuInputRef}
+                  value={buscaMenu}
+                  onChange={(e) => setBuscaMenu(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setBuscaMenu("");
                   }}
-                  className="p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  aria-label="Buscar no menu (expande a barra)"
-                  title="Buscar no menu"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-              ) : (
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
-                  <input
-                    ref={buscaMenuInputRef}
-                    value={buscaMenu}
-                    onChange={(e) => setBuscaMenu(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") setBuscaMenu("");
-                    }}
-                    placeholder="Buscar no menu..."
-                    aria-label="Buscar no menu"
-                    className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
-                  />
-                </div>
-              )}
+                  placeholder="Buscar no menu..."
+                  aria-label="Buscar no menu"
+                  className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
+                />
+              </div>
             </div>
             <nav
               ref={navScrollRef}
@@ -1350,20 +1272,10 @@ function AppShellInner() {
                 const groupHasActive = row.items.some(itemHasActive);
                 const hideLabel =
                   subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-                const open =
-                  collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
+                const open = hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
                 return (
-                  <div
-                    key={row.label}
-                    // Recolhido não há título de seção; um filete separa os
-                    // grupos para a lista de ícones não virar um bloco só.
-                    className={cn(
-                      "space-y-1",
-                      collapsed && "border-t border-white/10 pt-3 first:border-t-0 first:pt-0",
-                    )}
-                    title={collapsed ? row.label : undefined}
-                  >
-                    {!collapsed && !hideLabel && (
+                  <div key={row.label} className="space-y-1">
+                    {!hideLabel && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1388,56 +1300,34 @@ function AppShellInner() {
                         if (isParent(item)) {
                           const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                           const subKey = `${row.label}::${item.label}`;
-                          // Recolhido: os filhos ficam escondidos (14 ícones
-                          // soltos do "Nina" não diriam nada ao usuário). O
-                          // ícone do grupo reabre o menu já com ele expandido.
-                          const subOpen = collapsed
-                            ? false
-                            : buscandoMenu
-                              ? true
-                              : (openGroups[subKey] ?? false);
+                          const subOpen = buscandoMenu ? true : (openGroups[subKey] ?? false);
                           return (
                             <div
                               key={subKey}
                               className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))}
                               {...dragProps(row.label, navItemKey(item))}
                             >
-                              {collapsed ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    expandirSidebar();
-                                    setOpenGroups((prev) => ({ ...prev, [subKey]: true }));
-                                  }}
-                                  title={`${item.label} — clique para expandir o menu`}
-                                  aria-label={`${item.label} (expandir menu)`}
-                                  className={`w-full flex justify-center rounded-lg py-2 transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10"}`}
-                                >
-                                  <item.icon className="h-[18px] w-[18px] shrink-0" />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setOpenGroups((prev) => ({
-                                      ...prev,
-                                      [subKey]: !(prev[subKey] ?? false),
-                                    }));
-                                  }}
-                                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
-                                  aria-expanded={subOpen}
-                                >
-                                  <item.icon className="h-[18px] w-[18px] shrink-0" />
-                                  <span className={cn("flex-1 text-left", labelCls)}>
-                                    {item.label}
-                                  </span>
-                                  <ChevronDown
-                                    className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
-                                  />
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenGroups((prev) => ({
+                                    ...prev,
+                                    [subKey]: !(prev[subKey] ?? false),
+                                  }));
+                                }}
+                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                aria-expanded={subOpen}
+                              >
+                                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                <span className="flex-1 text-left leading-snug break-words">
+                                  {item.label}
+                                </span>
+                                <ChevronDown
+                                  className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
+                                />
+                              </button>
                               {subOpen &&
                                 item.children.map((child) => {
                                   const active = leafIsActive(child.to, child.hash);
@@ -1451,14 +1341,13 @@ function AppShellInner() {
                                         href={href}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        title={collapsed ? child.label : undefined}
                                         data-nav-to={child.to}
-                                        className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                       >
                                         <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                        {!collapsed && (
-                                          <span className={labelCls}>{child.label}</span>
-                                        )}
+                                        <span className="leading-snug break-words">
+                                          {child.label}
+                                        </span>
                                       </a>
                                     );
                                   }
@@ -1466,7 +1355,6 @@ function AppShellInner() {
                                     <a
                                       key={linkKey}
                                       href={href}
-                                      title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
                                       data-nav-active={active ? "true" : undefined}
                                       aria-current={uxMelhorias && active ? "page" : undefined}
@@ -1481,18 +1369,19 @@ function AppShellInner() {
                                         )
                                           return;
                                         event.preventDefault();
+                                        fecharSidebar();
                                         irPara(href);
                                       }}
-                                      className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
+                                      className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[13px] font-medium tracking-tight transition-all ${
                                         active
                                           ? "bg-white text-slate-900 shadow-sm"
                                           : "text-white hover:bg-white/10 hover:text-white"
                                       }${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                      {!collapsed && (
-                                        <span className={labelCls}>{child.label}</span>
-                                      )}
+                                      <span className="leading-snug break-words">
+                                        {child.label}
+                                      </span>
                                     </a>
                                   );
                                 })}
@@ -1508,7 +1397,6 @@ function AppShellInner() {
                           <a
                             key={item.to}
                             href={href}
-                            title={collapsed ? item.label : undefined}
                             data-nav-to={item.to}
                             data-nav-active={active ? "true" : undefined}
                             aria-current={uxMelhorias && active ? "page" : undefined}
@@ -1523,11 +1411,12 @@ function AppShellInner() {
                               )
                                 return;
                               event.preventDefault();
+                              fecharSidebar();
                               irPara(href);
                             }}
                             {...dragProps(row.label, navItemKey(item))}
                             className={cn(
-                              `relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
+                              `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
                                   : "text-white hover:bg-white/10 hover:text-white"
@@ -1536,7 +1425,7 @@ function AppShellInner() {
                             )}
                           >
                             <item.icon className="h-[18px] w-[18px] shrink-0" />
-                            {!collapsed && <span className={labelCls}>{item.label}</span>}
+                            <span className="leading-snug break-words">{item.label}</span>
                           </a>
                         );
                       })}
@@ -1544,19 +1433,14 @@ function AppShellInner() {
                 );
               })}
             </nav>
-            <div
-              className={cn(
-                "shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20",
-                collapsed && "flex justify-center",
-              )}
-            >
+            <div className="shrink-0 px-2 py-2 border-t border-white/15 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <SidebarUserMenu
                 userId={user?.id}
                 userName={userName}
                 email={user?.email}
                 initial={initial}
                 color={clinicColor}
-                showName={!collapsed}
+                showName
                 onChangePassword={() => setPwOpen(true)}
                 onSignOut={() => void handleSignOut()}
                 onSwitchPortal={() => abrirSeletorPortais()}
@@ -1591,89 +1475,14 @@ function AppShellInner() {
         </Suspense>
       )}
       <KeyboardShortcuts />
-      {!isChooser && (
-        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent
-            side="left"
-            className="w-[300px] p-0 border-0 text-white lg:hidden flex flex-col h-full max-h-[100dvh] overflow-hidden"
-            style={{ backgroundColor: corSidebar }}
-            onPointerDownOutside={() => setMobileNavOpen(false)}
-            onInteractOutside={() => setMobileNavOpen(false)}
-            onEscapeKeyDown={() => setMobileNavOpen(false)}
-          >
-            <SheetHeader className="shrink-0 px-4 py-3 border-b border-white/10 text-left">
-              <SheetTitle className="text-white flex items-center gap-2 text-base">
-                <Activity className="h-5 w-5 shrink-0 text-white" />
-                ClinicaOS
-                <span className="sr-only">Menu</span>
-              </SheetTitle>
-            </SheetHeader>
-            <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-4 sidebar-mono sidebar-scroll">
-              {visibleNavRows.map((row) => (
-                <div key={row.label} className="space-y-1">
-                  <div className="px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200">
-                    {row.label}
-                  </div>
-                  {row.items.map((item) => {
-                    if (isParent(item)) {
-                      return (
-                        <MobileNavParent
-                          key={item.label}
-                          item={item}
-                          onNavigate={(href) => {
-                            setMobileNavOpen(false);
-                            irPara(href);
-                          }}
-                        />
-                      );
-                    }
-                    const active = itemDeMenuAtivo(location.pathname, item.to);
-                    return (
-                      <a
-                        key={item.to}
-                        href={item.to}
-                        onClick={(e) => {
-                          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-                          e.preventDefault();
-                          setMobileNavOpen(false);
-                          irPara(item.to);
-                        }}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-semibold tracking-tight ${
-                          active
-                            ? "bg-white text-slate-900 shadow-sm"
-                            : "text-white hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="leading-snug break-words">{item.label}</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              ))}
-            </nav>
-            <div className="shrink-0 px-2 py-3 border-t border-white/15 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <SidebarUserMenu
-                userId={user?.id}
-                userName={userName}
-                email={user?.email}
-                initial={initial}
-                color={clinicColor}
-                showName
-                onChangePassword={() => setPwOpen(true)}
-                onSignOut={() => void handleSignOut()}
-                onSwitchPortal={() => abrirSeletorPortais()}
-              />
-            </div>
-          </SheetContent>
-        </Sheet>
-      )}
-      {!isChooser && uxMelhorias && (
+      {/* A barra inferior do celular some enquanto a gaveta está aberta: ela
+          é fixa no rodapé e cobriria o menu do usuário dentro da gaveta. */}
+      {!isChooser && uxMelhorias && !sidebarAberta && (
         <LiquidBottomNav
           pathname={location.pathname}
           onNavigate={irPara}
           cor={corSidebar}
-          onMais={() => setMobileNavOpen(true)}
+          onMais={() => setSidebarAberta(true)}
         />
       )}
       {seletorPortaisAberto && !isChooser && (
