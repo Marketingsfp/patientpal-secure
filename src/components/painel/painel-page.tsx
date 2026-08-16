@@ -21,6 +21,12 @@ type Senha = {
   chamada_em: string | null;
   paciente_id?: string | null;
   paciente_nome?: string | null;
+  /**
+   * Só chega preenchido depois da migration que faz
+   * `painel_senhas_publicas` devolver o procedimento do dia. Enquanto não
+   * existir, o anúncio simplesmente omite este bloco.
+   */
+  procedimento?: string | null;
 };
 
 export function PainelPage() {
@@ -329,12 +335,43 @@ export function PainelPage() {
     return escolhida;
   }
 
+  /**
+   * O guichê é texto livre digitado pela recepção: pode vir "3" ou já vir
+   * "Consultório 1". Só prefixamos "guichê" quando é um número solto, para
+   * não anunciar "guichê Consultório 1".
+   */
+  function rotuloLocal(guiche: string): string {
+    const g = guiche.trim();
+    return /[a-zA-ZÀ-ÿ]/.test(g) ? g : `guichê ${g}`;
+  }
+
+  /**
+   * Monta o texto do anúncio em blocos separados por vírgula e terminados em
+   * ponto. A pontuação é o que faz a voz do navegador pausar entre as
+   * informações — sem ela, tudo sai numa tirada só e o paciente não entende.
+   *
+   * Formato: "{Nome}, {Guichê/Consultório}, {Procedimento}."
+   * Cada bloco só entra se existir; sem nome de paciente, cai para a senha.
+   */
   function textoDaSenha(s: Senha) {
-    const ehNome = /[a-zA-Z]{3,}/.test(s.codigo) && /\s/.test(s.codigo.trim());
-    if (ehNome) return `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
-    const tipoNome = { N: "Comum", P: "Preferencial", C: "Cartão consulta", R: "Retorno" }[s.tipo];
-    const nomePart = s.paciente_nome ? `, ${s.paciente_nome}` : "";
-    return `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
+    const partes: string[] = [];
+
+    const codigoEhNome = /[a-zA-Z]{3,}/.test(s.codigo) && /\s/.test(s.codigo.trim());
+    if (s.paciente_nome) {
+      partes.push(s.paciente_nome);
+    } else if (codigoEhNome) {
+      partes.push(s.codigo);
+    } else {
+      const tipoNome = { N: "Comum", P: "Preferencial", C: "Cartão consulta", R: "Retorno" }[
+        s.tipo
+      ];
+      partes.push(`Senha ${tipoNome} ${s.codigo.replace("-", " ")}`);
+    }
+
+    if (s.guiche) partes.push(rotuloLocal(s.guiche));
+    if (s.procedimento) partes.push(s.procedimento);
+
+    return `${partes.join(", ")}.`;
   }
 
   // Processa a fila de anúncios: só chama a próxima senha depois que a

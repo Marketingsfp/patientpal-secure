@@ -23,6 +23,18 @@ export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
 
 /**
+ * Velocidade padrão da voz DO NAVEGADOR quando não há nada salvo.
+ *
+ * Existe separada de `DEFAULT_TTS_RATE` porque o número significa coisas
+ * diferentes nos dois motores. No Piper o valor vira `playbackRate` de um
+ * áudio já gravado, então 0.55 deixa a locução bem arrastada — e era esse o
+ * ajuste desejado. Na Web Speech API, `utterance.rate = 1` já é a velocidade
+ * natural da voz, e 0.55 soa lento demais. 0.85 é o meio-termo: pausado o
+ * suficiente para uma sala de espera, sem parecer câmera lenta.
+ */
+export const DEFAULT_NATIVE_TTS_RATE = 0.85;
+
+/**
  * Valores especiais do seletor de voz.
  *
  * `AUTO` mantém o comportamento histórico (Piper na Menino Jesus, voz nativa
@@ -153,6 +165,22 @@ export function getUserTtsRate(): number {
   return Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, n));
 }
 
+/** True se existe uma velocidade gravada (por este navegador ou pela clínica). */
+function temRateSalvo(): boolean {
+  if (typeof window === "undefined") return false;
+  const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
+  return !!raw && Number.isFinite(Number(raw));
+}
+
+/**
+ * Velocidade a usar na voz do navegador: a configurada, ou
+ * `DEFAULT_NATIVE_TTS_RATE` quando nunca se salvou nada nesta máquina.
+ */
+export function getNativeTtsRate(): number {
+  if (!temRateSalvo()) return DEFAULT_NATIVE_TTS_RATE;
+  return getUserTtsRate();
+}
+
 export function setUserTtsRate(rate: number) {
   if (typeof window === "undefined") return;
   const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, rate));
@@ -274,7 +302,7 @@ export function resolveBrowserVoice(): SpeechSynthesisVoice | null {
 export function createUtterance(text: string): SpeechSynthesisUtterance {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "pt-BR";
-  utter.rate = getUserTtsRate();
+  utter.rate = getNativeTtsRate();
   const voz = resolveBrowserVoice();
   if (voz) utter.voice = voz;
   return utter;
