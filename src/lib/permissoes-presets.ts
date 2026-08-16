@@ -60,6 +60,8 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "estoque",
   "modelos-documentos",
   "clinicas",
+  "painel-totem",
+  "backups",
   "tipos-servico",
   // RH
   "hr-ponto",

@@ -148,7 +148,10 @@ const GRUPOS_BASE: Grupo[] = [
         nome: "Documentos do paciente",
         descricao: "Anexos e arquivos clínicos",
       },
-      { key: "painel", nome: "Painel de Senhas", descricao: "Painel público de chamadas" },
+      // "painel" saiu daqui: o Painel de Senhas é a rota pública /painel
+      // (TV da recepção, fora da área logada), então ligar/desligar a chave
+      // nunca teve efeito. A configuração dele está em Configurações ›
+      // Painel & Totem, governada pela chave "painel-totem".
     ],
   },
   {
@@ -208,13 +211,14 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "disponibilidades", nome: "Horários médicos", descricao: "Agenda dos médicos" },
       { key: "prontuario-modelos", nome: "Modelos de Prontuário", descricao: "Templates clínicos" },
       { key: "unidades", nome: "Unidades", descricao: "Clínicas / unidades" },
-      { key: "planos", nome: "Planos / Convênios", descricao: "Planos de saúde e convênios" },
+      // "planos" saiu daqui: a tela /app/planos só redireciona para
+      // Cartão Benefícios › Convênios, que é governada pela chave
+      // "cartao-beneficios". A linha antiga em `perfil_permissoes` é inerte.
       {
         key: "modelos-documentos",
         nome: "Modelos de Documentos",
         descricao: "Templates de documentos",
       },
-      { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
       { key: "medicos", nome: "Médicos", descricao: "Cadastro de médicos" },
       { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
       { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
@@ -265,6 +269,26 @@ const GRUPOS_BASE: Grupo[] = [
         key: "painel-executivo",
         nome: "Painel Executivo",
         descricao: "Indicadores executivos da clínica",
+      },
+    ],
+  },
+  {
+    // Espelha a seção "Configurações" do menu lateral. A tela
+    // "Voz & Áudio (TTS)" não entra aqui de propósito: ela é restrita a
+    // administradores da clínica (ADMIN_ONLY_ROUTES), regra mais forte que
+    // qualquer configuração desta matriz.
+    label: "Configurações",
+    modulos: [
+      {
+        key: "painel-totem",
+        nome: "Painel & Totem",
+        descricao: "Configuração do painel de senhas e do totem de autoatendimento",
+      },
+      { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
+      {
+        key: "backups",
+        nome: "Backups",
+        descricao: "Geração e download de cópias de segurança do banco",
       },
     ],
   },

@@ -109,7 +109,9 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/regras-ia": "financeiro",
   "/app/financeiro/relatorios": "financeiro",
   "/app/configuracoes/nfse": "nfse",
-  "/app/configuracoes/painel-totem": "clinicas",
+  // Antes usava a chave "clinicas": quem podia ver o cadastro de clínicas
+  // enxergava também a configuração do painel/totem, sem como separar.
+  "/app/configuracoes/painel-totem": "painel-totem",
   "/app/nfse": "nfse",
   "/app/relatorios": "relatorios",
   "/app/auditoria": "auditoria",
@@ -118,14 +120,15 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/contratos": "contratos",
   "/app/integration-secrets": "integration-secrets",
   "/app/lgpd": "lgpd",
-  "/app/backups": "auditoria",
+  // Chave própria (antes "auditoria"): baixar/restaurar backup é bem mais
+  // sensível do que consultar os logs de auditoria.
+  "/app/backups": "backups",
 
   // Sistema / livre
-  "/app/dev-caixa-shell": null,
-  "/app/dev-clientes-shell": null,
-  "/app/dev-hhp": null,
-  "/app/dev-list-shell": null,
-  "/app/dev-orcamentos-shell": null,
+  // As telas "/app/dev-*" NÃO ficam aqui: elas renderizavam as listas reais
+  // de clientes/caixa/orçamentos e ainda ligam/desligam feature flags, mas
+  // eram "livres" — qualquer perfil logado abria pela URL. Passaram para
+  // ADMIN_ONLY_ROUTES abaixo.
   "/app/sem-permissao": null,
 };
 
@@ -134,7 +137,18 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
  * estiver salvo em `perfil_permissoes`. Nenhum perfil não-admin entra aqui,
  * nem digitando a URL na barra de endereços.
  */
-export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = ["/app/configuracoes/voz", "/app/planos"];
+export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = [
+  "/app/configuracoes/voz",
+  "/app/planos",
+  // Previews internos de telas em desenvolvimento: mostram dados reais e
+  // alteram feature flags da clínica. Não têm item de menu e agora também
+  // não abrem por URL para quem não é administrador.
+  "/app/dev-caixa-shell",
+  "/app/dev-clientes-shell",
+  "/app/dev-hhp",
+  "/app/dev-list-shell",
+  "/app/dev-orcamentos-shell",
+];
 
 /** True quando a rota atual só pode ser aberta por administrador. */
 export function rotaSomenteAdmin(pathname: string): boolean {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import {
+  ADMIN_ONLY_ROUTES,
   moduloDaRota,
   rotaSomenteAdmin,
   ROUTE_TO_MODULE,
@@ -80,5 +81,49 @@ describe("tela Perfis de Acesso cobre os módulos usados nas rotas", () => {
   it("submódulos declarados têm pai válido", () => {
     const paisInvalidos = Object.values(SUBMODULE_PARENT).filter((p) => !MODULOS_DA_TELA.has(p));
     expect(paisInvalidos).toEqual([]);
+  });
+});
+
+// Terceira trava, do lado do menu lateral. O filtro do AppShell (`leafAllowed`)
+// consulta ROUTE_TO_MODULE por chave EXATA — não por prefixo. Um item de menu
+// sem entrada exata some para todo perfil não-admin (e um item cujo módulo não
+// esteja na matriz nunca poderia ser liberado). Este teste garante que toda
+// seção do menu (Operação, Inteligência, Marketing, Cadastros, RH, Gestão e
+// Configurações) esteja coberta pela tela de Perfis de Acesso.
+const SHELL_TSX = readFileSync("src/components/app-shell.tsx", "utf8");
+const NAV_ROWS = SHELL_TSX.slice(
+  SHELL_TSX.indexOf("const navRows"),
+  SHELL_TSX.indexOf("export function AppShell()"),
+);
+const ROTAS_DO_MENU = [...new Set([...NAV_ROWS.matchAll(/to:\s*"([^"]+)"/g)].map((m) => m[1]!))];
+
+describe("menu lateral está coberto pela matriz de permissões", () => {
+  it("leu os itens do menu", () => {
+    expect(ROTAS_DO_MENU.length).toBeGreaterThan(40);
+  });
+
+  it("todo item de menu tem entrada exata no mapa (ou é restrito a admin)", () => {
+    const semEntrada = ROTAS_DO_MENU.filter(
+      (to) => !(to in ROUTE_TO_MODULE) && !rotaSomenteAdmin(to),
+    );
+    expect(semEntrada).toEqual([]);
+  });
+
+  it("todo item de menu tem módulo configurável na tela de perfis", () => {
+    const semControle = ROTAS_DO_MENU.filter((to) => {
+      if (rotaSomenteAdmin(to)) return false; // trava mais forte que a matriz
+      const mod = ROUTE_TO_MODULE[to];
+      if (mod === null) return false; // rota de sistema
+      return typeof mod !== "string" || !MODULOS_DA_TELA.has(mod);
+    });
+    expect(semControle).toEqual([]);
+  });
+
+  it("nenhuma tela de preview interna (/app/dev-*) fica livre", () => {
+    const devLivres = Object.entries(ROUTE_TO_MODULE)
+      .filter(([rota, mod]) => rota.startsWith("/app/dev-") && mod === null)
+      .map(([rota]) => rota);
+    expect(devLivres).toEqual([]);
+    expect(ADMIN_ONLY_ROUTES.filter((r) => r.startsWith("/app/dev-")).length).toBeGreaterThan(0);
   });
 });

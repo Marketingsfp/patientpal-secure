@@ -42,7 +42,7 @@ const fmtBytes = (n: number) => {
 function Page() {
   const { clinicaAtual } = useClinica();
   const isAdmin = clinicaAtual?.role === "admin";
-  const podeEscrever = usePodeEscrever("auditoria");
+  const podeEscrever = usePodeEscrever("backups");
   const [dias, setDias] = useState<DiaBackup[]>([]);
   const [execs, setExecs] = useState<Execucao[]>([]);
   const [loading, setLoading] = useState(false);
