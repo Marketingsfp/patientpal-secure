@@ -74,6 +74,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
+import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
 import {
   AtendDashboard,
   AtendDepartamentos,
@@ -220,6 +221,7 @@ function NinaPage() {
     "automacoes",
     "config",
     "templates",
+    "homologacao",
     "atend-status",
     "atend-dashboard",
     "atend-depto",
@@ -421,6 +423,11 @@ function NinaPage() {
         {/* ============ TEMPLATES (HSM) ============ */}
         <TabsContent value="templates">
           <TemplatesWhatsapp />
+        </TabsContent>
+
+        {/* ============ HOMOLOGAÇÃO ============ */}
+        <TabsContent value="homologacao">
+          <HomologacaoWhatsapp />
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
