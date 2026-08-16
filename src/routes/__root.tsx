@@ -98,6 +98,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
     ],
     links: [
+      // Ícone da aba do navegador: batimento cardíaco (lucide "activity") no
+      // lugar do globo padrão que aparece quando não há favicon declarado.
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "apple-touch-icon", href: "/favicon.svg" },
       {
         rel: "stylesheet",
         href: appCss,
