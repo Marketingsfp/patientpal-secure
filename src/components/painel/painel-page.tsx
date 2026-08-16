@@ -5,8 +5,11 @@ import { Loader2, Volume2, VolumeX } from "lucide-react";
 import {
   speak as ttsSpeak,
   isUserTtsEnabled,
-  getUserTtsRate,
   subscribeClinicaTtsConfig,
+  createUtterance,
+  resolveBrowserVoice,
+  usuarioPreferePiper,
+  usuarioPrefereVozDoNavegador,
 } from "@/lib/tts-service";
 type Senha = {
   id: string;
@@ -306,35 +309,21 @@ export function PainelPage() {
     return subscribeClinicaTtsConfig(clinicaId);
   }, [clinicaAtual?.clinica_id]);
 
+  // A fala nasce sempre em `createUtterance`, que fixa lang=pt-BR, aplica a
+  // velocidade configurada e atribui a voz escolhida na tela de Voz & Áudio
+  // (ou a melhor voz pt-BR disponível, quando o modo é automático).
   function criarFala(texto: string, key: string) {
-    const utter = new SpeechSynthesisUtterance(texto);
-    utter.lang = "pt-BR";
-    // Usa a mesma velocidade configurada para o TTS Piper (fallback nativo).
-    utter.rate = getUserTtsRate();
-    const voz = vozFemininaRef.current ?? escolherVozFeminina();
-    if (voz) utter.voice = voz;
+    const utter = createUtterance(texto);
     utter.onstart = () => {
       if (chamadaPendenteRef.current?.key === key) chamadaPendenteRef.current = null;
     };
     return utter;
   }
 
-  // Escolhe uma voz pt-BR feminina disponível no navegador do painel.
-  // A lista de vozes carrega de forma assíncrona; por isso reavaliamos
-  // sempre que necessário e escutamos "voiceschanged" no efeito abaixo.
+  // A lista de vozes do navegador carrega de forma assíncrona: aquecemos o
+  // cache assim que ela fica disponível e a cada "voiceschanged".
   function escolherVozFeminina(): SpeechSynthesisVoice | null {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
-    const vozes = window.speechSynthesis.getVoices();
-    if (!vozes.length) return null;
-    const ptBR = vozes.filter(
-      (v) => /pt(-|_)?BR/i.test(v.lang) || /portuguese.*brazil/i.test(v.name),
-    );
-    const candidatas = ptBR.length ? ptBR : vozes.filter((v) => /^pt/i.test(v.lang));
-    // Nomes conhecidos de vozes femininas em pt-BR nos principais SOs/browsers
-    const nomesFemininos =
-      /(luciana|maria|francisca|camila|helena|joana|vitoria|vitória|fernanda|paulina|google.*português|microsoft.*(maria|francisca|heloisa|helo[íi]sa)|female|feminina|mulher)/i;
-    const feminina = candidatas.find((v) => nomesFemininos.test(v.name));
-    const escolhida = feminina ?? candidatas[0] ?? null;
+    const escolhida = resolveBrowserVoice();
     vozFemininaRef.current = escolhida;
     return escolhida;
   }
@@ -360,10 +349,15 @@ export function PainelPage() {
     // Piper TTS local (Menino Jesus): usa o backend de IA quando habilitado,
     // com fallback silencioso para SpeechSynthesis nativo se falhar.
     const nomeClinica = (clinicaAtual?.clinica?.nome ?? "").toLowerCase();
+    // A escolha feita na tela de Voz & Áudio manda:
+    //   voz do navegador → nunca usa o Piper;
+    //   "Servidor Piper" → usa o Piper em qualquer clínica;
+    //   automático       → comportamento histórico (Piper só na Menino Jesus).
+    const piperPermitido = usuarioPrefereVozDoNavegador()
+      ? false
+      : usuarioPreferePiper() || nomeClinica.includes("menino jesus");
     const usarPiper =
-      nomeClinica.includes("menino jesus") &&
-      isUserTtsEnabled() &&
-      Date.now() > piperBloqueadoAteRef.current;
+      piperPermitido && isUserTtsEnabled() && Date.now() > piperBloqueadoAteRef.current;
     if (usarPiper) {
       try {
         window.speechSynthesis.cancel();

@@ -21,10 +21,15 @@ import {
   DEFAULT_TTS_RATE,
   MAX_TTS_RATE,
   MIN_TTS_RATE,
+  TTS_VOICE_AUTO,
+  TTS_VOICE_PIPER,
   getUserTtsRate,
   setUserTtsRate,
   isUserTtsEnabled,
   setUserTtsEnabled,
+  getUserTtsVoice,
+  setUserTtsVoice,
+  listBrowserVoices,
   speak,
   stopSpeaking,
   fetchClinicaTtsConfig,
@@ -55,9 +60,30 @@ function VozConfigPage() {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [savedRate, setSavedRate] = useState<number>(DEFAULT_TTS_RATE);
   const [savedEnabled, setSavedEnabled] = useState<boolean>(true);
+  const [voz, setVoz] = useState<string>(TTS_VOICE_AUTO);
+  const [savedVoz, setSavedVoz] = useState<string>(TTS_VOICE_AUTO);
+  const [vozes, setVozes] = useState<SpeechSynthesisVoice[]>([]);
+  const [temPtBr, setTemPtBr] = useState<boolean>(true);
   const [texto, setTexto] = useState<string>(FRASE_PADRAO);
   const [testando, setTestando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+
+  // A lista de vozes do navegador chega de forma assíncrona: no Chrome a
+  // primeira chamada a getVoices() costuma vir vazia e só depois dispara
+  // "voiceschanged". Por isso recarregamos no evento também.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const carregar = () => {
+      const { vozes: lista, temPtBr: achouPtBr } = listBrowserVoices();
+      setVozes(lista);
+      setTemPtBr(achouPtBr);
+    };
+    carregar();
+    window.speechSynthesis.addEventListener?.("voiceschanged", carregar);
+    return () => {
+      window.speechSynthesis.removeEventListener?.("voiceschanged", carregar);
+    };
+  }, []);
 
   useEffect(() => {
     // Fonte de verdade: banco por clínica (para propagar em Realtime ao
@@ -79,6 +105,11 @@ function VozConfigPage() {
       setSavedRate(r);
       setEnabled(e);
       setSavedEnabled(e);
+      // A voz NÃO vem do banco: a lista depende do sistema operacional de
+      // cada máquina, então a preferência é sempre deste navegador.
+      const v = getUserTtsVoice();
+      setVoz(v);
+      setSavedVoz(v);
     })();
     return () => {
       cancelado = true;
@@ -101,6 +132,7 @@ function VozConfigPage() {
       // Cache local + evento (aplica na mesma aba imediatamente).
       setUserTtsRate(rate);
       setUserTtsEnabled(enabled);
+      setUserTtsVoice(voz);
       // Fonte de verdade compartilhada com o painel (Realtime).
       if (clinicaId) {
         const { error } = await saveClinicaTtsConfig(clinicaId, { rate, enabled });
@@ -111,6 +143,7 @@ function VozConfigPage() {
       }
       setSavedRate(rate);
       setSavedEnabled(enabled);
+      setSavedVoz(voz);
       toast.success(
         clinicaId
           ? `Preferências salvas (${Math.round(rate * 100)}%) — painel atualizado.`
@@ -124,6 +157,13 @@ function VozConfigPage() {
   function descartar() {
     setRate(savedRate);
     setEnabled(savedEnabled);
+    setVoz(savedVoz);
+  }
+
+  /** Volta velocidade e voz ao que está salvo (o teste aplica em caráter temporário). */
+  function restaurarSalvos() {
+    setUserTtsRate(savedRate);
+    setUserTtsVoice(savedVoz);
   }
 
   async function testar() {
@@ -131,32 +171,37 @@ function VozConfigPage() {
       toast.warning("Ative a voz antes de testar.");
       return;
     }
-    // Aplica temporariamente a velocidade em edição só para o teste,
+    // Aplica temporariamente a velocidade e a voz em edição só para o teste,
     // sem persistir — o Salvar continua responsável por gravar.
     setUserTtsRate(rate);
+    setUserTtsVoice(voz);
     setTestando(true);
     try {
       await speak(texto || FRASE_PADRAO, {
         onEnd: () => {
           setTestando(false);
-          setUserTtsRate(savedRate);
+          restaurarSalvos();
         },
         onError: () => {
           setTestando(false);
-          setUserTtsRate(savedRate);
-          toast.error("Falha ao reproduzir. Verifique o servidor de TTS.");
+          restaurarSalvos();
+          toast.error(
+            voz === TTS_VOICE_PIPER || voz === TTS_VOICE_AUTO
+              ? "Falha ao reproduzir. Verifique o servidor de TTS."
+              : "Falha ao reproduzir com esta voz. Tente outra da lista.",
+          );
         },
       });
     } catch {
       setTestando(false);
-      setUserTtsRate(savedRate);
+      restaurarSalvos();
     }
   }
 
   function parar() {
     stopSpeaking();
     setTestando(false);
-    setUserTtsRate(savedRate);
+    restaurarSalvos();
   }
 
   function resetar() {
@@ -164,7 +209,7 @@ function VozConfigPage() {
   }
 
   const percent = Math.round(rate * 100);
-  const dirty = rate !== savedRate || enabled !== savedEnabled;
+  const dirty = rate !== savedRate || enabled !== savedEnabled || voz !== savedVoz;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
@@ -191,6 +236,44 @@ function VozConfigPage() {
               </div>
             </div>
             <Switch checked={enabled} onCheckedChange={alterarEnabled} />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Voz do Totem</Label>
+            <p className="text-xs text-muted-foreground">
+              Escolha a voz usada para chamar as senhas. Com o Windows em inglês, a opção automática
+              cai na voz americana — por isso selecione aqui uma voz em português.
+            </p>
+            <Select value={voz} onValueChange={setVoz}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a voz" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TTS_VOICE_AUTO}>Automática (escolhe sozinho)</SelectItem>
+                <SelectItem value={TTS_VOICE_PIPER}>Usar Servidor Piper</SelectItem>
+                {vozes.map((v) => (
+                  <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} ({v.lang})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {vozes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Carregando as vozes do navegador… Se a lista não aparecer, recarregue a página.
+              </p>
+            ) : !temPtBr ? (
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                Nenhuma voz em português foi encontrada neste computador, então a lista mostra todas
+                as disponíveis. Para o sotaque ficar correto, instale um pacote de voz em português
+                nas configurações de idioma do Windows — ou use o Servidor Piper.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Esta escolha vale só para este navegador, porque as vozes disponíveis dependem do
+                sistema de cada computador. Configure também na máquina que exibe o painel.
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -266,9 +349,12 @@ function VozConfigPage() {
           </div>
 
           <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-            A voz é gerada pelo servidor local Piper via <code>/api/public/tts</code>. A velocidade
-            é aplicada no navegador mantendo o tom natural (<code>preservesPitch</code>). Quando o
-            Piper estiver indisponível, o painel usa a voz nativa do navegador na mesma velocidade.
+            Ao escolher uma voz da lista, a fala é gerada pelo próprio navegador, sempre em
+            português do Brasil. Nas opções <strong>Automática</strong> e{" "}
+            <strong>Usar Servidor Piper</strong>, o áudio vem do servidor local Piper via{" "}
+            <code>/api/public/tts</code>, e o painel volta para a voz do navegador se o Piper
+            estiver fora do ar. A velocidade é aplicada mantendo o tom natural (
+            <code>preservesPitch</code>).
           </div>
         </CardContent>
       </Card>
