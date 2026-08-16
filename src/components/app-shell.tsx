@@ -38,6 +38,7 @@ import {
   BarChart3,
   Wallet,
   ChevronDown,
+  Search,
   X,
   HeartPulse,
   Contact,
@@ -652,12 +653,57 @@ function AppShellInner() {
       window.localStorage.setItem("appshell:sidebarCollapsed", collapsed ? "1" : "0");
     }
   }, [collapsed]);
-  // A busca do menu lateral (lupa + campo "Buscar no menu...") foi removida:
-  // deixava o topo da barra apertado a ponto de cortar o nome do sistema, e a
-  // busca global do cabeçalho já cobre o dia a dia.
-  const alternarSidebar = useCallback(() => {
-    setCollapsed((v) => !v);
+  // Busca/filtro das telas dentro do menu lateral. O campo fica sempre
+  // visível quando a barra está aberta; recolhida, sobra só o ícone da lupa.
+  const [buscaMenu, setBuscaMenu] = useState("");
+  const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
+  const [focarBuscaMenu, setFocarBuscaMenu] = useState(false);
+
+  // Foco no campo depois que a barra termina de expandir (o input só existe
+  // no estado aberto).
+  useEffect(() => {
+    if (collapsed || !focarBuscaMenu) return;
+    const id = requestAnimationFrame(() => {
+      buscaMenuInputRef.current?.focus();
+      setFocarBuscaMenu(false);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [collapsed, focarBuscaMenu]);
+
+  // Enquanto a largura anima, os rótulos ficam em linha única. Sem isso, num
+  // instante a barra está estreita e textos longos quebram em várias linhas,
+  // esticando e encolhendo as alturas — é o "pulo" que se vê na tela.
+  const [animandoSidebar, setAnimandoSidebar] = useState(false);
+  const animacaoTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (animacaoTimerRef.current !== null) window.clearTimeout(animacaoTimerRef.current);
+    },
+    [],
+  );
+  const marcarAnimacao = useCallback(() => {
+    setAnimandoSidebar(true);
+    if (animacaoTimerRef.current !== null) window.clearTimeout(animacaoTimerRef.current);
+    animacaoTimerRef.current = window.setTimeout(() => setAnimandoSidebar(false), 320);
   }, []);
+
+  // Recolher limpa o termo: com o campo escondido, um filtro esquecido
+  // sumiria com itens do menu sem o usuário entender o porquê.
+  const alternarSidebar = useCallback(() => {
+    marcarAnimacao();
+    setCollapsed((v) => {
+      if (!v) setBuscaMenu("");
+      return !v;
+    });
+  }, [marcarAnimacao]);
+
+  const expandirSidebar = useCallback(() => {
+    marcarAnimacao();
+    setCollapsed(false);
+  }, [marcarAnimacao]);
+
+  // Classe dos rótulos do menu: quebra de linha só fora da animação.
+  const labelCls = animandoSidebar ? "leading-snug whitespace-nowrap" : "leading-snug break-words";
 
   // Ctrl+B (ou ⌘B) alterna o menu, padrão da maioria dos editores. Ignorado
   // enquanto o usuário digita, para não atrapalhar campos de texto.
@@ -918,6 +964,28 @@ function AppShellInner() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
+  // Resultado da busca do menu lateral (sem acento, case-insensitive).
+  const termoMenu = buscaMenu.trim();
+  const buscandoMenu = termoMenu.length > 0;
+  const searchedNavRows = useMemo(() => {
+    if (!buscandoMenu) return visibleNavRows;
+    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const alvo = norm(termoMenu);
+    return visibleNavRows
+      .map((row) => {
+        const items = row.items
+          .map((it) => {
+            if (!isParent(it)) return norm(it.label).includes(alvo) ? it : null;
+            if (norm(it.label).includes(alvo)) return it;
+            const children = it.children.filter((c) => norm(c.label).includes(alvo));
+            return children.length > 0 ? { ...it, children } : null;
+          })
+          .filter((it): it is NavItem => it !== null);
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+  }, [visibleNavRows, buscandoMenu, termoMenu]);
+
   // Solta um item do menu sobre outro do MESMO grupo: insere na posição do
   // alvo e salva a lista completa de chaves do grupo no perfil do usuário.
   const soltarItemMenu = (rowLabel: string, targetKey: string) => {
@@ -1092,415 +1160,430 @@ function AppShellInner() {
 
   return (
     <div
-      className={cn("flex bg-background overflow-hidden", uxMelhorias ? "h-[100dvh]" : "h-screen")}
+      className={cn(
+        "flex flex-col bg-background overflow-hidden",
+        uxMelhorias ? "h-[100dvh]" : "h-screen",
+      )}
     >
+      {/* Cabeçalho branco: ocupa 100% da largura no topo. O menu hambúrguer,
+          o ícone do sistema e o botão de portal moram aqui — a barra azul
+          começa abaixo dele, sem sobrepor. */}
       {!isChooser && (
-        <aside
-          id="menu-lateral"
-          className={cn(
-            "shrink-0 text-white overflow-hidden hidden lg:flex flex-col border-r border-white/10",
-            "relative z-40",
-            "transition-[width] duration-200 ease-out motion-reduce:transition-none",
-            uxMelhorias ? "h-[100dvh]" : "h-screen",
-            collapsed ? "w-16" : "w-60 2xl:w-64",
-          )}
-          style={{ backgroundColor: corSidebar }}
-        >
-          <div className="shrink-0 w-full h-14 border-b border-white/10">
-            <div
-              className={cn(
-                "flex h-full w-full items-center min-w-0",
-                collapsed ? "justify-center px-2" : "gap-1.5 px-4",
-              )}
+        <header className="shrink-0 relative z-40 h-14 w-full bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
+            {/* Telas pequenas: abre a gaveta do menu. */}
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+              aria-label="Abrir menu"
+              title="Menu"
             >
-              <button
-                type="button"
-                onClick={alternarSidebar}
-                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                aria-expanded={!collapsed}
-                aria-controls="menu-lateral"
-                title={collapsed ? "Expandir menu (Ctrl+B)" : "Recolher menu (Ctrl+B)"}
+              <MenuIcon className="h-5 w-5" />
+            </button>
+            {/* Desktop: recolhe/expande a barra azul. */}
+            <button
+              type="button"
+              onClick={alternarSidebar}
+              className="hidden lg:flex h-9 w-9 -ml-1 rounded-md items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+              aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+              aria-expanded={!collapsed}
+              aria-controls="menu-lateral"
+              title={collapsed ? "Expandir menu (Ctrl+B)" : "Recolher menu (Ctrl+B)"}
+            >
+              <MenuIcon className="h-5 w-5" />
+            </button>
+            <Link to="/app" className="flex items-center gap-2 min-w-0 shrink-0" title="ClinicaOS">
+              <Activity className="h-5 w-5 shrink-0 text-slate-800" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => abrirSeletorPortais()}
+              className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
+              title="Trocar de portal"
+            >
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline truncate max-w-[140px]">
+                {subsystemLabel ?? "Portais"}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
+            {clinicaAtual && (
+              <img
+                src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
+                alt={clinicaAtual.clinica.nome}
+                className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
+              />
+            )}
+            {memberships.length > 0 && (
+              <Select
+                value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
+                onValueChange={(v) => {
+                  if (v === "__todas__") setModoTodas(true);
+                  else setClinicaAtual(v);
+                }}
               >
-                <MenuIcon className="h-4 w-4" />
-              </button>
-              {!collapsed && (
-                <span className="text-sm font-bold tracking-tight text-white whitespace-nowrap select-none">
-                  ClinicaOS
-                </span>
-              )}
-              {!collapsed && !isChooser && (
-                <button
-                  type="button"
-                  onClick={() => abrirSeletorPortais()}
-                  title="Trocar de portal"
-                  className="ml-auto inline-flex items-center gap-1 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer"
-                >
-                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">Portal</span>
-                </button>
-              )}
+                <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
+                  <SelectValue placeholder="Selecione a clínica" />
+                </SelectTrigger>
+                <SelectContent>
+                  {memberships.length > 1 && (
+                    <SelectItem value="__todas__">
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                        Todas as clínicas
+                      </span>
+                    </SelectItem>
+                  )}
+                  {memberships.map((m) => (
+                    <SelectItem key={m.clinica_id} value={m.clinica_id}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ backgroundColor: corDaClinica(m.clinica.nome) }}
+                        />
+                        {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-1.5 min-w-0">
+            <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
+              <UniversalSearchBar />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+              title="Atalhos de teclado (?)"
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+              }}
+            >
+              <span className="text-base font-semibold">?</span>
+            </Button>
+            <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
+              <EstornosBell />
+              <TTSToggle />
             </div>
           </div>
-          <nav
-            ref={navScrollRef}
-            onMouseEnter={() => {
-              navHoverRef.current = true;
-            }}
-            onMouseLeave={() => {
-              navHoverRef.current = false;
-            }}
-            className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
+        </header>
+      )}
+
+      <div className="flex flex-1 min-h-0 min-w-0">
+        {!isChooser && (
+          <aside
+            id="menu-lateral"
+            className={cn(
+              "shrink-0 h-full text-white overflow-hidden hidden lg:flex flex-col border-r border-white/10",
+              "relative z-30",
+              "transition-all duration-300 ease-in-out motion-reduce:transition-none",
+              collapsed ? "w-16" : "w-60 2xl:w-64",
+            )}
+            style={{ backgroundColor: corSidebar }}
           >
-            {visibleNavRows.map((row) => {
-              const leafIsActive = (to: string, hash?: string) => {
-                const pathOk = itemDeMenuAtivo(location.pathname, to);
-                if (!pathOk) return false;
-                if (!hash) return true;
-                return (location.hash ?? "").replace(/^#/, "") === hash;
-              };
-              const itemHasActive = (it: NavItem): boolean =>
-                isParent(it)
-                  ? it.children.some((c) => leafIsActive(c.to, c.hash))
-                  : leafIsActive(it.to);
-              const groupHasActive = row.items.some(itemHasActive);
-              const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-              const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
-              return (
-                <div
-                  key={row.label}
-                  // Recolhido não há título de seção; um filete separa os
-                  // grupos para a lista de ícones não virar um bloco só.
-                  className={cn(
-                    "space-y-1",
-                    collapsed && "border-t border-white/10 pt-3 first:border-t-0 first:pt-0",
-                  )}
-                  title={collapsed ? row.label : undefined}
+            {/* Busca das telas do menu. Aberta: campo de texto. Recolhida:
+                só a lupa, que expande a barra e já foca o campo. */}
+            <div
+              className={cn("shrink-0 pt-3 pb-1", collapsed ? "flex justify-center px-2" : "px-3")}
+            >
+              {collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    expandirSidebar();
+                    setFocarBuscaMenu(true);
+                  }}
+                  className="p-1.5 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  aria-label="Buscar no menu (expande a barra)"
+                  title="Buscar no menu"
                 >
-                  {!collapsed && !hideLabel && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setOpenGroups((prev) => ({
-                          ...prev,
-                          [row.label]: !(prev[row.label] ?? true),
-                        }));
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
-                      aria-expanded={open}
-                    >
-                      <span>{row.label}</span>
-                      <ChevronDown
-                        className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
-                      />
-                    </button>
-                  )}
-                  {open &&
-                    row.items.map((item) => {
-                      if (isParent(item)) {
-                        const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
-                        const subKey = `${row.label}::${item.label}`;
-                        // Recolhido: os filhos ficam escondidos (14 ícones
-                        // soltos do "Nina" não diriam nada ao usuário). O
-                        // ícone do grupo reabre o menu já com ele expandido.
-                        const subOpen = collapsed ? false : (openGroups[subKey] ?? false);
-                        return (
-                          <div
-                            key={subKey}
-                            className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))}
-                            {...dragProps(row.label, navItemKey(item))}
-                          >
-                            {collapsed ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCollapsed(false);
-                                  setOpenGroups((prev) => ({ ...prev, [subKey]: true }));
-                                }}
-                                title={`${item.label} — clique para expandir o menu`}
-                                aria-label={`${item.label} (expandir menu)`}
-                                className={`w-full flex justify-center rounded-lg py-2 transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10"}`}
-                              >
-                                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setOpenGroups((prev) => ({
-                                    ...prev,
-                                    [subKey]: !(prev[subKey] ?? false),
-                                  }));
-                                }}
-                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
-                                aria-expanded={subOpen}
-                              >
-                                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                                <span className="flex-1 text-left leading-snug break-words">
-                                  {item.label}
-                                </span>
-                                <ChevronDown
-                                  className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
-                                />
-                              </button>
-                            )}
-                            {subOpen &&
-                              item.children.map((child) => {
-                                const active = leafIsActive(child.to, child.hash);
-                                const linkKey = `${child.to}#${child.hash ?? ""}`;
-                                const openInNewTab = false;
-                                const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
-                                if (openInNewTab) {
+                  <Search className="h-4 w-4" />
+                </button>
+              ) : (
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
+                  <input
+                    ref={buscaMenuInputRef}
+                    value={buscaMenu}
+                    onChange={(e) => setBuscaMenu(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setBuscaMenu("");
+                    }}
+                    placeholder="Buscar no menu..."
+                    aria-label="Buscar no menu"
+                    className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
+                  />
+                </div>
+              )}
+            </div>
+            <nav
+              ref={navScrollRef}
+              onMouseEnter={() => {
+                navHoverRef.current = true;
+              }}
+              onMouseLeave={() => {
+                navHoverRef.current = false;
+              }}
+              className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono"
+            >
+              {buscandoMenu && searchedNavRows.length === 0 && (
+                <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
+              )}
+              {searchedNavRows.map((row) => {
+                const leafIsActive = (to: string, hash?: string) => {
+                  const pathOk = itemDeMenuAtivo(location.pathname, to);
+                  if (!pathOk) return false;
+                  if (!hash) return true;
+                  return (location.hash ?? "").replace(/^#/, "") === hash;
+                };
+                const itemHasActive = (it: NavItem): boolean =>
+                  isParent(it)
+                    ? it.children.some((c) => leafIsActive(c.to, c.hash))
+                    : leafIsActive(it.to);
+                const groupHasActive = row.items.some(itemHasActive);
+                const hideLabel =
+                  subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
+                const open =
+                  collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
+                return (
+                  <div
+                    key={row.label}
+                    // Recolhido não há título de seção; um filete separa os
+                    // grupos para a lista de ícones não virar um bloco só.
+                    className={cn(
+                      "space-y-1",
+                      collapsed && "border-t border-white/10 pt-3 first:border-t-0 first:pt-0",
+                    )}
+                    title={collapsed ? row.label : undefined}
+                  >
+                    {!collapsed && !hideLabel && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenGroups((prev) => ({
+                            ...prev,
+                            [row.label]: !(prev[row.label] ?? true),
+                          }));
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
+                        aria-expanded={open}
+                      >
+                        <span>{row.label}</span>
+                        <ChevronDown
+                          className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+                        />
+                      </button>
+                    )}
+                    {open &&
+                      row.items.map((item) => {
+                        if (isParent(item)) {
+                          const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
+                          const subKey = `${row.label}::${item.label}`;
+                          // Recolhido: os filhos ficam escondidos (14 ícones
+                          // soltos do "Nina" não diriam nada ao usuário). O
+                          // ícone do grupo reabre o menu já com ele expandido.
+                          const subOpen = collapsed
+                            ? false
+                            : buscandoMenu
+                              ? true
+                              : (openGroups[subKey] ?? false);
+                          return (
+                            <div
+                              key={subKey}
+                              className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))}
+                              {...dragProps(row.label, navItemKey(item))}
+                            >
+                              {collapsed ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    expandirSidebar();
+                                    setOpenGroups((prev) => ({ ...prev, [subKey]: true }));
+                                  }}
+                                  title={`${item.label} — clique para expandir o menu`}
+                                  aria-label={`${item.label} (expandir menu)`}
+                                  className={`w-full flex justify-center rounded-lg py-2 transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10"}`}
+                                >
+                                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setOpenGroups((prev) => ({
+                                      ...prev,
+                                      [subKey]: !(prev[subKey] ?? false),
+                                    }));
+                                  }}
+                                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                  aria-expanded={subOpen}
+                                >
+                                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                  <span className={cn("flex-1 text-left", labelCls)}>
+                                    {item.label}
+                                  </span>
+                                  <ChevronDown
+                                    className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`}
+                                  />
+                                </button>
+                              )}
+                              {subOpen &&
+                                item.children.map((child) => {
+                                  const active = leafIsActive(child.to, child.hash);
+                                  const linkKey = `${child.to}#${child.hash ?? ""}`;
+                                  const openInNewTab = false;
+                                  const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+                                  if (openInNewTab) {
+                                    return (
+                                      <a
+                                        key={linkKey}
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={collapsed ? child.label : undefined}
+                                        data-nav-to={child.to}
+                                        className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                      >
+                                        <child.icon className="h-[18px] w-[18px] shrink-0" />
+                                        {!collapsed && (
+                                          <span className={labelCls}>{child.label}</span>
+                                        )}
+                                      </a>
+                                    );
+                                  }
                                   return (
                                     <a
                                       key={linkKey}
                                       href={href}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
                                       title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
-                                      className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                      data-nav-active={active ? "true" : undefined}
+                                      aria-current={uxMelhorias && active ? "page" : undefined}
+                                      onMouseEnter={() => preCarregar(child.to)}
+                                      onClick={(event) => {
+                                        if (
+                                          event.metaKey ||
+                                          event.ctrlKey ||
+                                          event.shiftKey ||
+                                          event.altKey ||
+                                          event.button !== 0
+                                        )
+                                          return;
+                                        event.preventDefault();
+                                        irPara(href);
+                                      }}
+                                      className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
+                                        active
+                                          ? "bg-white text-slate-900 shadow-sm"
+                                          : "text-white hover:bg-white/10 hover:text-white"
+                                      }${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-[18px] w-[18px] shrink-0" />
                                       {!collapsed && (
-                                        <span className="leading-snug break-words">
-                                          {child.label}
-                                        </span>
+                                        <span className={labelCls}>{child.label}</span>
                                       )}
                                     </a>
                                   );
-                                }
-                                return (
-                                  <a
-                                    key={linkKey}
-                                    href={href}
-                                    title={collapsed ? child.label : undefined}
-                                    data-nav-to={child.to}
-                                    data-nav-active={active ? "true" : undefined}
-                                    aria-current={uxMelhorias && active ? "page" : undefined}
-                                    onMouseEnter={() => preCarregar(child.to)}
-                                    onClick={(event) => {
-                                      if (
-                                        event.metaKey ||
-                                        event.ctrlKey ||
-                                        event.shiftKey ||
-                                        event.altKey ||
-                                        event.button !== 0
-                                      )
-                                        return;
-                                      event.preventDefault();
-                                      irPara(href);
-                                    }}
-                                    className={`relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
-                                      active
-                                        ? "bg-white text-slate-900 shadow-sm"
-                                        : "text-white hover:bg-white/10 hover:text-white"
-                                    }${hoverScaleCls}`}
-                                  >
-                                    <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                    {!collapsed && (
-                                      <span className="leading-snug break-words">
-                                        {child.label}
-                                      </span>
-                                    )}
-                                  </a>
-                                );
-                              })}
-                          </div>
+                                })}
+                            </div>
+                          );
+                        }
+                        const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
+                        const active =
+                          itemDeMenuAtivo(location.pathname, item.to) ||
+                          aliases.some((a) => itemDeMenuAtivo(location.pathname, a));
+                        const href = item.to;
+                        return (
+                          <a
+                            key={item.to}
+                            href={href}
+                            title={collapsed ? item.label : undefined}
+                            data-nav-to={item.to}
+                            data-nav-active={active ? "true" : undefined}
+                            aria-current={uxMelhorias && active ? "page" : undefined}
+                            onMouseEnter={() => preCarregar(item.to)}
+                            onClick={(event) => {
+                              if (
+                                event.metaKey ||
+                                event.ctrlKey ||
+                                event.shiftKey ||
+                                event.altKey ||
+                                event.button !== 0
+                              )
+                                return;
+                              event.preventDefault();
+                              irPara(href);
+                            }}
+                            {...dragProps(row.label, navItemKey(item))}
+                            className={cn(
+                              `relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
+                                active
+                                  ? "bg-white text-slate-900 shadow-sm"
+                                  : "text-white hover:bg-white/10 hover:text-white"
+                              }${hoverScaleCls}`,
+                              dragCls(navItemKey(item)),
+                            )}
+                          >
+                            <item.icon className="h-[18px] w-[18px] shrink-0" />
+                            {!collapsed && <span className={labelCls}>{item.label}</span>}
+                          </a>
                         );
-                      }
-                      const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
-                      const active =
-                        itemDeMenuAtivo(location.pathname, item.to) ||
-                        aliases.some((a) => itemDeMenuAtivo(location.pathname, a));
-                      const href = item.to;
-                      return (
-                        <a
-                          key={item.to}
-                          href={href}
-                          title={collapsed ? item.label : undefined}
-                          data-nav-to={item.to}
-                          data-nav-active={active ? "true" : undefined}
-                          aria-current={uxMelhorias && active ? "page" : undefined}
-                          onMouseEnter={() => preCarregar(item.to)}
-                          onClick={(event) => {
-                            if (
-                              event.metaKey ||
-                              event.ctrlKey ||
-                              event.shiftKey ||
-                              event.altKey ||
-                              event.button !== 0
-                            )
-                              return;
-                            event.preventDefault();
-                            irPara(href);
-                          }}
-                          {...dragProps(row.label, navItemKey(item))}
-                          className={cn(
-                            `relative flex items-center gap-2.5 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-[13px] font-medium tracking-tight transition-all ${
-                              active
-                                ? "bg-white text-slate-900 shadow-sm"
-                                : "text-white hover:bg-white/10 hover:text-white"
-                            }${hoverScaleCls}`,
-                            dragCls(navItemKey(item)),
-                          )}
-                        >
-                          <item.icon className="h-[18px] w-[18px] shrink-0" />
-                          {!collapsed && (
-                            <span className="leading-snug break-words">{item.label}</span>
-                          )}
-                        </a>
-                      );
-                    })}
-                </div>
-              );
-            })}
-          </nav>
-          <div
-            className={cn(
-              "shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20",
-              collapsed && "flex justify-center",
-            )}
-          >
-            <SidebarUserMenu
-              userId={user?.id}
-              userName={userName}
-              email={user?.email}
-              initial={initial}
-              color={clinicColor}
-              showName={!collapsed}
-              onChangePassword={() => setPwOpen(true)}
-              onSignOut={() => void handleSignOut()}
-              onSwitchPortal={() => abrirSeletorPortais()}
-            />
-          </div>
-        </aside>
-      )}
-
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
-        {!isChooser && (
-          <header className="sticky top-0 z-30 h-14 bg-white text-slate-700 border-b border-slate-200 flex items-center justify-between gap-2 px-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-6">
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
-              {!isChooser && (
-                <button
-                  type="button"
-                  onClick={() => setMobileNavOpen(true)}
-                  className="lg:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
-                  aria-label="Abrir menu"
-                  title="Menu"
-                >
-                  <MenuIcon className="h-5 w-5" />
-                </button>
+                      })}
+                  </div>
+                );
+              })}
+            </nav>
+            <div
+              className={cn(
+                "shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20",
+                collapsed && "flex justify-center",
               )}
-              <Link
-                to="/app"
-                className="lg:hidden flex items-center gap-2 min-w-0 shrink-0"
-                title="ClinicaOS"
-              >
-                <Activity className="h-5 w-5 shrink-0 text-slate-800" />
-              </Link>
-              {!isChooser && (
-                <button
-                  type="button"
-                  onClick={() => abrirSeletorPortais()}
-                  className="lg:hidden inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-800 shrink-0"
-                  title="Trocar de portal"
-                >
-                  <LayoutGrid className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline truncate max-w-[140px]">
-                    {subsystemLabel ?? "Portais"}
-                  </span>
-                </button>
-              )}
+            >
+              <SidebarUserMenu
+                userId={user?.id}
+                userName={userName}
+                email={user?.email}
+                initial={initial}
+                color={clinicColor}
+                showName={!collapsed}
+                onChangePassword={() => setPwOpen(true)}
+                onSignOut={() => void handleSignOut()}
+                onSwitchPortal={() => abrirSeletorPortais()}
+              />
             </div>
-
-            <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
-              {clinicaAtual && (
-                <img
-                  src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
-                  alt={clinicaAtual.clinica.nome}
-                  className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
-                />
-              )}
-              {memberships.length > 0 && (
-                <Select
-                  value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
-                  onValueChange={(v) => {
-                    if (v === "__todas__") setModoTodas(true);
-                    else setClinicaAtual(v);
-                  }}
-                >
-                  <SelectTrigger className="max-w-[180px] sm:max-w-sm w-auto min-w-0 h-9 px-2.5 text-xs font-semibold truncate shrink rounded-lg border-0 bg-slate-100 text-slate-800 shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-slate-200 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:ml-1.5 [&>span]:truncate [&>span]:min-w-0">
-                    <SelectValue placeholder="Selecione a clínica" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {memberships.length > 1 && (
-                      <SelectItem value="__todas__">
-                        <span className="flex items-center gap-2">
-                          <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                          Todas as clínicas
-                        </span>
-                      </SelectItem>
-                    )}
-                    {memberships.map((m) => (
-                      <SelectItem key={m.clinica_id} value={m.clinica_id}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: corDaClinica(m.clinica.nome) }}
-                          />
-                          {m.clinica.nome} {m.clinica.cidade ? `— ${m.clinica.cidade}` : ""}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-1.5 min-w-0">
-              <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
-                <UniversalSearchBar />
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden sm:inline-flex h-9 w-9 p-0 rounded-full text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                title="Atalhos de teclado (?)"
-                onClick={() => {
-                  window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
-                }}
-              >
-                <span className="text-base font-semibold">?</span>
-              </Button>
-              <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
-                <EstornosBell />
-                <TTSToggle />
-              </div>
-            </div>
-          </header>
+          </aside>
         )}
-        <main
-          key={uxMelhorias ? location.pathname : "static"}
-          className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
-            isChooser
-              ? "p-0 w-full"
-              : cn(
-                  "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
-                  // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
-                  uxMelhorias ? "pb-28 sm:pb-28 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
-                ),
-            uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
-          )}
-          style={{ background: "var(--surface-cream)" }}
-        >
-          {guardedOutlet}
-        </main>
+
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          <main
+            key={uxMelhorias ? location.pathname : "static"}
+            className={cn(
+              "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
+              isChooser
+                ? "p-0 w-full"
+                : cn(
+                    "px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2",
+                    // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
+                    uxMelhorias ? "pb-28 sm:pb-28 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
+                  ),
+              uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
+            )}
+            style={{ background: "var(--surface-cream)" }}
+          >
+            {guardedOutlet}
+          </main>
+        </div>
       </div>
       {pwOpen && (
         <Suspense fallback={null}>
