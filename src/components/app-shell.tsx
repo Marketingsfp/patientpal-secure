@@ -1090,7 +1090,7 @@ function AppShellInner() {
             <button
               type="button"
               onClick={alternarSidebar}
-              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+              className="h-9 w-9 -ml-1 rounded-md flex items-center justify-center text-slate-700 hover:text-slate-900 hover:bg-slate-100 shrink-0 transition-colors duration-200"
               aria-label={sidebarAberta ? "Fechar menu lateral" : "Abrir menu lateral"}
               aria-expanded={sidebarAberta}
               aria-controls="menu-lateral"
@@ -1205,9 +1205,13 @@ function AppShellInner() {
               // da largura.
               "fixed inset-y-0 left-0 z-50 w-60 2xl:w-64 max-w-[85vw]",
               "flex flex-col text-white overflow-hidden border-r border-white/10 shadow-2xl",
-              // `visibility` entra no transition para tirar a gaveta fechada
-              // da ordem do Tab sem cortar a animação de saída.
-              "transition-[transform,visibility] duration-300 ease-in-out motion-reduce:transition-none",
+              // Deslize longo (500ms) com ease-out: entra rápido e desacelera
+              // até parar, em vez de estancar de uma vez. `will-change` manda
+              // o navegador preparar a camada antes, evitando engasgo no
+              // primeiro quadro. `visibility` acompanha o transition para a
+              // gaveta fechada sair da ordem do Tab sem cortar a saída.
+              "transform will-change-transform",
+              "transition-[transform,visibility] duration-500 ease-out motion-reduce:transition-none",
               sidebarAberta ? "visible translate-x-0" : "invisible -translate-x-full",
             )}
             style={{ backgroundColor: corSidebar }}
@@ -1221,7 +1225,7 @@ function AppShellInner() {
               <button
                 type="button"
                 onClick={fecharSidebar}
-                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors duration-200 cursor-pointer"
                 aria-label="Fechar menu lateral"
                 title="Fechar menu (Esc)"
               >
