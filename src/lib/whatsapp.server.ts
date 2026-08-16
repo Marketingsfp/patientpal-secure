@@ -140,6 +140,57 @@ export async function metaSendText(
 
 /**
  * Decide se estamos DENTRO do horário de atendimento humano.
+ */
+export async function metaSendTemplate(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  templateName: string,
+  language: string,
+  bodyParams: string[] = [],
+): Promise<{ wa_message_id: string | null }> {
+  const components =
+    bodyParams.length > 0
+      ? [
+          {
+            type: "body",
+            parameters: bodyParams.map((t) => ({ type: "text", text: t.slice(0, 400) })),
+          },
+        ]
+      : undefined;
+  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: language },
+        ...(components ? { components } : {}),
+      },
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const metaErr = (json as any)?.error ?? {};
+    const msg = metaErr.message ?? `HTTP ${res.status}`;
+    if (res.status === 401 || metaErr.code === 190) {
+      throw new Error(
+        "Token do WhatsApp inválido ou expirado. Gere um novo Access Token e salve em Configuração.",
+      );
+    }
+    throw new Error(`WhatsApp: ${msg}`);
+  }
+  return { wa_message_id: (json as any)?.messages?.[0]?.id ?? null };
+}
+
+/**
  * Compara hora atual de São Paulo com horario_inicio/fim configurados.
  */
 export function dentroHorarioAtendimento(cfg: WhatsAppConfigRow, now: Date = new Date()): boolean {
