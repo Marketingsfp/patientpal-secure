@@ -76,6 +76,12 @@ function EditarFuncionarioPage() {
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [membershipRole, setMembershipRole] = useState<string>("recepcao");
   const [membershipAtivo, setMembershipAtivo] = useState<boolean>(true);
+  // Valores como estão gravados no banco: servem para saber se o usuário mexeu
+  // no perfil/situação e precisamos salvá-los junto com o botão "Salvar" do rodapé.
+  const [membershipSalvo, setMembershipSalvo] = useState<{ role: string; ativo: boolean }>({
+    role: "recepcao",
+    ativo: true,
+  });
   const [loginEmail, setLoginEmail] = useState<string | null>(null);
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -199,9 +205,12 @@ function EditarFuncionarioPage() {
                 () => ({ email: null as string | null }),
               ),
             ]);
+            const roleAtual = (mem.data?.role as string | undefined) ?? "recepcao";
+            const ativoAtual = (mem.data?.ativo as boolean | undefined) ?? true;
             setMembershipId((mem.data?.id as string | undefined) ?? null);
-            setMembershipRole((mem.data?.role as string | undefined) ?? "recepcao");
-            setMembershipAtivo((mem.data?.ativo as boolean | undefined) ?? true);
+            setMembershipRole(roleAtual);
+            setMembershipAtivo(ativoAtual);
+            setMembershipSalvo({ role: roleAtual, ativo: ativoAtual });
             setLoginEmail((emailRes as { email?: string | null })?.email ?? null);
           } else {
             // Contrato sem login: lista memberships que ainda não foram
@@ -336,11 +345,38 @@ function EditarFuncionarioPage() {
     const { error } = isNovo
       ? await supabase.from("hr_contratos").insert(payload)
       : await supabase.from("hr_contratos").update(payload).eq("id", id);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       mostrarErro(error);
       return;
     }
+
+    // O perfil de acesso e a situação ficam na aba "Acesso ao sistema" e são
+    // gravados numa tabela diferente (clinica_memberships). Sem isto, escolher
+    // "Caixa" e clicar em "Salvar" no rodapé descartava a escolha em silêncio.
+    const acessoMudou =
+      !!membershipId &&
+      (membershipRole !== membershipSalvo.role || membershipAtivo !== membershipSalvo.ativo);
+    if (acessoMudou) {
+      try {
+        await editarMembroFn({
+          data: {
+            clinicaId: form.clinica_id,
+            membershipId: membershipId!,
+            role: membershipRole as "recepcao",
+            ativo: membershipAtivo,
+          },
+        });
+        setMembershipSalvo({ role: membershipRole, ativo: membershipAtivo });
+      } catch (e) {
+        setSaving(false);
+        toast.error("Dados salvos, mas o perfil de acesso não pôde ser alterado.");
+        mostrarErro(e as { message: string });
+        return;
+      }
+    }
+
+    setSaving(false);
     toast.success(isNovo ? "Funcionário cadastrado" : "Funcionário atualizado");
     void navigate({ to: "/app/hr-contratos" });
   }
@@ -357,6 +393,7 @@ function EditarFuncionarioPage() {
           ativo: membershipAtivo,
         },
       });
+      setMembershipSalvo({ role: membershipRole, ativo: membershipAtivo });
       toast.success("Acesso atualizado");
     } catch (e) {
       mostrarErro(e as { message: string });
