@@ -139,7 +139,7 @@ export async function metaSendText(
 }
 
 /**
- * Decide se estamos DENTRO do horário de atendimento humano.
+ * Envia um template aprovado (HSM) — funciona fora da janela de 24h.
  */
 export async function metaSendTemplate(
   phoneNumberId: string,
