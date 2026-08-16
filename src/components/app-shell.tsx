@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -640,9 +641,18 @@ function AppShellInner() {
         .catch(() => {});
     }
   };
-  // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
-  // aberta pelo botão hamburguer do cabeçalho (drawer).
-  const collapsed = false;
+  // Desktop: a sidebar pode ficar recolhida (só ícones) para sobrar área de
+  // trabalho. A escolha é lembrada entre sessões. Em telas menores ela some e
+  // é aberta pelo botão hamburguer do cabeçalho (drawer).
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("appshell:sidebarCollapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("appshell:sidebarCollapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
   // Busca dentro do menu lateral: input que abre/fecha pela lupa e filtra
   // os itens (e sub-itens) conforme o usuário digita.
   const [buscaMenuAberta, setBuscaMenuAberta] = useState(false);
@@ -660,6 +670,38 @@ function AppShellInner() {
     });
     return () => cancelAnimationFrame(id);
   }, [buscaMenuAberta]);
+
+  // Recolher/expandir o menu. Ao recolher, fecha a busca do menu junto: o
+  // campo de texto não cabe na faixa estreita de ícones.
+  const alternarSidebar = useCallback(() => {
+    setCollapsed((v) => {
+      if (!v) {
+        setBuscaMenuAberta(false);
+        setBuscaMenu("");
+      }
+      return !v;
+    });
+  }, []);
+
+  // Ctrl+B (ou ⌘B) alterna o menu, padrão da maioria dos editores. Ignorado
+  // enquanto o usuário digita, para não atrapalhar campos de texto.
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "b") return;
+      const alvo = e.target as HTMLElement | null;
+      if (
+        alvo &&
+        (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      alternarSidebar();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [alternarSidebar]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -1104,26 +1146,46 @@ function AppShellInner() {
     >
       {!isChooser && (
         <aside
+          id="menu-lateral"
           className={cn(
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col border-r border-white/10",
             "relative z-40",
+            "transition-[width] duration-200 ease-out motion-reduce:transition-none",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
             collapsed ? "w-16" : "w-60 2xl:w-64",
           )}
           style={{ backgroundColor: corSidebar }}
         >
           <div className="shrink-0 w-full h-14 border-b border-white/10">
-            <div className="flex h-full w-full items-center gap-1.5 px-4 min-w-0">
-              <div
-                className="flex min-w-0 items-center gap-1.5 cursor-default select-none"
-                title="ClinicaOS"
+            <div
+              className={cn(
+                "flex h-full w-full items-center min-w-0",
+                collapsed ? "justify-center px-2" : "gap-1.5 px-4",
+              )}
+            >
+              <button
+                type="button"
+                onClick={alternarSidebar}
+                className="shrink-0 p-1.5 rounded-lg flex items-center justify-center text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+                aria-expanded={!collapsed}
+                aria-controls="menu-lateral"
+                title={collapsed ? "Expandir menu (Ctrl+B)" : "Recolher menu (Ctrl+B)"}
               >
-                <Activity className="h-4 w-4 shrink-0 text-white" />
-                <span className="truncate text-sm font-bold tracking-tight text-white">
-                  ClinicaOS
-                </span>
-              </div>
-              {!isChooser && (
+                <MenuIcon className="h-4 w-4" />
+              </button>
+              {!collapsed && (
+                <div
+                  className="flex min-w-0 items-center gap-1.5 cursor-default select-none"
+                  title="ClinicaOS"
+                >
+                  <Activity className="h-4 w-4 shrink-0 text-white" />
+                  <span className="truncate text-sm font-bold tracking-tight text-white">
+                    ClinicaOS
+                  </span>
+                </div>
+              )}
+              {!collapsed && !isChooser && (
                 <button
                   type="button"
                   onClick={() => abrirSeletorPortais()}
@@ -1134,24 +1196,26 @@ function AppShellInner() {
                   <span className="whitespace-nowrap">Portal</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setBuscaMenuAberta((v) => {
-                    if (v) setBuscaMenu("");
-                    return !v;
-                  });
-                }}
-                className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
-                aria-expanded={buscaMenuAberta}
-                title="Buscar no menu"
-              >
-                {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-              </button>
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBuscaMenuAberta((v) => {
+                      if (v) setBuscaMenu("");
+                      return !v;
+                    });
+                  }}
+                  className="ml-auto shrink-0 p-1 rounded-lg flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
+                  aria-expanded={buscaMenuAberta}
+                  title="Buscar no menu"
+                >
+                  {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                </button>
+              )}
             </div>
           </div>
-          <div className="px-3">
+          <div className={cn("px-3", collapsed && "hidden")}>
             <div
               className={cn(
                 "grid transition-all duration-200 ease-out motion-reduce:transition-none",
@@ -1209,7 +1273,16 @@ function AppShellInner() {
               const open =
                 collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
               return (
-                <div key={row.label} className={cn("space-y-1")}>
+                <div
+                  key={row.label}
+                  // Recolhido não há título de seção; um filete separa os
+                  // grupos para a lista de ícones não virar um bloco só.
+                  className={cn(
+                    "space-y-1",
+                    collapsed && "border-t border-white/10 pt-3 first:border-t-0 first:pt-0",
+                  )}
+                  title={collapsed ? row.label : undefined}
+                >
                   {!collapsed && !hideLabel && (
                     <button
                       type="button"
@@ -1235,8 +1308,14 @@ function AppShellInner() {
                       if (isParent(item)) {
                         const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                         const subKey = `${row.label}::${item.label}`;
-                        const subOpen =
-                          collapsed || buscandoMenu ? true : (openGroups[subKey] ?? false);
+                        // Recolhido: os filhos ficam escondidos (14 ícones
+                        // soltos do "Nina" não diriam nada ao usuário). O
+                        // ícone do grupo reabre o menu já com ele expandido.
+                        const subOpen = collapsed
+                          ? false
+                          : buscandoMenu
+                            ? true
+                            : (openGroups[subKey] ?? false);
                         return (
                           <div
                             key={subKey}
@@ -1244,9 +1323,18 @@ function AppShellInner() {
                             {...dragProps(row.label, navItemKey(item))}
                           >
                             {collapsed ? (
-                              <div className="flex justify-center py-2" title={item.label}>
-                                <item.icon className="h-[18px] w-[18px] shrink-0 opacity-80" />
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCollapsed(false);
+                                  setOpenGroups((prev) => ({ ...prev, [subKey]: true }));
+                                }}
+                                title={`${item.label} — clique para expandir o menu`}
+                                aria-label={`${item.label} (expandir menu)`}
+                                className={`w-full flex justify-center rounded-lg py-2 transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10"}`}
+                              >
+                                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -1382,14 +1470,19 @@ function AppShellInner() {
               );
             })}
           </nav>
-          <div className="shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20">
+          <div
+            className={cn(
+              "shrink-0 px-2 py-2 border-t border-white/15 border-r border-r-white/20",
+              collapsed && "flex justify-center",
+            )}
+          >
             <SidebarUserMenu
               userId={user?.id}
               userName={userName}
               email={user?.email}
               initial={initial}
               color={clinicColor}
-              showName
+              showName={!collapsed}
               onChangePassword={() => setPwOpen(true)}
               onSignOut={() => void handleSignOut()}
               onSwitchPortal={() => abrirSeletorPortais()}

@@ -211,6 +211,7 @@ function ShortcutsHelpDialog({
       {
         title: "Menu lateral",
         items: [
+          { keys: ["Ctrl", "B"], desc: "Recolher / expandir o menu lateral" },
           { keys: ["Alt", "1–9"], desc: "Ir para os 9 primeiros itens do menu" },
           { keys: ["↑", "↓"], desc: "Navegar entre itens (com foco na sidebar)" },
         ],
