@@ -483,6 +483,12 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             icon: FileText,
           },
           { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+          {
+            to: "/app/nina",
+            hash: "homologacao",
+            label: "Homologação (envio de testes)",
+            icon: FlaskConical,
+          },
         ],
       },
       { to: "/app/odontologia", label: "Odontologia", icon: Tooth },
