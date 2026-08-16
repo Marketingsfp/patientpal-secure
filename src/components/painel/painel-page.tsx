@@ -21,12 +21,6 @@ type Senha = {
   chamada_em: string | null;
   paciente_id?: string | null;
   paciente_nome?: string | null;
-  /**
-   * Só chega preenchido depois da migration que faz
-   * `painel_senhas_publicas` devolver o procedimento do dia. Enquanto não
-   * existir, o anúncio simplesmente omite este bloco.
-   */
-  procedimento?: string | null;
 };
 
 export function PainelPage() {
@@ -346,12 +340,17 @@ export function PainelPage() {
   }
 
   /**
-   * Monta o texto do anúncio em blocos separados por vírgula e terminados em
-   * ponto. A pontuação é o que faz a voz do navegador pausar entre as
-   * informações — sem ela, tudo sai numa tirada só e o paciente não entende.
+   * Monta o texto do anúncio: "{Nome completo}. {Guichê/Consultório}."
    *
-   * Formato: "{Nome}, {Guichê/Consultório}, {Procedimento}."
-   * Cada bloco só entra se existir; sem nome de paciente, cai para a senha.
+   * O separador é PONTO, não vírgula: o ponto produz uma pausa bem mais longa
+   * na voz do navegador, que é o que dá tempo do paciente ouvir o nome antes
+   * de vir o local.
+   *
+   * Procedimento e exame não entram aqui de propósito — o painel fica numa TV
+   * virada para a sala de espera e isso é dado de saúde (LGPD, art. 11).
+   * Se precisar aparecer, que seja escrito na tela, nunca falado.
+   *
+   * Sem nome de paciente (fila de balcão), cai para a senha.
    */
   function textoDaSenha(s: Senha) {
     const partes: string[] = [];
@@ -369,9 +368,8 @@ export function PainelPage() {
     }
 
     if (s.guiche) partes.push(rotuloLocal(s.guiche));
-    if (s.procedimento) partes.push(s.procedimento);
 
-    return `${partes.join(", ")}.`;
+    return `${partes.join(". ")}.`;
   }
 
   // Processa a fila de anúncios: só chama a próxima senha depois que a

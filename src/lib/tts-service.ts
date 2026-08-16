@@ -61,7 +61,9 @@ export interface ClinicaTtsConfig {
 export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
   if (typeof window === "undefined") return;
   if (typeof cfg.rate === "number" && Number.isFinite(cfg.rate)) {
-    const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, cfg.rate));
+    // Normaliza aqui também: este é o caminho por onde o valor da clínica
+    // chega do banco, e é onde uma porcentagem gravada por fora entraria.
+    const clamped = normalizarRate(cfg.rate);
     window.localStorage.setItem(RATE_STORAGE_KEY, String(clamped));
     if (currentAudio) {
       try {
@@ -157,12 +159,30 @@ function emitTtsChanged() {
   }
 }
 
+/**
+ * Converte o número para o formato que os motores esperam: uma FRAÇÃO, onde
+ * 1 é a velocidade natural.
+ *
+ * A tela grava fração (o slider já faz `valor / 100` antes de salvar), mas um
+ * valor em porcentagem pode entrar por fora — alguém editando a tabela
+ * `clinica_tts_config` na mão, ou uma integração futura gravando 85 em vez de
+ * 0.85. Sem esta guarda, 85 seria apenas cortado no teto (1.5) e a chamada
+ * sairia acelerada sem ninguém entender por quê.
+ *
+ * Por isso: qualquer valor acima do teto é interpretado como porcentagem e
+ * dividido por 100. Depois disso, o clamp normal se aplica.
+ */
+function normalizarRate(n: number): number {
+  const emFracao = n > MAX_TTS_RATE ? n / 100 : n;
+  return Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, emFracao));
+}
+
 export function getUserTtsRate(): number {
   if (typeof window === "undefined") return DEFAULT_TTS_RATE;
   const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
   const n = raw ? Number(raw) : NaN;
   if (!Number.isFinite(n)) return DEFAULT_TTS_RATE;
-  return Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, n));
+  return normalizarRate(n);
 }
 
 /** True se existe uma velocidade gravada (por este navegador ou pela clínica). */
@@ -183,7 +203,7 @@ export function getNativeTtsRate(): number {
 
 export function setUserTtsRate(rate: number) {
   if (typeof window === "undefined") return;
-  const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, rate));
+  const clamped = normalizarRate(rate);
   window.localStorage.setItem(RATE_STORAGE_KEY, String(clamped));
   // Aplica ao áudio em reprodução, se houver, para refletir em tempo real.
   if (currentAudio) {
