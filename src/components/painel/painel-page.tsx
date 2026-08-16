@@ -10,6 +10,7 @@ import {
   resolveBrowserVoice,
   usuarioPreferePiper,
   usuarioPrefereVozDoNavegador,
+  temVozPtBrInstalada,
 } from "@/lib/tts-service";
 type Senha = {
   id: string;
@@ -353,9 +354,12 @@ export function PainelPage() {
     //   voz do navegador → nunca usa o Piper;
     //   "Servidor Piper" → usa o Piper em qualquer clínica;
     //   automático       → comportamento histórico (Piper só na Menino Jesus).
+    // Sem nenhuma voz pt-BR instalada, a fala nativa sairia com sotaque
+    // americano: nesse caso o Piper é preferível mesmo fora da Menino Jesus.
+    const semVozPtBr = !temVozPtBrInstalada();
     const piperPermitido = usuarioPrefereVozDoNavegador()
       ? false
-      : usuarioPreferePiper() || nomeClinica.includes("menino jesus");
+      : usuarioPreferePiper() || nomeClinica.includes("menino jesus") || semVozPtBr;
     const usarPiper =
       piperPermitido && isUserTtsEnabled() && Date.now() > piperBloqueadoAteRef.current;
     if (usarPiper) {
@@ -405,6 +409,16 @@ export function PainelPage() {
     function fallbackSpeechSynth() {
       falandoRef.current = true;
       const item = prox!;
+      // Diagnóstico: sem voz pt-BR instalada a chamada sai com sotaque
+      // americano e não há correção possível no código — o pacote de voz em
+      // português precisa ser instalado NESTA máquina (ou usar o Piper).
+      // Não mostramos aviso na tela porque o painel fica visível ao paciente.
+      if (!temVozPtBrInstalada()) {
+        console.warn(
+          "[painel] Nenhuma voz pt-BR instalada neste computador: a chamada usará a voz padrão do sistema. " +
+            "Instale um pacote de voz em português no Windows ou selecione 'Usar Servidor Piper' em Configurações → Voz & Áudio.",
+        );
+      }
       try {
         window.speechSynthesis.cancel();
       } catch {

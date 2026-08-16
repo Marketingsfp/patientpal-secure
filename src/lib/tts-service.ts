@@ -204,6 +204,18 @@ export function listBrowserVoices(): { vozes: SpeechSynthesisVoice[]; temPtBr: b
   return ptBr.length ? { vozes: ptBr, temPtBr: true } : { vozes: todas, temPtBr: false };
 }
 
+/**
+ * True se existe ao menos uma voz pt-BR instalada NESTE navegador.
+ *
+ * Importa porque, sem nenhuma, não há o que atribuir a `utterance.voice`: o
+ * navegador usa a voz padrão do sistema operacional e o português sai com
+ * sotaque americano. Nesse caso é melhor falar pelo Piper do que falar errado.
+ */
+export function temVozPtBrInstalada(): boolean {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+  return window.speechSynthesis.getVoices().some(ehPtBr);
+}
+
 /** Heurística histórica: prefere uma voz feminina pt-BR entre as disponíveis. */
 function escolherVozPtBrPadrao(todas: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const ptBR = todas.filter(ehPtBr);
