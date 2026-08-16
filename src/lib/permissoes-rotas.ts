@@ -21,7 +21,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/caixa": "caixa",
   "/app/chat": "chat",
   "/app/clientes": "clientes",
-  "/app/clientes/duplicados": "clientes",
+  // Módulo próprio (e não "clientes"): mesclar cadastros é uma ação
+  // destrutiva e de gestão, então precisa poder ser escondida de perfis
+  // que têm acesso normal à lista de clientes (ex.: Caixa).
+  "/app/clientes/duplicados": "clientes-duplicados",
   // O sidebar rotula esta rota "Dashboard" (LayoutDashboard) e ela é a
   // página de indicadores — nada a ver com o módulo "painel" (Painel de
   // Senhas, painel público de chamadas em src/routes/painel.tsx, fora da

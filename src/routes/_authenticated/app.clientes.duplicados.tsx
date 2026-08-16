@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Merge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -81,6 +82,8 @@ function formatChave(g: Grupo): string {
 
 function DuplicadosPage() {
   const { clinicaIds } = useClinica();
+  // "Leitura" no módulo mostra a conferência; só "Edição" libera mesclar.
+  const podeMesclar = usePodeEscrever("clientes-duplicados");
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(false);
   const [tipo, setTipo] = useState<"" | Grupo["tipo"]>("");
@@ -178,6 +181,10 @@ function DuplicadosPage() {
   const [cienteConflito, setCienteConflito] = useState(false);
 
   const executarMerge = async () => {
+    if (!podeMesclar) {
+      toast.error("Você não tem permissão para mesclar cadastros.");
+      return;
+    }
     if (!vencedorPrevisto || selecionadosAtuais.length < 2) return;
     if (conflitos.length > 0 && !cienteConflito) {
       toast.error("Confirme que está ciente das diferenças antes de mesclar.");
@@ -248,7 +255,8 @@ function DuplicadosPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={(sel[groupKey(g, i)]?.size ?? 0) < 2}
+                  disabled={!podeMesclar || (sel[groupKey(g, i)]?.size ?? 0) < 2}
+                  title={podeMesclar ? undefined : "Seu perfil tem acesso somente de leitura aqui."}
                   onClick={() => setConfirmKey(groupKey(g, i))}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >

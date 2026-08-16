@@ -193,6 +193,12 @@ const GRUPOS_BASE: Grupo[] = [
     label: "Cadastros",
     modulos: [
       { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
+      {
+        key: "clientes-duplicados",
+        nome: "Duplicados / Merge",
+        descricao:
+          "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
+      },
       { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
       {
         key: "especialidades",

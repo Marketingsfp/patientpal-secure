@@ -48,6 +48,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "mkt-segmentos",
   // Cadastros
   "equipe",
+  "clientes-duplicados",
   "especialidades",
   "disponibilidades",
   "prontuario-modelos",
@@ -114,6 +115,9 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     especialidades: "read",
     procedimentos: "read",
     disponibilidades: "write",
+    // Só "read": a mesclagem em si é restrita a administradores pela função
+    // merge_pacientes no banco, então dar "write" aqui só geraria erro.
+    "clientes-duplicados": "read",
     "prontuario-modelos": "read",
     "modelos-documentos": "read",
     planos: "read",
@@ -149,6 +153,9 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     agenda: "write",
     recepcao: "write",
     clientes: "write",
+    // Enxerga a lista de possíveis duplicados para corrigir os cadastros,
+    // mas sem o botão de mesclar (só "Leitura").
+    "clientes-duplicados": "read",
     fluxo: "write",
     orcamentos: "write",
     "consulta-rapida": "read",
