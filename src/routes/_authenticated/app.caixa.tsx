@@ -389,6 +389,30 @@ const TIPO_CLASS: Record<MovTipo, string> = {
     "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
+/**
+ * Versão suavizada de TIPO_CLASS para a tabela do modal "Sessão de caixa".
+ *
+ * Ali a badge é só um rótulo de categoria: quem carrega a informação é o valor,
+ * à direita. Fundo saturado em toda linha competia com ele e deixava a tabela
+ * pesada. Mantém o mesmo matiz de TIPO_CLASS para não reeducar o olho de quem
+ * já usa as outras telas — só baixa a intensidade do fundo e da borda.
+ */
+const TIPO_CLASS_SUAVE: Record<MovTipo, string> = {
+  abertura: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300",
+  suprimento:
+    "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300",
+  recebimento:
+    "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300",
+  sangria: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300",
+  despesa: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300",
+  fechamento:
+    "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/50 dark:text-slate-300",
+  estorno:
+    "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:text-fuchsia-300",
+  reabertura:
+    "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300",
+};
+
 const SESSAO_FIELDS =
   "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
 const MOV_FIELDS =
@@ -5095,7 +5119,7 @@ function Page() {
             )}
           </DialogHeader>
           {openDetalhe && (
-            <div className="space-y-3">
+            <div className="space-y-5">
               {(() => {
                 const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
@@ -5126,81 +5150,129 @@ function Page() {
                 const qtdRecebLiquido = Math.max(0, qtdReceb - qtdEstornoReceb);
                 const diff = Number(openDetalhe.diferenca || 0);
                 const media = qtdRecebLiquido > 0 ? recebLiquido / qtdRecebLiquido : 0;
+                const sessaoAberta = openDetalhe.status !== "fechado";
+                // Saldo líquido em tempo real da sessão: abertura + recebimentos
+                // + suprimentos − sangrias − despesas − estornos. Usa TIPO_SINAL
+                // sobre todos os movimentos carregados (verDetalhe busca a sessão
+                // inteira, sem paginar), então bate com a tabela abaixo.
+                //
+                // Numa sessão aberta as colunas valor_fechamento_* ainda estão
+                // nulas no banco — elas só são gravadas no fechamento. Ler o
+                // "Calculado" direto dali fazia a barra nascer em R$ 0,00 mesmo
+                // com recebimentos na tela. Sessão fechada continua mostrando o
+                // valor gravado, que é o registro de auditoria daquele
+                // fechamento e não deve ser recalculado.
+                const saldoLiquido = Number(
+                  detalheMovs
+                    .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0)
+                    .toFixed(2),
+                );
+                const cards = [
+                  {
+                    key: "abertura",
+                    label: "Abertura",
+                    valor: fmt(openDetalhe.valor_abertura),
+                    cls: "text-slate-700 dark:text-slate-200",
+                  },
+                  {
+                    key: "recebimentos",
+                    label: "Recebimentos",
+                    valor: fmt(recebLiquido),
+                    cls: "text-emerald-700 dark:text-emerald-400",
+                    nota: `${qtdRecebLiquido} lançamento${qtdRecebLiquido === 1 ? "" : "s"}${
+                      qtdEstornoReceb > 0
+                        ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}`
+                        : ""
+                    }`,
+                  },
+                  {
+                    key: "sangrias",
+                    label: "Sangrias",
+                    valor: tot.sangria > 0.005 ? `- ${fmt(tot.sangria)}` : fmt(0),
+                    cls: tot.sangria > 0.005 ? "text-rose-700 dark:text-rose-400" : "",
+                  },
+                  {
+                    key: "media",
+                    label: "Média / atendimento",
+                    valor: fmt(media),
+                    cls: "text-slate-700 dark:text-slate-200",
+                    nota: `${qtdRecebLiquido} atendimento${qtdRecebLiquido === 1 ? "" : "s"}`,
+                  },
+                  {
+                    key: "estornos",
+                    label: "Estornos",
+                    valor: tot.estorno > 0.005 ? `- ${fmt(tot.estorno)}` : fmt(0),
+                    cls: tot.estorno > 0.005 ? "text-rose-700 dark:text-rose-400" : "",
+                  },
+                ];
                 return (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                      <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Abertura
-                        </p>
-                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">
-                          {fmt(openDetalhe.valor_abertura)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Recebimentos
-                        </p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">
-                          {fmt(recebLiquido)}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {qtdRecebLiquido} lançamento{qtdRecebLiquido === 1 ? "" : "s"}
-                          {qtdEstornoReceb > 0
-                            ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Sangrias
-                        </p>
-                        <p className="text-base font-bold text-amber-700 dark:text-amber-400">
-                          {fmt(tot.sangria)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Média / atendimento
-                        </p>
-                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">
-                          {fmt(media)}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Estornos
-                        </p>
-                        <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">
-                          {fmt(tot.estorno)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm rounded-lg border bg-muted/30 p-3">
-                      <div>
-                        <span className="text-muted-foreground">Calculado:</span>{" "}
-                        <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Informado:</span>{" "}
-                        <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Diferença:</span>{" "}
-                        <strong
-                          className={diff < 0 ? "text-rose-600" : diff > 0 ? "text-amber-600" : ""}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {cards.map((c) => (
+                        <div
+                          key={c.key}
+                          className="rounded-lg border bg-card shadow-sm p-3.5 space-y-1"
                         >
-                          {fmt(diff)}
-                        </strong>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {c.label}
+                          </p>
+                          <p className={`text-base font-bold tabular-nums ${c.cls}`}>{c.valor}</p>
+                          {c.nota && <p className="text-[11px] text-muted-foreground">{c.nota}</p>}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 px-4 py-3.5">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {sessaoAberta ? "Saldo atual (em tempo real)" : "Calculado"}
+                          </p>
+                          <p className="text-lg font-bold tabular-nums">
+                            {fmt(
+                              sessaoAberta
+                                ? saldoLiquido
+                                : Number(openDetalhe.valor_fechamento_calculado || 0),
+                            )}
+                          </p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Informado
+                          </p>
+                          <p className="text-lg font-bold tabular-nums">
+                            {sessaoAberta ? "—" : fmt(openDetalhe.valor_fechamento_informado)}
+                          </p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Diferença
+                          </p>
+                          <p
+                            className={`text-lg font-bold tabular-nums ${
+                              sessaoAberta
+                                ? ""
+                                : diff < 0
+                                  ? "text-rose-600"
+                                  : diff > 0
+                                    ? "text-amber-600"
+                                    : ""
+                            }`}
+                          >
+                            {sessaoAberta ? "—" : fmt(diff)}
+                          </p>
+                        </div>
                       </div>
+                      {sessaoAberta && (
+                        <p className="text-[11px] text-muted-foreground mt-2.5">
+                          Sessão em andamento: nada foi conferido ainda, então Informado e Diferença
+                          só existem depois do fechamento.
+                        </p>
+                      )}
                     </div>
                   </>
                 );
               })()}
-              <div className="max-h-[400px] overflow-auto">
+              <div className="max-h-[400px] overflow-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -5210,7 +5282,7 @@ function Page() {
                       <TableHead>Descrição</TableHead>
                       <TableHead>Forma</TableHead>
                       <TableHead>Usuário</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right tabular-nums">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -5236,7 +5308,7 @@ function Page() {
                             </TableCell>
                             <TableCell>
                               {idx === 0 ? (
-                                <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
                                   {TIPO_LABEL[m.tipo]}
                                 </Badge>
                               ) : null}
@@ -5255,7 +5327,7 @@ function Page() {
                               {idx === 0 ? usuarioNomeFor(m) : ""}
                             </TableCell>
                             <TableCell
-                              className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                              className={`text-right tabular-nums font-medium whitespace-nowrap ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
                             >
                               {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                               {fmt(v)}
@@ -5275,7 +5347,7 @@ function Page() {
                             })}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                            <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
                               {TIPO_LABEL[m.tipo]}
                             </Badge>
                           </TableCell>
@@ -5285,7 +5357,7 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
                           <TableCell
-                            className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                            className={`text-right tabular-nums font-medium whitespace-nowrap ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
                           >
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                             {fmt(m.valor)}
