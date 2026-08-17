@@ -79,6 +79,20 @@ const fmtDataSimples = (iso: string | null) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
+/**
+ * Envolve uma consulta auxiliar para que uma falha de rede nela nunca derrube a
+ * impressão da guia — devolve `{ data: vazio }` e o fluxo segue pelo fallback,
+ * exatamente como faziam os `try/catch` que existiam em volta de cada consulta
+ * antes delas serem agrupadas em `Promise.all`.
+ */
+async function semFalhar<T>(p: PromiseLike<{ data: T }>, vazio: T): Promise<{ data: T }> {
+  try {
+    return await p;
+  } catch {
+    return { data: vazio };
+  }
+}
+
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
@@ -116,80 +130,51 @@ function numViasGR(
 
 const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
 
-/**
- * Resolve o rótulo do campo "CONV." da GR a partir do tipo_atendimento do
- * agendamento. Para "convenio", busca o nome do convênio do contrato ativo
- * do paciente (titular ou dependente). Para "particular", retorna "PARTICULAR".
- * Retorna null quando não deve renderizar a linha.
- */
-async function resolveConvLabel(
-  tipoAtendimento: string | null | undefined,
-  pacienteId: string | null | undefined,
-  clinicaId: string,
-): Promise<string | null> {
-  if (tipoAtendimento === "particular") return "PARTICULAR";
-  if (tipoAtendimento !== "convenio") return null;
-  if (!pacienteId) return "CONVÊNIO";
-  try {
-    const { data: titular } = await supabase
-      .from("contratos_assinatura")
-      .select("id, cb_convenios(nome)")
-      .eq("clinica_id", clinicaId)
-      .eq("status", "ativo")
-      .eq("paciente_id", pacienteId)
-      .limit(1);
-    const t0 = ((titular ?? []) as any[])[0];
-    if (t0?.cb_convenios?.nome) return String(t0.cb_convenios.nome).toUpperCase();
-    const { data: deps } = await supabase
-      .from("contrato_dependentes")
-      .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
-      .eq("paciente_id", pacienteId)
-      .eq("ativo", true)
-      .limit(5);
-    const cand = ((deps ?? []) as any[])
-      .map((d) => d.contratos_assinatura)
-      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
-    if (cand?.cb_convenios?.nome) return String(cand.cb_convenios.nome).toUpperCase();
-  } catch {
-    /* fallback */
-  }
-  return "CONVÊNIO";
+interface VinculoConvenio {
+  convenioNome: string;
+  vinculo: "titular" | "dependente";
+  titularNome?: string;
 }
 
 /**
  * Verifica se o paciente tem contrato ativo do cartão de benefícios/convênio
  * na clínica atual — como titular ou dependente — independente do
  * `tipo_atendimento` do agendamento. Usado para imprimir na GR o plano/
- * vínculo mesmo quando o pagamento foi feito no particular.
+ * vínculo mesmo quando o pagamento foi feito no particular, e também como
+ * fonte do rótulo do campo "CONV." (ver `rotuloConvenio`).
+ *
+ * Antes existiam DUAS funções (uma para o rótulo, outra para o vínculo) que
+ * rodavam em sequência disparando exatamente as mesmas consultas — até quatro
+ * idas e voltas ao servidor para responder à mesma pergunta. Agora é uma só
+ * chamada, com as consultas de titular e de dependente em paralelo. A ordem de
+ * precedência continua igual: titular ganha de dependente.
  */
-async function resolveVinculoConvenio(
+async function buscarVinculoConvenio(
   pacienteId: string | null | undefined,
   clinicaId: string,
-): Promise<{
-  convenioNome: string;
-  vinculo: "titular" | "dependente";
-  titularNome?: string;
-} | null> {
+): Promise<VinculoConvenio | null> {
   if (!pacienteId) return null;
   try {
-    const { data: titular } = await supabase
-      .from("contratos_assinatura")
-      .select("id, cb_convenios(nome)")
-      .eq("clinica_id", clinicaId)
-      .eq("status", "ativo")
-      .eq("paciente_id", pacienteId)
-      .limit(1);
-    const t0 = ((titular ?? []) as any[])[0];
+    const [titularRes, depsRes] = await Promise.all([
+      supabase
+        .from("contratos_assinatura")
+        .select("id, cb_convenios(nome)")
+        .eq("clinica_id", clinicaId)
+        .eq("status", "ativo")
+        .eq("paciente_id", pacienteId)
+        .limit(1),
+      supabase
+        .from("contrato_dependentes")
+        .select("contratos_assinatura!inner(id,clinica_id,status,paciente_nome,cb_convenios(nome))")
+        .eq("paciente_id", pacienteId)
+        .eq("ativo", true)
+        .limit(5),
+    ]);
+    const t0 = ((titularRes.data ?? []) as any[])[0];
     const nomeT = t0?.cb_convenios?.nome;
     if (nomeT) return { convenioNome: String(nomeT).toUpperCase(), vinculo: "titular" };
 
-    const { data: deps } = await supabase
-      .from("contrato_dependentes")
-      .select("contratos_assinatura!inner(id,clinica_id,status,paciente_nome,cb_convenios(nome))")
-      .eq("paciente_id", pacienteId)
-      .eq("ativo", true)
-      .limit(5);
-    const cand = ((deps ?? []) as any[])
+    const cand = ((depsRes.data ?? []) as any[])
       .map((d) => d.contratos_assinatura)
       .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
     const nomeD = cand?.cb_convenios?.nome;
@@ -204,6 +189,22 @@ async function resolveVinculoConvenio(
     /* ignora e retorna null */
   }
   return null;
+}
+
+/**
+ * Rótulo do campo "CONV." da GR, derivado do tipo_atendimento do agendamento e
+ * do vínculo JÁ buscado por `buscarVinculoConvenio` — sem nenhuma consulta
+ * nova. Para "particular" retorna "PARTICULAR"; para "convenio" retorna o nome
+ * do convênio (ou "CONVÊNIO" quando não dá para descobrir qual é). Retorna null
+ * quando a linha não deve ser renderizada.
+ */
+function rotuloConvenio(
+  tipoAtendimento: string | null | undefined,
+  vinculo: VinculoConvenio | null,
+): string | null {
+  if (tipoAtendimento === "particular") return "PARTICULAR";
+  if (tipoAtendimento !== "convenio") return null;
+  return vinculo?.convenioNome ? vinculo.convenioNome.toUpperCase() : "CONVÊNIO";
 }
 
 /**
@@ -478,57 +479,18 @@ async function printGuiaAtendimentoCore({
   pagamento,
   fichaNumero,
 }: PrintGRInput) {
-  // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
-  const { data: visExistentes, error: errVias } = await supabase
-    .from("gr_impressoes" as never)
-    .select("via_numero, impresso_por_nome")
-    .eq("agendamento_id", agendamentoId)
-    .order("via_numero", { ascending: false });
-  if (errVias) throw new Error(errVias.message);
-  const existentes =
-    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
-  const ultimaVia = existentes[0]?.via_numero ?? 0;
-  let viaNumero: number;
-  if (reimpressao) {
-    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
-  } else {
-    viaNumero = ultimaVia + 1;
-  }
-  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
-  // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
-  // operador logado que está imprimindo. Ordem de resolução:
-  //   1) fin_lancamentos.criado_por → profiles.nome (fonte da verdade)
-  //   2) impresso_por_nome gravado na 1ª via (histórico)
-  //   3) usuarioNome do caller (fallback quando não há lançamento)
-  let usuarioFinalNome: string | null | undefined = undefined;
-  try {
-    const { data: lancs } = await supabase
-      .from("fin_lancamentos")
-      .select("criado_por, created_at")
+  // ---- ONDA 1 -------------------------------------------------------------
+  // Vias já impressas, agendamento, clínica, lançamentos e vínculo com itens de
+  // orçamento saem todos juntos. Antes isso eram quatro etapas em série antes
+  // de qualquer outra coisa começar — e cada ida e volta ao Supabase custa
+  // ~250ms de rede, contra ~2ms de execução no banco.
+  const [visRes, ag, cli, lancsRes, orcLinksRes] = await Promise.all([
+    // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
+    supabase
+      .from("gr_impressoes" as never)
+      .select("via_numero, impresso_por_nome")
       .eq("agendamento_id", agendamentoId)
-      .eq("tipo", "receita")
-      .neq("status", "cancelado")
-      .order("created_at", { ascending: true });
-    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
-      .map((l) => l.criado_por)
-      .find((v): v is string => !!v);
-    if (criadoPor) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("nome")
-        .eq("id", criadoPor)
-        .maybeSingle();
-      const nome = (prof as { nome: string | null } | null)?.nome;
-      if (nome) usuarioFinalNome = nome;
-    }
-  } catch {
-    /* segue para fallback */
-  }
-  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
-
-  // Busca dados em paralelo
-  const [ag, cli] = await Promise.all([
+      .order("via_numero", { ascending: false }),
     supabase
       .from("agendamentos")
       .select(
@@ -541,13 +503,67 @@ async function printGuiaAtendimentoCore({
       .select("nome, endereco, cidade, estado, telefone, cnpj")
       .eq("id", clinicaId)
       .maybeSingle(),
+    // Uma consulta só em fin_lancamentos atende aos TRÊS usos que antes estavam
+    // espalhados pela função (cada um com sua própria ida ao servidor):
+    // descobrir quem faturou, somar o valor realmente pago (só confirmados) e
+    // detectar Cartão Consulta pela descrição.
+    semFalhar<any[] | null>(
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes, criado_por, created_at, status",
+        )
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita")
+        .neq("status", "cancelado")
+        .order("created_at", { ascending: true }),
+      null,
+    ),
+    semFalhar<any[] | null>(
+      supabase
+        .from("agendamento_orcamento_itens")
+        .select("orcamento_item_id")
+        .eq("agendamento_id", agendamentoId),
+      null,
+    ),
   ]);
+
+  const { data: visExistentes, error: errVias } = visRes;
+  if (errVias) throw new Error(errVias.message);
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const ultimaVia = existentes[0]?.via_numero ?? 0;
+  let viaNumero: number;
+  if (reimpressao) {
+    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
+  } else {
+    viaNumero = ultimaVia + 1;
+  }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
 
   if (ag.error || !ag.data) {
     throw new Error(ag.error?.message ?? "Agendamento não encontrado");
   }
   const a = ag.data;
   const c = cli.data;
+
+  const lancs = (lancsRes.data ?? []) as Array<{
+    valor: number | string;
+    descricao: string | null;
+    forma_pagamento: string | null;
+    parcelas: number | null;
+    bandeira_cartao: string | null;
+    observacoes: string | null;
+    criado_por: string | null;
+    status: string | null;
+  }>;
+  // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
+  // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
+  // operador logado que está imprimindo. Ordem de resolução:
+  //   1) fin_lancamentos.criado_por → profiles.nome (fonte da verdade)
+  //   2) impresso_por_nome gravado na 1ª via (histórico)
+  //   3) usuarioNome do caller (fallback quando não há lançamento)
+  const criadoPor = lancs.map((l) => l.criado_por).find((v): v is string => !!v);
 
   // Se o agendamento não tem medico_id direto, tenta resolver pelo médico vinculado à agenda
   let medicoIdEfetivo: string | null = a.medico_id ?? null;
@@ -560,7 +576,12 @@ async function printGuiaAtendimentoCore({
     medicoIdEfetivo = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
   }
 
-  const [pac, med, proc] = await Promise.all([
+  // ---- ONDA 2 -------------------------------------------------------------
+  // Paciente, médico, procedimento, nome de quem faturou, dados sensíveis de
+  // repasse, dados do cartão de benefícios do médico e o vínculo de convênio do
+  // paciente: tudo depende apenas do agendamento, então tudo sai junto. Antes
+  // eram cinco etapas em série.
+  const [pac, med, proc, profRes, sensRes, mcbRes, vinculoConv] = await Promise.all([
     a.paciente_id
       ? supabase
           .from("pacientes")
@@ -583,7 +604,34 @@ async function printGuiaAtendimentoCore({
           .ilike("nome", a.procedimento)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    criadoPor
+      ? semFalhar<{ nome: string | null } | null>(
+          supabase.from("profiles").select("nome").eq("id", criadoPor).maybeSingle(),
+          null,
+        )
+      : Promise.resolve({ data: null as { nome: string | null } | null }),
+    a.medico_id
+      ? semFalhar<any>(supabase.rpc("medico_dados_sensiveis", { _medico_id: a.medico_id }), null)
+      : Promise.resolve({ data: null }),
+    // Dados do Cartão de Benefícios do médico (não vêm em medico_dados_sensiveis)
+    a.medico_id
+      ? semFalhar<any>(
+          supabase
+            .from("medicos")
+            .select(
+              "aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
+            )
+            .eq("id", a.medico_id)
+            .maybeSingle(),
+          null,
+        )
+      : Promise.resolve({ data: null }),
+    buscarVinculoConvenio(a.paciente_id ?? null, clinicaId),
   ]);
+
+  const nomeAutor = (profRes.data as { nome: string | null } | null)?.nome;
+  const usuarioFinalNome: string | null | undefined =
+    nomeAutor || (primeiraVia?.impresso_por_nome ?? usuarioNome);
 
   const paciente = pac.data as {
     nome: string;
@@ -605,19 +653,14 @@ async function printGuiaAtendimentoCore({
     valor_repasse_padrao: number | null;
   } | null = null;
   if (a.medico_id) {
-    try {
-      const { data: sens } = await supabase.rpc("medico_dados_sensiveis", {
-        _medico_id: a.medico_id,
-      });
-      const s = (sens as any) ?? {};
-      medicoData = {
-        tipo_repasse: s.tipo_repasse ?? null,
-        percentual_repasse_padrao: s.percentual_repasse_padrao ?? null,
-        valor_repasse_padrao: s.valor_repasse_padrao ?? null,
-      };
-    } catch {
-      medicoData = null;
-    }
+    const s = (sensRes.data as any) ?? null;
+    medicoData = s
+      ? {
+          tipo_repasse: s.tipo_repasse ?? null,
+          percentual_repasse_padrao: s.percentual_repasse_padrao ?? null,
+          valor_repasse_padrao: s.valor_repasse_padrao ?? null,
+        }
+      : null;
   }
   // Dados do Cartão de Benefícios do médico (não vêm em medico_dados_sensiveis)
   let medicoCb: {
@@ -627,25 +670,14 @@ async function printGuiaAtendimentoCore({
     percentual: number | null;
   } | null = null;
   if (a.medico_id) {
-    try {
-      const { data: mcb } = await supabase
-        .from("medicos")
-        .select(
-          "aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
-        )
-        .eq("id", a.medico_id)
-        .maybeSingle();
-      const m = (mcb as any) ?? null;
-      if (m)
-        medicoCb = {
-          aceita: !!m.aceita_cartao_beneficios,
-          tipo: m.cb_tipo_repasse ?? null,
-          valor: m.cb_valor_repasse ?? null,
-          percentual: m.cb_percentual_repasse ?? null,
-        };
-    } catch {
-      medicoCb = null;
-    }
+    const m = (mcbRes.data as any) ?? null;
+    if (m)
+      medicoCb = {
+        aceita: !!m.aceita_cartao_beneficios,
+        tipo: m.cb_tipo_repasse ?? null,
+        valor: m.cb_valor_repasse ?? null,
+        percentual: m.cb_percentual_repasse ?? null,
+      };
   }
   let procData = proc.data as {
     id: string;
@@ -677,19 +709,26 @@ async function printGuiaAtendimentoCore({
       if (semParens && !out.includes(semParens)) out.push(semParens);
       return out;
     };
-    for (const alvo of stripParens(a.procedimento)) {
-      if (alvo === a.procedimento) continue;
-      const { data: pAlt } = await supabase
-        .from("procedimentos")
-        .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
-        .eq("clinica_id", clinicaId)
-        .ilike("nome", alvo)
-        .maybeSingle();
-      if (pAlt) {
-        procData = pAlt as unknown as typeof procData;
-        break;
-      }
-    }
+    // As variantes são testadas TODAS ao mesmo tempo, mas o resultado escolhido
+    // continua sendo o da primeira variante que casar, na mesma ordem de
+    // prioridade de antes (da mais específica para a mais curta). Antes elas
+    // eram consultadas uma a uma, em série, e como a agenda quase sempre anexa
+    // "(ESPECIALIDADE)" ao nome, esse laço rodava em praticamente toda guia,
+    // somando várias idas e voltas ao servidor.
+    const alvos = stripParens(a.procedimento).filter((alvo) => alvo !== a.procedimento);
+    const tentativas = await Promise.all(
+      alvos.map(async (alvo) => {
+        const { data: pAlt } = await supabase
+          .from("procedimentos")
+          .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
+          .eq("clinica_id", clinicaId)
+          .ilike("nome", alvo)
+          .maybeSingle();
+        return pAlt;
+      }),
+    );
+    const achado = tentativas.find((p) => !!p);
+    if (achado) procData = achado as unknown as typeof procData;
   }
 
   // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
@@ -698,30 +737,31 @@ async function printGuiaAtendimentoCore({
   // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
   if (medicoIdEfetivo && procData?.id) {
     try {
+      // O nome da especialidade vem junto pela chave estrangeira
+      // (medico_procedimentos.especialidade_id → especialidades.id), em vez de
+      // uma segunda consulta em série só para traduzir o id em nome.
       const { data: mps } = await supabase
         .from("medico_procedimentos")
-        .select("especialidade_id")
+        .select(
+          "especialidade_id, esp:especialidades!medico_procedimentos_especialidade_id_fkey(nome)",
+        )
         .eq("medico_id", medicoIdEfetivo)
         .eq("procedimento_id", procData.id)
         .not("especialidade_id", "is", null);
-      const eids = Array.from(
-        new Set(
-          ((mps ?? []) as Array<{ especialidade_id: string | null }>)
-            .map((r) => r.especialidade_id)
-            .filter((v): v is string => !!v),
-        ),
-      );
+      const vinculos = new Map<string, string | null>();
+      for (const r of (mps ?? []) as Array<{
+        especialidade_id: string | null;
+        esp: { nome: string | null } | null;
+      }>) {
+        if (!r.especialidade_id) continue;
+        vinculos.set(r.especialidade_id, r.esp?.nome ?? null);
+      }
       // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
       // mesmo serviço estiver vinculado a várias especialidades para este médico
       // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
       // mantém a especialidade principal do médico (fallback acima).
-      if (eids.length === 1) {
-        const { data: esp } = await supabase
-          .from("especialidades")
-          .select("nome")
-          .eq("id", eids[0])
-          .maybeSingle();
-        const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
+      if (vinculos.size === 1) {
+        const nomeVinculo = Array.from(vinculos.values())[0];
         if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
       }
     } catch {
@@ -757,34 +797,19 @@ async function printGuiaAtendimentoCore({
     let parcelasResolvidas: number | null = null;
     let bandeiraResolvida: string | null = null;
     let obsResolvida: string | null = null;
-    try {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes")
-        .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita")
-        .eq("status", "confirmado");
-      for (const l of (lancs ?? []) as Array<{
-        valor: number | string;
-        descricao: string | null;
-        forma_pagamento: string | null;
-        parcelas: number | null;
-        bandeira_cartao: string | null;
-        observacoes: string | null;
-      }>) {
-        valorPago += Number(l.valor);
-        if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
-        // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
-        // e sem forma) — a cobrança principal é a que dita a forma na GR.
-        if (!formaResolvida && l.forma_pagamento) {
-          formaResolvida = l.forma_pagamento;
-          parcelasResolvidas = l.parcelas;
-          bandeiraResolvida = l.bandeira_cartao;
-          obsResolvida = l.observacoes;
-        }
+    // Lançamentos já vieram na onda 1; aqui só interessam os CONFIRMADOS, que
+    // era o filtro da consulta que existia neste ponto.
+    for (const l of lancs.filter((x) => x.status === "confirmado")) {
+      valorPago += Number(l.valor);
+      if (detectCartaoConsulta(l.descricao)) isCartaoConsulta = true;
+      // Preserva a primeira forma "real" (ignora linhas-sombra de valor 0
+      // e sem forma) — a cobrança principal é a que dita a forma na GR.
+      if (!formaResolvida && l.forma_pagamento) {
+        formaResolvida = l.forma_pagamento;
+        parcelasResolvidas = l.parcelas;
+        bandeiraResolvida = l.bandeira_cartao;
+        obsResolvida = l.observacoes;
       }
-    } catch {
-      /* segue para fallback */
     }
     valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
     if (formaResolvida) {
@@ -835,21 +860,12 @@ async function printGuiaAtendimentoCore({
   // Quando o pagamento já vem informado pelo caller, ainda consultamos os
   // lançamentos para descobrir se é Cartão Consulta (não há flag no payload).
   if (pagamento && !isCartaoConsulta) {
-    try {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("descricao")
-        .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita")
-        .neq("status", "cancelado");
-      for (const l of (lancs ?? []) as Array<{ descricao: string | null }>) {
-        if (detectCartaoConsulta(l.descricao)) {
-          isCartaoConsulta = true;
-          break;
-        }
+    // Mesmos lançamentos da onda 1 (receitas não canceladas) — sem nova consulta.
+    for (const l of lancs) {
+      if (detectCartaoConsulta(l.descricao)) {
+        isCartaoConsulta = true;
+        break;
       }
-    } catch {
-      /* noop */
     }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
@@ -1052,11 +1068,8 @@ async function printGuiaAtendimentoCore({
   // SINAL / SALDO FINAL / TOTAL. Sem itens com sinal, nada muda na guia.
   const sinalBloco = { sinal: 0, saldo: 0, total: 0, pago: 0 };
   try {
-    const { data: links } = await supabase
-      .from("agendamento_orcamento_itens")
-      .select("orcamento_item_id")
-      .eq("agendamento_id", agendamentoId);
-    const itemIds = ((links ?? []) as Array<{ orcamento_item_id: string | null }>)
+    // Os vínculos com itens de orçamento já vieram na onda 1.
+    const itemIds = ((orcLinksRes.data ?? []) as Array<{ orcamento_item_id: string | null }>)
       .map((l) => l.orcamento_item_id)
       .filter((v): v is string => !!v);
     if (itemIds.length > 0) {
@@ -1107,12 +1120,12 @@ async function printGuiaAtendimentoCore({
     </table>`
     : "";
 
-  let convLabel = await resolveConvLabel(
+  // O vínculo de convênio já veio da onda 2; o rótulo é derivado dele sem
+  // nenhuma consulta nova.
+  let convLabel = rotuloConvenio(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
-    a.paciente_id ?? null,
-    clinicaId,
+    vinculoConv,
   );
-  const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
   // Corrige o rótulo quando o agendamento ficou gravado como "particular"
   // mas o desconto do convênio foi aplicado no caixa (paciente pagou a taxa
   // do convênio em dinheiro/PIX/cartão). Nesse caso a GR deve exibir o
@@ -1331,6 +1344,113 @@ const normalizar = (s: string) =>
     .toLowerCase()
     .trim();
 
+interface ProcedimentoResumo {
+  nome: string;
+  valor_dinheiro_pix: number | null;
+  valor_cartao: number | null;
+  tipo: string | null;
+}
+
+/**
+ * Monta o mapa `normalizar(nome) \u2192 procedimento` usado pela GR agrupada,
+ * buscando SOMENTE os servi\u00e7os que aparecem nesta guia.
+ *
+ * Antes a GR baixava a tabela inteira de procedimentos da cl\u00ednica (milhares de
+ * linhas, centenas de kB de JSON) a cada impress\u00e3o, para usar uma ou duas.
+ *
+ * O `ilike` \u00e9 apenas um pr\u00e9-filtro feito no servidor; quem decide se o
+ * procedimento casou continua sendo o `normalizar()` aqui do cliente, que \u00e9
+ * exatamente o mesmo crit\u00e9rio do mapa antigo. Ou seja: um nome que n\u00e3o casava
+ * antes continua n\u00e3o casando (a GR j\u00e1 convive com isso \u2014 a agenda costuma
+ * anexar "(ESPECIALIDADE)" ao nome), e nenhum nome passa a casar de forma
+ * diferente. Nomes n\u00e3o encontrados simplesmente ficam de fora do mapa, igual
+ * a antes.
+ */
+async function mapaProcedimentosDaGuia(
+  clinicaId: string,
+  nomes: Array<string | null | undefined>,
+): Promise<Map<string, ProcedimentoResumo>> {
+  const mapa = new Map<string, ProcedimentoResumo>();
+  const alvos = Array.from(new Set(nomes.map((n) => (n ?? "").trim()).filter((n) => n.length > 0)));
+  if (alvos.length === 0) return mapa;
+  const linhasPorAlvo = await Promise.all(
+    alvos.map(async (alvo) => {
+      try {
+        const { data } = await supabase
+          .from("procedimentos")
+          .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
+          .eq("clinica_id", clinicaId)
+          .ilike("nome", alvo)
+          .limit(20);
+        return (data ?? []) as ProcedimentoResumo[];
+      } catch {
+        return [] as ProcedimentoResumo[];
+      }
+    }),
+  );
+  for (const linhas of linhasPorAlvo) {
+    // "\u00daltimo vence" em caso de nomes repetidos no cadastro \u2014 mesma regra do
+    // Map que era montado sobre a tabela inteira.
+    for (const p of linhas) mapa.set(normalizar(p.nome ?? ""), p);
+  }
+  return mapa;
+}
+
+/**
+ * Ficha = POSI\u00c7\u00c3O da linha na fila do PROFISSIONAL no dia (mesma regra de
+ * app.agenda.tsx > fichaPorId e da GR individual): cada (dia, profissional,
+ * agenda) tem sua pr\u00f3pria sequ\u00eancia 001, 002, 003\u2026
+ *
+ * Devolve um mapa `agendamento_id \u2192 n\u00famero da ficha`. As consultas de cada
+ * agendamento saem em paralelo entre si, e a chamada inteira roda junto com as
+ * demais buscas da guia em vez de esperar o c\u00e1lculo dos repasses terminar.
+ */
+async function calcularFichas(
+  clinicaId: string,
+  ags: Array<{ id: string; inicio: string; medico_id: string | null; agenda_id?: string | null }>,
+): Promise<Map<string, number>> {
+  const fichas = new Map<string, number>();
+  await Promise.all(
+    ags.map(async (a) => {
+      try {
+        const dt = new Date(a.inicio);
+        const ini = new Date(dt);
+        ini.setHours(0, 0, 0, 0);
+        const fim = new Date(dt);
+        fim.setHours(23, 59, 59, 999);
+        const q = supabase
+          .from("agendamentos")
+          .select("id, inicio, paciente_nome, medico_id, agenda_id")
+          .eq("clinica_id", clinicaId)
+          .gte("inicio", ini.toISOString())
+          .lte("inicio", fim.toISOString());
+        if (a.medico_id) q.eq("medico_id", a.medico_id);
+        else q.is("medico_id", null);
+        const agendaId = a.agenda_id ?? null;
+        if (agendaId) q.eq("agenda_id", agendaId);
+        else q.is("agenda_id", null);
+        const { data } = await q;
+        const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
+          const t = String(x.inicio).localeCompare(String(y.inicio));
+          if (t !== 0) return t;
+          return String(x.paciente_nome ?? "").localeCompare(
+            String(y.paciente_nome ?? ""),
+            "pt-BR",
+            {
+              sensitivity: "base",
+            },
+          );
+        });
+        const idx = ordenados.findIndex((r: any) => r.id === a.id);
+        fichas.set(a.id, idx >= 0 ? idx + 1 : 0);
+      } catch {
+        fichas.set(a.id, 0);
+      }
+    }),
+  );
+  return fichas;
+}
+
 export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
   const ids = Array.from(new Set((input.agendamentoIds ?? []).filter(Boolean)));
   if (ids.length === 0) throw new Error("Nenhum agendamento informado para impressão.");
@@ -1360,52 +1480,18 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Controle de vias: usa o primeiro id como "chave" para limite (1ª/2ª via).
   const chaveVia = ids[0];
-  const { data: visExistentes, error: errVias } = await supabase
-    .from("gr_impressoes" as never)
-    .select("via_numero, impresso_por_nome")
-    .eq("agendamento_id", chaveVia)
-    .order("via_numero", { ascending: false });
-  if (errVias) throw new Error(errVias.message);
-  const existentes =
-    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
-  const ultimaVia = existentes[0]?.via_numero ?? 0;
-  let viaNumero: number;
-  if (reimpressao) {
-    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
-  } else {
-    viaNumero = ultimaVia + 1;
-  }
-  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  // "USUÁRIO:" = quem faturou (autor do lançamento), sempre. Ordem: criador do
-  // fin_lancamento → nome gravado na 1ª via → usuarioNome do caller.
-  let usuarioFinalNome: string | null | undefined = undefined;
-  try {
-    const { data: lancs } = await supabase
-      .from("fin_lancamentos")
-      .select("criado_por, created_at")
-      .in("agendamento_id", ids)
-      .eq("tipo", "receita")
-      .neq("status", "cancelado")
-      .order("created_at", { ascending: true });
-    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
-      .map((l) => l.criado_por)
-      .find((v): v is string => !!v);
-    if (criadoPor) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("nome")
-        .eq("id", criadoPor)
-        .maybeSingle();
-      const nome = (prof as { nome: string | null } | null)?.nome;
-      if (nome) usuarioFinalNome = nome;
-    }
-  } catch {
-    /* segue para fallback */
-  }
-  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
-  // Busca agendamentos + clínica + tabela de procedimentos da clínica
-  const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
+  // ---- ONDA 1 -------------------------------------------------------------
+  // Tudo que não depende de nada sai junto. Antes eram três consultas em SÉRIE
+  // (vias → lançamentos → autor do lançamento) só para depois começar a buscar
+  // agendamento e clínica. Como cada ida e volta ao Supabase custa ~250ms de
+  // rede (a consulta em si roda em ~2ms no banco), serializar era o gargalo.
+  const [visRes, agsRes, cliRes, lancsRes] = await Promise.all([
+    supabase
+      .from("gr_impressoes" as never)
+      .select("via_numero, impresso_por_nome")
+      .eq("agendamento_id", chaveVia)
+      .order("via_numero", { ascending: false }),
     supabase
       .from("agendamentos")
       .select(
@@ -1417,40 +1503,59 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       .select("nome, endereco, cidade, estado, telefone, cnpj")
       .eq("id", clinicaId)
       .maybeSingle(),
-    supabase
-      .from("procedimentos")
-      .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
-      .eq("clinica_id", clinicaId),
-    supabase
-      .from("fin_lancamentos")
-      .select("agendamento_id, valor, status, tipo")
-      .in("agendamento_id", ids)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado"),
+    // Uma consulta só em fin_lancamentos atende aos dois usos: descobrir quem
+    // faturou (qualquer lançamento não cancelado, na ordem de criação) e somar
+    // o valor pago (só os confirmados). Antes eram duas consultas na mesma
+    // tabela, em momentos diferentes do fluxo.
+    semFalhar<any[] | null>(
+      supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id, valor, status, tipo, criado_por, created_at")
+        .in("agendamento_id", ids)
+        .eq("tipo", "receita")
+        .neq("status", "cancelado")
+        .order("created_at", { ascending: true }),
+      null,
+    ),
   ]);
+
+  const { data: visExistentes, error: errVias } = visRes;
+  if (errVias) throw new Error(errVias.message);
+  const existentes =
+    (visExistentes as Array<{ via_numero: number; impresso_por_nome: string | null }> | null) ?? [];
+  const ultimaVia = existentes[0]?.via_numero ?? 0;
+  let viaNumero: number;
+  if (reimpressao) {
+    viaNumero = ultimaVia > 0 ? ultimaVia : 1;
+  } else {
+    viaNumero = ultimaVia + 1;
+  }
+  const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
 
   if (agsRes.error || !agsRes.data || agsRes.data.length === 0) {
     throw new Error(agsRes.error?.message ?? "Agendamentos não encontrados");
   }
   const ags = agsRes.data;
   const c = cliRes.data;
-  const procs = (procsRes.data ?? []) as Array<{
-    nome: string;
-    valor_dinheiro_pix: number | null;
-    valor_cartao: number | null;
-    tipo: string | null;
+
+  const lancs = (lancsRes.data ?? []) as Array<{
+    agendamento_id: string | null;
+    valor: number | string;
+    status: string | null;
+    criado_por: string | null;
   }>;
-  const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
+  // "USUÁRIO:" = quem faturou (autor do lançamento), sempre. Ordem: criador do
+  // fin_lancamento → nome gravado na 1ª via → usuarioNome do caller.
+  const criadoPor = lancs.map((l) => l.criado_por).find((v): v is string => !!v);
+
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
   // Agendamentos que têm lançamento confirmado mas com valor total 0 →
   // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
   const gratuidadeByAg = new Map<string, boolean>();
-  for (const l of (lancsRes.data ?? []) as Array<{
-    agendamento_id: string | null;
-    valor: number | string;
-  }>) {
+  for (const l of lancs) {
     if (!l.agendamento_id) continue;
+    if (l.status !== "confirmado") continue;
     valorPagoByAg.set(
       l.agendamento_id,
       (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor),
@@ -1464,13 +1569,76 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
   const pacIdRef = ags[0].paciente_id;
-  const pacienteRes = pacIdRef
-    ? await supabase
-        .from("pacientes")
-        .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
-        .eq("id", pacIdRef)
-        .maybeSingle()
-    : { data: null };
+  // Busca dados de todos os médicos envolvidos + seus convênios
+  const medicoIds = Array.from(
+    new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)),
+  );
+
+  // ---- ONDA 2 -------------------------------------------------------------
+  // Tudo que depende SÓ dos agendamentos sai de uma vez: nome de quem faturou,
+  // paciente, médicos, convênios, repasses, procedimentos da guia, vínculo de
+  // convênio do paciente e as fichas. Antes isso era feito em quatro etapas
+  // sequenciais espalhadas pelo resto da função.
+  const [profRes, pacienteRes, medsRes, convsRes, repRes, procByNome, vinculoConv, fichaByGrupo] =
+    await Promise.all([
+      criadoPor
+        ? semFalhar<{ nome: string | null } | null>(
+            supabase.from("profiles").select("nome").eq("id", criadoPor).maybeSingle(),
+            null,
+          )
+        : Promise.resolve({ data: null as { nome: string | null } | null }),
+      pacIdRef
+        ? supabase
+            .from("pacientes")
+            .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
+            .eq("id", pacIdRef)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      medicoIds.length > 0
+        ? supabase
+            .from("medicos")
+            .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
+            .in("id", medicoIds)
+        : Promise.resolve({
+            data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>,
+          }),
+      medicoIds.length > 0
+        ? supabase
+            .from("medico_convenios")
+            .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+            .in("medico_id", medicoIds)
+            .eq("ativo", true)
+        : Promise.resolve({
+            data: [] as Array<{
+              medico_id: string;
+              nome: string;
+              tipo_repasse: string | null;
+              percentual: number | null;
+              valor: number | null;
+            }>,
+          }),
+      medicoIds.length > 0
+        ? supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId })
+        : Promise.resolve({
+            data: [] as Array<{
+              id: string;
+              tipo_repasse: string | null;
+              percentual_repasse_padrao: number | null;
+              valor_repasse_padrao: number | null;
+            }>,
+          }),
+      mapaProcedimentosDaGuia(
+        clinicaId,
+        ags.map((a) => a.procedimento || "CONSULTA"),
+      ),
+      buscarVinculoConvenio(pacIdRef ?? null, clinicaId),
+      calcularFichas(clinicaId, ags),
+    ]);
+
+  const nomeAutor = (profRes.data as { nome: string | null } | null)?.nome;
+  const usuarioFinalNome: string | null | undefined =
+    nomeAutor || (primeiraVia?.impresso_por_nome ?? usuarioNome);
+
   const paciente = pacienteRes.data as {
     nome: string;
     cpf: string | null;
@@ -1482,45 +1650,6 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
   const prontuarioPac = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
-  // Busca dados de todos os médicos envolvidos + seus convênios
-  const medicoIds = Array.from(
-    new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)),
-  );
-  const [medsRes, convsRes, repRes] = await Promise.all([
-    medicoIds.length > 0
-      ? supabase
-          .from("medicos")
-          .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
-          .in("id", medicoIds)
-      : Promise.resolve({
-          data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>,
-        }),
-    medicoIds.length > 0
-      ? supabase
-          .from("medico_convenios")
-          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
-          .in("medico_id", medicoIds)
-          .eq("ativo", true)
-      : Promise.resolve({
-          data: [] as Array<{
-            medico_id: string;
-            nome: string;
-            tipo_repasse: string | null;
-            percentual: number | null;
-            valor: number | null;
-          }>,
-        }),
-    medicoIds.length > 0
-      ? supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId })
-      : Promise.resolve({
-          data: [] as Array<{
-            id: string;
-            tipo_repasse: string | null;
-            percentual_repasse_padrao: number | null;
-            valor_repasse_padrao: number | null;
-          }>,
-        }),
-  ]);
   const repMap = new Map<
     string,
     {
@@ -1698,45 +1827,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição na fila do PROFISSIONAL no dia) para cada grupo —
-  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: cada
-  // (dia, profissional, agenda) tem sua própria sequência 001, 002, 003…
-  const fichaByGrupo = new Map<string, number>();
-  await Promise.all(
-    Array.from(grupos.entries()).map(async ([key, g]) => {
-      try {
-        const dt = new Date(g.inicioRef);
-        const ini = new Date(dt);
-        ini.setHours(0, 0, 0, 0);
-        const fim = new Date(dt);
-        fim.setHours(23, 59, 59, 999);
-        const q = supabase
-          .from("agendamentos")
-          .select("id, inicio, paciente_nome, medico_id, agenda_id")
-          .eq("clinica_id", clinicaId)
-          .gte("inicio", ini.toISOString())
-          .lte("inicio", fim.toISOString());
-        if (g.medicoId) q.eq("medico_id", g.medicoId);
-        else q.is("medico_id", null);
-        if (g.agendaId) q.eq("agenda_id", g.agendaId);
-        else q.is("agenda_id", null);
-        const { data } = await q;
-        const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
-          const t = String(x.inicio).localeCompare(String(y.inicio));
-          if (t !== 0) return t;
-          return String(x.paciente_nome ?? "").localeCompare(
-            String(y.paciente_nome ?? ""),
-            "pt-BR",
-            { sensitivity: "base" },
-          );
-        });
-        const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
-        fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
-      } catch {
-        fichaByGrupo.set(key, 0);
-      }
-    }),
-  );
+  // As fichas (posição na fila do profissional no dia) já vieram prontas da
+  // onda 2, em `fichaByGrupo`, indexadas pelo id do agendamento — que é
+  // exatamente a chave usada aqui (cada agendamento vira seu próprio grupo).
 
   // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
   // "DINHEIRO" quando a forma real é desconhecida.
@@ -1764,18 +1857,18 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     .join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  let convLabelAgrupada = await resolveConvLabel(
+  // O vínculo de convênio já veio da onda 2; o rótulo é derivado dele sem
+  // nenhuma consulta nova.
+  let convLabelAgrupada = rotuloConvenio(
     (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
-    pacIdRef ?? null,
-    clinicaId,
+    vinculoConv,
   );
-  const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
-  if (convLabelAgrupada === "PARTICULAR" && vinculoConvAgrupada?.convenioNome) {
+  if (convLabelAgrupada === "PARTICULAR" && vinculoConv?.convenioNome) {
     const usouConv = await agendamentoUsouConvenio(
       ags.map((x) => x.id),
-      vinculoConvAgrupada.convenioNome,
+      vinculoConv.convenioNome,
     );
-    if (usouConv) convLabelAgrupada = vinculoConvAgrupada.convenioNome.toUpperCase();
+    if (usouConv) convLabelAgrupada = vinculoConv.convenioNome.toUpperCase();
   }
 
   // Cabeçalho da clínica (reutilizado em cada GR)

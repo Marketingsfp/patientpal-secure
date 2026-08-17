@@ -8237,6 +8237,7 @@ function AgendaPage() {
         initialFormaPagamento={pagamentoForma}
         agendamentoId={pagamentoAgId}
         resumoSaldo={saldoOrcResumo}
+        aguardarImpressao
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
@@ -8466,82 +8467,93 @@ function AgendaPage() {
             if (emitirNotaAposRef.current) {
               emitirNotaAposRef.current = false;
               // Emite a NFS-e automaticamente, sem o usuário precisar reabrir nada.
-              try {
-                const emitenteIdEscolhido =
-                  emitenteNotaAposRef.current ?? (await pickEmitenteNfse());
-                emitenteNotaAposRef.current = null;
-                if (!emitenteIdEscolhido) {
-                  toast.error("Selecione a empresa emitente para emitir a NFS-e.");
-                } else {
-                  const ag = items.find((x) => x.id === agId);
-                  if (!ag?.paciente_id) {
-                    toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
+              // Roda DESTACADO deste callback (setTimeout): o diálogo de
+              // pagamento agora só fecha quando a promessa daqui resolve, e a
+              // emissão abre outros diálogos (empresa emitente, tomador,
+              // descrição) que ficariam presos atrás dele.
+              const emitirNotaAgora = async () => {
+                try {
+                  const emitenteIdEscolhido =
+                    emitenteNotaAposRef.current ?? (await pickEmitenteNfse());
+                  emitenteNotaAposRef.current = null;
+                  if (!emitenteIdEscolhido) {
+                    toast.error("Selecione a empresa emitente para emitir a NFS-e.");
                   } else {
-                    const { data: pac } = await supabase
-                      .from("pacientes")
-                      .select(
-                        "id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado",
-                      )
-                      .eq("id", ag.paciente_id)
-                      .maybeSingle();
-                    if (!pac) {
-                      toast.error("Paciente não encontrado para emissão da NFS-e.");
+                    const ag = items.find((x) => x.id === agId);
+                    if (!ag?.paciente_id) {
+                      toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
                     } else {
-                      const tomador = await pickTomadorNfse({
-                        paciente: {
-                          nome: pac.nome,
-                          cpfCnpj: pac.cpf ?? undefined,
-                          email: pac.email ?? undefined,
-                          cep: pac.cep ?? undefined,
-                          logradouro: pac.logradouro ?? undefined,
-                          numero: pac.numero ?? undefined,
-                          bairro: pac.bairro ?? undefined,
-                          municipio: pac.cidade ?? undefined,
-                          uf: pac.estado ?? undefined,
-                        },
-                        valorBase: Number(dados.valor) || 0,
-                      });
-                      if (!tomador) {
-                        toast.error("Emissão cancelada.");
-                        return;
-                      }
-                      const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
-                      const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
-                      const descComDep = tomador.dependenteAtendido
-                        ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
-                        : descBase;
-                      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
-                      const descFinal = await pedirDescricaoNfse(descSugerida);
-                      if (!descFinal) {
-                        toast.error("Emissão cancelada.");
-                        return;
-                      }
-                      const res = await emitirNfseFn({
-                        data: {
-                          emitenteId: emitenteIdEscolhido,
-                          pacienteId: pac.id,
-                          agendamentoId: agId,
-                          valorServicos: parcial.valor,
-                          descricaoServicos: descFinal,
-                          tomador,
-                        },
-                      });
-                      const nfseId = (res as { id?: string })?.id;
-                      if (nfseId) {
-                        toast.success("NFS-e enviada. Consultando status...");
-                        await new Promise((r) => setTimeout(r, 4000));
-                        await consultarNfseFn({ data: { id: nfseId } });
-                        toast.success("NFS-e emitida com sucesso.");
+                      const { data: pac } = await supabase
+                        .from("pacientes")
+                        .select(
+                          "id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado",
+                        )
+                        .eq("id", ag.paciente_id)
+                        .maybeSingle();
+                      if (!pac) {
+                        toast.error("Paciente não encontrado para emissão da NFS-e.");
                       } else {
-                        toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
+                        const tomador = await pickTomadorNfse({
+                          paciente: {
+                            nome: pac.nome,
+                            cpfCnpj: pac.cpf ?? undefined,
+                            email: pac.email ?? undefined,
+                            cep: pac.cep ?? undefined,
+                            logradouro: pac.logradouro ?? undefined,
+                            numero: pac.numero ?? undefined,
+                            bairro: pac.bairro ?? undefined,
+                            municipio: pac.cidade ?? undefined,
+                            uf: pac.estado ?? undefined,
+                          },
+                          valorBase: Number(dados.valor) || 0,
+                        });
+                        if (!tomador) {
+                          toast.error("Emissão cancelada.");
+                          return;
+                        }
+                        const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
+                        const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
+                        const descComDep = tomador.dependenteAtendido
+                          ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
+                          : descBase;
+                        const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+                        const descFinal = await pedirDescricaoNfse(descSugerida);
+                        if (!descFinal) {
+                          toast.error("Emissão cancelada.");
+                          return;
+                        }
+                        const res = await emitirNfseFn({
+                          data: {
+                            emitenteId: emitenteIdEscolhido,
+                            pacienteId: pac.id,
+                            agendamentoId: agId,
+                            valorServicos: parcial.valor,
+                            descricaoServicos: descFinal,
+                            tomador,
+                          },
+                        });
+                        const nfseId = (res as { id?: string })?.id;
+                        if (nfseId) {
+                          toast.success("NFS-e enviada. Consultando status...");
+                          await new Promise((r) => setTimeout(r, 4000));
+                          await consultarNfseFn({ data: { id: nfseId } });
+                          toast.success("NFS-e emitida com sucesso.");
+                        } else {
+                          toast.warning(
+                            "NFS-e enviada — acompanhe o status em Financeiro › NFS-e.",
+                          );
+                        }
                       }
                     }
                   }
+                } catch (err) {
+                  mostrarErro(err, "falha ao emitir NFS-e");
+                  navigate({ to: "/app/nfse" });
                 }
-              } catch (err) {
-                mostrarErro(err, "falha ao emitir NFS-e");
-                navigate({ to: "/app/nfse" });
-              }
+              };
+              setTimeout(() => {
+                void emitirNotaAgora();
+              }, 0);
             }
           };
           try {

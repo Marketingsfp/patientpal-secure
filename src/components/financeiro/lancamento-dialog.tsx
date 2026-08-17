@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -72,7 +72,21 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   tipo: Tipo;
   onSaved?: () => void;
-  onSavedWithData?: (data: LancamentoSavedData) => void;
+  onSavedWithData?: (data: LancamentoSavedData) => void | Promise<void>;
+  /**
+   * Quando true, o diálogo só fecha depois que `onSavedWithData` termina —
+   * ou seja, depois que a guia já foi montada e mandada para a impressora.
+   * Enquanto isso o botão fica travado mostrando "Gerando guia...".
+   *
+   * Existe porque a geração da GR leva alguns segundos: sem a trava o diálogo
+   * fechava assim que o lançamento era gravado e a tela ficava em silêncio
+   * durante a montagem da guia, convidando o atendente a clicar de novo e
+   * enfileirar impressões duplicadas.
+   *
+   * Só ative em telas cujo `onSavedWithData` NÃO abra outros diálogos que
+   * dependam de resposta do usuário — eles ficariam presos atrás deste.
+   */
+  aguardarImpressao?: boolean;
   initialDescricao?: string;
   initialValor?: string;
   agendamentoId?: string | null;
@@ -105,6 +119,7 @@ export function LancamentoDialog({
   tipo,
   onSaved,
   onSavedWithData,
+  aguardarImpressao,
   initialDescricao,
   initialValor,
   agendamentoId,
@@ -133,6 +148,14 @@ export function LancamentoDialog({
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
   const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  // Segunda etapa do "Salvar e imprimir": o lançamento já está gravado e a
+  // guia está sendo montada/enviada para a impressora.
+  const [imprimindo, setImprimindo] = useState(false);
+  const ocupado = saving || imprimindo;
+  // Trava síncrona contra clique duplo: `saving` só vira true no próximo
+  // render, então dois cliques rápidos (ou Enter + clique) passariam pela
+  // checagem de estado e gravariam o pagamento duas vezes.
+  const emAndamentoRef = useRef(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
   const [pagamentos, setPagamentos] = useState<
@@ -384,7 +407,19 @@ export function LancamentoDialog({
     manual: "Manual",
   };
 
+  // Porta de entrada dos botões do rodapé: garante que só existe UMA gravação
+  // em andamento por vez, do clique até a guia sair.
   const handleSave = async (imprimir = true) => {
+    if (emAndamentoRef.current) return;
+    emAndamentoRef.current = true;
+    try {
+      await handleSaveInterno(imprimir);
+    } finally {
+      emAndamentoRef.current = false;
+    }
+  };
+
+  async function handleSaveInterno(imprimir = true) {
     if (!clinicaAtual) return;
     if (!descricao.trim() || !valor) {
       toast.error("Descrição e valor são obrigatórios");
@@ -1025,7 +1060,7 @@ export function LancamentoDialog({
         toast.error("Lançamento salvo, mas não foi possível abrir a impressão do recibo.");
       }
     }
-    onSavedWithData?.({
+    const posSalvar = onSavedWithData?.({
       lancamento_id: lancInserido.id,
       valor: Number(valor),
       forma_pagamento: formaFinal,
@@ -1045,6 +1080,19 @@ export function LancamentoDialog({
             .filter((x) => x.forma && x.pago > 0)
         : undefined,
     });
+    // Segura o diálogo aberto (e travado) enquanto a tela chamadora monta e
+    // envia a guia. Sem isso o diálogo sumia na hora e a tela ficava ~6s sem
+    // resposta nenhuma, o que levava o atendente a repetir a cobrança.
+    if (aguardarImpressao && imprimir && posSalvar) {
+      setImprimindo(true);
+      try {
+        await posSalvar;
+      } catch (e) {
+        console.error("Falha no pós-salvamento (impressão da guia):", e);
+      } finally {
+        setImprimindo(false);
+      }
+    }
     setDescricao("");
     setValor("");
     setObservacoes("");
@@ -1059,11 +1107,19 @@ export function LancamentoDialog({
     setPagamentos([{ forma: "dinheiro", recebido: "" }]);
     onSaved?.();
     onOpenChange(false);
-  };
+  }
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          // Enquanto grava/imprime, ESC e clique fora não fecham o diálogo —
+          // fechar aqui deixaria o pagamento pela metade sem aviso nenhum.
+          if (!v && ocupado) return;
+          onOpenChange(v);
+        }}
+      >
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col gap-3 p-4">
           <DialogHeader className="space-y-1">
             <DialogTitle className={tipo === "receita" ? "text-success" : "text-destructive"}>
@@ -1628,7 +1684,7 @@ export function LancamentoDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={ocupado}>
               Cancelar
             </Button>
             {/* A ação padrão deste diálogo é salvar E imprimir a guia: é o que a
@@ -1643,18 +1699,22 @@ export function LancamentoDialog({
             <Button
               variant="outline"
               onClick={() => void handleSave(false)}
-              disabled={saving}
+              disabled={ocupado}
               className="border-slate-300 text-slate-700 hover:bg-slate-50"
             >
               {saving ? "Salvando..." : "Salvar sem imprimir"}
             </Button>
             <Button
               onClick={() => void handleSave(true)}
-              disabled={saving}
+              disabled={ocupado}
               className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
             >
-              <Printer className="h-4 w-4" />
-              {saving ? "Salvando..." : "Salvar e imprimir"}
+              {ocupado ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {imprimindo ? "Gerando guia..." : saving ? "Salvando..." : "Salvar e imprimir"}
             </Button>
           </DialogFooter>
         </DialogContent>
