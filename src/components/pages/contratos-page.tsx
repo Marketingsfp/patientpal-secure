@@ -5,6 +5,7 @@ import {
   Plus,
   Printer,
   Search,
+  X,
   Trash2,
   Link2,
   Check,
@@ -33,6 +34,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -41,6 +43,67 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+/**
+ * Larguras do skeleton da lista de contratos, uma por coluna, na mesma ordem
+ * do cabeçalho. Imitam o tamanho do conteúdo real para a tabela não "pular"
+ * quando os dados chegam.
+ */
+const SKELETON_LARGURAS = [
+  "w-10", // Nº
+  "w-40", // Paciente
+  "w-14", // Prontuário
+  "w-28", // Convênio
+  "w-16", // Início
+  "w-16", // Término
+  "w-16", // Mensal
+  "w-12", // Parcelas
+  "w-16", // Situação
+  "w-20", // Vendedor
+  "w-16", // Status
+  "w-4", // Seta
+];
+
+/**
+ * Cores dos badges da coluna STATUS. Tons pastel com texto escuro: numa lista
+ * de 50 linhas os fundos sólidos anteriores competiam com o conteúdo, e o
+ * "cancelado" ainda vinha com texto preto sobre vermelho forte (ilegível).
+ */
+const STATUS_NEUTRO =
+  "bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300";
+const STATUS_CORES: Record<string, string> = {
+  ativo: "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950/60 dark:text-green-300",
+  cancelado: "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950/60 dark:text-red-300",
+  renovado: "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300",
+  suspenso:
+    "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300",
+  pendente:
+    "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300",
+  inadimplente:
+    "bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950/60 dark:text-orange-300",
+  encerrado: STATUS_NEUTRO,
+  finalizado: STATUS_NEUTRO,
+};
+const BADGE_BASE = "rounded-full border-transparent px-2.5 py-0.5 text-xs font-medium capitalize";
+const corStatus = (s?: string | null) =>
+  STATUS_CORES[(s ?? "").trim().toLowerCase()] ?? STATUS_NEUTRO;
+
+/** Linhas cinza animadas exibidas no lugar do antigo texto "Carregando…". */
+function LinhasSkeletonContratos({ linhas = 8 }: { linhas?: number }) {
+  return (
+    <>
+      {Array.from({ length: linhas }).map((_, i) => (
+        <TableRow key={`sk-${i}`} className="hover:bg-transparent">
+          {SKELETON_LARGURAS.map((w, j) => (
+            <TableCell key={j}>
+              <Skeleton className={`h-4 ${w} max-w-full animate-none hhp-shimmer`} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeObs: boolean }> = [
   { value: "troca_endereco", label: "Troca de endereço", pedeObs: false },
@@ -364,14 +427,29 @@ export function ContratosPage({
   const [flowType, setFlowType] = useState<"renovacao" | "troca_convenio">("renovacao");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
+  // 450ms: tempo suficiente para quem digita o nome inteiro do paciente sem
+  // disparar uma consulta por letra (cada busca faz 3 idas ao banco).
   const [qDebounced, setQDebounced] = useState("");
   useEffect(() => {
-    const t = setTimeout(() => setQDebounced(q.trim()), 300);
+    const t = setTimeout(() => setQDebounced(q.trim()), 450);
     return () => clearTimeout(t);
   }, [q]);
+  // Enquanto o debounce não venceu, a lista mostrada ainda é a do termo
+  // anterior — o skeleton avisa que o resultado está a caminho.
+  const buscaPendente = q.trim() !== qDebounced;
+  // Um único sinal para a tabela: vale tanto para a carga do banco quanto para
+  // o intervalo em que o usuário ainda está digitando.
+  const carregando = loading || buscaPendente;
+
+  // Sequência da última busca disparada. Sem isso, uma resposta lenta de um
+  // termo antigo podia chegar depois da resposta do termo novo e sobrescrever
+  // a lista com o resultado errado.
+  const loadSeq = useRef(0);
 
   const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
+    const seq = ++loadSeq.current;
+    const desatualizada = () => seq !== loadSeq.current;
     setLoading(true);
     let contratosQuery = supabase
       .from("contratos_assinatura")
@@ -418,6 +496,7 @@ export function ContratosPage({
         .eq("ativo", true)
         .order("nome"),
     ]);
+    if (desatualizada()) return;
     if (cs.error) mostrarErro(cs.error);
     const contratosRows = (cs.data ?? []) as Contrato[];
     // Enriquecer com codigo_prontuario do paciente titular (leitura, imutável).
@@ -437,6 +516,7 @@ export function ContratosPage({
         ]),
       );
     }
+    if (desatualizada()) return;
     setList(
       contratosRows.map((c) => ({
         ...c,
@@ -454,20 +534,32 @@ export function ContratosPage({
       const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
       for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
       const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
+      const lotes: string[][] = [];
       for (let i = 0; i < contratoIds.length; i += LOTE) {
-        const slice = contratoIds.slice(i, i + LOTE);
-        const { data: mens } = await supabase
-          .from("contrato_mensalidades")
-          .select("contrato_id, status, vencimento, numero_parcela")
-          .in("contrato_id", slice);
-        // Agrupa por contrato para segmentar em ciclos de 12 parcelas
-        // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
-        // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
-        // contrato representa um período de 12 meses.
-        const porContrato: Record<
-          string,
-          Array<{ status: string; vencimento: string; numero_parcela: number }>
-        > = {};
+        lotes.push(contratoIds.slice(i, i + LOTE));
+      }
+      // Os lotes vão juntos e não em fila: com 500 contratos eram 9 idas ao
+      // banco esperando uma pela outra, o que dominava o tempo de abertura da
+      // tela. Cada contrato aparece em um único lote, então o resultado é o
+      // mesmo — só chega mais rápido.
+      const respostas = await Promise.all(
+        lotes.map((slice) =>
+          supabase
+            .from("contrato_mensalidades")
+            .select("contrato_id, status, vencimento, numero_parcela")
+            .in("contrato_id", slice),
+        ),
+      );
+      if (desatualizada()) return;
+      // Agrupa por contrato para segmentar em ciclos de 12 parcelas
+      // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
+      // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
+      // contrato representa um período de 12 meses.
+      const porContrato: Record<
+        string,
+        Array<{ status: string; vencimento: string; numero_parcela: number }>
+      > = {};
+      for (const { data: mens } of respostas) {
         for (const m of (mens ?? []) as Array<{
           contrato_id: string;
           status: string;
@@ -477,17 +569,17 @@ export function ContratosPage({
           if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
           (porContrato[m.contrato_id] ||= []).push(m);
         }
-        for (const [cid, arr] of Object.entries(porContrato)) {
-          const a = agg[cid];
-          if (!a) continue;
-          // Ciclo atual = as 12 parcelas com maior numero_parcela.
-          arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
-          const cicloAtual = arr.slice(0, 12);
-          a.total = cicloAtual.length;
-          for (const m of cicloAtual) {
-            if (m.status === "pago") a.pagas += 1;
-            else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
-          }
+      }
+      for (const [cid, arr] of Object.entries(porContrato)) {
+        const a = agg[cid];
+        if (!a) continue;
+        // Ciclo atual = as 12 parcelas com maior numero_parcela.
+        arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
+        const cicloAtual = arr.slice(0, 12);
+        a.total = cicloAtual.length;
+        for (const m of cicloAtual) {
+          if (m.status === "pago") a.pagas += 1;
+          else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
         }
       }
       setParcAgg(agg);
@@ -504,6 +596,7 @@ export function ContratosPage({
     );
     if (ids.length > 0) {
       const { data: profs } = await supabase.from("profiles").select("id,nome").in("id", ids);
+      if (desatualizada()) return;
       const map: Record<string, string> = {};
       for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
         if (p.nome) map[p.id] = p.nome;
@@ -602,8 +695,10 @@ export function ContratosPage({
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
   }, [
+    // `q` não entra: o texto é aplicado na busca do servidor, não aqui. Com
+    // ele na lista, cada tecla refazia o filtro completo de até 500 contratos
+    // — era o que travava a digitação.
     list,
-    q,
     sortPaciente,
     parcAgg,
     vendedores,
@@ -627,6 +722,12 @@ export function ContratosPage({
     }
     return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
   }, [list, vendedores]);
+  // Nome do convênio por id — evita um `find` na lista inteira por linha.
+  const convenioNomePorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const cv of convenios) m.set(cv.id, cv.nome);
+    return m;
+  }, [convenios]);
   const statusOpcoes = useMemo(() => {
     const s = new Set<string>();
     for (const c of list) if (c.status) s.add(c.status);
@@ -636,7 +737,7 @@ export function ContratosPage({
   // Filtros ativos (para contagem/rótulo/limpar)
   const filtrosAtivos = useMemo(() => {
     const arr: string[] = [];
-    if (q.trim()) arr.push("Busca");
+    if (qDebounced) arr.push("Busca");
     if (filtroConvenio !== "todos") arr.push("Convênio");
     if (filtroInicio !== "todos") arr.push("Início");
     if (filtroTermino !== "todos") arr.push("Término");
@@ -647,7 +748,7 @@ export function ContratosPage({
     if (filtroStatus !== "todos") arr.push("Status");
     return arr;
   }, [
-    q,
+    qDebounced,
     filtroConvenio,
     filtroInicio,
     filtroTermino,
@@ -681,7 +782,7 @@ export function ContratosPage({
   useEffect(() => {
     setPagina(1);
   }, [
-    q,
+    qDebounced,
     sortPaciente,
     filtroConvenio,
     filtroInicio,
@@ -755,17 +856,34 @@ export function ContratosPage({
         </div>
       ) : null}
       <div className="relative max-w-md">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          aria-hidden
+        />
         <Input
-          className="pl-8"
+          className="h-10 rounded-lg border-gray-300 pl-9 pr-9 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700"
           placeholder="Buscar por número ou paciente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          aria-label="Buscar contratos"
         />
+        {q ? (
+          <button
+            type="button"
+            onClick={() => setQ("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            title="Limpar busca"
+            aria-label="Limpar busca"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
       </div>
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>
-          {filtered.length === 0 ? (
+          {carregando ? (
+            <span>Buscando contratos…</span>
+          ) : filtered.length === 0 ? (
             <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
           ) : temFiltroAtivo ? (
             <span>
@@ -985,101 +1103,108 @@ export function ContratosPage({
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
-                  Carregando…
-                </TableCell>
-              </TableRow>
-            ) : null}
-            {!loading && filtered.length === 0 ? (
-              <TableRow>
+          {/* `divide-y` no corpo desenha uma única linha separadora entre as
+              linhas (o `border-b` de cada `TableRow` é desligado aqui). */}
+          <TableBody className="divide-y divide-gray-200 dark:divide-gray-800 [&_tr]:border-b-0">
+            {carregando ? <LinhasSkeletonContratos /> : null}
+            {!carregando && filtered.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
             ) : null}
-            {paginados.map((c) => {
-              const agg = parcAgg[c.id];
-              const emDia = !agg || !agg.temAtrasada;
-              return (
-                <TableRow
-                  key={c.id}
-                  className={`cursor-pointer ${c.tabela_legada ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50" : ""}`}
-                  onClick={() => setDetail(c)}
-                >
-                  <TableCell className="font-semibold">{c.numero}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 whitespace-normal break-words">
-                      <span>{c.paciente_nome}</span>
-                      {c.sem_carencia ? (
-                        <Badge
-                          variant="outline"
-                          className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
-                        >
-                          Sem carência
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="tabular-nums text-sm">
-                    {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
-                  </TableCell>
-                  <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}
-                  </TableCell>
-                  <TableCell>{BRL(c.valor_mensal)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {agg ? `${agg.pagas} / ${agg.total}` : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {c.status === "cancelado" ? (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        —
-                      </Badge>
-                    ) : emDia ? (
-                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">
-                        Em dia
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pendente</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {c.criado_por && vendedores[c.criado_por] ? (
-                      <span>
-                        {vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/60">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={c.status === "ativo" ? "default" : "secondary"}
+            {carregando
+              ? null
+              : paginados.map((c) => {
+                  const agg = parcAgg[c.id];
+                  const emDia = !agg || !agg.temAtrasada;
+                  return (
+                    <TableRow
+                      key={c.id}
                       className={
-                        c.status === "cancelado"
-                          ? "bg-red-600 text-black hover:bg-red-600"
-                          : undefined
+                        c.tabela_legada
+                          ? "cursor-pointer bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+                          : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       }
+                      onClick={() => setDetail(c)}
                     >
-                      {c.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                      <TableCell className="font-semibold">{c.numero}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 whitespace-normal break-words">
+                          <span>{c.paciente_nome}</span>
+                          {c.sem_carencia ? (
+                            <Badge
+                              variant="outline"
+                              className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                            >
+                              Sem carência
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums text-sm">
+                        {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {(c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}
+                      </TableCell>
+                      <TableCell>{BRL(c.valor_mensal)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {agg ? `${agg.pagas} / ${agg.total}` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {c.status === "cancelado" ? (
+                          <Badge
+                            variant="outline"
+                            className="rounded-full px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                          >
+                            —
+                          </Badge>
+                        ) : emDia ? (
+                          <Badge
+                            className={`${BADGE_BASE} bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300`}
+                          >
+                            Em dia
+                          </Badge>
+                        ) : (
+                          <Badge
+                            className={`${BADGE_BASE} bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300`}
+                          >
+                            Pendente
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {c.criado_por && vendedores[c.criado_por] ? (
+                          <span>
+                            {vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/60">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={`${BADGE_BASE} ${corStatus(c.status)}`}
+                        >
+                          {c.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
           </TableBody>
         </Table>
-        {filtered.length > 0 ? (
+        {!carregando && filtered.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
               {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
@@ -1115,7 +1240,7 @@ export function ContratosPage({
             ) : null}
           </div>
         ) : null}
-        {filtered.some((c) => c.tabela_legada) ? (
+        {!carregando && filtered.some((c) => c.tabela_legada) ? (
           <div className="flex items-center gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
             <span
               className="inline-block h-3 w-3 rounded-sm bg-amber-100 border border-amber-300"
