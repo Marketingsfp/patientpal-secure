@@ -6109,7 +6109,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     },
                   });
                 toast.success(
-                  "Pagamento registrado. GR única (mensalidade + taxa de adesão) enviada para impressão.",
+                  dados.imprimir !== false
+                    ? "Pagamento registrado. GR única (mensalidade + taxa de adesão) enviada para impressão."
+                    : "Pagamento registrado. Nenhuma GR foi impressa.",
                 );
               } catch (err) {
                 mostrarErro(err);
@@ -6129,7 +6131,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     detalhe: dados.pagamentos_detalhe,
                   },
                 });
-              toast.success("Pagamento registrado e GR enviado para impressão.");
+              toast.success(
+                dados.imprimir !== false
+                  ? "Pagamento registrado e GR enviado para impressão."
+                  : "Pagamento registrado. Nenhuma GR foi impressa.",
+              );
             }
           } catch (err) {
             mostrarErro(err);

@@ -1631,21 +1631,30 @@ export function LancamentoDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancelar
             </Button>
+            {/* A ação padrão deste diálogo é salvar E imprimir a guia: é o que a
+                recepção faz em praticamente todo atendimento. Até 10/08 existia
+                um único botão ("Salvar e imprimir"); ele foi dividido em dois e o
+                botão em destaque passou a ser o "Salvar", que NÃO imprime. Como
+                a divisão é invisível para quem só reconhece o botão colorido da
+                direita, a clínica ficou dias sem emitir guia nenhuma, sem
+                qualquer erro na tela. O destaque volta para a ação que imprime;
+                "Salvar sem imprimir" continua disponível, mas como opção
+                secundária e com nome explícito. */}
             <Button
               variant="outline"
-              onClick={() => void handleSave(true)}
-              disabled={saving}
-              className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" />
-              Salvar e imprimir
-            </Button>
-            <Button
               onClick={() => void handleSave(false)}
               disabled={saving}
-              className="bg-indigo-600 text-white hover:bg-indigo-700"
+              className="border-slate-300 text-slate-700 hover:bg-slate-50"
             >
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : "Salvar sem imprimir"}
+            </Button>
+            <Button
+              onClick={() => void handleSave(true)}
+              disabled={saving}
+              className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
+            >
+              <Printer className="h-4 w-4" />
+              {saving ? "Salvando..." : "Salvar e imprimir"}
             </Button>
           </DialogFooter>
         </DialogContent>

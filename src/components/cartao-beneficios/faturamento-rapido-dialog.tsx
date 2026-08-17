@@ -462,7 +462,14 @@ export function FaturamentoRapidoMensalidadeDialog({
           } catch (err) {
             mostrarErro(err);
           }
-          notify.success("Mensalidade recebida e GR enviada para impressão.");
+          // A mensagem precisa refletir o que realmente aconteceu: quando o
+          // usuário escolhe salvar sem imprimir, dizer "GR enviada para
+          // impressão" faz a guia que nunca saiu parecer problema de impressora.
+          notify.success(
+            dados.imprimir !== false
+              ? "Mensalidade recebida e GR enviada para impressão."
+              : "Mensalidade recebida. Nenhuma GR foi impressa.",
+          );
           setItens((prev) => prev.filter((x) => x.id !== m.id));
           setPagando(null);
           onPago?.();

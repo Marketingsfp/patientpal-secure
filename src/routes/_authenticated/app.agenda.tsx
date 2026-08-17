@@ -8449,7 +8449,11 @@ function AgendaPage() {
                   },
                 });
               if (!rateioFalhou) {
-                toast.success("Pagamento registrado e GR enviado para impressão.");
+                toast.success(
+                  dados.imprimir !== false
+                    ? "Pagamento registrado e GR enviado para impressão."
+                    : "Pagamento registrado. Nenhuma GR foi impressa.",
+                );
               }
             } catch (err) {
               mostrarErro(err);
