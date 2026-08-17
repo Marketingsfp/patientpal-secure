@@ -1,4 +1,11 @@
-import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  Link,
+  Navigate,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   lazy,
@@ -505,6 +512,32 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
 ];
+
+// Rota "principal" de cada portal — é para onde o hub (/app) e o seletor de
+// portais mandam o usuário quando ele clica no módulo (Clínica Médica →
+// /app/painel, Funcionários / RH → /app/hr-ponto).
+const ROTAS_HOME_PORTAL: ReadonlySet<string> = new Set(
+  Object.values(SUBSYSTEMS).map((s) => s.home),
+);
+
+/**
+ * Primeira tela que o usuário realmente pode abrir, na ordem em que ela
+ * aparece no menu lateral já filtrado (portal + permissões + feature flags +
+ * ordem personalizada). Grupos expansíveis (ex.: Nina) entram pelo primeiro
+ * filho. Retorna null quando não sobrou nenhuma tela visível.
+ */
+function primeiraRotaVisivel(
+  rows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }>,
+): { to: string; hash?: string } | null {
+  for (const row of rows) {
+    for (const item of row.items) {
+      if (!isParent(item)) return { to: item.to };
+      const filho = item.children[0];
+      if (filho) return { to: filho.to, hash: filho.hash };
+    }
+  }
+  return null;
+}
 
 export function AppShell() {
   return <AppShellInner />;
@@ -1070,12 +1103,33 @@ function AppShellInner() {
     if (temSubPermitido) return true;
     return false;
   })();
+  // Entrar num portal não pode terminar em "Acesso negado". A rota principal
+  // da Clínica Médica é o Dashboard (/app/painel), que perfis operacionais
+  // (Recepção, Médico, Caixa, Financeiro, Enfermagem) normalmente não têm —
+  // o usuário só clicou no módulo, não pediu aquela tela. Nesse caso mandamos
+  // ele, sem aviso, para a primeira tela do menu a que ele tem acesso (Agenda,
+  // Clientes, Atendimento médico…). Fora das rotas-home de portal o
+  // comportamento continua o mesmo: URL digitada ou link direto para uma tela
+  // sem permissão segue mostrando o bloqueio, que é o aviso correto ali.
+  const pathAtual =
+    location.pathname.length > 1 && location.pathname.endsWith("/")
+      ? location.pathname.slice(0, -1)
+      : location.pathname;
+  const destinoPortal =
+    !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
+      ? primeiraRotaVisivel(visibleNavRows)
+      : null;
   const guardedOutlet = permsLoading ? (
     <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
       Carregando permissões…
     </div>
   ) : rotaPermitida ? (
     <Outlet />
+  ) : // A comparação com `pathAtual` é só uma trava contra laço infinito: se o
+  // menu devolvesse a própria rota bloqueada, cairíamos no redirecionamento
+  // para sempre.
+  destinoPortal && destinoPortal.to !== pathAtual ? (
+    <Navigate to={destinoPortal.to} hash={destinoPortal.hash} replace />
   ) : (
     <SemPermissao modulo={currentModulo ?? undefined} />
   );
