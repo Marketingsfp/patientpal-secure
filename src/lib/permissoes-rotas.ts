@@ -42,6 +42,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/cartao-beneficios/beneficios": "cartao-beneficios",
   "/app/cartao-beneficios/convenios": "cartao-beneficios",
   "/app/cartao-beneficios/dependentes": "cartao-beneficios",
+  "/app/cartao-beneficios/conferencia": "cartao-beneficios",
   "/app/cartao-beneficios/modelos": "cartao-beneficios",
   "/app/cartao-beneficios/relatorios": "cartao-beneficios",
   "/app/imprimir": "agenda",
