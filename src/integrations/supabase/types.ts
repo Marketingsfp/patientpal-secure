@@ -9040,6 +9040,17 @@ export type Database = {
         Returns: string
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
+      buscar_contratos: {
+        Args: { _clinica_id: string; _limit?: number; _termo?: string }
+        Returns: {
+          codigo_prontuario: string | null
+          contrato: Json
+          parcela_atrasada: boolean
+          parcelas_pagas: number
+          parcelas_total: number
+          vendedor_nome: string | null
+        }[]
+      }
       buscar_paciente_contato: {
         Args: {
           _clinica_id: string

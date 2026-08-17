@@ -45,6 +45,37 @@ import {
 } from "@/components/ui/select";
 
 /**
+ * Quanto a tela pede ao banco. A busca por texto traz pouco de propósito — ela
+ * serve para achar um paciente específico, e o corte baixo mantém a resposta
+ * rápida. A listagem sem termo traz mais, porque os filtros das colunas
+ * (convênio, vendedor, status…) trabalham em cima do que já foi carregado.
+ */
+const LIMITE_BUSCA = 50;
+const LIMITE_LISTA = 500;
+
+/** Uma linha devolvida pela função `buscar_contratos` do banco. */
+type LinhaBuscaContrato = {
+  contrato: unknown;
+  codigo_prontuario: string | null;
+  parcelas_pagas: number;
+  parcelas_total: number;
+  parcela_atrasada: boolean;
+  vendedor_nome: string | null;
+};
+
+/**
+ * A função `buscar_contratos` ainda não existe neste banco? PGRST202 é a
+ * resposta do PostgREST quando não acha a função; 42883 é a do próprio
+ * PostgreSQL. Só nesses dois casos a tela volta ao caminho antigo — qualquer
+ * outro erro é erro de verdade e precisa aparecer para o usuário.
+ */
+function funcaoAusenteNoBanco(erro: { code?: string; message?: string } | null): boolean {
+  if (!erro) return false;
+  if (erro.code === "PGRST202" || erro.code === "42883") return true;
+  return /could not find the function/i.test(erro.message ?? "");
+}
+
+/**
  * Larguras do skeleton da lista de contratos, uma por coluna, na mesma ordem
  * do cabeçalho. Imitam o tamanho do conteúdo real para a tabela não "pular"
  * quando os dados chegam.
@@ -381,6 +412,9 @@ export function ContratosPage({
     Record<string, { pagas: number; total: number; temAtrasada: boolean }>
   >({});
   const [loading, setLoading] = useState(true);
+  // Verdadeiro quando a busca bateu no limite e pode haver mais resultados
+  // além dos exibidos — a tela avisa em vez de calar.
+  const [resultadoCortado, setResultadoCortado] = useState(false);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
@@ -449,8 +483,74 @@ export function ContratosPage({
   const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
     const seq = ++loadSeq.current;
-    const desatualizada = () => seq !== loadSeq.current;
     setLoading(true);
+    // Caminho novo primeiro; se a função ainda não existir no banco, o
+    // caminho antigo assume e a tela continua funcionando.
+    const resolvido = await carregarViaRpc(termo, seq);
+    if (!resolvido) await carregarLegado(termo, seq);
+  };
+
+  /**
+   * Caminho novo: uma única chamada à função `buscar_contratos`, que já volta
+   * com prontuário, contagem de parcelas e nome do vendedor. Devolve `false`
+   * quando a função ainda não foi criada no banco, para o chamador cair no
+   * caminho antigo.
+   */
+  const carregarViaRpc = async (termo: string, seq: number): Promise<boolean> => {
+    const desatualizada = () => seq !== loadSeq.current;
+    const s = termo.trim();
+    const buscando = s.length >= 2;
+    const [res, cv] = await Promise.all([
+      supabase.rpc("buscar_contratos", {
+        _clinica_id: clinicaAtual!.clinica_id,
+        _termo: buscando ? s : "",
+        _limit: buscando ? LIMITE_BUSCA : LIMITE_LISTA,
+      }),
+      supabase
+        .from("cb_convenios")
+        .select("*")
+        .eq("clinica_id", clinicaAtual!.clinica_id)
+        .eq("ativo", true)
+        .order("nome"),
+    ]);
+    if (desatualizada()) return true;
+    if (res.error) {
+      if (funcaoAusenteNoBanco(res.error)) return false;
+      mostrarErro(res.error);
+      setLoading(false);
+      return true;
+    }
+    const linhas = (res.data ?? []) as LinhaBuscaContrato[];
+    const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
+    const vend: Record<string, string> = {};
+    const lista = linhas.map((l) => {
+      const c = l.contrato as unknown as Contrato;
+      agg[c.id] = {
+        pagas: l.parcelas_pagas ?? 0,
+        total: l.parcelas_total ?? 0,
+        temAtrasada: Boolean(l.parcela_atrasada),
+      };
+      if (c.criado_por && l.vendedor_nome) vend[c.criado_por] = l.vendedor_nome;
+      return { ...c, codigo_prontuario: l.codigo_prontuario ?? null };
+    });
+    setList(lista);
+    setParcAgg(agg);
+    setVendedores(vend);
+    setConvenios((cv.data ?? []) as Convenio[]);
+    // Avisa a tela quando o corte do limite pode ter escondido resultados.
+    setResultadoCortado(buscando && linhas.length >= LIMITE_BUSCA);
+    setLoading(false);
+    return true;
+  };
+
+  /**
+   * Caminho antigo, mantido só como rede de segurança até a função
+   * `buscar_contratos` estar aplicada no banco. Faz cinco idas em sequência.
+   */
+  const carregarLegado = async (termo: string, seq: number) => {
+    if (!clinicaAtual) return;
+    const desatualizada = () => seq !== loadSeq.current;
+    setResultadoCortado(false);
     let contratosQuery = supabase
       .from("contratos_assinatura")
       .select("*")
@@ -483,9 +583,9 @@ export function ContratosPage({
       const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
       if (soDigitos) orParts.push(`numero.eq.${s}`);
       if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
-      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
+      contratosQuery = contratosQuery.or(orParts.join(",")).limit(LIMITE_BUSCA);
     } else {
-      contratosQuery = contratosQuery.limit(500);
+      contratosQuery = contratosQuery.limit(LIMITE_LISTA);
     }
     const [cs, cv] = await Promise.all([
       contratosQuery,
@@ -605,6 +705,7 @@ export function ContratosPage({
     } else {
       setVendedores({});
     }
+    setResultadoCortado(termo.trim().length >= 2 && contratosRows.length >= LIMITE_BUSCA);
     setLoading(false);
   };
   useEffect(() => {
@@ -908,6 +1009,16 @@ export function ContratosPage({
           </Button>
         ) : null}
       </div>
+      {!carregando && resultadoCortado ? (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            A busca mostra os <strong>{LIMITE_BUSCA}</strong> contratos mais recentes que combinam
+            com o texto. Pode haver mais — escreva o nome completo ou o número do prontuário para
+            estreitar o resultado.
+          </span>
+        </div>
+      ) : null}
       <div className="rounded-md border bg-card overflow-hidden">
         <Table className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
