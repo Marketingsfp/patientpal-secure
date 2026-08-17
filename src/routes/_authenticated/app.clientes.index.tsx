@@ -188,7 +188,7 @@ function ClientesPage() {
   const LIMITE_BUSCA = 500;
   const LIMITE_LISTA = 500;
 
-  const loadManual = async (termo: string = "") => {
+  const loadManual = async (termo: string = "", paginaAtual: number = 0) => {
     if (!clinicaAtual) return;
     const requestId = ++loadSeq.current;
     setLoadingManual(true);
@@ -203,7 +203,8 @@ function ClientesPage() {
         _clinica_id: clinicaAtual.clinica_id,
         _termo: q,
         _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
-      });
+        _offset: q ? 0 : paginaAtual * LIMITE_LISTA,
+      } as any);
       const countRequest = q
         ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
@@ -244,21 +245,20 @@ function ClientesPage() {
     return () => clearTimeout(t);
   }, [busca]);
 
-  // Página atual (paginação de 500 em 500) — apenas usada no caminho
-  // com cache (São Francisco de Paula via flag `ux_melhorias`) e somente
-  // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
-  // filtro roda no banco todo em uma página só.
+  // Página atual (paginação de 500 em 500) — vale para os dois caminhos
+  // (manual e com cache) e somente quando não há termo de busca. Ao buscar por
+  // nome/CPF/telefone o filtro roda no banco todo em uma página só.
   const [pagina, setPagina] = useState(0);
   useEffect(() => {
     setPagina(0);
   }, [debouncedBusca]);
 
-  // Caminho manual (sem a flag): idêntico ao comportamento anterior.
+  // Caminho manual (sem a flag): agora também recarrega ao trocar de página.
   useEffect(() => {
     if (!clinicaAtual || uxMelhorias) return;
-    void loadManual(debouncedBusca);
+    void loadManual(debouncedBusca, pagina);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [debouncedBusca, clinicaAtual?.clinica_id, uxMelhorias]);
+  }, [debouncedBusca, pagina, clinicaAtual?.clinica_id, uxMelhorias]);
 
   // Caminho com cache (só São Francisco): staleTime de 60s — revisitar a
   // tela com o mesmo termo mostra os dados na hora e revalida em segundo
@@ -318,7 +318,7 @@ function ClientesPage() {
       void queryClient.invalidateQueries({ queryKey: ["clientes-lista", clinicaId] });
       void queryClient.invalidateQueries({ queryKey: ["clientes-total", clinicaId] });
     } else {
-      void loadManual(busca);
+      void loadManual(busca, pagina);
     }
   };
 
@@ -612,7 +612,7 @@ function ClientesPage() {
         </div>
       </div>
 
-      {atingiuTeto && !(uxMelhorias && !debouncedBusca.trim()) && (
+      {atingiuTeto && !!debouncedBusca.trim() && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca
           (nome completo, CPF ou telefone) para ver mais.
@@ -833,61 +833,58 @@ function ClientesPage() {
         </div>
       )}
 
-      {uxMelhorias &&
-        !debouncedBusca.trim() &&
-        totalPacientes !== null &&
-        totalPacientes > LIMITE_LISTA && (
-          <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
-            <div className="text-muted-foreground">
-              Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
-              <span className="font-medium text-foreground">
-                {Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}
-              </span>
-              {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–
-              {pagina * LIMITE_LISTA + filtrados.length} de {totalPacientes.toLocaleString("pt-BR")}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagina === 0 || loading}
-                onClick={() => setPagina(0)}
-                title="Primeira página"
-              >
-                Primeira
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagina === 0 || loading}
-                onClick={() => setPagina((p) => Math.max(0, p - 1))}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={
-                  loading ||
-                  (pagina + 1) * LIMITE_LISTA >= totalPacientes ||
-                  filtrados.length < LIMITE_LISTA
-                }
-                onClick={() => setPagina((p) => p + 1)}
-              >
-                Próxima
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes}
-                onClick={() => setPagina(Math.max(0, Math.ceil(totalPacientes / LIMITE_LISTA) - 1))}
-                title="Última página"
-              >
-                Última
-              </Button>
-            </div>
+      {!debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+          <div className="text-muted-foreground">
+            Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
+            <span className="font-medium text-foreground">
+              {Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}
+            </span>
+            {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length}{" "}
+            de {totalPacientes.toLocaleString("pt-BR")}
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina(0)}
+              title="Primeira página"
+            >
+              Primeira
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                loading ||
+                (pagina + 1) * LIMITE_LISTA >= totalPacientes ||
+                filtrados.length < LIMITE_LISTA
+              }
+              onClick={() => setPagina((p) => p + 1)}
+            >
+              Próxima
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes}
+              onClick={() => setPagina(Math.max(0, Math.ceil(totalPacientes / LIMITE_LISTA) - 1))}
+              title="Última página"
+            >
+              Última
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
