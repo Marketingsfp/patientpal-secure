@@ -27,6 +27,27 @@ export function saldoEsperadoGaveta(c: ComposicaoGaveta): number {
   return c.saldoInicial + c.recebimentosDinheiro + c.suprimentos - c.sangrias - c.despesas;
 }
 
+/**
+ * Soma de TODAS as formas de pagamento conferidas no fechamento.
+ *
+ * A grade de conferência guarda os valores como texto (vêm de um campo de
+ * moeda), então entradas vazias ou não numéricas valem zero. O resultado é
+ * arredondado em duas casas para não arrastar erro de ponto flutuante até a
+ * comparação com o saldo do dia.
+ *
+ * Existe como função única porque a tela tinha um estado paralelo guardando
+ * esse mesmo total: ele era pré-preenchido apenas com o esperado em espécie e,
+ * num dia com sangrias, a gaveta zerada fazia o total do dia aparecer como
+ * R$ 0,00 — acusando "Falta em caixa" do valor inteiro do dia e travando o
+ * fechamento. Com uma fonte só, o total não pode divergir das partes.
+ */
+export function totalConferido(
+  conferido: Record<string, string | number | null | undefined>,
+): number {
+  const soma = Object.values(conferido).reduce<number>((acc, v) => acc + (Number(v) || 0), 0);
+  return Number(soma.toFixed(2));
+}
+
 export type TipoDiferenca = "sobra" | "falta" | "exato";
 
 export interface Diferenca {

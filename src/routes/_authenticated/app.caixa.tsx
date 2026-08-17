@@ -79,6 +79,7 @@ import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
 import {
   saldoEsperadoGaveta,
   classificarDiferenca,
+  totalConferido,
   statusCaixa,
   STATUS_CAIXA_LABEL,
   STATUS_CAIXA_CLASS,
@@ -2004,11 +2005,28 @@ function Page() {
     if (!dataFechamento) return reais;
     return reais.filter((m) => localYMD(m.created_at) === dataFechamento);
   }, [minhasMovs, dataFechamento]);
+  /**
+   * Saldo do dia no escopo da conferência: exatamente os mesmos movimentos que
+   * porFormaDoDiaFechamento distribui por forma de pagamento.
+   *
+   * A abertura fica FORA de propósito. O troco inicial não é uma forma de
+   * pagamento — ele é conferido no quadro "Dinheiro na gaveta", que já o inclui
+   * via saldoInicial em esperadoGaveta. Se entrasse aqui, o total das formas
+   * nunca fecharia com o calculado num dia aberto com troco, e como o campo do
+   * total deixou de ser editável ninguém poderia corrigir: o fechamento
+   * gravaria diferença ≠ 0 e o caixa cairia em "Em conferência" sem motivo.
+   * Medido na base: em 60 dias, 1 dia-operador tinha troco > 0 (11/08/2026,
+   * R$ 110,00, que viraria uma falta fantasma de R$ 110,00).
+   *
+   * Os demais tipos não precisam de filtro: fechamento e reabertura já têm
+   * TIPO_SINAL 0.
+   */
   const saldoDoDiaFechamento = useMemo(() => {
-    return movsDoDiaFechamento.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
+    const soma = movsDoDiaFechamento.reduce(
+      (acc, m) => (m.tipo === "abertura" ? acc : acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0)),
       0,
     );
+    return Number(soma.toFixed(2));
   }, [movsDoDiaFechamento]);
   const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {
@@ -2321,15 +2339,7 @@ function Page() {
    * e travando o fechamento. Mantendo uma única fonte de verdade, o total
    * não pode mais divergir das partes.
    */
-  const totalConferidoOwn = useMemo(
-    () =>
-      Number(
-        Object.values(conferidoOwn)
-          .reduce((acc, v) => acc + (Number(v) || 0), 0)
-          .toFixed(2),
-      ),
-    [conferidoOwn],
-  );
+  const totalConferidoOwn = useMemo(() => totalConferido(conferidoOwn), [conferidoOwn]);
 
   /** Linha do tempo de sangrias e suprimentos do turno atual. */
   const movsGaveta = useMemo(
@@ -4676,10 +4686,7 @@ function Page() {
                   (k) =>
                     (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005,
                 );
-                const totalConferido = Object.values(conferidoTerceiro).reduce(
-                  (acc, v) => acc + (Number(v) || 0),
-                  0,
-                );
+                const totalTerceiro = totalConferido(conferidoTerceiro);
                 return (
                   <div className="space-y-2">
                     <Label>Conferência por forma de pagamento</Label>
@@ -4716,7 +4723,7 @@ function Page() {
                     </div>
                     <div className="flex justify-between text-sm pt-1 border-t">
                       <span className="text-muted-foreground">Total conferido</span>
-                      <strong>{fmt(totalConferido)}</strong>
+                      <strong>{fmt(totalTerceiro)}</strong>
                     </div>
                   </div>
                 );
