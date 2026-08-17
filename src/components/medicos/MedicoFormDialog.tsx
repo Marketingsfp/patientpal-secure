@@ -1829,7 +1829,9 @@ export function MedicoFormDialog({
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Quando marcado, este médico aceita os preços/descontos dos cartões benefícios.
-                  Defina abaixo o repasse aplicado às <b>consultas</b> pagas com cartão benefício.
+                  Defina abaixo o repasse aplicado às <b>consultas</b> pagas com cartão benefício.{" "}
+                  <b>Campo em branco = usa o repasse padrão do médico</b>; digite 0 só para não
+                  pagar repasse nesses atendimentos.
                 </p>
               </div>
             </div>
@@ -1851,12 +1853,13 @@ export function MedicoFormDialog({
                     min={0}
                     max={100}
                     step={0.01}
-                    placeholder="% repasse"
+                    placeholder="padrão do médico"
                     value={form.cb_percentual}
                     onChange={(e) => setForm({ ...form, cb_percentual: e.target.value })}
                   />
                 ) : (
                   <CurrencyInput
+                    placeholder="padrão do médico"
                     value={form.cb_valor}
                     onChange={(v) => setForm({ ...form, cb_valor: v })}
                   />
@@ -2020,6 +2023,7 @@ export function MedicoFormDialog({
                                 type="number"
                                 step="0.01"
                                 min={0}
+                                placeholder="padrão"
                                 value={c.percentual}
                                 onChange={(e) =>
                                   setConvenios((cs) =>
@@ -2031,6 +2035,7 @@ export function MedicoFormDialog({
                               />
                             ) : (
                               <CurrencyInput
+                                placeholder="padrão"
                                 value={c.valor}
                                 onChange={(v) =>
                                   setConvenios((cs) =>
@@ -2081,6 +2086,7 @@ export function MedicoFormDialog({
                               />
                             ) : (
                               <CurrencyInput
+                                placeholder="padrão"
                                 value={c.convenio_valor}
                                 onChange={(v) =>
                                   setConvenios((cs) =>
@@ -2092,6 +2098,7 @@ export function MedicoFormDialog({
                           </td>
                           <td className="px-2 py-1">
                             <CurrencyInput
+                              placeholder="padrão"
                               value={c.cartao_consulta_valor}
                               onChange={(v) =>
                                 setConvenios((cs) =>
@@ -2104,6 +2111,7 @@ export function MedicoFormDialog({
                           </td>
                           <td className="px-2 py-1">
                             <CurrencyInput
+                              placeholder="padrão"
                               value={c.cartao_desconto_valor}
                               onChange={(v) =>
                                 setConvenios((cs) =>
