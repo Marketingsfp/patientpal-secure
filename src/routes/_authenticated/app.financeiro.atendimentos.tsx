@@ -99,6 +99,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
+import { resolverRepasse, formaDoAtendimento } from "@/lib/repasse-calc";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
@@ -152,6 +153,11 @@ interface Convenio {
   tipo_repasse: string;
   percentual: number | null;
   valor: number | null;
+  convenio_tipo_repasse?: string | null;
+  convenio_percentual?: number | null;
+  convenio_valor?: number | null;
+  cartao_consulta_valor?: number | null;
+  cartao_desconto_valor?: number | null;
 }
 interface Conta {
   id: string;
@@ -1076,19 +1082,6 @@ function AtendimentosPage() {
     return Array.from(out).filter(Boolean);
   };
 
-  // Detecta lançamentos de "Cartão Consulta" pela descrição.
-  const isCartaoConsultaDesc = (desc: string | null | undefined): boolean => {
-    if (!desc) return false;
-    const d = desc.toUpperCase();
-    if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
-    return (
-      d.includes("CARTAO CONSULTA") ||
-      d.includes("CARTÃO CONSULTA") ||
-      d.includes("CONSULTA CARTAO") ||
-      d.includes("CONSULTA CARTÃO")
-    );
-  };
-
   // Índices O(1) para o cálculo de repasse, que roda uma vez por linha em
   // `load()`. Antes disso eram `medicos.find`/`convenios.find` (O(n) cada),
   // repetidos por linha × variante de nome — em clínicas com milhares de
@@ -1122,36 +1115,18 @@ function AtendimentosPage() {
     modalidade?: "cartao_consulta" | "cartao_desconto" | null,
   ): { total: number; repasse: number } => {
     if (!medicoId) return { total: totalPago, repasse: 0 };
-    const med = medicosById.get(medicoId);
-    // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
-    // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
-    // convênio particular). Detecta pelo CADASTRO do paciente (contrato ativo)
-    // e, só como fallback histórico, pela descrição do lançamento.
-    const ehConvenio =
-      modalidade === "cartao_consulta" ||
-      modalidade === "cartao_desconto" ||
-      (modalidade == null && isCartaoConsultaDesc(descricao));
-    if (ehConvenio && med?.aceita_cartao_beneficios) {
-      if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
-        return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
-      }
-      if (med.cb_tipo_repasse === "percentual" && med.cb_percentual_repasse != null) {
-        return {
-          total: totalPago,
-          repasse: +((totalPago * Number(med.cb_percentual_repasse)) / 100).toFixed(2),
-        };
-      }
-    }
-    // 1) Procura convênio cadastrado pelo nome do procedimento (independente de ter pagamento)
+    const med = medicosById.get(medicoId) ?? null;
+    // Linha cadastrada para o servico (ou para a categoria dele). Os indices
+    // O(1) existem porque isto roda uma vez por atendimento carregado.
+    let linha: Convenio | undefined;
     if (procNome) {
       const variants = procVariants(procNome);
-      let c: Convenio | undefined;
       for (const alvo of variants) {
-        c = convenioIdx.porNomeNorm.get(`${medicoId}|${alvo}`);
-        if (c) break;
+        linha = convenioIdx.porNomeNorm.get(`${medicoId}|${alvo}`);
+        if (linha) break;
       }
       // Fallback: repasse por categoria (__CAT__:<TIPO>) usando o tipo do procedimento
-      if (!c) {
+      if (!linha) {
         let tipo: string | undefined;
         for (const alvo of variants) {
           tipo = procTipos.get(alvo);
@@ -1159,55 +1134,19 @@ function AtendimentosPage() {
         }
         if (tipo) {
           const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
-          c = convenioIdx.porNomeCru.get(`${medicoId}|${sentinel}`);
+          linha = convenioIdx.porNomeCru.get(`${medicoId}|${sentinel}`);
         }
-      }
-      if (c) {
-        // Sem pagamento registrado, mantém total zerado (será preenchido quando o
-        // financeiro for lançado). Com pagamento, usa o valor pago como base.
-        const base = totalPago;
-        if (c.tipo_repasse === "valor" && c.valor != null) {
-          // Repasse fixo do convênio é pago integralmente, mesmo que o paciente
-          // tenha pago R$ 0 no caixa (convênio cobre direto com a clínica).
-          return { total: Math.max(base, Number(c.valor)), repasse: Number(c.valor) };
-        }
-        if (c.tipo_repasse === "percentual" && c.percentual != null) {
-          return { total: base, repasse: +((base * Number(c.percentual)) / 100).toFixed(2) };
-        }
-        // convênio sem tipo definido → cai no padrão do médico abaixo, usando base
-        if (med) {
-          if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-            return { total: base, repasse: Math.min(Number(med.valor_repasse_padrao), base) };
-          }
-          return {
-            total: base,
-            repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
-          };
-        }
-        return { total: base, repasse: 0 };
       }
     }
-    // 2) Sem convênio casado e sem pagamento → trata como Cartão Consulta
-    if (!totalPago) {
-      if (med?.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
-        return { total: 0, repasse: Number(med.cb_valor_repasse) };
-      }
-      if (med?.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-        return { total: 0, repasse: Number(med.valor_repasse_padrao) };
-      }
-      return { total: 0, repasse: 0 };
-    }
-    // 3) Pagou em dinheiro/cartão sem convênio → repasse padrão do médico sobre o total pago
-    if (med) {
-      if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-        return { total: totalPago, repasse: Math.min(Number(med.valor_repasse_padrao), totalPago) };
-      }
-      return {
-        total: totalPago,
-        repasse: +((totalPago * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
-      };
-    }
-    return { total: totalPago, repasse: 0 };
+    // A escada de heranca (coluna da forma de pagamento -> Convenio -> cartao
+    // beneficio do medico -> Repasse Padrao) vive em @/lib/repasse-calc, para
+    // esta tela e a 2a via dos comprovantes decidirem igual.
+    return resolverRepasse({
+      linha,
+      med,
+      base: totalPago,
+      forma: formaDoAtendimento(descricao, modalidade),
+    });
   };
   const calcRepasse = (medicoId: string | null, total: number, procNome: string | null): number =>
     calcRepasseFull(medicoId, total, procNome).repasse;
@@ -1566,7 +1505,9 @@ function AtendimentosPage() {
       for (;;) {
         const { data: cv, error: cvErr } = await supabase
           .from("medico_convenios")
-          .select("medico_id, nome, tipo_repasse, percentual, valor, ativo")
+          .select(
+            "medico_id, nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor",
+          )
           .in("medico_id", ids)
           .eq("ativo", true)
           .range(offset, offset + CHUNK - 1);

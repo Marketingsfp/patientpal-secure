@@ -106,6 +106,19 @@ const REPASSE_EXTRA_VAZIO = {
   cartao_desconto_valor: "",
 };
 
+/**
+ * Campo de repasse deixado EM BRANCO significa "herda o Repasse Padrão do
+ * médico" — por isso grava `null`, e não 0. Gravar 0 fazia o cálculo entender
+ * "este atendimento não paga repasse" e a tela de Atendimentos marcava a linha
+ * como "Sem repasse". Zero só entra no banco quando é digitado de propósito.
+ */
+const numeroOuNulo = (v: string | null | undefined): number | null => {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+  const n = parseFloat(s.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
 const limparPrefixoMedico = (nome: string) => nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
 const fetchProcedimentosAtivos = async (clinicaId: string) => {
@@ -824,18 +837,20 @@ export function MedicoFormDialog({
       crm_uf: form.crm_uf.toUpperCase(),
       especialidade_id: form.especialidades[0]?.especialidade_id ?? null,
       tipo_repasse: form.tipo_repasse,
+      // A coluna do percentual padrão não aceita nulo no banco; as demais sim,
+      // e nelas "em branco" precisa chegar como nulo para a herança funcionar.
       percentual_repasse_padrao:
-        form.tipo_repasse === "percentual" ? parseFloat(form.percentual || "0") : 0,
-      valor_repasse_padrao: form.tipo_repasse === "valor" ? parseFloat(form.valor || "0") : null,
+        form.tipo_repasse === "percentual" ? (numeroOuNulo(form.percentual) ?? 0) : 0,
+      valor_repasse_padrao: form.tipo_repasse === "valor" ? numeroOuNulo(form.valor) : null,
       aceita_cartao_beneficios: form.aceita_cartao_beneficios,
       cb_tipo_repasse: form.aceita_cartao_beneficios ? form.cb_tipo_repasse : null,
       cb_percentual_repasse:
         form.aceita_cartao_beneficios && form.cb_tipo_repasse === "percentual"
-          ? parseFloat(form.cb_percentual || "0")
+          ? numeroOuNulo(form.cb_percentual)
           : null,
       cb_valor_repasse:
         form.aceita_cartao_beneficios && form.cb_tipo_repasse === "valor"
-          ? parseFloat(form.cb_valor || "0")
+          ? numeroOuNulo(form.cb_valor)
           : null,
       duracao_consulta_min: parseInt(form.duracao_consulta_min || "15") || 15,
       usa_sistema: form.usa_sistema,
@@ -977,9 +992,10 @@ export function MedicoFormDialog({
           medico_id: medicoId!,
           nome: c.nome.trim(),
           tipo_repasse: c.tipo_repasse,
-          percentual: c.tipo_repasse === "percentual" ? parseFloat(c.percentual || "0") : 0,
-          valor: c.tipo_repasse === "valor" ? parseFloat(c.valor || "0") : null,
-          // Convênio / cartões: em branco = herda o repasse padrão do médico.
+          // Todas as colunas seguem a mesma regra: em branco = herda o repasse
+          // padrão do médico (nulo), número digitado = valor da célula.
+          percentual: c.tipo_repasse === "percentual" ? numeroOuNulo(c.percentual) : null,
+          valor: c.tipo_repasse === "valor" ? numeroOuNulo(c.valor) : null,
           convenio_tipo_repasse: (c.convenio_tipo_repasse === "percentual"
             ? c.convenio_percentual
             : c.convenio_valor
@@ -987,19 +1003,11 @@ export function MedicoFormDialog({
             ? c.convenio_tipo_repasse
             : null,
           convenio_percentual:
-            c.convenio_tipo_repasse === "percentual" && c.convenio_percentual.trim()
-              ? parseFloat(c.convenio_percentual)
-              : null,
+            c.convenio_tipo_repasse === "percentual" ? numeroOuNulo(c.convenio_percentual) : null,
           convenio_valor:
-            c.convenio_tipo_repasse === "valor" && c.convenio_valor.trim()
-              ? parseFloat(c.convenio_valor)
-              : null,
-          cartao_consulta_valor: c.cartao_consulta_valor.trim()
-            ? parseFloat(c.cartao_consulta_valor)
-            : null,
-          cartao_desconto_valor: c.cartao_desconto_valor.trim()
-            ? parseFloat(c.cartao_desconto_valor)
-            : null,
+            c.convenio_tipo_repasse === "valor" ? numeroOuNulo(c.convenio_valor) : null,
+          cartao_consulta_valor: numeroOuNulo(c.cartao_consulta_valor),
+          cartao_desconto_valor: numeroOuNulo(c.cartao_desconto_valor),
           ativo: c.ativo,
         }));
       if (convRows.length) {

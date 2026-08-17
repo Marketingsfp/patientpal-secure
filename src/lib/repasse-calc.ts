@@ -75,6 +75,130 @@ export const normRepasse = (s: string) =>
     .toLowerCase()
     .trim();
 
+/** Forma de atendimento que decide QUAL coluna da grade de repasse vale. */
+export type FormaRepasse = "particular" | "convenio" | "cartao_consulta" | "cartao_desconto";
+
+/**
+ * Lê uma célula da grade de repasse (Particular, Convênio, Cartão Consulta,
+ * Cartão Desconto).
+ *
+ * Célula em branco significa "herda o Repasse Padrão do médico" — por isso
+ * `null`, `undefined`, string vazia e o texto "padrão" (que a tela mostra no
+ * campo vazio e versões antigas chegaram a gravar) devolvem `null`.
+ *
+ * Só um número conta como valor configurado — inclusive `0`, que é como o
+ * usuário diz "este atendimento não gera repasse".
+ */
+export const valorCelulaRepasse = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const bruto = String(v).trim();
+  if (!bruto) return null;
+  if (normRepasse(bruto) === "padrao") return null;
+  const n = Number(bruto.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Repasse padrão do médico (o fundo do poço da herança). */
+export function repassePadraoDoMedico(med: RepasseMedico | null | undefined, base: number): number {
+  if (!med) return 0;
+  const valor = valorCelulaRepasse(med.valor_repasse_padrao);
+  if (med.tipo_repasse === "valor" && valor != null) {
+    // Sem pagamento no caixa (convênio cobra direto da clínica) o fixo é pago
+    // integral; com pagamento, nunca passa do que entrou.
+    return base > 0 ? Math.min(valor, base) : valor;
+  }
+  const pct = valorCelulaRepasse(med.percentual_repasse_padrao) ?? 0;
+  return +((base * pct) / 100).toFixed(2);
+}
+
+/** Repasse de cartão benefício cadastrado no próprio médico (null = não configurado). */
+function repasseCartaoBeneficios(
+  med: RepasseMedico | null | undefined,
+  base: number,
+): number | null {
+  if (!med?.aceita_cartao_beneficios) return null;
+  if (med.cb_tipo_repasse === "valor") return valorCelulaRepasse(med.cb_valor_repasse);
+  if (med.cb_tipo_repasse === "percentual") {
+    const pct = valorCelulaRepasse(med.cb_percentual_repasse);
+    return pct == null ? null : +((base * pct) / 100).toFixed(2);
+  }
+  return null;
+}
+
+/** Lê a coluna pedida da linha do serviço. `null` = coluna em branco. */
+function repasseDaColuna(
+  linha: RepasseConvenio | null | undefined,
+  coluna: FormaRepasse,
+  base: number,
+): { repasse: number; inflaTotal: boolean } | null {
+  if (!linha) return null;
+  if (coluna === "cartao_consulta") {
+    const v = valorCelulaRepasse(linha.cartao_consulta_valor);
+    return v == null ? null : { repasse: v, inflaTotal: false };
+  }
+  if (coluna === "cartao_desconto") {
+    const v = valorCelulaRepasse(linha.cartao_desconto_valor);
+    return v == null ? null : { repasse: v, inflaTotal: false };
+  }
+  const tipo = coluna === "convenio" ? linha.convenio_tipo_repasse : linha.tipo_repasse;
+  const valor = valorCelulaRepasse(coluna === "convenio" ? linha.convenio_valor : linha.valor);
+  const pct = valorCelulaRepasse(
+    coluna === "convenio" ? linha.convenio_percentual : linha.percentual,
+  );
+  if (tipo === "valor" && valor != null) return { repasse: valor, inflaTotal: true };
+  if (tipo === "percentual" && pct != null) {
+    return { repasse: +((base * pct) / 100).toFixed(2), inflaTotal: false };
+  }
+  return null;
+}
+
+/**
+ * Herança do repasse, do mais específico para o mais geral:
+ *
+ * 1. coluna da forma de pagamento na linha do serviço (Cartão Consulta /
+ *    Cartão Desconto / Convênio / Particular);
+ * 2. para atendimento de convênio, a coluna Convênio da mesma linha;
+ * 3. o repasse de cartão benefício cadastrado no médico;
+ * 4. o Repasse Padrão do médico.
+ *
+ * Uma coluna em branco (vazia, nula ou "padrão") NÃO zera nada: só passa a vez
+ * para o próximo degrau. O repasse só fica zerado quando alguém gravou o
+ * número 0 de propósito.
+ */
+export function resolverRepasse(params: {
+  linha?: RepasseConvenio | null;
+  med?: RepasseMedico | null;
+  base: number;
+  forma: FormaRepasse;
+}): { total: number; repasse: number } {
+  const { linha, med, base, forma } = params;
+  const colunas: FormaRepasse[] =
+    forma === "cartao_consulta"
+      ? ["cartao_consulta", "convenio"]
+      : forma === "cartao_desconto"
+        ? ["cartao_desconto", "convenio"]
+        : forma === "convenio"
+          ? ["convenio"]
+          : ["particular"];
+  for (const coluna of colunas) {
+    const cel = repasseDaColuna(linha, coluna, base);
+    if (cel) {
+      return {
+        total: cel.inflaTotal ? Math.max(base, cel.repasse) : base,
+        repasse: cel.repasse,
+      };
+    }
+  }
+  // Cartão benefício do médico. Também vale para atendimento sem pagamento
+  // registrado, que historicamente era tratado como cartão consulta.
+  if (forma !== "particular" || base === 0) {
+    const cb = repasseCartaoBeneficios(med, base);
+    if (cb != null) return { total: base, repasse: cb };
+  }
+  return { total: base, repasse: repassePadraoDoMedico(med, base) };
+}
+
 export const procVariants = (nome: string): string[] => {
   const base = normRepasse(nome);
   const out = new Set<string>([base]);
@@ -118,95 +242,24 @@ export function calcRepasseFull(
    */
   modalidade?: "cartao_consulta" | "cartao_desconto" | null,
 ): { total: number; repasse: number } {
-  const { medicos, convenios, procTipos } = ctx;
   if (!medicoId) return { total: totalPago, repasse: 0 };
-  const med = medicos.find((m) => m.id === medicoId);
-  const ehCartaoConsulta =
-    modalidade === "cartao_consulta" || (modalidade == null && isCartaoConsultaDesc(descricao));
-  const ehCartaoDesconto =
-    modalidade === "cartao_desconto" || (modalidade == null && isCartaoDescontoDesc(descricao));
+  const med = ctx.medicos.find((m) => m.id === medicoId) ?? null;
+  return resolverRepasse({
+    linha: findConvenioRow(ctx, medicoId, procNome),
+    med,
+    base: totalPago,
+    forma: formaDoAtendimento(descricao, modalidade),
+  });
+}
 
-  // 1) Repasse cadastrado por serviço para a forma de pagamento usada.
-  //    Em branco = cai nas regras existentes (padrão do médico / categoria).
-  const linhaServico = findConvenioRow(ctx, medicoId, procNome);
-  if (linhaServico) {
-    if (ehCartaoConsulta && linhaServico.cartao_consulta_valor != null) {
-      return { total: totalPago, repasse: Number(linhaServico.cartao_consulta_valor) };
-    }
-    if (ehCartaoDesconto && linhaServico.cartao_desconto_valor != null) {
-      return { total: totalPago, repasse: Number(linhaServico.cartao_desconto_valor) };
-    }
-  }
-
-  if ((ehCartaoConsulta || ehCartaoDesconto) && med?.aceita_cartao_beneficios) {
-    if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
-      return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
-    }
-    if (med.cb_tipo_repasse === "percentual" && med.cb_percentual_repasse != null) {
-      return {
-        total: totalPago,
-        repasse: +((totalPago * Number(med.cb_percentual_repasse)) / 100).toFixed(2),
-      };
-    }
-  }
-
-  if (procNome) {
-    const variants = procVariants(procNome);
-    let c: RepasseConvenio | undefined;
-    for (const alvo of variants) {
-      c = convenios.find((cv) => cv.medico_id === medicoId && normRepasse(cv.nome) === alvo);
-      if (c) break;
-    }
-    if (!c) {
-      let tipo: string | undefined;
-      for (const alvo of variants) {
-        tipo = procTipos.get(alvo);
-        if (tipo) break;
-      }
-      if (tipo) {
-        const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
-        c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
-      }
-    }
-    if (c) {
-      const base = totalPago;
-      if (c.tipo_repasse === "valor" && c.valor != null) {
-        return { total: Math.max(base, Number(c.valor)), repasse: Number(c.valor) };
-      }
-      if (c.tipo_repasse === "percentual" && c.percentual != null) {
-        return { total: base, repasse: +((base * Number(c.percentual)) / 100).toFixed(2) };
-      }
-      if (med) {
-        if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-          return { total: base, repasse: Math.min(Number(med.valor_repasse_padrao), base) };
-        }
-        return {
-          total: base,
-          repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
-        };
-      }
-      return { total: base, repasse: 0 };
-    }
-  }
-
-  if (!totalPago) {
-    if (med?.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
-      return { total: 0, repasse: Number(med.cb_valor_repasse) };
-    }
-    if (med?.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-      return { total: 0, repasse: Number(med.valor_repasse_padrao) };
-    }
-    return { total: 0, repasse: 0 };
-  }
-
-  if (med) {
-    if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-      return { total: totalPago, repasse: Math.min(Number(med.valor_repasse_padrao), totalPago) };
-    }
-    return {
-      total: totalPago,
-      repasse: +((totalPago * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
-    };
-  }
-  return { total: totalPago, repasse: 0 };
+/** Descobre qual coluna da grade vale para este atendimento. */
+export function formaDoAtendimento(
+  descricao?: string | null,
+  modalidade?: "cartao_consulta" | "cartao_desconto" | null,
+): FormaRepasse {
+  if (modalidade === "cartao_consulta") return "cartao_consulta";
+  if (modalidade === "cartao_desconto") return "cartao_desconto";
+  if (modalidade == null && isCartaoConsultaDesc(descricao)) return "cartao_consulta";
+  if (modalidade == null && isCartaoDescontoDesc(descricao)) return "cartao_desconto";
+  return "particular";
 }

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { valorCelulaRepasse } from "@/lib/repasse-calc";
 
 /**
  * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
@@ -951,22 +952,34 @@ async function printGuiaAtendimentoCore({
   const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;
   let prestador = 0;
   let repasseFixoConvenio = false;
-  // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
-  if (a.medico_id && isCartaoConsulta && medicoCb?.aceita) {
-    if (medicoCb.tipo === "valor" && medicoCb.valor != null) {
-      prestador = Number(medicoCb.valor);
+  // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico. Se esse
+  // campo estiver EM BRANCO, não zera nada — segue para a linha do serviço e,
+  // no fim, para o Repasse Padrão do médico.
+  const cbValor = medicoCb?.tipo === "valor" ? valorCelulaRepasse(medicoCb.valor) : null;
+  const cbPercentual =
+    medicoCb?.tipo === "percentual" ? valorCelulaRepasse(medicoCb.percentual) : null;
+  const usaCartaoBeneficios =
+    !!a.medico_id &&
+    isCartaoConsulta &&
+    !!medicoCb?.aceita &&
+    (cbValor != null || cbPercentual != null);
+  if (usaCartaoBeneficios) {
+    if (cbValor != null) {
+      prestador = cbValor;
       // Cartão Consulta: repasse SEMPRE fixo. O paciente paga uma taxa
       // simbólica no caixa (ex.: R$ 9,99) e o médico recebe o valor cheio
       // cadastrado em "Repasse cartões benefícios" (ex.: R$ 35,00). Nunca
       // limitar pelo valor pago.
       repasseFixoConvenio = true;
-    } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
-      prestador = +((valorBase * Number(medicoCb.percentual)) / 100).toFixed(2);
+    } else if (cbPercentual != null) {
+      prestador = +((valorBase * cbPercentual) / 100).toFixed(2);
     }
   } else if (a.medico_id) {
     const { data: convs } = await supabase
       .from("medico_convenios")
-      .select("nome, tipo_repasse, percentual, valor, ativo")
+      .select(
+        "nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor",
+      )
       .eq("medico_id", a.medico_id)
       .eq("ativo", true);
     const variants = variantsOf(procNomeBase);
@@ -976,6 +989,10 @@ async function printGuiaAtendimentoCore({
           tipo_repasse: string | null;
           percentual: number | null;
           valor: number | null;
+          convenio_tipo_repasse?: string | null;
+          convenio_percentual?: number | null;
+          convenio_valor?: number | null;
+          cartao_consulta_valor?: number | null;
         }
       | undefined;
     for (const alvo of variants) {
@@ -986,32 +1003,39 @@ async function printGuiaAtendimentoCore({
       const sentinel = `__CAT__:${String(procData.tipo).toUpperCase()}`;
       conv = (convs ?? []).find((c) => c.nome === sentinel) as typeof conv;
     }
-    if (conv) {
-      if (conv.tipo_repasse === "valor" && conv.valor != null) {
-        prestador = Number(conv.valor);
-        // Repasse fixo de convênio só se aplica quando o paciente não pagou
-        // nada no caixa (convênio cobre direto com a clínica). Quando há
-        // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
-        if (valor <= 0) repasseFixoConvenio = true;
-      } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-        prestador = +((valorBase * Number(conv.percentual)) / 100).toFixed(2);
-      } else if (medicoData) {
-        // sem tipo/valor cadastrado para o serviço → usa padrão do médico
-        if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
-          prestador = Number(medicoData.valor_repasse_padrao);
-        } else {
-          prestador = +(
-            (valorBase * Number(medicoData.percentual_repasse_padrao ?? 0)) /
-            100
-          ).toFixed(2);
-        }
+    // Coluna que vale para este atendimento. Célula em branco NÃO zera o
+    // repasse: passa a vez para a próxima regra, até o Repasse Padrão.
+    let colValor: number | null = null;
+    let colPercentual: number | null = null;
+    if (isCartaoConsulta) {
+      colValor = valorCelulaRepasse(conv?.cartao_consulta_valor);
+      if (colValor == null && conv?.convenio_tipo_repasse === "valor") {
+        colValor = valorCelulaRepasse(conv?.convenio_valor);
       }
+      if (colValor == null && conv?.convenio_tipo_repasse === "percentual") {
+        colPercentual = valorCelulaRepasse(conv?.convenio_percentual);
+      }
+    } else if (conv?.tipo_repasse === "valor") {
+      colValor = valorCelulaRepasse(conv.valor);
+    } else if (conv?.tipo_repasse === "percentual") {
+      colPercentual = valorCelulaRepasse(conv.percentual);
+    }
+    if (colValor != null) {
+      prestador = colValor;
+      // Repasse fixo de convênio só se aplica quando o paciente não pagou
+      // nada no caixa (convênio cobre direto com a clínica). Quando há
+      // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
+      if (valor <= 0) repasseFixoConvenio = true;
+    } else if (colPercentual != null) {
+      prestador = +((valorBase * colPercentual) / 100).toFixed(2);
     } else if (medicoData) {
-      if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
-        prestador = Number(medicoData.valor_repasse_padrao);
+      // Serviço sem repasse próprio para esta forma de pagamento → Repasse Padrão
+      const padraoValor = valorCelulaRepasse(medicoData.valor_repasse_padrao);
+      if (medicoData.tipo_repasse === "valor" && padraoValor != null) {
+        prestador = padraoValor;
       } else {
         prestador = +(
-          (valorBase * Number(medicoData.percentual_repasse_padrao ?? 0)) /
+          (valorBase * (valorCelulaRepasse(medicoData.percentual_repasse_padrao) ?? 0)) /
           100
         ).toFixed(2);
       }
@@ -1771,23 +1795,23 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         const sentinel = `__CAT__:${String(proc.tipo).toUpperCase()}`;
         conv = convs.find((cv) => cv.nome === sentinel);
       }
-      if (conv) {
-        if (conv.tipo_repasse === "valor" && conv.valor != null) {
-          prestador = Number(conv.valor);
-        } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-          prestador = +((valor * Number(conv.percentual)) / 100).toFixed(2);
-        } else if (med) {
-          if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-            prestador = Number(med.valor_repasse_padrao);
-          } else {
-            prestador = +((valor * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
-          }
-        }
+      // Célula em branco no serviço não zera o repasse: cai no Repasse Padrão.
+      const linhaValor = conv?.tipo_repasse === "valor" ? valorCelulaRepasse(conv.valor) : null;
+      const linhaPercentual =
+        conv?.tipo_repasse === "percentual" ? valorCelulaRepasse(conv.percentual) : null;
+      if (linhaValor != null) {
+        prestador = linhaValor;
+      } else if (linhaPercentual != null) {
+        prestador = +((valor * linhaPercentual) / 100).toFixed(2);
       } else if (med) {
-        if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
-          prestador = Number(med.valor_repasse_padrao);
+        const padraoValor = valorCelulaRepasse(med.valor_repasse_padrao);
+        if (med.tipo_repasse === "valor" && padraoValor != null) {
+          prestador = padraoValor;
         } else {
-          prestador = +((valor * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
+          prestador = +(
+            (valor * (valorCelulaRepasse(med.percentual_repasse_padrao) ?? 0)) /
+            100
+          ).toFixed(2);
         }
       }
     }
