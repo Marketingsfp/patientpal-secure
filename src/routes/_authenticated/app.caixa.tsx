@@ -5082,12 +5082,12 @@ function Page() {
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-6xl">
           <DialogHeader>
-            <div className="flex items-center justify-between gap-2 pr-8">
+            <div className="flex flex-wrap items-center justify-between gap-2 pr-8">
               <DialogTitle>Sessão de caixa</DialogTitle>
               {openDetalhe && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant="outline" onClick={exportarDetalhe}>
                     <FileDown className="h-4 w-4 mr-1" /> Excel
                   </Button>
@@ -5119,7 +5119,10 @@ function Page() {
             )}
           </DialogHeader>
           {openDetalhe && (
-            <div className="space-y-5">
+            // min-w-0: DialogContent é um grid, e item de grid tem min-width
+            // auto — sem isto o conteúdo largo empurra a largura do diálogo e
+            // acaba cortado, porque ele só rola na vertical.
+            <div className="space-y-5 min-w-0">
               {(() => {
                 const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
@@ -5207,11 +5210,11 @@ function Page() {
                 ];
                 return (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                       {cards.map((c) => (
                         <div
                           key={c.key}
-                          className="rounded-lg border bg-card shadow-sm p-3.5 space-y-1"
+                          className="rounded-lg border bg-card shadow-sm p-3.5 space-y-1 min-w-0"
                         >
                           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                             {c.label}
@@ -5272,102 +5275,101 @@ function Page() {
                   </>
                 );
               })()}
-              <div className="max-h-[400px] overflow-auto rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Hora</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Forma</TableHead>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead className="text-right tabular-nums">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detalheMovs.flatMap((m) => {
-                      const bucket = bucketDeMov(m);
-                      const partes = bucket === "misto" ? partesDoMov(m) : {};
-                      const entradas = Object.entries(partes).filter(
-                        ([, v]) => (v ?? 0) > 0.005,
-                      ) as Array<[FormaBucket, number]>;
-                      if (bucket === "misto" && entradas.length > 0) {
-                        return entradas.map(([k, v], idx) => (
-                          <TableRow key={`${m.id}-${k}`}>
-                            <TableCell className="whitespace-nowrap">
-                              {idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}
-                            </TableCell>
-                            <TableCell>
-                              {idx === 0
-                                ? new Date(m.created_at).toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : ""}
-                            </TableCell>
-                            <TableCell>
-                              {idx === 0 ? (
-                                <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
-                                  {TIPO_LABEL[m.tipo]}
-                                </Badge>
-                              ) : null}
-                            </TableCell>
-                            <TableCell>
-                              {idx === 0 ? (
-                                m.descricao || "—"
-                              ) : (
-                                <span className="text-muted-foreground text-xs pl-2">
-                                  ↳ parcela
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
-                            <TableCell className="text-xs uppercase">
-                              {idx === 0 ? usuarioNomeFor(m) : ""}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right tabular-nums font-medium whitespace-nowrap ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
-                            >
-                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
-                              {fmt(v)}
-                            </TableCell>
-                          </TableRow>
-                        ));
-                      }
-                      return [
-                        <TableRow key={m.id}>
+              {/* Sem div extra em volta: a própria Table já é o contêiner de
+                  rolagem nos dois eixos (padrão global de UI). Aninhar outro
+                  anulava a rolagem horizontal e a coluna Valor ficava cortada. */}
+              <Table containerClassName="max-h-[400px] rounded-lg border">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Hora</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Forma</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead className="text-right tabular-nums">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detalheMovs.flatMap((m) => {
+                    const bucket = bucketDeMov(m);
+                    const partes = bucket === "misto" ? partesDoMov(m) : {};
+                    const entradas = Object.entries(partes).filter(
+                      ([, v]) => (v ?? 0) > 0.005,
+                    ) as Array<[FormaBucket, number]>;
+                    if (bucket === "misto" && entradas.length > 0) {
+                      return entradas.map(([k, v], idx) => (
+                        <TableRow key={`${m.id}-${k}`}>
                           <TableCell className="whitespace-nowrap">
-                            {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                            {idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}
                           </TableCell>
                           <TableCell>
-                            {new Date(m.created_at).toLocaleTimeString("pt-BR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {idx === 0
+                              ? new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : ""}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
-                              {TIPO_LABEL[m.tipo]}
-                            </Badge>
+                            {idx === 0 ? (
+                              <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
+                                {TIPO_LABEL[m.tipo]}
+                              </Badge>
+                            ) : null}
                           </TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell>
-                            <FormaCellEditavel m={m} />
+                            {idx === 0 ? (
+                              m.descricao || "—"
+                            ) : (
+                              <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>
+                            )}
                           </TableCell>
-                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
+                          <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                          <TableCell className="text-xs uppercase">
+                            {idx === 0 ? usuarioNomeFor(m) : ""}
+                          </TableCell>
                           <TableCell
                             className={`text-right tabular-nums font-medium whitespace-nowrap ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
                           >
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
-                            {fmt(m.valor)}
+                            {fmt(v)}
                           </TableCell>
-                        </TableRow>,
-                      ];
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                        </TableRow>
+                      ));
+                    }
+                    return [
+                      <TableRow key={m.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={TIPO_CLASS_SUAVE[m.tipo]}>
+                            {TIPO_LABEL[m.tipo]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{m.descricao || "—"}</TableCell>
+                        <TableCell>
+                          <FormaCellEditavel m={m} />
+                        </TableCell>
+                        <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums font-medium whitespace-nowrap ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                        >
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                          {fmt(m.valor)}
+                        </TableCell>
+                      </TableRow>,
+                    ];
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </DialogContent>
