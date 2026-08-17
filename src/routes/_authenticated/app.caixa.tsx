@@ -985,7 +985,6 @@ function Page() {
   const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>(
     [],
   );
-  const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [dataFechamento, setDataFechamento] = useState<string>(() =>
     new Date().toISOString().slice(0, 10),
@@ -2310,6 +2309,28 @@ function Page() {
 
   const esperadoGaveta = useMemo(() => saldoEsperadoGaveta(gavetaSessaoAtual), [gavetaSessaoAtual]);
 
+  /**
+   * Total conferido no fechamento do próprio caixa: soma de TODAS as formas
+   * de pagamento informadas na grade de conferência (dinheiro, PIX, cartões,
+   * boleto, transferência, convênio...).
+   *
+   * É derivado de `conferidoOwn` de propósito. Antes existia um estado
+   * paralelo (`valorInformado`) que era pré-preenchido apenas com o esperado
+   * em espécie; num dia com sangrias a gaveta fica em zero e o total do dia
+   * aparecia como R$ 0,00, acusando "Falta em caixa" do valor inteiro do dia
+   * e travando o fechamento. Mantendo uma única fonte de verdade, o total
+   * não pode mais divergir das partes.
+   */
+  const totalConferidoOwn = useMemo(
+    () =>
+      Number(
+        Object.values(conferidoOwn)
+          .reduce((acc, v) => acc + (Number(v) || 0), 0)
+          .toFixed(2),
+      ),
+    [conferidoOwn],
+  );
+
   /** Linha do tempo de sangrias e suprimentos do turno atual. */
   const movsGaveta = useMemo(
     () =>
@@ -2502,7 +2523,7 @@ function Page() {
   const fecharCaixa = async (e: FormEvent) => {
     e.preventDefault();
     if (!minhaSessao || !clinicaAtual || !user) return;
-    const informado = Number(valorInformado) || 0;
+    const informado = totalConferidoOwn;
     // Escopo por dia selecionado: fecha apenas os valores do dia escolhido.
     const saldoRef = saldoDoDiaFechamento;
     const diff = informado - saldoRef;
@@ -2544,7 +2565,6 @@ function Page() {
     }
     setOpenFechar(false);
     const obsFinal = obsFechamento;
-    setValorInformado("");
     setObsFechamento("");
     setConferidoOwn({});
     setDataFechamento(new Date().toISOString().slice(0, 10));
@@ -3144,7 +3164,6 @@ function Page() {
                         type="button"
                         className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
                         onClick={() => {
-                          setValorInformado(esperadoGaveta.toFixed(2));
                           if (minhaSessao) {
                             const inicial: Record<string, string> = {};
                             for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
@@ -4420,8 +4439,6 @@ function Page() {
                   }
                   if (!inicial.dinheiro) inicial.dinheiro = "0.00";
                   setConferidoOwn(inicial);
-                  const soma = Object.values(inicial).reduce((a, x) => a + (Number(x) || 0), 0);
-                  setValorInformado(soma.toFixed(2));
                 }}
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -4449,10 +4466,6 @@ function Page() {
                   (k) =>
                     (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005,
                 );
-                const totalConferido = Object.values(conferidoOwn).reduce(
-                  (acc, v) => acc + (Number(v) || 0),
-                  0,
-                );
                 return (
                   <div className="space-y-2">
                     <Label>Conferência por forma de pagamento</Label>
@@ -4471,17 +4484,7 @@ function Page() {
                             </div>
                             <CurrencyInput
                               value={conferidoOwn[k] ?? ""}
-                              onChange={(v) => {
-                                setConferidoOwn((prev) => {
-                                  const next = { ...prev, [k]: v };
-                                  const soma = Object.values(next).reduce(
-                                    (a, x) => a + (Number(x) || 0),
-                                    0,
-                                  );
-                                  setValorInformado(soma.toFixed(2));
-                                  return next;
-                                });
-                              }}
+                              onChange={(v) => setConferidoOwn((prev) => ({ ...prev, [k]: v }))}
                             />
                           </div>
                         );
@@ -4489,22 +4492,26 @@ function Page() {
                     </div>
                     <div className="flex justify-between text-sm pt-1 border-t">
                       <span className="text-muted-foreground">Total conferido</span>
-                      <strong>{fmt(totalConferido)}</strong>
+                      <strong>{fmt(totalConferidoOwn)}</strong>
                     </div>
                   </div>
                 );
               })()}
             <div>
               <Label>Valor conferido em caixa</Label>
-              <CurrencyInput value={valorInformado} onChange={setValorInformado} />
+              {/* Somatório das formas acima — não é editável para não voltar a
+                  divergir das partes conferidas. */}
+              <div className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm font-semibold tabular-nums">
+                {fmt(totalConferidoOwn)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Soma automática de todas as formas de pagamento conferidas acima.
+              </p>
             </div>
             {(() => {
               const contadoDinheiro = Number(conferidoOwn.dinheiro ?? 0) || 0;
               const difGaveta = classificarDiferenca(contadoDinheiro, esperadoGaveta);
-              const difTotal = classificarDiferenca(
-                Number(valorInformado) || 0,
-                saldoDoDiaFechamento,
-              );
+              const difTotal = classificarDiferenca(totalConferidoOwn, saldoDoDiaFechamento);
               return (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className={`rounded-lg border p-3 ${difGaveta.cls}`}>
@@ -4524,8 +4531,7 @@ function Page() {
                       Total do dia (todas as formas)
                     </div>
                     <div className="text-xs mt-0.5">
-                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido{" "}
-                      {fmt(Number(valorInformado) || 0)}
+                      Calculado {fmt(saldoDoDiaFechamento)} · Conferido {fmt(totalConferidoOwn)}
                     </div>
                     <div className="text-lg font-bold tabular-nums mt-1">
                       {difTotal.label}
