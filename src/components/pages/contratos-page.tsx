@@ -3406,7 +3406,7 @@ function DetalheContrato({
     }
     const resultado = await estornarLancamentoReceita(m.lancamento_id, clinicaAtual?.clinica_id);
     if (!resultado.ok) {
-      if (resultado.motivo === "repasse_pago") {
+      if (resultado.motivo === "bloqueado") {
         toast.error(resultado.mensagem);
       } else {
         mostrarErro(resultado.error, resultado.mensagem);
@@ -3414,7 +3414,9 @@ function DetalheContrato({
       return;
     }
     toast.success(
-      "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
+      resultado.aviso === "lancado_em_sessao_atual"
+        ? "Pagamento estornado. A saída foi lançada no caixa aberto atual, porque o caixa do pagamento original já estava fechado."
+        : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
     );
     load();
   };

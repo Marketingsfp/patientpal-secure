@@ -246,14 +246,23 @@ function Page() {
     }
     const resultado = await estornarLancamentoReceita(s.lancamento_id, clinicaAtual?.clinica_id);
     if (!resultado.ok) {
-      if (resultado.motivo === "repasse_pago") {
+      if (resultado.motivo === "bloqueado") {
         toast.error(resultado.mensagem);
       } else {
         mostrarErro(resultado.error, resultado.mensagem);
       }
       return null;
     }
-    return { executado: true, resposta: "Estorno executado" };
+    // Quando o caixa do pagamento original já estava fechado, a saída foi para
+    // o caixa aberto atual — registra isso na resposta para quem consultar a
+    // solicitação depois entender por que o valor não está no dia original.
+    return {
+      executado: true,
+      resposta:
+        resultado.aviso === "lancado_em_sessao_atual"
+          ? "Estorno executado — saída lançada no caixa aberto atual (o caixa do pagamento original já estava fechado)."
+          : "Estorno executado",
+    };
   };
 
   const aprovar = async (s: Solic) => {

@@ -84,8 +84,12 @@ export function SolicitarEstornoDialog({
         .limit(1);
       if (cancelled) return;
       if (!data || data.length === 0) {
+        // Texto anterior prometia lançar "na data informada abaixo", o que nunca
+        // aconteceu: a saída ia para a sessão do recebimento original, fechada
+        // ou não. Agora ela vai para o caixa aberto atual — e o aviso descreve
+        // exatamente isso. As datas abaixo seguem valendo como registro do caso.
         setCaixaFechadoAviso(
-          "O caixa do dia do pagamento original já está fechado. A devolução será lançada como saída na data informada abaixo (caixa/banco atual), sem alterar o fechamento anterior.",
+          "O caixa do dia do pagamento original já está fechado. A devolução será lançada como saída no caixa aberto atual, sem alterar o fechamento anterior. As datas abaixo ficam registradas na solicitação.",
         );
       } else {
         setCaixaFechadoAviso(null);

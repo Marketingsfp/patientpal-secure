@@ -3523,7 +3523,14 @@ function Page() {
                           <TableHead>Usuário</TableHead>
                           <TableHead>Forma</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
-                          <TableHead className="text-right w-[1%]">Ação</TableHead>
+                          {/* Coluna fixada à direita: a tabela tem 12 colunas e
+                              estoura a largura da tela, então o botão "Solicitar
+                              estorno" ficava fora do campo de visão e o usuário
+                              concluía que ele não existia. Fixa, o botão está
+                              sempre visível sem precisar rolar de lado. */}
+                          <TableHead className="text-right w-[1%] right-0 z-30 border-l">
+                            Ação
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -3610,7 +3617,7 @@ function Page() {
                                     {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                                     {fmt(v)}
                                   </TableCell>
-                                  <TableCell className="text-right"></TableCell>
+                                  <TableCell className="text-right sticky right-0 z-10 bg-card border-l"></TableCell>
                                 </TableRow>
                               ));
                             }
@@ -3659,7 +3666,7 @@ function Page() {
                                   {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
                                   {fmt(m.valor)}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
                                   {m.tipo === "recebimento" &&
                                     podeEscrever &&
                                     (() => {
@@ -4200,9 +4207,30 @@ function Page() {
               {openMov?.tipo === "recebimento" && "Entrada de pagamento avulsa."}
               {openMov?.tipo === "despesa" && "Pagamento avulso de despesa pelo caixa."}
               {openMov?.tipo === "estorno" &&
-                "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
+                "Saída de dinheiro avulsa (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
             </DialogDescription>
           </DialogHeader>
+          {/* Este botão é confundido com o estorno de atendimento: ele lança uma
+              saída solta, que NÃO cancela a cobrança do paciente e que nenhuma
+              tela consegue desfazer depois. O aviso abaixo existe para que a
+              pessoa perceba isso antes de confirmar, e não depois. */}
+          {openMov?.tipo === "estorno" && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-semibold">
+                Atenção: isto não estorna o atendimento de um paciente.
+              </p>
+              <p>
+                Esta tela só tira dinheiro do caixa. A cobrança continua como paga no financeiro, o
+                agendamento continua atendido, e{" "}
+                <strong>este lançamento não pode ser desfeito</strong> por nenhuma tela do sistema.
+              </p>
+              <p>
+                Para estornar o atendimento de um paciente, feche esta janela e use o botão{" "}
+                <strong>"Solicitar estorno"</strong> na aba <strong>Movimentos</strong>, na linha do
+                recebimento dele.
+              </p>
+            </div>
+          )}
           <form onSubmit={lancarMov} className="space-y-3">
             <div>
               <Label>Valor</Label>

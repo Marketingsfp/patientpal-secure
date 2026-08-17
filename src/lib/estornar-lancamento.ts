@@ -2,8 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAction } from "@/hooks/use-crud";
 
 export type EstornoLancamentoResultado =
-  | { ok: true }
-  | { ok: false; motivo: "repasse_pago"; mensagem: string }
+  | { ok: true; aviso?: string | null }
+  /**
+   * Recusa prevista pela regra de negócio — a mensagem já vem pronta do banco e
+   * deve ser mostrada como aviso, não como erro técnico. Hoje: repasse já pago
+   * e caixa de origem fechado sem nenhum caixa aberto para receber a saída.
+   */
+  | { ok: false; motivo: "bloqueado"; mensagem: string }
   | { ok: false; motivo: "erro"; mensagem: string; error: unknown };
 
 /**
@@ -39,6 +44,7 @@ export async function estornarLancamentoReceita(
     ok: boolean;
     motivo?: string;
     mensagem?: string;
+    aviso?: string | null;
     agendamento_id?: string | null;
     mensalidade_id?: string | null;
     valor?: number | null;
@@ -46,8 +52,8 @@ export async function estornarLancamentoReceita(
   if (!resultado.ok) {
     return {
       ok: false,
-      motivo: "repasse_pago",
-      mensagem: resultado.mensagem ?? "Repasse já pago — estorne o pagamento do repasse primeiro.",
+      motivo: "bloqueado",
+      mensagem: resultado.mensagem ?? "Não foi possível estornar este lançamento.",
     };
   }
 
@@ -85,5 +91,5 @@ export async function estornarLancamentoReceita(
     /* auditoria best-effort */
   }
 
-  return { ok: true };
+  return { ok: true, aviso: resultado.aviso ?? null };
 }
