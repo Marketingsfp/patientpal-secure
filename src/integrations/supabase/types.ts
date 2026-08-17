@@ -9043,12 +9043,12 @@ export type Database = {
       buscar_contratos: {
         Args: { _clinica_id: string; _limit?: number; _termo?: string }
         Returns: {
-          codigo_prontuario: string | null
+          codigo_prontuario: string
           contrato: Json
           parcela_atrasada: boolean
           parcelas_pagas: number
           parcelas_total: number
-          vendedor_nome: string | null
+          vendedor_nome: string
         }[]
       }
       buscar_paciente_contato: {
