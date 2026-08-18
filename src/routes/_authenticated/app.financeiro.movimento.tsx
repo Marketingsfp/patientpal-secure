@@ -23,6 +23,18 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
+import {
+  classificarForma,
+  filtroFormaPostgrest,
+  formaCasaComFiltro,
+  baldeCasaComFiltro,
+  partesDoPagamentoMisto,
+  FORMAS_SEMPRE_VISIVEIS,
+  LABEL_FORMA,
+  ORDEM_FORMAS,
+  type FiltroForma,
+  type FormaCanonica,
+} from "@/lib/financeiro/formas-pagamento";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -83,9 +95,16 @@ interface Lanc {
   conta_id: string | null;
   forma_pagamento: string | null;
   criado_por: string | null;
-  /** Observações do lançamento — usadas para decompor pagamentos "misto"
+  /** Observações do lançamento — retaguarda para decompor pagamentos "misto"
    *  em suas formas reais (DINHEIRO, PIX, CARTAO…) no relatório. */
   observacoes?: string | null;
+  /** Composição estruturada do pagamento misto ({ partes: [{forma, valor}] }).
+   *  É a fonte confiável da decomposição; as observações só valem para
+   *  lançamentos gravados antes deste campo existir. */
+  composicao_pagamento?: unknown;
+  /** Balde canônico da forma de pagamento desta linha (Dinheiro, PIX, Cartão
+   *  de Débito, Cartão de Crédito…), calculado por `classificarForma`. */
+  formaCanonica?: FormaCanonica;
   /** true → linha veio de caixa_movimentos (sangria/suprimento); não editável aqui */
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
@@ -135,35 +154,14 @@ const EMPTY = {
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/** Extrai as partes de um pagamento "misto" a partir de fin_lancamentos.observacoes
- *  no formato "Pagamento misto: DINHEIRO R$ 100,00; CARTAO DEBITO R$ 30,00".
- *  Retorna [] quando não é misto ou não foi possível parsear. */
-function parseMistoPartes(
-  forma: string | null | undefined,
-  obs: string | null | undefined,
-): Array<{ label: string; valor: number }> {
-  if ((forma ?? "").toLowerCase() !== "misto" || !obs) return [];
-  const idx = obs.toLowerCase().indexOf("misto:");
-  const trecho = idx >= 0 ? obs.slice(idx + "misto:".length) : obs;
-  const primeiroBloco = trecho.split(" | ")[0];
-  const partes: Array<{ label: string; valor: number }> = [];
-  for (const raw of primeiroBloco.split(";")) {
-    const m = raw.match(/^\s*([^R$]+?)\s*R\$\s*([\d.,]+)/i);
-    if (!m) continue;
-    const label = m[1].replace(/\s+/g, " ").trim().toUpperCase();
-    const num = Number(m[2].replace(/\./g, "").replace(",", "."));
-    if (!label || !Number.isFinite(num) || num <= 0) continue;
-    partes.push({ label, valor: num });
-  }
-  return partes;
-}
-
 /** Expande as linhas de "misto" em uma linha sintética por forma real.
- *  A soma das partes = valor original (validado; caso contrário mantém a linha original). */
+ *  A soma das partes = valor original (validado; caso contrário mantém a linha
+ *  original). Cada linha sintética já sai com o balde canônico definido, para
+ *  que a parte em débito nunca seja confundida com a parte em crédito. */
 function expandMistoItems(items: Lanc[]): Lanc[] {
   const out: Lanc[] = [];
   for (const l of items) {
-    const partes = parseMistoPartes(l.forma_pagamento, l.observacoes);
+    const partes = partesDoPagamentoMisto(l.forma_pagamento, l.observacoes, l.composicao_pagamento);
     if (partes.length === 0) {
       out.push(l);
       continue;
@@ -174,18 +172,37 @@ function expandMistoItems(items: Lanc[]): Lanc[] {
       continue;
     }
     partes.forEach((p, i) => {
+      const label = LABEL_FORMA[p.forma];
       out.push({
         ...l,
         id: `${l.id}#m${i}`,
         valor: p.valor,
-        forma_pagamento: p.label,
-        descricao: `${l.descricao} — ${p.label}`,
+        forma_pagamento: label,
+        formaCanonica: p.forma,
+        descricao: `${l.descricao} — ${label}`,
         _mistoParte: true,
         _mistoPaiId: l.id,
       });
     });
   }
   return out;
+}
+
+/** Balde canônico de uma linha: o já calculado (partes de misto) ou o texto
+ *  gravado no banco, classificado na hora. */
+const baldeDaLinha = (l: Lanc): FormaCanonica =>
+  l.formaCanonica ?? classificarForma(l.forma_pagamento);
+
+/**
+ * Lista final de linhas: decompõe os pagamentos mistos (quando a opção está
+ * ligada) e mantém só o que pertence à forma escolhida no filtro. Usada tanto
+ * na tela quanto no cálculo dos cards de Receita/Despesa/Saldo, para que os
+ * dois números venham sempre da mesma conta.
+ */
+function linhasVisiveis(items: Lanc[], filtro: FiltroForma, decompor: boolean): Lanc[] {
+  const expandido = decompor ? expandMistoItems(items) : items;
+  if (filtro === "todos") return expandido;
+  return expandido.filter((l) => baldeCasaComFiltro(baldeDaLinha(l), filtro));
 }
 
 function Page() {
@@ -269,35 +286,17 @@ function Page() {
     return () => clearTimeout(t);
   }, [filterFicha]);
 
-  const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(
-    q: T,
-  ): T => {
-    switch (filterForma) {
-      case "dinheiro":
-        return q.or("forma_pagamento.ilike.%dinheiro%,forma_pagamento.ilike.caixa%");
-      case "pix":
-        return q.ilike("forma_pagamento", "%pix%");
-      case "debito":
-        return q.or(
-          "forma_pagamento.ilike.%debito%,forma_pagamento.ilike.%débito%,forma_pagamento.eq.cartao_debito,forma_pagamento.ilike.maestro%",
-        );
-      case "credito":
-        return q.or(
-          "forma_pagamento.ilike.%credito%,forma_pagamento.ilike.%crédito%,forma_pagamento.eq.cartao_credito",
-        );
-      case "cartao":
-        return q.or(
-          "forma_pagamento.ilike.%cart%,forma_pagamento.ilike.master%,forma_pagamento.ilike.visa%,forma_pagamento.ilike.elo%,forma_pagamento.ilike.american%,forma_pagamento.ilike.maestro%",
-        );
-      case "boleto":
-        return q.or(
-          "forma_pagamento.ilike.%boleto%,forma_pagamento.ilike.%banking%,forma_pagamento.ilike.%transfer%",
-        );
-      case "sem":
-        return q.or("forma_pagamento.is.null,forma_pagamento.eq.");
-      default:
-        return q;
-    }
+  /**
+   * Recorte do filtro de forma direto no banco. É de propósito mais largo que
+   * a regra final (ver `@/lib/financeiro/formas-pagamento`): serve só para não
+   * baixar o período inteiro. A separação exata entre Cartão de Débito e
+   * Cartão de Crédito é aplicada depois, no cliente, por `classificarForma` —
+   * assim as bandeiras antigas (MASTER, VISA, MAESTRO, ELO…) caem sempre no
+   * cartão certo, o que o `ilike` sozinho não conseguia garantir.
+   */
+  const applyForma = <T extends { or: (s: string) => T }>(q: T): T => {
+    const expr = filtroFormaPostgrest(filterForma as FiltroForma, decomporMisto);
+    return expr ? q.or(expr) : q;
   };
 
   const load = async () => {
@@ -319,7 +318,7 @@ function Page() {
         let q = supabase
           .from("fin_lancamentos")
           .select(
-            "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at",
+            "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .gte("data", fromDate)
@@ -484,6 +483,11 @@ function Page() {
         categoria_id: null,
         conta_id: null,
         forma_pagamento: m.forma_pagamento,
+        // Sangria e suprimento mexem no dinheiro físico da gaveta: quando vêm
+        // sem forma preenchida, contam como Dinheiro (mesma regra do Caixa).
+        formaCanonica: m.forma_pagamento
+          ? classificarForma(m.forma_pagamento)
+          : ("dinheiro" as const),
         criado_por: m.user_id,
         origem: "caixa" as const,
         transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
@@ -498,6 +502,23 @@ function Page() {
       if (ha !== hb) return ha < hb ? 1 : -1;
       return 0;
     });
+    // Separação final por forma de pagamento. O `ilike` do banco é um recorte
+    // grosseiro; quem decide é `classificarForma`, para que Cartão de Débito e
+    // Cartão de Crédito fiquem 100% isolados um do outro. Um pagamento misto
+    // só permanece se alguma de suas partes for da forma procurada.
+    if (filterForma !== "todos") {
+      const filtro = filterForma as FiltroForma;
+      merged = merged.filter((l) => {
+        if (formaCasaComFiltro(l.forma_pagamento, filtro)) return true;
+        if (l.formaCanonica && baldeCasaComFiltro(l.formaCanonica, filtro)) return true;
+        if (!decomporMisto) return false;
+        return partesDoPagamentoMisto(
+          l.forma_pagamento,
+          l.observacoes,
+          l.composicao_pagamento,
+        ).some((p) => baldeCasaComFiltro(p.forma, filtro));
+      });
+    }
     // Filtros client-side: valor exato e nº da ficha (referência).
     const vNum = filterValorDebounced ? Number(filterValorDebounced.replace(",", ".")) : NaN;
     if (Number.isFinite(vNum)) {
@@ -509,10 +530,13 @@ function Page() {
     }
     setItems(merged);
     // Se qualquer filtro client-side estiver ativo, recomputa o resumo a partir da lista filtrada.
-    if (Number.isFinite(vNum) || Number.isFinite(fNum)) {
+    // O filtro de forma entra aqui porque a separação exata entre débito e
+    // crédito (e a decomposição do misto) só existe no cliente.
+    if (Number.isFinite(vNum) || Number.isFinite(fNum) || filterForma !== "todos") {
       let r = 0,
         d = 0;
-      for (const l of merged) {
+      const base = linhasVisiveis(merged, filterForma as FiltroForma, decomporMisto);
+      for (const l of base) {
         if (l.status === "cancelado") continue;
         if (filterStatus !== "todos" && l.status !== filterStatus) continue;
         const v = Number(l.valor) || 0;
@@ -533,6 +557,11 @@ function Page() {
       setResumo({ r: 0, d: 0, saldo: 0, totalRows: items.length });
       return;
     }
+    // Com filtro de forma, quem fecha a conta é `load()`: só lá existe a
+    // classificação exata (débito ≠ crédito) e a decomposição do misto. Somar
+    // aqui, direto do recorte do banco, contaria o misto inteiro na forma
+    // errada.
+    if (filterForma !== "todos") return;
     // Sem filtro por usuário/tipo/forma → usa RPC agregado (rápido).
     if (
       filterUsuario === "todos" &&
@@ -686,6 +715,9 @@ function Page() {
     filterStatus,
     filterUsuario,
     filterForma,
+    // recarrega ao ligar/desligar a decomposição do misto: ela muda o recorte
+    // enviado ao banco (os lançamentos "misto" entram ou não no filtro de forma)
+    decomporMisto,
     filterPacienteDebounced,
     filterValorDebounced,
     filterFichaDebounced,
@@ -1056,7 +1088,7 @@ function Page() {
   // Lista efetivamente usada em TODAS as visões (tabela, drill-down, export,
   // relatório). Quando a opção está ligada, cada lançamento "misto" vira N
   // linhas sintéticas (uma por forma real). A soma dos valores é preservada.
-  const displayItems = decomporMisto ? expandMistoItems(items) : items;
+  const displayItems = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto);
 
   const imprimirRelatorio = () => {
     const source = displayItems;
@@ -1072,7 +1104,35 @@ function Page() {
       );
     type Row = { label: string; pagamento: number; recebimento: number };
     const cats2 = new Map<string, Row>();
-    const formas = new Map<string, Row>();
+    /**
+     * Uma linha por forma canônica. `origens` guarda os textos que o banco
+     * tinha (cartao_credito, MASTER, VISA…) só para o relatório mostrar de
+     * onde veio cada total — a soma em si é sempre por balde, então Cartão de
+     * Débito e Cartão de Crédito nunca compartilham valor.
+     */
+    type LinhaForma = {
+      pagamento: number;
+      recebimento: number;
+      origens: Map<string, number>;
+    };
+    const formas = new Map<FormaCanonica, LinhaForma>();
+    const somarForma = (
+      balde: FormaCanonica,
+      origem: string,
+      valor: number,
+      isReceita: boolean,
+      isDespesa: boolean,
+    ) => {
+      const linha = formas.get(balde) ?? {
+        pagamento: 0,
+        recebimento: 0,
+        origens: new Map<string, number>(),
+      };
+      if (isReceita) linha.recebimento += valor;
+      else if (isDespesa) linha.pagamento += valor;
+      linha.origens.set(origem, (linha.origens.get(origem) ?? 0) + valor);
+      formas.set(balde, linha);
+    };
     let totPag = 0,
       totReceb = 0;
     for (const l of source) {
@@ -1094,21 +1154,16 @@ function Page() {
       }
       cats2.set(catLabel, c);
       // Decompõe pagamentos "misto" quando a opção estiver ligada; caso
-      // contrário mantém o rótulo original "MISTO" no Resumo por tipo de moeda.
-      const partes = decomporMisto ? parseMistoPartes(l.forma_pagamento, l.observacoes) : [];
+      // contrário mantém a linha "Misto" no Resumo por tipo de moeda.
+      const partes = decomporMisto
+        ? partesDoPagamentoMisto(l.forma_pagamento, l.observacoes, l.composicao_pagamento)
+        : [];
       if (partes.length) {
         for (const p of partes) {
-          const f = formas.get(p.label) ?? { label: p.label, pagamento: 0, recebimento: 0 };
-          if (isReceita) f.recebimento += p.valor;
-          else if (isDespesa) f.pagamento += p.valor;
-          formas.set(p.label, f);
+          somarForma(p.forma, `Misto → ${LABEL_FORMA[p.forma]}`, p.valor, isReceita, isDespesa);
         }
       } else {
-        const fLabel = (l.forma_pagamento || "—").toUpperCase();
-        const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
-        if (isReceita) f.recebimento += v;
-        else if (isDespesa) f.pagamento += v;
-        formas.set(fLabel, f);
+        somarForma(baldeDaLinha(l), l.forma_pagamento || "(sem forma)", v, isReceita, isDespesa);
       }
     }
     let acc = 0;
@@ -1128,19 +1183,40 @@ function Page() {
         );
       })
       .join("");
-    let accF = 0;
-    const linhasForma = Array.from(formas.values())
-      .map((f) => {
-        accF += f.recebimento - f.pagamento;
+    // Linhas por forma: ordem fixa, Dinheiro / PIX / Débito / Crédito sempre
+    // presentes (mesmo zerados) para a conferência com a maquininha, e o saldo
+    // é o da PRÓPRIA forma — não um acumulado corrido, que fazia o valor do
+    // Cartão de Débito aparecer somado ao do Cartão de Crédito.
+    const chavesForma = ORDEM_FORMAS.filter(
+      (k) => formas.has(k) || (FORMAS_SEMPRE_VISIVEIS.includes(k) && filterForma === "todos"),
+    );
+    const linhasForma = chavesForma
+      .map((k) => {
+        const f = formas.get(k) ?? { pagamento: 0, recebimento: 0, origens: new Map() };
+        const saldo = f.recebimento - f.pagamento;
+        const origens = Array.from(f.origens.entries())
+          .filter(([, valor]) => Math.abs(valor) > 0.004)
+          .map(([nome]) => nome)
+          .sort();
+        // Mostra os textos de origem quando o balde reúne mais de um (o caso
+        // dos cartões: cartao_credito + MASTER + VISA do sistema antigo), para
+        // que dê para auditar de onde veio cada centavo.
+        const detalhe =
+          origens.length > 1
+            ? '<div style="font-size:10px;color:#64748b;">registrado como: ' +
+              esc(origens.join(" · ")) +
+              "</div>"
+            : "";
         return (
           "<tr><td>" +
-          esc(f.label) +
+          esc(LABEL_FORMA[k]) +
+          detalhe +
           '</td><td style="text-align:right;">' +
           fmt(f.pagamento) +
           '</td><td style="text-align:right;">' +
           fmt(f.recebimento) +
           '</td><td style="text-align:right;">' +
-          fmt(accF) +
+          fmt(saldo) +
           "</td></tr>"
         );
       })
@@ -1167,7 +1243,7 @@ function Page() {
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
       linhasCat +
       "</tbody></table>" +
-      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
+      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Saldo da forma</th></tr></thead><tbody>' +
       linhasForma +
       "</tbody>" +
       '<tfoot><tr><td>TOTAL</td><td class="right">' +
@@ -1229,7 +1305,8 @@ function Page() {
                       : "",
                   categoria: l.categoria_id ? (catMap.get(l.categoria_id) ?? "") : "",
                   conta: l.conta_id ? (contaMap.get(l.conta_id) ?? "") : "",
-                  forma_pagamento: l.forma_pagamento ?? "",
+                  forma_pagamento: LABEL_FORMA[baldeDaLinha(l)],
+                  forma_registrada: l.forma_pagamento ?? "",
                   status: l.status,
                   usuario: l.criado_por ? (userMap.get(l.criado_por) ?? "") : "",
                   valor: Number(l.valor).toFixed(2),
@@ -1245,6 +1322,7 @@ function Page() {
                   { key: "categoria", label: "Categoria" },
                   { key: "conta", label: "Conta" },
                   { key: "forma_pagamento", label: "Forma pagamento" },
+                  { key: "forma_registrada", label: "Registrado como" },
                   { key: "status", label: "Status" },
                   { key: "usuario", label: "Usuário" },
                   { key: "valor", label: "Valor (R$)" },
@@ -1818,6 +1896,9 @@ function Page() {
                               {typeof l.ficha_numero === "number" && (
                                 <span>Ficha {String(l.ficha_numero).padStart(3, "0")}</span>
                               )}
+                              <span className="whitespace-nowrap">
+                                {LABEL_FORMA[baldeDaLinha(l)]}
+                              </span>
                               {l.criado_por && (
                                 <span className="whitespace-nowrap">
                                   {userMap.get(l.criado_por) ?? "—"}
@@ -1901,6 +1982,7 @@ function Page() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Médico</TableHead>
                         <TableHead className="text-right">Ficha</TableHead>
+                        <TableHead>Forma</TableHead>
                         <TableHead>Usuário</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
@@ -1941,6 +2023,14 @@ function Page() {
                               {typeof l.ficha_numero === "number"
                                 ? String(l.ficha_numero).padStart(3, "0")
                                 : "—"}
+                            </TableCell>
+                            <TableCell
+                              className="text-sm whitespace-nowrap"
+                              // O texto original fica no tooltip: nos lançamentos
+                              // antigos ele é a bandeira (MASTER, MAESTRO…).
+                              title={l.forma_pagamento ?? "sem forma registrada"}
+                            >
+                              {LABEL_FORMA[baldeDaLinha(l)]}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {l.criado_por ? (userMap.get(l.criado_por) ?? "—") : "—"}
