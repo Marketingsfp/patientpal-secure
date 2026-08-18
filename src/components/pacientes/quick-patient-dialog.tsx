@@ -4,6 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
+import {
+  AJUDA_PRONTUARIO,
+  PLACEHOLDER_PRONTUARIO,
+  conflitoCodigoProntuario,
+  normalizarCodigoProntuario,
+} from "@/lib/prontuario";
+import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
@@ -47,6 +54,7 @@ export function QuickPatientDialog({
   const [dataNasc, setDataNasc] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+  const [codigoProntuario, setCodigoProntuario] = useState("");
   const [saving, setSaving] = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
   const [descritor, setDescritor] = useState<number[] | null>(null);
@@ -60,6 +68,7 @@ export function QuickPatientDialog({
       setDataNasc("");
       setTelefone("");
       setEmail("");
+      setCodigoProntuario("");
       setDescritor(null);
     }
   }, [open, nomeInicial]);
@@ -88,6 +97,16 @@ export function QuickPatientDialog({
       return;
     }
 
+    // Prontuário digitado pela recepção (número da ficha antiga). Em branco,
+    // o banco gera um número automático. É único por clínica, então avisamos
+    // antes de gravar em vez de devolver erro cru do índice único.
+    const codigo = normalizarCodigoProntuario(codigoProntuario);
+    const conflito = await conflitoCodigoProntuario(clinicaId, codigo);
+    if (conflito) {
+      toast.error(conflito);
+      return;
+    }
+
     setSaving(true);
     try {
       const { data, error } = await supabase
@@ -100,6 +119,7 @@ export function QuickPatientDialog({
           data_nascimento: dataNasc || null,
           telefone: telDigits || null,
           email: email ? email.trim() : null,
+          codigo_prontuario: codigo,
         })
         .select("id, nome, cpf, telefone, data_nascimento, clinica_id, email")
         .single();
@@ -184,6 +204,16 @@ export function QuickPatientDialog({
                 placeholder="paciente@exemplo.com"
               />
             </div>
+          </div>
+          <div>
+            <Label>Número de prontuário</Label>
+            <Input
+              value={codigoProntuario}
+              onChange={(e) => setCodigoProntuario(e.target.value)}
+              placeholder={PLACEHOLDER_PRONTUARIO}
+              maxLength={LIMITES.codigo}
+            />
+            <p className="text-xs text-muted-foreground mt-1">{AJUDA_PRONTUARIO}</p>
           </div>
           <div className="flex items-center gap-2 pt-1">
             <Button

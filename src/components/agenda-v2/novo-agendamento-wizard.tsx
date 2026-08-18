@@ -4,6 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
 import {
+  PLACEHOLDER_PRONTUARIO,
+  conflitoCodigoProntuario,
+  normalizarCodigoProntuario,
+} from "@/lib/prontuario";
+import { LIMITES } from "@/lib/seguranca/sanitizar";
+import {
   Check,
   ChevronRight,
   User,
@@ -210,6 +216,7 @@ export function NovoAgendamentoWizard({
   const [qcNasc, setQcNasc] = useState("");
   const [qcTel, setQcTel] = useState("");
   const [qcCpf, setQcCpf] = useState("");
+  const [qcProntuario, setQcProntuario] = useState("");
   const [qcSaving, setQcSaving] = useState(false);
 
   const resetQuickCreate = () => {
@@ -219,6 +226,7 @@ export function NovoAgendamentoWizard({
     setQcNasc("");
     setQcTel("");
     setQcCpf("");
+    setQcProntuario("");
     setQcSaving(false);
   };
 
@@ -402,6 +410,15 @@ export function NovoAgendamentoWizard({
       notify.error("CPF inválido");
       return;
     }
+    // Prontuário digitado pela recepção (número da ficha antiga). Em branco,
+    // o banco gera um número automático. É único por clínica, então avisamos
+    // antes de gravar em vez de devolver erro cru do índice único.
+    const codigoProntuario = normalizarCodigoProntuario(qcProntuario);
+    const conflitoPront = await conflitoCodigoProntuario(clinicaId, codigoProntuario);
+    if (conflitoPront) {
+      notify.error(conflitoPront);
+      return;
+    }
     setQcSaving(true);
     try {
       const { data, error } = await supabase
@@ -414,6 +431,7 @@ export function NovoAgendamentoWizard({
           telefone: telDigits,
           cpf: cpfDigits ? cpfDigits : null,
           ativo: true,
+          codigo_prontuario: codigoProntuario,
         })
         .select("id,nome,cpf,telefone,data_nascimento,clinica_id")
         .single();
@@ -623,10 +641,18 @@ export function NovoAgendamentoWizard({
                       inputMode="numeric"
                       className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                     />
+                    <input
+                      value={qcProntuario}
+                      onChange={(e) => setQcProntuario(e.target.value)}
+                      placeholder={PLACEHOLDER_PRONTUARIO}
+                      maxLength={LIMITES.codigo}
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    />
                   </div>
                   <div className="text-[11px] text-slate-500">
                     Nome, sexo, nascimento e telefone são obrigatórios porque o agendamento exige
-                    paciente com cadastro completo.
+                    paciente com cadastro completo. O prontuário em branco recebe um número
+                    automático.
                   </div>
                   <button
                     type="button"

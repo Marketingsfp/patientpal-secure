@@ -23,6 +23,12 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { pacienteSchema, primeiroErro } from "@/lib/schemas/paciente";
+import { LIMITES } from "@/lib/seguranca/sanitizar";
+import {
+  AJUDA_PRONTUARIO,
+  PLACEHOLDER_PRONTUARIO,
+  conflitoCodigoProntuario,
+} from "@/lib/prontuario";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
 import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
@@ -1147,6 +1153,17 @@ export function ClienteForm({
         return;
       }
     }
+    // O prontuário é único por clínica. Avisamos com nome legível antes de
+    // tentar gravar, em vez de deixar o banco devolver erro de índice único.
+    const conflito = await conflitoCodigoProntuario(
+      clinicaId,
+      dados.codigo_prontuario,
+      editing?.id,
+    );
+    if (conflito) {
+      toast.error(conflito);
+      return;
+    }
     setSaving(true);
     const payload = {
       nome: dados.nome,
@@ -1170,9 +1187,15 @@ export function ClienteForm({
       responsavel_parentesco: dados.responsavel_parentesco,
       clinica_id: clinicaId,
     } as Record<string, unknown>;
-    // Número de prontuário / pasta: só admin pode alterar.
+    // Número de serviço / pasta: só admin pode alterar.
     if (isAdmin) {
       payload.numero_pasta = dados.numero_pasta;
+    }
+    // Número de prontuário: campo livre, digitado pela recepção lendo a ficha
+    // antiga. Enviamos exatamente o que foi digitado — o banco só gera número
+    // automático quando o campo chega vazio num cadastro novo. Ao editar, campo
+    // vazio significa "não mexer", para nunca apagar um número já existente.
+    if (!editing || dados.codigo_prontuario) {
       payload.codigo_prontuario = dados.codigo_prontuario;
     }
     let pacienteId: string | undefined = editing?.id;
@@ -1340,21 +1363,16 @@ export function ClienteForm({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label>
-                      Número de prontuário
-                      {!isAdmin && (
-                        <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>
-                      )}
-                    </Label>
+                    <Label>Número de prontuário</Label>
                     <Input
                       value={form.codigo_prontuario}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, codigo_prontuario: e.target.value }))
                       }
-                      placeholder="Ex.: 000123"
-                      disabled={!isAdmin}
-                      readOnly={!isAdmin}
+                      placeholder={PLACEHOLDER_PRONTUARIO}
+                      maxLength={LIMITES.codigo}
                     />
+                    <p className="text-xs text-muted-foreground">{AJUDA_PRONTUARIO}</p>
                   </div>
                   <div className="space-y-1">
                     <Label>

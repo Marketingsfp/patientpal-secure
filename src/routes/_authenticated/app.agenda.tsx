@@ -9,6 +9,13 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import {
+  AJUDA_PRONTUARIO,
+  PLACEHOLDER_PRONTUARIO,
+  conflitoCodigoProntuario,
+  normalizarCodigoProntuario,
+} from "@/lib/prontuario";
+import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
 import { hojeBR } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
@@ -2498,6 +2505,7 @@ function AgendaPage() {
     telefone: "",
     data_nascimento: "",
     email: "",
+    codigo_prontuario: "",
   });
   const [faceOpen, setFaceOpen] = useState(false);
   const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
@@ -2707,6 +2715,15 @@ function AgendaPage() {
       toast.error("CPF inválido");
       return;
     }
+    // Prontuário digitado pela recepção (número da ficha antiga). Em branco,
+    // o banco gera um número automático. É único por clínica, então avisamos
+    // antes de gravar em vez de devolver erro cru do índice único.
+    const codigoProntuario = normalizarCodigoProntuario(novoPac.codigo_prontuario);
+    const conflitoPront = await conflitoCodigoProntuario(clinicaAtual.clinica_id, codigoProntuario);
+    if (conflitoPront) {
+      toast.error(conflitoPront);
+      return;
+    }
     setSavingPac(true);
     const { data, error } = await supabase
       .from("pacientes")
@@ -2717,6 +2734,7 @@ function AgendaPage() {
         telefone: somenteDigitos(novoPac.telefone) || null,
         data_nascimento: novoPac.data_nascimento || null,
         email: novoPac.email.trim() || null,
+        codigo_prontuario: codigoProntuario,
       })
       .select("id,nome")
       .single();
@@ -2740,7 +2758,14 @@ function AgendaPage() {
         toast.warning(`Paciente salvo, mas a foto não foi registrada: ${bioErr.message}`);
       }
     }
-    setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setNovoPac({
+      nome: "",
+      cpf: "",
+      telefone: "",
+      data_nascimento: "",
+      email: "",
+      codigo_prontuario: "",
+    });
     setDescritorFace(null);
     setNovoPacOpen(false);
     toast.success("Paciente cadastrado");
@@ -8924,6 +8949,16 @@ function AgendaPage() {
                 value={novoPac.email}
                 onChange={(e) => setNovoPac((p) => ({ ...p, email: e.target.value }))}
               />
+            </div>
+            <div className="space-y-1">
+              <Label>Número de prontuário</Label>
+              <Input
+                value={novoPac.codigo_prontuario}
+                onChange={(e) => setNovoPac((p) => ({ ...p, codigo_prontuario: e.target.value }))}
+                placeholder={PLACEHOLDER_PRONTUARIO}
+                maxLength={LIMITES.codigo}
+              />
+              <p className="text-xs text-muted-foreground">{AJUDA_PRONTUARIO}</p>
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Button
