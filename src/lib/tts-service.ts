@@ -18,6 +18,8 @@ const PROXY_URL = "/api/public/tts";
 const STORAGE_KEY = "tts:enabled";
 const RATE_STORAGE_KEY = "tts:rate";
 const VOICE_STORAGE_KEY = "tts:voice";
+const PIPER_VOICE_STORAGE_KEY = "tts:piperVoice";
+const VOICES_URL = "/api/public/tts-voices";
 export const DEFAULT_TTS_RATE = 0.55;
 export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
@@ -55,6 +57,43 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ClinicaTtsConfig {
   rate: number;
   enabled: boolean;
+  /** Voz do servidor Piper (ex.: "pt_BR-faber-medium"). Vazio = padrão do servidor. */
+  piperVoice?: string;
+}
+
+export interface PiperVoice {
+  id: string;
+  label: string;
+}
+
+/**
+ * Catálogo de vozes do servidor Piper, via proxy do backend (o servidor fica
+ * em rede privada e não libera CORS). Nunca lança: em falha devolve [].
+ */
+export async function fetchPiperVoices(): Promise<{ voices: PiperVoice[]; source: string }> {
+  try {
+    const res = await fetch(VOICES_URL, { headers: { Accept: "application/json" } });
+    if (!res.ok) return { voices: [], source: "erro" };
+    const json = (await res.json()) as { voices?: PiperVoice[]; source?: string };
+    return { voices: Array.isArray(json.voices) ? json.voices : [], source: json.source ?? "" };
+  } catch {
+    return { voices: [], source: "erro" };
+  }
+}
+
+/** Voz do Piper escolhida (vazio = deixa o servidor usar o padrão dele). */
+export function getPiperVoice(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(PIPER_VOICE_STORAGE_KEY) || "";
+}
+
+export function setPiperVoice(value: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PIPER_VOICE_STORAGE_KEY, value || "");
+  // O cache de áudio é por texto; trocar a voz precisa invalidá-lo.
+  limparCacheAudio();
+  stopSpeaking();
+  emitTtsChanged();
 }
 
 /** Aplica a config recebida no cache local e notifica todas as abas/hooks. */
@@ -74,6 +113,13 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
       }
     }
   }
+  if (typeof cfg.piperVoice === "string") {
+    const anterior = window.localStorage.getItem(PIPER_VOICE_STORAGE_KEY) || "";
+    if (anterior !== cfg.piperVoice) {
+      window.localStorage.setItem(PIPER_VOICE_STORAGE_KEY, cfg.piperVoice);
+      limparCacheAudio();
+    }
+  }
   if (typeof cfg.enabled === "boolean") {
     window.localStorage.setItem(STORAGE_KEY, cfg.enabled ? "1" : "0");
     if (!cfg.enabled) stopSpeaking();
@@ -85,11 +131,15 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
 export async function fetchClinicaTtsConfig(clinicaId: string): Promise<ClinicaTtsConfig | null> {
   const { data, error } = await supabase
     .from("clinica_tts_config")
-    .select("rate, enabled")
+    .select("rate, enabled, piper_voice")
     .eq("clinica_id", clinicaId)
     .maybeSingle();
   if (error || !data) return null;
-  return { rate: Number(data.rate), enabled: !!data.enabled };
+  return {
+    rate: Number(data.rate),
+    enabled: !!data.enabled,
+    piperVoice: (data as { piper_voice?: string | null }).piper_voice ?? "",
+  };
 }
 
 /** Grava a configuração da clínica no banco (dispara Realtime). */
@@ -102,6 +152,7 @@ export async function saveClinicaTtsConfig(
       clinica_id: clinicaId,
       rate: cfg.rate,
       enabled: cfg.enabled,
+      piper_voice: cfg.piperVoice ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "clinica_id" },
@@ -130,11 +181,16 @@ export function subscribeClinicaTtsConfig(clinicaId: string): () => void {
         filter: `clinica_id=eq.${clinicaId}`,
       },
       (payload) => {
-        const row = (payload.new ?? payload.old) as { rate?: number; enabled?: boolean } | null;
+        const row = (payload.new ?? payload.old) as {
+          rate?: number;
+          enabled?: boolean;
+          piper_voice?: string | null;
+        } | null;
         if (!row) return;
         applyClinicaTtsConfig({
           rate: typeof row.rate === "number" ? row.rate : Number(row.rate),
           enabled: row.enabled,
+          piperVoice: row.piper_voice ?? "",
         });
       },
     )
@@ -367,6 +423,18 @@ let currentAudio: HTMLAudioElement | null = null;
 let currentUrl: string | null = null;
 const cache = new Map<string, string>(); // text → objectUrl (LRU-lite, max 20)
 
+/** Descarta os áudios em cache (usado ao trocar a voz do Piper). */
+function limparCacheAudio() {
+  for (const url of cache.values()) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* noop */
+    }
+  }
+  cache.clear();
+}
+
 export function isUserTtsEnabled(): boolean {
   if (typeof window === "undefined") return true;
   return window.localStorage.getItem(STORAGE_KEY) !== "0";
@@ -400,13 +468,14 @@ export function stopSpeaking() {
 }
 
 async function fetchAudioUrl(text: string): Promise<string> {
-  const key = text.trim();
+  const voice = getPiperVoice();
+  const key = `${voice}|${text.trim()}`;
   const cached = cache.get(key);
   if (cached) return cached;
   const res = await fetch(PROXY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: key }),
+    body: JSON.stringify(voice ? { text: text.trim(), voice } : { text: text.trim() }),
   });
   if (!res.ok) throw new Error(`TTS falhou: ${res.status}`);
   const blob = await res.blob();

@@ -36,6 +36,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
@@ -109,7 +110,6 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
-import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts.voices'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
@@ -280,6 +280,11 @@ const PainelTTokenRoute = PainelTTokenRouteImport.update({
 const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
   path: '/p/contrato/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTtsVoicesRoute = ApiPublicTtsVoicesRouteImport.update({
+  id: '/api/public/tts-voices',
+  path: '/api/public/tts-voices',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
@@ -699,11 +704,6 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicTtsVoicesRoute = ApiPublicTtsVoicesRouteImport.update({
-  id: '/voices',
-  path: '/voices',
-  getParentRoute: () => ApiPublicTtsRoute,
-} as any)
 const ApiPublicHooksBackupDiarioRoute =
   ApiPublicHooksBackupDiarioRouteImport.update({
     id: '/api/public/hooks/backup-diario',
@@ -1015,7 +1015,8 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRouteWithChildren
+  '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1054,7 +1055,6 @@ export interface FileRoutesByFullPath {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/tts/voices': typeof ApiPublicTtsVoicesRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1150,7 +1150,8 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRouteWithChildren
+  '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1189,7 +1190,6 @@ export interface FileRoutesByTo {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/tts/voices': typeof ApiPublicTtsVoicesRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1291,7 +1291,8 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRouteWithChildren
+  '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel_/t/$token': typeof PainelTTokenRoute
   '/totem_/t/$token': typeof TotemTTokenRoute
@@ -1330,7 +1331,6 @@ export interface FileRoutesById {
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/tts/voices': typeof ApiPublicTtsVoicesRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1433,6 +1433,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/tts'
+    | '/api/public/tts-voices'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1471,7 +1472,6 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/tts/voices'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1568,6 +1568,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/tts'
+    | '/api/public/tts-voices'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1606,7 +1607,6 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/tts/voices'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1708,6 +1708,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
     | '/api/public/tts'
+    | '/api/public/tts-voices'
     | '/p/contrato/$token'
     | '/painel_/t/$token'
     | '/totem_/t/$token'
@@ -1746,7 +1747,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/tts/voices'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1781,7 +1781,8 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
-  ApiPublicTtsRoute: typeof ApiPublicTtsRouteWithChildren
+  ApiPublicTtsRoute: typeof ApiPublicTtsRoute
+  ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
@@ -1979,6 +1980,13 @@ declare module '@tanstack/react-router' {
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tts-voices': {
+      id: '/api/public/tts-voices'
+      path: '/api/public/tts-voices'
+      fullPath: '/api/public/tts-voices'
+      preLoaderRoute: typeof ApiPublicTtsVoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tts': {
@@ -2491,13 +2499,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/whatsapp/$clinicaId'
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/api/public/tts/voices': {
-      id: '/api/public/tts/voices'
-      path: '/voices'
-      fullPath: '/api/public/tts/voices'
-      preLoaderRoute: typeof ApiPublicTtsVoicesRouteImport
-      parentRoute: typeof ApiPublicTtsRoute
     }
     '/api/public/hooks/backup-diario': {
       id: '/api/public/hooks/backup-diario'
@@ -3094,18 +3095,6 @@ const PainelRouteChildren: PainelRouteChildren = {
 const PainelRouteWithChildren =
   PainelRoute._addFileChildren(PainelRouteChildren)
 
-interface ApiPublicTtsRouteChildren {
-  ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
-}
-
-const ApiPublicTtsRouteChildren: ApiPublicTtsRouteChildren = {
-  ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
-}
-
-const ApiPublicTtsRouteWithChildren = ApiPublicTtsRoute._addFileChildren(
-  ApiPublicTtsRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -3128,7 +3117,8 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
-  ApiPublicTtsRoute: ApiPublicTtsRouteWithChildren,
+  ApiPublicTtsRoute: ApiPublicTtsRoute,
+  ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,
