@@ -2522,6 +2522,7 @@ export type Database = {
         Row: {
           clinica_id: string
           enabled: boolean
+          piper_voice: string | null
           rate: number
           updated_at: string
           updated_by: string | null
@@ -2530,6 +2531,7 @@ export type Database = {
         Insert: {
           clinica_id: string
           enabled?: boolean
+          piper_voice?: string | null
           rate?: number
           updated_at?: string
           updated_by?: string | null
@@ -2538,6 +2540,7 @@ export type Database = {
         Update: {
           clinica_id?: string
           enabled?: boolean
+          piper_voice?: string | null
           rate?: number
           updated_at?: string
           updated_by?: string | null
