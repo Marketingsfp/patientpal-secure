@@ -5996,15 +5996,13 @@ function AgendaPage() {
         toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
         return;
       }
-      // Regra global: o paciente paga na chegada — sem pagamento (ou sem
-      // autorização do convênio) o atendimento não pode ser realizado.
+      // Regra global: o paciente particular paga na chegada — sem pagamento o
+      // atendimento não pode ser realizado. Convênio não trava: a autorização é
+      // conferida na recepção e entra apenas como aviso na tela.
       const ehConvenio = (a.tipo_atendimento ?? "particular") === "convenio";
       if (ehConvenio) {
         if (!a.convenio_autorizado) {
-          toast.error(
-            "Convênio sem autorização confirmada. Confirme a autorização na recepção antes de realizar o atendimento.",
-          );
-          return;
+          toast.warning("Convênio sem autorização confirmada na recepção.");
         }
       } else if (!pagosSet.has(a.id) && !a.data_pagamento) {
         toast.error(
