@@ -135,6 +135,7 @@ import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
+import { Route as AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport } from './routes/_authenticated/app.cartao-beneficios.sem-convenio'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
 import { Route as AuthenticatedAppCartaoBeneficiosModelosRouteImport } from './routes/_authenticated/app.cartao-beneficios.modelos'
 import { Route as AuthenticatedAppCartaoBeneficiosImportarRouteImport } from './routes/_authenticated/app.cartao-beneficios.importar'
@@ -854,6 +855,12 @@ const AuthenticatedAppClientesDuplicadosRoute =
     path: '/clientes/duplicados',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppCartaoBeneficiosSemConvenioRoute =
+  AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport.update({
+    id: '/sem-convenio',
+    path: '/sem-convenio',
+    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
+  } as any)
 const AuthenticatedAppCartaoBeneficiosRelatoriosRoute =
   AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport.update({
     id: '/relatorios',
@@ -1030,6 +1037,7 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/importar': typeof AuthenticatedAppCartaoBeneficiosImportarRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
@@ -1165,6 +1173,7 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/importar': typeof AuthenticatedAppCartaoBeneficiosImportarRoute
   '/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
@@ -1306,6 +1315,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/importar': typeof AuthenticatedAppCartaoBeneficiosImportarRoute
   '/_authenticated/app/cartao-beneficios/modelos': typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  '/_authenticated/app/cartao-beneficios/sem-convenio': typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
@@ -1447,6 +1457,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/importar'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/cartao-beneficios/sem-convenio'
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
@@ -1582,6 +1593,7 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/importar'
     | '/app/cartao-beneficios/modelos'
     | '/app/cartao-beneficios/relatorios'
+    | '/app/cartao-beneficios/sem-convenio'
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
@@ -1722,6 +1734,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/importar'
     | '/_authenticated/app/cartao-beneficios/modelos'
     | '/_authenticated/app/cartao-beneficios/relatorios'
+    | '/_authenticated/app/cartao-beneficios/sem-convenio'
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/configuracoes/painel-totem'
@@ -2675,6 +2688,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClientesDuplicadosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/cartao-beneficios/sem-convenio': {
+      id: '/_authenticated/app/cartao-beneficios/sem-convenio'
+      path: '/sem-convenio'
+      fullPath: '/app/cartao-beneficios/sem-convenio'
+      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosSemConvenioRouteImport
+      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
+    }
     '/_authenticated/app/cartao-beneficios/relatorios': {
       id: '/_authenticated/app/cartao-beneficios/relatorios'
       path: '/relatorios'
@@ -2789,6 +2809,7 @@ interface AuthenticatedAppCartaoBeneficiosRouteChildren {
   AuthenticatedAppCartaoBeneficiosImportarRoute: typeof AuthenticatedAppCartaoBeneficiosImportarRoute
   AuthenticatedAppCartaoBeneficiosModelosRoute: typeof AuthenticatedAppCartaoBeneficiosModelosRoute
   AuthenticatedAppCartaoBeneficiosRelatoriosRoute: typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
+  AuthenticatedAppCartaoBeneficiosSemConvenioRoute: typeof AuthenticatedAppCartaoBeneficiosSemConvenioRoute
 }
 
 const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBeneficiosRouteChildren =
@@ -2809,6 +2830,8 @@ const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBenef
       AuthenticatedAppCartaoBeneficiosModelosRoute,
     AuthenticatedAppCartaoBeneficiosRelatoriosRoute:
       AuthenticatedAppCartaoBeneficiosRelatoriosRoute,
+    AuthenticatedAppCartaoBeneficiosSemConvenioRoute:
+      AuthenticatedAppCartaoBeneficiosSemConvenioRoute,
   }
 
 const AuthenticatedAppCartaoBeneficiosRouteWithChildren =

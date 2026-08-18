@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation, redirect } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   CreditCard,
   FileSignature,
   BarChart3,
@@ -27,6 +28,7 @@ const tabs = [
   { to: "/app/cartao-beneficios/convenios", label: "Convênios", icon: ShieldCheck },
   { to: "/app/cartao-beneficios/dependentes", label: "Dependentes", icon: Users },
   { to: "/app/cartao-beneficios/conferencia", label: "Conferência", icon: ClipboardCheck },
+  { to: "/app/cartao-beneficios/sem-convenio", label: "Sem convênio", icon: AlertTriangle },
   { to: "/app/cartao-beneficios/relatorios", label: "Relatórios (BI)", icon: BarChart3 },
   { to: "/app/cartao-beneficios/importar", label: "Importar planilha", icon: Upload },
 ];
