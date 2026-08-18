@@ -187,7 +187,10 @@ const RELATORIOS: Relatorio[] = [
       const { data, error } = await supabase
         .from("fin_lancamentos")
         .select(
-          "data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos(nome)",
+          // `fin_lancamentos` tem duas chaves estrangeiras para `medicos`
+          // (medico_id e medico_laudador_id), então o vínculo precisa ser
+          // nomeado ou o PostgREST devolve PGRST201 e o relatório não abre.
+          "data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos!fin_lancamentos_medico_id_fkey(nome)",
         )
         .eq("clinica_id", clinicaId)
         .gte("data", ini!)

@@ -131,7 +131,12 @@ export function getMedicoConveniosAgenda(clinicaId: string): Promise<MedicoConve
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
         .from("medico_convenios")
-        .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
+        // A dica `!medico_convenios_medico_id_fkey` é obrigatória: desde que
+        // `medico_convenios.terceiro_id` passou a apontar para `medicos`, a tabela
+        // tem DUAS chaves estrangeiras para `medicos` e o PostgREST recusa o
+        // vínculo ambíguo (erro PGRST201). Sem a dica esta consulta falha, o
+        // `Promise.all` da Agenda quebra e o filtro de profissional fica vazio.
+        .select("medico_id,nome,ativo,medicos!medico_convenios_medico_id_fkey!inner(clinica_id)")
         .eq("ativo", true)
         .eq("medicos.clinica_id", clinicaId)
         .range(from, from + pageSize - 1);

@@ -408,6 +408,20 @@ async function buscarProcedimentoPorNome(
 const fetchProcedimentosAgenda = getProcedimentosAgenda;
 const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
+// As listas de apoio da Agenda (serviços do médico, convênios, vínculos) são
+// buscadas em paralelo com a lista de médicos. Se qualquer uma delas falha, o
+// `Promise.all` inteiro falha e a tela perde TUDO — inclusive os médicos, o que
+// deixa o filtro de profissional vazio sem nenhuma mensagem de erro. Este
+// invólucro isola a falha: a lista que quebrou volta vazia e as outras seguem.
+async function listaTolerante<T>(p: Promise<T[]>, rotulo: string): Promise<T[]> {
+  try {
+    return await p;
+  } catch (err) {
+    console.error(`agenda: falha ao carregar ${rotulo}`, err);
+    return [];
+  }
+}
+
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number; percentualOutros?: number }
   | { tipo: "valor"; valor: number }
@@ -3262,14 +3276,17 @@ function AgendaPage() {
         .from("medico_especialidades")
         .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
         .eq("medicos.clinica_id", clinicaAtual.clinica_id),
-      fetchProcedimentosAgenda(clinicaAtual.clinica_id),
+      listaTolerante(fetchProcedimentosAgenda(clinicaAtual.clinica_id), "serviços"),
       supabase
         .from("procedimento_split_regras")
         .select("medico_id,procedimento_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .not("medico_id", "is", null),
-      getMedicoConveniosAgenda(clinicaAtual.clinica_id),
-      fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
+      listaTolerante(getMedicoConveniosAgenda(clinicaAtual.clinica_id), "convênios do médico"),
+      listaTolerante(
+        fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
+        "serviços por médico",
+      ),
       supabase
         .from("medico_agendas")
         .select("id,nome,medico_id,ativo,ordem")
