@@ -32,6 +32,10 @@ import {
   listBrowserVoices,
   speak,
   stopSpeaking,
+  fetchPiperVoices,
+  getPiperVoice,
+  setPiperVoice,
+  type PiperVoice,
   fetchClinicaTtsConfig,
   saveClinicaTtsConfig,
   applyClinicaTtsConfig,
@@ -63,6 +67,10 @@ function VozConfigPage() {
   const [voz, setVoz] = useState<string>(TTS_VOICE_AUTO);
   const [savedVoz, setSavedVoz] = useState<string>(TTS_VOICE_AUTO);
   const [vozes, setVozes] = useState<SpeechSynthesisVoice[]>([]);
+  const [piperVozes, setPiperVozes] = useState<PiperVoice[]>([]);
+  const [piperFonte, setPiperFonte] = useState<string>("");
+  const [piperVoz, setPiperVoz] = useState<string>("");
+  const [savedPiperVoz, setSavedPiperVoz] = useState<string>("");
   const [temPtBr, setTemPtBr] = useState<boolean>(true);
   const [texto, setTexto] = useState<string>(FRASE_PADRAO);
   const [testando, setTestando] = useState(false);
@@ -85,6 +93,19 @@ function VozConfigPage() {
     };
   }, []);
 
+  // Catálogo real do servidor Piper (via proxy do backend).
+  useEffect(() => {
+    let cancelado = false;
+    void fetchPiperVoices().then(({ voices, source }) => {
+      if (cancelado) return;
+      setPiperVozes(voices);
+      setPiperFonte(source);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   useEffect(() => {
     // Fonte de verdade: banco por clínica (para propagar em Realtime ao
     // painel). Se não houver linha ainda, usa o cache local como fallback.
@@ -92,11 +113,13 @@ function VozConfigPage() {
     (async () => {
       let r = getUserTtsRate();
       let e = isUserTtsEnabled();
+      let pv = getPiperVoice();
       if (clinicaId) {
         const cfg = await fetchClinicaTtsConfig(clinicaId);
         if (cfg) {
           r = cfg.rate;
           e = cfg.enabled;
+          pv = cfg.piperVoice ?? "";
           applyClinicaTtsConfig(cfg);
         }
       }
@@ -105,6 +128,8 @@ function VozConfigPage() {
       setSavedRate(r);
       setEnabled(e);
       setSavedEnabled(e);
+      setPiperVoz(pv);
+      setSavedPiperVoz(pv);
       // A voz NÃO vem do banco: a lista depende do sistema operacional de
       // cada máquina, então a preferência é sempre deste navegador.
       const v = getUserTtsVoice();
@@ -133,9 +158,14 @@ function VozConfigPage() {
       setUserTtsRate(rate);
       setUserTtsEnabled(enabled);
       setUserTtsVoice(voz);
+      setPiperVoice(piperVoz);
       // Fonte de verdade compartilhada com o painel (Realtime).
       if (clinicaId) {
-        const { error } = await saveClinicaTtsConfig(clinicaId, { rate, enabled });
+        const { error } = await saveClinicaTtsConfig(clinicaId, {
+          rate,
+          enabled,
+          piperVoice: piperVoz,
+        });
         if (error) {
           toast.error(`Falha ao sincronizar com o painel: ${error}`);
           return;
@@ -144,6 +174,7 @@ function VozConfigPage() {
       setSavedRate(rate);
       setSavedEnabled(enabled);
       setSavedVoz(voz);
+      setSavedPiperVoz(piperVoz);
       toast.success(
         clinicaId
           ? `Preferências salvas (${Math.round(rate * 100)}%) — painel atualizado.`
@@ -158,12 +189,14 @@ function VozConfigPage() {
     setRate(savedRate);
     setEnabled(savedEnabled);
     setVoz(savedVoz);
+    setPiperVoz(savedPiperVoz);
   }
 
   /** Volta velocidade e voz ao que está salvo (o teste aplica em caráter temporário). */
   function restaurarSalvos() {
     setUserTtsRate(savedRate);
     setUserTtsVoice(savedVoz);
+    setPiperVoice(savedPiperVoz);
   }
 
   async function testar() {
@@ -175,6 +208,7 @@ function VozConfigPage() {
     // sem persistir — o Salvar continua responsável por gravar.
     setUserTtsRate(rate);
     setUserTtsVoice(voz);
+    setPiperVoice(piperVoz);
     setTestando(true);
     try {
       await speak(texto || FRASE_PADRAO, {
@@ -209,7 +243,12 @@ function VozConfigPage() {
   }
 
   const percent = Math.round(rate * 100);
-  const dirty = rate !== savedRate || enabled !== savedEnabled || voz !== savedVoz;
+  const dirty =
+    rate !== savedRate ||
+    enabled !== savedEnabled ||
+    voz !== savedVoz ||
+    piperVoz !== savedPiperVoz;
+  const usaPiper = voz === TTS_VOICE_AUTO || voz === TTS_VOICE_PIPER;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
@@ -274,6 +313,43 @@ function VozConfigPage() {
                 sistema de cada computador. Configure também na máquina que exibe o painel.
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Voz do Servidor Piper</Label>
+            <p className="text-xs text-muted-foreground">
+              Usada quando o áudio vem do servidor (opções <strong>Automática</strong> e{" "}
+              <strong>Usar Servidor Piper</strong>). Ao contrário das vozes do navegador, esta vale
+              para todos os computadores da clínica.
+            </p>
+            <Select
+              value={piperVoz || "__padrao__"}
+              onValueChange={(v) => setPiperVoz(v === "__padrao__" ? "" : v)}
+              disabled={!usaPiper}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Padrão do servidor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__padrao__">Padrão do servidor</SelectItem>
+                {piperVozes.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.label} — {v.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {piperVozes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Carregando vozes do servidor…</p>
+            ) : piperFonte === "fallback" ? (
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                O servidor Piper não respondeu; a lista mostra as vozes do serviço de reserva.
+              </p>
+            ) : !usaPiper ? (
+              <p className="text-xs text-muted-foreground">
+                Sem efeito enquanto uma voz do navegador estiver selecionada acima.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -367,18 +443,18 @@ function VozConfigPage() {
 // Mesma rota usada por src/lib/tts-service.ts. Valida tamanho do texto,
 // restringe o formato de `voice` e tem fallback quando o Piper cai.
 const TTS_ENDPOINT = "/api/public/tts";
-const VOZES = [
-  { value: "faber", label: "Faber (Masculino)" },
-  { value: "feminina", label: "Feminina" },
-] as const;
-
 function TesteServidorLocalCard() {
   const [texto, setTexto] = useState<string>("Olá! Este é um teste de síntese de voz.");
-  const [voice, setVoice] = useState<string>("faber");
+  const [voice, setVoice] = useState<string>("");
+  const [vozesServidor, setVozesServidor] = useState<PiperVoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    void fetchPiperVoices().then(({ voices }) => setVozesServidor(voices));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -397,7 +473,7 @@ function TesteServidorLocalCard() {
       const res = await fetch(TTS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: t, voice }),
+        body: JSON.stringify(voice ? { text: t, voice } : { text: t }),
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -449,14 +525,18 @@ function TesteServidorLocalCard() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="space-y-2">
             <Label className="text-sm">Voz</Label>
-            <Select value={voice} onValueChange={setVoice}>
+            <Select
+              value={voice || "__padrao__"}
+              onValueChange={(v) => setVoice(v === "__padrao__" ? "" : v)}
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Padrão do servidor" />
               </SelectTrigger>
               <SelectContent>
-                {VOZES.map((v) => (
-                  <SelectItem key={v.value} value={v.value}>
-                    {v.label}
+                <SelectItem value="__padrao__">Padrão do servidor</SelectItem>
+                {vozesServidor.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.label} — {v.id}
                   </SelectItem>
                 ))}
               </SelectContent>
