@@ -4431,7 +4431,8 @@ function AgendaPage() {
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // ---- "Agora": destaque + rolagem automática para o horário atual (só hoje)
+  // ---- "Agora": destaque do horário atual (só hoje). A rolagem acontece apenas
+  // quando o usuário clica no botão "Ir para agora" — nunca na abertura da tela.
   const ehHojeAgenda = dataRef === hojeBR();
   const [agoraTs, setAgoraTs] = useState(() => Date.now());
   useEffect(() => {
@@ -4467,17 +4468,6 @@ function AgendaPage() {
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 120);
   }, [agoraAgId, filtradosOrdenados, page]);
-
-  const autoScrollFeitoRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!ehHojeAgenda || !agoraAgId) return;
-    if (autoScrollFeitoRef.current === dataRef) return;
-    autoScrollFeitoRef.current = dataRef;
-    irParaAgora();
-  }, [ehHojeAgenda, agoraAgId, dataRef, irParaAgora]);
-  useEffect(() => {
-    autoScrollFeitoRef.current = null;
-  }, [dataRef]);
 
   const limparFiltros = () => {
     setFiltroMedico("todos");
