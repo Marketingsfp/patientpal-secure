@@ -2241,6 +2241,7 @@ function AgendaPage() {
   const [pacienteCadastroVersao, setPacienteCadastroVersao] = useState(0);
   const podeEditarCliente = usePodeEscrever("clientes");
   type PacInfoEdit = {
+    codigo_prontuario: string;
     cpf: string;
     data_nascimento: string;
     telefone: string;
@@ -2253,6 +2254,7 @@ function AgendaPage() {
     estado: string;
   };
   const emptyPacEdit: PacInfoEdit = {
+    codigo_prontuario: "",
     cpf: "",
     data_nascimento: "",
     telefone: "",
@@ -2291,6 +2293,7 @@ function AgendaPage() {
   useEffect(() => {
     if (pacInfo) {
       setPacEdit({
+        codigo_prontuario: pacInfo.codigo_prontuario ?? "",
         cpf: pacInfo.cpf ?? "",
         data_nascimento: pacInfo.data_nascimento ?? "",
         telefone: pacInfo.telefone ?? "",
@@ -2310,6 +2313,7 @@ function AgendaPage() {
   const pacEditDirty = useMemo(() => {
     if (!pacInfo) return false;
     const orig: PacInfoEdit = {
+      codigo_prontuario: pacInfo.codigo_prontuario ?? "",
       cpf: pacInfo.cpf ?? "",
       data_nascimento: pacInfo.data_nascimento ?? "",
       telefone: pacInfo.telefone ?? "",
@@ -2329,7 +2333,28 @@ function AgendaPage() {
     if (!pacInfo?.id || !pacEditDirty) return;
     setPacEditSaving(true);
     try {
-      const patch = {
+      // Prontuário é único por clínica (índice no banco). A checagem sai da
+      // mesma função usada no cadastro completo, para a recepção receber o
+      // aviso com o nome do paciente que já usa o número — em vez do erro cru
+      // de índice único, que não diz de quem é a ficha.
+      const codigoProntuario = normalizarCodigoProntuario(pacEdit.codigo_prontuario);
+      // A unicidade é por clínica: confere na clínica do próprio paciente,
+      // não na que está selecionada na tela.
+      const clinicaDoPaciente: string | null =
+        pacInfo.clinica_id ?? clinicaAtual?.clinica_id ?? null;
+      if (clinicaDoPaciente) {
+        const conflito = await conflitoCodigoProntuario(
+          clinicaDoPaciente,
+          codigoProntuario,
+          pacInfo.id,
+        );
+        if (conflito) {
+          toast.error(conflito);
+          setPacEditSaving(false);
+          return;
+        }
+      }
+      const patchBase = {
         cpf: somenteDigitos(pacEdit.cpf) || null,
         data_nascimento: pacEdit.data_nascimento.trim() || null,
         telefone: somenteDigitos(pacEdit.telefone) || null,
@@ -2340,10 +2365,20 @@ function AgendaPage() {
         bairro: pacEdit.bairro.trim() || null,
         cidade: pacEdit.cidade.trim() || null,
         estado: pacEdit.estado.trim().toUpperCase().slice(0, 2) || null,
-      } as const;
+      };
+      // Campo de prontuário vazio numa edição significa "não mexer", nunca
+      // "apagar" — mesma regra do cadastro completo. Sem isso, limpar o campo
+      // sem querer deixaria o paciente sem número de ficha.
+      const patch = codigoProntuario
+        ? { ...patchBase, codigo_prontuario: codigoProntuario }
+        : patchBase;
       const { error } = await supabase.from("pacientes").update(patch).eq("id", pacInfo.id);
       if (error) throw error;
       setPacInfo({ ...pacInfo, ...patch });
+      // Faz o card do paciente na ficha de agendamento reler os dados: sem
+      // isso, o prontuário corrigido aqui continuaria aparecendo com o número
+      // antigo na tela de trás até fechar e reabrir o agendamento.
+      setPacienteCadastroVersao((v) => v + 1);
       toast.success("Dados atualizados.");
     } catch (e) {
       mostrarErro(e);
@@ -2379,7 +2414,7 @@ function AgendaPage() {
     const { data } = await supabase
       .from("pacientes")
       .select(
-        "id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cep,cidade,estado,bairro,logradouro,numero,foto_url",
+        "id,clinica_id,nome,cpf,telefone,email,data_nascimento,codigo_prontuario,numero_pasta,cep,cidade,estado,bairro,logradouro,numero,foto_url",
       )
       .eq("id", pacienteId)
       .maybeSingle();
@@ -10824,6 +10859,21 @@ function AgendaPage() {
                 disabled={!podeEditarCliente || pacEditSaving}
                 className="w-full min-w-0 overflow-hidden grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t disabled:opacity-70"
               >
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Prontuário</Label>
+                  <Input
+                    value={pacEdit.codigo_prontuario}
+                    onChange={(e) =>
+                      setPacEdit((s) => ({ ...s, codigo_prontuario: e.target.value }))
+                    }
+                    placeholder={PLACEHOLDER_PRONTUARIO}
+                    maxLength={LIMITES.codigo}
+                    className="h-8"
+                  />
+                  <p className="text-[11px] leading-tight text-muted-foreground">
+                    {AJUDA_PRONTUARIO}
+                  </p>
+                </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CPF</Label>
                   <InputCPF
