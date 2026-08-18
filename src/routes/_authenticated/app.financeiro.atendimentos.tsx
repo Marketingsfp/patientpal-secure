@@ -1217,7 +1217,7 @@ function AtendimentosPage() {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, paciente:pacientes(nome), categoria:fin_categorias(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
@@ -1266,7 +1266,22 @@ function AtendimentosPage() {
       setLoading(false);
       return;
     }
-    const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    // Mensalidades de contrato não são atendimentos clínicos: não têm médico
+    // nem procedimento e não geram repasse. Ficavam aqui como linhas "—".
+    const ehMensalidadeContrato = (r: {
+      descricao?: string | null;
+      categoria?: { nome?: string | null } | null;
+    }) => {
+      const desc = (r.descricao ?? "").toUpperCase();
+      const cat = (r.categoria?.nome ?? "").toUpperCase();
+      return (
+        cat.includes("MENSALIDADE") ||
+        /^MENSALIDADE\s+\d+\s*\/\s*\d+/.test(desc) ||
+        /—\s*CONTRATO\s*$/.test(desc)
+      );
+    };
+    const semAgendaRows = (sr.data ?? []).filter((r: any) => !ehMensalidadeContrato(r));
+    const agendaRows = [...(ar.data ?? []), ...semAgendaRows];
     const manualLancamentoIds = (mr.data ?? [])
       .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
       .filter((x): x is string => !!x);
