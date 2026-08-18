@@ -16,11 +16,13 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
+import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -102,6 +104,17 @@ interface Lanc {
   /** id do lançamento pai quando esta linha é uma parte de "misto". */
   _mistoPaiId?: string;
 }
+/** Rótulos amigáveis das formas de pagamento (usados no recibo impresso). */
+const FORMA_LABEL: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  cartao_credito: "Cartão Crédito",
+  cartao_debito: "Cartão Débito",
+  boleto: "Boleto",
+  convenio: "Convênio",
+  transferencia: "Transferência",
+};
+
 interface Opt {
   id: string;
   nome: string;
@@ -177,6 +190,7 @@ function expandMistoItems(items: Lanc[]): Lanc[] {
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const podeEscrever = usePodeEscrever("financeiro");
   // Estorno segue a matriz de Perfis de Acesso normalmente (módulo "financeiro"),
   // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
@@ -722,9 +736,20 @@ function Page() {
     setOpen(true);
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const salvarLancamento = async (imprimir: boolean) => {
     if (!clinicaAtual) return;
+    if (!form.descricao.trim()) {
+      toast.error("Preencha a descrição.");
+      return;
+    }
+    if (!form.data) {
+      toast.error("Informe a data.");
+      return;
+    }
+    if (!(Number(form.valor) > 0)) {
+      toast.error("Informe o valor.");
+      return;
+    }
     // Forma de pagamento é obrigatória para receita já confirmada (pendente
     // pode legitimamente não ter forma ainda). Sem essa checagem, lançamentos
     // manuais ficavam com forma_pagamento NULL e a guia impressa (GR) caía
@@ -755,9 +780,38 @@ function Page() {
       return;
     }
     toast.success("Salvo");
+    // Recibo do lançamento: mesma impressão usada pelo diálogo de Receita /
+    // Despesa do financeiro, para o papel sair igual em todas as telas.
+    if (imprimir) {
+      try {
+        printReciboLancamento({
+          tipo: form.tipo,
+          clinicaNome: clinicaAtual.clinica?.nome ?? "",
+          operadorNome:
+            (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null,
+          descricao: form.descricao.trim(),
+          valor: Number(form.valor),
+          data: form.data,
+          categoriaNome: cats.find((c) => c.id === form.categoria_id)?.nome ?? null,
+          contaNome: contas.find((c) => c.id === form.conta_id)?.nome ?? null,
+          formaPagamentoLabel: form.forma_pagamento
+            ? (FORMA_LABEL[form.forma_pagamento] ?? form.forma_pagamento)
+            : null,
+          observacoes: form.observacoes || null,
+        });
+      } catch (err) {
+        console.error("Falha ao imprimir recibo do lançamento:", err);
+        toast.error("Lançamento salvo, mas não foi possível abrir a impressão do recibo.");
+      }
+    }
     setOpen(false);
     await load();
     await loadResumo();
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void salvarLancamento(false);
   };
 
   const remove = (l: Lanc) => {
@@ -1426,6 +1480,15 @@ function Page() {
                   />
                 </div>
                 <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => void salvarLancamento(true)}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    {saving ? "Salvando..." : "Salvar e imprimir"}
+                  </Button>
                   <Button type="submit" disabled={saving}>
                     {saving ? "Salvando..." : "Salvar"}
                   </Button>
