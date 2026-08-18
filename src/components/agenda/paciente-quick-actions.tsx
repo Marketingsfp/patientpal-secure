@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Calendar, Camera, Check, IdCard, Loader2, MapPin, Phone, Save, X } from "lucide-react";
+import {
+  Calendar,
+  Camera,
+  Check,
+  FileText,
+  IdCard,
+  Loader2,
+  MapPin,
+  Phone,
+  Save,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InputCPF, InputTelefone, limparTelefone } from "@/components/ui/masked-input";
@@ -28,6 +39,10 @@ interface PacData {
   telefone2: string | null;
   cpf: string | null;
   data_nascimento: string | null;
+  /** Número da ficha (digitado pela recepção). Exibido, não editado aqui. */
+  codigo_prontuario: string | null;
+  /** Numeração legada, usada como reserva quando não há código_prontuario. */
+  numero_pasta: string | null;
   cep: string | null;
   logradouro: string | null;
   numero: string | null;
@@ -43,6 +58,8 @@ const EMPTY: PacData = {
   telefone2: "",
   cpf: "",
   data_nascimento: "",
+  codigo_prontuario: null,
+  numero_pasta: null,
   cep: "",
   logradouro: "",
   numero: "",
@@ -69,7 +86,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       const { data: row } = await supabase
         .from("pacientes")
         .select(
-          "telefone,telefone2,cpf,data_nascimento,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
+          "telefone,telefone2,cpf,data_nascimento,codigo_prontuario,numero_pasta,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
         )
         .eq("id", pacienteId)
         .maybeSingle();
@@ -80,6 +97,8 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           telefone2: row.telefone2 ?? "",
           cpf: row.cpf ?? "",
           data_nascimento: row.data_nascimento ?? "",
+          codigo_prontuario: row.codigo_prontuario ?? null,
+          numero_pasta: row.numero_pasta ?? null,
           cep: row.cep ?? "",
           logradouro: row.logradouro ?? "",
           numero: row.numero ?? "",
@@ -176,6 +195,11 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
     );
   }
 
+  // `codigo_prontuario` é a numeração atual; `numero_pasta` é a legada, usada
+  // como reserva para cadastros antigos que ainda não têm a nova.
+  const prontuario =
+    (data.codigo_prontuario ?? "").trim() || (data.numero_pasta ?? "").trim() || null;
+
   return (
     <div className="rounded-md border bg-muted/30 p-2 space-y-2">
       <div className="grid grid-cols-12 gap-2 items-center">
@@ -215,6 +239,19 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Número da ficha do paciente. Fica só de leitura aqui de propósito:
+            alterar prontuário passa pela checagem de duplicidade do cadastro
+            completo (o lápis ao lado do nome), que avisa quando o número já
+            pertence a outro paciente. Um campo solto aqui contornaria essa
+            checagem e deixaria dois pacientes com a mesma ficha. */}
+        <span
+          className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-[11px] leading-none text-muted-foreground"
+          title="Número da ficha do paciente. Para alterar, use o lápis ao lado do nome."
+        >
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          Prontuário
+          <span className="font-mono font-semibold text-foreground">{prontuario ?? "—"}</span>
+        </span>
         {edited && (
           <Button type="button" size="sm" onClick={salvarDadosBasicos} disabled={savingPhone}>
             {savingPhone ? (

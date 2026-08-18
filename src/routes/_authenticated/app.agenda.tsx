@@ -2235,6 +2235,10 @@ function AgendaPage() {
   const [editarPacienteOpen, setEditarPacienteOpen] = useState(false);
   const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
   const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
+  // Sobe a cada gravação no cadastro completo. Entra na `key` dos blocos de
+  // resumo do paciente para que eles releiam os dados na hora — sem isso, a
+  // recepção corrigia o prontuário e continuava vendo o número antigo na ficha.
+  const [pacienteCadastroVersao, setPacienteCadastroVersao] = useState(0);
   const podeEditarCliente = usePodeEscrever("clientes");
   type PacInfoEdit = {
     cpf: string;
@@ -7822,6 +7826,26 @@ function AgendaPage() {
                             <UserPlus className="h-4 w-4" />
                           </Button>
                         )}
+                        {/* Atalho para o cadastro completo sem sair do
+                            agendamento: a recepção precisa corrigir prontuário,
+                            CPF ou endereço no meio do atendimento, e antes isso
+                            obrigava a fechar a ficha e ir até a lista de
+                            clientes. Reaproveita o mesmo formulário (e a mesma
+                            checagem de prontuário duplicado) da tela Clientes. */}
+                        {form.paciente_id && podeEditarCliente && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            title="Editar cadastro do paciente (prontuário, CPF, endereço…)"
+                            aria-label="Editar cadastro do paciente"
+                            onClick={() => {
+                              void abrirEditarPacienteInline(form.paciente_id);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                       {editing && pagosSet.has(editing.id) && (
                         <p className="text-xs text-amber-600">
@@ -7840,10 +7864,11 @@ function AgendaPage() {
                             key={`resumo-${form.paciente_id}`}
                             pacienteId={form.paciente_id}
                             clinicaId={clinicaAtual.clinica_id}
+                            versao={pacienteCadastroVersao}
                             onCompletarCadastro={() => setQuickCompleteOpen(true)}
                           />
                           <PacienteQuickActions
-                            key={form.paciente_id}
+                            key={`${form.paciente_id}-${pacienteCadastroVersao}`}
                             pacienteId={form.paciente_id}
                             clinicaId={clinicaAtual.clinica_id}
                           />
@@ -10979,6 +11004,26 @@ function AgendaPage() {
                 const id = editarPacienteData.id;
                 setEditarPacienteOpen(false);
                 setEditarPacienteData(null);
+                // Faz os blocos de resumo (prontuário, telefone, CPF) relerem
+                // o cadastro, em vez de continuarem mostrando o dado antigo.
+                setPacienteCadastroVersao((v) => v + 1);
+                // O nome pode ter sido corrigido no cadastro; a ficha aberta
+                // continuaria exibindo o antigo e gravaria ele no agendamento.
+                if (id && form.paciente_id === id) {
+                  const { data: atualizado } = await supabase
+                    .from("pacientes")
+                    .select("nome")
+                    .eq("id", id)
+                    .maybeSingle();
+                  const nomeNovo = (atualizado?.nome ?? "").trim();
+                  if (nomeNovo) {
+                    setForm((f) =>
+                      f.paciente_id === id && f.paciente_nome !== nomeNovo
+                        ? { ...f, paciente_nome: nomeNovo }
+                        : f,
+                    );
+                  }
+                }
                 if (id && pacInfoOpen) {
                   await abrirInfoPaciente(id, pacInfo?.nome ?? "");
                 }

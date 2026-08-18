@@ -52,14 +52,21 @@ function fmtData(d: string | null | undefined) {
 export function PacienteResumoBar({
   pacienteId,
   clinicaId,
+  versao = 0,
   onCompletarCadastro,
 }: {
   pacienteId: string;
   clinicaId: string;
+  /**
+   * Muda quando o cadastro do paciente foi alterado em outra tela. Entra na
+   * chave da consulta porque o resultado fica 60s em cache: sem isso, corrigir
+   * o nome no cadastro completo não refletia aqui até o cache expirar.
+   */
+  versao?: number;
   onCompletarCadastro?: () => void;
 }) {
   const { data, isLoading } = useQuery({
-    queryKey: ["paciente-resumo-recepcao", pacienteId, clinicaId],
+    queryKey: ["paciente-resumo-recepcao", pacienteId, clinicaId, versao],
     enabled: !!pacienteId && !!clinicaId,
     staleTime: 60_000,
     queryFn: async () => {
