@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Users,
   ClipboardCheck,
+  Upload,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
@@ -27,6 +28,7 @@ const tabs = [
   { to: "/app/cartao-beneficios/dependentes", label: "Dependentes", icon: Users },
   { to: "/app/cartao-beneficios/conferencia", label: "Conferência", icon: ClipboardCheck },
   { to: "/app/cartao-beneficios/relatorios", label: "Relatórios (BI)", icon: BarChart3 },
+  { to: "/app/cartao-beneficios/importar", label: "Importar planilha", icon: Upload },
 ];
 
 function CartaoBeneficiosLayout() {
