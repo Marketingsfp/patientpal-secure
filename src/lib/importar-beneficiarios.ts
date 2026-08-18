@@ -9,17 +9,28 @@
  * precisam de teste automatizado, e teste de tela é caro.
  *
  * A biblioteca `xlsx` é carregada sob demanda (import dinâmico): ela pesa
- * perto de 400 KB e só é necessária para quem abre a tela de importação —
+ * perto de 870 KB e só é necessária para quem abre a tela de importação —
  * não deve entrar no pacote que todo mundo baixa ao abrir o sistema.
  */
 
-/** Linha de cabeçalho da planilha (linha 7 na tela do Excel = índice 6). */
-export const LINHAS_IGNORADAS = 6;
+/**
+ * Onde o cabeçalho costuma ficar quando não dá para detectar (índice 6 =
+ * linha 7 na tela do Excel). É só rede de segurança: cada aba tem a sua
+ * linha de cabeçalho descoberta em `detectarLinhaCabecalho`, porque no
+ * UNIMED_MJ.xlsx a aba 2025 usa a linha 6 e a aba 2026 usa a linha 7.
+ */
+export const LINHA_CABECALHO_PADRAO = 6;
+
+/** Até onde vale a pena procurar o cabeçalho antes de desistir. */
+const MAX_LINHAS_PROCURA_CABECALHO = 25;
 
 /** Abas lidas por padrão. */
 export const ABAS_PADRAO = ["2025", "2026"];
 
 export type TipoBeneficiario = "titular" | "dependente";
+
+/** Motivo pelo qual um dependente não pôde ser importado. */
+export type MotivoOrfao = "sem-titular-informado" | "titular-nao-encontrado";
 
 export interface LinhaBeneficiario {
   aba: string;
@@ -36,26 +47,50 @@ export interface LinhaBeneficiario {
   matriculaTitular: string | null;
 }
 
+export interface Orfao {
+  linha: LinhaBeneficiario;
+  motivo: MotivoOrfao;
+}
+
+/**
+ * Aviso com categoria, para a tela agrupar. Uma planilha real gera centenas
+ * de avisos e uma lista solta com 400 itens não é lida por ninguém — o que
+ * interessa é "98 dependentes sem titular informado", com os exemplos à mão.
+ */
+export interface Aviso {
+  categoria: string;
+  mensagem: string;
+}
+
+export interface GrupoAvisos {
+  categoria: string;
+  quantidade: number;
+  mensagens: string[];
+}
+
+export interface AbaLida {
+  nome: string;
+  /** Linha do cabeçalho como aparece no Excel (1 = primeira linha). */
+  linhaCabecalho: number | null;
+  linhas: number;
+  colunas: Record<string, string | null>;
+}
+
 export interface ResultadoLeitura {
   linhas: LinhaBeneficiario[];
   titulares: LinhaBeneficiario[];
   dependentes: LinhaBeneficiario[];
-  /** Dependentes cuja "Matrícula Titular" não existe entre os titulares. */
-  orfaos: LinhaBeneficiario[];
-  avisos: string[];
-  /** Uma entrada por aba lida, para mostrar na tela o que foi reconhecido. */
-  abas: {
-    nome: string;
-    linhas: number;
-    colunas: Record<string, string | null>;
-  }[];
+  /** Dependentes que não dá para amarrar a nenhum titular do arquivo. */
+  orfaos: Orfao[];
+  avisos: Aviso[];
+  abas: AbaLida[];
 }
 
 /** Tira acentos, deixa minúsculo e troca pontuação por espaço. */
 export function chaveTexto(valor: unknown): string {
   return String(valor ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -76,6 +111,47 @@ export function acharColuna(cabecalhos: string[], apelidos: string[]): string | 
     }
   }
   return null;
+}
+
+/**
+ * Descobre em qual linha está o cabeçalho de verdade.
+ *
+ * Cada aba do arquivo real traz um número diferente de linhas de enfeite
+ * antes da tabela (título do relatório, filtros, linhas em branco), então
+ * pular um número fixo de linhas quebra silenciosamente: a aba inteira sai
+ * da importação sem que ninguém perceba o motivo.
+ *
+ * Em vez de fixar, cada linha ganha uma pontuação pelos nomes de coluna que
+ * reconhece. Vence a linha com mais pontos, e "Nome" mais "Matrícula" são
+ * obrigatórios porque são as duas colunas sem as quais nada pode ser
+ * importado. Devolve `null` quando nenhuma linha convence.
+ */
+export function detectarLinhaCabecalho(matriz: unknown[][]): number | null {
+  let melhorIndice: number | null = null;
+  let melhorPontuacao = 0;
+
+  const limite = Math.min(matriz.length, MAX_LINHAS_PROCURA_CABECALHO);
+  for (let i = 0; i < limite; i++) {
+    const celulas = (matriz[i] ?? []).map(chaveTexto).filter(Boolean);
+    if (!celulas.length) continue;
+
+    const temNome = celulas.some((c) => c === "nome" || c.startsWith("nome "));
+    const temMatricula = celulas.some((c) => c.startsWith("matricula"));
+    if (!temNome || !temMatricula) continue;
+
+    let pontuacao = 2;
+    if (celulas.some((c) => c === "cpf")) pontuacao++;
+    if (celulas.some((c) => c.includes("nascimento"))) pontuacao++;
+    if (celulas.some((c) => c === "sexo")) pontuacao++;
+    if (celulas.some((c) => c.includes("titular ou dependente"))) pontuacao++;
+    if (celulas.some((c) => c.includes("matricula titular"))) pontuacao++;
+
+    if (pontuacao > melhorPontuacao) {
+      melhorPontuacao = pontuacao;
+      melhorIndice = i;
+    }
+  }
+  return melhorIndice;
 }
 
 /**
@@ -145,11 +221,24 @@ export function normalizarTipo(valor: unknown): TipoBeneficiario {
   return "titular";
 }
 
-/** Excel costuma entregar matrícula numérica como "1234" ou "1234.0". */
+/**
+ * Excel costuma entregar matrícula numérica como "1234" ou "1234.0".
+ * Devolve null para célula vazia e para o lixo que aparece no lugar de uma
+ * matrícula ausente ("-", "0", "N/A", "SEM TITULAR"), porque tratar isso
+ * como matrícula válida faria o dependente ser amarrado ao titular errado.
+ */
 export function normalizarMatricula(valor: unknown): string | null {
-  const texto = String(valor ?? "").trim();
+  const texto = String(valor ?? "")
+    .trim()
+    .replace(/\.0+$/, "")
+    .toUpperCase();
   if (!texto) return null;
-  return texto.replace(/\.0+$/, "").toUpperCase();
+  if (/^[-–—.,;/\\_*]+$/.test(texto)) return null;
+  if (/^0+$/.test(texto)) return null;
+  const semPontuacao = chaveTexto(texto);
+  if (["n a", "na", "nao informado", "sem titular", "sem", "nenhum", "null"].includes(semPontuacao))
+    return null;
+  return texto;
 }
 
 /** Nome limpo e dentro do limite da coluna (2 a 200 caracteres). */
@@ -160,16 +249,36 @@ export function normalizarNome(valor: unknown): string {
     .slice(0, 200);
 }
 
+/** Junta os avisos por categoria para a tela não despejar 400 linhas soltas. */
+export function agruparAvisos(avisos: Aviso[]): GrupoAvisos[] {
+  const mapa = new Map<string, string[]>();
+  for (const aviso of avisos) {
+    const atual = mapa.get(aviso.categoria);
+    if (atual) atual.push(aviso.mensagem);
+    else mapa.set(aviso.categoria, [aviso.mensagem]);
+  }
+  return [...mapa.entries()]
+    .map(([categoria, mensagens]) => ({
+      categoria,
+      quantidade: mensagens.length,
+      mensagens,
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+}
+
 /**
  * Lê o arquivo enviado pelo operador e devolve as linhas já conferidas.
  *
- * Regras aplicadas aqui (todas viram aviso na tela, nunca erro silencioso):
+ * Nada aqui interrompe a leitura: todo problema vira aviso e as demais
+ * linhas seguem. Regras aplicadas:
+ * - a linha do cabeçalho é procurada em cada aba, separadamente;
  * - linha sem nome ou sem matrícula é descartada;
  * - matrícula repetida no arquivo: fica a primeira;
  * - CPF repetido no arquivo: o segundo entra sem CPF, porque a tabela
  *   `pacientes` tem CPF único por clínica e o insert inteiro falharia;
- * - dependente cuja "Matrícula Titular" não aparece entre os titulares é
- *   separado em `orfaos` e não é importado.
+ * - dependente sem "Matrícula Titular" preenchida, ou apontando para uma
+ *   matrícula que não existe entre os titulares, sai da importação e vira
+ *   aviso — não trava a leitura nem entra sem vínculo.
  */
 export async function lerPlanilhaBeneficiarios(
   arquivo: ArrayBuffer,
@@ -178,26 +287,56 @@ export async function lerPlanilhaBeneficiarios(
   const XLSX = await import("xlsx");
   const wb = XLSX.read(arquivo, { type: "array", cellDates: true });
 
-  const avisos: string[] = [];
-  const abas: ResultadoLeitura["abas"] = [];
+  const avisos: Aviso[] = [];
+  const abas: AbaLida[] = [];
   const lidas: LinhaBeneficiario[] = [];
+
+  const avisar = (categoria: string, mensagem: string) => avisos.push({ categoria, mensagem });
 
   for (const desejada of abasDesejadas) {
     const nomeReal = wb.SheetNames.find((n) => chaveTexto(n) === chaveTexto(desejada));
     if (!nomeReal) {
-      avisos.push(
+      avisar(
+        "Aba não encontrada",
         `A aba "${desejada}" não existe neste arquivo. Abas encontradas: ${wb.SheetNames.join(", ")}.`,
       );
       continue;
     }
 
-    const brutas = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[nomeReal], {
-      range: LINHAS_IGNORADAS,
+    const planilha = wb.Sheets[nomeReal];
+    const matriz = XLSX.utils.sheet_to_json<unknown[]>(planilha, {
+      header: 1,
+      blankrows: true,
+      defval: null,
+    });
+
+    const indiceCabecalho = detectarLinhaCabecalho(matriz);
+    if (indiceCabecalho === null) {
+      abas.push({ nome: nomeReal, linhaCabecalho: null, linhas: 0, colunas: {} });
+      avisar(
+        "Cabeçalho não encontrado",
+        `Na aba "${nomeReal}" não achei uma linha de cabeçalho com as colunas Nome e Matrícula ` +
+          `nas primeiras ${MAX_LINHAS_PROCURA_CABECALHO} linhas.`,
+      );
+      continue;
+    }
+
+    const brutas = XLSX.utils.sheet_to_json<Record<string, unknown>>(planilha, {
+      range: indiceCabecalho,
       defval: null,
       blankrows: false,
     });
     if (!brutas.length) {
-      avisos.push(`A aba "${nomeReal}" não tem dados a partir da linha 7.`);
+      abas.push({
+        nome: nomeReal,
+        linhaCabecalho: indiceCabecalho + 1,
+        linhas: 0,
+        colunas: {},
+      });
+      avisar(
+        "Aba vazia",
+        `A aba "${nomeReal}" não tem dados abaixo do cabeçalho (linha ${indiceCabecalho + 1}).`,
+      );
       continue;
     }
 
@@ -222,6 +361,7 @@ export async function lerPlanilhaBeneficiarios(
 
     abas.push({
       nome: nomeReal,
+      linhaCabecalho: indiceCabecalho + 1,
       linhas: brutas.length,
       colunas: {
         Nome: colNome,
@@ -235,9 +375,10 @@ export async function lerPlanilhaBeneficiarios(
     });
 
     if (!colNome || !colMatricula) {
-      avisos.push(
-        `Na aba "${nomeReal}" não encontrei as colunas obrigatórias Nome e Matrícula. ` +
-          `Cabeçalhos lidos na linha 7: ${cabecalhos.join(" | ")}.`,
+      avisar(
+        "Colunas obrigatórias ausentes",
+        `Na aba "${nomeReal}" não encontrei as colunas Nome e Matrícula. ` +
+          `Cabeçalhos lidos na linha ${indiceCabecalho + 1}: ${cabecalhos.join(" | ")}.`,
       );
       continue;
     }
@@ -245,12 +386,16 @@ export async function lerPlanilhaBeneficiarios(
     brutas.forEach((linha, indice) => {
       const nome = normalizarNome(linha[colNome]);
       const matricula = normalizarMatricula(linha[colMatricula]);
-      // 7 é o cabeçalho, então os dados começam na linha 8 do Excel.
-      const linhaExcel = indice + LINHAS_IGNORADAS + 2;
+      // O cabeçalho está em `indiceCabecalho + 1`, então os dados começam na
+      // linha seguinte.
+      const linhaExcel = indice + indiceCabecalho + 2;
 
       if (nome.length < 2) return; // linha em branco ou rodapé
       if (!matricula) {
-        avisos.push(`${nomeReal}, linha ${linhaExcel}: "${nome}" está sem matrícula — ignorado.`);
+        avisar(
+          "Sem matrícula",
+          `${nomeReal}, linha ${linhaExcel}: "${nome}" está sem matrícula — ignorado.`,
+        );
         return;
       }
 
@@ -276,7 +421,8 @@ export async function lerPlanilhaBeneficiarios(
   for (const l of lidas) {
     const anterior = porMatricula.get(l.matricula);
     if (anterior) {
-      avisos.push(
+      avisar(
+        "Matrícula repetida",
         `Matrícula ${l.matricula} aparece mais de uma vez: fica "${anterior.nome}" ` +
           `(${anterior.aba}, linha ${anterior.linhaExcel}) e sai "${l.nome}" ` +
           `(${l.aba}, linha ${l.linhaExcel}).`,
@@ -293,7 +439,8 @@ export async function lerPlanilhaBeneficiarios(
     if (!l.cpf) continue;
     const anterior = porCpf.get(l.cpf);
     if (anterior) {
-      avisos.push(
+      avisar(
+        "CPF repetido",
         `CPF repetido no arquivo entre "${anterior.nome}" (matrícula ${anterior.matricula}) e ` +
           `"${l.nome}" (matrícula ${l.matricula}). O segundo será cadastrado sem CPF.`,
       );
@@ -305,18 +452,32 @@ export async function lerPlanilhaBeneficiarios(
 
   const titulares = linhas.filter((l) => l.tipo === "titular");
   const matriculasDeTitular = new Set(titulares.map((t) => t.matricula));
-  const dependentesTodos = linhas.filter((l) => l.tipo === "dependente");
 
-  const orfaos = dependentesTodos.filter(
-    (d) => !d.matriculaTitular || !matriculasDeTitular.has(d.matriculaTitular),
-  );
-  for (const d of orfaos) {
-    avisos.push(
-      `Dependente "${d.nome}" (${d.aba}, linha ${d.linhaExcel}): a Matrícula Titular ` +
-        `"${d.matriculaTitular ?? "(vazia)"}" não existe entre os titulares do arquivo — não será importado.`,
-    );
+  const dependentes: LinhaBeneficiario[] = [];
+  const orfaos: Orfao[] = [];
+  for (const d of linhas) {
+    if (d.tipo !== "dependente") continue;
+
+    if (!d.matriculaTitular) {
+      orfaos.push({ linha: d, motivo: "sem-titular-informado" });
+      avisar(
+        "Dependente sem titular informado",
+        `Dependente "${d.nome}" (${d.aba}, linha ${d.linhaExcel}) ignorado: a planilha não informa ` +
+          `a Matrícula Titular.`,
+      );
+      continue;
+    }
+    if (!matriculasDeTitular.has(d.matriculaTitular)) {
+      orfaos.push({ linha: d, motivo: "titular-nao-encontrado" });
+      avisar(
+        "Titular não encontrado",
+        `Dependente "${d.nome}" (${d.aba}, linha ${d.linhaExcel}) ignorado: a Matrícula Titular ` +
+          `"${d.matriculaTitular}" não existe entre os titulares do arquivo.`,
+      );
+      continue;
+    }
+    dependentes.push(d);
   }
-  const dependentes = dependentesTodos.filter((d) => !orfaos.includes(d));
 
   return { linhas, titulares, dependentes, orfaos, avisos, abas };
 }

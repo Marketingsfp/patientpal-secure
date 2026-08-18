@@ -1,24 +1,32 @@
 import { describe, expect, it } from "bun:test";
 import * as XLSX from "xlsx";
 import {
+  agruparAvisos,
+  detectarLinhaCabecalho,
   fimDeVigencia,
   inicioContratoDaAba,
   lerPlanilhaBeneficiarios,
   normalizarCpf,
   normalizarData,
+  normalizarMatricula,
   normalizarSexo,
   normalizarTipo,
+  type Aviso,
 } from "./importar-beneficiarios";
 
 /**
- * Monta um arquivo igual ao UNIMED_MJ.xlsx: seis linhas de enfeite antes do
- * cabeçalho real, que fica na linha 7 da tela do Excel.
+ * Monta um arquivo no formato do UNIMED_MJ.xlsx. `enfeite` é quantas linhas
+ * de título/filtro vêm antes do cabeçalho — no arquivo real esse número muda
+ * de aba para aba (2025 tem 5, 2026 tem 6), que foi justamente o que quebrou
+ * a primeira versão da leitura.
  */
-function planilhaFalsa(abas: Record<string, (string | number | null)[][]>): ArrayBuffer {
+function planilhaFalsa(
+  abas: Record<string, { enfeite: number; linhas: (string | number | null)[][] }>,
+): ArrayBuffer {
   const wb = XLSX.utils.book_new();
-  for (const [nome, linhas] of Object.entries(abas)) {
-    const enfeite = Array.from({ length: 6 }, () => ["RELATORIO DE BENEFICIARIOS"]);
-    const ws = XLSX.utils.aoa_to_sheet([...enfeite, ...linhas]);
+  for (const [nome, { enfeite, linhas }] of Object.entries(abas)) {
+    const topo = Array.from({ length: enfeite }, () => ["RELATORIO DE BENEFICIARIOS"]);
+    const ws = XLSX.utils.aoa_to_sheet([...topo, ...linhas]);
     XLSX.utils.book_append_sheet(wb, ws, nome);
   }
   return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
@@ -33,6 +41,10 @@ const CABECALHO = [
   "Matricula",
   "Matrícula Titular",
 ];
+
+function categorias(avisos: Aviso[]): string[] {
+  return [...new Set(avisos.map((a) => a.categoria))];
+}
 
 describe("normalização de campos", () => {
   it("aceita CPF com pontuação e recusa o que não tem 11 dígitos", () => {
@@ -64,59 +76,143 @@ describe("normalização de campos", () => {
     expect(normalizarTipo("AGREGADO")).toBe("dependente");
     expect(normalizarTipo(null)).toBe("titular"); // coluna vazia não pode virar órfão
   });
+
+  it("descarta matrícula vazia e o lixo que aparece no lugar dela", () => {
+    expect(normalizarMatricula("1234")).toBe("1234");
+    expect(normalizarMatricula("1234.0")).toBe("1234");
+    expect(normalizarMatricula("")).toBeNull();
+    expect(normalizarMatricula("   ")).toBeNull();
+    expect(normalizarMatricula("-")).toBeNull();
+    expect(normalizarMatricula(0)).toBeNull();
+    expect(normalizarMatricula("000")).toBeNull();
+    expect(normalizarMatricula("N/A")).toBeNull();
+    expect(normalizarMatricula("SEM TITULAR")).toBeNull();
+  });
+});
+
+describe("detecção da linha de cabeçalho", () => {
+  it("acha o cabeçalho mesmo com número variável de linhas antes", () => {
+    const matriz = [
+      ["POLICLINICA", null],
+      [null, null],
+      ["Nome", "Matricula"],
+    ];
+    expect(detectarLinhaCabecalho(matriz)).toBe(2);
+  });
+
+  it("exige Nome e Matrícula: linha só com Nome não serve", () => {
+    expect(detectarLinhaCabecalho([["Nome", "Endereco"]])).toBeNull();
+  });
+
+  it("prefere a linha mais completa quando há mais de uma candidata", () => {
+    const matriz = [
+      ["Nome", "Matricula"],
+      ["Nome", "CPF", "Nascimento", "Sexo", "TITULAR OU DEPENDENTE?", "Matricula"],
+    ];
+    expect(detectarLinhaCabecalho(matriz)).toBe(1);
+  });
+
+  it("devolve null quando não existe cabeçalho reconhecível", () => {
+    expect(detectarLinhaCabecalho([["a", "b"], ["c"]])).toBeNull();
+  });
 });
 
 describe("leitura da planilha", () => {
-  it("pula as 6 primeiras linhas, junta as duas abas e separa titular de dependente", async () => {
+  it("lê abas com cabeçalhos em linhas diferentes (o caso do arquivo real)", async () => {
     const arquivo = planilhaFalsa({
-      "2025": [
-        CABECALHO,
-        ["Maria Souza", "529.982.247-25", "07/03/1984", "F", "TITULAR", "1001", null],
-        ["Pedro Souza", null, "10/10/2010", "M", "DEPENDENTE", "1002", "1001"],
-      ],
-      "2026": [
-        CABECALHO,
-        ["Joao Lima", null, "01/02/1970", "M", "TITULAR", "2001", null],
-        ["Ana Lima", null, "05/06/2005", "F", "DEPENDENTE", "2002", "2001"],
-      ],
+      // aba 2025: cabeçalho na linha 6 do Excel (5 linhas de enfeite)
+      "2025": {
+        enfeite: 5,
+        linhas: [
+          CABECALHO,
+          ["Maria Souza", "529.982.247-25", "07/03/1984", "F", "TITULAR", "1001", null],
+          ["Pedro Souza", null, "10/10/2010", "M", "DEPENDENTE", "1002", "1001"],
+        ],
+      },
+      // aba 2026: cabeçalho na linha 7 do Excel (6 linhas de enfeite)
+      "2026": {
+        enfeite: 6,
+        linhas: [
+          CABECALHO,
+          ["Joao Lima", null, "01/02/1970", "M", "TITULAR", "2001", null],
+          ["Ana Lima", null, "05/06/2005", "F", "DEPENDENTE", "2002", "2001"],
+        ],
+      },
     });
 
     const r = await lerPlanilhaBeneficiarios(arquivo);
 
+    expect(r.abas.map((a) => a.linhaCabecalho)).toEqual([6, 7]);
     expect(r.titulares.map((t) => t.nome)).toEqual(["Maria Souza", "Joao Lima"]);
     expect(r.dependentes.map((d) => d.nome)).toEqual(["Pedro Souza", "Ana Lima"]);
     expect(r.orfaos).toHaveLength(0);
-    expect(r.titulares[0].matricula).toBe("1001");
     expect(r.titulares[0].nascimento).toBe("1984-03-07");
     expect(r.titulares[0].cpf).toBe("52998224725");
     expect(r.dependentes[0].matriculaTitular).toBe("1001");
-    expect(r.abas.map((a) => a.nome)).toEqual(["2025", "2026"]);
+    // A linha do Excel informada tem que bater com o deslocamento de cada aba.
+    expect(r.titulares[0].linhaExcel).toBe(7);
+    expect(r.titulares[1].linhaExcel).toBe(8);
   });
 
-  it("separa dependente cujo titular não está no arquivo", async () => {
+  it("ignora dependente sem Matrícula Titular e continua com os demais", async () => {
     const arquivo = planilhaFalsa({
-      "2025": [
-        CABECALHO,
-        ["Maria Souza", null, "07/03/1984", "F", "TITULAR", "1001", null],
-        ["Orfao Silva", null, "10/10/2010", "M", "DEPENDENTE", "1002", "9999"],
-      ],
+      "2025": {
+        enfeite: 6,
+        linhas: [
+          CABECALHO,
+          ["Maria Souza", null, "07/03/1984", "F", "TITULAR", "1001", null],
+          ["Filho Sem Titular", null, "10/10/2010", "M", "DEPENDENTE", "1002", null],
+          ["Outro Sem Titular", null, "11/11/2011", "F", "DEPENDENTE", "1003", "   "],
+          ["Filho Certo", null, "12/12/2012", "M", "DEPENDENTE", "1004", "1001"],
+        ],
+      },
     });
 
     const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
 
-    expect(r.dependentes).toHaveLength(0);
-    expect(r.orfaos.map((o) => o.nome)).toEqual(["Orfao Silva"]);
-    expect(r.avisos.some((a) => a.includes("Orfao Silva"))).toBe(true);
+    // O dependente bom entra; os sem titular saem sem derrubar a leitura.
+    expect(r.dependentes.map((d) => d.nome)).toEqual(["Filho Certo"]);
+    expect(r.orfaos).toHaveLength(2);
+    expect(r.orfaos.every((o) => o.motivo === "sem-titular-informado")).toBe(true);
+    expect(categorias(r.avisos)).toContain("Dependente sem titular informado");
+    expect(r.titulares).toHaveLength(1);
+  });
+
+  it("separa quem tem titular informado mas inexistente de quem não tem titular", async () => {
+    const arquivo = planilhaFalsa({
+      "2025": {
+        enfeite: 6,
+        linhas: [
+          CABECALHO,
+          ["Maria Souza", null, "07/03/1984", "F", "TITULAR", "1001", null],
+          ["Sem Nada", null, "10/10/2010", "M", "DEPENDENTE", "1002", null],
+          ["Aponta Errado", null, "10/10/2010", "M", "DEPENDENTE", "1003", "9999"],
+        ],
+      },
+    });
+
+    const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
+
+    expect(r.orfaos.map((o) => o.motivo)).toEqual([
+      "sem-titular-informado",
+      "titular-nao-encontrado",
+    ]);
+    expect(categorias(r.avisos)).toEqual(
+      expect.arrayContaining(["Dependente sem titular informado", "Titular não encontrado"]),
+    );
   });
 
   it("mantém a primeira linha quando a matrícula repete e zera o CPF repetido", async () => {
     const arquivo = planilhaFalsa({
-      "2025": [
-        CABECALHO,
-        ["Primeira Pessoa", "529.982.247-25", "07/03/1984", "F", "TITULAR", "1001", null],
-        ["Segunda Pessoa", null, "08/03/1984", "M", "TITULAR", "1001", null],
-        ["Terceira Pessoa", "529.982.247-25", "09/03/1984", "M", "TITULAR", "1003", null],
-      ],
+      "2025": {
+        enfeite: 6,
+        linhas: [
+          CABECALHO,
+          ["Primeira Pessoa", "529.982.247-25", "07/03/1984", "F", "TITULAR", "1001", null],
+          ["Segunda Pessoa", null, "08/03/1984", "M", "TITULAR", "1001", null],
+          ["Terceira Pessoa", "529.982.247-25", "09/03/1984", "M", "TITULAR", "1003", null],
+        ],
+      },
     });
 
     const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
@@ -124,13 +220,41 @@ describe("leitura da planilha", () => {
     expect(r.titulares.map((t) => t.nome)).toEqual(["Primeira Pessoa", "Terceira Pessoa"]);
     expect(r.titulares[0].cpf).toBe("52998224725");
     expect(r.titulares[1].cpf).toBeNull(); // CPF já usado pela primeira linha
-    expect(r.avisos.some((a) => a.includes("CPF repetido"))).toBe(true);
+    expect(categorias(r.avisos)).toEqual(
+      expect.arrayContaining(["Matrícula repetida", "CPF repetido"]),
+    );
   });
 
   it("avisa quando a aba pedida não existe em vez de falhar", async () => {
-    const arquivo = planilhaFalsa({ "2025": [CABECALHO] });
+    const arquivo = planilhaFalsa({ "2025": { enfeite: 6, linhas: [CABECALHO] } });
     const r = await lerPlanilhaBeneficiarios(arquivo, ["2025", "2026"]);
-    expect(r.avisos.some((a) => a.includes("2026"))).toBe(true);
+    expect(categorias(r.avisos)).toContain("Aba não encontrada");
+  });
+
+  it("avisa quando a aba existe mas não tem cabeçalho reconhecível", async () => {
+    const arquivo = planilhaFalsa({
+      "2025": { enfeite: 3, linhas: [["Relatorio", "sem", "tabela"]] },
+    });
+    const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
+    expect(categorias(r.avisos)).toContain("Cabeçalho não encontrado");
+    expect(r.abas[0].linhaCabecalho).toBeNull();
+    expect(r.linhas).toHaveLength(0);
+  });
+});
+
+describe("agrupamento de avisos", () => {
+  it("junta por categoria e ordena do assunto mais frequente para o menos", () => {
+    const grupos = agruparAvisos([
+      { categoria: "Sem matrícula", mensagem: "a" },
+      { categoria: "Dependente sem titular informado", mensagem: "b" },
+      { categoria: "Dependente sem titular informado", mensagem: "c" },
+      { categoria: "Dependente sem titular informado", mensagem: "d" },
+    ]);
+    expect(grupos.map((g) => [g.categoria, g.quantidade])).toEqual([
+      ["Dependente sem titular informado", 3],
+      ["Sem matrícula", 1],
+    ]);
+    expect(grupos[0].mensagens).toEqual(["b", "c", "d"]);
   });
 });
 

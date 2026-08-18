@@ -40,9 +40,11 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import {
   ABAS_PADRAO,
+  agruparAvisos,
   fimDeVigencia,
   inicioContratoDaAba,
   lerPlanilhaBeneficiarios,
+  type Aviso,
   type LinhaBeneficiario,
   type ResultadoLeitura,
 } from "@/lib/importar-beneficiarios";
@@ -102,7 +104,7 @@ type Conferencia = {
   novos: LinhaBeneficiario[];
   /** matrícula já usada por outro paciente: exige conferência manual */
   conflitos: { linha: LinhaBeneficiario; dono: PacienteExistente }[];
-  observacoes: string[];
+  observacoes: Aviso[];
 };
 
 type Etapa = {
@@ -110,6 +112,11 @@ type Etapa = {
   feitos: number;
   total: number;
 };
+
+/** "1 titular" / "324 titulares" — plural certo nos selos da tela. */
+function contar(quantidade: number, singular: string, plural: string): string {
+  return `${quantidade} ${quantidade === 1 ? singular : plural}`;
+}
 
 function pedacos<T>(itens: T[], tamanho: number): T[][] {
   const saida: T[][] = [];
@@ -120,7 +127,7 @@ function pedacos<T>(itens: T[], tamanho: number): T[][] {
 function chaveNome(valor: string): string {
   return valor
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -152,6 +159,21 @@ function ImportarBeneficiariosPage() {
   const convenio = useMemo(
     () => convenios.find((c) => c.id === convenioId) ?? null,
     [convenios, convenioId],
+  );
+
+  const semTitularInformado = useMemo(
+    () => (leitura?.orfaos ?? []).filter((o) => o.motivo === "sem-titular-informado").length,
+    [leitura],
+  );
+  const titularNaoEncontrado = useMemo(
+    () => (leitura?.orfaos ?? []).filter((o) => o.motivo === "titular-nao-encontrado").length,
+    [leitura],
+  );
+
+  /** Avisos da planilha e da conferência, juntos e agrupados por assunto. */
+  const gruposDeAvisos = useMemo(
+    () => agruparAvisos([...(leitura?.avisos ?? []), ...(conferencia?.observacoes ?? [])]),
+    [leitura, conferencia],
   );
 
   // --- convênios da clínica -------------------------------------------------
@@ -210,6 +232,13 @@ function ImportarBeneficiariosPage() {
         toast.success(
           `Planilha lida: ${resultado.titulares.length} titulares e ${resultado.dependentes.length} dependentes.`,
         );
+        if (resultado.orfaos.length > 0) {
+          toast.warning(
+            `${resultado.orfaos.length} dependentes ficaram de fora por não ter titular ` +
+              `identificável na planilha. Veja "Avisos por assunto".`,
+            { duration: 8000 },
+          );
+        }
       }
     } catch (e) {
       mostrarErro(e, "ler a planilha");
@@ -258,7 +287,7 @@ function ImportarBeneficiariosPage() {
       const reaproveitar = new Map<string, string>();
       const novos: LinhaBeneficiario[] = [];
       const conflitos: Conferencia["conflitos"] = [];
-      const observacoes: string[] = [];
+      const observacoes: Aviso[] = [];
 
       for (const linha of alvo) {
         const donoProntuario = porProntuario.get(linha.matricula);
@@ -267,9 +296,10 @@ function ImportarBeneficiariosPage() {
           const mesmoNome = chaveNome(donoProntuario.nome) === chaveNome(linha.nome);
           if (mesmoCpf || mesmoNome) {
             reaproveitar.set(linha.matricula, donoProntuario.id);
-            observacoes.push(
-              `"${linha.nome}" já está cadastrado com o prontuário ${linha.matricula} — será reaproveitado.`,
-            );
+            observacoes.push({
+              categoria: "Já cadastrado (será reaproveitado)",
+              mensagem: `"${linha.nome}" já está cadastrado com o prontuário ${linha.matricula}.`,
+            });
           } else {
             conflitos.push({ linha, dono: donoProntuario });
           }
@@ -278,10 +308,12 @@ function ImportarBeneficiariosPage() {
         const donoCpf = linha.cpf ? porCpf.get(linha.cpf) : null;
         if (donoCpf) {
           reaproveitar.set(linha.matricula, donoCpf.id);
-          observacoes.push(
-            `"${linha.nome}" já existe pelo CPF (prontuário ${donoCpf.codigo_prontuario ?? "sem número"}) — ` +
-              `será reaproveitado em vez de duplicar.`,
-          );
+          observacoes.push({
+            categoria: "Já cadastrado (será reaproveitado)",
+            mensagem:
+              `"${linha.nome}" já existe pelo CPF, com o prontuário ` +
+              `${donoCpf.codigo_prontuario ?? "sem número"} — não será duplicado.`,
+          });
           continue;
         }
         novos.push(linha);
@@ -528,10 +560,11 @@ function ImportarBeneficiariosPage() {
         <AlertTitle>Como funciona</AlertTitle>
         <AlertDescription className="text-sm">
           A planilha é lida aqui no seu navegador, com o seu login — o arquivo não é enviado para
-          servidor nenhum. São lidas as abas <strong>2025</strong> e <strong>2026</strong>, pulando
-          as 6 primeiras linhas (o cabeçalho fica na linha 7). A coluna <strong>Matrícula</strong>{" "}
-          vira o número de prontuário do paciente. Rodar duas vezes não duplica: quem já existe é
-          reaproveitado.
+          servidor nenhum. São lidas as abas <strong>2025</strong> e <strong>2026</strong>, e a
+          linha do cabeçalho é procurada em cada aba separadamente (elas não começam na mesma
+          altura). A coluna <strong>Matrícula</strong> vira o número de prontuário do paciente.
+          Dependente sem titular identificável fica de fora e é listado nos avisos. Rodar duas vezes
+          não duplica: quem já existe é reaproveitado.
         </AlertDescription>
       </Alert>
 
@@ -592,23 +625,43 @@ function ImportarBeneficiariosPage() {
           {leitura && (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{leitura.titulares.length} titulares</Badge>
-                <Badge variant="secondary">{leitura.dependentes.length} dependentes</Badge>
+                <Badge variant="secondary">
+                  {contar(leitura.titulares.length, "titular", "titulares")}
+                </Badge>
+                <Badge variant="secondary">
+                  {contar(leitura.dependentes.length, "dependente", "dependentes")}
+                </Badge>
                 {leitura.orfaos.length > 0 && (
-                  <Badge variant="destructive">
-                    {leitura.orfaos.length} dependentes sem titular
+                  <Badge variant="outline" className="border-amber-500 text-amber-700">
+                    {contar(leitura.orfaos.length, "dependente ignorado", "dependentes ignorados")}
                   </Badge>
                 )}
                 {leitura.avisos.length > 0 && (
-                  <Badge variant="outline">{leitura.avisos.length} avisos</Badge>
+                  <Badge variant="outline">
+                    {contar(leitura.avisos.length, "aviso", "avisos")}
+                  </Badge>
                 )}
               </div>
+
+              {leitura.orfaos.length > 0 && (
+                <p className="text-xs text-amber-700">
+                  Ignorados porque não dá para dizer de quem são dependentes: {semTitularInformado}{" "}
+                  sem a Matrícula Titular preenchida na planilha e {titularNaoEncontrado} apontando
+                  para uma matrícula que não existe entre os titulares. O resto da importação segue
+                  normalmente.
+                </p>
+              )}
+
               {leitura.abas.map((aba) => (
                 <p key={aba.nome} className="text-xs text-muted-foreground">
-                  Aba <strong>{aba.nome}</strong>: {aba.linhas} linhas. Colunas reconhecidas:{" "}
-                  {Object.entries(aba.colunas)
-                    .map(([rotulo, achada]) => `${rotulo} → ${achada ?? "não encontrada"}`)
-                    .join(" | ")}
+                  Aba <strong>{aba.nome}</strong>:{" "}
+                  {aba.linhaCabecalho
+                    ? `cabeçalho encontrado na linha ${aba.linhaCabecalho}, ${aba.linhas} linhas de dados. Colunas reconhecidas: `
+                    : "não achei a linha de cabeçalho. "}
+                  {aba.linhaCabecalho &&
+                    Object.entries(aba.colunas)
+                      .map(([rotulo, achada]) => `${rotulo} → ${achada ?? "não encontrada"}`)
+                      .join(" | ")}
                 </p>
               ))}
             </div>
@@ -736,18 +789,25 @@ function ImportarBeneficiariosPage() {
               </div>
             )}
 
-            {(leitura.avisos.length > 0 || conferencia?.observacoes.length) && (
-              <details className="rounded border p-3 text-sm">
-                <summary className="cursor-pointer font-medium">
-                  Ver avisos da planilha (
-                  {leitura.avisos.length + (conferencia?.observacoes.length ?? 0)})
-                </summary>
-                <ul className="mt-2 max-h-64 list-disc space-y-1 overflow-auto pl-5 text-xs text-muted-foreground">
-                  {[...leitura.avisos, ...(conferencia?.observacoes ?? [])].map((a, i) => (
-                    <li key={i}>{a}</li>
-                  ))}
-                </ul>
-              </details>
+            {gruposDeAvisos.length > 0 && (
+              <div className="space-y-2 rounded border p-3">
+                <p className="text-sm font-medium">Avisos por assunto</p>
+                {gruposDeAvisos.map((grupo) => (
+                  <details key={grupo.categoria} className="text-sm">
+                    <summary className="cursor-pointer">
+                      {grupo.categoria}{" "}
+                      <span className="text-muted-foreground">
+                        ({contar(grupo.quantidade, "caso", "casos")})
+                      </span>
+                    </summary>
+                    <ul className="mt-1 max-h-56 list-disc space-y-1 overflow-auto pl-5 text-xs text-muted-foreground">
+                      {grupo.mensagens.map((mensagem, i) => (
+                        <li key={i}>{mensagem}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
