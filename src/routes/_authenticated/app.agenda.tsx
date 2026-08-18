@@ -443,6 +443,30 @@ function acrescimoParaDesconto(
 
 type FormaOpcao = { forma: string; label: string; valor: number; memoria?: string };
 
+/** Contexto exibido na tela "Forma de pagamento" (paciente, serviço, médico). */
+type FormaPagCtx = {
+  agId: string;
+  desc: string;
+  paciente?: string;
+  procedimento?: string;
+  medico?: string;
+  especialidade?: string;
+};
+
+/**
+ * Guarda as duas versões da mesma cobrança quando o desconto do cartão entra
+ * automaticamente: a com o preço do convênio (usada por padrão) e a com o
+ * valor cheio. Serve para o botão "Cobrar valor cheio (Particular)" da tela de
+ * pagamento — o atendente troca de uma para a outra sem sair da cobrança, e a
+ * descrição do lançamento acompanha a escolha.
+ */
+type CobrancaAlternativa = {
+  convenioNome: string;
+  usandoCheio: boolean;
+  comConvenio: { opcoes: FormaOpcao[]; ctx: FormaPagCtx };
+  cheio: { opcoes: FormaOpcao[]; ctx: FormaPagCtx };
+};
+
 type ConvenioInfo = {
   convenioNome: string;
   /** true quando não há parcela vencida há MAIS de 5 dias — inclui o caso "em carência" (≤5 dias), que funciona normalmente. */
@@ -662,7 +686,7 @@ async function obterInfoConvenioPaciente(params: {
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
     .limit(5);
-  let contrato: {
+  type ContratoAtivo = {
     id: string;
     convenio_id: string | null;
     contrato_origem_id?: string | null;
@@ -671,9 +695,19 @@ async function obterInfoConvenioPaciente(params: {
     data_inicio?: string | null;
     renovado_em?: string | null;
     cb_convenios: { nome: string } | null;
-  } | null = ((titularContratos ?? [])[0] as any) ?? null;
+  };
+  // Prefere sempre o contrato que TEM convênio vinculado. Existem contratos
+  // ativos legados sem `convenio_id` (criados pelo vínculo automático
+  // titular-dependente da importação): quando um deles vinha primeiro na
+  // lista, o paciente perdia o desconto do cartão que de fato possui, porque
+  // a função desistia no `!contrato.convenio_id` e a cobrança saía cheia.
+  const titulares = ((titularContratos ?? []) as any[]).filter(Boolean) as ContratoAtivo[];
+  let contrato: ContratoAtivo | null =
+    titulares.find((c) => c?.convenio_id) ?? titulares[0] ?? null;
 
-  if (!contrato) {
+  // Segue para o vínculo como DEPENDENTE também quando o contrato de titular
+  // encontrado está sem convênio — o benefício pode vir do contrato da família.
+  if (!contrato?.convenio_id) {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
       .select(
@@ -682,9 +716,12 @@ async function obterInfoConvenioPaciente(params: {
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
       .limit(5);
-    const cand = ((deps ?? []) as any[])
+    const ativos = ((deps ?? []) as any[])
       .map((d) => d.contratos_assinatura)
-      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+      .filter(
+        (c: any) => c && c.clinica_id === clinicaId && c.status === "ativo",
+      ) as ContratoAtivo[];
+    const cand = ativos.find((c) => c.convenio_id) ?? ativos[0] ?? null;
     if (cand) contrato = cand;
   }
   if (!contrato || !contrato.convenio_id) return null;
@@ -987,6 +1024,66 @@ async function obterInfoConvenioPaciente(params: {
       beneficioEscolhido = null;
       const n = Number(regraOriginal.carencia_mensalidades) || 0;
       avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+    }
+  }
+
+  // 4c) Reserva: tabela de preços por serviço do convênio.
+  //     Quando NENHUMA regra da aba "Regras de Preço" cobre este serviço, o
+  //     sistema passa a respeitar o valor digitado à mão na aba "Convênios"
+  //     do cadastro do serviço (`procedimento_cb_convenio_valores`,
+  //     origem='manual'). Antes esse valor aparecia na tela de Serviços mas
+  //     nunca era lido na cobrança: o cadastro mostrava o preço do cartão e a
+  //     agenda cobrava o particular cheio.
+  //     Só linhas 'manual' entram aqui — as de origem='regra' são um cache
+  //     gravado pelo "Reaplicar" e poderiam ressuscitar o preço de uma regra
+  //     já alterada ou excluída.
+  //     Não vale quando a regra existe mas está barrada por carência
+  //     (`avisoLimite` preenchido acima): nesse caso a cobrança particular é
+  //     a decisão correta.
+  if (!desconto && !avisoLimite && procedimentoId) {
+    const { data: tabela } = await (supabase as any)
+      .from("procedimento_cb_convenio_valores")
+      .select("valor_dinheiro,valor_outros")
+      .eq("clinica_id", clinicaId)
+      .eq("convenio_id", contrato.convenio_id)
+      .eq("procedimento_id", procedimentoId)
+      .eq("origem", "manual")
+      .limit(1);
+    const linha = ((tabela ?? [])[0] ?? null) as {
+      valor_dinheiro: number | string | null;
+      valor_outros: number | string | null;
+    } | null;
+    const vDin = Number(linha?.valor_dinheiro) || 0;
+    const vOut = Number(linha?.valor_outros) || 0;
+    if (vDin > 0 || vOut > 0) {
+      // Trava de segurança: o cartão NUNCA pode encarecer a conta. Parte
+      // dessas linhas digitadas à mão está desatualizada e hoje está ACIMA do
+      // preço particular (ex.: restauração de resina a R$ 147,25 contra
+      // R$ 120,00 do particular). Quando isso acontece, a forma de pagamento
+      // afetada continua no valor particular.
+      const { data: procValores } = await supabase
+        .from("procedimentos")
+        .select(
+          "valor_dinheiro,valor_dinheiro_pix,valor_padrao,valor_pix,valor_cartao_credito,valor_cartao_debito,valor_cartao",
+        )
+        .eq("id", procedimentoId)
+        .maybeSingle();
+      const baseDin = primeiroValorValido(
+        (procValores as any)?.valor_dinheiro,
+        (procValores as any)?.valor_dinheiro_pix,
+        (procValores as any)?.valor_padrao,
+      );
+      const baseOutros = valorCartaoProcedimento(procValores);
+      const candDin = vDin > 0 ? vDin : vOut;
+      const candOutros = vOut > 0 ? vOut : vDin;
+      const finalDin = baseDin > 0 && candDin > baseDin ? baseDin : candDin;
+      const finalOutros = baseOutros > 0 && candOutros > baseOutros ? baseOutros : candOutros;
+      // Só vale como benefício se alguma das formas realmente ficar mais barata.
+      const houveDesconto =
+        (baseDin > 0 && finalDin < baseDin) || (baseOutros > 0 && finalOutros < baseOutros);
+      if (houveDesconto) {
+        desconto = { tipo: "valor_fixo", valor: finalDin, valorOutros: finalOutros };
+      }
     }
   }
 
@@ -1632,7 +1729,11 @@ async function calcularOpcoesMultiExame(params: {
   clinicaId: string;
   pacienteId: string | null | undefined;
   medicoId: string | null | undefined;
-  tipoAtendimento: string;
+  /**
+   * Mantido apenas por compatibilidade com as chamadas existentes — o cálculo
+   * não usa mais essa marcação para decidir se consulta o convênio.
+   */
+  tipoAtendimento?: string;
   dataRef: string | null | undefined;
   nomes: string[];
   agendamentoIds: (string | null | undefined)[];
@@ -1642,19 +1743,21 @@ async function calcularOpcoesMultiExame(params: {
   descSuffix: string;
   avisoLimite?: { tom: "warning" | "error"; mensagem: string };
 }> {
-  const { clinicaId, pacienteId, medicoId, tipoAtendimento, dataRef, nomes, procs } = params;
+  const { clinicaId, pacienteId, medicoId, dataRef, nomes, procs } = params;
+  // O contrato do paciente é consultado SEMPRE, inclusive quando o
+  // atendimento está marcado como "particular" — essa marcação é o valor
+  // padrão do banco e, na prática, sobrava em atendimentos de quem tem cartão
+  // ativo, fazendo a cobrança sair pelo valor cheio sem ninguém perceber.
   const infos = await Promise.all(
     nomes.map((nome, idx) =>
-      tipoAtendimento === "particular"
-        ? Promise.resolve(null)
-        : obterInfoConvenioPaciente({
-            clinicaId,
-            pacienteId,
-            medicoId,
-            procedimentoNome: nome,
-            agendamentoId: params.agendamentoIds[idx] ?? params.agendamentoIds[0] ?? null,
-            dataRef: dataRef ?? null,
-          }).catch(() => null),
+      obterInfoConvenioPaciente({
+        clinicaId,
+        pacienteId,
+        medicoId,
+        procedimentoNome: nome,
+        agendamentoId: params.agendamentoIds[idx] ?? params.agendamentoIds[0] ?? null,
+        dataRef: dataRef ?? null,
+      }).catch(() => null),
     ),
   );
   let vDinheiro = 0,
@@ -1967,6 +2070,12 @@ function AgendaPage() {
     /** Vencidas há ≤5 dias — dentro da tolerância, não bloqueia o convênio. */
     qtdEmCarencia: number;
     diasCarenciaRestantes: number | null;
+    /**
+     * Contrato ativo, mas SEM convênio vinculado no cadastro. Não existe tabela
+     * de preços para aplicar: a cobrança sai pelo valor particular e a tela
+     * precisa avisar isso, em vez de deixar passar em silêncio.
+     */
+    semConvenio: boolean;
   } | null>(null);
   const contratoPacienteReqId = useRef(0);
   useEffect(() => {
@@ -1979,27 +2088,37 @@ function AgendaPage() {
     const clinicaId = clinicaAtual.clinica_id;
     (async () => {
       // 1) Contrato ativo (titular ou dependente)
+      // Mesma preferência de `obterInfoConvenioPaciente`: entre contratos
+      // ativos, vale o que TEM convênio vinculado (há contratos legados sem
+      // convênio que, vindo primeiro, faziam o paciente perder o desconto).
       const { data: titular } = await supabase
         .from("contratos_assinatura")
-        .select("id, cb_convenios(nome)")
+        .select("id, convenio_id, cb_convenios(nome)")
         .eq("clinica_id", clinicaId)
         .eq("status", "ativo")
         .eq("paciente_id", pacId)
-        .limit(1);
-      let contrato: { id: string; convenioNome: string } | null = null;
-      const t0 = (titular ?? [])[0] as any;
-      if (t0) contrato = { id: t0.id, convenioNome: t0.cb_convenios?.nome ?? "Convênio" };
-      if (!contrato) {
+        .limit(5);
+      const daLinha = (c: any) => ({
+        id: c.id as string,
+        convenioNome: c.cb_convenios?.nome ?? "Convênio",
+        semConvenio: !c.convenio_id,
+      });
+      const titulares = ((titular ?? []) as any[]).filter(Boolean);
+      const titularEscolhido = titulares.find((c) => c.convenio_id) ?? titulares[0] ?? null;
+      let contrato: { id: string; convenioNome: string; semConvenio: boolean } | null =
+        titularEscolhido ? daLinha(titularEscolhido) : null;
+      if (!contrato || contrato.semConvenio) {
         const { data: deps } = await supabase
           .from("contrato_dependentes")
-          .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+          .select("contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
           .eq("paciente_id", pacId)
           .eq("ativo", true)
           .limit(5);
-        const cand = ((deps ?? []) as any[])
+        const ativos = ((deps ?? []) as any[])
           .map((d) => d.contratos_assinatura)
-          .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
-        if (cand) contrato = { id: cand.id, convenioNome: cand.cb_convenios?.nome ?? "Convênio" };
+          .filter((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+        const cand = ativos.find((c: any) => c.convenio_id) ?? ativos[0] ?? null;
+        if (cand) contrato = daLinha(cand);
       }
       if (reqId !== contratoPacienteReqId.current) return;
       if (!contrato) {
@@ -2039,6 +2158,7 @@ function AgendaPage() {
           emCarenciaLista.length > 0
             ? Math.min(...emCarenciaLista.map((d) => DIAS_TOLERANCIA - d))
             : null,
+        semConvenio: contrato.semConvenio,
       });
       // Regra: se o paciente tem cartão convênio e não tem parcela vencida
       // há mais de 5 dias → "Convênio" (inclui dentro da tolerância). Só
@@ -2052,6 +2172,128 @@ function AgendaPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
+
+  /**
+   * Prévia do valor do atendimento, calculada na própria tela do agendamento
+   * assim que o paciente e o serviço estão escolhidos. Usa exatamente o mesmo
+   * motor da cobrança (`obterInfoConvenioPaciente`), então o que aparece aqui
+   * é o que vai ser cobrado no caixa.
+   *
+   * Antes nenhum valor aparecia nesta tela: se o desconto do cartão não
+   * entrasse, ninguém percebia até o paciente pagar — e a diferença numa
+   * consulta chega a mais de R$ 100.
+   */
+  const [previaCobranca, setPreviaCobranca] = useState<{
+    carregando: boolean;
+    dinheiro: number;
+    outros: number;
+    convenioNome: string | null;
+    gratuito: boolean;
+    aviso: string | null;
+  } | null>(null);
+  const previaReqId = useRef(0);
+  const previaProcsKey = (form.procedimentos ?? []).join("|");
+  useEffect(() => {
+    const nomes = (form.procedimentos?.length ? form.procedimentos : [form.procedimento])
+      .map((n) => (n ?? "").trim())
+      .filter(Boolean);
+    if (!open || !clinicaAtual || !form.paciente_id || nomes.length === 0) {
+      setPreviaCobranca(null);
+      return;
+    }
+    const reqId = ++previaReqId.current;
+    const clinicaId = clinicaAtual.clinica_id;
+    const pacienteId = form.paciente_id;
+    const medicoId = form.medico_id || null;
+    const agendamentoId = editing?.id ?? null;
+    const dataRef = form.inicio || null;
+    setPreviaCobranca((atual) =>
+      atual
+        ? { ...atual, carregando: true }
+        : {
+            carregando: true,
+            dinheiro: 0,
+            outros: 0,
+            convenioNome: null,
+            gratuito: false,
+            aviso: null,
+          },
+    );
+    // Espera o operador terminar de escolher antes de ir ao banco — cada
+    // prévia consulta contrato, regras e cadastro do serviço.
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const lista = await getProcedimentosComValor(clinicaId);
+          const [procs, infos] = await Promise.all([
+            Promise.all(nomes.map((n) => buscarProcedimentoPorNome(clinicaId, n, lista))),
+            Promise.all(
+              nomes.map((n) =>
+                obterInfoConvenioPaciente({
+                  clinicaId,
+                  pacienteId,
+                  medicoId,
+                  procedimentoNome: n,
+                  agendamentoId,
+                  dataRef,
+                }).catch(() => null),
+              ),
+            ),
+          ]);
+          if (reqId !== previaReqId.current) return;
+          let dinheiro = 0;
+          let outros = 0;
+          let convenioNome: string | null = null;
+          let gratuito = false;
+          const motivos = new Set<string>();
+          (procs as any[]).forEach((p, i) => {
+            const baseDin = primeiroValorValido(
+              p?.valor_dinheiro,
+              p?.valor_dinheiro_pix,
+              p?.valor_padrao,
+            );
+            const baseOutros = valorCartaoProcedimento(p);
+            const info = infos[i];
+            if (info) convenioNome = info.convenioNome;
+            if (info && !info.emDia) {
+              motivos.add(`mensalidade em atraso (${info.parcelasAtrasadas} parcela(s))`);
+            } else if (info && info.bloquear) {
+              motivos.add(info.avisoLimite ?? "limite do convênio atingido");
+            } else if (info && !info.desconto) {
+              motivos.add(`sem preço de convênio cadastrado para "${nomes[i]}"`);
+            }
+            const desc = info && info.emDia && !info.bloquear ? info.desconto : null;
+            if (desc?.tipo === "gratuidade") gratuito = true;
+            dinheiro += desc ? aplicarDescontoPorForma(baseDin, "dinheiro", desc) : baseDin;
+            outros += desc
+              ? aplicarDescontoPorForma(baseOutros, "cartao_credito", desc)
+              : baseOutros;
+          });
+          setPreviaCobranca({
+            carregando: false,
+            dinheiro,
+            outros,
+            convenioNome,
+            gratuito,
+            aviso: convenioNome && motivos.size > 0 ? Array.from(motivos).join("; ") : null,
+          });
+        } catch {
+          if (reqId === previaReqId.current) setPreviaCobranca(null);
+        }
+      })();
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    open,
+    clinicaAtual?.clinica_id,
+    form.paciente_id,
+    form.medico_id,
+    form.procedimento,
+    previaProcsKey,
+    form.inicio,
+    editing?.id,
+  ]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
   // (usado pelo botão "Agendar" da conversa do WhatsApp).
   const novoFromUrlConsumido = useRef(false);
@@ -2503,14 +2745,22 @@ function AgendaPage() {
   };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
-  const [formaPagCtx, setFormaPagCtx] = useState<{
-    agId: string;
-    desc: string;
-    paciente?: string;
-    procedimento?: string;
-    medico?: string;
-    especialidade?: string;
-  } | null>(null);
+  const [formaPagCtx, setFormaPagCtx] = useState<FormaPagCtx | null>(null);
+  // Cobrança com desconto do cartão × valor cheio (ver `CobrancaAlternativa`).
+  const [cobrancaAlt, setCobrancaAlt] = useState<CobrancaAlternativa | null>(null);
+  /**
+   * Alterna a cobrança aberta entre o preço do cartão e o valor cheio
+   * (Particular). Troca os valores das formas de pagamento E a descrição, para
+   * que o lançamento no caixa registre exatamente o que foi cobrado.
+   */
+  const alternarCobrancaCheia = () => {
+    if (!cobrancaAlt) return;
+    const usarCheio = !cobrancaAlt.usandoCheio;
+    const alvo = usarCheio ? cobrancaAlt.cheio : cobrancaAlt.comConvenio;
+    setFormaPagOpcoes(alvo.opcoes);
+    setFormaPagCtx(alvo.ctx);
+    setCobrancaAlt({ ...cobrancaAlt, usandoCheio: usarCheio });
+  };
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{
@@ -4316,22 +4566,21 @@ function AgendaPage() {
       // Desconto do convênio POR ITEM. Sem isto, a cobrança em lote somava
       // sempre o valor particular CHEIO, ignorando o desconto (%/valor fixo)
       // configurado nas Regras de Preço do convênio — ao contrário da
-      // cobrança individual (cobrarAgendamento), que já aplica. Atendimento
-      // "particular" ignora o convênio de propósito. Atraso/bloqueio/gratuidade
+      // cobrança individual (cobrarAgendamento), que já aplica. O contrato é
+      // conferido em todos os itens, inclusive nos marcados como
+      // "particular" (marcação padrão do banco). Atraso/bloqueio/gratuidade
       // caem no valor cheio aqui (a gratuidade exige a confirmação
       // "usar agora/depois", disponível apenas na cobrança individual).
       const infosConvenio = await Promise.all(
         itens.map((it) =>
-          it.tipo_atendimento === "particular"
-            ? Promise.resolve(null)
-            : obterInfoConvenioPaciente({
-                clinicaId: clinicaAtual.clinica_id,
-                pacienteId: it.paciente_id,
-                medicoId: it.medico_id,
-                procedimentoNome: it.procedimento ?? "",
-                agendamentoId: it.id,
-                dataRef: it.inicio ?? null,
-              }).catch(() => null),
+          obterInfoConvenioPaciente({
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: it.paciente_id,
+            medicoId: it.medico_id,
+            procedimentoNome: it.procedimento ?? "",
+            agendamentoId: it.id,
+            dataRef: it.inicio ?? null,
+          }).catch(() => null),
         ),
       );
       const pesos: Record<string, number> = {};
@@ -4390,6 +4639,10 @@ function AgendaPage() {
       });
       setPagamentoPesos(pesos);
       setPagamentoRotulos(rotulos);
+      // Cobrança em lote não oferece a troca por valor cheio (cada item pode
+      // ter um desconto diferente) — garante que um resto de cobrança anterior
+      // não deixe o botão na tela.
+      setCobrancaAlt(null);
       const paciente = itens[0].paciente_nome;
       setPagamentoPacienteNome(paciente);
       const desc = `${paciente} — ${itens.map((i) => i.procedimento ?? rotuloFallbackProc(i.medico_id)).join(" + ")} (${itens.length} serviços)${algumDescontoConvenio ? " — desconto de convênio aplicado" : ""}`;
@@ -5761,11 +6014,16 @@ function AgendaPage() {
               ),
             ),
           ),
-          // Atendimento marcado como "Particular" ignora o convênio do paciente
-          // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+          // O contrato do paciente é conferido SEMPRE, mesmo com o atendimento
+          // marcado como "Particular": essa marcação é o valor padrão da
+          // coluna no banco e sobrava em atendimentos de quem tem cartão
+          // ativo, cobrando o valor cheio em silêncio. Quem tem contrato em
+          // dia paga pela tabela do cartão; para cobrar cheio de propósito,
+          // o atendente usa o botão "Cobrar valor cheio" na tela de
+          // pagamento. Atraso/limite/carência continuam cobrando particular.
           // Multi-exame resolve o convênio por item mais abaixo (o nome
           // concatenado não bate com nenhum procedimento cadastrado).
-          isMulti || payload.tipo_atendimento === "particular"
+          isMulti
             ? Promise.resolve(null)
             : obterInfoConvenioPaciente({
                 clinicaId: clinicaAtual.clinica_id,
@@ -5785,6 +6043,13 @@ function AgendaPage() {
       let info = infoInicial;
       let opcoes: FormaOpcao[];
       let descSuffix = "";
+      // Atendimento que chegou marcado como "Particular" e mesmo assim tem
+      // contrato ativo: o desconto entra, mas os avisos ficam menos intrusivos
+      // (aviso rápido em vez de modal) para não travar a fila da recepção.
+      const marcadoParticular = (payload.tipo_atendimento ?? "particular") === "particular";
+      // Versão da cobrança SEM o desconto do cartão, guardada para o botão
+      // "Cobrar valor cheio (Particular)" da tela de pagamento.
+      let cobrancaCheia: { opcoes: FormaOpcao[]; descSuffix: string } | null = null;
       const opcoesOrc = orcCobranca?.opcoes ?? null;
       orcFatoresRef.current = orcCobranca?.fatores ?? {};
 
@@ -5846,10 +6111,12 @@ function AgendaPage() {
           }
         } else if (info) {
           if (!info.emDia) {
-            setAvisoConvenio({
-              tom: "error",
-              mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-            });
+            const emAtraso = `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`;
+            // Marcado como Particular: aviso rápido em vez de modal — antes o
+            // convênio nem era consultado nesse caso, e um modal por cobrança
+            // travaria a fila da recepção sem mudar o valor.
+            if (marcadoParticular) toast.warning(emAtraso);
+            else setAvisoConvenio({ tom: "error", mensagem: emAtraso });
             descSuffix = ` — ${info.convenioNome} EM ATRASO`;
           } else if (info.bloquear) {
             setAvisoConvenio({
@@ -5859,6 +6126,7 @@ function AgendaPage() {
             descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
           } else if (info.desconto) {
             const descAtual = info.desconto;
+            cobrancaCheia = { opcoes, descSuffix };
             opcoes = opcoes.map((o) => ({
               ...o,
               valor: aplicarDescontoPorForma(o.valor, o.forma, descAtual),
@@ -5874,15 +6142,21 @@ function AgendaPage() {
                     : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
             descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
             if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-            else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+            else
+              toast.success(
+                `Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).` +
+                  (marcadoParticular ? " O atendimento estava marcado como Particular." : ""),
+              );
           } else if (info.avisoLimite) {
             setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
             descSuffix = ` — ${info.convenioNome} (limite atingido)`;
           } else {
-            setAvisoConvenio({
-              tom: "warning",
-              mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
-            });
+            const semBeneficio = `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`;
+            // Modal só quando o atendimento é de convênio de fato. Nos que
+            // vieram marcados como "Particular" o aviso é rápido — antes essa
+            // consulta nem acontecia, e um modal a cada cobrança travaria a fila.
+            if (marcadoParticular) toast.warning(semBeneficio);
+            else setAvisoConvenio({ tom: "warning", mensagem: semBeneficio });
           }
         }
       }
@@ -5891,18 +6165,37 @@ function AgendaPage() {
       const etapaNovo = await aplicarEtapaSinal(opcoes, novoId, etapaSinalPrecarregada);
       opcoes = etapaNovo.opcoes;
       descSuffix += etapaNovo.descSuffix;
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
+      const montarCtxNovo = (sufixo: string): FormaPagCtx => ({
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
         // cobrança marque todos os agendamentos correspondentes como pagos.
         agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
-        desc: `${payload.paciente_nome} — ${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${sufixo}`,
         paciente: payload.paciente_nome ?? "",
-        procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
+        procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${sufixo}`,
         medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
         especialidade:
           medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
+      setFormaPagOpcoes(opcoes);
+      setFormaPagCtx(montarCtxNovo(descSuffix));
+      // Só oferece a troca para valor cheio quando o desconto do cartão foi de
+      // fato aplicado e a cobrança não é sinal/saldo de orçamento (nesse caso
+      // os valores vêm do orçamento e a troca não faria sentido).
+      setCobrancaAlt(
+        cobrancaCheia && info && !etapaNovo.descSuffix
+          ? {
+              convenioNome: info.convenioNome,
+              usandoCheio: false,
+              comConvenio: { opcoes, ctx: montarCtxNovo(descSuffix) },
+              cheio: {
+                opcoes: cobrancaCheia.opcoes,
+                ctx: montarCtxNovo(
+                  `${cobrancaCheia.descSuffix} — VALOR CHEIO (Particular, a pedido do paciente)`,
+                ),
+              },
+            }
+          : null,
+      );
       setFormaPagOpen(true);
       crono.marcar("montar a tela");
       // Só fecha a medição depois que o navegador desenhou de fato — é o que
@@ -6400,11 +6693,12 @@ function AgendaPage() {
           .eq("agendamento_id", a.id)
           .limit(1),
         getProcedimentosComValor(clinicaAtual.clinica_id),
-        // Atendimento marcado como "Particular" ignora o convênio do paciente
-        // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+        // Contrato conferido SEMPRE — ver comentário no fluxo "Salvar e pagar".
+        // A marcação "Particular" é o padrão do banco e não pode mais, por si
+        // só, cancelar o desconto de quem tem cartão ativo e em dia.
         // Multi-exame resolve o convênio por item mais abaixo (o nome
         // concatenado não bate com nenhum procedimento cadastrado).
-        isMulti || a.tipo_atendimento === "particular"
+        isMulti
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
               clinicaId: clinicaAtual.clinica_id,
@@ -6433,6 +6727,9 @@ function AgendaPage() {
       );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
+      // Ver comentários equivalentes no fluxo "Salvar e pagar".
+      const marcadoParticular = (a.tipo_atendimento ?? "particular") === "particular";
+      let cobrancaCheia: { opcoes: FormaOpcao[]; descSuffix: string } | null = null;
 
       if (isMulti) {
         if (opcoesOrc) {
@@ -6495,10 +6792,10 @@ function AgendaPage() {
           }
         } else if (info) {
           if (!info.emDia) {
-            setAvisoConvenio({
-              tom: "error",
-              mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-            });
+            const emAtraso = `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`;
+            // Ver comentário equivalente no fluxo "Salvar e pagar".
+            if (marcadoParticular) toast.warning(emAtraso);
+            else setAvisoConvenio({ tom: "error", mensagem: emAtraso });
             descSuffix = ` — ${info.convenioNome} EM ATRASO`;
           } else if (info.bloquear) {
             setAvisoConvenio({
@@ -6508,6 +6805,7 @@ function AgendaPage() {
             descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
           } else if (info.desconto) {
             const descAtual = info.desconto;
+            cobrancaCheia = { opcoes, descSuffix };
             opcoes = opcoes.map((o) => ({
               ...o,
               valor: aplicarDescontoPorForma(o.valor, o.forma, descAtual),
@@ -6523,15 +6821,18 @@ function AgendaPage() {
                     : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
             descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
             if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-            else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+            else
+              toast.success(
+                `Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).` +
+                  (marcadoParticular ? " O atendimento estava marcado como Particular." : ""),
+              );
           } else if (info.avisoLimite) {
             setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
             descSuffix = ` — ${info.convenioNome} (limite atingido)`;
           } else {
-            setAvisoConvenio({
-              tom: "warning",
-              mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
-            });
+            const semBeneficio = `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`;
+            if (marcadoParticular) toast.warning(semBeneficio);
+            else setAvisoConvenio({ tom: "warning", mensagem: semBeneficio });
           }
         }
       }
@@ -6661,15 +6962,31 @@ function AgendaPage() {
         }
         return;
       }
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
+      const montarCtxCobranca = (sufixo: string): FormaPagCtx => ({
         agId: a.id,
-        desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+        desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${sufixo}`,
         paciente: a.paciente_nome ?? "",
-        procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+        procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${sufixo}`,
         medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
         especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
       });
+      setFormaPagOpcoes(opcoes);
+      setFormaPagCtx(montarCtxCobranca(descSuffix));
+      setCobrancaAlt(
+        cobrancaCheia && info && !etapaAplicada.descSuffix
+          ? {
+              convenioNome: info.convenioNome,
+              usandoCheio: false,
+              comConvenio: { opcoes, ctx: montarCtxCobranca(descSuffix) },
+              cheio: {
+                opcoes: cobrancaCheia.opcoes,
+                ctx: montarCtxCobranca(
+                  `${cobrancaCheia.descSuffix} — VALOR CHEIO (Particular, a pedido do paciente)`,
+                ),
+              },
+            }
+          : null,
+      );
       setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarAgendamento]", e);
@@ -7977,6 +8294,64 @@ function AgendaPage() {
                           )}
                       </div>
                     )}
+                    {contratoPacienteInfo?.semConvenio && (
+                      <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                        Paciente tem contrato ativo do cartão, mas o contrato está{" "}
+                        <b>sem convênio vinculado</b> no cadastro — sem isso o sistema não encontra
+                        a tabela de preços e a cobrança sai pelo valor cheio. Avise o setor de
+                        contratos.
+                      </p>
+                    )}
+                    {previaCobranca && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-slate-700">
+                          Valor previsto desta cobrança
+                        </Label>
+                        <div className="rounded-md border px-2 py-2 text-xs space-y-1">
+                          {previaCobranca.carregando ? (
+                            <span className="text-muted-foreground">Calculando o valor…</span>
+                          ) : previaCobranca.gratuito ? (
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                              Gratuito pelo {previaCobranca.convenioNome ?? "convênio"} — a
+                              confirmar na cobrança.
+                            </span>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Dinheiro</span>
+                                <b className="tabular-nums">
+                                  {previaCobranca.dinheiro.toLocaleString("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  })}
+                                </b>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Pix / cartão</span>
+                                <b className="tabular-nums">
+                                  {previaCobranca.outros.toLocaleString("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  })}
+                                </b>
+                              </div>
+                            </>
+                          )}
+                          {!previaCobranca.carregando && !previaCobranca.aviso && (
+                            <p className="text-[11px] text-muted-foreground pt-0.5 border-t">
+                              Tabela aplicada:{" "}
+                              <b>{previaCobranca.convenioNome ?? "Particular (valor cheio)"}</b>
+                            </p>
+                          )}
+                          {!previaCobranca.carregando && previaCobranca.aviso && (
+                            <p className="text-[11px] text-amber-700 dark:text-amber-400 pt-0.5 border-t">
+                              Cobrando <b>valor particular</b> mesmo com o cartão{" "}
+                              {previaCobranca.convenioNome}: {previaCobranca.aviso}.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-700">
                         Forma de pagamento prevista
@@ -8442,6 +8817,34 @@ function AgendaPage() {
             {/* Botão "Valor manual" removido: valores devem sempre seguir a
                 regra do convênio (Cartão Benefícios) para evitar cobranças
                 divergentes do desconto configurado. */}
+            {cobrancaAlt ? (
+              <div className="mt-1 rounded-md border bg-muted/40 px-2 py-2 text-[11px] space-y-1.5">
+                <p className="leading-snug">
+                  {cobrancaAlt.usandoCheio ? (
+                    <>
+                      Cobrando o <b>valor cheio (Particular)</b>. O paciente tem contrato ativo do{" "}
+                      <b>{cobrancaAlt.convenioNome}</b>.
+                    </>
+                  ) : (
+                    <>
+                      Preço do <b>{cobrancaAlt.convenioNome}</b> aplicado — o paciente tem contrato
+                      ativo e em dia.
+                    </>
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full text-[11px]"
+                  onClick={alternarCobrancaCheia}
+                >
+                  {cobrancaAlt.usandoCheio
+                    ? "Voltar ao preço do cartão"
+                    : "Cobrar valor cheio (Particular)"}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

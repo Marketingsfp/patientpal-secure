@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -169,6 +169,32 @@ export function NovoAgendamentoWizard({
       cancelado = true;
     };
   }, [tipoAtendimento, clinicaId, paciente?.id]);
+
+  // Contrato ativo do Cartão Benefícios (titular ou dependente): assim que o
+  // paciente é escolhido, o wizard passa a marcar o atendimento como
+  // "convênio" por conta própria. Sem isso o agendamento nascia "particular"
+  // (padrão do banco) mesmo para quem tem cartão ativo — e a checagem de
+  // mensalidade em atraso (`validar_inadimplencia`) nem era executada.
+  // Escolha manual do atendente no seletor tem prioridade e não é sobrescrita.
+  const tipoEscolhidoManualRef = useRef(false);
+  const [contratoDetectado, setContratoDetectado] = useState<{ nome: string } | null>(null);
+  useEffect(() => {
+    tipoEscolhidoManualRef.current = false;
+    if (!clinicaId || !paciente?.id) {
+      setContratoDetectado(null);
+      return;
+    }
+    let cancelado = false;
+    void (async () => {
+      const vinculo = await buscarVinculoConvenio(clinicaId, paciente.id);
+      if (cancelado) return;
+      setContratoDetectado(vinculo ? { nome: vinculo.convenioNome } : null);
+      if (vinculo && !tipoEscolhidoManualRef.current) setTipoAtendimento("convenio");
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId, paciente?.id]);
 
   // Repasse automático do atendimento externo — cadastro de repasse do médico.
   useEffect(() => {
@@ -888,7 +914,10 @@ export function NovoAgendamentoWizard({
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setTipoAtendimento(t)}
+                  onClick={() => {
+                    tipoEscolhidoManualRef.current = true;
+                    setTipoAtendimento(t);
+                  }}
                   className={cn(
                     "h-9 px-4 rounded-lg text-xs font-semibold border transition-colors",
                     tipoAtendimento === t
@@ -904,6 +933,13 @@ export function NovoAgendamentoWizard({
                 </button>
               ))}
             </div>
+
+            {contratoDetectado && tipoAtendimento === "convenio" && (
+              <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-400">
+                Paciente com contrato ativo do <b>{contratoDetectado.nome}</b> — a cobrança segue a
+                tabela do cartão.
+              </p>
+            )}
 
             {tipoAtendimento === "externo" && (
               <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
