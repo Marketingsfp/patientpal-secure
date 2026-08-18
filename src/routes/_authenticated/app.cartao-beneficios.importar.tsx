@@ -44,6 +44,7 @@ import {
   fimDeVigencia,
   inicioContratoDaAba,
   lerPlanilhaBeneficiarios,
+  TELEFONE_AUSENTE,
   type Aviso,
   type LinhaBeneficiario,
   type ResultadoLeitura,
@@ -319,6 +320,19 @@ function ImportarBeneficiariosPage() {
         novos.push(linha);
       }
 
+      // Quem vai entrar com o telefone de enchimento. Fica registrado antes de
+      // gravar para a clínica saber de quem precisa correr atrás do número.
+      for (const linha of novos) {
+        if (linha.telefone) continue;
+        observacoes.push({
+          categoria: "Sem telefone na planilha",
+          mensagem:
+            `"${linha.nome}" (matrícula ${linha.matricula}) será cadastrado com o telefone ` +
+            `${TELEFONE_AUSENTE}, que o sistema já reconhece como "sem contato". ` +
+            `O número real precisa ser preenchido na ficha depois.`,
+        });
+      }
+
       setConferencia({ reaproveitar, novos, conflitos, observacoes });
       toast.success("Conferência concluída. Nada foi gravado ainda.");
     } catch (e) {
@@ -347,6 +361,10 @@ function ImportarBeneficiariosPage() {
           clinica_id: clinicaId,
           nome: l.nome,
           cpf: l.cpf,
+          // O banco recusa paciente novo sem telefone de 10 dígitos. Quando a
+          // planilha não traz um número usável, entra o marcador de telefone
+          // ausente — senão o cadastro simplesmente não existe, que é pior.
+          telefone: l.telefone ?? TELEFONE_AUSENTE,
           data_nascimento: l.nascimento,
           sexo: l.sexo,
           codigo_prontuario: l.matricula,
@@ -550,6 +568,7 @@ function ImportarBeneficiariosPage() {
   }
 
   const totalNovos = conferencia?.novos.length ?? 0;
+  const novosSemTelefone = (conferencia?.novos ?? []).filter((l) => !l.telefone).length;
   const podeImportar =
     Boolean(conferencia) && Boolean(convenio) && !importando && !conferindo && Boolean(user?.id);
 
@@ -750,7 +769,22 @@ function ImportarBeneficiariosPage() {
                       {conferencia.conflitos.length} conflitos de prontuário
                     </Badge>
                   )}
+                  {novosSemTelefone > 0 && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-700">
+                      {contar(novosSemTelefone, "sem telefone", "sem telefone")}
+                    </Badge>
+                  )}
                 </div>
+
+                {novosSemTelefone > 0 && (
+                  <p className="text-xs text-amber-700">
+                    {novosSemTelefone} desses cadastros entram com o telefone {TELEFONE_AUSENTE},
+                    porque o banco não aceita paciente novo sem telefone. O sistema já trata esse
+                    número como "sem contato", então ele não vira destino de campanha — mas o número
+                    real precisa ser preenchido na ficha depois. A lista com os nomes está em
+                    "Avisos por assunto".
+                  </p>
+                )}
 
                 {conferencia.conflitos.length > 0 && (
                   <Alert variant="destructive">

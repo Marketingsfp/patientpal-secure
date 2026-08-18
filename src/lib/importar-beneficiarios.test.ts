@@ -10,6 +10,7 @@ import {
   normalizarData,
   normalizarMatricula,
   normalizarSexo,
+  normalizarTelefone,
   normalizarTipo,
   type Aviso,
 } from "./importar-beneficiarios";
@@ -75,6 +76,19 @@ describe("normalização de campos", () => {
     expect(normalizarTipo("Dependente")).toBe("dependente");
     expect(normalizarTipo("AGREGADO")).toBe("dependente");
     expect(normalizarTipo(null)).toBe("titular"); // coluna vazia não pode virar órfão
+  });
+
+  it("aceita telefone com DDD e recusa o que não serve como contato", () => {
+    expect(normalizarTelefone("(21) 98765-4321")).toBe("21987654321");
+    expect(normalizarTelefone("2134567890")).toBe("2134567890");
+    expect(normalizarTelefone("5521987654321")).toBe("21987654321"); // código do país
+    expect(normalizarTelefone("987654321")).toBeNull(); // sem DDD
+    expect(normalizarTelefone("")).toBeNull();
+    expect(normalizarTelefone(null)).toBeNull();
+    // Números de enchimento não podem passar por contato de verdade.
+    expect(normalizarTelefone("00000000000")).toBeNull();
+    expect(normalizarTelefone("21999999999")).toBeNull();
+    expect(normalizarTelefone("11888888888")).toBeNull();
   });
 
   it("descarta matrícula vazia e o lixo que aparece no lugar dela", () => {
@@ -223,6 +237,52 @@ describe("leitura da planilha", () => {
     expect(categorias(r.avisos)).toEqual(
       expect.arrayContaining(["Matrícula repetida", "CPF repetido"]),
     );
+  });
+
+  it("lê a coluna de telefone quando existe e devolve null quando não dá para usar", async () => {
+    const cabecalhoComTelefone = [
+      "Nome",
+      "CPF",
+      "Telefone",
+      "Nascimento",
+      "Sexo",
+      "TITULAR OU DEPENDENTE?",
+      "Matricula",
+      "Matrícula Titular",
+    ];
+    const arquivo = planilhaFalsa({
+      "2025": {
+        enfeite: 6,
+        linhas: [
+          cabecalhoComTelefone,
+          ["Com Celular", null, "(21) 98765-4321", "07/03/1984", "F", "TITULAR", "1001", null],
+          ["Sem Nada", null, null, "07/03/1984", "M", "TITULAR", "1002", null],
+          ["So Ddd Faltando", null, "98765432", "07/03/1984", "M", "TITULAR", "1003", null],
+        ],
+      },
+    });
+
+    const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
+
+    expect(r.titulares[0].telefone).toBe("21987654321");
+    expect(r.titulares[1].telefone).toBeNull();
+    expect(r.titulares[2].telefone).toBeNull();
+    expect(r.abas[0].colunas.Telefone).toBe("Telefone");
+  });
+
+  it("não quebra quando a planilha não tem coluna de telefone", async () => {
+    const arquivo = planilhaFalsa({
+      "2025": {
+        enfeite: 6,
+        linhas: [CABECALHO, ["Maria Souza", null, "07/03/1984", "F", "TITULAR", "1001", null]],
+      },
+    });
+
+    const r = await lerPlanilhaBeneficiarios(arquivo, ["2025"]);
+
+    expect(r.titulares).toHaveLength(1);
+    expect(r.titulares[0].telefone).toBeNull();
+    expect(r.abas[0].colunas.Telefone).toBeNull();
   });
 
   it("avisa quando a aba pedida não existe em vez de falhar", async () => {

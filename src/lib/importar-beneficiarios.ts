@@ -13,6 +13,8 @@
  * não deve entrar no pacote que todo mundo baixa ao abrir o sistema.
  */
 
+import { telefoneInutilComoPista } from "@/lib/convenio/vidas-contrato";
+
 /**
  * Onde o cabeçalho costuma ficar quando não dá para detectar (índice 6 =
  * linha 7 na tela do Excel). É só rede de segurança: cada aba tem a sua
@@ -32,12 +34,29 @@ export type TipoBeneficiario = "titular" | "dependente";
 /** Motivo pelo qual um dependente não pôde ser importado. */
 export type MotivoOrfao = "sem-titular-informado" | "titular-nao-encontrado";
 
+/**
+ * Telefone gravado quando a planilha não traz nenhum utilizável.
+ *
+ * O banco tem um gatilho (`pacientes_require_telefone_fn`) que recusa
+ * paciente novo sem pelo menos 10 dígitos de telefone — foi ele que barrou 70
+ * cadastros na primeira importação. Onze zeros satisfazem o gatilho e já são
+ * a marca de "telefone que não serve" reconhecida pelo resto do sistema:
+ * `telefoneInutilComoPista` em `src/lib/convenio/vidas-contrato.ts` trata
+ * `00000000000` como inútil, e a migration dos boletos (20260812133348) já
+ * exclui esse número dos envios.
+ *
+ * Ou seja: o paciente entra, mas ninguém confunde isso com contato real.
+ */
+export const TELEFONE_AUSENTE = "00000000000";
+
 export interface LinhaBeneficiario {
   aba: string;
   /** Número da linha como aparece no Excel, para o operador conferir. */
   linhaExcel: number;
   nome: string;
   cpf: string | null;
+  /** Só dígitos, já com DDD. `null` quando a planilha não traz nada usável. */
+  telefone: string | null;
   nascimento: string | null; // yyyy-mm-dd
   sexo: "masculino" | "feminino" | "outro" | "nao_informar";
   tipo: TipoBeneficiario;
@@ -205,6 +224,28 @@ export function normalizarData(valor: unknown): string | null {
   return null;
 }
 
+/**
+ * Telefone só com dígitos, pronto para o banco (que guarda sem pontuação).
+ *
+ * Devolve null para tudo que o sistema não aceitaria como contato: menos de
+ * 10 dígitos (número sem DDD), e os números de enchimento que o próprio
+ * sistema já classifica como inúteis — zeros, dígito repetido, 21999999999.
+ * Deixar um desses passar seria pior que o campo vazio: a recepção acharia
+ * que tem telefone e ninguém pediria o número certo.
+ */
+export function normalizarTelefone(valor: unknown): string | null {
+  let digitos = String(valor ?? "").replace(/\D/g, "");
+  if (!digitos) return null;
+
+  // Código do país e zero de operadora que às vezes vêm colados.
+  if (digitos.length > 11 && digitos.startsWith("55")) digitos = digitos.slice(2);
+  if (digitos.length > 11 && digitos.startsWith("0")) digitos = digitos.replace(/^0+/, "");
+
+  if (digitos.length < 10 || digitos.length > 11) return null;
+  if (telefoneInutilComoPista(digitos)) return null;
+  return digitos;
+}
+
 /** A tabela `pacientes` só aceita masculino | feminino | outro | nao_informar. */
 export function normalizarSexo(valor: unknown): LinhaBeneficiario["sexo"] {
   const k = chaveTexto(valor);
@@ -349,6 +390,13 @@ export async function lerPlanilhaBeneficiarios(
       "Data de Nascimento",
     ]);
     const colSexo = acharColuna(cabecalhos, ["Sexo"]);
+    const colTelefone = acharColuna(cabecalhos, [
+      "Telefone",
+      "Celular",
+      "WhatsApp",
+      "Fone",
+      "Contato",
+    ]);
     const colTipo = acharColuna(cabecalhos, [
       "TITULAR OU DEPENDENTE?",
       "Titular ou Dependente",
@@ -368,6 +416,7 @@ export async function lerPlanilhaBeneficiarios(
         CPF: colCpf,
         Nascimento: colNascimento,
         Sexo: colSexo,
+        Telefone: colTelefone,
         "Titular ou dependente": colTipo,
         Matrícula: colMatricula,
         "Matrícula Titular": colMatriculaTitular,
@@ -404,6 +453,7 @@ export async function lerPlanilhaBeneficiarios(
         linhaExcel,
         nome,
         cpf: colCpf ? normalizarCpf(linha[colCpf]) : null,
+        telefone: colTelefone ? normalizarTelefone(linha[colTelefone]) : null,
         nascimento: colNascimento ? normalizarData(linha[colNascimento]) : null,
         sexo: colSexo ? normalizarSexo(linha[colSexo]) : "nao_informar",
         tipo: colTipo ? normalizarTipo(linha[colTipo]) : "titular",
