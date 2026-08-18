@@ -861,3 +861,35 @@ html.theme-emerald {
   &::-webkit-scrollbar { height: 8px; width: 8px; }
   &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
 }
+
+/* =====================================================================
+ * Agenda "seca" — sem animações nem transições.
+ *
+ * As recepcionistas relataram lentidão na tela de Agendas, então ali tudo
+ * precisa aparecer instantaneamente: abrir diálogo, trocar de aba/visão,
+ * abrir select ou menu. As classes de transição do código da própria
+ * Agenda foram removidas na origem; este bloco cobre o que sobra e vem dos
+ * componentes compartilhados (Dialog, Sheet, Select, Popover, DropdownMenu
+ * e Tooltip do Radix, animados via tw-animate-css).
+ *
+ * Por que a classe fica no <html> e não num container da página: esses
+ * componentes são renderizados em portal, fora da árvore da Agenda, então
+ * um seletor escopado ao container não os alcançaria. A classe é adicionada
+ * quando /app/agenda monta e removida no desmonte — nenhuma outra tela do
+ * sistema muda de comportamento.
+ * ===================================================================== */
+html.agenda-sem-animacao *,
+html.agenda-sem-animacao *::before,
+html.agenda-sem-animacao *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Única exceção: o spinner de "carregando". Um spinner congelado passa a
+ * impressão de tela travada, e o custo é o de um ícone girando. */
+@keyframes agenda-spin {
+  to { transform: rotate(360deg); }
+}
+html.agenda-sem-animacao .animate-spin {
+  animation: agenda-spin 1s linear infinite !important;
+}

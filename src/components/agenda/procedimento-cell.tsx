@@ -121,7 +121,7 @@ export function ProcedimentoCell({
         <button
           type="button"
           title={`${tituloAtual} — clique para trocar o serviço`}
-          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[11px] font-medium uppercase leading-snug text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[11px] font-medium uppercase leading-snug text-muted-foreground hover:bg-primary/10 hover:text-primary"
         >
           <span
             title={tituloAtual}
@@ -129,7 +129,7 @@ export function ProcedimentoCell({
           >
             {textoAtual}
           </span>
-          <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[340px] p-0" align="start">

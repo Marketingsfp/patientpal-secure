@@ -166,8 +166,8 @@ export function AgendaPorMedicoDia({
                           livre
                             ? leituraLivre
                               ? "flex w-full min-w-0 flex-col rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
-                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
-                            : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs transition-colors hover:bg-slate-50"
+                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center hover:border-indigo-300 hover:bg-indigo-50/30"
+                            : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-white p-2.5 text-left shadow-xs hover:bg-slate-50"
                         }
                       >
                         {livre ? (

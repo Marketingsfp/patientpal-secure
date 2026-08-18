@@ -110,7 +110,7 @@ export function SelecionarItensOrcamentoDialog(props: {
             return (
               <label
                 key={it.id}
-                className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 p-3 cursor-pointer ${
                   checked ? "bg-primary/5" : "hover:bg-muted/40"
                 }`}
               >
