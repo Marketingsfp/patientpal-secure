@@ -4420,6 +4420,50 @@ export type Database = {
           },
         ]
       }
+      fin_regras_ia: {
+        Row: {
+          ativo: boolean
+          categoria_id: string | null
+          clinica_id: string
+          created_at: string
+          id: string
+          nome: string
+          padrao_descricao: string | null
+          prioridade: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id?: string | null
+          clinica_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          padrao_descricao?: string | null
+          prioridade?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          padrao_descricao?: string | null
+          prioridade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_regras_ia_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fin_repasse_terceiro: {
         Row: {
           atendimento_id: string | null
@@ -4483,10 +4527,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fin_repasse_terceiro_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fin_repasse_terceiro_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_repasse_terceiro_executante_medico_id_fkey"
+            columns: ["executante_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
             referencedColumns: ["id"]
           },
           {
@@ -4497,10 +4555,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fin_repasse_terceiro_atendimento_id_fkey"
-            columns: ["atendimento_id"]
+            foreignKeyName: "fin_repasse_terceiro_repasse_lancamento_id_fkey"
+            columns: ["repasse_lancamento_id"]
             isOneToOne: false
-            referencedRelation: "fin_atendimentos"
+            referencedRelation: "fin_lancamentos"
             referencedColumns: ["id"]
           },
           {
@@ -4508,57 +4566,6 @@ export type Database = {
             columns: ["terceiro_medico_id"]
             isOneToOne: false
             referencedRelation: "medicos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_repasse_terceiro_executante_medico_id_fkey"
-            columns: ["executante_medico_id"]
-            isOneToOne: false
-            referencedRelation: "medicos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fin_regras_ia: {
-        Row: {
-          ativo: boolean
-          categoria_id: string | null
-          clinica_id: string
-          created_at: string
-          id: string
-          nome: string
-          padrao_descricao: string | null
-          prioridade: number
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          categoria_id?: string | null
-          clinica_id: string
-          created_at?: string
-          id?: string
-          nome: string
-          padrao_descricao?: string | null
-          prioridade?: number
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          categoria_id?: string | null
-          clinica_id?: string
-          created_at?: string
-          id?: string
-          nome?: string
-          padrao_descricao?: string | null
-          prioridade?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fin_regras_ia_categoria_id_fkey"
-            columns: ["categoria_id"]
-            isOneToOne: false
-            referencedRelation: "fin_categorias"
             referencedColumns: ["id"]
           },
         ]
@@ -10012,6 +10019,22 @@ export type Database = {
           _total: number
         }
         Returns: string
+      }
+      pagar_repasse_medico_com_terceiros: {
+        Args: {
+          _agenda_ids: string[]
+          _clinica_id: string
+          _conta_id: string
+          _criado_por: string
+          _data: string
+          _forma_pagamento: string
+          _manual_ids: string[]
+          _medico_id: string
+          _medico_nome: string
+          _terceiros?: Json
+          _total: number
+        }
+        Returns: Json
       }
       painel_senhas_publicas: {
         Args: { _clinica_id: string }
