@@ -578,6 +578,21 @@ export function disposeCurrent() {
 // A habilitação (ligar/desligar) é aplicada interrompendo a fala em curso.
 // ---------------------------------------------------------------------------
 if (typeof window !== "undefined") {
+  // Migração única: quem tinha o padrão antigo (0.55) gravado no navegador
+  // continuava ouvindo a voz arrastada mesmo depois da correção do padrão.
+  try {
+    const MIGRATED_KEY = "tts:rate:migrado-1";
+    if (!window.localStorage.getItem(MIGRATED_KEY)) {
+      const atual = Number(window.localStorage.getItem(RATE_STORAGE_KEY));
+      if (Number.isFinite(atual) && Math.abs(atual - LEGACY_SLOW_RATE) < 0.001) {
+        window.localStorage.setItem(RATE_STORAGE_KEY, String(DEFAULT_TTS_RATE));
+      }
+      window.localStorage.setItem(MIGRATED_KEY, "1");
+    }
+  } catch {
+    /* noop */
+  }
+
   const applyLive = () => {
     if (!isUserTtsEnabled()) {
       stopSpeaking();
