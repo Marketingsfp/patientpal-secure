@@ -4420,6 +4420,105 @@ export type Database = {
           },
         ]
       }
+      fin_repasse_terceiro: {
+        Row: {
+          atendimento_id: string | null
+          clinica_id: string
+          created_at: string
+          data: string
+          executante_medico_id: string | null
+          id: string
+          lancamento_id: string | null
+          origem: string
+          percentual: number | null
+          repasse_conta_id: string | null
+          repasse_forma_pagamento: string | null
+          repasse_lancamento_id: string | null
+          repasse_pago: boolean
+          repasse_pago_at: string
+          repasse_pago_em: string | null
+          repasse_pago_por: string | null
+          terceiro_medico_id: string
+          valor: number
+        }
+        Insert: {
+          atendimento_id?: string | null
+          clinica_id: string
+          created_at?: string
+          data: string
+          executante_medico_id?: string | null
+          id?: string
+          lancamento_id?: string | null
+          origem: string
+          percentual?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          terceiro_medico_id: string
+          valor: number
+        }
+        Update: {
+          atendimento_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          executante_medico_id?: string | null
+          id?: string
+          lancamento_id?: string | null
+          origem?: string
+          percentual?: number | null
+          repasse_conta_id?: string | null
+          repasse_forma_pagamento?: string | null
+          repasse_lancamento_id?: string | null
+          repasse_pago?: boolean
+          repasse_pago_at?: string
+          repasse_pago_em?: string | null
+          repasse_pago_por?: string | null
+          terceiro_medico_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_repasse_terceiro_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_repasse_terceiro_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_repasse_terceiro_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_repasse_terceiro_terceiro_medico_id_fkey"
+            columns: ["terceiro_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_repasse_terceiro_executante_medico_id_fkey"
+            columns: ["executante_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fin_regras_ia: {
         Row: {
           ativo: boolean
@@ -5572,6 +5671,8 @@ export type Database = {
           medico_id: string
           nome: string
           percentual: number | null
+          percentual_terceiro: number | null
+          terceiro_id: string | null
           tipo_repasse: string
           updated_at: string
           valor: number | null
@@ -5588,6 +5689,8 @@ export type Database = {
           medico_id: string
           nome: string
           percentual?: number | null
+          percentual_terceiro?: number | null
+          terceiro_id?: string | null
           tipo_repasse?: string
           updated_at?: string
           valor?: number | null
@@ -5604,6 +5707,8 @@ export type Database = {
           medico_id?: string
           nome?: string
           percentual?: number | null
+          percentual_terceiro?: number | null
+          terceiro_id?: string | null
           tipo_repasse?: string
           updated_at?: string
           valor?: number | null
@@ -5612,6 +5717,13 @@ export type Database = {
           {
             foreignKeyName: "medico_convenios_medico_id_fkey"
             columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_convenios_terceiro_id_fkey"
+            columns: ["terceiro_id"]
             isOneToOne: false
             referencedRelation: "medicos"
             referencedColumns: ["id"]

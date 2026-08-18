@@ -29,6 +29,25 @@ export interface RepasseConvenio {
   cartao_consulta_valor?: number | null;
   /** Repasse fixo em pagamentos via Cartão Desconto (nulo = usa padrão) */
   cartao_desconto_valor?: number | null;
+  /**
+   * REPASSE TRIPLO — médico terceiro (ex.: dono do equipamento usado no exame)
+   * que também recebe por este serviço. Nulo = esta linha não tem terceiro.
+   */
+  terceiro_id?: string | null;
+  /**
+   * REPASSE TRIPLO — percentual do VALOR TOTAL do atendimento pago ao terceiro.
+   * Vale para qualquer forma de atendimento (particular, convênio, cartões),
+   * porque o combinado com o dono do equipamento é sobre o exame, não sobre a
+   * forma de pagamento do paciente.
+   */
+  percentual_terceiro?: number | null;
+}
+
+/** Parte do terceiro (dono do equipamento) apurada num atendimento. */
+export interface RepasseTerceiro {
+  medico_id: string;
+  percentual: number;
+  valor: number;
 }
 
 /** Localiza a linha de repasse cadastrada para o serviço (ou sua categoria). */
@@ -171,6 +190,38 @@ export function resolverRepasse(params: {
   med?: RepasseMedico | null;
   base: number;
   forma: FormaRepasse;
+}): { total: number; repasse: number; terceiro: RepasseTerceiro | null } {
+  const bruto = resolverRepasseExecutante(params);
+  return { ...bruto, terceiro: repasseDoTerceiro(params.linha, bruto.total) };
+}
+
+/**
+ * REPASSE TRIPLO — parte do médico terceiro (dono do equipamento).
+ *
+ * É sempre um percentual do VALOR TOTAL do atendimento, igual ao percentual do
+ * executante: numa regra de 30% clínica / 40% executante / 30% terceiro os três
+ * pedaços somam o total. Devolve `null` quando a linha não tem terceiro
+ * configurado ou quando o percentual é zero.
+ */
+export function repasseDoTerceiro(
+  linha: RepasseConvenio | null | undefined,
+  total: number,
+): RepasseTerceiro | null {
+  if (!linha?.terceiro_id) return null;
+  const pct = valorCelulaRepasse(linha.percentual_terceiro);
+  if (pct == null || pct <= 0) return null;
+  return {
+    medico_id: linha.terceiro_id,
+    percentual: pct,
+    valor: +((total * pct) / 100).toFixed(2),
+  };
+}
+
+function resolverRepasseExecutante(params: {
+  linha?: RepasseConvenio | null;
+  med?: RepasseMedico | null;
+  base: number;
+  forma: FormaRepasse;
 }): { total: number; repasse: number } {
   const { linha, med, base, forma } = params;
   const colunas: FormaRepasse[] =
@@ -241,8 +292,8 @@ export function calcRepasseFull(
    * leitura do texto da descrição, que fica só como fallback histórico.
    */
   modalidade?: "cartao_consulta" | "cartao_desconto" | null,
-): { total: number; repasse: number } {
-  if (!medicoId) return { total: totalPago, repasse: 0 };
+): { total: number; repasse: number; terceiro: RepasseTerceiro | null } {
+  if (!medicoId) return { total: totalPago, repasse: 0, terceiro: null };
   const med = ctx.medicos.find((m) => m.id === medicoId) ?? null;
   return resolverRepasse({
     linha: findConvenioRow(ctx, medicoId, procNome),

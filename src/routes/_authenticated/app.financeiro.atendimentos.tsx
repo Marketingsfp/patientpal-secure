@@ -99,7 +99,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
-import { resolverRepasse, formaDoAtendimento } from "@/lib/repasse-calc";
+import { resolverRepasse, formaDoAtendimento, type RepasseTerceiro } from "@/lib/repasse-calc";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
@@ -131,6 +131,12 @@ interface Atend {
   laudo_status?: string | null;
   medico_laudador_id?: string | null;
   valor_laudo?: number;
+  /** REPASSE TRIPLO — dono do equipamento que também recebe por este atendimento */
+  terceiro_medico_id?: string | null;
+  terceiro_percentual?: number | null;
+  terceiro_valor?: number;
+  /** Repasse do terceiro já foi pago (existe linha em fin_repasse_terceiro) */
+  terceiro_pago?: boolean;
 }
 interface Medico {
   id: string;
@@ -158,6 +164,8 @@ interface Convenio {
   convenio_valor?: number | null;
   cartao_consulta_valor?: number | null;
   cartao_desconto_valor?: number | null;
+  terceiro_id?: string | null;
+  percentual_terceiro?: number | null;
 }
 interface Conta {
   id: string;
@@ -1113,8 +1121,8 @@ function AtendimentosPage() {
     descricao?: string | null,
     /** Modalidade vinda do cadastro (contrato ativo) — prevalece sobre o texto. */
     modalidade?: "cartao_consulta" | "cartao_desconto" | null,
-  ): { total: number; repasse: number } => {
-    if (!medicoId) return { total: totalPago, repasse: 0 };
+  ): { total: number; repasse: number; terceiro: RepasseTerceiro | null } => {
+    if (!medicoId) return { total: totalPago, repasse: 0, terceiro: null };
     const med = medicosById.get(medicoId) ?? null;
     // Linha cadastrada para o servico (ou para a categoria dele). Os indices
     // O(1) existem porque isto roda uma vez por atendimento carregado.
@@ -1303,12 +1311,47 @@ function AtendimentosPage() {
       }
       return true;
     });
+    // REPASSE TRIPLO — quais repasses de terceiro já foram pagos no período.
+    // A tabela só ganha linha quando o terceiro é efetivamente pago, então a
+    // ausência de linha significa "ainda a receber".
+    const terceirosPagos = new Set<string>();
+    {
+      const { data: pagos, error: ePagos } = await supabase
+        .from("fin_repasse_terceiro")
+        .select("origem, lancamento_id, atendimento_id, terceiro_medico_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fIni)
+        .lte("data", fFim);
+      if (ePagos) {
+        mostrarErro(ePagos);
+        setLoading(false);
+        return;
+      }
+      for (const p of pagos ?? []) {
+        const ref = p.origem === "agenda" ? p.lancamento_id : p.atendimento_id;
+        if (ref) terceirosPagos.add(`${p.origem}:${ref}:${p.terceiro_medico_id}`);
+      }
+    }
+    const marcaTerceiro = (
+      origem: "agenda" | "manual",
+      id: string,
+      terceiro: RepasseTerceiro | null,
+    ) =>
+      terceiro
+        ? {
+            terceiro_medico_id: terceiro.medico_id,
+            terceiro_percentual: terceiro.percentual,
+            terceiro_valor: terceiro.valor,
+            terceiro_pago: terceirosPagos.has(`${origem}:${id}:${terceiro.medico_id}`),
+          }
+        : {};
+
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
       // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
-      const { total, repasse } = calcRepasseFull(
+      const { total, repasse, terceiro } = calcRepasseFull(
         r.medico_id,
         pago,
         r.procedimento,
@@ -1323,7 +1366,9 @@ function AtendimentosPage() {
         procedimento: r.procedimento,
         valor_total: valorTotal,
         valor_medico: valorMedico,
-        valor_clinica: +(valorTotal - valorMedico).toFixed(2),
+        // O que sobra para a clínica já desconta a parte do terceiro.
+        valor_clinica: +(valorTotal - valorMedico - (terceiro?.valor ?? 0)).toFixed(2),
+        ...marcaTerceiro("manual", r.id, terceiro),
         status: r.status,
         forma_pagamento: r.forma_pagamento,
         medico_id: r.medico_id,
@@ -1365,7 +1410,7 @@ function AtendimentosPage() {
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
-      const { total, repasse } = calcRepasseFull(
+      const { total, repasse, terceiro } = calcRepasseFull(
         medIdEff,
         pago,
         proc,
@@ -1386,7 +1431,8 @@ function AtendimentosPage() {
           ? Number(overrideRaw)
           : null;
       const valorMedicoFinal = override !== null && Number.isFinite(override) ? override : repasse;
-      const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
+      // O que sobra para a clínica já desconta a parte do terceiro.
+      const valorClinicaFinal = +(total - valorMedicoFinal - (terceiro?.valor ?? 0)).toFixed(2);
       return {
         id: r.id,
         data: dataRepasse,
@@ -1408,6 +1454,7 @@ function AtendimentosPage() {
         repasse_conta_id: (r as any).repasse_conta_id ?? null,
         agendamento_inicio: ag?.inicio ?? null,
         agendamento_status: ag?.status ?? null,
+        ...marcaTerceiro("agenda", r.id, terceiro),
         laudo_status: (r as any).laudo_status ?? null,
         medico_laudador_id: (r as any).medico_laudador_id ?? null,
         valor_laudo: Number((r as any).valor_laudo ?? 0),
@@ -1506,7 +1553,7 @@ function AtendimentosPage() {
         const { data: cv, error: cvErr } = await supabase
           .from("medico_convenios")
           .select(
-            "medico_id, nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor",
+            "medico_id, nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro",
           )
           .in("medico_id", ids)
           .eq("ativo", true)
@@ -2029,9 +2076,24 @@ function AtendimentosPage() {
           acc.clinica += Number(a.valor_clinica) || 0;
           if (a.repasse_pago) acc.pago += Number(a.valor_medico) || 0;
           else acc.aReceber += Number(a.valor_medico) || 0;
+          // REPASSE TRIPLO — a parte do dono do equipamento é somada à parte,
+          // porque ela sai num lançamento separado do repasse do executante.
+          const vt = a.terceiro_medico_id ? Number(a.terceiro_valor) || 0 : 0;
+          if (vt > 0) {
+            if (a.terceiro_pago) acc.terceiroPago += vt;
+            else acc.terceiroAPagar += vt;
+          }
           return acc;
         },
-        { total: 0, medico: 0, clinica: 0, pago: 0, aReceber: 0 },
+        {
+          total: 0,
+          medico: 0,
+          clinica: 0,
+          pago: 0,
+          aReceber: 0,
+          terceiroPago: 0,
+          terceiroAPagar: 0,
+        },
       ),
     [filteredItems],
   );
@@ -2093,6 +2155,26 @@ function AtendimentosPage() {
     else next.add(k);
     setSel(next);
   };
+  // REPASSE TRIPLO — prévia de quanto cada dono de equipamento vai receber
+  // pelos atendimentos selecionados. Mostrada na janela de pagamento para o
+  // operador conferir a divisão antes de confirmar.
+  const terceirosSelecionados = useMemo(() => {
+    const m = new Map<string, { nome: string; total: number; qtd: number }>();
+    for (const a of selectedItems) {
+      if (!a.terceiro_medico_id || a.terceiro_pago) continue;
+      const valor = Number(a.terceiro_valor) || 0;
+      if (valor <= 0) continue;
+      const cur = m.get(a.terceiro_medico_id) ?? {
+        nome: medMap.get(a.terceiro_medico_id) ?? "Terceiro",
+        total: 0,
+        qtd: 0,
+      };
+      cur.total = +(cur.total + valor).toFixed(2);
+      cur.qtd += 1;
+      m.set(a.terceiro_medico_id, cur);
+    }
+    return Array.from(m.values());
+  }, [selectedItems, medMap]);
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado =
@@ -2185,15 +2267,75 @@ function AtendimentosPage() {
           "Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.",
         );
       }
+      // Quantos lançamentos separados de terceiro (dono de equipamento) foram
+      // gerados — só para avisar o operador no fim.
+      let terceirosGerados = 0;
       for (const [medId, list] of byMed) {
         const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         const total = usarValorManual ? valorManualNum : totalCalc;
-        if (total <= 0) continue;
+        if (total <= 0) {
+          // Repasse do executante zerado: nada a pagar. Se houvesse terceiro
+          // pendente nesses atendimentos ele ficaria de fora sem ninguém
+          // perceber — por isso o aviso explícito.
+          const terceiroPendente = list.some(
+            (x) => x.terceiro_medico_id && !x.terceiro_pago && (Number(x.terceiro_valor) || 0) > 0,
+          );
+          if (terceiroPendente) {
+            toast.warning(
+              "Há repasse de terceiro pendente em atendimentos cujo repasse do médico executante é zero. Esses terceiros não foram pagos — lance a despesa manualmente em Financeiro → Movimento.",
+            );
+          }
+          continue;
+        }
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
         const { data: userData } = await supabase.auth.getUser();
         const currentUserId = userData?.user?.id ?? null;
         const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
         const agendaIds = list.filter((x) => x.origem === "agenda").map((x) => x.id);
+        // REPASSE TRIPLO — a parte do dono do equipamento sai num lançamento
+        // PRÓPRIO, por terceiro, dentro do mesmo COMMIT do repasse do
+        // executante. O valor do terceiro não depende do valor manual do
+        // executante: é sempre o percentual cadastrado sobre o valor do
+        // atendimento.
+        const terceirosMap = new Map<
+          string,
+          {
+            terceiro_id: string;
+            terceiro_nome: string;
+            total: number;
+            itens: Array<{
+              origem: string;
+              id: string;
+              valor: number;
+              percentual: number | null;
+              data: string;
+            }>;
+          }
+        >();
+        for (const x of list) {
+          if (!x.terceiro_medico_id || x.terceiro_pago) continue;
+          const valorTerceiro = +(Number(x.terceiro_valor) || 0).toFixed(2);
+          if (valorTerceiro <= 0) continue;
+          const k = x.terceiro_medico_id;
+          if (!terceirosMap.has(k)) {
+            terceirosMap.set(k, {
+              terceiro_id: k,
+              terceiro_nome: medMap.get(k) ?? "Terceiro",
+              total: 0,
+              itens: [],
+            });
+          }
+          const t = terceirosMap.get(k)!;
+          t.total = +(t.total + valorTerceiro).toFixed(2);
+          t.itens.push({
+            origem: x.origem ?? "manual",
+            id: x.id,
+            valor: valorTerceiro,
+            percentual: x.terceiro_percentual ?? null,
+            data: x.data,
+          });
+        }
+        const terceiros = Array.from(terceirosMap.values());
         // Cria a despesa e marca todos os atendimentos como pagos numa ÚNICA
         // transação no banco (RPC pagar_repasse_medico). Se qualquer passo
         // falhar — inclusive outra aba/retry já tendo pago algum desses
@@ -2201,7 +2343,7 @@ function AtendimentosPage() {
         // automaticamente (transação real), sem depender de rollback manual
         // no cliente e sem janela onde a despesa exista sem todos os
         // atendimentos marcados como pagos (ou vice-versa).
-        const { error: eRpc } = await supabase.rpc("pagar_repasse_medico", {
+        const argsRpc = {
           _clinica_id: clinicaAtual.clinica_id,
           _medico_id: medId !== "sem" ? medId : null,
           _manual_ids: manualIds,
@@ -2212,7 +2354,17 @@ function AtendimentosPage() {
           _conta_id: payForm.conta_id || null,
           _criado_por: currentUserId,
           _medico_nome: medNome,
-        } as never);
+        };
+        // Sem terceiro o fluxo continua exatamente como sempre foi. Com
+        // terceiro, a RPC estendida faz os dois pagamentos numa transação só —
+        // ou entram os dois créditos, ou não entra nenhum.
+        const { error: eRpc } = terceiros.length
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase.rpc as any)("pagar_repasse_medico_com_terceiros", {
+              ...argsRpc,
+              _terceiros: terceiros,
+            })
+          : await supabase.rpc("pagar_repasse_medico", argsRpc as never);
         if (eRpc) {
           toast.error(
             (eRpc as { code?: string }).code === "23505"
@@ -2221,6 +2373,7 @@ function AtendimentosPage() {
           );
           continue;
         }
+        terceirosGerados += terceiros.length;
         // Se usamos valor manual, ajusta o valor_medico de cada atendimento
         // MANUAL proporcionalmente para que o comprovante e o total pago
         // batam. Para atendimentos de agenda o valor_medico é derivado das
@@ -2251,7 +2404,11 @@ function AtendimentosPage() {
           }
         }
       }
-      toast.success("Repasses pagos com sucesso");
+      toast.success(
+        terceirosGerados > 0
+          ? `Repasses pagos com sucesso. Foram gerados ${terceirosGerados} lançamento(s) separado(s) de repasse de terceiro (dono do equipamento).`
+          : "Repasses pagos com sucesso",
+      );
       const c = buildComprovante(selectedItems, {
         ...payForm,
         pago_at: new Date().toISOString(),
@@ -2691,6 +2848,23 @@ function AtendimentosPage() {
                         </div>
                       </div>
                     </div>
+                    {/* REPASSE TRIPLO — só aparece quando há dono de equipamento
+                        a receber no período filtrado. */}
+                    {totais.terceiroAPagar + totais.terceiroPago > 0 && (
+                      <div
+                        className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center"
+                        title="Repasse de terceiro (dono do equipamento) — sai em lançamento separado do repasse do médico executante"
+                      >
+                        <div>
+                          <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                            Terceiros
+                          </div>
+                          <div className="text-xs font-bold text-amber-700 leading-tight">
+                            {fmt(totais.terceiroAPagar)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2860,6 +3034,26 @@ function AtendimentosPage() {
                           )}
                           <TableCell className="text-xs text-right font-semibold text-primary whitespace-nowrap px-2">
                             {fmt(Number(a.valor_medico))}
+                            {/* REPASSE TRIPLO — a parte do dono do equipamento
+                                aparece logo abaixo do repasse do executante,
+                                para o operador ver a divisão antes de pagar. */}
+                            {a.terceiro_medico_id && (Number(a.terceiro_valor) || 0) > 0 && (
+                              <div
+                                className="mt-0.5 font-normal text-[10px] text-amber-700 dark:text-amber-500"
+                                title={`Repasse de terceiro (dono do equipamento): ${
+                                  medMap.get(a.terceiro_medico_id) ?? "—"
+                                } — ${a.terceiro_percentual ?? "?"}% do valor do atendimento`}
+                              >
+                                + {fmt(Number(a.terceiro_valor))}{" "}
+                                <span className="text-muted-foreground">
+                                  {medMap.get(a.terceiro_medico_id) ?? "terceiro"}
+                                  {a.terceiro_percentual != null
+                                    ? ` (${a.terceiro_percentual}%)`
+                                    : ""}
+                                  {a.terceiro_pago ? " • pago" : ""}
+                                </span>
+                              </div>
+                            )}
                           </TableCell>
                           {!isMedicoOnly && (
                             <TableCell className="text-xs text-right text-muted-foreground whitespace-nowrap px-2">
@@ -3287,6 +3481,26 @@ function AtendimentosPage() {
                   <span>{selectedItems.length} atendimento(s)</span>
                   <span className="font-semibold text-primary">{fmt(selectedTotal)}</span>
                 </div>
+                {terceirosSelecionados.length > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-1">
+                    <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                      Repasse de terceiro (dono do equipamento) — sai em lançamento separado
+                    </p>
+                    {terceirosSelecionados.map((t) => (
+                      <div key={t.nome} className="flex justify-between text-xs">
+                        <span>
+                          {t.nome} — {t.qtd} atend.
+                        </span>
+                        <span className="font-semibold">{fmt(t.total)}</span>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-muted-foreground pt-1">
+                      Cada médico executante recebe o lançamento dele e cada terceiro acima recebe
+                      um lançamento próprio — {terceirosSelecionados.length} a mais. Tudo é gravado
+                      de uma vez só: ou entram todos, ou não entra nenhum.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Valor do repasse (opcional)</Label>
                   <Input

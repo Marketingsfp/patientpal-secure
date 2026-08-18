@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { confirmDialog } from "@/lib/confirm";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, UserPlus, UserMinus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,7 +77,17 @@ interface ConvenioRow {
   cartao_consulta_valor: string;
   /** Repasse fixo quando o pagamento é via CARTÃO DESCONTO */
   cartao_desconto_valor: string;
+  /** REPASSE TRIPLO — médico terceiro (dono do equipamento). "" = sem terceiro */
+  terceiro_id: string;
+  /** REPASSE TRIPLO — % do valor total do atendimento pago ao terceiro */
+  percentual_terceiro: string;
   ativo: boolean;
+}
+
+/** Médico da clínica que pode ser escolhido como terceiro (dono do equipamento). */
+interface TerceiroOption {
+  id: string;
+  nome: string;
 }
 
 interface LaudadorOption {
@@ -105,6 +115,8 @@ const REPASSE_EXTRA_VAZIO = {
   convenio_valor: "",
   cartao_consulta_valor: "",
   cartao_desconto_valor: "",
+  terceiro_id: "",
+  percentual_terceiro: "",
 };
 
 /**
@@ -238,6 +250,9 @@ export function MedicoFormDialog({
   // Laudo Terceiro: catálogo de cardiologistas ativos da clínica + linhas configuradas
   const [laudadoresCatalog, setLaudadoresCatalog] = useState<LaudadorOption[]>([]);
   const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
+  // Repasse Triplo: todos os médicos ativos da clínica podem ser o "terceiro"
+  // (dono do equipamento) de um serviço.
+  const [terceirosCatalog, setTerceirosCatalog] = useState<TerceiroOption[]>([]);
   // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
   const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
   // Contagem de procedimentos que o médico já tinha no banco no momento da
@@ -540,11 +555,24 @@ export function MedicoFormDialog({
         }
         setProcEspMap(m);
       });
+    // Repasse Triplo: catálogo de possíveis "donos de equipamento".
+    void supabase
+      .from("medicos")
+      .select("id, nome")
+      .eq("clinica_id", activeClinicaId)
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setTerceirosCatalog(
+          ((data as TerceiroOption[]) ?? []).filter((m) => m.id !== editingMedicoId),
+        );
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [open, activeClinicaId]);
+  }, [open, activeClinicaId, editingMedicoId]);
 
   // Load medico when editing
   useEffect(() => {
@@ -603,7 +631,7 @@ export function MedicoFormDialog({
       const { data: convs } = await supabase
         .from("medico_convenios")
         .select(
-          "id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, ativo",
+          "id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro, ativo",
         )
         .eq("medico_id", med.id)
         .order("created_at");
@@ -616,6 +644,8 @@ export function MedicoFormDialog({
               convenio_valor?: number | null;
               cartao_consulta_valor?: number | null;
               cartao_desconto_valor?: number | null;
+              terceiro_id?: string | null;
+              percentual_terceiro?: number | null;
             };
             return {
               id: c.id,
@@ -632,6 +662,9 @@ export function MedicoFormDialog({
                 r.cartao_consulta_valor != null ? String(r.cartao_consulta_valor) : "",
               cartao_desconto_valor:
                 r.cartao_desconto_valor != null ? String(r.cartao_desconto_valor) : "",
+              terceiro_id: r.terceiro_id ?? "",
+              percentual_terceiro:
+                r.percentual_terceiro != null ? String(r.percentual_terceiro) : "",
               ativo: c.ativo ?? true,
             };
           }),
@@ -1009,6 +1042,12 @@ export function MedicoFormDialog({
             c.convenio_tipo_repasse === "valor" ? numeroOuNulo(c.convenio_valor) : null,
           cartao_consulta_valor: numeroOuNulo(c.cartao_consulta_valor),
           cartao_desconto_valor: numeroOuNulo(c.cartao_desconto_valor),
+          // Repasse triplo: só grava a dupla (terceiro + percentual) quando os
+          // dois estão preenchidos. Terceiro sem percentual não pagaria nada e
+          // percentual sem terceiro não teria a quem pagar.
+          terceiro_id:
+            c.terceiro_id && numeroOuNulo(c.percentual_terceiro) != null ? c.terceiro_id : null,
+          percentual_terceiro: c.terceiro_id ? numeroOuNulo(c.percentual_terceiro) : null,
           ativo: c.ativo,
         }));
       if (convRows.length) {
@@ -1921,6 +1960,14 @@ export function MedicoFormDialog({
                   <b>repasse padrão</b> do médico. A cobrança do paciente não muda — continua
                   seguindo as regras do contrato/convênio.
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <b>Repasse triplo:</b> quando o serviço usa equipamento de outro médico, clique em{" "}
+                  <b>Adicionar</b> na coluna <b>Terceiro</b> e informe quem é o dono do equipamento
+                  e o percentual dele. Executante e terceiro recebem, cada um, o seu percentual do{" "}
+                  <b>valor total do atendimento</b>, e a clínica fica com o que sobrar (ex.: exame
+                  com 40% executante + 30% terceiro deixa 30% para a clínica). No fechamento, cada
+                  um recebe um <b>lançamento separado</b>.
+                </p>
               </div>
               <Button
                 type="button"
@@ -1950,7 +1997,7 @@ export function MedicoFormDialog({
               </p>
             ) : (
               <div className="border rounded-md overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-260 text-sm">
                   <thead className="bg-muted/50">
                     <tr className="text-left">
                       <th className="px-2 py-2 font-medium">Serviço</th>
@@ -1960,6 +2007,7 @@ export function MedicoFormDialog({
                       <th className="px-2 py-2 font-medium w-28">Convênio</th>
                       <th className="px-2 py-2 font-medium w-28">Cartão Consulta</th>
                       <th className="px-2 py-2 font-medium w-28">Cartão Desconto</th>
+                      <th className="px-2 py-2 font-medium w-32 text-center">Terceiro</th>
                       <th className="px-2 py-2 w-10"></th>
                     </tr>
                   </thead>
@@ -1970,178 +2018,336 @@ export function MedicoFormDialog({
                         !catLbl && c.nome
                           ? (labelServicoPorNomeKey.get(normalizarNome(c.nome)) ?? null)
                           : null;
+                      const temTerceiro = !!c.terceiro_id;
+                      const terceiroNome =
+                        terceirosCatalog.find((t) => t.id === c.terceiro_id)?.nome ?? "";
+                      const pctTerceiro = parseFloat(
+                        (c.percentual_terceiro || "").replace(",", "."),
+                      );
+                      const pctExecutante = parseFloat((c.percentual || "").replace(",", "."));
+                      const somaPct =
+                        (Number.isFinite(pctExecutante) ? pctExecutante : 0) +
+                        (Number.isFinite(pctTerceiro) ? pctTerceiro : 0);
+                      const executanteLbl =
+                        c.tipo_repasse === "valor"
+                          ? c.valor
+                            ? `R$ ${c.valor}`
+                            : "padrão do médico"
+                          : Number.isFinite(pctExecutante)
+                            ? `${pctExecutante}%`
+                            : "padrão do médico";
                       return (
-                        <tr key={i} className="border-t align-middle">
-                          <td className="px-2 py-1">
-                            {catLbl ? (
-                              <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
-                                {catLbl}
-                              </div>
-                            ) : servicoLbl ? (
-                              <div className="px-2 py-1.5 text-sm text-foreground/90">
-                                {servicoLbl}
-                              </div>
-                            ) : (
+                        <Fragment key={i}>
+                          <tr className="border-t align-middle">
+                            <td className="px-2 py-1">
+                              {catLbl ? (
+                                <div className="px-2 py-1.5 text-sm font-medium uppercase tracking-wide text-foreground/80">
+                                  {catLbl}
+                                </div>
+                              ) : servicoLbl ? (
+                                <div className="px-2 py-1.5 text-sm text-foreground/90">
+                                  {servicoLbl}
+                                </div>
+                              ) : (
+                                <select
+                                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                  value={c.nome}
+                                  onChange={(e) =>
+                                    setConvenios((cs) =>
+                                      cs.map((x, j) =>
+                                        j === i ? { ...x, nome: e.target.value } : x,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <option value="">Selecione um serviço…</option>
+                                  {servicosDoMedico.map((s) => (
+                                    <option key={s.value} value={s.value}>
+                                      {s.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                            <td className="px-2 py-1">
                               <select
                                 className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                                value={c.nome}
+                                value={c.tipo_repasse}
                                 onChange={(e) =>
                                   setConvenios((cs) =>
                                     cs.map((x, j) =>
-                                      j === i ? { ...x, nome: e.target.value } : x,
+                                      j === i
+                                        ? {
+                                            ...x,
+                                            tipo_repasse: e.target.value as "percentual" | "valor",
+                                          }
+                                        : x,
                                     ),
                                   )
                                 }
                               >
-                                <option value="">Selecione um serviço…</option>
-                                {servicosDoMedico.map((s) => (
-                                  <option key={s.value} value={s.value}>
-                                    {s.label}
-                                  </option>
-                                ))}
+                                <option value="percentual">% Percentual</option>
+                                <option value="valor">R$ Valor</option>
                               </select>
-                            )}
-                          </td>
-                          <td className="px-2 py-1">
-                            <select
-                              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                              value={c.tipo_repasse}
-                              onChange={(e) =>
-                                setConvenios((cs) =>
-                                  cs.map((x, j) =>
-                                    j === i
-                                      ? {
-                                          ...x,
-                                          tipo_repasse: e.target.value as "percentual" | "valor",
-                                        }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="percentual">% Percentual</option>
-                              <option value="valor">R$ Valor</option>
-                            </select>
-                          </td>
-                          <td className="px-2 py-1">
-                            {c.tipo_repasse === "percentual" ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                placeholder="padrão"
-                                value={c.percentual}
+                            </td>
+                            <td className="px-2 py-1">
+                              {c.tipo_repasse === "percentual" ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  placeholder="padrão"
+                                  value={c.percentual}
+                                  onChange={(e) =>
+                                    setConvenios((cs) =>
+                                      cs.map((x, j) =>
+                                        j === i ? { ...x, percentual: e.target.value } : x,
+                                      ),
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <CurrencyInput
+                                  placeholder="padrão"
+                                  value={c.valor}
+                                  onChange={(v) =>
+                                    setConvenios((cs) =>
+                                      cs.map((x, j) => (j === i ? { ...x, valor: v } : x)),
+                                    )
+                                  }
+                                />
+                              )}
+                            </td>
+                            <td className="px-2 py-1">
+                              <select
+                                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                value={c.convenio_tipo_repasse}
                                 onChange={(e) =>
                                   setConvenios((cs) =>
                                     cs.map((x, j) =>
-                                      j === i ? { ...x, percentual: e.target.value } : x,
+                                      j === i
+                                        ? {
+                                            ...x,
+                                            convenio_tipo_repasse: e.target.value as
+                                              | "percentual"
+                                              | "valor",
+                                          }
+                                        : x,
+                                    ),
+                                  )
+                                }
+                              >
+                                <option value="percentual">% Percentual</option>
+                                <option value="valor">R$ Valor</option>
+                              </select>
+                            </td>
+                            <td className="px-2 py-1">
+                              {c.convenio_tipo_repasse === "percentual" ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  placeholder="padrão"
+                                  value={c.convenio_percentual}
+                                  onChange={(e) =>
+                                    setConvenios((cs) =>
+                                      cs.map((x, j) =>
+                                        j === i ? { ...x, convenio_percentual: e.target.value } : x,
+                                      ),
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <CurrencyInput
+                                  placeholder="padrão"
+                                  value={c.convenio_valor}
+                                  onChange={(v) =>
+                                    setConvenios((cs) =>
+                                      cs.map((x, j) => (j === i ? { ...x, convenio_valor: v } : x)),
+                                    )
+                                  }
+                                />
+                              )}
+                            </td>
+                            <td className="px-2 py-1">
+                              <CurrencyInput
+                                placeholder="padrão"
+                                value={c.cartao_consulta_valor}
+                                onChange={(v) =>
+                                  setConvenios((cs) =>
+                                    cs.map((x, j) =>
+                                      j === i ? { ...x, cartao_consulta_valor: v } : x,
                                     ),
                                   )
                                 }
                               />
-                            ) : (
+                            </td>
+                            <td className="px-2 py-1">
                               <CurrencyInput
                                 placeholder="padrão"
-                                value={c.valor}
+                                value={c.cartao_desconto_valor}
                                 onChange={(v) =>
                                   setConvenios((cs) =>
-                                    cs.map((x, j) => (j === i ? { ...x, valor: v } : x)),
-                                  )
-                                }
-                              />
-                            )}
-                          </td>
-                          <td className="px-2 py-1">
-                            <select
-                              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                              value={c.convenio_tipo_repasse}
-                              onChange={(e) =>
-                                setConvenios((cs) =>
-                                  cs.map((x, j) =>
-                                    j === i
-                                      ? {
-                                          ...x,
-                                          convenio_tipo_repasse: e.target.value as
-                                            | "percentual"
-                                            | "valor",
-                                        }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="percentual">% Percentual</option>
-                              <option value="valor">R$ Valor</option>
-                            </select>
-                          </td>
-                          <td className="px-2 py-1">
-                            {c.convenio_tipo_repasse === "percentual" ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                placeholder="padrão"
-                                value={c.convenio_percentual}
-                                onChange={(e) =>
-                                  setConvenios((cs) =>
                                     cs.map((x, j) =>
-                                      j === i ? { ...x, convenio_percentual: e.target.value } : x,
+                                      j === i ? { ...x, cartao_desconto_valor: v } : x,
                                     ),
                                   )
                                 }
                               />
-                            ) : (
-                              <CurrencyInput
-                                placeholder="padrão"
-                                value={c.convenio_valor}
-                                onChange={(v) =>
-                                  setConvenios((cs) =>
-                                    cs.map((x, j) => (j === i ? { ...x, convenio_valor: v } : x)),
-                                  )
-                                }
-                              />
-                            )}
-                          </td>
-                          <td className="px-2 py-1">
-                            <CurrencyInput
-                              placeholder="padrão"
-                              value={c.cartao_consulta_valor}
-                              onChange={(v) =>
-                                setConvenios((cs) =>
-                                  cs.map((x, j) =>
-                                    j === i ? { ...x, cartao_consulta_valor: v } : x,
-                                  ),
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <CurrencyInput
-                              placeholder="padrão"
-                              value={c.cartao_desconto_valor}
-                              onChange={(v) =>
-                                setConvenios((cs) =>
-                                  cs.map((x, j) =>
-                                    j === i ? { ...x, cartao_desconto_valor: v } : x,
-                                  ),
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            {catLbl || servicoLbl ? null : (
+                            </td>
+                            <td className="px-2 py-1 text-center">
                               <Button
                                 type="button"
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))}
-                                aria-label="Remover"
+                                size="sm"
+                                variant={temTerceiro ? "secondary" : "outline"}
+                                className="h-9 w-full text-xs"
+                                title={
+                                  temTerceiro
+                                    ? "Remover o repasse de terceiro deste serviço"
+                                    : "Adicionar repasse de terceiro (dono do equipamento)"
+                                }
+                                onClick={() =>
+                                  setConvenios((cs) =>
+                                    cs.map((x, j) =>
+                                      j === i
+                                        ? temTerceiro
+                                          ? { ...x, terceiro_id: "", percentual_terceiro: "" }
+                                          : {
+                                              ...x,
+                                              terceiro_id: terceirosCatalog[0]?.id ?? "",
+                                            }
+                                        : x,
+                                    ),
+                                  )
+                                }
                               >
-                                <Trash2 className="h-4 w-4" />
+                                {temTerceiro ? (
+                                  <>
+                                    <UserMinus className="h-3.5 w-3.5 mr-1" /> Remover
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                                  </>
+                                )}
                               </Button>
-                            )}
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="px-2 py-1 text-right">
+                              {catLbl || servicoLbl ? null : (
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setConvenios((cs) => cs.filter((_, j) => j !== i))}
+                                  aria-label="Remover"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                          {temTerceiro && (
+                            <tr className="bg-muted/30">
+                              <td colSpan={9} className="px-2 pb-3 pt-1">
+                                <div className="rounded-md border border-dashed border-primary/40 bg-background p-3 space-y-2">
+                                  <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                                    <Users className="h-3.5 w-3.5" />
+                                    REPASSE TRIPLO — equipamento de terceiro
+                                  </div>
+                                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
+                                    <div className="space-y-1">
+                                      <Label className="text-[11px] text-muted-foreground">
+                                        Terceiro (dono do equipamento)
+                                      </Label>
+                                      <select
+                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                        value={c.terceiro_id}
+                                        onChange={(e) =>
+                                          setConvenios((cs) =>
+                                            cs.map((x, j) =>
+                                              j === i ? { ...x, terceiro_id: e.target.value } : x,
+                                            ),
+                                          )
+                                        }
+                                      >
+                                        <option value="">Selecione o médico…</option>
+                                        {terceirosCatalog.map((t) => (
+                                          <option key={t.id} value={t.id}>
+                                            {t.nome}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[11px] text-muted-foreground">
+                                        % do terceiro
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        min={0}
+                                        max={100}
+                                        placeholder="ex.: 30"
+                                        value={c.percentual_terceiro}
+                                        onChange={(e) =>
+                                          setConvenios((cs) =>
+                                            cs.map((x, j) =>
+                                              j === i
+                                                ? { ...x, percentual_terceiro: e.target.value }
+                                                : x,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                  {/* Divisão lado a lado — o que cada um recebe deste serviço */}
+                                  <div className="flex flex-wrap items-stretch gap-2">
+                                    <div className="flex-1 min-w-40 rounded-md border bg-primary/5 px-3 py-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        Médico Executante
+                                      </div>
+                                      <div className="text-sm font-semibold text-primary">
+                                        {executanteLbl}
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 min-w-40 rounded-md border bg-amber-500/10 px-3 py-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        Terceiro{terceiroNome ? ` (${terceiroNome})` : ""}
+                                      </div>
+                                      <div className="text-sm font-semibold text-amber-700 dark:text-amber-500">
+                                        {Number.isFinite(pctTerceiro) ? `${pctTerceiro}%` : "—"}
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 min-w-40 rounded-md border bg-muted px-3 py-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        Clínica (fica com o resto)
+                                      </div>
+                                      <div className="text-sm font-semibold">
+                                        {c.tipo_repasse === "percentual" && Number.isFinite(somaPct)
+                                          ? `${+(100 - somaPct).toFixed(2)}%`
+                                          : "restante"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {c.tipo_repasse === "percentual" && somaPct > 100 && (
+                                    <p className="text-xs text-destructive">
+                                      Executante + terceiro somam {+somaPct.toFixed(2)}% — passa dos
+                                      100% do valor do atendimento. A clínica ficaria no prejuízo
+                                      neste serviço.
+                                    </p>
+                                  )}
+                                  {!c.percentual_terceiro.trim() && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Preencha o <b>% do terceiro</b> para o repasse ser gravado.
+                                      Sem percentual, este serviço continua sem repasse de terceiro.
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>

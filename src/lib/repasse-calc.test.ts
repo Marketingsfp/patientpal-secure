@@ -194,3 +194,86 @@ describe("calcRepasseFull encontra a linha do servico", () => {
     expect(r.repasse).toBe(40);
   });
 });
+
+// REPASSE TRIPLO — exame feito com equipamento de outro médico. Os dois
+// percentuais incidem sobre o VALOR TOTAL do atendimento e a clínica fica com
+// o que sobra (cenário do pedido: 30% clínica / 40% executante / 30% terceiro).
+describe("repasse triplo (terceiro dono do equipamento)", () => {
+  const LINHA_EXAME_COM_TERCEIRO: RepasseConvenio = {
+    medico_id: "med-1",
+    nome: "MAPEAMENTO DE RETINA",
+    tipo_repasse: "percentual",
+    percentual: 40,
+    valor: null,
+    convenio_tipo_repasse: null,
+    convenio_percentual: null,
+    convenio_valor: null,
+    cartao_consulta_valor: null,
+    cartao_desconto_valor: null,
+    terceiro_id: "med-terceiro",
+    percentual_terceiro: 30,
+  };
+
+  it("divide 100 reais em 40 executante, 30 terceiro e 30 clinica", () => {
+    const r = resolverRepasse({
+      linha: LINHA_EXAME_COM_TERCEIRO,
+      med: MEDICO,
+      base: 100,
+      forma: "particular",
+    });
+    expect(r.repasse).toBe(40);
+    expect(r.terceiro?.medico_id).toBe("med-terceiro");
+    expect(r.terceiro?.valor).toBe(30);
+    expect(+(r.total - r.repasse - (r.terceiro?.valor ?? 0)).toFixed(2)).toBe(30);
+  });
+
+  it("terceiro recebe mesmo quando o executante cai no Repasse Padrao", () => {
+    // Coluna Convenio em branco: o executante herda o padrao (R$ 55), mas o
+    // combinado com o dono do equipamento continua valendo.
+    const r = resolverRepasse({
+      linha: LINHA_EXAME_COM_TERCEIRO,
+      med: MEDICO,
+      base: 200,
+      forma: "convenio",
+    });
+    expect(r.repasse).toBe(55);
+    expect(r.terceiro?.valor).toBe(60);
+  });
+
+  it("linha sem terceiro nao gera repasse de terceiro", () => {
+    const r = resolverRepasse({
+      linha: LINHA_SO_PARTICULAR,
+      med: MEDICO,
+      base: 200,
+      forma: "particular",
+    });
+    expect(r.terceiro).toBeNull();
+  });
+
+  it("terceiro cadastrado com percentual zerado nao gera repasse", () => {
+    const linha: RepasseConvenio = { ...LINHA_EXAME_COM_TERCEIRO, percentual_terceiro: 0 };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 200, forma: "particular" });
+    expect(r.terceiro).toBeNull();
+  });
+
+  it("calcRepasseFull devolve a parte do terceiro pelo nome do servico", () => {
+    const ctx: RepasseCtx = {
+      medicos: [MEDICO],
+      convenios: [LINHA_EXAME_COM_TERCEIRO],
+      procTipos: new Map([["mapeamento de retina", "EXAME"]]),
+    };
+    const r = calcRepasseFull(ctx, "med-1", 250, "MAPEAMENTO DE RETINA", null, null);
+    expect(r.repasse).toBe(100);
+    expect(r.terceiro?.valor).toBe(75);
+  });
+
+  it("atendimento sem medico nao tem terceiro", () => {
+    const ctx: RepasseCtx = {
+      medicos: [MEDICO],
+      convenios: [LINHA_EXAME_COM_TERCEIRO],
+      procTipos: new Map(),
+    };
+    const r = calcRepasseFull(ctx, null, 250, "MAPEAMENTO DE RETINA", null, null);
+    expect(r.terceiro).toBeNull();
+  });
+});
