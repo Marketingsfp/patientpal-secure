@@ -20,7 +20,17 @@ const RATE_STORAGE_KEY = "tts:rate";
 const VOICE_STORAGE_KEY = "tts:voice";
 const PIPER_VOICE_STORAGE_KEY = "tts:piperVoice";
 const VOICES_URL = "/api/public/tts-voices";
-export const DEFAULT_TTS_RATE = 0.55;
+/**
+ * Velocidade padrão da voz do Piper. 1 = velocidade natural da gravação.
+ *
+ * Antes valia 0.55, o que deixava a locução arrastada em qualquer máquina que
+ * nunca tivesse salvo uma preferência (painel/TV/totem novos). Como a fala do
+ * Piper já sai pausada, o padrão correto é 1.
+ */
+export const DEFAULT_TTS_RATE = 1;
+
+/** Valor do padrão antigo, que deixava a voz lenta. Migrado para 1 uma vez. */
+const LEGACY_SLOW_RATE = 0.55;
 export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
 
@@ -34,7 +44,7 @@ export const MAX_TTS_RATE = 1.5;
  * natural da voz, e 0.55 soa lento demais. 0.85 é o meio-termo: pausado o
  * suficiente para uma sala de espera, sem parecer câmera lenta.
  */
-export const DEFAULT_NATIVE_TTS_RATE = 0.85;
+export const DEFAULT_NATIVE_TTS_RATE = 0.95;
 
 /**
  * Valores especiais do seletor de voz.
