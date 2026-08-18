@@ -5344,7 +5344,11 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const submit = async (e: FormEvent, irParaPagamento = false) => {
+  // `imprimirComprovanteApos` é o botão "Salvar e imprimir" da recepção: salva
+  // normalmente e, com o agendamento já gravado, dispara o comprovante do
+  // paciente sem nenhum clique extra. O "Salvar" comum segue sem imprimir —
+  // edição e reagendamento não devem cuspir papel toda vez.
+  const submit = async (e: FormEvent, irParaPagamento = false, imprimirComprovanteApos = false) => {
     e.preventDefault();
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -5555,6 +5559,21 @@ function AgendaPage() {
     setSaving(false);
     toast.success("Salvo");
     fecharDialogoAgenda();
+    // Impressão antes do `load()`: a lista pode demorar a recarregar e é o
+    // papel na mão do paciente que segura a fila da recepção.
+    if (imprimirComprovanteApos && novoId) {
+      try {
+        await printComprovanteAgendamento({
+          agendamentoId: novoId,
+          clinicaId: clinicaAtual.clinica_id,
+          usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+        });
+      } catch (err) {
+        // O agendamento JÁ está gravado — uma falha de impressão não pode
+        // aparecer para a recepção como se o agendamento tivesse se perdido.
+        mostrarErro(err, "agendamento salvo, mas a impressão do comprovante falhou");
+      }
+    }
     await load();
     if (irParaPagamento && novoId) {
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
@@ -8106,6 +8125,23 @@ function AgendaPage() {
                           title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
                         >
                           Pagar + NFS-e
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={saving || !form.paciente_id}
+                          onClick={(e) => {
+                            emitirNotaAposRef.current = false;
+                            submit(e as unknown as FormEvent, false, true);
+                          }}
+                          title={
+                            !form.paciente_id
+                              ? "Selecione um paciente cadastrado antes de salvar"
+                              : "Salva o agendamento e já abre a impressão do comprovante do paciente"
+                          }
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          {saving ? "Salvando…" : "Salvar e imprimir"}
                         </Button>
                         <Button
                           type="submit"
