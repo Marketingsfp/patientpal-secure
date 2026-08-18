@@ -1075,6 +1075,7 @@ function ProcedimentosPage() {
     toast.success(
       `${novos.length} exames de ${pacote.grupo} cadastrados. Ajuste os valores em cada um.`,
     );
+    invalidateAgendaRefs(clinicaAtual.clinica_id);
     void load();
   };
 

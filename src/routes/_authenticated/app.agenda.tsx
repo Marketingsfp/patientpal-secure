@@ -144,6 +144,7 @@ import {
   getMedicoConveniosAgenda,
   getProcedimentosComValor,
   getMedicosAgenda,
+  EVENTO_REFS_INVALIDADAS,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
@@ -3390,6 +3391,22 @@ function AgendaPage() {
     if (open) void loadRef();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Alteração no catálogo (tela de Serviços) ou no cadastro do médico dispara
+  // `invalidateAgendaRefs`, que emite este evento — inclusive vindo de outra
+  // aba do navegador. Recarregamos as listas na hora para que o dropdown de
+  // serviços mostre o nome/valor novo sem precisar recarregar a página.
+  useEffect(() => {
+    if (!clinicaAtual?.clinica_id) return;
+    const aoInvalidar = (ev: Event) => {
+      const alvo = (ev as CustomEvent<{ clinicaId: string | null }>).detail?.clinicaId ?? null;
+      if (alvo && alvo !== clinicaAtual.clinica_id) return;
+      void loadRef();
+    };
+    window.addEventListener(EVENTO_REFS_INVALIDADAS, aoInvalidar);
+    return () => window.removeEventListener(EVENTO_REFS_INVALIDADAS, aoInvalidar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaAtual?.clinica_id]);
 
   // Fallback definitivo: se ao selecionar um médico a lista local de
   // serviços vier vazia (por qualquer motivo — cache defasado, RLS,

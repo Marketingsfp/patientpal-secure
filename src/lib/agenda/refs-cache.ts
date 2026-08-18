@@ -167,13 +167,63 @@ export function getProcedimentosComValor(clinicaId: string): Promise<ProcComValo
 }
 
 /**
- * Invalida os caches. Se `clinicaId` for passado, limpa só aquela clínica;
- * sem argumento, limpa todas.
+ * Evento disparado no `window` sempre que os caches são invalidados.
+ * A Agenda escuta este evento e recarrega as listas na hora, em vez de
+ * esperar a próxima abertura do diálogo de agendamento.
  */
-export function invalidateAgendaRefs(clinicaId?: string): void {
+export const EVENTO_REFS_INVALIDADAS = "agenda:refs-invalidadas";
+
+/** Canal usado para avisar as OUTRAS abas do mesmo navegador. */
+const CANAL_REFS = "agenda-refs-invalidacao";
+
+function limparCaches(clinicaId?: string): void {
   cProcedimentos.invalidate(clinicaId);
   cMedicoProcs.invalidate(clinicaId);
   cMedicoConvenios.invalidate(clinicaId);
   cProcedimentosComValor.invalidate(clinicaId);
   cMedicos.invalidate(clinicaId);
+}
+
+function avisarTela(clinicaId?: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(EVENTO_REFS_INVALIDADAS, { detail: { clinicaId: clinicaId ?? null } }),
+  );
+}
+
+// O cache vive na memória de CADA aba. Sem este canal, salvar um serviço na
+// aba do cadastro não limpava o cache da aba que está com a Agenda aberta, e
+// o dropdown continuava com o nome/valor antigo até o TTL expirar.
+// `BroadcastChannel` não entrega a mensagem para quem a enviou — por isso a
+// aba que salvou limpa o próprio cache diretamente.
+let canalRefs: BroadcastChannel | null = null;
+if (typeof window !== "undefined" && typeof BroadcastChannel !== "undefined") {
+  try {
+    canalRefs = new BroadcastChannel(CANAL_REFS);
+    canalRefs.onmessage = (ev: MessageEvent) => {
+      const clinicaId = (ev.data as { clinicaId?: string | null } | null)?.clinicaId ?? undefined;
+      limparCaches(clinicaId ?? undefined);
+      avisarTela(clinicaId ?? undefined);
+    };
+  } catch {
+    canalRefs = null;
+  }
+}
+
+/**
+ * Invalida os caches. Se `clinicaId` for passado, limpa só aquela clínica;
+ * sem argumento, limpa todas.
+ *
+ * Além de limpar a memória desta aba, avisa a própria tela (evento) e as
+ * demais abas do navegador (BroadcastChannel), para que a Agenda releia o
+ * catálogo imediatamente após qualquer alteração em Serviços/Médicos.
+ */
+export function invalidateAgendaRefs(clinicaId?: string): void {
+  limparCaches(clinicaId);
+  avisarTela(clinicaId);
+  try {
+    canalRefs?.postMessage({ clinicaId: clinicaId ?? null });
+  } catch {
+    // Canal indisponível (aba fechando / navegador sem suporte): o TTL cobre.
+  }
 }

@@ -4,6 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -218,6 +219,9 @@ export function MedicoAgendasTab({
         return;
       }
     }
+    // Estes vínculos definem quais serviços o dropdown da Agenda mostra para
+    // esta agenda do médico — avisa a Agenda para reler na hora.
+    if (clinicaId) invalidateAgendaRefs(clinicaId);
     void load();
   };
 

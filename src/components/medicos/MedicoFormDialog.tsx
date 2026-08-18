@@ -11,6 +11,7 @@ import {
   definirSenhaFuncionario,
 } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
+import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -1049,6 +1050,11 @@ export function MedicoFormDialog({
         }
       }
     }
+    // Os serviços que aparecem no dropdown da Agenda vêm de
+    // `medico_procedimentos` (cache de 60s em refs-cache). Sem esta linha,
+    // incluir/remover um serviço do médico só refletia na Agenda depois que o
+    // cache expirava ou a página era recarregada.
+    if (activeClinicaId) invalidateAgendaRefs(activeClinicaId);
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
     // Auto-create paciente on new medico
