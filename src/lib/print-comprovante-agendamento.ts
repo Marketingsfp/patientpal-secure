@@ -7,6 +7,16 @@
  *
  * Layout enxuto no mesmo estilo dos demais comprovantes (papel térmico 80mm),
  * usando iframe oculto para disparar `window.print()` sem bloqueio de pop-up.
+ *
+ * Desempenho: a versão original fazia até 4 rodadas de consulta ao banco, uma
+ * dependendo da outra (agendamento → agenda do médico → paciente/médico →
+ * especialidade). Quem imprime logo depois de salvar já tem quase tudo isso na
+ * memória da tela, então existem dois atalhos:
+ *  - `dadosLocais` evita reler o que a tela acabou de gravar;
+ *  - `precarregarComprovanteAgendamento` dispara o que sobrou (cabeçalho da
+ *    clínica e cadastro do paciente) em paralelo com o salvamento, para que os
+ *    dados já estejam prontos quando o INSERT responder.
+ * Sem esses atalhos o comportamento é exatamente o de antes.
  */
 import { supabase } from "@/integrations/supabase/client";
 
@@ -26,85 +36,191 @@ function fmtDataSimples(iso: string): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+interface LinhaAgendamento {
+  id: string;
+  paciente_nome: string;
+  paciente_id: string | null;
+  medico_id: string | null;
+  agenda_id: string | null;
+  inicio: string;
+  procedimento: string | null;
+  especialidade_id: string | null;
+}
+
+interface ClinicaCabecalho {
+  nome: string | null;
+  endereco: string | null;
+  cidade: string | null;
+  estado: string | null;
+  telefone: string | null;
+  cnpj: string | null;
+}
+
+interface PacienteImpresso {
+  nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  data_nascimento: string | null;
+  codigo_prontuario: string | null;
+}
+
+export interface DadosRemotosComprovante {
+  clinica: ClinicaCabecalho | null;
+  paciente: PacienteImpresso | null;
+}
+
+/**
+ * O cabeçalho da clínica (nome, endereço, telefone, CNPJ) não muda durante o
+ * expediente. Guardar em memória evita uma ida ao banco em toda impressão — a
+ * recepção emite dezenas por dia, sempre da mesma clínica.
+ */
+const cacheClinica = new Map<string, ClinicaCabecalho | null>();
+
+async function buscarClinica(clinicaId: string): Promise<ClinicaCabecalho | null> {
+  const emCache = cacheClinica.get(clinicaId);
+  if (emCache !== undefined) return emCache;
+  const { data } = await supabase
+    .from("clinicas")
+    .select("nome, endereco, cidade, estado, telefone, cnpj")
+    .eq("id", clinicaId)
+    .maybeSingle();
+  const clinica = (data as ClinicaCabecalho | null) ?? null;
+  cacheClinica.set(clinicaId, clinica);
+  return clinica;
+}
+
+async function buscarPaciente(pacienteId: string | null): Promise<PacienteImpresso | null> {
+  if (!pacienteId) return null;
+  const { data } = await supabase
+    .from("pacientes")
+    .select("nome, cpf, telefone, data_nascimento, codigo_prontuario")
+    .eq("id", pacienteId)
+    .maybeSingle();
+  return (data as PacienteImpresso | null) ?? null;
+}
+
+/**
+ * Dispara, em paralelo, as duas únicas informações que o comprovante não tem
+ * como tirar do estado da tela: o cabeçalho da clínica e o cadastro do paciente
+ * (prontuário, CPF, telefone, nascimento).
+ *
+ * Deve ser chamada ANTES do salvamento, para que as consultas corram junto com
+ * o INSERT em vez de depois dele. Nunca rejeita: uma falha de rede aqui degrada
+ * o comprovante do mesmo jeito que já degradava antes (campos em branco) e não
+ * pode derrubar um agendamento que foi gravado com sucesso.
+ */
+export function precarregarComprovanteAgendamento(
+  clinicaId: string,
+  pacienteId: string | null,
+): Promise<DadosRemotosComprovante> {
+  return Promise.all([buscarClinica(clinicaId), buscarPaciente(pacienteId)])
+    .then(([clinica, paciente]) => ({ clinica, paciente }))
+    .catch((err) => {
+      console.error("[comprovante] falha ao pré-carregar dados da impressão", err);
+      return { clinica: null, paciente: null };
+    });
+}
+
+/** O que a tela chamadora já sabe sobre o agendamento que acabou de gravar. */
+export interface DadosLocaisComprovante {
+  pacienteId: string | null;
+  pacienteNome: string;
+  inicio: string;
+  procedimento: string | null;
+  /** Nome do médico como está no cadastro (sem "Dr./Dra."). */
+  medicoNome?: string | null;
+  especialidadeNome?: string | null;
+}
+
 export interface PrintComprovanteAgendamentoInput {
   agendamentoId: string;
   clinicaId: string;
   usuarioNome?: string;
+  /** Evita reler do banco o que a tela acabou de gravar. */
+  dadosLocais?: DadosLocaisComprovante | null;
+  /** Consultas já em andamento, vindas de `precarregarComprovanteAgendamento`. */
+  precarregado?: Promise<DadosRemotosComprovante> | null;
 }
 
 export async function printComprovanteAgendamento({
   agendamentoId,
   clinicaId,
   usuarioNome,
+  dadosLocais,
+  precarregado,
 }: PrintComprovanteAgendamentoInput): Promise<void> {
-  const [ag, cli] = await Promise.all([
-    supabase
+  // A linha do agendamento só é lida do banco quando falta alguma informação —
+  // no caminho rápido (logo depois de salvar) ela nunca chega a ser buscada.
+  let linha: LinhaAgendamento | null = null;
+  const carregarLinha = async (): Promise<LinhaAgendamento> => {
+    if (linha) return linha;
+    const { data, error } = await supabase
       .from("agendamentos")
       .select(
         "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, especialidade_id",
       )
       .eq("id", agendamentoId)
-      .maybeSingle(),
-    supabase
-      .from("clinicas")
-      .select("nome, endereco, cidade, estado, telefone, cnpj")
-      .eq("id", clinicaId)
-      .maybeSingle(),
-  ]);
-  if (ag.error || !ag.data) throw new Error(ag.error?.message ?? "Agendamento não encontrado");
-  const a = ag.data;
-  const c = cli.data;
-
-  // Resolve médico direto ou pela agenda
-  let medicoIdEfetivo: string | null = a.medico_id ?? null;
-  if (!medicoIdEfetivo && a.agenda_id) {
-    const { data } = await supabase
-      .from("medico_agendas")
-      .select("medico_id")
-      .eq("id", a.agenda_id)
       .maybeSingle();
-    medicoIdEfetivo = (data as { medico_id: string | null } | null)?.medico_id ?? null;
-  }
+    if (error || !data) throw new Error(error?.message ?? "Agendamento não encontrado");
+    linha = data as LinhaAgendamento;
+    return linha;
+  };
 
-  const [pac, med] = await Promise.all([
-    a.paciente_id
-      ? supabase
-          .from("pacientes")
-          .select("nome, cpf, telefone, data_nascimento, codigo_prontuario")
-          .eq("id", a.paciente_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    medicoIdEfetivo
-      ? supabase
-          .from("medicos")
-          .select("nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
-          .eq("id", medicoIdEfetivo)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const a = dadosLocais
+    ? {
+        paciente_nome: dadosLocais.pacienteNome,
+        paciente_id: dadosLocais.pacienteId,
+        inicio: dadosLocais.inicio,
+        procedimento: dadosLocais.procedimento,
+      }
+    : await carregarLinha();
 
-  const paciente = pac.data as {
-    nome: string;
-    cpf: string | null;
-    telefone: string | null;
-    data_nascimento: string | null;
-    codigo_prontuario: string | null;
-  } | null;
-  const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
-  const medicoNome = medicoBasic?.nome ?? "—";
-  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
-  // Se o agendamento tiver uma especialidade escolhida na hora de agendar,
-  // ela prevalece sobre a especialidade principal do médico.
-  const agEspId = (a as { especialidade_id: string | null }).especialidade_id ?? null;
-  if (agEspId) {
-    const { data: esp } = await supabase
-      .from("especialidades")
-      .select("nome")
-      .eq("id", agEspId)
-      .maybeSingle();
-    const nome = (esp as { nome: string } | null)?.nome;
-    if (nome) espNome = nome.toUpperCase();
+  const remotos = await (precarregado ??
+    precarregarComprovanteAgendamento(clinicaId, a.paciente_id));
+  const c = remotos.clinica;
+  const paciente = remotos.paciente;
+
+  // Médico e especialidade vêm da tela quando ela os conhece. Quando não vêm
+  // (agendamento sem médico direto, preso a uma agenda), cai no caminho antigo:
+  // resolve pela agenda e lê o cadastro, para não imprimir "—" no lugar do nome
+  // do profissional.
+  let medicoNome = dadosLocais?.medicoNome?.trim() || "";
+  let espNome = (dadosLocais?.especialidadeNome ?? "").trim().toUpperCase();
+  if (!medicoNome) {
+    const linhaAg = await carregarLinha();
+    let medicoIdEfetivo: string | null = linhaAg.medico_id ?? null;
+    if (!medicoIdEfetivo && linhaAg.agenda_id) {
+      const { data } = await supabase
+        .from("medico_agendas")
+        .select("medico_id")
+        .eq("id", linhaAg.agenda_id)
+        .maybeSingle();
+      medicoIdEfetivo = (data as { medico_id: string | null } | null)?.medico_id ?? null;
+    }
+    if (medicoIdEfetivo) {
+      const { data: med } = await supabase
+        .from("medicos")
+        .select("nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
+        .eq("id", medicoIdEfetivo)
+        .maybeSingle();
+      const medicoBasic = med as { nome: string; especialidade: { nome: string } | null } | null;
+      medicoNome = medicoBasic?.nome ?? "";
+      if (!espNome) espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+    }
+    // Se o agendamento tiver uma especialidade escolhida na hora de agendar,
+    // ela prevalece sobre a especialidade principal do médico.
+    if (linhaAg.especialidade_id) {
+      const { data: esp } = await supabase
+        .from("especialidades")
+        .select("nome")
+        .eq("id", linhaAg.especialidade_id)
+        .maybeSingle();
+      const nome = (esp as { nome: string } | null)?.nome;
+      if (nome) espNome = nome.toUpperCase();
+    }
   }
+  if (!medicoNome) medicoNome = "—";
+
   const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
   const procNome =
     espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;

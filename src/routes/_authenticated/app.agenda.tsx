@@ -121,7 +121,10 @@ import {
   Eye,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
-import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
+import {
+  printComprovanteAgendamento,
+  precarregarComprovanteAgendamento,
+} from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
@@ -5520,6 +5523,13 @@ function AgendaPage() {
     // inadimplência de cartão, INSERT/UPDATE do agendamento e vínculos com
     // agendamento_orcamento_itens) foi extraído para `criarAgendamento`
     // (src/lib/agenda/criar-agendamento.functions.ts) — cópia 1:1 da lógica original.
+    // As duas consultas que o comprovante não consegue tirar do estado da tela
+    // (cabeçalho da clínica e cadastro do paciente) saem AGORA, em paralelo com
+    // o salvamento. Quando o INSERT responde os dados já estão na mão e a
+    // impressão abre na hora, em vez de começar a buscar tudo só depois.
+    const comprovantePrecarregado = imprimirComprovanteApos
+      ? precarregarComprovanteAgendamento(clinicaAtual.clinica_id, form.paciente_id || null)
+      : null;
     const result = await fnCriarAgendamento({
       data: {
         clinica_id: clinicaAtual.clinica_id,
@@ -5563,10 +5573,20 @@ function AgendaPage() {
     // papel na mão do paciente que segura a fila da recepção.
     if (imprimirComprovanteApos && novoId) {
       try {
+        const medicoDoForm = medicos.find((m) => m.id === payload.medico_id);
         await printComprovanteAgendamento({
           agendamentoId: novoId,
           clinicaId: clinicaAtual.clinica_id,
           usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+          precarregado: comprovantePrecarregado,
+          dadosLocais: {
+            pacienteId: payload.paciente_id,
+            pacienteNome: payload.paciente_nome,
+            inicio: payload.inicio,
+            procedimento: payload.procedimento,
+            medicoNome: medicoDoForm?.nome ?? null,
+            especialidadeNome: medicoDoForm?.especialidade_nome ?? null,
+          },
         });
       } catch (err) {
         // O agendamento JÁ está gravado — uma falha de impressão não pode
