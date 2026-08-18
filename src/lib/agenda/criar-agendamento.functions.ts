@@ -151,13 +151,139 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       }
     }
 
+    // ---------- Leituras do banco: todas em paralelo (perf) ----------
+    // Antes, cada checagem abaixo só começava depois que a anterior tinha
+    // respondido: eram até 8 idas e voltas ao Supabase EM SÉRIE só para
+    // salvar um agendamento. Como este handler roda no Worker (longe do
+    // banco), esse enfileiramento era o grosso da espera que a recepção
+    // sente entre clicar em salvar e a tela de pagamento abrir.
+    //
+    // Nenhuma dessas consultas precisa do RESULTADO de outra — só as
+    // DECISÕES precisam. Então todas saem juntas num único Promise.all, e as
+    // validações continuam sendo avaliadas logo abaixo exatamente na mesma
+    // ordem, com as mesmas mensagens e os mesmos critérios de antes.
+    //
+    // Duas leituras passam a ser disparadas também em casos em que antes
+    // eram puladas (os horários do dia e os procedimentos escolhidos): saber
+    // se valia a pena buscá-las exigia esperar o registro atual chegar, o
+    // que custaria uma ida e volta inteira. São consultas pequenas e
+    // indexadas, e o resultado só é USADO sob exatamente as mesmas condições
+    // de antes.
+    const pacienteId = payload.paciente_id;
+    const recursoId = payload.medico_id;
+
+    const di = new Date(payload.inicio);
+    const df = new Date(payload.fim);
+    const inicioDia = new Date(
+      di.getFullYear(),
+      di.getMonth(),
+      di.getDate(),
+      0,
+      0,
+      0,
+    ).toISOString();
+    const fimDia = new Date(
+      di.getFullYear(),
+      di.getMonth(),
+      di.getDate(),
+      23,
+      59,
+      59,
+    ).toISOString();
+
+    // Nomes usados na checagem "tipo da agenda × tipo do procedimento" (4b).
+    const nomesProcParaTipo = (
+      procedimentos.length > 0 ? procedimentos : [String(payload.procedimento ?? "").trim()]
+    )
+      .map((n) => n.trim())
+      .filter(Boolean);
+
+    // Whitelist de procedimentos por agenda. Antes só dava para consultar
+    // DEPOIS de descobrir qual agenda o slot escolhido usava (mais uma ida e
+    // volta em série); agora trazemos todas as agendas deste médico de uma
+    // vez, junto com as demais leituras, e escolhemos a certa em memória.
+    type AgendaComTipos = {
+      id: string;
+      medico_agenda_procedimentos: Array<{ procedimentos: { tipo: string | null } | null }>;
+    };
+
+    const [pacCheck, atual, conflitos, slotsDia, procsEscolhidos, agendasDoMedico, blk] =
+      await Promise.all([
+        // 1. Paciente com telefone e data de nascimento preenchidos.
+        checagens.validar_paciente_completo && pacienteId
+          ? supabase
+              .from("pacientes")
+              .select("telefone,data_nascimento")
+              .eq("id", pacienteId)
+              .maybeSingle()
+              .then((r) => r.data)
+          : Promise.resolve(null),
+        // Registro atual (edição) — diz o que de fato está mudando.
+        editing_id
+          ? supabase
+              .from("agendamentos")
+              .select("medico_id, paciente_id, inicio, fim, agenda_id")
+              .eq("id", editing_id)
+              .maybeSingle()
+              .then((r) => r.data)
+          : Promise.resolve(null),
+        // MED-03. Outro agendamento do MESMO paciente no mesmo horário.
+        pacienteId
+          ? supabase
+              .from("agendamentos")
+              .select("id, inicio")
+              .eq("clinica_id", clinica_id)
+              .eq("paciente_id", pacienteId)
+              .neq("status", "cancelado")
+              .lt("inicio", payload.fim)
+              .gt("fim", payload.inicio)
+              .then((r) => r.data)
+          : Promise.resolve(null),
+        // 2/3/4. Horários do médico no dia (agenda aberta + slot livre).
+        // O `count: "exact"` que existia aqui foi removido: obrigava o banco
+        // a contar as linhas e o número nunca era usado.
+        recursoId
+          ? supabase
+              .from("agendamentos")
+              .select("id,paciente_nome,inicio,fim,agenda_id")
+              .eq("clinica_id", clinica_id)
+              .eq("medico_id", recursoId)
+              .gte("inicio", inicioDia)
+              .lte("inicio", fimDia)
+              .limit(500)
+              .then((r) => r.data)
+          : Promise.resolve(null),
+        // 4b. Tipo (consulta/exame/procedimento) dos procedimentos pedidos.
+        nomesProcParaTipo.length > 0
+          ? supabase
+              .from("procedimentos")
+              .select("nome,tipo")
+              .eq("clinica_id", clinica_id)
+              .in("nome", nomesProcParaTipo)
+              .then((r) => r.data)
+          : Promise.resolve(null),
+        // 4b. Agendas deste médico + tipos liberados em cada uma.
+        recursoId
+          ? supabase
+              .from("medico_agendas")
+              .select("id, medico_agenda_procedimentos(procedimentos(tipo))")
+              .eq("clinica_id", clinica_id)
+              .eq("medico_id", recursoId)
+              .then((r) => (r.error ? null : (r.data as unknown as AgendaComTipos[])))
+          : Promise.resolve(null),
+        // 5. Mensalidade vencida no cartão benefícios.
+        checagens.validar_inadimplencia && pacienteId && payload.tipo_atendimento === "convenio"
+          ? supabase
+              .rpc("paciente_cartao_inadimplente", {
+                _paciente_id: pacienteId,
+                _clinica_id: clinica_id,
+              })
+              .then((r) => r.data)
+          : Promise.resolve(null),
+      ]);
+
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
-    if (checagens.validar_paciente_completo && payload.paciente_id) {
-      const { data: pacCheck } = await supabase
-        .from("pacientes")
-        .select("telefone,data_nascimento")
-        .eq("id", payload.paciente_id)
-        .maybeSingle();
+    if (checagens.validar_paciente_completo && pacienteId) {
       const semTel = !pacCheck?.telefone || !String(pacCheck.telefone).trim();
       const semNasc = !pacCheck?.data_nascimento;
       if (semTel || semNasc) {
@@ -195,21 +321,6 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // sempre que há médico OU recurso de enfermagem, e o recurso/horário
     // está de fato mudando — comparado ao que já está GRAVADO no banco,
     // nunca ao que o caller alega em `checagens`.
-    const recursoField: "medico_id" | null = payload.medico_id ? "medico_id" : null;
-    const recursoId = payload.medico_id;
-
-    // Uma única leitura do registro atual (edição) — usada para decidir se
-    // agenda/paciente/horário estão de fato mudando, servindo às duas
-    // checagens abaixo (MED-03) e à de recurso mais adiante.
-    const atual = editing_id
-      ? (
-          await supabase
-            .from("agendamentos")
-            .select("medico_id, paciente_id, inicio, fim, agenda_id")
-            .eq("id", editing_id)
-            .maybeSingle()
-        ).data
-      : null;
     const horarioMudou =
       !editing_id ||
       !atual ||
@@ -217,14 +328,13 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       new Date(atual.fim).getTime() !== new Date(payload.fim).getTime();
 
     let precisaValidarAgenda = false;
-    if (recursoField && recursoId) {
+    if (recursoId) {
       if (!editing_id || !atual) {
         // Criação nova (ou registro atual não encontrado): sempre precisa
         // validar — falha fechado, não aberto.
         precisaValidarAgenda = true;
       } else {
-        const atualRecursoId = atual.medico_id;
-        precisaValidarAgenda = atualRecursoId !== recursoId || horarioMudou;
+        precisaValidarAgenda = atual.medico_id !== recursoId || horarioMudou;
       }
     }
 
@@ -249,15 +359,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     }
     const pacienteOuHorarioMudou =
       horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
-    if (payload.paciente_id && pacienteOuHorarioMudou) {
-      const { data: conflitos } = await supabase
-        .from("agendamentos")
-        .select("id, inicio")
-        .eq("clinica_id", clinica_id)
-        .eq("paciente_id", payload.paciente_id)
-        .neq("status", "cancelado")
-        .lt("inicio", payload.fim)
-        .gt("fim", payload.inicio);
+    if (pacienteId && pacienteOuHorarioMudou) {
       const conflito = (conflitos ?? []).find((c) => c.id !== editing_id);
       if (conflito) {
         return {
@@ -270,34 +372,8 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     }
 
     // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo (2440-2478) ----------
-    if (precisaValidarAgenda && recursoField && recursoId) {
+    if (precisaValidarAgenda && recursoId) {
       const rotuloRecurso = "médico";
-      const di = new Date(payload.inicio);
-      const df = new Date(payload.fim);
-      const inicioDia = new Date(
-        di.getFullYear(),
-        di.getMonth(),
-        di.getDate(),
-        0,
-        0,
-        0,
-      ).toISOString();
-      const fimDia = new Date(
-        di.getFullYear(),
-        di.getMonth(),
-        di.getDate(),
-        23,
-        59,
-        59,
-      ).toISOString();
-      const { data: slotsDia } = await supabase
-        .from("agendamentos")
-        .select("id,paciente_nome,inicio,fim,agenda_id", { count: "exact", head: false })
-        .eq("clinica_id", clinica_id)
-        .eq(recursoField, recursoId)
-        .gte("inicio", inicioDia)
-        .lte("inicio", fimDia)
-        .limit(500);
       const lista = (slotsDia ?? []) as {
         id: string;
         paciente_nome: string;
@@ -342,66 +418,60 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       // (medico_agenda_procedimentos). Agendas sem linkagem (whitelist
       // vazio) ou mistas ficam fora da checagem.
       const agendaAlvoId = slotEscolhido.agenda_id;
-      if (agendaAlvoId) {
-        const nomesProc = (
-          procedimentos.length > 0 ? procedimentos : [String(payload.procedimento ?? "").trim()]
-        )
-          .map((n) => n.trim())
-          .filter(Boolean);
-        if (nomesProc.length > 0) {
-          const { data: procsEscolhidos } = await supabase
-            .from("procedimentos")
-            .select("nome,tipo")
-            .eq("clinica_id", clinica_id)
-            .in("nome", nomesProc);
+      if (agendaAlvoId && nomesProcParaTipo.length > 0) {
+        // Caminho normal: a agenda do slot está entre as que já vieram no
+        // pré-carregamento acima — zero ida e volta extra. O `else` é rede
+        // de segurança (agenda de outro médico, ou a consulta agrupada ter
+        // falhado): cai na consulta pontual original, o comportamento antigo.
+        const daAgenda = (agendasDoMedico ?? []).find((a) => a.id === agendaAlvoId) ?? null;
+        let tiposAgenda: Set<string>;
+        if (daAgenda) {
+          tiposAgenda = new Set(
+            (daAgenda.medico_agenda_procedimentos ?? [])
+              .map((l) => l.procedimentos?.tipo)
+              .filter((t): t is string => !!t),
+          );
+        } else {
           const { data: linkados } = await supabase
             .from("medico_agenda_procedimentos")
             .select("procedimento_id, procedimentos!inner(tipo)")
             .eq("agenda_id", agendaAlvoId);
-          const tiposAgenda = new Set(
+          tiposAgenda = new Set(
             ((linkados ?? []) as Array<{ procedimentos: { tipo: string | null } | null }>)
               .map((l) => l.procedimentos?.tipo)
               .filter((t): t is string => !!t),
           );
-          const isConsulta =
-            tiposAgenda.size > 0 && tiposAgenda.size === 1 && tiposAgenda.has("consulta");
-          const isExame =
-            tiposAgenda.size > 0 &&
-            Array.from(tiposAgenda).every((t) => t === "exame" || t === "procedimento");
-          if (isConsulta || isExame) {
-            const rotuloAgenda = isConsulta ? "consultas" : "exames";
-            const procs = (procsEscolhidos ?? []) as Array<{ nome: string; tipo: string | null }>;
-            const incompatível = procs.find((p) => {
-              if (!p.tipo) return false;
-              if (isConsulta) return p.tipo !== "consulta";
-              return p.tipo === "consulta";
-            });
-            if (incompatível) {
-              const tipoProcLabel = incompatível.tipo === "consulta" ? "consulta" : "exame";
-              return {
-                ok: false,
-                validation_error: {
-                  message: `Esta agenda é de ${rotuloAgenda}. O procedimento "${incompatível.nome}" é de ${tipoProcLabel} e não pode ser agendado aqui. Escolha uma agenda compatível ou outro procedimento.`,
-                  toast_duration: 8000,
-                },
-              };
-            }
+        }
+        const isConsulta =
+          tiposAgenda.size > 0 && tiposAgenda.size === 1 && tiposAgenda.has("consulta");
+        const isExame =
+          tiposAgenda.size > 0 &&
+          Array.from(tiposAgenda).every((t) => t === "exame" || t === "procedimento");
+        if (isConsulta || isExame) {
+          const rotuloAgenda = isConsulta ? "consultas" : "exames";
+          const procs = (procsEscolhidos ?? []) as Array<{ nome: string; tipo: string | null }>;
+          const incompatível = procs.find((p) => {
+            if (!p.tipo) return false;
+            if (isConsulta) return p.tipo !== "consulta";
+            return p.tipo === "consulta";
+          });
+          if (incompatível) {
+            const tipoProcLabel = incompatível.tipo === "consulta" ? "consulta" : "exame";
+            return {
+              ok: false,
+              validation_error: {
+                message: `Esta agenda é de ${rotuloAgenda}. O procedimento "${incompatível.nome}" é de ${tipoProcLabel} e não pode ser agendado aqui. Escolha uma agenda compatível ou outro procedimento.`,
+                toast_duration: 8000,
+              },
+            };
           }
         }
       }
     }
 
     // ---------- 5. Inadimplência em cartão benefícios (2483-2501) ----------
-    if (
-      checagens.validar_inadimplencia &&
-      payload.paciente_id &&
-      payload.tipo_atendimento === "convenio"
-    ) {
-      const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
-        _paciente_id: payload.paciente_id,
-        _clinica_id: clinica_id,
-      });
-      const info = (blk ?? {}) as {
+    if (checagens.validar_inadimplencia && pacienteId && payload.tipo_atendimento === "convenio") {
+      const info = (blk ?? {}) as unknown as {
         bloqueado?: boolean;
         total_aberto?: number;
         mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }>;

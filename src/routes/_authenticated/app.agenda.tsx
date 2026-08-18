@@ -5655,7 +5655,15 @@ function AgendaPage() {
         mostrarErro(err, "agendamento salvo, mas a impressão do comprovante falhou");
       }
     }
-    await load();
+    // A recarga da lista da Agenda (janela de até 30 dias, com joins) não é
+    // pré-requisito de nada daqui para baixo: a tela de pagamento é montada a
+    // partir do payload que já está em mãos. Antes este `await` segurava a
+    // recepção esperando a agenda inteira voltar do banco ANTES de começar a
+    // montar a cobrança. Agora a recarga corre em segundo plano e só é
+    // aguardada no fim, depois que a tela de pagamento já abriu.
+    const recargaAgenda = load().catch((err) => {
+      mostrarErro(err, "agendamento salvo, mas a lista da agenda não recarregou");
+    });
     if (irParaPagamento && novoId) {
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
       // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
@@ -5665,7 +5673,11 @@ function AgendaPage() {
           ? procedimentosParaSalvar
           : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
       const isMulti = nomesParaValorar.length > 1;
-      const [lista, infoInicial] = await Promise.all([
+      // Tudo o que a tela de pagamento precisa buscar no banco sai junto, numa
+      // única rodada. A cobrança do orçamento e a etapa de sinal/saldo eram
+      // consultadas mais adiante, cada uma esperando a anterior — nenhuma
+      // depende do resultado da outra, então enfileirá-las só somava espera.
+      const [lista, infoInicial, orcCobranca, etapaSinalPrecarregada] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
         // Atendimento marcado como "Particular" ignora o convênio do paciente
         // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
@@ -5681,6 +5693,10 @@ function AgendaPage() {
               agendamentoId: novoId,
               dataRef: payload.inicio ?? null,
             }),
+        payload.orcamento_id
+          ? opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
+          : Promise.resolve(null),
+        obterEtapaSinal(novoId),
       ]);
       // Reatribuído adiante quando o usuário adia o desconto do convênio.
       let info = infoInicial;
@@ -5691,9 +5707,6 @@ function AgendaPage() {
       );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
-      const orcCobranca = payload.orcamento_id
-        ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
-        : null;
       const opcoesOrc = orcCobranca?.opcoes ?? null;
       orcFatoresRef.current = orcCobranca?.fatores ?? {};
 
@@ -5797,7 +5810,7 @@ function AgendaPage() {
       }
       // Sinal/saldo: mesma regra do fluxo "Agendar > Pagar" — quando o(s)
       // item(ns) do orçamento têm entrada, sugere a etapa pendente.
-      const etapaNovo = await aplicarEtapaSinal(opcoes, novoId);
+      const etapaNovo = await aplicarEtapaSinal(opcoes, novoId, etapaSinalPrecarregada);
       opcoes = etapaNovo.opcoes;
       descSuffix += etapaNovo.descSuffix;
       setFormaPagOpcoes(opcoes);
@@ -5814,6 +5827,9 @@ function AgendaPage() {
       });
       setFormaPagOpen(true);
     }
+    // A tela de pagamento já está aberta; só aqui esperamos a lista terminar
+    // de recarregar, para o `submit` não retornar com a recarga solta.
+    await recargaAgenda;
   };
 
   const remove = async (a: Agendamento) => {
