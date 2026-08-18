@@ -3752,6 +3752,25 @@ function AgendaPage() {
   const rotuloFallbackProc = (medicoId: string | null | undefined) =>
     medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
 
+  // Rótulo do serviço na GRADE (Lista, cartão mobile e visão "Por médico").
+  // Regra (2026-08-18): agendamento de laboratório sempre aparece na coluna
+  // "Serviço" como "EXAMES LABORATORIAIS" — nunca com o nome do exame avulso
+  // nem com a concatenação "HEMOGRAMA + GLICEMIA + TSH". A recepção não precisa
+  // mais limpar o campo à mão para a grade mostrar a categoria.
+  //
+  // IMPORTANTE: isto é APENAS exibição. O texto gravado em
+  // `agendamentos.procedimento` continua com os exames escolhidos, porque é
+  // dele que a cobrança tira o valor de cada exame (split por " + ", ver
+  // `abrirCobranca`), além da contagem de atendimentos, do repasse e do
+  // comprovante. Trocar o dado gravado pelo rótulo apagaria a lista de exames.
+  const rotuloServicoGrade = (
+    medicoId: string | null | undefined,
+    procedimento: string | null | undefined,
+  ) =>
+    medicoEhLaboratorioFormulario(medicoId)
+      ? "EXAMES LABORATORIAIS"
+      : procedimentoEfetivo(medicoId, procedimento);
+
   const procedimentoEhImagem = (label: string) => {
     // Preferência: consulta a categoria no cadastro do procedimento.
     const alvo = normalizar(label);
@@ -9786,9 +9805,13 @@ function AgendaPage() {
                     </span>
                     <span
                       className="truncate max-w-[45%] text-right"
-                      title={procedimentoEfetivo(a.medico_id, a.procedimento) || ""}
+                      title={
+                        procedimentoEfetivo(a.medico_id, a.procedimento) ||
+                        rotuloServicoGrade(a.medico_id, a.procedimento) ||
+                        ""
+                      }
                     >
-                      {procedimentoEfetivo(a.medico_id, a.procedimento) || "—"}
+                      {rotuloServicoGrade(a.medico_id, a.procedimento) || "—"}
                     </span>
                   </div>
 
@@ -10155,6 +10178,11 @@ function AgendaPage() {
                       <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
+                          rotuloExibicao={
+                            medicoEhLaboratorioFormulario(a.medico_id)
+                              ? "EXAMES LABORATORIAIS"
+                              : null
+                          }
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
                           padrao={
                             procedimentoPadraoDoMedico(a.medico_id) ||
@@ -10553,9 +10581,9 @@ function AgendaPage() {
               medico_id: a.medico_id,
               inicio: a.inicio,
               fim: a.fim,
-              procedimento:
-                a.procedimento ??
-                (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : null),
+              procedimento: medicoEhLaboratorioFormulario(a.medico_id)
+                ? "EXAMES LABORATORIAIS"
+                : a.procedimento,
               status: a.status,
               livre: isSlotLivre(a.paciente_nome),
             }))}

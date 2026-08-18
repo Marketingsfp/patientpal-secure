@@ -14,6 +14,13 @@ interface Props {
   valor: string | null;
   opcoes: { id: string; nome: string }[]; // já filtrado para este médico
   padrao?: string | null; // serviço padrão do médico — usado como fallback quando vazio
+  /**
+   * Texto de categoria que substitui o nome do serviço APENAS na exibição
+   * (ex.: laboratório sempre aparece como "EXAMES LABORATORIAIS", mesmo tendo
+   * "HEMOGRAMA + GLICEMIA" gravado). O valor real continua intacto no banco e
+   * aparece no tooltip; trocar de serviço pelo popover segue funcionando igual.
+   */
+  rotuloExibicao?: string | null;
   semFallback?: boolean; // se true, não usa "CONSULTA" como fallback visual
   disabled?: boolean;
   onChange: (novoNome: string) => void | Promise<void>;
@@ -26,6 +33,7 @@ export function ProcedimentoCell({
   semFallback,
   disabled,
   onChange,
+  rotuloExibicao,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -87,13 +95,19 @@ export function ProcedimentoCell({
   };
 
   const fallback = (padrao && padrao.trim()) || (semFallback ? "" : "CONSULTA");
-  const textoAtual = valor || fallback || "—";
+  const textoReal = valor || fallback || "—";
+  const rotulo = (rotuloExibicao ?? "").trim();
+  const textoAtual = rotulo || textoReal;
+  // Quando o rótulo de categoria esconde o serviço real, o tooltip mostra os
+  // dois — a recepção precisa conseguir conferir os exames sem abrir a ficha.
+  const tituloAtual =
+    rotulo && textoReal !== "—" && textoReal !== rotulo ? `${rotulo} — ${textoReal}` : textoAtual;
 
   if (disabled || lista.length === 0) {
     return (
       <Badge
         variant="secondary"
-        title={textoAtual}
+        title={tituloAtual}
         className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[11px] font-medium leading-snug text-muted-foreground"
       >
         {textoAtual}
@@ -106,11 +120,11 @@ export function ProcedimentoCell({
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={`${textoAtual} — clique para trocar o serviço`}
+          title={`${tituloAtual} — clique para trocar o serviço`}
           className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[11px] font-medium uppercase leading-snug text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
         >
           <span
-            title={textoAtual}
+            title={tituloAtual}
             className="inline-block min-w-0 flex-1 whitespace-normal break-words align-middle"
           >
             {textoAtual}
@@ -175,7 +189,7 @@ export function ProcedimentoCell({
                     </span>
                   )}
                   <span className="flex-1 truncate">{p.nome}</span>
-                  {norm(p.nome) === norm(textoAtual) && (
+                  {norm(p.nome) === norm(textoReal) && (
                     <Badge variant="secondary" className="text-[10px]">
                       atual
                     </Badge>
