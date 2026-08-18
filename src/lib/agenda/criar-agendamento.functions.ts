@@ -82,6 +82,14 @@ export type CriarAgendamentoResult =
        * todos os exames do mesmo horário/paciente.
        */
       sibling_ids?: string[];
+      /**
+       * Diagnóstico de performance (milissegundos gastos DENTRO do servidor).
+       * Serve para separar o que é tempo de banco do que é tempo de rede
+       * entre o navegador e o Worker: se o cliente esperou 900ms na chamada
+       * mas aqui dentro passaram 150ms, os outros 750ms são rede, não banco.
+       * Não influencia nenhuma regra — a UI só registra no console.
+       */
+      tempos?: { leituras: number; gravacao: number; total: number };
       // Vínculo de itens de orçamento falhou, mas o agendamento foi salvo.
       // A UI clássica exibe: mostrarErro(vErr, "agendamento salvo, mas
       // vínculo com itens do orçamento falhou").
@@ -128,6 +136,10 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         code: e.code ?? null,
       };
     };
+    // Marcos de tempo do próprio servidor — ver `tempos` em
+    // CriarAgendamentoResult. Só medem; não alteram nenhuma decisão.
+    const tInicio = Date.now();
+    let tDepoisDasLeituras = tInicio;
     const { clinica_id, editing_id, payload, checagens, pending_orc_item_ids } = data;
     const procedimentos = Array.from(
       new Set((data.procedimentos ?? []).map((p) => String(p ?? "").trim()).filter(Boolean)),
@@ -281,6 +293,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
               .then((r) => r.data)
           : Promise.resolve(null),
       ]);
+    tDepoisDasLeituras = Date.now();
 
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
     if (checagens.validar_paciente_completo && pacienteId) {
@@ -593,5 +606,15 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       novoId = resultado.id;
     }
 
-    return { ok: true, id: novoId!, sibling_ids: siblingIds };
+    const tFim = Date.now();
+    return {
+      ok: true,
+      id: novoId!,
+      sibling_ids: siblingIds,
+      tempos: {
+        leituras: tDepoisDasLeituras - tInicio,
+        gravacao: tFim - tDepoisDasLeituras,
+        total: tFim - tInicio,
+      },
+    };
   });

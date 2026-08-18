@@ -46,6 +46,7 @@ import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { iniciarCronometro } from "@/lib/perf-cronometro";
 import {
   Table,
   TableBody,
@@ -5591,6 +5592,11 @@ function AgendaPage() {
     const comprovantePrecarregado = imprimirComprovanteApos
       ? precarregarComprovanteAgendamento(clinicaAtual.clinica_id, form.paciente_id || null)
       : null;
+    // Diagnóstico: quebra a espera da recepção em etapas e imprime no console
+    // (F12 › Console). Não aparece na tela nem muda nenhum comportamento.
+    const crono = iniciarCronometro(
+      irParaPagamento ? "abrir tela de pagamento" : "salvar agendamento",
+    );
     const result = await fnCriarAgendamento({
       data: {
         clinica_id: clinicaAtual.clinica_id,
@@ -5607,6 +5613,7 @@ function AgendaPage() {
         pending_orc_item_ids: pendingOrcItemIds,
       },
     });
+    crono.marcar("salvar no servidor");
     if (!result.ok) {
       setSaving(false);
       if ("validation_error" in result) {
@@ -5619,6 +5626,12 @@ function AgendaPage() {
       }
       return;
     }
+    // Tempos medidos DENTRO do servidor — a diferença entre eles e a etapa
+    // "salvar no servidor" acima é a rede entre o navegador e o Worker.
+    const temposServidor = {
+      servidor_leituras: result.tempos?.leituras,
+      servidor_gravacao: result.tempos?.gravacao,
+    };
     if (result.vinculo_warning) {
       mostrarErro(
         result.vinculo_warning.pg_error,
@@ -5677,34 +5690,43 @@ function AgendaPage() {
       // única rodada. A cobrança do orçamento e a etapa de sinal/saldo eram
       // consultadas mais adiante, cada uma esperando a anterior — nenhuma
       // depende do resultado da outra, então enfileirá-las só somava espera.
-      const [lista, infoInicial, orcCobranca, etapaSinalPrecarregada] = await Promise.all([
-        getProcedimentosComValor(clinicaAtual.clinica_id),
-        // Atendimento marcado como "Particular" ignora o convênio do paciente
-        // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
-        // Multi-exame resolve o convênio por item mais abaixo (o nome
-        // concatenado não bate com nenhum procedimento cadastrado).
-        isMulti || payload.tipo_atendimento === "particular"
-          ? Promise.resolve(null)
-          : obterInfoConvenioPaciente({
-              clinicaId: clinicaAtual.clinica_id,
-              pacienteId: payload.paciente_id,
-              medicoId: payload.medico_id,
-              procedimentoNome: payload.procedimento ?? "",
-              agendamentoId: novoId,
-              dataRef: payload.inicio ?? null,
-            }),
-        payload.orcamento_id
-          ? opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
-          : Promise.resolve(null),
-        obterEtapaSinal(novoId),
-      ]);
+      const [procsIndividuais, infoInicial, orcCobranca, etapaSinalPrecarregada] =
+        await Promise.all([
+          // `buscarProcedimentoPorNome` SEMPRE confere o valor no cadastro do
+          // banco (o catálogo em memória é só o último recurso, de propósito:
+          // cobrar por um valor desatualizado é pior que esperar). Ou seja, ela
+          // também é uma ida ao servidor — e antes só COMEÇAVA depois que o
+          // convênio, o orçamento e o sinal já tinham respondido. Agora entra
+          // na mesma rodada que eles.
+          getProcedimentosComValor(clinicaAtual.clinica_id).then((lista) =>
+            Promise.all(
+              nomesParaValorar.map((nome) =>
+                buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
+              ),
+            ),
+          ),
+          // Atendimento marcado como "Particular" ignora o convênio do paciente
+          // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+          // Multi-exame resolve o convênio por item mais abaixo (o nome
+          // concatenado não bate com nenhum procedimento cadastrado).
+          isMulti || payload.tipo_atendimento === "particular"
+            ? Promise.resolve(null)
+            : obterInfoConvenioPaciente({
+                clinicaId: clinicaAtual.clinica_id,
+                pacienteId: payload.paciente_id,
+                medicoId: payload.medico_id,
+                procedimentoNome: payload.procedimento ?? "",
+                agendamentoId: novoId,
+                dataRef: payload.inicio ?? null,
+              }),
+          payload.orcamento_id
+            ? opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
+            : Promise.resolve(null),
+          obterEtapaSinal(novoId),
+        ]);
+      crono.marcar("buscar valores da cobranca");
       // Reatribuído adiante quando o usuário adia o desconto do convênio.
       let info = infoInicial;
-      const procsIndividuais = await Promise.all(
-        nomesParaValorar.map((nome) =>
-          buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
-        ),
-      );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
       const opcoesOrc = orcCobranca?.opcoes ?? null;
@@ -5826,6 +5848,12 @@ function AgendaPage() {
           medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
       setFormaPagOpen(true);
+      crono.marcar("montar a tela");
+      // Só fecha a medição depois que o navegador desenhou de fato — é o que
+      // mostra se a demora restante é rede/banco ou renderização.
+      crono.encerrarNaProximaPintura(temposServidor);
+    } else {
+      crono.encerrar(temposServidor);
     }
     // A tela de pagamento já está aberta; só aqui esperamos a lista terminar
     // de recarregar, para o `submit` não retornar com a recarga solta.
