@@ -143,7 +143,6 @@ import { Route as AuthenticatedAppCartaoBeneficiosDependentesRouteImport } from 
 import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from './routes/_authenticated/app.cartao-beneficios.convenios'
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
 import { Route as AuthenticatedAppCartaoBeneficiosConferenciaRouteImport } from './routes/_authenticated/app.cartao-beneficios.conferencia'
-import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
@@ -903,12 +902,6 @@ const AuthenticatedAppCartaoBeneficiosConferenciaRoute =
     path: '/conferencia',
     getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
   } as any)
-const AuthenticatedAppCartaoBeneficiosBeneficiosRoute =
-  AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport.update({
-    id: '/beneficios',
-    path: '/beneficios',
-    getParentRoute: () => AuthenticatedAppCartaoBeneficiosRoute,
-  } as any)
 const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
   AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport.update({
     id: '/$agendamentoId',
@@ -1029,7 +1022,6 @@ export interface FileRoutesByFullPath {
   '/totem/t/$token': typeof TotemTTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
-  '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/conferencia': typeof AuthenticatedAppCartaoBeneficiosConferenciaRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/convenios': typeof AuthenticatedAppCartaoBeneficiosConveniosRoute
@@ -1165,7 +1157,6 @@ export interface FileRoutesByTo {
   '/totem/t/$token': typeof TotemTTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
-  '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/conferencia': typeof AuthenticatedAppCartaoBeneficiosConferenciaRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/app/cartao-beneficios/convenios': typeof AuthenticatedAppCartaoBeneficiosConveniosRoute
@@ -1307,7 +1298,6 @@ export interface FileRoutesById {
   '/totem_/t/$token': typeof TotemTTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
-  '/_authenticated/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/_authenticated/app/cartao-beneficios/conferencia': typeof AuthenticatedAppCartaoBeneficiosConferenciaRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   '/_authenticated/app/cartao-beneficios/convenios': typeof AuthenticatedAppCartaoBeneficiosConveniosRoute
@@ -1449,7 +1439,6 @@ export interface FileRouteTypes {
     | '/totem/t/$token'
     | '/app/'
     | '/app/atendimento-ia/$agendamentoId'
-    | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/conferencia'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/convenios'
@@ -1585,7 +1574,6 @@ export interface FileRouteTypes {
     | '/totem/t/$token'
     | '/app'
     | '/app/atendimento-ia/$agendamentoId'
-    | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/conferencia'
     | '/app/cartao-beneficios/contratos'
     | '/app/cartao-beneficios/convenios'
@@ -1726,7 +1714,6 @@ export interface FileRouteTypes {
     | '/totem_/t/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/atendimento-ia/$agendamentoId'
-    | '/_authenticated/app/cartao-beneficios/beneficios'
     | '/_authenticated/app/cartao-beneficios/conferencia'
     | '/_authenticated/app/cartao-beneficios/contratos'
     | '/_authenticated/app/cartao-beneficios/convenios'
@@ -2744,13 +2731,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosConferenciaRouteImport
       parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
     }
-    '/_authenticated/app/cartao-beneficios/beneficios': {
-      id: '/_authenticated/app/cartao-beneficios/beneficios'
-      path: '/beneficios'
-      fullPath: '/app/cartao-beneficios/beneficios'
-      preLoaderRoute: typeof AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport
-      parentRoute: typeof AuthenticatedAppCartaoBeneficiosRoute
-    }
     '/_authenticated/app/atendimento-ia/$agendamentoId': {
       id: '/_authenticated/app/atendimento-ia/$agendamentoId'
       path: '/$agendamentoId'
@@ -2801,7 +2781,6 @@ const AuthenticatedAppAtendimentoIaRouteWithChildren =
   )
 
 interface AuthenticatedAppCartaoBeneficiosRouteChildren {
-  AuthenticatedAppCartaoBeneficiosBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   AuthenticatedAppCartaoBeneficiosConferenciaRoute: typeof AuthenticatedAppCartaoBeneficiosConferenciaRoute
   AuthenticatedAppCartaoBeneficiosContratosRoute: typeof AuthenticatedAppCartaoBeneficiosContratosRoute
   AuthenticatedAppCartaoBeneficiosConveniosRoute: typeof AuthenticatedAppCartaoBeneficiosConveniosRoute
@@ -2814,8 +2793,6 @@ interface AuthenticatedAppCartaoBeneficiosRouteChildren {
 
 const AuthenticatedAppCartaoBeneficiosRouteChildren: AuthenticatedAppCartaoBeneficiosRouteChildren =
   {
-    AuthenticatedAppCartaoBeneficiosBeneficiosRoute:
-      AuthenticatedAppCartaoBeneficiosBeneficiosRoute,
     AuthenticatedAppCartaoBeneficiosConferenciaRoute:
       AuthenticatedAppCartaoBeneficiosConferenciaRoute,
     AuthenticatedAppCartaoBeneficiosContratosRoute:

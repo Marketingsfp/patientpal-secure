@@ -26,6 +26,35 @@ export interface VinculoConvenio {
 /** Mapa paciente_id -> vínculo de convênio ativo na clínica. */
 export type MapaConvenioPaciente = Map<string, VinculoConvenio>;
 
+/**
+ * Tamanho da página do PostgREST. O servidor devolve no máximo 1000 linhas por
+ * requisição, independentemente do `.limit()` pedido — um `.limit(20000)` volta
+ * truncado e em silêncio.
+ */
+const PAGINA = 1000;
+
+/**
+ * Busca completa, de 1000 em 1000.
+ *
+ * `carregarMapaConvenioPacientes` pedia 20.000 contratos numa tacada só e
+ * recebia 1.000. Com quase 1.900 contratos ativos, cerca de metade dos
+ * pacientes de convênio ficava fora do mapa e era tratada como particular no
+ * cálculo do repasse do médico (a coluna errada da grade de comissão).
+ */
+async function carregarPaginado<T>(
+  montarQuery: (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await montarQuery(de, de + PAGINA - 1);
+    if (error) break;
+    const lote = (data ?? []) as T[];
+    out.push(...lote);
+    if (lote.length < PAGINA) break;
+  }
+  return out;
+}
+
 const normalizarModalidade = (v: unknown): ModalidadeConvenio =>
   v === "cartao_desconto" ? "cartao_desconto" : "cartao_consulta";
 
@@ -40,15 +69,20 @@ export async function carregarMapaConvenioPacientes(
   const mapa: MapaConvenioPaciente = new Map();
   if (!clinicaId) return mapa;
 
-  const { data: contratos } = await supabase
-    .from("contratos_assinatura")
-    .select("id, paciente_id, convenio_id, cb_convenios(nome, modalidade)")
-    .eq("clinica_id", clinicaId)
-    .eq("status", "ativo")
-    .limit(20000);
+  const contratos = await carregarPaginado<Record<string, unknown>>((de, ate) =>
+    supabase
+      .from("contratos_assinatura")
+      .select("id, paciente_id, convenio_id, cb_convenios(nome, modalidade)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      // Ordem fixa: sem ela o Postgres pode repetir ou pular linhas entre as
+      // páginas, e o mapa sairia com buracos aleatórios a cada carregamento.
+      .order("id")
+      .range(de, ate),
+  );
 
   const porContrato = new Map<string, VinculoConvenio>();
-  for (const c of (contratos ?? []) as Array<Record<string, unknown>>) {
+  for (const c of contratos) {
     const convenio = c.cb_convenios as { nome?: string; modalidade?: string } | null;
     if (!c.convenio_id) continue;
     const vinculo: VinculoConvenio = {
@@ -64,12 +98,17 @@ export async function carregarMapaConvenioPacientes(
   const ids = Array.from(porContrato.keys());
   for (let i = 0; i < ids.length; i += 200) {
     const lote = ids.slice(i, i + 200);
-    const { data: deps } = await supabase
-      .from("contrato_dependentes")
-      .select("contrato_id, paciente_id")
-      .eq("ativo", true)
-      .in("contrato_id", lote);
-    for (const d of (deps ?? []) as Array<{ contrato_id: string; paciente_id: string | null }>) {
+    const deps = await carregarPaginado<{ contrato_id: string; paciente_id: string | null }>(
+      (de, ate) =>
+        supabase
+          .from("contrato_dependentes")
+          .select("contrato_id, paciente_id")
+          .eq("ativo", true)
+          .in("contrato_id", lote)
+          .order("id")
+          .range(de, ate),
+    );
+    for (const d of deps) {
       const v = porContrato.get(d.contrato_id);
       if (v && d.paciente_id && !mapa.has(d.paciente_id)) mapa.set(d.paciente_id, v);
     }

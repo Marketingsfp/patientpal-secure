@@ -14,7 +14,6 @@ import {
   Printer,
   Gift,
   FileSignature,
-  Stethoscope,
   Scale,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -194,27 +193,6 @@ type Faixa = {
   valor_mensal: number;
 };
 
-type Beneficio = {
-  id?: string;
-  nome: string;
-  descricao: string | null;
-  ativo: boolean;
-  escopo: "servico" | "especialidade" | "consulta";
-  procedimento_id: string | null;
-  especialidade_id: string | null;
-  tipo_desconto: "percentual" | "valor" | "gratuidade";
-  valor_desconto: number | null;
-  inicio_a_partir: 1 | 2 | 6;
-  limite_uso: "ilimitado" | "1";
-  periodicidade: "dia" | "mes" | "contrato";
-  pessoa: "titular" | "titular_dependentes_soma" | "titular_ou_dependentes";
-  prioridade: number;
-  procedimento_ids: string[];
-};
-
-type ProcOpt = { id: string; nome: string; tipo?: string | null };
-type EspOpt = { id: string; nome: string };
-
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("cartao-beneficios");
@@ -245,111 +223,10 @@ function ConveniosPage() {
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
-  // Benefícios do convênio (aba)
-  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
-  const [benLoading, setBenLoading] = useState(false);
-  const [procedimentosList, setProcedimentosList] = useState<ProcOpt[]>([]);
-  const [especialidadesList, setEspecialidadesList] = useState<EspOpt[]>([]);
-  const [escopoDialogOpen, setEscopoDialogOpen] = useState(false);
-  const [editingBenIdx, setEditingBenIdx] = useState<number | null>(null);
-
-  const loadBeneficios = async (convenioId: string) => {
-    setBenLoading(true);
-    const { data, error } = await supabase
-      .from("cb_beneficios")
-      .select(
-        "id, nome, descricao, ativo, escopo, procedimento_id, especialidade_id, tipo_desconto, valor_desconto, inicio_a_partir, limite_uso, periodicidade, pessoa, prioridade, procedimento_ids",
-      )
-      .eq("convenio_id", convenioId)
-      .order("nome");
-    if (error) mostrarErro(error);
-    setBeneficios(
-      ((data ?? []) as any[]).map((b) => ({
-        id: b.id,
-        nome: b.nome,
-        descricao: b.descricao,
-        ativo: b.ativo,
-        escopo: (b.escopo ?? "servico") as Beneficio["escopo"],
-        procedimento_id: b.procedimento_id ?? null,
-        especialidade_id: b.especialidade_id ?? null,
-        tipo_desconto: (b.tipo_desconto ?? "percentual") as "percentual" | "valor" | "gratuidade",
-        valor_desconto:
-          b.valor_desconto !== null && b.valor_desconto !== undefined
-            ? Number(b.valor_desconto)
-            : null,
-        inicio_a_partir: (b.inicio_a_partir ?? 1) as 1 | 2 | 6,
-        limite_uso: (b.limite_uso ?? "ilimitado") as "ilimitado" | "1",
-        periodicidade: (b.periodicidade ?? "contrato") as "dia" | "mes" | "contrato",
-        pessoa: (b.pessoa ?? "titular") as Beneficio["pessoa"],
-        prioridade: Number(b.prioridade ?? 1),
-        procedimento_ids: Array.isArray(b.procedimento_ids) ? (b.procedimento_ids as string[]) : [],
-      })),
-    );
-    setBenLoading(false);
-  };
-
-  const loadCatalogos = async () => {
-    if (!clinicaAtual) return;
-    // PostgREST aplica db-max-rows=1000 mesmo com .range() amplo —
-    // precisamos paginar manualmente para obter todos os serviços.
-    const PAGE = 1000;
-    const allProcs: ProcOpt[] = [];
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabase
-        .from("procedimentos")
-        .select("id, nome, tipo")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome")
-        .range(from, from + PAGE - 1);
-      if (error) break;
-      const page = (data ?? []) as ProcOpt[];
-      allProcs.push(...page);
-      if (page.length < PAGE) break;
-    }
-    const { data: esps } = await supabase
-      .from("especialidades")
-      .select("id, nome")
-      .eq("ativo", true)
-      .order("nome")
-      .range(0, 9999);
-    setProcedimentosList(allProcs);
-    setEspecialidadesList((esps ?? []) as EspOpt[]);
-  };
-
-  const addBeneficio = (escopo: "servico" | "especialidade" | "consulta") => {
-    setBeneficios((prev) => {
-      const next = [
-        ...prev,
-        {
-          nome: "",
-          descricao: "",
-          ativo: true,
-          escopo,
-          procedimento_id: null,
-          especialidade_id: null,
-          tipo_desconto: (escopo === "consulta"
-            ? "valor"
-            : "percentual") as Beneficio["tipo_desconto"],
-          valor_desconto: null,
-          inicio_a_partir: 1 as 1 | 2 | 6,
-          limite_uso: "ilimitado" as const,
-          periodicidade: "contrato" as const,
-          pessoa: "titular" as Beneficio["pessoa"],
-          prioridade: 1,
-          procedimento_ids: [] as string[],
-        },
-      ];
-      setEditingBenIdx(next.length - 1);
-      return next;
-    });
-    setEscopoDialogOpen(false);
-  };
-
   const clinicaId = clinicaAtual?.clinica_id;
   // Lista de convênios oferecidos — catálogo de baixo risco, cache de 5min.
-  // A edição/detalhe (benefícios, faixas no form, catálogos) continua sob
-  // demanda, sem cache — só a listagem principal se beneficia aqui.
+  // A edição/detalhe (faixas no form) continua sob demanda, sem cache — só a
+  // listagem principal se beneficia aqui.
   const {
     data: listData,
     isLoading: loading,
@@ -397,7 +274,6 @@ function ConveniosPage() {
       return;
     }
     setEditing(null);
-    setEditingBenIdx(null);
     setNome("");
     setDescricao("");
     setAtivo(true);
@@ -413,8 +289,6 @@ function ConveniosPage() {
     setInformativoHtml("");
     setTermoInclusaoHtml("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    setBeneficios([]);
-    loadCatalogos();
     setView("form");
   };
 
@@ -424,7 +298,6 @@ function ConveniosPage() {
       return;
     }
     setEditing(c);
-    setEditingBenIdx(null);
     setNome(c.nome);
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
@@ -462,8 +335,6 @@ function ConveniosPage() {
       valor_mensal: Number(f.valor_mensal),
     }));
     setFaixas(list.length ? list : [{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-    loadBeneficios(c.id);
-    loadCatalogos();
     setView("form");
   };
 
@@ -585,62 +456,6 @@ function ConveniosPage() {
       if (fErr) {
         setSaving(false);
         mostrarErro(fErr);
-        return;
-      }
-    }
-    // Substitui benefícios
-    await supabase.from("cb_beneficios").delete().eq("convenio_id", convenioId!);
-    const bensToInsert: any[] = [];
-    for (const b of beneficios) {
-      if (b.escopo === "servico" && !b.procedimento_id) {
-        setSaving(false);
-        toast.error("Selecione o serviço em todos os benefícios de serviço único.");
-        return;
-      }
-      if (b.escopo === "especialidade" && !b.especialidade_id) {
-        setSaving(false);
-        toast.error("Selecione a especialidade em todos os benefícios.");
-        return;
-      }
-      if (
-        b.tipo_desconto !== "gratuidade" &&
-        (b.valor_desconto === null || b.valor_desconto <= 0)
-      ) {
-        setSaving(false);
-        toast.error("Informe o valor do desconto.");
-        return;
-      }
-      const nomeAuto =
-        b.escopo === "servico"
-          ? (procedimentosList.find((p) => p.id === b.procedimento_id)?.nome ?? "Serviço")
-          : b.escopo === "especialidade"
-            ? "Especialidade: " +
-              (especialidadesList.find((e) => e.id === b.especialidade_id)?.nome ?? "")
-            : (b.nome ?? "").toString().trim() || "Consultas";
-      bensToInsert.push({
-        clinica_id: clinicaAtual.clinica_id,
-        convenio_id: convenioId!,
-        nome: nomeAuto,
-        descricao: (b.descricao ?? "").toString().trim() || null,
-        ativo: b.ativo,
-        escopo: b.escopo,
-        procedimento_id: b.escopo === "servico" ? b.procedimento_id : null,
-        especialidade_id: b.escopo === "especialidade" ? b.especialidade_id : null,
-        tipo_desconto: b.tipo_desconto,
-        valor_desconto: b.tipo_desconto === "gratuidade" ? null : b.valor_desconto,
-        inicio_a_partir: b.inicio_a_partir,
-        limite_uso: b.limite_uso,
-        periodicidade: b.periodicidade,
-        pessoa: b.pessoa,
-        prioridade: b.prioridade,
-        procedimento_ids: b.escopo === "consulta" ? (b.procedimento_ids ?? []) : [],
-      });
-    }
-    if (bensToInsert.length) {
-      const { error: bErr } = await supabase.from("cb_beneficios").insert(bensToInsert);
-      if (bErr) {
-        setSaving(false);
-        mostrarErro(bErr);
         return;
       }
     }
@@ -1164,48 +979,6 @@ function ConveniosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={escopoDialogOpen} onOpenChange={setEscopoDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Novo benefício</DialogTitle>
-            <DialogDescription>
-              O desconto será aplicado a um serviço único ou a uma especialidade inteira?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-2">
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => addBeneficio("servico")}
-            >
-              <Gift className="h-6 w-6" />
-              <span>Serviço único</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => addBeneficio("especialidade")}
-            >
-              <Layers className="h-6 w-6" />
-              <span>Especialidade</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => addBeneficio("consulta")}
-            >
-              <Stethoscope className="h-6 w-6" />
-              <span>Consultas</span>
-            </Button>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEscopoDialogOpen(false)}>
-              Cancelar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

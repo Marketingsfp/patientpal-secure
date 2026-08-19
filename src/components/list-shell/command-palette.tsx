@@ -169,7 +169,7 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Documentos", "/app/documentos"),
       mk("Cartão de Benefícios", "/app/cartao-beneficios", "Associados, regras e planos"),
       mk("Associados", "/app/cartao-beneficios/dependentes", "Titulares e dependentes"),
-      mk("Regras do Cartão", "/app/cartao-beneficios/beneficios", "Regras dos benefícios"),
+      mk("Regras do Cartão", "/app/cartao-beneficios/convenios", "Regras de preço por convênio"),
       mk("Modelos de Cartão", "/app/cartao-beneficios/convenios"),
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
       mk(

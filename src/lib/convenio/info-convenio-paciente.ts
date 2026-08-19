@@ -993,9 +993,18 @@ export async function obterInfoConvenioPaciente(params: {
           // Fallback: procura a próxima regra do mesmo convênio para este
           // procedimento excluindo regras gratuitas. Aplica o desconto dessa
           // regra como se o benefício gratuito não existisse.
+          //
+          // A própria regra que estourou o limite fica FORA da busca. Sem essa
+          // exclusão, uma regra não gratuita com limite (ex.: consulta de
+          // Cardiologia a R$ 8,00, 1/dia por contrato) era reencontrada como
+          // "regra padrão" e reaplicada: a 2ª consulta do dia saía pelos
+          // mesmos R$ 8,00, exibindo "limite atingido" — ou seja, a cota não
+          // tinha efeito nenhum. Só as regras gratuitas escapavam do problema,
+          // porque `excludeGratuito` já as removia da busca.
+          const regrasFallback = (regrasCb as any[]).filter((r) => r.id !== beneficioEscolhido.id);
           let fallback: any = null;
           for (const eid of espsTentativa) {
-            const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, {
+            const r = findRegra(regrasFallback as any, eid, procedimentoTipo, procedimentoId, {
               excludeGratuito: true,
             });
             if (r && (!fallback || scoreRegra(r) > scoreRegra(fallback))) {
@@ -1065,7 +1074,12 @@ export async function obterInfoConvenioPaciente(params: {
   //    tratado nos fluxos de cobrança que chamam esta função).
   if (emCarencia) {
     const diasAtraso = DIAS_TOLERANCIA - (diasCarenciaRestantes ?? 0);
-    const info = `Mensalidade vencida há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias, convênio segue liberado normalmente. Regularize em até ${diasCarenciaRestantes ?? 0} dia(s) para evitar bloqueio.`;
+    // No próprio dia do vencimento o atraso é zero — a parcela vence hoje, não
+    // está vencida. Dizer "vencida há 0 dia(s)" fazia a recepção achar que o
+    // paciente estava devendo já no dia da cobrança.
+    const abertura =
+      diasAtraso <= 0 ? "Mensalidade vence hoje" : `Mensalidade vencida há ${diasAtraso} dia(s)`;
+    const info = `${abertura} — dentro da tolerância de ${DIAS_TOLERANCIA} dias, convênio segue liberado normalmente. Regularize em até ${diasCarenciaRestantes ?? 0} dia(s) para evitar bloqueio.`;
     avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
   }
 

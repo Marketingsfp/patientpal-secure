@@ -3220,12 +3220,39 @@ function DetalheContrato({
         cancelamento_motivo: motivo,
       } as any)
       .eq("id", contrato.id);
-    setCancelSaving(false);
     if (error) {
+      setCancelSaving(false);
       mostrarErro(error);
       return;
     }
-    toast.success("Contrato cancelado");
+
+    // Cancela junto as cobranças que ainda não foram pagas. Antes só o status
+    // do contrato mudava: as parcelas seguiam pendentes e continuavam saindo
+    // em carnê, boleto e nos relatórios de "a receber" de um contrato que já
+    // não existe mais. Parcelas pagas nunca são tocadas.
+    const { data: canceladas, error: errParcelas } = await supabase
+      .from("contrato_mensalidades")
+      .update({
+        status: "cancelado",
+        observacoes: `Cancelada junto com o contrato — ${motivo}`,
+      } as any)
+      .eq("contrato_id", contrato.id)
+      .in("status", ["pendente", "aberto"])
+      .select("id");
+    setCancelSaving(false);
+    if (errParcelas) {
+      mostrarErro(
+        errParcelas,
+        "contrato cancelado, mas as parcelas em aberto continuaram pendentes",
+      );
+      return;
+    }
+    const qtdCanceladas = ((canceladas ?? []) as Array<{ id: string }>).length;
+    toast.success(
+      qtdCanceladas > 0
+        ? `Contrato cancelado. ${qtdCanceladas} parcela(s) em aberto também foram canceladas.`
+        : "Contrato cancelado",
+    );
     setCanceladoEm(agora);
     setCancelMotivoAtual(motivo);
     setCancelOpen(false);
@@ -6603,7 +6630,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <DialogHeader>
             <DialogTitle>Cancelar contrato</DialogTitle>
             <DialogDescription>
-              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do
+              Esta ação cancela o plano e todos os benefícios deste contrato. As parcelas ainda não
+              pagas também serão canceladas — as já pagas não são alteradas. Informe o motivo do
               cancelamento.
             </DialogDescription>
           </DialogHeader>

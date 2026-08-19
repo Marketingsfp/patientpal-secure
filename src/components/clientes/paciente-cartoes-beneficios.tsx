@@ -29,6 +29,9 @@ import { Label } from "@/components/ui/label";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { useAuth } from "@/hooks/use-auth";
 
+/** Dias corridos de tolerância após o vencimento — espelha `contrato_dias_tolerancia()`. */
+const DIAS_TOLERANCIA = 5;
+
 interface Contrato {
   id: string;
   numero: number;
@@ -76,7 +79,16 @@ export function PacienteCartoesBeneficios({
 
   const load = async () => {
     setLoading(true);
-    const hoje = new Date().toISOString().slice(0, 10);
+    // Tolerância de 5 dias corridos após o vencimento (a mesma de
+    // `contrato_dias_tolerancia()` no banco e do motor de preço do convênio).
+    // Só vence de verdade quem passou dessa data.
+    const limiteVencidas = (() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - DIAS_TOLERANCIA);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    })();
 
     // 1. Contratos como titular
     const { data: cTit } = await supabase
@@ -115,7 +127,11 @@ export function PacienteCartoesBeneficios({
         vencimento: string;
       }>) {
         const cur = (abertas[m.contrato_id] ??= { vencidas: 0, total: 0 });
-        if (m.vencimento < hoje) {
+        // Mesma tolerância do resto do sistema: a parcela só conta como
+        // vencida a partir do 6º dia. Antes esta ficha acusava atraso já no
+        // dia seguinte ao vencimento, enquanto o caixa seguia liberando o
+        // convênio normalmente — dois avisos contraditórios para a recepção.
+        if (m.vencimento < limiteVencidas) {
           cur.vencidas++;
           cur.total += Number(m.valor || 0);
         }
