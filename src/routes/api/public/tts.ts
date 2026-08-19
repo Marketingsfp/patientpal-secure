@@ -30,7 +30,13 @@ const VOICE_RE = /^[a-z0-9_-]{1,32}$/i;
  *
  * A `voice` pedida pelo cliente NÃO é repassada aqui de propósito: os nomes do
  * Piper ("faber", "feminina") não existem no gateway, que usa o catálogo da
- * OpenAI. O fallback sempre usa "alloy".
+ * OpenAI. O fallback usa sempre a mesma voz: "nova".
+ *
+ * Por que "nova" e não "alloy" (que era o valor anterior): a clínica configurou
+ * uma voz FEMININA para o painel de senhas, e "alloy" soa masculina. Numa queda
+ * do Piper a chamada trocava de sexo no meio do expediente, que é exatamente a
+ * reclamação que a recepção reportou. "nova" é a voz feminina do catálogo da
+ * OpenAI, então a queda passa despercebida para quem está na sala de espera.
  */
 async function fallbackTts(text: string): Promise<Response> {
   const apiKey = process.env["LOVABLE_API_KEY"];
@@ -46,7 +52,7 @@ async function fallbackTts(text: string): Promise<Response> {
     body: JSON.stringify({
       model: "openai/gpt-4o-mini-tts",
       input: text,
-      voice: "alloy",
+      voice: "nova",
       response_format: "wav",
     }),
   });
