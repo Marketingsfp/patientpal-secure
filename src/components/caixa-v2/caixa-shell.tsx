@@ -447,8 +447,21 @@ export function CaixaShellV2({
   useEffect(() => {
     void loadFila();
   }, [loadFila]);
+  // A fila vem da função `fila_caixa_hoje`, que é cara (12 CTEs, cálculo de
+  // convênio/carência por ficha). Recalcular a cada evento de `agendamentos`,
+  // sem intervalo, fazia essa função sozinha responder por ~21% de todo o
+  // tempo de processamento do banco — e, em pico, levar segundos.
+  //
+  // Duas defesas: só reagimos a fichas do DIA (a fila é de hoje) e agrupamos a
+  // rajada num único recálculo.
   useEffect(() => {
     if (!clinicaAtual) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ehDeHoje = (linha: { inicio?: string | null } | null | undefined) => {
+      if (!linha?.inicio) return true; // sem a data, não dá para descartar
+      const hoje = new Date().toLocaleDateString("en-CA");
+      return new Date(linha.inicio).toLocaleDateString("en-CA") === hoje;
+    };
     const ch = supabase
       .channel(`caixa-v2-fila-${clinicaAtual.clinica_id}`)
       .on(
@@ -459,12 +472,18 @@ export function CaixaShellV2({
           table: "agendamentos",
           filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
         },
-        () => {
-          void loadFila();
+        (payload: {
+          new?: { inicio?: string | null } | null;
+          old?: { inicio?: string | null } | null;
+        }) => {
+          if (!ehDeHoje(payload?.new) && !ehDeHoje(payload?.old)) return;
+          if (t) clearTimeout(t);
+          t = setTimeout(() => void loadFila(), 800);
         },
       )
       .subscribe();
     return () => {
+      if (t) clearTimeout(t);
       void supabase.removeChannel(ch);
     };
   }, [clinicaAtual, loadFila]);

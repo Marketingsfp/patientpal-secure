@@ -263,6 +263,29 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 100;
 
+// Quantos dias À FRENTE do dia selecionado ainda trazemos agendamentos já
+// MARCADOS na janela padrão ("a partir de"). Os horários VAZIOS desses dias
+// não vêm — só aparecem quando a atendente escolhe aquela data (ou define um
+// intervalo no seletor de período), que é quando ela realmente vai usá-los.
+const HORIZONTE_MARCADOS_DIAS = 30;
+
+// Acima deste número de fichas alteradas de uma vez, o refresh pontual do
+// realtime deixa de compensar e caímos no recarregamento completo (ex.:
+// reagendamento em lote, importação).
+const LIMITE_PATCH_REALTIME = 40;
+
+// Colunas da listagem da Agenda. Fica no módulo (e não dentro do `load`)
+// porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
+// as linhas que mudaram.
+const AGENDA_SELECT =
+  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+
+type AgendaRowBruta = Agendamento & {
+  medico?: { nome: string | null; sexo: string | null } | null;
+  paciente?: { nome: string | null } | null;
+  orcamento?: { numero: number | null } | null;
+};
+
 // ID fixo da especialidade "Odontologia" no cadastro de especialidades.
 // Usado para restringir orçamentos odonto a médicos odontologistas.
 const ODONTO_ESPECIALIDADE_ID = "f0cfaa0a-2a67-4176-97de-a7072c37077c";
@@ -283,6 +306,21 @@ const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
   return nome === "disponivel" || nome === "bloqueio";
 };
+
+// Normaliza as linhas cruas de `agendamentos` para o formato da lista.
+// Fica no módulo porque tanto o `load()` completo quanto o refresh pontual do
+// realtime precisam aplicar exatamente a mesma normalização.
+const mapAgendaRows = (rows: AgendaRowBruta[]): Agendamento[] =>
+  rows.map((a) => ({
+    ...a,
+    // O nome gravado no agendamento é mantido em dia pelo gatilho
+    // trg_sync_paciente_nome_agendamentos (não há FK para embed).
+    paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
+    medico_id: a.medico_id ?? null,
+    medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
+    medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
+    orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
+  }));
 
 // Busca robusta de procedimento por nome. Usa lista pré-carregada (lookup local)
 // e, se não achar OU vier sem valores, faz fallback direto no banco com ilike.
@@ -1970,6 +2008,10 @@ function AgendaPage() {
   // Aponta sempre para o `load` mais recente — usado pelo handler realtime
   // para não cair em stale closure (ver comentário na assinatura realtime).
   const loadFnRef = useRef<() => void>(() => {});
+  // Chave do snapshot em memória do load mais recente. O refresh pontual do
+  // realtime invalida essa entrada para que uma remontagem da tela não
+  // reexiba a lista de antes da alteração.
+  const cacheKeyRef = useRef<string | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -1986,6 +2028,7 @@ function AgendaPage() {
       filtroStatus,
       filtroCliente.trim(),
     ].join("|");
+    cacheKeyRef.current = cacheKey;
     const cached = agendaSnapshotCache.get(cacheKey);
     if (cached) {
       setItems(cached.items);
@@ -1994,8 +2037,7 @@ function AgendaPage() {
     } else {
       setLoading(true);
     }
-    const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+    const agendaSelect = AGENDA_SELECT;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
@@ -2023,6 +2065,12 @@ function AgendaPage() {
     // descartar justamente o paciente buscado.
     const termoCli = filtroCliente.trim();
     const digitosCli = termoCli.replace(/\D/g, "");
+    // Há busca por cliente empurrada para o servidor? Quando há, o resultado
+    // já vem pequeno e podemos manter a janela de datas aberta.
+    const buscaClienteServidor = digitosCli.length >= 3 || termoCli.length >= 2;
+    // Segunda consulta da janela padrão: os agendamentos JÁ MARCADOS dos dias
+    // seguintes ao dia selecionado (ver comentário no bloco de datas abaixo).
+    let qMarcadosFuturos: typeof q | null = null;
     // Se o usuário digitou 3+ dígitos, tratamos como busca por CPF:
     // buscamos os pacientes com cpf_digits casando e filtramos os
     // agendamentos por esses paciente_id. Caso contrário, busca por nome.
@@ -2059,21 +2107,62 @@ function AgendaPage() {
       const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
-      // Padrão "a partir de": mostra tudo do dia selecionado em diante.
-      // Se o usuário definiu uma data final no picker de intervalo,
-      // respeita o intervalo; caso contrário, não aplica limite superior.
-      // O `.range(0, 9999)` do PostgREST já protege contra volume excessivo.
+      // Padrão "a partir de": mostra o dia selecionado em diante.
+      //
+      // Antes não havia limite superior e o `.range(0, 9999)` do PostgREST
+      // era o único freio — na prática a Agenda baixava as 10.000 linhas do
+      // teto (~7 MB de JSON) a cada abertura. Quase tudo era horário VAZIO de
+      // semanas à frente: numa amostra real, 9.804 das 10.000 linhas eram
+      // slots livres e só 196 tinham paciente. Nada disso cabe na página
+      // atual (100 por vez), então era peso puro no navegador.
+      //
+      // A janela padrão passa a ser:
+      //   - o dia selecionado INTEIRO (livres + marcados) — a operação do
+      //     balcão; e
+      //   - só os agendamentos JÁ MARCADOS dos dias seguintes, até
+      //     HORIZONTE_MARCADOS_DIAS — que é o motivo de o padrão ser "a
+      //     partir de": a recepção enxergar os próximos retornos do paciente.
+      //
+      // Horários VAZIOS de dias futuros continuam acessíveis: basta escolher
+      // aquela data, ou definir um intervalo no seletor de período (o ramo do
+      // `dataFim` abaixo carrega o intervalo inteiro como antes).
+      //
+      // Com busca por cliente/CPF ativa o filtro já vai para o servidor e o
+      // resultado é pequeno — aí mantemos a janela sem teto, para não esconder
+      // um agendamento distante justamente do paciente procurado.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       q = q.gte("inicio", inicio);
       if (dataFim) {
         const f = new Date(`${dataFim}T23:59:59`).toISOString();
         q = q.lte("inicio", f);
+      } else if (!buscaClienteServidor) {
+        const diaSeguinte = new Date(`${dataRef}T00:00:00`);
+        diaSeguinte.setDate(diaSeguinte.getDate() + 1);
+        q = q.lt("inicio", diaSeguinte.toISOString());
+
+        const horizonte = new Date(`${dataRef}T00:00:00`);
+        horizonte.setDate(horizonte.getDate() + HORIZONTE_MARCADOS_DIAS);
+        let qf = supabase
+          .from("agendamentos")
+          .select(agendaSelect as never)
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .gte("inicio", diaSeguinte.toISOString())
+          .lt("inicio", horizonte.toISOString())
+          .not("paciente_id", "is", null)
+          .order("inicio", { ascending: true });
+        if (filtroMedico !== "todos") {
+          qf = qf.eq("medico_id", filtroMedico);
+        }
+        qMarcadosFuturos = qf.range(0, 9999) as typeof q;
       }
     }
     if (!statusEspecifico) {
       q = q.range(0, 9999);
     }
-    const { data, error } = await q;
+    const [{ data, error }, resFuturos] = await Promise.all([
+      q,
+      qMarcadosFuturos ?? Promise.resolve({ data: null, error: null }),
+    ]);
     // Descarta a resposta se um load mais novo já começou (refresh em corrida).
     if (reqId !== loadReqId.current) return;
     setLoading(false);
@@ -2081,38 +2170,17 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    const mapAgendaRows = (
-      rows: Array<
-        Agendamento & {
-          medico?: { nome: string | null; sexo: string | null } | null;
-          paciente?: { nome: string | null } | null;
-          orcamento?: { numero: number | null } | null;
-        }
-      >,
-    ): Agendamento[] =>
-      rows.map((a) => ({
-        ...a,
-        // O nome gravado no agendamento é mantido em dia pelo gatilho
-        // trg_sync_paciente_nome_agendamentos (não há FK para embed).
-        paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
-        medico_id: a.medico_id ?? null,
-        medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
-        medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
-        orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
-      }));
 
-    const mapped = mapAgendaRows(
-      (data ?? []) as unknown as Array<
-        Agendamento & {
-          medico?: { nome: string | null; sexo: string | null } | null;
-          paciente?: { nome: string | null } | null;
-          orcamento?: { numero: number | null } | null;
-        }
-      >,
-    );
+    // Junta o dia selecionado com os marcados dos dias seguintes. Se a
+    // segunda consulta falhar, seguimos só com o dia — a Agenda do balcão
+    // continua funcionando, apenas sem a prévia dos próximos dias.
+    const brutas = [
+      ...((data ?? []) as unknown as AgendaRowBruta[]),
+      ...(((resFuturos?.error ? null : resFuturos?.data) ?? []) as unknown as AgendaRowBruta[]),
+    ];
+    const mapped = mapAgendaRows(brutas);
 
     let fichaBaseMapped = mapped;
-    const buscaClienteServidor = digitosCli.length >= 3 || termoCli.length >= 2;
     if (buscaClienteServidor && mapped.length > 0) {
       let fichaQ = supabase
         .from("agendamentos")
@@ -2124,43 +2192,37 @@ function AgendaPage() {
         fichaQ = fichaQ.eq("medico_id", filtroMedico);
       }
 
-      if (apenasData) {
-        const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-        const fim = new Date(`${dataRef}T23:59:59`).toISOString();
-        fichaQ = fichaQ.gte("inicio", inicio).lte("inicio", fim);
-      } else {
-        const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-        fichaQ = fichaQ.gte("inicio", inicio);
-        if (dataFim) {
-          const fim = new Date(`${dataFim}T23:59:59`).toISOString();
-          fichaQ = fichaQ.lte("inicio", fim);
-        } else {
-          const ultimoDiaEncontrado = [...mapped]
-            .map((a) =>
-              new Date(a.inicio).toLocaleDateString("en-CA", {
-                timeZone: "America/Sao_Paulo",
-              }),
-            )
-            .sort()
-            .at(-1);
-          if (ultimoDiaEncontrado) {
-            const fim = new Date(`${ultimoDiaEncontrado}T23:59:59`).toISOString();
-            fichaQ = fichaQ.lte("inicio", fim);
-          }
-        }
-      }
+      // A numeração da ficha é POSICIONAL por (dia, profissional, agenda) —
+      // ver `fichaPorId`. Então a base de numeração só precisa conter os DIAS
+      // em que o paciente pesquisado aparece, não o período inteiro.
+      //
+      // Antes esta consulta ia de `dataRef` até o último dia encontrado, sem
+      // filtro de nome: procurar um paciente com retorno marcado para daqui a
+      // dois meses fazia a tela baixar TODOS os horários (inclusive os vazios)
+      // desses dois meses só para calcular três números de ficha.
+      const diasDoResultado = Array.from(
+        new Set(
+          mapped.map((a) =>
+            new Date(a.inicio).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
+          ),
+        ),
+      ).sort();
 
-      const { data: fichaData, error: fichaError } = await fichaQ.range(0, 9999);
-      if (reqId !== loadReqId.current) return;
-      if (!fichaError) {
-        fichaBaseMapped = mapAgendaRows(
-          (fichaData ?? []) as unknown as Array<
-            Agendamento & {
-              medico?: { nome: string | null; sexo: string | null } | null;
-              orcamento?: { numero: number | null } | null;
-            }
-          >,
-        );
+      const faixas = diasDoResultado.map((dia) => {
+        const ini = new Date(`${dia}T00:00:00`);
+        const fim = new Date(ini);
+        fim.setDate(fim.getDate() + 1);
+        return `and(inicio.gte.${ini.toISOString()},inicio.lt.${fim.toISOString()})`;
+      });
+
+      // Sem dias (resultado vazio) não há o que numerar — mantém a base atual.
+      if (faixas.length > 0) {
+        fichaQ = fichaQ.or(faixas.join(","));
+        const { data: fichaData, error: fichaError } = await fichaQ.range(0, 9999);
+        if (reqId !== loadReqId.current) return;
+        if (!fichaError) {
+          fichaBaseMapped = mapAgendaRows((fichaData ?? []) as unknown as AgendaRowBruta[]);
+        }
       }
     }
 
@@ -2716,31 +2778,196 @@ function AgendaPage() {
   // sobrescrita com o recorte antigo) até uma nova pesquisa manual.
   loadFnRef.current = load;
 
-  // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
-  // pagamento no caixa, etc.). Debounce simples para evitar refetch em rajada.
+  // Parâmetros da janela vigente. O refresh do realtime lê daqui em vez de
+  // fechar sobre os estados, pelo mesmo motivo do `loadFnRef` acima: a
+  // assinatura só é recriada quando a clínica muda.
+  const janelaRef = useRef({ dataRef, dataFim, apenasData });
+  janelaRef.current = { dataRef, dataFim, apenasData };
+
+  // Uma ficha alterada pertence à janela carregada? Usada para decidir se uma
+  // ficha NOVA (ou remarcada para outro dia) deve entrar na lista.
+  const dentroDaJanela = (inicioIso: string) => {
+    const { dataRef: dRef, dataFim: dFim, apenasData: soDia } = janelaRef.current;
+    const ini = new Date(`${dRef}T00:00:00`).toISOString();
+    if (inicioIso < ini) return false;
+    if (soDia) {
+      const fimDia = new Date(`${dRef}T00:00:00`);
+      fimDia.setDate(fimDia.getDate() + 1);
+      return inicioIso < fimDia.toISOString();
+    }
+    if (dFim) return inicioIso <= new Date(`${dFim}T23:59:59`).toISOString();
+    const horizonte = new Date(`${dRef}T00:00:00`);
+    horizonte.setDate(horizonte.getDate() + HORIZONTE_MARCADOS_DIAS);
+    return inicioIso < horizonte.toISOString();
+  };
+
+  // Realtime: atualiza APENAS as fichas que mudaram.
+  //
+  // Antes, qualquer alteração em `agendamentos` — um check-in, uma cobrança no
+  // caixa, uma troca de horário — disparava um `load()` inteiro. Como a
+  // assinatura é por clínica, TODAS as telas de Agenda abertas recarregavam a
+  // janela completa ao mesmo tempo: com oito atendentes, um único clique de
+  // uma delas gerava oito recargas simultâneas. Era o que fazia a tela
+  // "travar sozinha" sem ninguém ter feito nada.
+  //
+  // Agora buscamos de volta só as linhas alteradas (por id) e as costuramos na
+  // lista em memória. O `load()` completo continua como plano B para rajadas
+  // grandes (reagendamento em lote, importação).
   useEffect(() => {
     if (!clinicaAtual) return;
+    const clinicaId = clinicaAtual.clinica_id;
     let t: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => {
+    let cancelado = false;
+    const sujos = new Set<string>();
+
+    const aplicar = async () => {
+      const ids = Array.from(sujos);
+      sujos.clear();
+      if (cancelado || ids.length === 0) return;
+      if (ids.length > LIMITE_PATCH_REALTIME) {
         void loadFnRef.current();
-      }, 400);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select(AGENDA_SELECT as never)
+        .eq("clinica_id", clinicaId)
+        .in("id", ids);
+      if (cancelado) return;
+      if (error) {
+        // Não conseguimos o recorte: cai no recarregamento completo para não
+        // deixar a lista divergente do banco.
+        void loadFnRef.current();
+        return;
+      }
+
+      const atualizadas = new Map<string, Agendamento>();
+      mapAgendaRows((data ?? []) as unknown as AgendaRowBruta[]).forEach((r) =>
+        atualizadas.set(r.id, r),
+      );
+      const alterados = new Set(ids);
+
+      const costurar = (lista: Agendamento[]): Agendamento[] => {
+        const out: Agendamento[] = [];
+        const jaNaLista = new Set<string>();
+        for (const a of lista) {
+          if (!alterados.has(a.id)) {
+            out.push(a);
+            continue;
+          }
+          jaNaLista.add(a.id);
+          const nova = atualizadas.get(a.id);
+          // Sem linha de volta = excluída (ou saiu da clínica); fora da janela
+          // = remarcada para outro período. Nos dois casos sai da lista.
+          if (nova && dentroDaJanela(nova.inicio)) out.push(nova);
+        }
+        for (const id of alterados) {
+          if (jaNaLista.has(id)) continue;
+          const nova = atualizadas.get(id);
+          if (nova && dentroDaJanela(nova.inicio)) out.push(nova);
+        }
+        out.sort((a, b) => a.inicio.localeCompare(b.inicio));
+        return out;
+      };
+
+      setItems((prev) => costurar(prev));
+      setFichaBaseItems((prev) => (prev.length > 0 ? costurar(prev) : prev));
+      setEtapaMap((prev) => {
+        const m = new Map(prev);
+        for (const id of alterados) {
+          const nova = atualizadas.get(id) as (Agendamento & { fluxo_etapa?: string }) | undefined;
+          if (nova) m.set(id, nova.fluxo_etapa ?? "aguardando_recepcao");
+          else m.delete(id);
+        }
+        return m;
+      });
+
+      // O snapshot em memória fica desatualizado após a costura — descarta a
+      // entrada para que uma remontagem da tela releia do banco.
+      if (cacheKeyRef.current) agendaSnapshotCache.delete(cacheKeyRef.current);
+
+      // Estado de pagamento das fichas alteradas: é o que muda quando o caixa
+      // recebe, e é barato conferir só para esses ids.
+      const idsComPaciente = ids.filter((id) => {
+        const nova = atualizadas.get(id);
+        return nova && !isSlotLivre(nova.paciente_nome);
+      });
+      if (idsComPaciente.length === 0) {
+        setPagosSet((prev) => {
+          const s = new Set(prev);
+          ids.forEach((id) => s.delete(id));
+          return s;
+        });
+        return;
+      }
+      const { data: pg, error: pgErr } = await supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id, valor, forma_pagamento")
+        .eq("clinica_id", clinicaId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", idsComPaciente);
+      if (cancelado || pgErr) return;
+      const pagosDoLote = new Map<string, { valor: number; forma: string | null }>();
+      (
+        (pg ?? []) as Array<{
+          agendamento_id: string | null;
+          valor: number | string | null;
+          forma_pagamento: string | null;
+        }>
+      ).forEach((r) => {
+        if (!r.agendamento_id) return;
+        const prev = pagosDoLote.get(r.agendamento_id);
+        pagosDoLote.set(r.agendamento_id, {
+          valor: (prev?.valor ?? 0) + Number(r.valor ?? 0),
+          forma: prev?.forma ?? r.forma_pagamento ?? null,
+        });
+      });
+      setPagosSet((prev) => {
+        const s = new Set(prev);
+        ids.forEach((id) => (pagosDoLote.has(id) ? s.add(id) : s.delete(id)));
+        return s;
+      });
+      setPagoInfoMap((prev) => {
+        const m = new Map(prev);
+        ids.forEach((id) => {
+          const info = pagosDoLote.get(id);
+          if (info) m.set(id, info);
+          else m.delete(id);
+        });
+        return m;
+      });
     };
+
+    const schedule = (payload: { new?: { id?: string } | null; old?: { id?: string } | null }) => {
+      const id = payload?.new?.id ?? payload?.old?.id;
+      // Sem id identificável não dá para fazer refresh pontual — recarrega.
+      if (!id) {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => void loadFnRef.current(), 400);
+        return;
+      }
+      sujos.add(id);
+      if (t) clearTimeout(t);
+      t = setTimeout(() => void aplicar(), 400);
+    };
+
     const ch = supabase
-      .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
+      .channel(`agenda-rt-${clinicaId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "agendamentos",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+          filter: `clinica_id=eq.${clinicaId}`,
         },
-        schedule,
+        schedule as never,
       )
       .subscribe();
     return () => {
+      cancelado = true;
       if (t) clearTimeout(t);
       void supabase.removeChannel(ch);
     };

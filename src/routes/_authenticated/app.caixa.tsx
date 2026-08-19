@@ -1586,8 +1586,18 @@ function Page() {
     void abrirCobranca(item);
   }, [minhaSessao, filaCaixa, abrirCobranca]);
 
+  // Mesma proteção da tela nova do caixa (caixa-shell): `fila_caixa_hoje` é
+  // uma função pesada e era recalculada a cada evento de `agendamentos`, em
+  // todos os caixas abertos ao mesmo tempo. Reagimos só a fichas do dia e
+  // agrupamos a rajada num único recálculo.
   useEffect(() => {
     if (!clinicaAtual || !minhaSessao) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ehDeHoje = (linha: { inicio?: string | null } | null | undefined) => {
+      if (!linha?.inicio) return true; // sem a data, não dá para descartar
+      const hoje = new Date().toLocaleDateString("en-CA");
+      return new Date(linha.inicio).toLocaleDateString("en-CA") === hoje;
+    };
     const ch = supabase
       .channel(`caixa-fila-${clinicaAtual.clinica_id}`)
       .on(
@@ -1598,12 +1608,18 @@ function Page() {
           table: "agendamentos",
           filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
         },
-        () => {
-          void loadFilaCaixa();
+        (payload: {
+          new?: { inicio?: string | null } | null;
+          old?: { inicio?: string | null } | null;
+        }) => {
+          if (!ehDeHoje(payload?.new) && !ehDeHoje(payload?.old)) return;
+          if (t) clearTimeout(t);
+          t = setTimeout(() => void loadFilaCaixa(), 800);
         },
       )
       .subscribe();
     return () => {
+      if (t) clearTimeout(t);
       void supabase.removeChannel(ch);
     };
   }, [clinicaAtual, minhaSessao, loadFilaCaixa]);
