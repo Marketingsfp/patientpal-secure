@@ -788,8 +788,9 @@ function Page() {
   const [openAbrir, setOpenAbrir] = useState(false);
   const [openMov, setOpenMov] = useState<{ tipo: MovTipo } | null>(null);
   const [openFechar, setOpenFechar] = useState(false);
-  /** Papel do comprovante de fechamento: bobina 80mm ou A4. */
-  const [formatoFechamento, setFormatoFechamento] = useState<"80mm" | "a4">("80mm");
+  /** Papel do comprovante de fechamento. A4 é o padrão porque é nele que a
+   *  recepção imprime; a bobina continua disponível no seletor. */
+  const [formatoFechamento, setFormatoFechamento] = useState<"80mm" | "a4">("a4");
   const [openDetalhe, setOpenDetalhe] = useState<Sessao | null>(null);
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
@@ -4669,8 +4670,8 @@ function Page() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="80mm">Bobina térmica 80mm</SelectItem>
                   <SelectItem value="a4">Folha A4</SelectItem>
+                  <SelectItem value="80mm">Bobina térmica 80mm</SelectItem>
                 </SelectContent>
               </Select>
             </div>

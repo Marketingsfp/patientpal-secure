@@ -846,6 +846,35 @@ function Page() {
     void salvarLancamento(false);
   };
 
+  /** Segunda via do recibo de um lançamento já gravado. Só monta o papel de
+   *  novo — não altera nada no banco, ao contrário de abrir em Editar e
+   *  clicar em "Salvar e imprimir", que regravava o registro. */
+  const reimprimirRecibo = (l: Lanc) => {
+    if (l.tipo === "transferencia") return;
+    try {
+      printReciboLancamento({
+        tipo: l.tipo,
+        clinicaNome: clinicaAtual?.clinica?.nome ?? "",
+        operadorNome: l.criado_por
+          ? (usuarios.find((u) => u.id === l.criado_por)?.nome ?? null)
+          : null,
+        descricao: l.descricao,
+        valor: Number(l.valor),
+        data: l.data,
+        categoriaNome: cats.find((c) => c.id === l.categoria_id)?.nome ?? null,
+        contaNome: contas.find((c) => c.id === l.conta_id)?.nome ?? null,
+        formaPagamentoLabel: l.forma_pagamento
+          ? (FORMA_LABEL[l.forma_pagamento] ?? l.forma_pagamento)
+          : null,
+        observacoes: l.observacoes || null,
+        segundaVia: true,
+      });
+    } catch (err) {
+      console.error("Falha ao reimprimir recibo do lançamento:", err);
+      toast.error("Não foi possível abrir a impressão do recibo.");
+    }
+  };
+
   const remove = (l: Lanc) => {
     setConfirmDel(l);
   };
@@ -1911,46 +1940,54 @@ function Page() {
                                 {l.status}
                               </Badge>
                             </div>
-                            {l.origem !== "caixa" &&
-                              !l._mistoParte &&
-                              (podeEstornar || podeEscrever) && (
-                                <div className="flex items-center gap-1 pt-1 -ml-2">
-                                  {podeEstornar &&
-                                  l.tipo !== "transferencia" &&
-                                  l.status !== "cancelado" ? (
+                            {l.origem !== "caixa" && !l._mistoParte && (
+                              <div className="flex items-center gap-1 pt-1 -ml-2">
+                                {l.tipo !== "transferencia" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-xs"
+                                    onClick={() => reimprimirRecibo(l)}
+                                  >
+                                    <Printer className="h-3.5 w-3.5 mr-1" /> Reimprimir
+                                  </Button>
+                                ) : null}
+                                {podeEstornar &&
+                                l.tipo !== "transferencia" &&
+                                l.status !== "cancelado" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-xs"
+                                    disabled={estornando === l.id}
+                                    onClick={() => estornar(l)}
+                                  >
+                                    <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Estornar
+                                  </Button>
+                                ) : null}
+                                {podeEscrever ? (
+                                  <>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-8 px-2 text-xs"
-                                      disabled={estornando === l.id}
-                                      onClick={() => estornar(l)}
+                                      onClick={() => openEdit(l)}
                                     >
-                                      <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Estornar
+                                      <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                                     </Button>
-                                  ) : null}
-                                  {podeEscrever ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-2 text-xs"
-                                        onClick={() => openEdit(l)}
-                                      >
-                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-2 text-xs"
-                                        onClick={() => remove(l)}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" />{" "}
-                                        Excluir
-                                      </Button>
-                                    </>
-                                  ) : null}
-                                </div>
-                              )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2 text-xs"
+                                      onClick={() => remove(l)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" />{" "}
+                                      Excluir
+                                    </Button>
+                                  </>
+                                ) : null}
+                              </div>
+                            )}
                             {l.origem === "caixa" &&
                               !l._mistoParte &&
                               l.caixaTipo === "sangria" &&
@@ -2091,6 +2128,18 @@ function Page() {
                                     onClick={() => setEstornoSangria(l)}
                                   >
                                     <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                                  </Button>
+                                ) : null}
+                                {!l._mistoParte &&
+                                l.origem !== "caixa" &&
+                                l.tipo !== "transferencia" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Reimprimir recibo — gera a segunda via do comprovante em folha A4. Não altera o lançamento."
+                                    onClick={() => reimprimirRecibo(l)}
+                                  >
+                                    <Printer className="h-3.5 w-3.5" />
                                   </Button>
                                 ) : null}
                                 {podeEscrever && !l._mistoParte && l.origem !== "caixa" ? (
