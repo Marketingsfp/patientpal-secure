@@ -1133,7 +1133,23 @@ function Page() {
   // Lista efetivamente usada em TODAS as visões (tabela, drill-down, export,
   // relatório). Quando a opção está ligada, cada lançamento "misto" vira N
   // linhas sintéticas (uma por forma real). A soma dos valores é preservada.
-  const displayItems = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto);
+  //
+  // O filtro de Status entra AQUI, e não só nos cards de Receita/Despesa/Saldo.
+  // Enquanto valia apenas para os cards, um atendimento estornado (status
+  // `cancelado`) sumia do card mas continuava listado na tabela, no Excel e —
+  // o que a recepção percebeu — somado no "Resumo por tipo de moeda" do
+  // relatório impresso. Resultado: a mesma tela mostrava dois valores para a
+  // mesma forma de pagamento e nenhum dos dois fechava com o comprovante do
+  // sistema antigo. Em 18/08/2026 o Cartão de Débito saía R$ 5.118,98 no
+  // relatório contra R$ 4.616,98 reais — os R$ 502,00 de dois atendimentos
+  // estornados no mesmo dia.
+  //
+  // `cancelado` sai em qualquer opção: as três escolhas do filtro são
+  // "confirmados", "pendentes" e "confirmados + pendentes". Estorno é assunto
+  // da aba Estorno, não do movimento do caixa.
+  const displayItems = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto).filter(
+    (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
+  );
 
   const imprimirRelatorio = () => {
     const source = displayItems;
@@ -1756,7 +1772,7 @@ function Page() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Status (totais)</Label>
+            <Label className="text-xs">Status</Label>
             <Select
               value={filterStatus}
               onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}
