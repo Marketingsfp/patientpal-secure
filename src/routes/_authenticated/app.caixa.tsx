@@ -1855,23 +1855,33 @@ function Page() {
   }, [clinicaAtual?.clinica_id]);
 
   // Calculos
+
+  // Movimento cujo lançamento foi cancelado (estornado) não é dinheiro do dia:
+  // fica fora do saldo, do resumo por tipo e da conferência por forma de
+  // pagamento. Vale para o recebimento original e para a sangria/estorno que o
+  // reverte — o par se anula, e se o reverso ainda não foi gravado (dados
+  // antigos) a conta já sai certa. Antes só o saldo aplicava essa regra, então
+  // uma taxa de adesão cobrada e depois cancelada sumia do saldo mas continuava
+  // inflando as Entradas e o "Resumo por forma de pagamento" do fechamento.
+  const movEstornado = useCallback(
+    (m: Mov) => {
+      if (!m.lancamento_id || !lancsCancelados.has(m.lancamento_id)) return false;
+      if (m.tipo === "recebimento" || m.tipo === "estorno") return true;
+      if (m.tipo === "sangria" && (m.descricao ?? "").toLowerCase().startsWith("estorno")) {
+        return true;
+      }
+      return false;
+    },
+    [lancsCancelados],
+  );
+
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
     return minhasMovs.reduce((acc, m) => {
-      // Blindagem: recebimento cujo lançamento foi cancelado (estornado) não
-      // entra no saldo. A sangria de reversão correspondente também é
-      // ignorada — o par se anula, mas se o reverso ainda não foi gravado
-      // (dados antigos) o saldo já fica correto.
-      if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
-        if (m.tipo === "recebimento") return acc;
-        if (m.tipo === "estorno") return acc;
-        if (m.tipo === "sangria" && (m.descricao ?? "").toLowerCase().startsWith("estorno")) {
-          return acc;
-        }
-      }
+      if (movEstornado(m)) return acc;
       return acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0);
     }, 0);
-  }, [minhaSessao, minhasMovs, lancsCancelados]);
+  }, [minhaSessao, minhasMovs, movEstornado]);
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
@@ -1885,10 +1895,11 @@ function Page() {
       reabertura: 0,
     };
     minhasMovs.forEach((m) => {
+      if (movEstornado(m)) return;
       r[m.tipo] += Number(m.valor || 0);
     });
     return r;
-  }, [minhasMovs]);
+  }, [minhasMovs, movEstornado]);
 
   // Decomposição de pagamentos "misto" — busca observações dos lançamentos
   // vinculados às movimentações da sessão atual. Chave = lancamento_id.
@@ -2035,6 +2046,7 @@ function Page() {
     };
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      if (movEstornado(m)) return;
       const v = Number(m.valor || 0);
       r.total += v;
       const bucket = bucketDeMov(m);
@@ -2054,7 +2066,7 @@ function Page() {
       }
     });
     return r;
-  }, [minhasMovs, partesDoMov, residualBucket]);
+  }, [minhasMovs, partesDoMov, residualBucket, movEstornado]);
 
   // Quebra do "Saldo" por dia (com base em created_at das movimentações
   // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
@@ -2081,6 +2093,7 @@ function Page() {
       indeterminado: 0,
     });
     for (const m of minhasMovs) {
+      if (movEstornado(m)) continue;
       const d = new Date(m.created_at);
       const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       let r = mapa.get(dia);
@@ -2119,7 +2132,7 @@ function Page() {
       }
     }
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
-  }, [minhasMovs, partesDoMov, residualBucket]);
+  }, [minhasMovs, partesDoMov, residualBucket, movEstornado]);
 
   // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
   // com o `<DateInputBR>` do modal de fechamento.
