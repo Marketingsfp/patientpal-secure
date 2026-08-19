@@ -162,11 +162,17 @@ export async function obterInfoConvenioPaciente(params: {
     : null;
 
   // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
+  //     A parcela 0 é a taxa de adesão, não uma mensalidade: sem o filtro
+  //     `numero_parcela > 0` ela entrava na conta e toda carência liberava um
+  //     mês antes do cadastrado — quem tinha pago a 1ª mensalidade contava 2, e
+  //     num cartão de adesão cobrada no ato bastavam os R$ 20,00 para liberar
+  //     benefício sem nenhuma mensalidade paga.
   const { count: pagasCount } = await supabase
     .from("contrato_mensalidades")
     .select("id", { count: "exact", head: true })
     .eq("contrato_id", contrato.id)
-    .eq("status", "pago");
+    .eq("status", "pago")
+    .gt("numero_parcela", 0);
   const mensalidadesPagas = pagasCount ?? 0;
 
   // 3) Busca procedimento_id e especialidade do médico
