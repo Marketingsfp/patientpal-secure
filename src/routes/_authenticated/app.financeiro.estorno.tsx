@@ -169,54 +169,67 @@ function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
-  const filtered = useMemo(() => {
+  // Tudo o que passa nos filtros, MENOS o filtro de status — é a base tanto da
+  // tabela quanto dos contadores do topo, para que os dois sempre concordem.
+  const baseFiltrada = useMemo(() => {
     const q = norm(fBusca.trim());
     const de = fDe ? new Date(fDe + "T00:00:00") : null;
     const ate = fAte ? new Date(fAte + "T23:59:59") : null;
-    // Dedup: mesma solicitação (mesmo lancamento_id) pode ter sido enviada
-    // duas vezes pelo caixa. Mantém apenas a mais recente por lancamento_id.
-    // Linhas sem lancamento_id (avulsas) não são deduplicadas.
+
+    // Dedup: o caixa pode enviar o mesmo pedido duas vezes, e enquanto as duas
+    // estão pendentes só a mais recente interessa.
+    //
+    // A dedup valia para a lista inteira e engolia o histórico: quando um
+    // pedido era recusado e a recepção mandava outro para o mesmo lançamento,
+    // a recusa sumia da tela e do contador (o segundo pedido é mais recente).
+    // Agora ela vale só entre pendentes — decisões já tomadas nunca somem.
     const seen = new Set<string>();
     const deduped: Solic[] = [];
     for (const s of items) {
-      if (s.lancamento_id) {
+      if (s.status === "pendente" && s.lancamento_id) {
         if (seen.has(s.lancamento_id)) continue;
         seen.add(s.lancamento_id);
       }
       deduped.push(s);
     }
+
+    // O período aceita a data do pedido OU a data da decisão: um estorno pedido
+    // ontem e resolvido hoje precisa aparecer ao filtrar por qualquer um dos
+    // dois dias, senão ele fica invisível justamente no dia em que foi decidido.
+    const noPeriodo = (s: Solic) => {
+      if (!de && !ate) return true;
+      const datas = [s.solicitado_em, s.resolvido_em]
+        .filter((x): x is string => !!x)
+        .map((x) => new Date(x));
+      return datas.some((d) => (!de || d >= de) && (!ate || d <= ate));
+    };
+
     return deduped.filter((s) => {
-      if (fStatus !== "todos" && s.status !== fStatus) return false;
       if (fTipo !== "todos" && (s.tipo ?? "") !== fTipo) return false;
       if (q) {
         const alvo = norm(`${s.paciente_nome ?? ""} ${s.descricao ?? ""} ${s.motivo ?? ""}`);
         if (!alvo.includes(q)) return false;
       }
-      const d = new Date(s.solicitado_em);
-      if (de && d < de) return false;
-      if (ate && d > ate) return false;
-      return true;
+      return noPeriodo(s);
     });
-  }, [items, fStatus, fTipo, fBusca, fDe, fAte]);
+  }, [items, fTipo, fBusca, fDe, fAte]);
 
+  const filtered = useMemo(
+    () => baseFiltrada.filter((s) => fStatus === "todos" || s.status === fStatus),
+    [baseFiltrada, fStatus],
+  );
+
+  // Contadores acompanham busca, tipo e período — só não obedecem ao filtro de
+  // status, que é justamente o que eles servem para escolher.
   const contagens = useMemo(() => {
     const c = { pendente: 0, aprovado: 0, rejeitado: 0 };
-    const seen = new Set<string>();
-    const deduped: Solic[] = [];
-    for (const s of items) {
-      if (s.lancamento_id) {
-        if (seen.has(s.lancamento_id)) continue;
-        seen.add(s.lancamento_id);
-      }
-      deduped.push(s);
-    }
-    for (const s of deduped) {
+    for (const s of baseFiltrada) {
       if (s.status === "pendente") c.pendente++;
       else if (s.status === "aprovado") c.aprovado++;
       else if (s.status === "rejeitado") c.rejeitado++;
     }
     return c;
-  }, [items]);
+  }, [baseFiltrada]);
 
   const executarEstorno = async (
     s: Solic,
@@ -285,7 +298,10 @@ function Page() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const { error } = await supabase
+      // O .select() é o que permite saber quantas linhas mudaram: sem ele, um
+      // UPDATE barrado pela RLS volta sem erro e a tela comemorava um estorno
+      // que não foi gravado.
+      const { data: gravadas, error } = await supabase
         .from("estorno_solicitacoes")
         .update({
           status: "aprovado",
@@ -293,9 +309,15 @@ function Page() {
           resolvido_em: new Date().toISOString(),
           resposta: r.resposta,
         })
-        .eq("id", s.id);
+        .eq("id", s.id)
+        .select("id");
       if (error) mostrarErro(error);
-      else {
+      else if (!gravadas || gravadas.length === 0) {
+        toast.error(
+          "O estorno foi executado, mas a solicitação não pôde ser marcada como aprovada. Avise o suporte.",
+        );
+        void load();
+      } else {
         toast.success(
           r.executado
             ? "Atendimento estornado e solicitação aprovada."
@@ -323,7 +345,7 @@ function Page() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const { error } = await supabase
+      const { data: gravadas, error } = await supabase
         .from("estorno_solicitacoes")
         .update({
           status: "rejeitado",
@@ -331,9 +353,16 @@ function Page() {
           resolvido_em: new Date().toISOString(),
           resposta: resp || null,
         })
-        .eq("id", s.id);
+        .eq("id", s.id)
+        .eq("status", "pendente")
+        .select("id");
       if (error) mostrarErro(error);
-      else {
+      else if (!gravadas || gravadas.length === 0) {
+        toast.error(
+          "Nada foi gravado — a solicitação já pode ter sido resolvida por outra pessoa.",
+        );
+        void load();
+      } else {
         toast.success("Solicitação recusada");
         void load();
       }
