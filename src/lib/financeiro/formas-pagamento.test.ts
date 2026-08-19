@@ -18,11 +18,6 @@ describe("classificarForma", () => {
 
   it("classifica os textos herdados do sistema antigo", () => {
     // Valores reais encontrados em fin_lancamentos.forma_pagamento.
-    expect(classificarForma("MAESTRO")).toBe("debito");
-    expect(classificarForma("MASTER")).toBe("credito");
-    expect(classificarForma("VISA")).toBe("credito");
-    expect(classificarForma("ELO")).toBe("credito");
-    expect(classificarForma("AMERICAN")).toBe("credito");
     expect(classificarForma("DINHEIRO CX 20")).toBe("dinheiro");
     expect(classificarForma("DINHEIRO F2")).toBe("dinheiro");
     expect(classificarForma("CAIXA 10")).toBe("dinheiro");
@@ -31,19 +26,25 @@ describe("classificarForma", () => {
     expect(classificarForma("\tDINHEIRO CX15")).toBe("dinheiro");
   });
 
+  it("todo cartão importado vai para a linha do sistema antigo", () => {
+    // O sistema antigo gravava a BANDEIRA no lugar do tipo, e a data da
+    // PARCELA no lugar da data da venda — há parcelas até dezembro/2026. Se
+    // essas linhas entrassem no Cartão de Crédito, o relatório do dia somaria
+    // dinheiro que não passou na maquininha naquele dia.
+    for (const f of ["MAESTRO", "MASTER", "VISA", "ELO", "AMERICAN", "VISA ELECTRON"]) {
+      expect(classificarForma(f)).toBe("legado_cartao");
+    }
+    // 27 mil linhas antigas gravadas só como "Cartão", sem bandeira e sem tipo.
+    expect(classificarForma("Cartão")).toBe("legado_cartao");
+  });
+
   it("nunca mistura débito com crédito", () => {
-    // "VISA ELECTRON" tem a palavra VISA (bandeira de crédito) mas é débito:
-    // a bandeira de débito é avaliada primeiro.
-    expect(classificarForma("VISA ELECTRON")).toBe("debito");
     expect(classificarForma("Cartão de Débito")).toBe("debito");
     expect(classificarForma("CARTÃO CRÉDITO")).toBe("credito");
     expect(classificarForma("cartao debito")).toBe("debito");
-  });
-
-  it("não chuta o tipo de um cartão sem bandeira", () => {
-    // 27 mil linhas antigas gravadas só como "Cartão": somá-las ao débito ou
-    // ao crédito falsearia a conferência com a maquininha.
-    expect(classificarForma("Cartão")).toBe("cartao_indefinido");
+    // O tipo escrito por extenso vence a bandeira citada junto.
+    expect(classificarForma("CARTAO CREDITO VISA")).toBe("credito");
+    expect(classificarForma("CARTAO DEBITO MAESTRO")).toBe("debito");
   });
 
   it("trata ausência de forma como sem informação", () => {
@@ -96,26 +97,42 @@ describe("partesDoPagamentoMisto", () => {
 
 describe("filtros de forma", () => {
   it("mantém débito e crédito isolados", () => {
-    expect(formaCasaComFiltro("MASTER", "credito")).toBe(true);
-    expect(formaCasaComFiltro("MASTER", "debito")).toBe(false);
-    expect(formaCasaComFiltro("MAESTRO", "debito")).toBe(true);
-    expect(formaCasaComFiltro("MAESTRO", "credito")).toBe(false);
+    expect(formaCasaComFiltro("cartao_credito", "credito")).toBe(true);
+    expect(formaCasaComFiltro("cartao_credito", "debito")).toBe(false);
+    expect(formaCasaComFiltro("cartao_debito", "debito")).toBe(true);
     expect(formaCasaComFiltro("cartao_debito", "credito")).toBe(false);
   });
 
-  it("agrupa os dois cartões só na opção 'Cartão (qualquer)'", () => {
-    for (const f of ["MAESTRO", "MASTER", "Cartão"]) {
+  it("o cartão importado não entra em Débito nem em Crédito", () => {
+    // É o que faz a linha do dia fechar com a maquininha.
+    for (const f of ["MASTER", "VISA", "MAESTRO", "Cartão"]) {
+      expect(formaCasaComFiltro(f, "credito")).toBe(false);
+      expect(formaCasaComFiltro(f, "debito")).toBe(false);
+      expect(formaCasaComFiltro(f, "legado")).toBe(true);
+    }
+    expect(formaCasaComFiltro("cartao_credito", "legado")).toBe(false);
+  });
+
+  it("agrupa todos os cartões só na opção 'Cartão (qualquer)'", () => {
+    for (const f of ["MAESTRO", "MASTER", "Cartão", "cartao_debito", "cartao_credito"]) {
       expect(formaCasaComFiltro(f, "cartao")).toBe(true);
     }
     expect(formaCasaComFiltro("dinheiro", "cartao")).toBe(false);
   });
 
-  it("o recorte enviado ao banco cobre as bandeiras antigas", () => {
+  it("o recorte enviado ao banco busca cada bandeira só no filtro que a usa", () => {
+    const legado = filtroFormaPostgrest("legado", false) ?? "";
+    expect(legado).toContain("master%");
+    expect(legado).toContain("visa%");
+    expect(legado).toContain("maestro%");
+    // Crédito e Débito não podem mais arrastar as dezenas de milhares de
+    // linhas herdadas só para descartá-las no cliente.
     const credito = filtroFormaPostgrest("credito", false) ?? "";
-    expect(credito).toContain("master%");
-    expect(credito).toContain("visa%");
+    expect(credito).not.toContain("master%");
+    expect(credito).not.toContain("visa%");
     const debito = filtroFormaPostgrest("debito", true) ?? "";
-    expect(debito).toContain("maestro%");
+    expect(debito).not.toContain("maestro%");
+    expect(debito).toContain("%debito%");
     expect(debito).toContain("forma_pagamento.eq.misto");
     expect(filtroFormaPostgrest("todos", true)).toBeNull();
   });

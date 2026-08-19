@@ -1817,6 +1817,7 @@ function Page() {
                 <SelectItem value="debito">Cartão débito</SelectItem>
                 <SelectItem value="credito">Cartão crédito</SelectItem>
                 <SelectItem value="cartao">Cartão (qualquer)</SelectItem>
+                <SelectItem value="legado">Parcelas do sistema antigo</SelectItem>
                 <SelectItem value="boleto">Boleto / Transferência</SelectItem>
                 <SelectItem value="sem">Sem informação</SelectItem>
               </SelectContent>

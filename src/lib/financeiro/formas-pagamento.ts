@@ -19,11 +19,25 @@
  * comprovante do sistema antigo. Este módulo é a fonte única da verdade:
  * débito e crédito são baldes independentes e nenhum texto cai nos dois.
  *
- * Regra das bandeiras antigas: MAESTRO e VISA ELECTRON são bandeiras
- * exclusivas de débito; MASTER, VISA, ELO, AMERICAN, HIPERCARD e DINERS
- * entram em crédito. Um "Cartão" genérico, sem bandeira e sem tipo, não pode
- * ser atribuído a nenhum dos dois: fica em "Cartão (sem identificação)" e
- * nunca é somado ao débito nem ao crédito.
+ * Regra do cartão importado: TODO texto de cartão que veio da importação —
+ * as bandeiras (MASTER, VISA, MAESTRO, ELO, AMERICAN…) e o "Cartão" genérico,
+ * sem bandeira e sem tipo — vai para uma linha própria, "Parcelas do sistema
+ * antigo", e nunca é somado ao Cartão de Débito nem ao Cartão de Crédito.
+ *
+ * O motivo é a conferência diária da maquininha. O sistema antigo gravava em
+ * `data` a data em que cada PARCELA cai, não a data da venda, e há parcelas
+ * lançadas até dezembro/2026. Elas pousavam no dia de hoje e entravam no
+ * Cartão de Crédito do relatório do dia sem ter passado na maquininha: em
+ * 18/08/2026 eram R$ 555,00 e em 17/08/2026, R$ 1.163,00. Separadas, as
+ * linhas de Débito e de Crédito passam a conter só o que o sistema atual
+ * registrou (`cartao_debito`, `cartao_credito` e as partes de "misto"), que é
+ * exatamente o que a recepção confere contra a maquininha. Nenhum valor some
+ * do relatório: o dinheiro antigo continua visível na sua própria linha, com
+ * os textos de origem listados ao lado.
+ *
+ * O débito segue a mesma regra por coerência, embora na prática não mude o
+ * dia a dia: MAESTRO, o débito do sistema antigo, não tem lançamento depois
+ * de 02/06/2026 — débito não é parcelado.
  */
 
 export type FormaCanonica =
@@ -31,7 +45,7 @@ export type FormaCanonica =
   | "pix"
   | "debito"
   | "credito"
-  | "cartao_indefinido"
+  | "legado_cartao"
   | "boleto"
   | "transferencia"
   | "convenio"
@@ -44,7 +58,7 @@ export const LABEL_FORMA: Record<FormaCanonica, string> = {
   pix: "PIX",
   debito: "Cartão de Débito",
   credito: "Cartão de Crédito",
-  cartao_indefinido: "Cartão (sem identificação)",
+  legado_cartao: "Parcelas do sistema antigo",
   boleto: "Boleto",
   transferencia: "Transferência / Depósito",
   convenio: "Convênio / Gratuidade",
@@ -59,7 +73,7 @@ export const ORDEM_FORMAS: FormaCanonica[] = [
   "pix",
   "debito",
   "credito",
-  "cartao_indefinido",
+  "legado_cartao",
   "boleto",
   "transferencia",
   "convenio",
@@ -86,15 +100,24 @@ function normalizar(raw: string | null | undefined): string {
     .trim();
 }
 
-/** Bandeiras que só existem em débito — checadas antes das de crédito. */
-const BANDEIRAS_DEBITO = /\b(maestro|electron)\b/;
-/** Bandeiras de crédito usadas pelo sistema antigo. */
-const BANDEIRAS_CREDITO = /\b(master|mastercard|visa|elo|american|amex|hipercard|diners)\b/;
+/**
+ * Textos de cartão que só a importação do sistema antigo produz: a BANDEIRA
+ * no lugar do tipo. O sistema atual nunca grava assim — ele grava
+ * `cartao_debito`/`cartao_credito` em `forma_pagamento` e guarda a bandeira
+ * no campo `bandeira_cartao`, à parte. Por isso o texto sozinho já identifica
+ * o lançamento como herdado.
+ */
+const BANDEIRAS_LEGADO =
+  /\b(maestro|electron|master|mastercard|visa|elo|american|amex|hipercard|diners)\b/;
 
 /**
  * Classifica qualquer texto de forma de pagamento em um único balde.
- * A ordem dos testes importa: débito é avaliado antes de crédito para que
- * `cartao_debito` e `VISA ELECTRON` nunca escorreguem para o crédito.
+ *
+ * A ordem dos testes importa: o TIPO escrito por extenso ("debito",
+ * "credito") vence a bandeira, para que `cartao_debito` e "CARTÃO CRÉDITO
+ * (VISA)" caiam no cartão certo do sistema atual. Só depois disso um texto
+ * puramente de bandeira — ou um "Cartão" genérico, sem bandeira e sem tipo —
+ * é reconhecido como herança da importação.
  */
 export function classificarForma(raw: string | null | undefined): FormaCanonica {
   const k = normalizar(raw);
@@ -104,9 +127,9 @@ export function classificarForma(raw: string | null | undefined): FormaCanonica 
     return "dinheiro";
   }
   if (/\bpix\b/.test(k)) return "pix";
-  if (/\bdebito\b/.test(k) || BANDEIRAS_DEBITO.test(k)) return "debito";
-  if (/\bcredito\b/.test(k) || BANDEIRAS_CREDITO.test(k)) return "credito";
-  if (/\bcart(ao|oes)\b/.test(k)) return "cartao_indefinido";
+  if (/\bdebito\b/.test(k)) return "debito";
+  if (/\bcredito\b/.test(k)) return "credito";
+  if (BANDEIRAS_LEGADO.test(k) || /\bcart(ao|oes)\b/.test(k)) return "legado_cartao";
   if (/\bboleto\b/.test(k)) return "boleto";
   if (/\b(transferencia|banking|deposito|ted|doc)\b/.test(k)) return "transferencia";
   if (/\b(convenio|gratuidade|associado)\b/.test(k) || /sem cobranca/.test(k)) return "convenio";
@@ -180,16 +203,23 @@ export type FiltroForma =
   | "debito"
   | "credito"
   | "cartao"
+  | "legado"
   | "boleto"
   | "sem";
 
-/** Quais baldes cada opção do filtro aceita. Débito e crédito não se cruzam. */
+/**
+ * Quais baldes cada opção do filtro aceita. Débito e crédito não se cruzam, e
+ * nenhum dos dois alcança o cartão importado — para isso existe "legado".
+ * "Cartão (qualquer)" continua sendo a opção que junta tudo, para quem só quer
+ * saber quanto passou em cartão no período, sem separar geração nem tipo.
+ */
 const FILTRO_ACEITA: Record<Exclude<FiltroForma, "todos">, FormaCanonica[]> = {
   dinheiro: ["dinheiro"],
   pix: ["pix"],
   debito: ["debito"],
   credito: ["credito"],
-  cartao: ["debito", "credito", "cartao_indefinido"],
+  cartao: ["debito", "credito", "legado_cartao"],
+  legado: ["legado_cartao"],
   boleto: ["boleto", "transferencia"],
   sem: ["sem_informacao"],
 };
@@ -208,10 +238,16 @@ export function baldeCasaComFiltro(forma: FormaCanonica, filtro: FiltroForma): b
 
 /**
  * Recorte grosseiro do filtro no PostgREST, só para não trazer o período
- * inteiro do banco. É propositalmente mais largo que `formaCasaComFiltro`
- * (o `visa%` do crédito, por exemplo, também traz "VISA ELECTRON", que é
- * débito): a separação exata é feita no cliente, com `classificarForma`, que
- * é a única regra que vale. Retorna `null` quando não há filtro a aplicar.
+ * inteiro do banco. Pode ser mais largo que `formaCasaComFiltro` — a
+ * separação exata é feita no cliente, com `classificarForma`, que é a única
+ * regra que vale. Retorna `null` quando não há filtro a aplicar.
+ *
+ * O que ele NÃO pode ser é largo à toa. Enquanto Débito e Crédito puxavam
+ * também as bandeiras antigas, um filtro de Crédito num período longo trazia
+ * dezenas de milhares de linhas herdadas só para descartá-las no cliente — e,
+ * com o teto de 20.000 linhas da consulta, as linhas de crédito de verdade
+ * podiam nem chegar. Agora cada bandeira é buscada apenas pelo filtro que
+ * realmente a usa: "legado".
  *
  * `incluirMisto` traz também os pagamentos mistos, que podem conter uma parte
  * da forma procurada — as partes que não interessam são descartadas depois.
@@ -221,10 +257,11 @@ export function filtroFormaPostgrest(filtro: FiltroForma, incluirMisto: boolean)
   const like = (p: string) => `${campo}.ilike.${p}`;
   const misto = incluirMisto ? [`${campo}.eq.misto`] : [];
   const dinheiro = [like("%dinheiro%"), like("caixa%"), like("cx%"), like("%especie%")];
-  const debito = [like("%debito%"), like("%débito%"), like("maestro%"), like("%electron%")];
-  const credito = [
-    like("%credito%"),
-    like("%crédito%"),
+  const debito = [like("%debito%"), like("%débito%")];
+  const credito = [like("%credito%"), like("%crédito%")];
+  const legado = [
+    like("maestro%"),
+    like("%electron%"),
     like("master%"),
     like("visa%"),
     like("elo%"),
@@ -232,6 +269,7 @@ export function filtroFormaPostgrest(filtro: FiltroForma, incluirMisto: boolean)
     like("amex%"),
     like("hipercard%"),
     like("diners%"),
+    like("%cart%"),
   ];
   switch (filtro) {
     case "dinheiro":
@@ -242,8 +280,10 @@ export function filtroFormaPostgrest(filtro: FiltroForma, incluirMisto: boolean)
       return [...debito, ...misto].join(",");
     case "credito":
       return [...credito, ...misto].join(",");
+    case "legado":
+      return legado.join(",");
     case "cartao":
-      return [...debito, ...credito, like("%cart%"), ...misto].join(",");
+      return [...debito, ...credito, ...legado, ...misto].join(",");
     case "boleto":
       return [
         like("%boleto%"),
