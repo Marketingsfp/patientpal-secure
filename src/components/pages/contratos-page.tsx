@@ -3075,10 +3075,49 @@ function DetalheContrato({
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!(await confirmDialog("Excluir esta parcela? Essa ação não pode ser desfeita."))) return;
-    const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
+    const alvo = mens.find((m) => m.id === id);
+    const removendoAdesao = Number(alvo?.numero_parcela ?? -1) === 0;
+    if (
+      !(await confirmDialog(
+        removendoAdesao
+          ? "Excluir a taxa de adesão? Ela deixa de ser cobrada, inclusive junto com a 1ª mensalidade. Essa ação não pode ser desfeita."
+          : "Excluir esta parcela? Essa ação não pode ser desfeita.",
+      ))
+    )
+      return;
+    // `.select()` para saber se a linha realmente saiu: o DELETE em
+    // contrato_mensalidades é restrito a admin/gestor pela RLS, e para os
+    // demais perfis o banco não devolve erro — apaga zero linhas em silêncio.
+    // Sem esta checagem a tela dizia "Parcela removida" e nada acontecia.
+    const { data: removidas, error } = await supabase
+      .from("contrato_mensalidades")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (error) return mostrarErro(error);
-    toast.success("Parcela removida.");
+    if (!removidas || removidas.length === 0) {
+      toast.error(
+        "Nada foi excluído: seu perfil não tem permissão para apagar cobranças. Peça a um administrador ou gestor.",
+      );
+      return;
+    }
+    if (removendoAdesao) {
+      // A taxa não vive só na linha da adesão: ela também está gravada em
+      // `taxa_adesao` da 1ª parcela, que é por onde ela é de fato cobrada
+      // quando está embutida. Apagar apenas a linha deixaria a cobrança de pé
+      // — a 1ª mensalidade continuaria saindo com a taxa somada.
+      const { error: errTaxa } = await supabase
+        .from("contrato_mensalidades")
+        .update({ taxa_adesao: 0 })
+        .eq("contrato_id", contrato.id)
+        .eq("numero_parcela", 1);
+      if (errTaxa)
+        return mostrarErro(
+          errTaxa,
+          "linha da adesão removida, mas a taxa embutida na 1ª parcela não foi zerada",
+        );
+    }
+    toast.success(removendoAdesao ? "Taxa de adesão removida." : "Parcela removida.");
     setRascunhos((prev) => {
       const n = { ...prev };
       delete n[id];
