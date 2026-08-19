@@ -22,6 +22,7 @@ import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
+import { hojeBR } from "@/lib/date-utils";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import {
   classificarForma,
@@ -140,18 +141,25 @@ interface Opt {
   tipo?: string;
 }
 
-const EMPTY = {
+/** Formulário zerado. É uma função, e não uma constante de módulo, porque a
+ *  data padrão precisa ser recalculada a cada abertura: como constante ela
+ *  ficava congelada no dia em que a aba foi carregada, e uma recepção que
+ *  deixa o sistema aberto de um dia para o outro lançava com a data de
+ *  ontem. `hojeBR` também resolve o outro lado do problema — `toISOString`
+ *  devolve a data em UTC, então depois das 21h de Brasília o lançamento
+ *  saía com a data do dia seguinte. */
+const emptyForm = () => ({
   tipo: "receita" as "receita" | "despesa",
   descricao: "",
   valor: "",
-  data: new Date().toISOString().slice(0, 10),
+  data: hojeBR(),
   status: "confirmado",
   categoria_id: "",
   conta_id: "",
   forma_pagamento: "",
   observacoes: "",
   referente_a: "outros" as "medico" | "funcionario" | "outros",
-};
+});
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 /** Expande as linhas de "misto" em uma linha sintética por forma real.
@@ -233,12 +241,14 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Lanc | null>(null);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(emptyForm);
   const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa" | "transferencia">(
     "todos",
   );
-  const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
-  const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
+  // Fuso de Brasília, não UTC: com `toISOString` o filtro já abria em "amanhã"
+  // depois das 21h e a tela aparecia vazia no fim do expediente.
+  const [fromDate, setFromDate] = useState(hojeBR);
+  const [toDate, setToDate] = useState(hojeBR);
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({
     r: 0,
@@ -744,7 +754,7 @@ function Page() {
 
   const openNew = () => {
     setEditing(null);
-    setForm(EMPTY);
+    setForm(emptyForm());
     setOpen(true);
   };
   const openEdit = (l: Lanc) => {
@@ -803,9 +813,15 @@ function Page() {
       forma_pagamento: form.forma_pagamento || null,
       observacoes: form.observacoes || null,
     };
+    // `criado_por` só vai no INSERT: o banco não tem gatilho que preencha essa
+    // coluna em fin_lancamentos (o gatilho de autoria existe só para
+    // orçamentos), então sem esta linha o lançamento nascia sem dono e sumia
+    // da própria listagem assim que alguém filtrava por usuário. No UPDATE ele
+    // fica de fora de propósito, para que editar um lançamento não roube a
+    // autoria de quem o criou.
     const { error } = editing
       ? await supabase.from("fin_lancamentos").update(payload).eq("id", editing.id)
-      : await supabase.from("fin_lancamentos").insert(payload);
+      : await supabase.from("fin_lancamentos").insert({ ...payload, criado_por: user?.id ?? null });
     setSaving(false);
     if (error) {
       mostrarErro(error);
