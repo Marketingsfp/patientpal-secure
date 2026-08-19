@@ -38,8 +38,11 @@ const hojeISO = () => {
  * Botão para encerrar o expediente do dia de um médico.
  * - Médico logado: encerra/reabre o próprio dia direto.
  * - Recepção / gestor / admin: abre diálogo para escolher o médico.
+ *
+ * `onMudou` avisa a tela que hospeda o botão (a Agenda) que a marcação mudou,
+ * para ela reesconder/reexibir os horários livres sem depender de um F5.
  */
-export function EncerrarExpedienteButton() {
+export function EncerrarExpedienteButton({ onMudou }: { onMudou?: () => void } = {}) {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
   const { medicoId: meuMedicoId, isMedicoOnly } = useMedicoContext();
@@ -93,6 +96,16 @@ export function EncerrarExpedienteButton() {
 
   const meuEncerramento = meuMedicoId ? encerrados.get(meuMedicoId) : null;
 
+  // Recarrega a lista SEMPRE que o diálogo abre. Sem isto o estado só era lido
+  // na montagem da tela: numa aba aberta desde cedo, um encerramento feito por
+  // outra recepcionista não aparecia, o botão continuava oferecendo "Encerrar"
+  // e o banco recusava o insert pelo índice único — para quem clicava, parecia
+  // que o botão não fazia nada.
+  const abrirDialogo = () => {
+    setOpen(true);
+    void carregar();
+  };
+
   const encerrar = async (medicoId: string, motivoTxt: string) => {
     if (!clinicaAtual || !medicoId) return;
     setSaving(true);
@@ -105,12 +118,24 @@ export function EncerrarExpedienteButton() {
     });
     setSaving(false);
     if (error) {
+      // 23505 = a tabela tem UNIQUE (clinica_id, medico_id, data). Cair aqui
+      // significa que alguém já encerrou o dia desse médico enquanto este
+      // diálogo estava aberto. Não é erro do usuário: recarrega e mostra o
+      // estado real, em vez de despejar uma mensagem técnica.
+      if ((error as { code?: string }).code === "23505") {
+        toast.info("Este médico já teve o expediente encerrado hoje.");
+        setMotivo("");
+        await carregar();
+        onMudou?.();
+        return;
+      }
       mostrarErro(error);
       return;
     }
-    toast.success("Expediente encerrado para hoje.");
+    toast.success("Expediente encerrado. Os horários livres do dia saem da Agenda.");
     setMotivo("");
     await carregar();
+    onMudou?.();
   };
 
   const reabrir = async (medicoId: string) => {
@@ -127,8 +152,9 @@ export function EncerrarExpedienteButton() {
       mostrarErro(error);
       return;
     }
-    toast.success("Expediente reaberto.");
+    toast.success("Expediente reaberto. Os horários livres voltam para a Agenda.");
     await carregar();
+    onMudou?.();
   };
 
   // Fluxo simples do próprio médico logado: toggle direto.
@@ -148,12 +174,7 @@ export function EncerrarExpedienteButton() {
       );
     }
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 text-[11px] px-2"
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" onClick={abrirDialogo}>
         <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
       </Button>
     );
@@ -161,12 +182,7 @@ export function EncerrarExpedienteButton() {
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 text-[11px] px-2"
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" onClick={abrirDialogo}>
         <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
         {encerrados.size > 0 && (
           <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
@@ -180,8 +196,9 @@ export function EncerrarExpedienteButton() {
           <DialogHeader>
             <DialogTitle>Encerrar expediente do médico · Hoje</DialogTitle>
             <DialogDescription>
-              Sinaliza que o médico já terminou os atendimentos do dia. É possível reabrir a
-              qualquer momento.
+              Sinaliza que o médico já terminou os atendimentos do dia: os horários ainda livres
+              dele saem da Agenda de hoje. Fichas com paciente continuam intactas, e é possível
+              reabrir a qualquer momento.
             </DialogDescription>
           </DialogHeader>
 

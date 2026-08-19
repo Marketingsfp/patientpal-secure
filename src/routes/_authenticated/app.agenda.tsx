@@ -19,6 +19,12 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
+import {
+  carregarExpedientesEncerrados,
+  chaveExpediente,
+  dataLocalDoInicio,
+  type ExpedienteEncerrado,
+} from "@/lib/agenda/expediente-encerrado";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import {
   AJUDA_PRONTUARIO,
@@ -844,6 +850,13 @@ function AgendaPage() {
     proximaData: string | null;
   } | null>(null);
   const [mostrarLivres, setMostrarLivres] = useState(true);
+  // Marcações de "expediente encerrado" (médico + dia) da janela carregada.
+  // Enquanto existir a marcação, os horários LIVRES daquele médico naquele dia
+  // saem da lista — é o que faz o botão "Fechar agenda" ter efeito visível.
+  const [expedientes, setExpedientes] = useState<Map<string, ExpedienteEncerrado>>(new Map());
+  // Escape hatch: permite reexibir os livres escondidos sem precisar reabrir o
+  // expediente (ex.: encaixar um retorno depois que o médico já fechou o dia).
+  const [mostrarEncerrados, setMostrarEncerrados] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
@@ -3456,8 +3469,31 @@ function AgendaPage() {
     return m;
   }, [items, fichaBaseItems]);
 
-  const filtrados = useMemo(() => {
-    return items.filter((a) => {
+  // Janela de encerramentos: mesma do `load()` — do dia de referência em
+  // diante, ou só o dia quando "apenas a data selecionada" está ligado.
+  const recarregarExpedientes = useCallback(async () => {
+    if (!clinicaAtual) {
+      setExpedientes(new Map());
+      return;
+    }
+    setExpedientes(
+      await carregarExpedientesEncerrados(
+        clinicaAtual.clinica_id,
+        dataRef,
+        apenasData ? dataRef : dataFim,
+      ),
+    );
+  }, [clinicaAtual, dataRef, dataFim, apenasData]);
+
+  useEffect(() => {
+    void recarregarExpedientes();
+  }, [recarregarExpedientes]);
+
+  const { filtrados, ocultosPorExpediente } = useMemo(() => {
+    // Livres escondidos por expediente encerrado, já com TODOS os outros
+    // filtros aplicados — é o que alimenta o aviso no topo da lista.
+    const ocultos: Agendamento[] = [];
+    const lista = items.filter((a) => {
       if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       const ehLivre = isSlotLivre(a.paciente_nome);
@@ -3502,11 +3538,25 @@ function AgendaPage() {
         }
       }
       if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
+      // ÚLTIMA regra, de propósito: só chega aqui o que já passou por todos os
+      // outros filtros, então o contador do aviso bate com o que sumiu da tela.
+      // Ficha com paciente nunca é escondida — encerrar expediente significa
+      // "não ofereça mais horário", não "cancele o que já está marcado".
+      if (isSlotLivre(a.paciente_nome) && a.medico_id) {
+        const enc = expedientes.get(chaveExpediente(a.medico_id, dataLocalDoInicio(a.inicio)));
+        if (enc) {
+          ocultos.push(a);
+          return mostrarEncerrados;
+        }
+      }
       return true;
     });
+    return { filtrados: lista, ocultosPorExpediente: ocultos };
   }, [
     items,
     mostrarLivres,
+    expedientes,
+    mostrarEncerrados,
     apenasData,
     filtroMedico,
     filtroStatus,
@@ -3610,10 +3660,16 @@ function AgendaPage() {
       return;
     }
     if (!clinicaAtual) return;
-    const ids = Array.from(selecionados);
+    // Fichas vazias são ignoradas em silêncio: desde que o horário livre passou
+    // a ser selecionável (para poder ser excluído), ele pode entrar na seleção
+    // sem que o usuário queira cobrar por ele. Sem este filtro, "DISPONÍVEL"
+    // contaria como um segundo paciente e barrava a cobrança sem explicação.
+    const ids = items
+      .filter((a) => selecionados.has(a.id) && !isSlotLivre(a.paciente_nome))
+      .map((a) => a.id);
     const itens = items.filter((a) => ids.includes(a.id));
     if (itens.length === 0) {
-      toast.info("Selecione ao menos um atendimento.");
+      toast.info("Selecione ao menos um atendimento com paciente.");
       return;
     }
     const pacientes = new Set(itens.map((i) => i.paciente_nome));
@@ -3938,6 +3994,30 @@ function AgendaPage() {
         `${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`,
       );
       return;
+    }
+    // Trava de segurança: horário livre é descartável, ficha com paciente não.
+    // Como o horário livre passou a ser selecionável (e o "marcar todos" do
+    // cabeçalho pega a página inteira), uma exclusão em lote pode arrastar
+    // pacientes junto sem que o usuário perceba. Quando isso acontece, exigimos
+    // confirmação explícita com os nomes — inclusive no caminho rápido, que
+    // normalmente apaga na hora e só oferece 5 segundos de "Desfazer".
+    const comPaciente = itens.filter((i) => !isSlotLivre(i.paciente_nome));
+    if (comPaciente.length > 0) {
+      const nomes = comPaciente
+        .slice(0, 5)
+        .map((i) => `• ${i.paciente_nome}`)
+        .join("\n");
+      const resto =
+        comPaciente.length > 5 ? `\n• …e mais ${comPaciente.length - 5} paciente(s)` : "";
+      const ok = await confirmDialog({
+        title: "Atenção: há pacientes nesta seleção",
+        tone: "warning",
+        confirmText: "Excluir mesmo assim",
+        description:
+          `Dos ${itens.length} horário(s) marcados, ${comPaciente.length} têm paciente agendado:\n\n${nomes}${resto}\n\n` +
+          `Excluir apaga a ficha desses pacientes da agenda. Se a intenção era só limpar horários vazios, cancele e desmarque as linhas com nome.`,
+      });
+      if (!ok) return;
     }
     const apagarNoBanco = async () => {
       const { error } = await supabase.from("agendamentos").delete().in("id", ids);
@@ -7026,7 +7106,12 @@ function AgendaPage() {
             </button>
           </div>
           <div className="hidden lg:inline-flex items-center gap-1">
-            <EncerrarExpedienteButton />
+            <EncerrarExpedienteButton
+              onMudou={() => {
+                setMostrarEncerrados(false);
+                void recarregarExpedientes();
+              }}
+            />
             <button
               type="button"
               title="Receber mensalidade do Cartão Benefícios"
@@ -9349,6 +9434,44 @@ function AgendaPage() {
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
+
+        {/* Aviso de expediente encerrado. Existe para que "sumiu horário da
+            agenda" nunca seja um mistério: diz quem fechou o dia, quantos
+            horários livres saíram da lista e como trazê-los de volta. */}
+        {ocultosPorExpediente.length > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold">Expediente encerrado</span>
+                <span className="mx-1.5 text-amber-400">·</span>
+                {(() => {
+                  const porMedico = new Map<string, { nome: string; qtd: number }>();
+                  for (const a of ocultosPorExpediente) {
+                    const chave = `${a.medico_id}|${dataLocalDoInicio(a.inicio)}`;
+                    const atual = porMedico.get(chave);
+                    if (atual) atual.qtd += 1;
+                    else porMedico.set(chave, { nome: medicoNomeAgendamento(a), qtd: 1 });
+                  }
+                  return Array.from(porMedico.values())
+                    .map((m) => `${m.nome} (${m.qtd})`)
+                    .join(" · ");
+                })()}
+                <span className="ml-1.5 text-amber-700">
+                  {mostrarEncerrados
+                    ? "— horários livres exibidos mesmo com o dia fechado."
+                    : "— horários livres ocultos. Fichas com paciente continuam na lista."}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarEncerrados((v) => !v)}
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                {mostrarEncerrados ? "Ocultar novamente" : "Mostrar mesmo assim"}
+              </button>
+            </div>
+          </div>
+        )}
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
           {loading && items.length === 0 ? (
@@ -9742,12 +9865,16 @@ function AgendaPage() {
 
                   return (
                     <TableRow key={a.id} data-ag-id={a.id} className={`${bgClass} ${borderLeft}`}>
-                      {/* Checkbox */}
+                      {/* Checkbox — horário livre TAMBÉM é selecionável: sem
+                          isso uma grade aberta por engano não tinha como ser
+                          apagada pela tela (o "Excluir" só age no que está
+                          marcado). Quem protege o paciente é a trava dentro de
+                          excluirSelecionados, não a caixinha desabilitada. */}
                       <TableCell className="py-1.5 px-1.5 align-middle text-xs">
                         <Checkbox
                           checked={selecionados.has(a.id)}
                           onCheckedChange={() => toggleSel(a.id)}
-                          disabled={ehLivre || realizado}
+                          disabled={realizado}
                         />
                       </TableCell>
 
@@ -10247,7 +10374,16 @@ function AgendaPage() {
             .filter(
               (a) =>
                 a.inicio.slice(0, 10) === dataRef &&
-                (filtroMedico === "todos" || a.medico_id === filtroMedico),
+                (filtroMedico === "todos" || a.medico_id === filtroMedico) &&
+                // Mesma regra da visão em lista: médico com expediente
+                // encerrado no dia não exibe mais horário livre. A grade por
+                // médico usa `items` cru, então a regra é repetida aqui.
+                !(
+                  !mostrarEncerrados &&
+                  isSlotLivre(a.paciente_nome) &&
+                  !!a.medico_id &&
+                  expedientes.has(chaveExpediente(a.medico_id, dataLocalDoInicio(a.inicio)))
+                ),
             )
             .map((a) => ({
               id: a.id,
@@ -10841,6 +10977,27 @@ function MedicoFiltroInput({
   }, [selecionadoNome]);
 
   const norm = (s: string) => normalizar(s);
+  // Quando dois cadastros ativos têm o mesmo nome, o dropdown mostrava duas
+  // linhas idênticas e não dava para saber qual escolher. Em vez de esconder
+  // uma delas (o que tornaria um cadastro inalcançável, inclusive homônimos
+  // legítimos), numeramos as repetidas para que a diferença fique visível.
+  const rotulo = useMemo(() => {
+    const contagem = new Map<string, number>();
+    for (const m of lista) contagem.set(norm(m.nome), (contagem.get(norm(m.nome)) ?? 0) + 1);
+    const vistos = new Map<string, number>();
+    const map = new Map<string, string>();
+    for (const m of lista) {
+      const k = norm(m.nome);
+      if ((contagem.get(k) ?? 0) < 2) {
+        map.set(m.id, m.nome);
+        continue;
+      }
+      const n = (vistos.get(k) ?? 0) + 1;
+      vistos.set(k, n);
+      map.set(m.id, `${m.nome} (cadastro ${n})`);
+    }
+    return map;
+  }, [lista]);
   const sugestoes = useMemo(() => {
     const t = norm(texto).trim();
     if (!t) return lista.slice(0, 100);
@@ -10921,7 +11078,7 @@ function MedicoFiltroInput({
                 selecionar(m);
               }}
             >
-              {m.nome}
+              {rotulo.get(m.id) ?? m.nome}
             </button>
           ))}
         </div>
