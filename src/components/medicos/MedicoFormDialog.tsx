@@ -862,8 +862,31 @@ export function MedicoFormDialog({
       );
       if (!ok) return;
     }
-    setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
+    // Trava contra cadastro duplicado: dois registros ativos com o mesmo nome
+    // fazem o profissional aparecer duas vezes no filtro da Agenda e dividem
+    // agendamentos/financeiro entre dois cadastros. Homônimos legítimos ainda
+    // são possíveis, mas exigem confirmação explícita.
+    {
+      const chave = normalizarNome(nomeLimpo);
+      if (chave) {
+        const { data: homonimos } = await supabase
+          .from("medicos")
+          .select("id, nome")
+          .eq("clinica_id", activeClinicaId)
+          .eq("ativo", true);
+        const iguais = ((homonimos as { id: string; nome: string }[]) ?? []).filter(
+          (m) => m.id !== editId && normalizarNome(limparPrefixoMedico(m.nome ?? "")) === chave,
+        );
+        if (iguais.length > 0) {
+          const ok = await confirmDialog(
+            `Já existe cadastro ativo com o nome "${nomeLimpo}".\n\nSalvar assim cria um segundo cadastro com o mesmo nome: ele aparece duas vezes no filtro de Profissional da Agenda e os agendamentos ficam divididos entre os dois.\n\nDeseja continuar mesmo assim?`,
+          );
+          if (!ok) return;
+        }
+      }
+    }
+    setSaving(true);
     const payload = {
       clinica_id: activeClinicaId,
       nome: nomeLimpo,
