@@ -20,12 +20,57 @@ interface Solic {
   solicitado_por: string;
 }
 
+/** Solicitação própria já decidida pelo financeiro — o retorno para quem pediu. */
+interface Resposta {
+  id: string;
+  paciente_nome: string | null;
+  descricao: string | null;
+  valor: number | null;
+  motivo: string;
+  status: "aprovado" | "rejeitado" | string;
+  resposta: string | null;
+  resolvido_em: string | null;
+}
+
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// Quem pediu o estorno não era avisado da decisão: o financeiro aprovava ou
+// recusava e a recepção só descobria olhando o botão do caixa voltar ao normal.
+// As respostas ficam visíveis no sino por alguns dias; o "já vi" é guardado no
+// próprio navegador (localStorage) para não precisar de coluna nova no banco.
+const DIAS_VISIVEIS = 7;
+const MAX_LIDAS_GUARDADAS = 200;
+
+const chaveLidas = (userId: string) => `estorno_respostas_lidas_${userId}`;
+
+function lerLidas(userId: string | undefined): Set<string> {
+  if (!userId) return new Set();
+  try {
+    const raw = localStorage.getItem(chaveLidas(userId));
+    const arr = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function gravarLidas(userId: string | undefined, ids: Set<string>) {
+  if (!userId) return;
+  try {
+    // Mantém só as últimas para o registro não crescer sem limite.
+    const arr = Array.from(ids).slice(-MAX_LIDAS_GUARDADAS);
+    localStorage.setItem(chaveLidas(userId), JSON.stringify(arr));
+  } catch {
+    /* navegador sem localStorage — o aviso apenas reaparece, não quebra nada */
+  }
+}
 
 export function EstornosBell() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const [items, setItems] = useState<Solic[]>([]);
+  const [respostas, setRespostas] = useState<Resposta[]>([]);
+  const [lidas, setLidas] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
 
   // Segue a matriz de Perfis de Acesso (módulo "financeiro"), não mais uma
@@ -47,9 +92,36 @@ export function EstornosBell() {
     setItems((data ?? []) as Solic[]);
   }, [clinicaAtual]);
 
+  // Respostas do financeiro às solicitações QUE EU MESMO enviei.
+  const loadRespostas = useCallback(async () => {
+    if (!clinicaAtual || !user) {
+      setRespostas([]);
+      return;
+    }
+    const corte = new Date(Date.now() - DIAS_VISIVEIS * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from("estorno_solicitacoes")
+      .select("id, paciente_nome, descricao, valor, motivo, status, resposta, resolvido_em")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("solicitado_por", user.id)
+      .in("status", ["aprovado", "rejeitado"])
+      .gte("resolvido_em", corte)
+      .order("resolvido_em", { ascending: false })
+      .limit(20);
+    setRespostas((data ?? []) as Resposta[]);
+  }, [clinicaAtual, user]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadRespostas();
+  }, [loadRespostas]);
+
+  useEffect(() => {
+    setLidas(lerLidas(user?.id));
+  }, [user?.id]);
 
   // Realtime
   useEffect(() => {
@@ -66,6 +138,7 @@ export function EstornosBell() {
         },
         (payload) => {
           void load();
+          void loadRespostas();
           // Toast quando uma nova solicitação chega (e não foi eu)
           if (
             payload.eventType === "INSERT" &&
@@ -77,15 +150,59 @@ export function EstornosBell() {
               description: `${n.paciente_nome ?? "—"} • ${n.valor != null ? fmt(Number(n.valor)) : ""}`,
             });
           }
+          // Toast para QUEM PEDIU quando o financeiro decide. A tabela está com
+          // REPLICA IDENTITY FULL, então `payload.old` traz o status anterior e
+          // dá para disparar só na transição de pendente -> decidido.
+          if (payload.eventType === "UPDATE") {
+            const antes = payload.old as { status?: string } | null;
+            const depois = payload.new as {
+              status?: string;
+              solicitado_por?: string;
+              paciente_nome?: string | null;
+              resposta?: string | null;
+            } | null;
+            const decidiu =
+              antes?.status === "pendente" &&
+              (depois?.status === "aprovado" || depois?.status === "rejeitado");
+            if (decidiu && depois?.solicitado_por === user?.id) {
+              const paciente = depois.paciente_nome ?? "sem paciente";
+              if (depois.status === "aprovado") {
+                toast.success("Seu estorno foi aprovado", {
+                  description: `${paciente}${depois.resposta ? ` — ${depois.resposta}` : ""}`,
+                  duration: 10000,
+                });
+              } else {
+                toast.error("Seu estorno foi recusado", {
+                  description: `${paciente}${depois.resposta ? ` — motivo: ${depois.resposta}` : ""}`,
+                  duration: 10000,
+                });
+              }
+            }
+          }
         },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [clinicaAtual, load, podeAprovar, user?.id]);
+  }, [clinicaAtual, load, loadRespostas, podeAprovar, user?.id]);
 
-  const count = items.length;
+  const naoLidas = respostas.filter((r) => !lidas.has(r.id));
+  const count = items.length + naoLidas.length;
+
+  const marcarLida = (id: string) => {
+    const novo = new Set(lidas);
+    novo.add(id);
+    setLidas(novo);
+    gravarLidas(user?.id, novo);
+  };
+
+  const marcarTodasLidas = () => {
+    const novo = new Set(lidas);
+    naoLidas.forEach((r) => novo.add(r.id));
+    setLidas(novo);
+    gravarLidas(user?.id, novo);
+  };
 
   const cancelar = async (id: string) => {
     const { error } = await supabase
@@ -125,7 +242,11 @@ export function EstornosBell() {
           variant="ghost"
           size="sm"
           className="h-9 w-9 p-0 rounded-full relative"
-          title={count > 0 ? `${count} solicitação(ões) de estorno` : "Notificações"}
+          title={
+            count > 0
+              ? `${items.length} estorno(s) pendente(s) e ${naoLidas.length} resposta(s) do financeiro`
+              : "Notificações"
+          }
         >
           <Bell className="h-4 w-4" />
           {count > 0 && (
@@ -139,8 +260,80 @@ export function EstornosBell() {
         <div className="px-3 py-2 border-b flex items-center gap-2 sticky top-0 bg-background">
           <Undo2 className="h-4 w-4 text-rose-600" />
           <strong className="text-sm">Solicitações de estorno</strong>
-          <span className="text-xs text-muted-foreground ml-auto">{count} pendente(s)</span>
+          <span className="text-xs text-muted-foreground ml-auto">{items.length} pendente(s)</span>
         </div>
+
+        {naoLidas.length > 0 && (
+          <div className="border-b bg-muted/40">
+            <div className="px-3 py-1.5 flex items-center gap-2">
+              <strong className="text-xs">Respostas do financeiro</strong>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 text-[11px] ml-auto"
+                onClick={marcarTodasLidas}
+              >
+                Marcar tudo como visto
+              </Button>
+            </div>
+            <ul className="divide-y">
+              {naoLidas.map((r) => {
+                const aprovado = r.status === "aprovado";
+                return (
+                  <li key={r.id} className="p-3 text-sm space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">
+                          {r.paciente_nome ?? "Sem paciente"}
+                        </div>
+                        {r.descricao && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {r.descricao}
+                          </div>
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+                          aprovado
+                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            : "bg-rose-100 text-rose-900 border border-rose-300"
+                        }`}
+                      >
+                        {aprovado ? "Aprovado" : "Recusado"}
+                      </span>
+                    </div>
+                    <div className="text-xs italic text-muted-foreground">"{r.motivo}"</div>
+                    {r.resposta && (
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Financeiro: </span>
+                        {r.resposta}
+                      </div>
+                    )}
+                    {!r.resposta && !aprovado && (
+                      <div className="text-xs text-muted-foreground">
+                        O financeiro não escreveu um motivo.
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[10px] text-muted-foreground">
+                        {r.resolvido_em ? new Date(r.resolvido_em).toLocaleString("pt-BR") : ""}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[11px] ml-auto"
+                        onClick={() => marcarLida(r.id)}
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Ok, vi
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {count === 0 && (
           <div className="p-6 text-sm text-center text-muted-foreground">
             Nenhuma solicitação pendente.

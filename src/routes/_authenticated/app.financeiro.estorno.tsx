@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Download, Undo2, Search, Filter } from "lucide-react";
+import { CheckCircle2, Download, Undo2, Search, Filter, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { EditarEstornoDialog } from "@/components/financeiro/EditarEstornoDialog";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/estorno")({
@@ -95,6 +96,8 @@ function Page() {
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // Solicitação pendente aberta no dialog de edição.
+  const [editando, setEditando] = useState<Solic | null>(null);
 
   const [fStatus, setFStatus] = useState<string>("pendente");
   const [fTipo, setFTipo] = useState<string>("todos");
@@ -489,7 +492,7 @@ function Page() {
                 <TableHead className="w-[110px]">Tipo</TableHead>
                 <TableHead>Motivo</TableHead>
                 <TableHead className="w-[110px]">Status</TableHead>
-                <TableHead className="w-[240px] text-right">Ações</TableHead>
+                <TableHead className="w-75 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -587,6 +590,16 @@ function Page() {
                             variant="outline"
                             className="h-7 text-xs"
                             disabled={busy === s.id}
+                            title="Corrigir o pedido antes de aprovar"
+                            onClick={() => setEditando(s)}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" /> Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={busy === s.id}
                             onClick={() => recusar(s)}
                           >
                             Recusar
@@ -603,6 +616,15 @@ function Page() {
           </Table>
         </CardContent>
       </Card>
+
+      <EditarEstornoDialog
+        open={!!editando}
+        onOpenChange={(v) => {
+          if (!v) setEditando(null);
+        }}
+        solicitacao={editando}
+        onSaved={() => void load()}
+      />
     </div>
   );
 }
