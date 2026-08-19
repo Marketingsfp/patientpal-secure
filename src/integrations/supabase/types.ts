@@ -1903,6 +1903,7 @@ export type Database = {
           acrescimo_cartao_modo: string | null
           acrescimo_cartao_percentual: number
           acrescimo_cartao_valor: number
+          adesao_no_ato: boolean
           ativo: boolean
           beneficios: string | null
           clinica_id: string
@@ -1927,6 +1928,7 @@ export type Database = {
           acrescimo_cartao_modo?: string | null
           acrescimo_cartao_percentual?: number
           acrescimo_cartao_valor?: number
+          adesao_no_ato?: boolean
           ativo?: boolean
           beneficios?: string | null
           clinica_id: string
@@ -1951,6 +1953,7 @@ export type Database = {
           acrescimo_cartao_modo?: string | null
           acrescimo_cartao_percentual?: number
           acrescimo_cartao_valor?: number
+          adesao_no_ato?: boolean
           ativo?: boolean
           beneficios?: string | null
           clinica_id?: string

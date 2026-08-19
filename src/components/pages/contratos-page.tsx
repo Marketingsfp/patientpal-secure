@@ -289,6 +289,8 @@ type Convenio = {
   descricao: string | null;
   valor_mensal: number;
   taxa_adesao: number;
+  /** true = a taxa de adesão é cobrada no ato da emissão, em cobrança própria. */
+  adesao_no_ato?: boolean | null;
   num_parcelas: number;
   max_dependentes: number;
   vigencia_meses: number;
@@ -1762,6 +1764,11 @@ function NovoContratoForm({
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
+    // Convênio com "adesão no ato": a taxa é cobrada na emissão do cartão, em
+    // linha própria (parcela 0, vencendo no dia do contrato), e as mensalidades
+    // ficam limpas. No modo padrão ela continua embutida na 1ª parcela, cobrada
+    // junto com ela no mês seguinte.
+    const adesaoNoAto = Boolean(convenio.adesao_no_ato) && Number(taxa || 0) > 0;
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
       // demais seguem mês a mês, cobrindo exatamente 12 meses até
@@ -1772,7 +1779,9 @@ function NovoContratoForm({
       const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
       // "já pagas" (contrato retroativo), a taxa também já foi paga e vai zero.
-      const taxaParcela = i === 0 && !jaPago ? Number(taxa || 0) : 0;
+      // No modo "adesão no ato" ela não entra em parcela nenhuma — sai na
+      // cobrança própria montada logo abaixo.
+      const taxaParcela = !adesaoNoAto && i === 0 && !jaPago ? Number(taxa || 0) : 0;
       return {
         numero_parcela: i + 1,
         vencimento: vencStr,
@@ -1783,9 +1792,27 @@ function NovoContratoForm({
       };
     });
     const taxaAdesao = Number(taxa) || 0;
-    // Taxa de adesão é registrada em contratos_assinatura.taxa_adesao e NÃO
-    // gera uma linha em contrato_mensalidades — não é uma mensalidade.
-    const cobrancas = parcelas;
+    // A linha da adesão (parcela 0) é criada pela própria RPC a partir de
+    // `_taxa_adesao`, com o vencimento da 1ª mensalidade — é assim que ela fica
+    // "colada" na 1ª parcela no modo padrão. No modo "adesão no ato" mandamos a
+    // parcela 0 explicitamente, com vencimento na data de início, e a RPC
+    // respeita a linha enviada em vez de criar a dela.
+    const cobrancas = adesaoNoAto
+      ? [
+          {
+            numero_parcela: 0,
+            vencimento: dataInicio,
+            valor: taxaAdesao,
+            taxa_adesao: 0,
+            status: mensalidadesJaPagas > 0 ? "pago" : "pendente",
+            ...(mensalidadesJaPagas > 0
+              ? { pago_em: dataInicio, valor_pago: taxaAdesao }
+              : {}),
+            observacoes: "Taxa de adesão",
+          },
+          ...parcelas,
+        ]
+      : parcelas;
 
     // Contrato + dependentes + mensalidades numa única transação (RPC):
     // se qualquer etapa falhar, o Postgres desfaz tudo — antes eram 3

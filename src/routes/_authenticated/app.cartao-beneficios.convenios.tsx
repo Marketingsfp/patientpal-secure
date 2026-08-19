@@ -175,6 +175,7 @@ type Convenio = {
   ativo: boolean;
   valor_mensal: number;
   taxa_adesao: number;
+  adesao_no_ato: boolean;
   taxa_inclusao_dependente: number;
   num_parcelas: number;
   max_dependentes: number;
@@ -203,6 +204,7 @@ function ConveniosPage() {
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
   const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [adesaoNoAto, setAdesaoNoAto] = useState<boolean>(false);
   const [taxaInclusaoDep, setTaxaInclusaoDep] = useState<number>(0);
   const [numParcelas, setNumParcelas] = useState<number>(12);
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
@@ -278,6 +280,7 @@ function ConveniosPage() {
     setDescricao("");
     setAtivo(true);
     setTaxaAdesao(0);
+    setAdesaoNoAto(false);
     setTaxaInclusaoDep(0);
     setNumParcelas(12);
     setMaxDependentes(0);
@@ -302,6 +305,7 @@ function ConveniosPage() {
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setAdesaoNoAto(Boolean((c as any).adesao_no_ato));
     setTaxaInclusaoDep(
       Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0),
     );
@@ -404,6 +408,9 @@ function ConveniosPage() {
       (m, f) => Math.min(m, Number(f.valor_mensal) || 0),
       Number(faixasParaSalvar[0].valor_mensal) || 0,
     );
+    // "Cobrar no ato" só faz sentido com taxa de adesão cadastrada — sem taxa
+    // não há cobrança nenhuma na emissão, e a marcação ficaria mentindo na tela.
+    const cobrarAdesaoNoAto = adesaoNoAto && taxaAdesao > 0;
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nomeClean,
@@ -411,6 +418,7 @@ function ConveniosPage() {
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
+      adesao_no_ato: cobrarAdesaoNoAto,
       taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
@@ -634,6 +642,21 @@ function ConveniosPage() {
                       value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
                       onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
                     />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Switch
+                        checked={adesaoNoAto}
+                        onCheckedChange={setAdesaoNoAto}
+                        disabled={taxaAdesao <= 0}
+                      />
+                      <span className="text-xs text-muted-foreground">Cobrar no ato da emissão</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {taxaAdesao <= 0
+                        ? "Sem taxa de adesão cadastrada."
+                        : adesaoNoAto
+                          ? "Na emissão do cartão o paciente paga só a taxa. As mensalidades vêm depois, com o valor cheio."
+                          : "A taxa é cobrada junto com a 1ª mensalidade, numa cobrança só."}
+                    </p>
                   </div>
                   <div>
                     <Label>Taxa de inclusão de dependente (R$)</Label>
