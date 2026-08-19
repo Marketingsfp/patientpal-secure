@@ -112,6 +112,14 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
   const is80 = input.formato === "80mm";
   const titulo = TITULOS[input.tipo];
 
+  const difValor = Number(input.diferenca ?? 0);
+  const difConfere = Math.abs(difValor) < 0.005;
+  const difRotulo = difConfere
+    ? "Diferença (confere)"
+    : difValor > 0
+      ? "Diferença (SOBRA)"
+      : "Diferença (FALTA)";
+
   const linhas: Array<{ label: string; valor: string; destaque?: boolean }> = [];
   if (isFech) {
     linhas.push({
@@ -122,16 +130,10 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       label: "Valor conferido em caixa",
       valor: fmtBRL(input.valorInformado ?? input.valor),
     });
-    const dif = Number(input.diferenca ?? 0);
     linhas.push({
-      label:
-        Math.abs(dif) < 0.005
-          ? "Diferença (confere)"
-          : dif > 0
-            ? "Diferença (SOBRA)"
-            : "Diferença (FALTA)",
-      valor: fmtBRL(dif),
-      destaque: Math.abs(dif) > 0.009,
+      label: difRotulo,
+      valor: fmtBRL(difValor),
+      destaque: Math.abs(difValor) > 0.009,
     });
   } else {
     linhas.push({ label: "Valor", valor: fmtBRL(input.valor), destaque: true });
@@ -157,101 +159,190 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
 
   /* ---------------- versão bobina 80mm (compacta) ---------------- */
   if (is80) {
-    const formasBlock = formasEntries.length
-      ? `<div class="sep"></div>
-       <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Recebimentos por forma</div>
-       ${formasEntries
-         .map(
-           ([k, v]) =>
-             `<div class="row"><span class="k">${esc(formaLabel(k))}</span><span class="v">${esc(fmtBRL(Number(v)))}</span></div>`,
-         )
-         .join("")}
-       <div class="row" style="margin-top:2px;"><span class="k bold">Total recebido</span><span class="v bold">${esc(fmtBRL(totalFormas))}</span></div>`
-      : "";
-    const movsBlock = movs.length
-      ? `<div class="sep"></div>
-       <div class="center" style="font-size:10px;font-weight:800;text-transform:uppercase;">Sangrias e suprimentos</div>
-       ${movs
-         .map(
-           (m) =>
-             `<div class="row"><span class="k">${esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }))} ${m.tipo === "sangria" ? "SANGRIA" : "SUPRIMENTO"}${m.descricao ? " — " + esc(m.descricao) : ""}</span><span class="v">${m.tipo === "sangria" ? "-" : "+"} ${esc(fmtBRL(Number(m.valor || 0)))}</span></div>`,
-         )
-         .join("")}
-       <div class="row" style="margin-top:2px;"><span class="k bold">Total suprimentos</span><span class="v bold">${esc(fmtBRL(totalSup))}</span></div>
-       <div class="row"><span class="k bold">Total sangrias</span><span class="v bold">${esc(fmtBRL(totalSang))}</span></div>`
-      : "";
+    /** Linha "rótulo ......... valor", com pontilhado ligando os dois lados. */
+    const linha80 = (rotulo: string, valor: string, forte = false) =>
+      `<div class="row${forte ? " forte" : ""}">
+         <span class="k">${esc(rotulo)}</span>
+         <span class="dots"></span>
+         <span class="v">${esc(valor)}</span>
+       </div>`;
+
+    /**
+     * Campo empilhado (rótulo em cima, valor embaixo). Usado para nomes de
+     * pessoa: numa bobina de 72mm um nome completo não cabe na mesma linha
+     * do rótulo sem espremer as duas metades.
+     */
+    const campo80 = (rotulo: string, valor: string) =>
+      `<div class="campo">
+         <div class="campo-rot">${esc(rotulo)}</div>
+         <div class="campo-val">${esc(valor)}</div>
+       </div>`;
+
+    /** Título de seção: texto pequeno em caixa alta com filete embaixo. */
+    const secao80 = (rotulo: string) => `<div class="secao">${esc(rotulo)}</div>`;
+
+    /** Caixa com o número que importa (valor do movimento ou diferença). */
+    const destaque80 = (rotulo: string, valor: string, alerta = false) =>
+      `<div class="destaque${alerta ? " alerta" : ""}">
+         <div class="destaque-rot">${esc(rotulo)}</div>
+         <div class="destaque-val">${esc(valor)}</div>
+       </div>`;
+
+    const identBlock = `${secao80("Identificação")}
+       ${linha80("Data / hora", dtStr)}
+       ${campo80("Atendente", input.operadorNome)}
+       ${!isFech && input.destinoNome ? campo80(rotuloDestino, input.destinoNome) : ""}`;
+
     const turnoBlock = isFech
-      ? `${input.aberturaEm ? `<div class="row"><span class="k">Início do turno</span><span class="v">${esc(fmtDT(new Date(input.aberturaEm)))}</span></div>` : ""}
-       ${input.fechamentoEm ? `<div class="row"><span class="k">Fim do turno</span><span class="v">${esc(fmtDT(new Date(input.fechamentoEm)))}</span></div>` : ""}
-       ${typeof input.saldoInicial === "number" ? `<div class="row"><span class="k">Saldo inicial (troco)</span><span class="v">${esc(fmtBRL(input.saldoInicial))}</span></div>` : ""}
-       ${typeof input.esperadoGaveta === "number" ? `<div class="row"><span class="k">Esperado em espécie</span><span class="v">${esc(fmtBRL(input.esperadoGaveta))}</span></div>` : ""}`
+      ? `${secao80("Turno")}
+       ${input.aberturaEm ? linha80("Início do turno", fmtDT(new Date(input.aberturaEm))) : ""}
+       ${input.fechamentoEm ? linha80("Fim do turno", fmtDT(new Date(input.fechamentoEm))) : ""}
+       ${typeof input.saldoInicial === "number" ? linha80("Saldo inicial (troco)", fmtBRL(input.saldoInicial)) : ""}
+       ${typeof input.esperadoGaveta === "number" ? linha80("Esperado em espécie", fmtBRL(input.esperadoGaveta)) : ""}`
       : "";
+
+    const conferenciaBlock = isFech
+      ? `${secao80("Conferência do caixa")}
+       ${linha80("Saldo calculado pelo sistema", fmtBRL(input.saldoCalculado ?? 0))}
+       ${linha80("Valor conferido em caixa", fmtBRL(input.valorInformado ?? input.valor), true)}
+       ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}`
+      : destaque80("Valor", fmtBRL(input.valor));
+
+    const formasBlock = formasEntries.length
+      ? `${secao80("Recebimentos por forma")}
+       ${formasEntries.map(([k, v]) => linha80(formaLabel(k), fmtBRL(Number(v)))).join("")}
+       ${linha80("Total recebido", fmtBRL(totalFormas), true)}`
+      : "";
+
+    const movsBlock = movs.length
+      ? `${secao80("Sangrias e suprimentos")}
+       ${movs
+         .map((m) => {
+           const sinal = m.tipo === "sangria" ? "−" : "+";
+           // Dia/mês + hora: o ano não cabe na largura da bobina e o turno
+           // impresso já diz de que ano o fechamento é.
+           const dm = new Date(m.created_at);
+           const pad = (n: number) => String(n).padStart(2, "0");
+           const quandoMov = `${pad(dm.getDate())}/${pad(dm.getMonth() + 1)} ${pad(dm.getHours())}:${pad(dm.getMinutes())}`;
+           return `<div class="item">
+              ${linha80(`${m.tipo === "sangria" ? "Sangria" : "Suprimento"} · ${quandoMov}`, `${sinal} ${fmtBRL(Number(m.valor || 0))}`)}
+              ${m.descricao ? `<div class="item-desc">${esc(m.descricao)}</div>` : ""}
+            </div>`;
+         })
+         .join("")}
+       ${linha80("Total de suprimentos", `+ ${fmtBRL(totalSup)}`, true)}
+       ${linha80("Total de sangrias", `− ${fmtBRL(totalSang)}`, true)}`
+      : "";
+
+    const descBlock =
+      input.descricao && input.descricao.trim()
+        ? `${secao80("Observações")}
+       <div class="desc">${esc(input.descricao)}</div>`
+        : "";
+
+    const assinatura80 = (cargo: string, nome?: string | null) =>
+      `<div class="sig">
+         <div class="sig-linha"></div>
+         <div class="sig-nome">${nome && nome.trim() ? esc(nome) : "&nbsp;"}</div>
+         <div class="sig-cargo">${esc(cargo)}</div>
+       </div>`;
 
     const css80 = `
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000;
+  html, body { margin: 0; padding: 0; background: #f4f4f5; color: #000;
     font-family: "Consolas", "Menlo", "Courier New", ui-monospace, monospace; }
-  .receipt { width: 72mm; padding: 3mm 3mm 6mm; margin: 0 auto; font-size: 11px; line-height: 1.35; }
-  .center { text-align: center; }
-  .bold { font-weight: 700; }
-  .clinica { font-size: 13px; font-weight: 800; text-transform: uppercase; }
-  .titulo { font-size: 12px; font-weight: 800; margin-top: 2px; text-transform: uppercase; }
-  .subtitulo { font-size: 10px; margin-bottom: 4px; }
-  .sep { border-top: 1px dashed #000; margin: 6px 0; }
-  .row { display: flex; justify-content: space-between; gap: 6px; }
-  .row .k { text-transform: uppercase; font-size: 10px; }
-  .row .v { text-align: right; word-break: break-word; }
-  .valor-destaque { font-size: 15px; font-weight: 800; text-align: center; margin: 4px 0; }
-  .desc { font-size: 10px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
-  .sig { margin-top: 14px; }
-  .sig .line { border-top: 1px solid #000; margin-top: 22px; padding-top: 2px;
-    font-size: 9px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-  .sig .nome { font-size: 10px; text-align: center; font-weight: 700; min-height: 12px; }
-  .rodape { font-size: 9px; margin-top: 8px; text-align: center; }
+  .receipt { width: 72mm; max-width: 100%; padding: 4mm 3mm 8mm; margin: 0 auto;
+    background: #fff; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+
+  /* ---- cabeçalho ---- */
+  .marca { text-align: center; }
+  .marca .clinica { font-size: 14px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .5px; line-height: 1.2; }
+  .marca .doc-tipo { margin: 5px 0 3px; padding: 3px 4px; background: #000; color: #fff;
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px;
+    line-height: 1.3; }
+  .marca .doc-sub { font-size: 9.5px; letter-spacing: .3px; }
+
+  /* ---- seções ---- */
+  .secao { margin: 9px 0 3px; padding-bottom: 2px; border-bottom: 1px solid #000;
+    font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.4px; }
+
+  /* ---- linhas rótulo/valor com guia pontilhada ---- */
+  .row { display: flex; align-items: baseline; gap: 3px; margin-top: 2px; }
+  .row .k { flex: 0 1 auto; min-width: 0; font-size: 9.5px; overflow-wrap: anywhere; }
+  .row .dots { flex: 1 1 6px; min-width: 6px; align-self: stretch;
+    border-bottom: 1px dotted #9a9a9a; transform: translateY(-3px); }
+  .row .v { flex: none; text-align: right; white-space: nowrap; font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  .row.forte .k { font-weight: 700; }
+  .row.forte .v { font-weight: 800; }
+
+  /* ---- campo empilhado (nomes longos) ---- */
+  .campo { margin-top: 3px; }
+  .campo-rot { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+  .campo-val { font-size: 11px; font-weight: 700; line-height: 1.25; }
+
+  /* ---- caixa de destaque (valor / diferença) ---- */
+  .destaque { margin: 7px 0 2px; padding: 5px 6px; border: 1.5px solid #000;
+    border-radius: 3px; text-align: center; }
+  .destaque.alerta { border-width: 3px; }
+  .destaque-rot { font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; }
+  .destaque-val { font-size: 19px; font-weight: 800; line-height: 1.15; margin-top: 1px;
+    font-variant-numeric: tabular-nums; }
+
+  /* ---- itens com descrição (sangrias/suprimentos) ---- */
+  .item { margin-top: 3px; }
+  .item-desc { font-size: 9px; padding-left: 6px; word-break: break-word; }
+
+  .desc { font-size: 9.5px; line-height: 1.45; margin-top: 3px;
+    white-space: pre-wrap; word-break: break-word; }
+
+  /* ---- assinaturas ---- */
+  .assinaturas { margin-top: 12px; }
+  .sig { margin-top: 24px; }
+  .sig .sig-linha { border-top: 1px solid #000; }
+  .sig .sig-nome { font-size: 10px; font-weight: 700; text-align: center;
+    min-height: 13px; margin-top: 2px; }
+  .sig .sig-cargo { font-size: 8.5px; text-align: center; text-transform: uppercase;
+    letter-spacing: 1px; }
+
+  .rodape { margin-top: 12px; padding-top: 5px; border-top: 1px dashed #000;
+    font-size: 8.5px; text-align: center; letter-spacing: .3px; }
+
   @media print {
     @page { size: 80mm auto; margin: 0; }
-    .receipt { width: 72mm; margin: 0; padding: 3mm 3mm 6mm; }
+    html, body { background: #fff; }
+    .receipt { width: 72mm; margin: 0; padding: 3mm 3mm 8mm; }
+    .secao, .destaque, .sig, .item { break-inside: avoid; page-break-inside: avoid; }
   }
 ${CSS_TOOLBAR_80MM}`;
 
     const corpo80 = `
   <div class="receipt">
-    <div class="center clinica">${esc(input.clinicaNome)}</div>
-    <div class="center titulo">${esc(titulo)}</div>
-    <div class="center subtitulo">${esc(SUBTITULOS[input.tipo])}</div>
-    <div class="sep"></div>
-    <div class="row"><span class="k">Data/Hora</span><span class="v">${esc(dtStr)}</span></div>
-    <div class="row"><span class="k">Atendente</span><span class="v">${esc(input.operadorNome)}</span></div>
+    <div class="marca">
+      <div class="clinica">${esc(input.clinicaNome)}</div>
+      <div class="doc-tipo">${esc(titulo.replace(/^COMPROVANTE DE /, ""))}</div>
+      <div class="doc-sub">${esc(SUBTITULOS[input.tipo])}</div>
+    </div>
+
+    ${identBlock}
     ${turnoBlock}
-    ${
-      !isFech && input.destinoNome
-        ? `<div class="row"><span class="k">${esc(rotuloDestino)}</span><span class="v bold">${esc(input.destinoNome)}</span></div>`
-        : ""
-    }
-    <div class="sep"></div>
-    ${
-      isFech
-        ? linhas
-            .map(
-              (l) =>
-                `<div class="row"><span class="k">${esc(l.label)}</span><span class="v ${l.destaque ? "bold" : ""}">${esc(l.valor)}</span></div>`,
-            )
-            .join("")
-        : `<div class="valor-destaque">${esc(fmtBRL(input.valor))}</div>`
-    }
+    ${conferenciaBlock}
     ${formasBlock}
     ${movsBlock}
-    ${input.descricao ? `<div class="sep"></div><div class="desc"><b>Descrição:</b> ${esc(input.descricao)}</div>` : ""}
-    <div class="sep"></div>
-    <div class="sig">
-      <div class="nome">${esc(input.operadorNome)}</div>
-      <div class="line">Assinatura do Atendente</div>
+    ${descBlock}
+
+    <div class="assinaturas">
+      ${assinatura80("Assinatura do atendente", input.operadorNome)}
+      ${
+        !isFech && input.destinoNome
+          ? assinatura80(cargoDestino, input.destinoNome)
+          : assinatura80("Assinatura da tesouraria")
+      }
     </div>
-    <div class="sig">
-      <div class="nome">${!isFech && input.destinoNome ? esc(input.destinoNome) : "&nbsp;"}</div>
-      <div class="line">${!isFech && input.destinoNome ? esc(cargoDestino) : "Assinatura da Tesouraria"}</div>
-    </div>
-    <div class="rodape">${esc(dtStr)} — ClinicaOS</div>
+
+    <div class="rodape">Emitido em ${esc(dtStr)} · ClinicaOS</div>
   </div>`;
 
     return documentoA4(titulo, corpo80, css80);
