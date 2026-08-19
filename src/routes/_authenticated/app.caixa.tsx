@@ -2474,6 +2474,47 @@ function Page() {
    */
   const totalConferidoOwn = useMemo(() => totalConferido(conferidoOwn), [conferidoOwn]);
 
+  /**
+   * Formas de pagamento com saldo negativo no dia que está sendo fechado.
+   *
+   * Nenhuma forma pode fechar negativa: significaria que saiu mais dinheiro
+   * daquela forma do que entrou. Na prática isso só acontece no Dinheiro, e
+   * sempre pelo mesmo motivo — sangria maior que a gaveta.
+   *
+   * O fechamento antigo não olhava para isso: somava todas as formas num total
+   * só, o buraco no dinheiro era coberto por cartão/PIX (que nem passam pela
+   * gaveta) e o caixa saía carimbado como "confere". Por isso a trava compara
+   * forma a forma, tanto no CALCULADO (o que o sistema apurou) quanto no
+   * CONFERIDO (o que a pessoa digitou) — ninguém conta dinheiro negativo.
+   */
+  const formasNegativasFechamento = useMemo(() => {
+    const out: Array<{ chave: string; calculado: number; conferido: number }> = [];
+    const chaves = new Set([...Object.keys(porFormaDoDiaFechamento), ...Object.keys(conferidoOwn)]);
+    for (const k of chaves) {
+      const calculado = Number(porFormaDoDiaFechamento[k] ?? 0);
+      const conferido = Number(conferidoOwn[k]) || 0;
+      if (calculado < -0.005 || conferido < -0.005) out.push({ chave: k, calculado, conferido });
+    }
+    return out.sort((a, b) => a.calculado - b.calculado);
+  }, [porFormaDoDiaFechamento, conferidoOwn]);
+
+  /**
+   * Mesma trava, no fechamento feito pelo gestor sobre o caixa de outra pessoa.
+   * Sem isto o bloqueio seria contornável só trocando de tela.
+   */
+  const formasNegativasTerceiro = useMemo(() => {
+    if (!openFecharTerceiro) return [];
+    const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
+    const out: Array<{ chave: string; calculado: number; conferido: number }> = [];
+    const chaves = new Set([...Object.keys(porForma), ...Object.keys(conferidoTerceiro)]);
+    for (const k of chaves) {
+      const calculado = Number(porForma[k] ?? 0);
+      const conferido = Number(conferidoTerceiro[k]) || 0;
+      if (calculado < -0.005 || conferido < -0.005) out.push({ chave: k, calculado, conferido });
+    }
+    return out.sort((a, b) => a.calculado - b.calculado);
+  }, [openFecharTerceiro, entradasPorFormaSessao, conferidoTerceiro]);
+
   /** Linha do tempo de sangrias e suprimentos do turno atual. */
   const movsGaveta = useMemo(
     () =>
@@ -2565,6 +2606,21 @@ function Page() {
         openMov.tipo === "sangria"
           ? "Selecione a quem o dinheiro está sendo entregue"
           : "Selecione de quem o dinheiro está sendo recebido",
+      );
+      return;
+    }
+    // Trava física da gaveta: sangria retira dinheiro em espécie, então nunca
+    // pode ser maior do que o dinheiro que existe no turno (abertura +
+    // recebimentos em dinheiro + suprimentos − sangrias − despesas em espécie).
+    //
+    // Sem esta trava a gaveta ficava negativa e o fechamento ainda dizia
+    // "confere", porque o total do dia soma cartão/PIX (que nunca passam pela
+    // gaveta) e o buraco no dinheiro era compensado por eles. Medido na base:
+    // em 30 dias, 13 fechamentos terminaram com a gaveta negativa marcando
+    // diferença R$ 0,00 — o maior deles, 18/08/2026, com −R$ 447,05.
+    if (openMov.tipo === "sangria" && v > esperadoGaveta + 0.005) {
+      toast.error(
+        `Sangria maior que o dinheiro em caixa. Disponível agora: ${fmt(Math.max(0, esperadoGaveta))}.`,
       );
       return;
     }
@@ -2666,6 +2722,17 @@ function Page() {
   const fecharCaixa = async (e: FormEvent) => {
     e.preventDefault();
     if (!minhaSessao || !clinicaAtual || !user) return;
+    // Trava: forma de pagamento negativa não pode virar fechamento "confere".
+    // Ver formasNegativasFechamento — o caixa precisa ser corrigido antes.
+    if (formasNegativasFechamento.length > 0) {
+      const lista = formasNegativasFechamento
+        .map((f) => FORMA_LABEL[f.chave as FormaBucket] ?? f.chave)
+        .join(", ");
+      toast.error(
+        `Não é possível fechar: ${lista} com saldo negativo. Corrija o lançamento errado antes de encerrar o caixa.`,
+      );
+      return;
+    }
     const informado = totalConferidoOwn;
     // Escopo por dia selecionado: fecha apenas os valores do dia escolhido.
     const saldoRef = saldoDoDiaFechamento;
@@ -2746,6 +2813,15 @@ function Page() {
     e.preventDefault();
     const alvo = openFecharTerceiro;
     if (!alvo || !clinicaAtual || !user) return;
+    if (formasNegativasTerceiro.length > 0) {
+      const lista = formasNegativasTerceiro
+        .map((f) => FORMA_LABEL[f.chave as FormaBucket] ?? f.chave)
+        .join(", ");
+      toast.error(
+        `Não é possível fechar: ${lista} com saldo negativo neste caixa. Corrija o lançamento errado antes de encerrar.`,
+      );
+      return;
+    }
     const calc = calcSaldoSessao(alvo.id);
     const conferidoNum: Record<string, number> = {};
     for (const [k, v] of Object.entries(conferidoTerceiro)) {
@@ -4387,6 +4463,24 @@ function Page() {
             <div>
               <Label>Valor</Label>
               <CurrencyInput value={movValor} onChange={setMovValor} />
+              {/* Na sangria o operador precisa ver o teto ANTES de digitar: o
+                  erro clássico é entregar um maço redondo (R$ 4.000,00) e
+                  digitar o número redondo em vez do que saiu de fato. */}
+              {openMov?.tipo === "sangria" &&
+                (() => {
+                  const pedido = Number(movValor) || 0;
+                  const excede = pedido > esperadoGaveta + 0.005;
+                  return (
+                    <p
+                      className={`mt-1 text-xs ${excede ? "font-semibold text-destructive" : "text-muted-foreground"}`}
+                    >
+                      Dinheiro disponível na gaveta agora:{" "}
+                      <strong>{fmt(Math.max(0, esperadoGaveta))}</strong>
+                      {excede &&
+                        ` — você está retirando ${fmt(pedido - esperadoGaveta)} a mais do que existe.`}
+                    </p>
+                  );
+                })()}
             </div>
             <div>
               <Label>
@@ -4497,7 +4591,12 @@ function Page() {
               </Button>
               <Button
                 type="submit"
-                disabled={saving || movDesc.trim().length < 3 || !(Number(movValor) > 0)}
+                disabled={
+                  saving ||
+                  movDesc.trim().length < 3 ||
+                  !(Number(movValor) > 0) ||
+                  (openMov?.tipo === "sangria" && (Number(movValor) || 0) > esperadoGaveta + 0.005)
+                }
                 data-primary
               >
                 Lançar
@@ -4531,6 +4630,36 @@ function Page() {
               </p>
             )}
           </DialogHeader>
+          {/* Bloqueio duro: alguma forma fechou negativa. Fica no topo porque o
+              caixa não pode ser encerrado enquanto isso não for corrigido. */}
+          {formasNegativasFechamento.length > 0 && (
+            <div className="rounded-md border-2 border-destructive bg-destructive/10 p-3 text-xs text-destructive space-y-2">
+              <p className="text-sm font-bold">
+                Fechamento bloqueado: saldo negativo por forma de pagamento.
+              </p>
+              <ul className="space-y-0.5">
+                {formasNegativasFechamento.map((f) => (
+                  <li key={f.chave} className="tabular-nums">
+                    <strong>{FORMA_LABEL[f.chave as FormaBucket] ?? f.chave}</strong>: calculado{" "}
+                    {fmt(f.calculado)}
+                    {Math.abs(f.conferido) > 0.005 ? ` · conferido ${fmt(f.conferido)}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="font-normal">
+                Saldo negativo significa que saiu mais dinheiro dessa forma do que entrou — o que é
+                impossível na prática. Quase sempre é uma <strong>sangria digitada a mais</strong>{" "}
+                do que o valor realmente entregue, ou um recebimento que ainda não foi lançado.
+                Confira os lançamentos do dia na aba Movimentos, corrija o valor errado e volte a
+                fechar.
+              </p>
+              <p className="font-normal">
+                Não encerre o caixa mesmo assim: o total do dia soma cartão e PIX, que não passam
+                pela gaveta, e eles acabam escondendo o buraco do dinheiro — o fechamento sairia
+                marcado como "confere" com a diferença ainda lá.
+              </p>
+            </div>
+          )}
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
               <Label>Dia a fechar</Label>
@@ -4697,7 +4826,12 @@ function Page() {
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={saving || formasNegativasFechamento.length > 0}
+                data-primary
+              >
                 <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
               </Button>
             </DialogFooter>
@@ -4790,6 +4924,27 @@ function Page() {
               </DialogDescription>
             )}
           </DialogHeader>
+          {formasNegativasTerceiro.length > 0 && (
+            <div className="rounded-md border-2 border-destructive bg-destructive/10 p-3 text-xs text-destructive space-y-2">
+              <p className="text-sm font-bold">
+                Fechamento bloqueado: saldo negativo por forma de pagamento.
+              </p>
+              <ul className="space-y-0.5">
+                {formasNegativasTerceiro.map((f) => (
+                  <li key={f.chave} className="tabular-nums">
+                    <strong>{FORMA_LABEL[f.chave as FormaBucket] ?? f.chave}</strong>: calculado{" "}
+                    {fmt(f.calculado)}
+                    {Math.abs(f.conferido) > 0.005 ? ` · conferido ${fmt(f.conferido)}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="font-normal">
+                Saiu mais dinheiro dessa forma do que entrou — normalmente uma sangria digitada a
+                mais do que o valor entregue, ou um recebimento que ficou sem lançar. Corrija o
+                lançamento no caixa deste operador antes de encerrar.
+              </p>
+            </div>
+          )}
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
             {openFecharTerceiro &&
               (() => {
@@ -4874,7 +5029,12 @@ function Page() {
               <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={saving || formasNegativasTerceiro.length > 0}
+                data-primary
+              >
                 Confirmar fechamento
               </Button>
             </DialogFooter>
