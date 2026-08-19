@@ -15,7 +15,7 @@ import {
   TrendingUp,
   Receipt,
   BadgeDollarSign,
-  Users,
+  FileText,
   UserPlus,
   Repeat,
   Handshake,
@@ -134,6 +134,18 @@ type Bloco = {
     conversaoOrcamento: number;
     orcamentosNoPeriodo: number;
   };
+  /**
+   * GRs (guias) emitidas no período — vem pronto do banco (RPC
+   * `painel_grs_periodo`), porque a contagem no navegador é limitada a 1.000
+   * linhas por consulta e a clínica emite muito mais que isso.
+   * `pacientes` = pacientes distintos que geraram essas guias.
+   */
+  grs: {
+    total: number;
+    pacientes: number;
+    novos: number;
+    recorrentes: number;
+  };
   qualidade: {
     noShowPct: number;
     atrasoMedioMin: number;
@@ -167,6 +179,7 @@ const emptyBloco = (): Bloco => ({
     receitaConvenio: 0,
   },
   comercial: { novos: 0, recorrentes: 0, conversaoOrcamento: 0, orcamentosNoPeriodo: 0 },
+  grs: { total: 0, pacientes: 0, novos: 0, recorrentes: 0 },
   qualidade: { noShowPct: 0, atrasoMedioMin: 0 },
 });
 
@@ -228,6 +241,19 @@ async function carregarBloco(
   const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
   const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
+  // GRs emitidas no período + pacientes distintos que as geraram. A conta é
+  // feita no banco (supabase/migrations/20260819180000_painel_grs_periodo.sql):
+  // no navegador ela sairia truncada, porque cada consulta traz no máximo 1.000
+  // linhas. Disparada aqui e aguardada abaixo, para rodar junto com as demais.
+  const grsPromise = supabase.rpc(
+    "painel_grs_periodo" as never,
+    {
+      p_clinica: cid,
+      p_ini: ini,
+      p_fim: fim,
+    } as never,
+  );
+
   const [agsR, lancR, atendR, medicosR, dispR, orcR, especR, medEspR, procR] = await Promise.all([
     supabase
       .from("agendamentos")
@@ -274,6 +300,7 @@ async function carregarBloco(
       .eq("clinica_id", cid)
       .eq("ativo", true),
   ]);
+  const grsR = await grsPromise;
 
   const ags = (agsR.data ?? []) as Ag[];
   const lancs = (lancR.data ?? []) as Lanc[];
@@ -298,6 +325,16 @@ async function carregarBloco(
     paciente_id: string | null;
     created_at: string;
   }[];
+  // A RPC devolve uma única linha. Se a função ainda não existir no banco, o
+  // painel continua abrindo — o card só mostra zero em vez de quebrar a tela.
+  const grLinha = (
+    (grsR.data ?? []) as {
+      grs: number;
+      pacientes: number;
+      novos: number;
+      recorrentes: number;
+    }[]
+  )[0];
   const espLista = (especR.data ?? []) as { id: string; nome: string }[];
   const medEsp = (medEspR.data ?? []) as { medico_id: string; especialidade_id: string }[];
 
@@ -555,6 +592,12 @@ async function carregarBloco(
       conversaoOrcamento,
       orcamentosNoPeriodo: orcs.length,
     },
+    grs: {
+      total: Number(grLinha?.grs ?? 0),
+      pacientes: Number(grLinha?.pacientes ?? 0),
+      novos: Number(grLinha?.novos ?? 0),
+      recorrentes: Number(grLinha?.recorrentes ?? 0),
+    },
     qualidade: {
       noShowPct,
       atrasoMedioMin,
@@ -622,6 +665,8 @@ function PainelExecutivoPage() {
     ca = anterior.comercial;
   const q = atual.qualidade,
     qa = anterior.qualidade;
+  const g = atual.grs,
+    gaAnt = anterior.grs;
 
   return (
     <div className="space-y-6">
@@ -716,13 +761,16 @@ function PainelExecutivoPage() {
           ]}
         />
         <BigCard
-          title="Clientes"
-          icon={Users}
-          value={int(c.novos + c.recorrentes)}
-          delta={delta(c.novos + c.recorrentes, ca.novos + ca.recorrentes)}
+          title="GRs / Guias"
+          icon={FileText}
+          value={int(g.total)}
+          delta={delta(g.total, gaAnt.total)}
           subs={[
-            { label: "Novos", value: int(c.novos) },
-            { label: "Recorrentes", value: int(c.recorrentes) },
+            { label: "Pacientes", value: int(g.pacientes) },
+            {
+              label: "Novos / Recorrentes",
+              value: `${int(g.novos)} / ${int(g.recorrentes)}`,
+            },
           ]}
         />
         {podeFin ? (
