@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { precoAtendimentoParaCaixa, type PrecoCaixa } from "@/lib/convenio/info-convenio-paciente";
 import { useClinica } from "@/hooks/use-clinica";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useAuth } from "@/hooks/use-auth";
@@ -801,6 +802,15 @@ function Page() {
     parcelas: "1",
   });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
+  /**
+   * Preço do atendimento recalculado pelo motor de convênio da Agenda ao abrir
+   * a cobrança. A fila é montada por uma função do banco que só faz uma conta
+   * aproximada; o valor que vale é este.
+   */
+  const [precoCobranca, setPrecoCobranca] = useState<PrecoCaixa | null>(null);
+  const [calculandoPreco, setCalculandoPreco] = useState(false);
+  /** Guarda qual cobrança está sendo calculada, para descartar resposta atrasada. */
+  const precoPedidoRef = useRef<string | null>(null);
 
   // Edição inline da "Forma" nas tabelas de Movimentos. Só liberada para
   // quem tem permissão de escrita no módulo caixa e apenas para movimentos
@@ -1468,9 +1478,7 @@ function Page() {
         id: r.id,
         paciente_id: r.paciente_id,
         paciente_nome: r.paciente_nome,
-        procedimento: r.desconto_origem
-          ? `${r.procedimento} (${r.desconto_origem})`
-          : r.procedimento,
+        procedimento: r.procedimento,
         inicio: r.inicio,
         medico_nome: r.medico_nome,
         valor: Number(r.valor ?? 0),
@@ -1483,6 +1491,71 @@ function Page() {
   useEffect(() => {
     if (minhaSessao) void loadFilaCaixa();
   }, [minhaSessao, loadFilaCaixa]);
+
+  /**
+   * Abre a cobrança de um paciente da fila recalculando o preço pelo motor de
+   * convênio da Agenda (`precoAtendimentoParaCaixa`).
+   *
+   * A fila vem da função `fila_caixa_hoje` do banco, que faz uma conta
+   * aproximada e divergia da Agenda: ignorava dependentes do contrato e
+   * benefícios com cota, repetia o preço de dinheiro na coluna de cartão e não
+   * checava mensalidade em atraso. O valor cobrado passa a sair do mesmo motor
+   * que a Agenda usa. Se o recálculo falhar, o valor da fila é mantido — a
+   * cobrança nunca fica travada por causa disso.
+   */
+  const abrirCobranca = useCallback(
+    async (f: FilaCaixa) => {
+      setOpenCobranca(f);
+      setCobrancaLinhas([
+        { forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" },
+      ]);
+      setPrecoCobranca(null);
+      if (!clinicaAtual || !f.paciente_id) return;
+      precoPedidoRef.current = f.id;
+      setCalculandoPreco(true);
+      try {
+        // O nome do serviço vem do próprio agendamento, e não do texto montado
+        // para a lista: a fila anexa ao nome a etiqueta do benefício
+        // ("CONSULTA (-10%)"), que não casa com o cadastro de serviços.
+        const { data: ag } = await supabase
+          .from("agendamentos")
+          .select("medico_id,procedimento,inicio")
+          .eq("id", f.id)
+          .maybeSingle();
+        const linha = ag as {
+          medico_id: string | null;
+          procedimento: string | null;
+          inicio: string | null;
+        } | null;
+        const preco = await precoAtendimentoParaCaixa({
+          clinicaId: clinicaAtual.clinica_id,
+          pacienteId: f.paciente_id,
+          medicoId: linha?.medico_id ?? null,
+          procedimentoNome: linha?.procedimento ?? f.procedimento,
+          agendamentoId: f.id,
+          dataRef: linha?.inicio ?? f.inicio,
+        });
+        if (precoPedidoRef.current !== f.id) return;
+        if (!preco) return;
+        setPrecoCobranca(preco);
+        setOpenCobranca((prev) =>
+          prev && prev.id === f.id
+            ? { ...prev, valor: preco.valorDinheiro, valor_cartao: preco.valorCartao }
+            : prev,
+        );
+        setCobrancaLinhas((prev) =>
+          prev.length === 1 && prev[0].forma === "dinheiro"
+            ? [{ ...prev[0], valor: String(preco.valorDinheiro) }]
+            : prev,
+        );
+      } catch (err) {
+        console.error("[caixa] falha ao recalcular preço do convênio", err);
+      } finally {
+        if (precoPedidoRef.current === f.id) setCalculandoPreco(false);
+      }
+    },
+    [clinicaAtual],
+  );
 
   // Consome ?receber=<agendamentoId> vindo do CaixaShellV2:
   // abre a cobrança do paciente correto assim que a fila carregar.
@@ -1507,11 +1580,8 @@ function Page() {
       toast.info(`${item.paciente_nome} já foi pago — cobrança bloqueada para evitar duplicidade.`);
       return;
     }
-    setOpenCobranca(item);
-    setCobrancaLinhas([
-      { forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" },
-    ]);
-  }, [minhaSessao, filaCaixa]);
+    void abrirCobranca(item);
+  }, [minhaSessao, filaCaixa, abrirCobranca]);
 
   useEffect(() => {
     if (!clinicaAtual || !minhaSessao) return;
@@ -1602,6 +1672,26 @@ function Page() {
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
       const hoje = new Date().toISOString().slice(0, 10);
+      // Carimbo do convênio na descrição, no mesmo formato da Agenda. Serve à
+      // contagem de cota do benefício: um atendimento gravado como "particular"
+      // só conta como uso do convênio quando o lançamento registra que o
+      // desconto foi aplicado. Sem o carimbo, um benefício limitado (ex.: uma
+      // consulta a R$ 9,99 por mês) poderia ser usado de novo no mesmo período.
+      // Só carimba quando o valor cobrado ficou dentro do preço do convênio —
+      // se o atendente digitou o valor cheio, a cobrança é particular e não
+      // consome a cota.
+      const totalCobrado = linhasValidadas.reduce((acc, l) => acc + l.valor, 0);
+      const tetoConvenio = precoCobranca
+        ? Math.max(precoCobranca.valorDinheiro, precoCobranca.valorCartao) + 0.01
+        : 0;
+      const sufixoConvenio =
+        precoCobranca &&
+        !precoCobranca.cobrandoParticular &&
+        precoCobranca.convenioNome &&
+        precoCobranca.rotuloBeneficio &&
+        totalCobrado <= tetoConvenio
+          ? ` — Convênio ${precoCobranca.convenioNome} (${precoCobranca.rotuloBeneficio})`
+          : "";
       // Cada linha vira um par atômico (lançamento + movimento) via RPC.
       // Se a inserção do movimento falhar dentro do banco, o lançamento
       // é revertido automaticamente pela transação Postgres — não há mais
@@ -1614,7 +1704,7 @@ function Page() {
             p_lancamento: {
               clinica_id: clinicaAtual.clinica_id,
               tipo: "receita",
-              descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
+              descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}${sufixoConvenio}`,
               valor: l.valor,
               data: hoje,
               status: "confirmado",
@@ -1628,7 +1718,7 @@ function Page() {
               user_id: user.id,
               tipo: "recebimento",
               valor: l.valor,
-              descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
+              descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}${sufixoConvenio}`,
               forma_pagamento: l.forma,
             },
           },
@@ -3403,17 +3493,7 @@ function Page() {
                                   <Button
                                     size="sm"
                                     className="w-full h-7 text-xs"
-                                    onClick={() => {
-                                      setOpenCobranca(f);
-                                      setCobrancaLinhas([
-                                        {
-                                          forma: "dinheiro",
-                                          valor: String(f.valor || 0),
-                                          bandeira: "",
-                                          parcelas: "1",
-                                        },
-                                      ]);
-                                    }}
+                                    onClick={() => void abrirCobranca(f)}
                                   >
                                     <Receipt className="h-3 w-3 mr-1" /> Cobrar{" "}
                                     <ChevronRight className="h-3 w-3 ml-auto" />
@@ -4921,6 +5001,40 @@ function Page() {
                 </div>
               );
             })()}
+            {calculandoPreco && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Conferindo convênio do paciente…
+              </div>
+            )}
+            {!calculandoPreco && precoCobranca?.convenioNome && (
+              <div
+                className={
+                  precoCobranca.cobrandoParticular
+                    ? "rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                    : "rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+                }
+              >
+                <div className="font-medium">
+                  {precoCobranca.cobrandoParticular
+                    ? `Convênio ${precoCobranca.convenioNome} — sem benefício neste atendimento`
+                    : `Convênio ${precoCobranca.convenioNome} · ${precoCobranca.rotuloBeneficio}`}
+                </div>
+                {!precoCobranca.cobrandoParticular && (
+                  <div className="mt-0.5">
+                    {precoCobranca.memoriaDinheiro} · cartão/PIX {fmt(precoCobranca.valorCartao)}{" "}
+                    <span className="text-emerald-700/70">
+                      (particular {fmt(precoCobranca.baseDinheiro)})
+                    </span>
+                  </div>
+                )}
+                {precoCobranca.aviso && <div className="mt-0.5">{precoCobranca.aviso}</div>}
+                {precoCobranca.gratuidade && (
+                  <div className="mt-0.5 font-medium">
+                    Cortesia do convênio — confira antes de confirmar.
+                  </div>
+                )}
+              </div>
+            )}
             <div className="space-y-3">
               {cobrancaLinhas.map((l, idx) => (
                 <div key={idx} className="rounded-md border p-3 space-y-2">
