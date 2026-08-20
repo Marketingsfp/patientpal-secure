@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { buscarProfissionaisFisio } from "@/lib/fisio-profissionais";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Dialog,
@@ -91,19 +92,14 @@ export function NovoPacoteDialog({
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const [{ data: proc }, { data: med }, { data: orc }] = await Promise.all([
+      const [{ data: proc }, med, { data: orc }] = await Promise.all([
         supabase
           .from("procedimentos")
           .select("id, nome, valor_padrao")
           .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .order("nome"),
-        supabase
-          .from("medicos")
-          .select("id, nome")
-          .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .order("nome"),
+        buscarProfissionaisFisio(clinicaId),
         supabase
           .from("orcamentos")
           .select("id, numero, valor_total")
@@ -113,7 +109,7 @@ export function NovoPacoteDialog({
           .order("numero", { ascending: false }),
       ]);
       setProcedimentos((proc as Procedimento[]) ?? []);
-      setProfissionais(med ?? []);
+      setProfissionais(med);
       setOrcamentos((orc as OrcamentoAberto[]) ?? []);
     })();
   }, [open, clinicaId, pacienteId]);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { buscarProfissionaisFisio } from "@/lib/fisio-profissionais";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Dialog,
@@ -75,13 +76,7 @@ export function MarcacaoDialog({
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const { data: m } = await supabase
-        .from("medicos")
-        .select("id, nome")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .order("nome");
-      setProfissionais(m ?? []);
+      setProfissionais(await buscarProfissionaisFisio(clinicaId));
     })();
   }, [open, clinicaId]);
 
