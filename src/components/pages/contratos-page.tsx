@@ -1637,6 +1637,34 @@ function NovoContratoForm({
     titularContratoAtivo === null &&
     obsSanitizedLen <= OBS_MAX;
 
+  // Resumo em dinheiro para a recepção: separa o que o paciente paga AGORA, no
+  // balcão, do que vem depois. A tela mostrava "Valor mensal" e "Taxa de adesão"
+  // lado a lado sem dizer qual dos dois se cobra na hora — num convênio com
+  // adesão no ato, a recepção batia o olho em R$ 290,00 e achava que era o
+  // valor da emissão, quando o certo eram os R$ 20,00 da adesão.
+  const resumoCobranca = useMemo(() => {
+    const adesao = Number(taxa) || 0;
+    const noAto = Boolean(convenio?.adesao_no_ato) && adesao > 0;
+    const parcelas = Math.max(0, Number(convenio?.num_parcelas ?? 0) || 0);
+    const valorParcela = (Number(valor) || 0) + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
+    const base = new Date(dataInicio + "T00:00:00");
+    const baseOk = !Number.isNaN(base.getTime());
+    const fmt = (d: Date) => d.toLocaleDateString("pt-BR");
+    return {
+      adesao,
+      noAto,
+      parcelas,
+      valorParcela,
+      /** O que a recepção recebe no balcão hoje. Zero quando a adesão vai embutida. */
+      pagarAgora: noAto ? adesao : 0,
+      /** 1ª mensalidade: sozinha no modo "no ato", somada à taxa no modo embutido. */
+      primeiraParcela: noAto ? valorParcela : valorParcela + adesao,
+      primeiroVenc: baseOk ? fmt(new Date(base.getFullYear(), base.getMonth() + 1, diaVenc)) : "—",
+      dataEmissao: baseOk ? fmt(base) : "—",
+      total: adesao + valorParcela * parcelas,
+    };
+  }, [taxa, convenio, valor, tipoCobranca, dataInicio, diaVenc]);
+
   useEffect(() => {
     if (convenio) {
       setValor(Number(convenio.valor_mensal));
@@ -1805,9 +1833,7 @@ function NovoContratoForm({
             valor: taxaAdesao,
             taxa_adesao: 0,
             status: mensalidadesJaPagas > 0 ? "pago" : "pendente",
-            ...(mensalidadesJaPagas > 0
-              ? { pago_em: dataInicio, valor_pago: taxaAdesao }
-              : {}),
+            ...(mensalidadesJaPagas > 0 ? { pago_em: dataInicio, valor_pago: taxaAdesao } : {}),
             observacoes: "Taxa de adesão",
           },
           ...parcelas,
@@ -2169,6 +2195,50 @@ function NovoContratoForm({
                 </Select>
               </div>
             </div>
+            {/* Quanto cobrar — resumo para a recepção não confundir o valor da
+                mensalidade com o valor a receber na emissão. */}
+            {convenio ? (
+              <div className="col-span-2 rounded-md border-2 border-primary/40 bg-primary/5 p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:border-r sm:border-primary/20 sm:pr-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                      Cobrar hoje, na emissão
+                    </div>
+                    <div className="text-2xl font-bold tabular-nums mt-0.5">
+                      {BRL(resumoCobranca.pagarAgora)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {resumoCobranca.pagarAgora > 0
+                        ? `Só a taxa de adesão. Vence em ${resumoCobranca.dataEmissao}, no ato.`
+                        : resumoCobranca.adesao > 0
+                          ? `Nada no balcão: a taxa de adesão de ${BRL(resumoCobranca.adesao)} é cobrada junto com a 1ª mensalidade.`
+                          : "Este convênio não tem taxa de adesão."}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Mensalidade a partir do próximo mês
+                    </div>
+                    <div className="text-2xl font-bold tabular-nums mt-0.5">
+                      {BRL(resumoCobranca.valorParcela)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {resumoCobranca.parcelas}x, a 1ª vencendo em {resumoCobranca.primeiroVenc}
+                      {resumoCobranca.pagarAgora === 0 && resumoCobranca.adesao > 0 ? (
+                        <span className="block text-amber-600 font-medium">
+                          A 1ª sai {BRL(resumoCobranca.primeiraParcela)} (mensalidade + adesão).
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-primary/20 text-xs text-muted-foreground">
+                  Total do contrato: <strong>{BRL(resumoCobranca.total)}</strong> —{" "}
+                  {BRL(resumoCobranca.adesao)} de adesão + {resumoCobranca.parcelas}x{" "}
+                  {BRL(resumoCobranca.valorParcela)}
+                </div>
+              </div>
+            ) : null}
             {(() => {
               // Mostra campo "já pagas" quando data de início é anterior ao mês atual
               if (!dataInicio || !convenio) return null;
