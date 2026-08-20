@@ -32,7 +32,7 @@ export function PacienteFisioPanel({
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button asChild size="sm" variant="outline">
-          <Link to="/app/fisioterapia" hash="avaliacao" search={{ paciente: pacienteId }}>
+          <Link to="/app/fisioterapia" search={{ paciente: pacienteId }}>
             <ExternalLink className="h-4 w-4 mr-2" /> Abrir módulo completo
           </Link>
         </Button>

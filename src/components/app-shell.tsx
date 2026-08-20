@@ -183,13 +183,25 @@ const navItemKey = (it: NavItem): string =>
 
 // Rotas que só ficam ativas em correspondência exata. "/app/clientes" tem
 // sub-rotas com item próprio no menu (ex.: "/app/clientes/duplicados"), então
-// o item pai não deve acender quando o usuário está numa sub-rota.
-const ROTAS_MATCH_EXATO: ReadonlySet<string> = new Set(["/app", "/app/clientes"]);
+// o item pai não deve acender quando o usuário está numa sub-rota. O mesmo
+// vale para as telas-raiz de Odontologia e Fisioterapia, que são prefixo das
+// irmãs "/orcamentos" e "/pacotes" — sem isso os dois itens do grupo
+// acenderiam ao mesmo tempo.
+const ROTAS_MATCH_EXATO: ReadonlySet<string> = new Set([
+  "/app",
+  "/app/clientes",
+  "/app/odontologia",
+  "/app/fisioterapia",
+]);
 
 /** True quando o item do menu (`to`) corresponde à rota atual. */
 export function itemDeMenuAtivo(pathname: string, to: string): boolean {
-  if (ROTAS_MATCH_EXATO.has(to)) return pathname === to;
-  return pathname === to || pathname.startsWith(`${to}/`);
+  // Rota de índice pode chegar com barra no fim ("/app/odontologia/"), que é o
+  // caminho que o roteador gera para o arquivo `.index.tsx`. Sem normalizar, o
+  // item de menu correspondente ficaria apagado nesse endereço.
+  const p = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  if (ROTAS_MATCH_EXATO.has(to)) return p === to;
+  return p === to || p.startsWith(`${to}/`);
 }
 
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
@@ -500,22 +512,19 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         ],
       },
       {
-        // Odontologia virou grupo expansível (mesmo padrão da Nina): os dois
-        // filhos apontam para a mesma rota e a tela escolhe a aba pelo hash.
-        // Assim "Orçamentos de Odonto" tem entrada própria no menu em vez de
-        // ficar escondido numa aba interna.
+        // Grupo expansível por especialidade. Cada filho tem rota própria —
+        // antes os dois apontavam para a mesma rota e a tela escolhia a aba
+        // pelo hash, o que deixava o endereço igual para telas diferentes.
         label: "Odontologia",
         icon: Tooth,
         children: [
           {
             to: "/app/odontologia",
-            hash: "prontuario",
             label: "Odontograma & Prontuário",
             icon: Tooth,
           },
           {
-            to: "/app/odontologia",
-            hash: "orcamento",
+            to: "/app/odontologia/orcamentos",
             label: "Orçamentos de Odonto",
             icon: Receipt,
           },
@@ -523,19 +532,17 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       },
       {
         // Mesma estrutura da Odontologia: um grupo por especialidade, com a
-        // tela clínica e a tela de gestão separadas no menu.
+        // tela clínica e a tela de gestão em rotas separadas.
         label: "Fisioterapia",
         icon: Activity,
         children: [
           {
             to: "/app/fisioterapia",
-            hash: "avaliacao",
             label: "Mapa Corporal & Avaliação",
             icon: Activity,
           },
           {
-            to: "/app/fisioterapia",
-            hash: "pacotes",
+            to: "/app/fisioterapia/pacotes",
             label: "Pacotes de Sessões",
             icon: ClipboardList,
           },

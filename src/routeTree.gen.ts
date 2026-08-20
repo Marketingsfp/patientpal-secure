@@ -54,7 +54,6 @@ import { Route as AuthenticatedAppPainelExecutivoRouteImport } from './routes/_a
 import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
 import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_authenticated/app.orcamentos-agenda'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
-import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
@@ -70,7 +69,6 @@ import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHiperdiaRouteImport } from './routes/_authenticated/app.hiperdia'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
-import { Route as AuthenticatedAppFisioterapiaRouteImport } from './routes/_authenticated/app.fisioterapia'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
@@ -104,8 +102,10 @@ import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/
 import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
 import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
+import { Route as AuthenticatedAppOdontologiaIndexRouteImport } from './routes/_authenticated/app.odontologia.index'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
+import { Route as AuthenticatedAppFisioterapiaIndexRouteImport } from './routes/_authenticated/app.fisioterapia.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
@@ -113,10 +113,12 @@ import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
+import { Route as AuthenticatedAppOdontologiaOrcamentosRouteImport } from './routes/_authenticated/app.odontologia.orcamentos'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
 import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_authenticated/app.hr-contratos.$id'
+import { Route as AuthenticatedAppFisioterapiaPacotesRouteImport } from './routes/_authenticated/app.fisioterapia.pacotes'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
@@ -385,12 +387,6 @@ const AuthenticatedAppOrcamentosRoute =
     path: '/orcamentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppOdontologiaRoute =
-  AuthenticatedAppOdontologiaRouteImport.update({
-    id: '/odontologia',
-    path: '/odontologia',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppNinaRoute = AuthenticatedAppNinaRouteImport.update({
   id: '/nina',
   path: '/nina',
@@ -476,12 +472,6 @@ const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
   path: '/fluxo',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppFisioterapiaRoute =
-  AuthenticatedAppFisioterapiaRouteImport.update({
-    id: '/fisioterapia',
-    path: '/fisioterapia',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppFinanceiroRoute =
   AuthenticatedAppFinanceiroRouteImport.update({
     id: '/financeiro',
@@ -669,6 +659,12 @@ const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   path: '/agenda',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppOdontologiaIndexRoute =
+  AuthenticatedAppOdontologiaIndexRouteImport.update({
+    id: '/odontologia/',
+    path: '/odontologia/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppNfseIndexRoute =
   AuthenticatedAppNfseIndexRouteImport.update({
     id: '/nfse/',
@@ -679,6 +675,12 @@ const AuthenticatedAppHrContratosIndexRoute =
   AuthenticatedAppHrContratosIndexRouteImport.update({
     id: '/hr-contratos/',
     path: '/hr-contratos/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFisioterapiaIndexRoute =
+  AuthenticatedAppFisioterapiaIndexRouteImport.update({
+    id: '/fisioterapia/',
+    path: '/fisioterapia/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFinanceiroIndexRoute =
@@ -723,6 +725,12 @@ const ApiPublicFocusnfeWebhookRoute =
     path: '/api/public/focusnfe/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAppOdontologiaOrcamentosRoute =
+  AuthenticatedAppOdontologiaOrcamentosRouteImport.update({
+    id: '/odontologia/orcamentos',
+    path: '/odontologia/orcamentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppNfseTestarRoute =
   AuthenticatedAppNfseTestarRouteImport.update({
     id: '/nfse/testar',
@@ -745,6 +753,12 @@ const AuthenticatedAppHrContratosIdRoute =
   AuthenticatedAppHrContratosIdRouteImport.update({
     id: '/hr-contratos/$id',
     path: '/hr-contratos/$id',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFisioterapiaPacotesRoute =
+  AuthenticatedAppFisioterapiaPacotesRouteImport.update({
+    id: '/fisioterapia/pacotes',
+    path: '/fisioterapia/pacotes',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFinanceiroRelatoriosRoute =
@@ -990,7 +1004,6 @@ export interface FileRoutesByFullPath {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
-  '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1006,7 +1019,6 @@ export interface FileRoutesByFullPath {
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
-  '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1057,10 +1069,12 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
   '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1068,8 +1082,10 @@ export interface FileRoutesByFullPath {
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
   '/app/hr-contratos/': typeof AuthenticatedAppHrContratosIndexRoute
   '/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
+  '/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -1126,7 +1142,6 @@ export interface FileRoutesByTo {
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
-  '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1142,7 +1157,6 @@ export interface FileRoutesByTo {
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
-  '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1193,10 +1207,12 @@ export interface FileRoutesByTo {
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
   '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1204,8 +1220,10 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaIndexRoute
   '/app/hr-contratos': typeof AuthenticatedAppHrContratosIndexRoute
   '/app/nfse': typeof AuthenticatedAppNfseIndexRoute
+  '/app/odontologia': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -1268,7 +1286,6 @@ export interface FileRoutesById {
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
-  '/_authenticated/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1284,7 +1301,6 @@ export interface FileRoutesById {
   '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
-  '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/_authenticated/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/_authenticated/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1335,10 +1351,12 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
+  '/_authenticated/app/fisioterapia/pacotes': typeof AuthenticatedAppFisioterapiaPacotesRoute
   '/_authenticated/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/_authenticated/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1346,8 +1364,10 @@ export interface FileRoutesById {
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
+  '/_authenticated/app/fisioterapia/': typeof AuthenticatedAppFisioterapiaIndexRoute
   '/_authenticated/app/hr-contratos/': typeof AuthenticatedAppHrContratosIndexRoute
   '/_authenticated/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
+  '/_authenticated/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
@@ -1410,7 +1430,6 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/financeiro'
-    | '/app/fisioterapia'
     | '/app/fluxo'
     | '/app/hiperdia'
     | '/app/hr-ferias'
@@ -1426,7 +1445,6 @@ export interface FileRouteTypes {
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
-    | '/app/odontologia'
     | '/app/orcamentos'
     | '/app/orcamentos-agenda'
     | '/app/painel'
@@ -1477,10 +1495,12 @@ export interface FileRouteTypes {
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
+    | '/app/fisioterapia/pacotes'
     | '/app/hr-contratos/$id'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/app/odontologia/orcamentos'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1488,8 +1508,10 @@ export interface FileRouteTypes {
     | '/app/clientes/'
     | '/app/equipe/'
     | '/app/financeiro/'
+    | '/app/fisioterapia/'
     | '/app/hr-contratos/'
     | '/app/nfse/'
+    | '/app/odontologia/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
     | '/app/equipe/medico/$medicoId/editar'
@@ -1546,7 +1568,6 @@ export interface FileRouteTypes {
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
-    | '/app/fisioterapia'
     | '/app/fluxo'
     | '/app/hiperdia'
     | '/app/hr-ferias'
@@ -1562,7 +1583,6 @@ export interface FileRouteTypes {
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
-    | '/app/odontologia'
     | '/app/orcamentos'
     | '/app/orcamentos-agenda'
     | '/app/painel'
@@ -1613,10 +1633,12 @@ export interface FileRouteTypes {
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
+    | '/app/fisioterapia/pacotes'
     | '/app/hr-contratos/$id'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/app/odontologia/orcamentos'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1624,8 +1646,10 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/equipe'
     | '/app/financeiro'
+    | '/app/fisioterapia'
     | '/app/hr-contratos'
     | '/app/nfse'
+    | '/app/odontologia'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
     | '/app/equipe/medico/$medicoId/editar'
@@ -1687,7 +1711,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/estoque'
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
-    | '/_authenticated/app/fisioterapia'
     | '/_authenticated/app/fluxo'
     | '/_authenticated/app/hiperdia'
     | '/_authenticated/app/hr-ferias'
@@ -1703,7 +1726,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nina'
-    | '/_authenticated/app/odontologia'
     | '/_authenticated/app/orcamentos'
     | '/_authenticated/app/orcamentos-agenda'
     | '/_authenticated/app/painel'
@@ -1754,10 +1776,12 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/notas'
     | '/_authenticated/app/financeiro/regras-ia'
     | '/_authenticated/app/financeiro/relatorios'
+    | '/_authenticated/app/fisioterapia/pacotes'
     | '/_authenticated/app/hr-contratos/$id'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
+    | '/_authenticated/app/odontologia/orcamentos'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1765,8 +1789,10 @@ export interface FileRouteTypes {
     | '/_authenticated/app/clientes/'
     | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
+    | '/_authenticated/app/fisioterapia/'
     | '/_authenticated/app/hr-contratos/'
     | '/_authenticated/app/nfse/'
+    | '/_authenticated/app/odontologia/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/clientes/$pacienteId/visualizar'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
@@ -2121,13 +2147,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppOrcamentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/odontologia': {
-      id: '/_authenticated/app/odontologia'
-      path: '/odontologia'
-      fullPath: '/app/odontologia'
-      preLoaderRoute: typeof AuthenticatedAppOdontologiaRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/nina': {
       id: '/_authenticated/app/nina'
       path: '/nina'
@@ -2231,13 +2250,6 @@ declare module '@tanstack/react-router' {
       path: '/fluxo'
       fullPath: '/app/fluxo'
       preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/fisioterapia': {
-      id: '/_authenticated/app/fisioterapia'
-      path: '/fisioterapia'
-      fullPath: '/app/fisioterapia'
-      preLoaderRoute: typeof AuthenticatedAppFisioterapiaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro': {
@@ -2471,6 +2483,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/odontologia/': {
+      id: '/_authenticated/app/odontologia/'
+      path: '/odontologia'
+      fullPath: '/app/odontologia/'
+      preLoaderRoute: typeof AuthenticatedAppOdontologiaIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/nfse/': {
       id: '/_authenticated/app/nfse/'
       path: '/nfse'
@@ -2483,6 +2502,13 @@ declare module '@tanstack/react-router' {
       path: '/hr-contratos'
       fullPath: '/app/hr-contratos/'
       preLoaderRoute: typeof AuthenticatedAppHrContratosIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/fisioterapia/': {
+      id: '/_authenticated/app/fisioterapia/'
+      path: '/fisioterapia'
+      fullPath: '/app/fisioterapia/'
+      preLoaderRoute: typeof AuthenticatedAppFisioterapiaIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro/': {
@@ -2534,6 +2560,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/app/odontologia/orcamentos': {
+      id: '/_authenticated/app/odontologia/orcamentos'
+      path: '/odontologia/orcamentos'
+      fullPath: '/app/odontologia/orcamentos'
+      preLoaderRoute: typeof AuthenticatedAppOdontologiaOrcamentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/nfse/testar': {
       id: '/_authenticated/app/nfse/testar'
       path: '/nfse/testar'
@@ -2560,6 +2593,13 @@ declare module '@tanstack/react-router' {
       path: '/hr-contratos/$id'
       fullPath: '/app/hr-contratos/$id'
       preLoaderRoute: typeof AuthenticatedAppHrContratosIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/fisioterapia/pacotes': {
+      id: '/_authenticated/app/fisioterapia/pacotes'
+      path: '/fisioterapia/pacotes'
+      fullPath: '/app/fisioterapia/pacotes'
+      preLoaderRoute: typeof AuthenticatedAppFisioterapiaPacotesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro/relatorios': {
@@ -2944,7 +2984,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
-  AuthenticatedAppFisioterapiaRoute: typeof AuthenticatedAppFisioterapiaRoute
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppHiperdiaRoute: typeof AuthenticatedAppHiperdiaRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
@@ -2960,7 +2999,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
-  AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
   AuthenticatedAppOrcamentosAgendaRoute: typeof AuthenticatedAppOrcamentosAgendaRoute
   AuthenticatedAppPainelRoute: typeof AuthenticatedAppPainelRoute
@@ -2982,13 +3020,17 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   AuthenticatedAppConfiguracoesVozRoute: typeof AuthenticatedAppConfiguracoesVozRoute
+  AuthenticatedAppFisioterapiaPacotesRoute: typeof AuthenticatedAppFisioterapiaPacotesRoute
   AuthenticatedAppHrContratosIdRoute: typeof AuthenticatedAppHrContratosIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
   AuthenticatedAppNfseTestarRoute: typeof AuthenticatedAppNfseTestarRoute
+  AuthenticatedAppOdontologiaOrcamentosRoute: typeof AuthenticatedAppOdontologiaOrcamentosRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
+  AuthenticatedAppFisioterapiaIndexRoute: typeof AuthenticatedAppFisioterapiaIndexRoute
   AuthenticatedAppHrContratosIndexRoute: typeof AuthenticatedAppHrContratosIndexRoute
   AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
+  AuthenticatedAppOdontologiaIndexRoute: typeof AuthenticatedAppOdontologiaIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
   AuthenticatedAppClientesPacienteIdVisualizarRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
 }
@@ -3032,7 +3074,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
-  AuthenticatedAppFisioterapiaRoute: AuthenticatedAppFisioterapiaRoute,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppHiperdiaRoute: AuthenticatedAppHiperdiaRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
@@ -3050,7 +3091,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
-  AuthenticatedAppOdontologiaRoute: AuthenticatedAppOdontologiaRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
   AuthenticatedAppOrcamentosAgendaRoute: AuthenticatedAppOrcamentosAgendaRoute,
   AuthenticatedAppPainelRoute: AuthenticatedAppPainelRoute,
@@ -3077,14 +3117,21 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppConfiguracoesPainelTotemRoute:
     AuthenticatedAppConfiguracoesPainelTotemRoute,
   AuthenticatedAppConfiguracoesVozRoute: AuthenticatedAppConfiguracoesVozRoute,
+  AuthenticatedAppFisioterapiaPacotesRoute:
+    AuthenticatedAppFisioterapiaPacotesRoute,
   AuthenticatedAppHrContratosIdRoute: AuthenticatedAppHrContratosIdRoute,
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
   AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
   AuthenticatedAppNfseTestarRoute: AuthenticatedAppNfseTestarRoute,
+  AuthenticatedAppOdontologiaOrcamentosRoute:
+    AuthenticatedAppOdontologiaOrcamentosRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
+  AuthenticatedAppFisioterapiaIndexRoute:
+    AuthenticatedAppFisioterapiaIndexRoute,
   AuthenticatedAppHrContratosIndexRoute: AuthenticatedAppHrContratosIndexRoute,
   AuthenticatedAppNfseIndexRoute: AuthenticatedAppNfseIndexRoute,
+  AuthenticatedAppOdontologiaIndexRoute: AuthenticatedAppOdontologiaIndexRoute,
   AuthenticatedAppClientesPacienteIdEditarRoute:
     AuthenticatedAppClientesPacienteIdEditarRoute,
   AuthenticatedAppClientesPacienteIdVisualizarRoute:

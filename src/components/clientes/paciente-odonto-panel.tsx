@@ -154,7 +154,7 @@ export function PacienteOdontoPanel({ pacienteId, clinicaId, readOnly = false }:
               : `${dentes.length} registro(s) no odontograma · ${orcadoSet.size} dente(s) em orçamento aberto.`}
         </p>
         <Button asChild size="sm" variant="outline">
-          <Link to="/app/odontologia" hash="prontuario" search={{ paciente: pacienteId }}>
+          <Link to="/app/odontologia" search={{ paciente: pacienteId }}>
             <ExternalLink className="h-4 w-4 mr-2" /> Abrir módulo completo
           </Link>
         </Button>
