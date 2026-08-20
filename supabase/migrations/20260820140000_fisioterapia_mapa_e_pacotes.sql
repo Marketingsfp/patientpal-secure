@@ -4,11 +4,20 @@
 -- Espelha a estrutura que já existe em Odontologia (odonto_prontuarios /
 -- odonto_dentes / odonto_evolucoes), com duas diferenças deliberadas:
 --
---  1) As policies já nascem com `has_module_access(clinica_id,'fisioterapia',…)`
---     em vez de `is_member(...)`. As tabelas de odonto usam só `is_member`, o
---     que significa que hoje o bloqueio por módulo existe apenas no menu — um
---     usuário do caixa lê prontuário odontológico direto pela API REST
---     (ver HANDOFF.md, item 3). Tabela nova não deve nascer com esse buraco.
+--  1) As policies já nascem com `has_module_access(auth.uid(), clinica_id,
+--     'fisioterapia', …)` em vez de `is_member(...)`. Conferido no banco em
+--     20/08/2026: nenhuma policy usa `has_module_access` ainda — todas as
+--     tabelas clínicas (inclusive odonto e prontuarios) param em `is_member`,
+--     então o bloqueio por módulo existe apenas no menu e um usuário do caixa
+--     lê prontuário odontológico direto pela API REST (HANDOFF.md, item 3).
+--     A migration 20260710135444_harden_module_permissions.sql, que prometia
+--     corrigir isso, NÃO está aplicada no banco de produção. Tabela nova não
+--     deve nascer com o buraco, mas consertar as antigas continua pendente.
+--
+--     Atenção à assinatura: a função viva é
+--     `has_module_access(_user_id uuid, _clinica_id uuid, _modulo text,
+--     _nivel text)` — quatro argumentos, começando pelo usuário. A versão de
+--     três argumentos que aparece naquela migration não existe no banco.
 --
 --  2) O controle de presença das sessões não é digitado duas vezes: a sessão
 --     aponta para o agendamento e um gatilho em `agendamentos` reflete o
@@ -177,18 +186,19 @@ begin
     execute format('drop policy if exists %I on public.%I', prefix||'_update', t);
     execute format('drop policy if exists %I on public.%I', prefix||'_delete', t);
     execute format(
-      'create policy %I on public.%I for select to authenticated using (public.has_module_access(clinica_id,''fisioterapia'',''read''))',
+      'create policy %I on public.%I for select to authenticated using (public.has_module_access(auth.uid(), clinica_id, ''fisioterapia'', ''read''))',
       prefix||'_select', t);
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (public.has_module_access(clinica_id,''fisioterapia'',''write''))',
+      'create policy %I on public.%I for insert to authenticated with check (public.has_module_access(auth.uid(), clinica_id, ''fisioterapia'', ''write''))',
       prefix||'_insert', t);
     execute format(
-      'create policy %I on public.%I for update to authenticated using (public.has_module_access(clinica_id,''fisioterapia'',''write'')) with check (public.has_module_access(clinica_id,''fisioterapia'',''write''))',
+      'create policy %I on public.%I for update to authenticated using (public.has_module_access(auth.uid(), clinica_id, ''fisioterapia'', ''write'')) with check (public.has_module_access(auth.uid(), clinica_id, ''fisioterapia'', ''write''))',
       prefix||'_update', t);
-    -- Apagar registro clínico continua sendo ato de administrador, igual a
-    -- `prontuarios`. O uso normal é mudar o status, não excluir.
+    -- Apagar registro clínico continua sendo ato de gestor, mesma função que
+    -- `prontuarios` e `odonto_dentes` usam hoje no banco vivo. O uso normal é
+    -- mudar o status, não excluir.
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (public.is_clinic_admin(clinica_id))',
+      'create policy %I on public.%I for delete to authenticated using (public.can_manage_clinica(auth.uid(), clinica_id))',
       prefix||'_delete', t);
   end loop;
 end
@@ -204,7 +214,7 @@ drop policy if exists f_sessoes_delete on public.fisio_sessoes;
 
 create policy f_sessoes_select on public.fisio_sessoes for select to authenticated
   using (
-    public.has_module_access(clinica_id,'fisioterapia','read')
+    public.has_module_access(auth.uid(), clinica_id, 'fisioterapia', 'read')
     and exists (
       select 1 from public.fisio_pacotes p
       where p.id = fisio_sessoes.pacote_id and p.clinica_id = fisio_sessoes.clinica_id
@@ -212,23 +222,23 @@ create policy f_sessoes_select on public.fisio_sessoes for select to authenticat
   );
 create policy f_sessoes_insert on public.fisio_sessoes for insert to authenticated
   with check (
-    public.has_module_access(clinica_id,'fisioterapia','write')
+    public.has_module_access(auth.uid(), clinica_id, 'fisioterapia', 'write')
     and exists (
       select 1 from public.fisio_pacotes p
       where p.id = fisio_sessoes.pacote_id and p.clinica_id = fisio_sessoes.clinica_id
     )
   );
 create policy f_sessoes_update on public.fisio_sessoes for update to authenticated
-  using (public.has_module_access(clinica_id,'fisioterapia','write'))
+  using (public.has_module_access(auth.uid(), clinica_id, 'fisioterapia', 'write'))
   with check (
-    public.has_module_access(clinica_id,'fisioterapia','write')
+    public.has_module_access(auth.uid(), clinica_id, 'fisioterapia', 'write')
     and exists (
       select 1 from public.fisio_pacotes p
       where p.id = fisio_sessoes.pacote_id and p.clinica_id = fisio_sessoes.clinica_id
     )
   );
 create policy f_sessoes_delete on public.fisio_sessoes for delete to authenticated
-  using (public.is_clinic_admin(clinica_id));
+  using (public.can_manage_clinica(auth.uid(), clinica_id));
 
 -- ── updated_at ──────────────────────────────────────────────────────────────
 
