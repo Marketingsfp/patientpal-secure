@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
+import { detectarTipoAtendimentoPadrao } from "@/lib/convenio/tipo-atendimento-padrao";
 
 export const Route = createFileRoute("/autoatendimento")({
   component: AutoatendimentoRoute,
@@ -415,6 +416,15 @@ function AutoatendimentoPage() {
     const obs = `[Totem] Forma de pagamento: ${formaLabel} — R$ ${valor
       .toFixed(2)
       .replace(".", ",")}`;
+    // Paciente com Cartão Benefícios ativo e em dia entra como "Convênio". Sem
+    // isto o totem gravava sempre "Particular" (padrão do banco), porque nunca
+    // preenchia a coluna. O valor cobrado não mudava — quem cobra é o caixa,
+    // que aplica o desconto do cartão de qualquer forma —, mas o atendimento
+    // ficava classificado errado nos relatórios.
+    const padraoConvenio = await detectarTipoAtendimentoPadrao(
+      clinicaAtual.clinica_id,
+      paciente.id,
+    );
     const { error: errAg } = await supabase.from("agendamentos").insert({
       clinica_id: clinicaAtual.clinica_id,
       paciente_id: paciente.id,
@@ -427,6 +437,7 @@ function AutoatendimentoPage() {
       fluxo_etapa: "caixa",
       agenda_id: vagaSel.agenda_id,
       observacoes: obs,
+      tipo_atendimento: padraoConvenio.tipo,
     });
     if (errAg) {
       setBusy(false);

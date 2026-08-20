@@ -33,6 +33,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
+import { detectarTipoAtendimentoPadrao } from "@/lib/convenio/tipo-atendimento-padrao";
 import {
   calcularRepasseExterno,
   listarConveniosClinica,
@@ -176,6 +177,14 @@ export function NovoAgendamentoWizard({
   // (padrão do banco) mesmo para quem tem cartão ativo — e a checagem de
   // mensalidade em atraso (`validar_inadimplencia`) nem era executada.
   // Escolha manual do atendente no seletor tem prioridade e não é sobrescrita.
+  //
+  // Usa `detectarTipoAtendimentoPadrao`, a regra compartilhada, e não mais
+  // `buscarVinculoConvenio`: aquela função descarta contratos com `convenio_id`
+  // nulo (existe para descobrir a modalidade e calcular repasse), e por isso os
+  // 245 contratos sem convênio vinculado continuavam caindo em "Particular"
+  // mesmo depois da correção de 18/08 — 100 dos 772 registros classificados
+  // errado. A regra compartilhada também aplica a tolerância de mensalidade
+  // vencida, que aqui não era verificada.
   const tipoEscolhidoManualRef = useRef(false);
   const [contratoDetectado, setContratoDetectado] = useState<{ nome: string } | null>(null);
   useEffect(() => {
@@ -186,10 +195,12 @@ export function NovoAgendamentoWizard({
     }
     let cancelado = false;
     void (async () => {
-      const vinculo = await buscarVinculoConvenio(clinicaId, paciente.id);
+      const padrao = await detectarTipoAtendimentoPadrao(clinicaId, paciente.id);
       if (cancelado) return;
-      setContratoDetectado(vinculo ? { nome: vinculo.convenioNome } : null);
-      if (vinculo && !tipoEscolhidoManualRef.current) setTipoAtendimento("convenio");
+      setContratoDetectado(padrao.contratoId ? { nome: padrao.convenioNome ?? "Convênio" } : null);
+      if (padrao.tipo === "convenio" && !tipoEscolhidoManualRef.current) {
+        setTipoAtendimento("convenio");
+      }
     })();
     return () => {
       cancelado = true;

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Trash2, Users, Calendar, Stethoscope, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,10 @@ import {
 import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
+import {
+  detectarTipoAtendimentoPadrao,
+  type TipoAtendimentoPadrao,
+} from "@/lib/convenio/tipo-atendimento-padrao";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-multiplo")({
   component: AtendimentoMultiploPage,
@@ -65,7 +69,10 @@ type Item = {
   tipo_atendimento: "particular" | "convenio";
 };
 
-function novoItem(dataBase: string): Item {
+function novoItem(
+  dataBase: string,
+  tipoAtendimento: "particular" | "convenio" = "particular",
+): Item {
   return {
     key: crypto.randomUUID(),
     procedimento_id: null,
@@ -77,7 +84,7 @@ function novoItem(dataBase: string): Item {
     medico_id: null,
     recurso_id: null,
     inicio: dataBase,
-    tipo_atendimento: "particular",
+    tipo_atendimento: tipoAtendimento,
   };
 }
 
@@ -146,6 +153,36 @@ function AtendimentoMultiploPage() {
   const [salvando, setSalvando] = useState(false);
 
   const clinicaId = clinicaAtual?.clinica_id ?? null;
+
+  // Contrato ativo do Cartão Benefícios do paciente escolhido.
+  //
+  // Sem isto todo item nascia "particular" (padrão do banco) mesmo para quem
+  // tem cartão ativo e em dia: esta tela era uma das três portas de entrada que
+  // não consultavam o contrato. A escolha manual do atendente no seletor de
+  // cada linha tem prioridade e não é sobrescrita — o `useRef` guarda essa
+  // decisão sem provocar novo render, e ela é zerada quando o paciente muda.
+  const [contratoDetectado, setContratoDetectado] = useState<TipoAtendimentoPadrao | null>(null);
+  const tipoEscolhidoManualRef = useRef(false);
+  const tipoPadrao: "particular" | "convenio" = contratoDetectado?.tipo ?? "particular";
+
+  useEffect(() => {
+    tipoEscolhidoManualRef.current = false;
+    if (!clinicaId || !paciente?.id) {
+      setContratoDetectado(null);
+      return;
+    }
+    let cancel = false;
+    void (async () => {
+      const resultado = await detectarTipoAtendimentoPadrao(clinicaId, paciente.id);
+      if (cancel) return;
+      setContratoDetectado(resultado);
+      if (tipoEscolhidoManualRef.current) return;
+      setItens((prev) => prev.map((it) => ({ ...it, tipo_atendimento: resultado.tipo })));
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [clinicaId, paciente?.id]);
 
   // Carrega médicos e recursos da clínica. Procedimentos são buscados
   // sob demanda (server-side) porque a base tem milhares de exames de
@@ -263,7 +300,9 @@ function AtendimentoMultiploPage() {
           return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
         })()
       : dataInicial;
-    setItens((prev) => [...prev, novoItem(proximoInicio)]);
+    // Item novo herda o tipo já vigente na ficha: se o atendente trocou para
+    // "Particular" de propósito, a linha adicionada não volta para "Convênio".
+    setItens((prev) => [...prev, novoItem(proximoInicio, ultimo?.tipo_atendimento ?? tipoPadrao)]);
   }
 
   function aplicarProcedimento(itemKey: string, proc: Procedimento) {
@@ -384,6 +423,26 @@ function AtendimentoMultiploPage() {
             >
               Trocar paciente
             </Button>
+            {contratoDetectado?.contratoId && (
+              <div className="w-full text-xs">
+                {contratoDetectado.tipo === "convenio" ? (
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    Convênio ativo: {contratoDetectado.convenioNome} — os serviços já entram
+                    marcados como <strong>Convênio</strong>.
+                    {contratoDetectado.semConvenio &&
+                      " O contrato está sem convênio vinculado no cadastro — vale corrigir em Contratos."}
+                  </span>
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-500">
+                    Cartão {contratoDetectado.convenioNome} com{" "}
+                    {contratoDetectado.qtdAtrasadas === 1
+                      ? "1 mensalidade vencida"
+                      : `${contratoDetectado.qtdAtrasadas} mensalidades vencidas`}{" "}
+                    além da tolerância — os serviços entram como <strong>Particular</strong>.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -597,9 +656,10 @@ function AtendimentoMultiploPage() {
                     <Label>Tipo de atendimento</Label>
                     <Select
                       value={it.tipo_atendimento}
-                      onValueChange={(v: "particular" | "convenio") =>
-                        atualizarItem(it.key, { tipo_atendimento: v })
-                      }
+                      onValueChange={(v: "particular" | "convenio") => {
+                        tipoEscolhidoManualRef.current = true;
+                        atualizarItem(it.key, { tipo_atendimento: v });
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
