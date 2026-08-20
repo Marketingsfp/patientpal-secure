@@ -173,6 +173,11 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
       {
+        key: "fisioterapia",
+        nome: "Fisioterapia",
+        descricao: "Mapa corporal, avaliação e pacotes de sessões",
+      },
+      {
         key: "hiperdia",
         nome: "Hiperdia",
         descricao: "Acompanhamento de hipertensos e diabéticos",

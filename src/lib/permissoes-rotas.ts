@@ -55,6 +55,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/consulta-rapida": "consulta-rapida",
   "/app/nina": "nina",
   "/app/odontologia": "odontologia",
+  "/app/fisioterapia": "fisioterapia",
   "/app/prontuarios": "prontuarios",
   "/app/anamneses": "anamneses",
   "/app/hiperdia": "hiperdia",

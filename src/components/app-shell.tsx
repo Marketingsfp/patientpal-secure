@@ -521,6 +521,26 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           },
         ],
       },
+      {
+        // Mesma estrutura da Odontologia: um grupo por especialidade, com a
+        // tela clínica e a tela de gestão separadas no menu.
+        label: "Fisioterapia",
+        icon: Activity,
+        children: [
+          {
+            to: "/app/fisioterapia",
+            hash: "avaliacao",
+            label: "Mapa Corporal & Avaliação",
+            icon: Activity,
+          },
+          {
+            to: "/app/fisioterapia",
+            hash: "pacotes",
+            label: "Pacotes de Sessões",
+            icon: ClipboardList,
+          },
+        ],
+      },
       { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     ],
   },

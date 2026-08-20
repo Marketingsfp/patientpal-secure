@@ -70,6 +70,7 @@ import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHiperdiaRouteImport } from './routes/_authenticated/app.hiperdia'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
+import { Route as AuthenticatedAppFisioterapiaRouteImport } from './routes/_authenticated/app.fisioterapia'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
@@ -475,6 +476,12 @@ const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
   path: '/fluxo',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppFisioterapiaRoute =
+  AuthenticatedAppFisioterapiaRouteImport.update({
+    id: '/fisioterapia',
+    path: '/fisioterapia',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFinanceiroRoute =
   AuthenticatedAppFinanceiroRouteImport.update({
     id: '/financeiro',
@@ -983,6 +990,7 @@ export interface FileRoutesByFullPath {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
+  '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1118,6 +1126,7 @@ export interface FileRoutesByTo {
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
+  '/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1259,6 +1268,7 @@ export interface FileRoutesById {
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
+  '/_authenticated/app/fisioterapia': typeof AuthenticatedAppFisioterapiaRoute
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
@@ -1400,6 +1410,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/financeiro'
+    | '/app/fisioterapia'
     | '/app/fluxo'
     | '/app/hiperdia'
     | '/app/hr-ferias'
@@ -1535,6 +1546,7 @@ export interface FileRouteTypes {
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
+    | '/app/fisioterapia'
     | '/app/fluxo'
     | '/app/hiperdia'
     | '/app/hr-ferias'
@@ -1675,6 +1687,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/estoque'
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
+    | '/_authenticated/app/fisioterapia'
     | '/_authenticated/app/fluxo'
     | '/_authenticated/app/hiperdia'
     | '/_authenticated/app/hr-ferias'
@@ -2218,6 +2231,13 @@ declare module '@tanstack/react-router' {
       path: '/fluxo'
       fullPath: '/app/fluxo'
       preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/fisioterapia': {
+      id: '/_authenticated/app/fisioterapia'
+      path: '/fisioterapia'
+      fullPath: '/app/fisioterapia'
+      preLoaderRoute: typeof AuthenticatedAppFisioterapiaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro': {
@@ -2924,6 +2944,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
+  AuthenticatedAppFisioterapiaRoute: typeof AuthenticatedAppFisioterapiaRoute
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppHiperdiaRoute: typeof AuthenticatedAppHiperdiaRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
@@ -3011,6 +3032,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
+  AuthenticatedAppFisioterapiaRoute: AuthenticatedAppFisioterapiaRoute,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppHiperdiaRoute: AuthenticatedAppHiperdiaRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,

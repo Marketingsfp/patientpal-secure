@@ -4330,6 +4330,249 @@ export type Database = {
           },
         ]
       }
+      fisio_avaliacoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          diagnostico_funcional: string | null
+          historia: string | null
+          id: string
+          objetivos: string | null
+          observacoes: string | null
+          paciente_id: string
+          plano_tratamento: string | null
+          profissional_id: string | null
+          queixa_principal: string | null
+          ultima_atualizacao_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          diagnostico_funcional?: string | null
+          historia?: string | null
+          id?: string
+          objetivos?: string | null
+          observacoes?: string | null
+          paciente_id: string
+          plano_tratamento?: string | null
+          profissional_id?: string | null
+          queixa_principal?: string | null
+          ultima_atualizacao_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          diagnostico_funcional?: string | null
+          historia?: string | null
+          id?: string
+          objetivos?: string | null
+          observacoes?: string | null
+          paciente_id?: string
+          plano_tratamento?: string | null
+          profissional_id?: string | null
+          queixa_principal?: string | null
+          ultima_atualizacao_por?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fisio_marcacoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          data: string
+          id: string
+          intensidade: number | null
+          lado: string
+          paciente_id: string
+          profissional_id: string | null
+          queixa: string | null
+          regiao: string
+          tipo: Database["public"]["Enums"]["fisio_marcacao_tipo"]
+          tratamento: string | null
+          updated_at: string
+          vista: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          intensidade?: number | null
+          lado?: string
+          paciente_id: string
+          profissional_id?: string | null
+          queixa?: string | null
+          regiao: string
+          tipo?: Database["public"]["Enums"]["fisio_marcacao_tipo"]
+          tratamento?: string | null
+          updated_at?: string
+          vista?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          intensidade?: number | null
+          lado?: string
+          paciente_id?: string
+          profissional_id?: string | null
+          queixa?: string | null
+          regiao?: string
+          tipo?: Database["public"]["Enums"]["fisio_marcacao_tipo"]
+          tratamento?: string | null
+          updated_at?: string
+          vista?: string
+        }
+        Relationships: []
+      }
+      fisio_pacotes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          data_inicio: string
+          descricao: string
+          id: string
+          observacoes: string | null
+          orcamento_id: string | null
+          orcamento_item_id: string | null
+          paciente_id: string
+          procedimento_id: string | null
+          profissional_id: string | null
+          status: string
+          total_sessoes: number
+          updated_at: string
+          valor_total: number
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          data_inicio?: string
+          descricao: string
+          id?: string
+          observacoes?: string | null
+          orcamento_id?: string | null
+          orcamento_item_id?: string | null
+          paciente_id: string
+          procedimento_id?: string | null
+          profissional_id?: string | null
+          status?: string
+          total_sessoes: number
+          updated_at?: string
+          valor_total?: number
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_inicio?: string
+          descricao?: string
+          id?: string
+          observacoes?: string | null
+          orcamento_id?: string | null
+          orcamento_item_id?: string | null
+          paciente_id?: string
+          procedimento_id?: string | null
+          profissional_id?: string | null
+          status?: string
+          total_sessoes?: number
+          updated_at?: string
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fisio_pacotes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fisio_pacotes_orcamento_item_id_fkey"
+            columns: ["orcamento_item_id"]
+            isOneToOne: false
+            referencedRelation: "orcamento_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fisio_sessoes: {
+        Row: {
+          agendamento_id: string | null
+          clinica_id: string
+          created_at: string
+          data_prevista: string | null
+          dor_antes: number | null
+          dor_depois: number | null
+          evolucao: string | null
+          id: string
+          numero: number
+          pacote_id: string
+          profissional_id: string | null
+          realizada_em: string | null
+          registrado_por: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          clinica_id: string
+          created_at?: string
+          data_prevista?: string | null
+          dor_antes?: number | null
+          dor_depois?: number | null
+          evolucao?: string | null
+          id?: string
+          numero: number
+          pacote_id: string
+          profissional_id?: string | null
+          realizada_em?: string | null
+          registrado_por?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          clinica_id?: string
+          created_at?: string
+          data_prevista?: string | null
+          dor_antes?: number | null
+          dor_depois?: number | null
+          evolucao?: string | null
+          id?: string
+          numero?: number
+          pacote_id?: string
+          profissional_id?: string | null
+          realizada_em?: string | null
+          registrado_por?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fisio_sessoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: true
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fisio_sessoes_pacote_id_fkey"
+            columns: ["pacote_id"]
+            isOneToOne: false
+            referencedRelation: "fisio_pacotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gr_impressoes: {
         Row: {
           agendamento_id: string | null
@@ -10064,6 +10307,15 @@ export type Database = {
       fin_status_lancamento: "pendente" | "confirmado" | "cancelado"
       fin_tipo_conta: "caixa" | "banco" | "cartao" | "maquininha" | "outro"
       fin_tipo_lancamento: "receita" | "despesa"
+      fisio_marcacao_tipo:
+        | "dor"
+        | "edema"
+        | "limitacao"
+        | "contratura"
+        | "parestesia"
+        | "cicatriz"
+        | "deformidade"
+        | "outro"
       fluxo_etapa:
         | "aguardando_recepcao"
         | "recepcao"
@@ -10314,6 +10566,16 @@ export const Constants = {
       fin_status_lancamento: ["pendente", "confirmado", "cancelado"],
       fin_tipo_conta: ["caixa", "banco", "cartao", "maquininha", "outro"],
       fin_tipo_lancamento: ["receita", "despesa"],
+      fisio_marcacao_tipo: [
+        "dor",
+        "edema",
+        "limitacao",
+        "contratura",
+        "parestesia",
+        "cicatriz",
+        "deformidade",
+        "outro",
+      ],
       fluxo_etapa: [
         "aguardando_recepcao",
         "recepcao",

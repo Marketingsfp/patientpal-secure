@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, Users } from "lucide-react";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { useAcessoModulo, usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,6 +12,7 @@ import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
 import { PacienteOdontoPanel } from "@/components/clientes/paciente-odonto-panel";
+import { PacienteFisioPanel } from "@/components/clientes/paciente-fisio-panel";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
@@ -30,6 +32,9 @@ function VisualizarClientePage() {
   // de acesso — dado clínico não deve vazar para quem não atende odonto.
   const acessoOdonto = useAcessoModulo("odontologia");
   const verOdonto = acessoOdonto !== "none";
+  const acessoFisio = useAcessoModulo("fisioterapia");
+  const verFisio = acessoFisio !== "none";
+  const { user } = useAuth();
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
@@ -120,6 +125,7 @@ function VisualizarClientePage() {
             <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
             <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
             {verOdonto && <TabsTrigger value="odontologia">Odontologia</TabsTrigger>}
+            {verFisio && <TabsTrigger value="fisioterapia">Fisioterapia</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="cadastro">
@@ -164,6 +170,20 @@ function VisualizarClientePage() {
                   pacienteId={paciente.id}
                   clinicaId={clinicaAtual.clinica_id}
                   readOnly={acessoOdonto !== "write"}
+                />
+              </div>
+            </TabsContent>
+          )}
+
+          {verFisio && (
+            <TabsContent value="fisioterapia">
+              <div className="rounded-lg border border-border bg-card p-6">
+                <PacienteFisioPanel
+                  pacienteId={paciente.id}
+                  pacienteNome={paciente.nome}
+                  clinicaId={clinicaAtual.clinica_id}
+                  userId={user?.id ?? null}
+                  readOnly={acessoFisio !== "write"}
                 />
               </div>
             </TabsContent>
