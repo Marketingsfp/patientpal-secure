@@ -2259,52 +2259,89 @@ function Page() {
     );
     return Number(soma.toFixed(2));
   }, [movsDoDiaFechamento]);
-  const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
-    const r: Record<string, number> = {
-      dinheiro: 0,
-      pix: 0,
-      debito: 0,
-      credito: 0,
-      boleto: 0,
-      transferencia: 0,
-      convenio: 0,
-      outros: 0,
-      indeterminado: 0,
-    };
-    movsDoDiaFechamento.forEach((m) => {
-      // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
-      // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
-      // também sangria e despesa com sinal negativo. Abertura/fechamento não
-      // entram (abertura é saldo inicial, fechamento é registro contábil).
-      if (
-        m.tipo !== "recebimento" &&
-        m.tipo !== "suprimento" &&
-        m.tipo !== "estorno" &&
-        m.tipo !== "sangria" &&
-        m.tipo !== "despesa"
-      )
-        return;
-      const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-      const v = Number(m.valor || 0) * sinal;
-      const bucket = bucketDeMov(m);
-      if (bucket === "misto") {
-        const partes = partesDoMov(m);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-          somado += (val ?? 0) * sinal;
+  /**
+   * Saldo líquido por forma de pagamento de um conjunto de movimentos.
+   *
+   * É a fonte única do "Esperado" de cada forma no fechamento. Existe como
+   * função porque a pré-carga da grade de conferência já foi calculada em
+   * paralelo, com outra regra: ela pulava sangria e despesa. Num dia com
+   * sangria o campo Dinheiro nascia com o valor BRUTO recebido em vez do que
+   * sobra na gaveta, e o modal abria acusando uma "Sobra em caixa" do tamanho
+   * exato da sangria — em 19/08/2026 seriam R$ 7.983,97 no caixa da Mayara,
+   * R$ 5.983,84 no da Suellen e R$ 4.900,00 no da Nicole. Quem fechava o dia
+   * já selecionado pegava a pré-carga certa (esta regra) e quem trocava o
+   * campo "Dia a fechar" pegava a errada: o caixa batia para uma operadora e
+   * não batia para outra. Com uma regra só, a pré-carga não pode divergir do
+   * esperado.
+   */
+  const porFormaDosMovs = useCallback(
+    (movs: Mov[]): Record<string, number> => {
+      const r: Record<string, number> = {
+        dinheiro: 0,
+        pix: 0,
+        debito: 0,
+        credito: 0,
+        boleto: 0,
+        transferencia: 0,
+        convenio: 0,
+        outros: 0,
+        indeterminado: 0,
+      };
+      movs.forEach((m) => {
+        // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
+        // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
+        // também sangria e despesa com sinal negativo. Abertura/fechamento não
+        // entram (abertura é saldo inicial, fechamento é registro contábil).
+        if (
+          m.tipo !== "recebimento" &&
+          m.tipo !== "suprimento" &&
+          m.tipo !== "estorno" &&
+          m.tipo !== "sangria" &&
+          m.tipo !== "despesa"
+        )
+          return;
+        const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
+        const v = Number(m.valor || 0) * sinal;
+        const bucket = bucketDeMov(m);
+        if (bucket === "misto") {
+          const partes = partesDoMov(m);
+          let somado = 0;
+          for (const [k, val] of Object.entries(partes)) {
+            r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+            somado += (val ?? 0) * sinal;
+          }
+          const resto = v - somado;
+          // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
+          // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
+          // recebimentos reais. O operador pode ajustar no modal de fechamento.
+          if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
+        } else {
+          r[bucket] = (r[bucket] ?? 0) + v;
         }
-        const resto = v - somado;
-        // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
-        // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
-        // recebimentos reais. O operador pode ajustar no modal de fechamento.
-        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-      } else {
-        r[bucket] = (r[bucket] ?? 0) + v;
-      }
-    });
-    return r;
-  }, [movsDoDiaFechamento, partesDoMov, residualBucket]);
+      });
+      return r;
+    },
+    [partesDoMov, residualBucket],
+  );
+
+  const porFormaDoDiaFechamento = useMemo<Record<string, number>>(
+    () => porFormaDosMovs(movsDoDiaFechamento),
+    [movsDoDiaFechamento, porFormaDosMovs],
+  );
+
+  /**
+   * Valores que a grade de conferência do fechamento assume por padrão: o
+   * esperado de cada forma com saldo, e Dinheiro sempre presente (é o único
+   * valor físico, tem que ser digitado mesmo quando o esperado é zero).
+   */
+  const conferenciaInicial = useCallback((porForma: Record<string, number>) => {
+    const inicial: Record<string, string> = {};
+    for (const [k, v] of Object.entries(porForma)) {
+      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+    }
+    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+    return inicial;
+  }, []);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback(
@@ -3482,12 +3519,7 @@ function Page() {
                         className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
                         onClick={() => {
                           if (minhaSessao) {
-                            const inicial: Record<string, string> = {};
-                            for (const [k, v] of Object.entries(porFormaDoDiaFechamento)) {
-                              if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                            }
-                            if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                            setConferidoOwn(inicial);
+                            setConferidoOwn(conferenciaInicial(porFormaDoDiaFechamento));
                           }
                           setOpenFechar(true);
                         }}
@@ -4785,36 +4817,18 @@ function Page() {
                   setDataFechamento(novo);
                   // Ao trocar o dia, pré-preenche a conferência com os valores
                   // esperados daquele dia (o operador ajusta em seguida).
+                  // Mesmo escopo e mesma regra de `movsDoDiaFechamento` e
+                  // `porFormaDoDiaFechamento`: fora as despesas virtuais do
+                  // Financeiro (que não passam pela gaveta) e com sangria e
+                  // despesa abatendo o Dinheiro. Enquanto esta pré-carga tinha
+                  // regra própria — pulando sangria e despesa —, trocar o dia
+                  // reescrevia o campo Dinheiro com o valor bruto recebido e o
+                  // fechamento abria acusando uma sobra do tamanho da sangria.
+                  const reais = minhasMovs.filter((m) => !m.id.startsWith("fin:"));
                   const filtrados = novo
-                    ? minhasMovs.filter((m) => localYMD(m.created_at) === novo)
-                    : minhasMovs;
-                  const pf: Record<string, number> = {};
-                  filtrados.forEach((m) => {
-                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno")
-                      return;
-                    const sinal = m.tipo === "estorno" ? -1 : 1;
-                    const v = Number(m.valor || 0) * sinal;
-                    const bucket = bucketDeMov(m);
-                    if (bucket === "misto") {
-                      const partes = partesDoMov(m);
-                      let somado = 0;
-                      for (const [k, val] of Object.entries(partes)) {
-                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal;
-                        somado += (val ?? 0) * sinal;
-                      }
-                      const resto = v - somado;
-                      if (Math.abs(resto) > 0.005)
-                        pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
-                    } else {
-                      pf[bucket] = (pf[bucket] ?? 0) + v;
-                    }
-                  });
-                  const inicial: Record<string, string> = {};
-                  for (const [k, v] of Object.entries(pf)) {
-                    if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                  }
-                  if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                  setConferidoOwn(inicial);
+                    ? reais.filter((m) => localYMD(m.created_at) === novo)
+                    : reais;
+                  setConferidoOwn(conferenciaInicial(porFormaDosMovs(filtrados)));
                 }}
               />
               <p className="text-xs text-muted-foreground mt-1">
