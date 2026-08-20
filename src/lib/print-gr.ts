@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 /**
  * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
@@ -586,7 +587,9 @@ async function printGuiaAtendimentoCore({
     a.paciente_id
       ? supabase
           .from("pacientes")
-          .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
+          .select(
+            "nome, cpf, telefone, data_nascimento, codigo_prontuario, codigo_prontuario_anterior, numero_pasta",
+          )
           .eq("id", a.paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -640,6 +643,7 @@ async function printGuiaAtendimentoCore({
     telefone: string | null;
     data_nascimento: string | null;
     codigo_prontuario: string | null;
+    codigo_prontuario_anterior: string | null;
     numero_pasta: string | null;
   } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
@@ -914,7 +918,7 @@ async function printGuiaAtendimentoCore({
     fichaNum > 0
       ? String(fichaNum).padStart(3, "0")
       : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
-  const prontuario = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
+  const prontuario = prontuarioExibicao(paciente) || paciente?.numero_pasta || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
   // senão usa o padrão do médico (tipo_repasse / percentual / valor).
@@ -1614,7 +1618,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       pacIdRef
         ? supabase
             .from("pacientes")
-            .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, numero_pasta")
+            .select(
+              "nome, cpf, telefone, data_nascimento, codigo_prontuario, codigo_prontuario_anterior, numero_pasta",
+            )
             .eq("id", pacIdRef)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1669,10 +1675,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     telefone: string | null;
     data_nascimento: string | null;
     codigo_prontuario: string | null;
+    codigo_prontuario_anterior: string | null;
     numero_pasta: string | null;
   } | null;
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
-  const prontuarioPac = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
+  const prontuarioPac = prontuarioExibicao(paciente) || paciente?.numero_pasta || "";
 
   const repMap = new Map<
     string,

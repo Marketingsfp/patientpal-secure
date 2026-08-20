@@ -47,6 +47,7 @@ import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
   component: ClientesPageGate,
@@ -132,6 +133,7 @@ interface Paciente {
   cpf: string | null;
   numero_pasta: string | null;
   codigo_prontuario: string | null;
+  codigo_prontuario_anterior: string | null;
   telefone: string | null;
   email: string | null;
   data_nascimento: string | null;
@@ -527,7 +529,7 @@ function ClientesPage() {
                   const { data, error } = await supabase
                     .from("pacientes")
                     .select(
-                      "nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,numero_pasta",
+                      "nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,codigo_prontuario_anterior,numero_pasta",
                     )
                     .eq("clinica_id", clinicaAtual.clinica_id)
                     .order("nome")
@@ -554,7 +556,8 @@ function ClientesPage() {
               }
               exportToExcel(
                 all.map((p: any) => ({
-                  prontuario: p.codigo_prontuario ?? "",
+                  prontuario: prontuarioExibicao(p) ?? "",
+                  prontuario_interno: p.codigo_prontuario ?? "",
                   pasta: p.numero_pasta ?? "",
                   nome: p.nome,
                   cpf: p.cpf ?? "",
@@ -570,6 +573,7 @@ function ClientesPage() {
                 `clientes-${new Date().toISOString().slice(0, 10)}`,
                 [
                   { key: "prontuario", label: "Prontuário" },
+                  { key: "prontuario_interno", label: "Prontuário (interno)" },
                   { key: "pasta", label: "Nº Serviço" },
                   { key: "nome", label: "Nome" },
                   { key: "cpf", label: "CPF" },
@@ -711,7 +715,7 @@ function ClientesPage() {
                   </TableCell>
                   <TableCell>
                     <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/60 px-2 py-0.5 rounded-md inline-block">
-                      {p.numero_pasta || p.codigo_prontuario || "—"}
+                      {prontuarioExibicao(p) || p.numero_pasta || "—"}
                     </span>
                   </TableCell>
                   <TableCell className="max-w-[320px] text-sm font-semibold text-slate-800">

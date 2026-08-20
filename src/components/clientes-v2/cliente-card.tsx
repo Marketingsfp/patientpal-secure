@@ -13,6 +13,7 @@ import {
   semTelefone,
   type PacienteV2,
 } from "./status-utils";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 interface Props {
   p: PacienteV2;
@@ -27,6 +28,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
   const sTel = semTelefone(p);
   const sCpf = semCpf(p);
   const idade = calcularIdade(p.data_nascimento);
+  const prontuario = prontuarioExibicao(p);
   const borderClass = !p.ativo
     ? "border-l-slate-400"
     : aniversariante
@@ -67,9 +69,9 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
             <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
               {p.nome}
             </span>
-            {p.codigo_prontuario && (
+            {prontuario && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
-                Prontuário {p.codigo_prontuario}
+                Prontuário {prontuario}
               </span>
             )}
             {p.numero_pasta && (

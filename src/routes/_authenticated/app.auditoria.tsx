@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { exportToExcel } from "@/lib/export-csv";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { prontuarioExibicao } from "@/lib/prontuario";
 export const Route = createFileRoute("/_authenticated/app/auditoria")({
   component: PageWithTabs,
   head: () => ({ meta: [{ title: "Auditoria — ClinicaOS" }] }),
@@ -205,16 +206,18 @@ async function resolverNomes(
       } else if (tab === "pacientes") {
         const { data } = await supabase
           .from("pacientes")
-          .select("id, nome, codigo_prontuario")
+          .select("id, nome, codigo_prontuario, codigo_prontuario_anterior")
           .in("id", ids);
         (
           (data ?? []) as unknown as Array<{
             id: string;
             nome: string;
             codigo_prontuario: string | null;
+            codigo_prontuario_anterior: string | null;
           }>
         ).forEach((r) => {
-          nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
+          const pront = prontuarioExibicao(r);
+          nomes[r.id] = pront ? `${r.nome} (#${pront})` : r.nome;
         });
       } else if (tab === "agendamentos") {
         const { data } = await supabase
@@ -325,13 +328,19 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
     pacientes.size
       ? supabase
           .from("pacientes")
-          .select("id, nome, codigo_prontuario")
+          .select("id, nome, codigo_prontuario, codigo_prontuario_anterior")
           .in("id", Array.from(pacientes))
           .then(({ data }) => {
             (
-              (data ?? []) as Array<{ id: string; nome: string; codigo_prontuario: string | null }>
+              (data ?? []) as Array<{
+                id: string;
+                nome: string;
+                codigo_prontuario: string | null;
+                codigo_prontuario_anterior: string | null;
+              }>
             ).forEach((r) => {
-              nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
+              const pront = prontuarioExibicao(r);
+              nomes[r.id] = pront ? `${r.nome} (#${pront})` : r.nome;
             });
           })
       : Promise.resolve(),

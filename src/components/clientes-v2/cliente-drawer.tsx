@@ -18,6 +18,7 @@ import {
   pagadorLabel,
   type PacienteV2,
 } from "./status-utils";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 interface Props {
   paciente: PacienteV2 | null;
@@ -54,7 +55,7 @@ export function ClienteDrawer({ paciente, onClose }: Props) {
               <Info k="Telefone" v={fmtTel(p.telefone)} />
               <Info k="Telefone 2" v={fmtTel(p.telefone2 ?? null)} />
               <Info k="E-mail" v={p.email ?? "—"} />
-              <Info k="Prontuário" v={p.codigo_prontuario ?? "—"} />
+              <Info k="Prontuário" v={prontuarioExibicao(p) ?? "—"} />
               <Info k="Pasta" v={p.numero_pasta ?? "—"} />
               <Info k="Cidade" v={[p.cidade, p.estado].filter(Boolean).join("/") || "—"} />
               <Info k="Cadastro em" v={fmtNasc(p.created_at.slice(0, 10))} />

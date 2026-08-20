@@ -5,6 +5,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { VoiceInput } from "@/components/voice-input";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 export interface PatientOption {
   id: string;
@@ -260,9 +261,9 @@ export function PatientSearchInput({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="font-medium truncate">{p.nome}</span>
-                    {p.codigo_prontuario && (
+                    {prontuarioExibicao(p) && (
                       <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
-                        Prontuário {p.codigo_prontuario}
+                        Prontuário {prontuarioExibicao(p)}
                       </span>
                     )}
                     {p.numero_pasta && (

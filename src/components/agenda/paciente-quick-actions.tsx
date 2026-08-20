@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
@@ -41,6 +42,8 @@ interface PacData {
   data_nascimento: string | null;
   /** Número da ficha (digitado pela recepção). Exibido, não editado aqui. */
   codigo_prontuario: string | null;
+  /** Numeração histórica vinda do sistema antigo; é a que a recepção usa. */
+  codigo_prontuario_anterior: string | null;
   /** Numeração legada, usada como reserva quando não há código_prontuario. */
   numero_pasta: string | null;
   cep: string | null;
@@ -59,6 +62,7 @@ const EMPTY: PacData = {
   cpf: "",
   data_nascimento: "",
   codigo_prontuario: null,
+  codigo_prontuario_anterior: null,
   numero_pasta: null,
   cep: "",
   logradouro: "",
@@ -86,7 +90,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       const { data: row } = await supabase
         .from("pacientes")
         .select(
-          "telefone,telefone2,cpf,data_nascimento,codigo_prontuario,numero_pasta,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
+          "telefone,telefone2,cpf,data_nascimento,codigo_prontuario,codigo_prontuario_anterior,numero_pasta,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
         )
         .eq("id", pacienteId)
         .maybeSingle();
@@ -98,6 +102,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           cpf: row.cpf ?? "",
           data_nascimento: row.data_nascimento ?? "",
           codigo_prontuario: row.codigo_prontuario ?? null,
+          codigo_prontuario_anterior: row.codigo_prontuario_anterior ?? null,
           numero_pasta: row.numero_pasta ?? null,
           cep: row.cep ?? "",
           logradouro: row.logradouro ?? "",
@@ -195,10 +200,9 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
     );
   }
 
-  // `codigo_prontuario` é a numeração atual; `numero_pasta` é a legada, usada
-  // como reserva para cadastros antigos que ainda não têm a nova.
-  const prontuario =
-    (data.codigo_prontuario ?? "").trim() || (data.numero_pasta ?? "").trim() || null;
+  // Mostra a numeração histórica do sistema antigo; cai na numeração interna e
+  // depois em `numero_pasta` para quem não veio da importação.
+  const prontuario = prontuarioExibicao(data) || (data.numero_pasta ?? "").trim() || null;
 
   return (
     <div className="rounded-md border bg-muted/30 p-2 space-y-2">

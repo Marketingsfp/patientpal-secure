@@ -214,6 +214,7 @@ import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Checkbox } from "@/components/ui/checkbox";
+import { prontuarioExibicao } from "@/lib/prontuario";
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
@@ -311,6 +312,8 @@ type Paciente = {
   email: string | null;
   face_descriptor?: number[] | null;
   codigo_prontuario?: string | null;
+  /** Numeração histórica do sistema antigo — só leitura, usada na exibição. */
+  codigo_prontuario_anterior?: string | null;
 };
 type Contrato = {
   id: string;
@@ -609,13 +612,16 @@ export function ContratosPage({
     if (pacIds.length > 0) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, codigo_prontuario")
+        .select("id, codigo_prontuario, codigo_prontuario_anterior")
         .in("id", pacIds);
       prontMap = Object.fromEntries(
-        ((pacs ?? []) as Array<{ id: string; codigo_prontuario: string | null }>).map((p) => [
-          p.id,
-          p.codigo_prontuario,
-        ]),
+        (
+          (pacs ?? []) as Array<{
+            id: string;
+            codigo_prontuario: string | null;
+            codigo_prontuario_anterior: string | null;
+          }>
+        ).map((p) => [p.id, prontuarioExibicao(p)]),
       );
     }
     if (desatualizada()) return;
@@ -1678,7 +1684,9 @@ function NovoContratoForm({
   async function carregarPacienteCompleto(p: PatientOption): Promise<Paciente> {
     const { data } = await supabase
       .from("pacientes")
-      .select("id, nome, cpf, telefone, email, face_descriptor, codigo_prontuario")
+      .select(
+        "id, nome, cpf, telefone, email, face_descriptor, codigo_prontuario, codigo_prontuario_anterior",
+      )
       .eq("id", p.id)
       .maybeSingle();
     return (
@@ -1949,7 +1957,7 @@ function NovoContratoForm({
                       <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                         <span className="font-medium flex items-center gap-2">
                           {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
-                          <ProntuarioBadge codigo={titular.codigo_prontuario} />
+                          <ProntuarioBadge codigo={prontuarioExibicao(titular)} />
                           {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
                             <Badge variant="default" className="gap-1">
                               <Check className="h-3 w-3" />
@@ -3477,7 +3485,7 @@ function DetalheContrato({
       supabase
         .from("pacientes")
         .select(
-          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario",
+          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario, codigo_prontuario_anterior",
         )
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),
@@ -3522,10 +3530,10 @@ function DetalheContrato({
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, codigo_prontuario, data_nascimento, telefone")
+        .select("id, cpf, codigo_prontuario, codigo_prontuario_anterior, data_nascimento, telefone")
         .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
-      prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
+      prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, prontuarioExibicao(p)]));
       nascMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.data_nascimento]));
       telMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.telefone]));
     }
@@ -4804,7 +4812,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <span>
             Contrato #{contrato.numero} — {contrato.paciente_nome}
           </span>
-          <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+          <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
         </h1>
         <div>
           {!cancelado && podeEscrever ? (
@@ -4918,7 +4926,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do
                     contrato.
                   </span>
-                  <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                  <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
                 </div>
               ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
@@ -5567,7 +5575,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="flex items-center gap-2 flex-wrap">
                     <Label>Paciente titular</Label>
                     <ProntuarioBadge
-                      codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
+                      codigo={prontuarioExibicao(admPaciente) ?? prontuarioExibicao(pacienteFull)}
                     />
                   </div>
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
@@ -5615,14 +5623,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-sm font-medium">Paciente titular</div>
-                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                      <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
                     </div>
                     <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm flex items-center gap-2 flex-wrap">
                       <span>
                         {contrato.paciente_nome}
                         {pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
                       </span>
-                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                      <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
                     </div>
                   </div>
                   {apenasFinanceiro ? (
@@ -6003,7 +6011,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         "Nascimento",
                         pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—",
                       ],
-                      ["Prontuário", pacienteFull?.codigo_prontuario ?? "—"],
+                      ["Prontuário", prontuarioExibicao(pacienteFull) ?? "—"],
                       ["Telefone", fmtTelDisplay(pacienteFull?.telefone)],
                       ["E-mail", pacienteFull?.email ?? "—"],
                       [

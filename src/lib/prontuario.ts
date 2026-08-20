@@ -46,3 +46,27 @@ export async function conflitoCodigoProntuario(
   }
   return null;
 }
+
+/** Campos mínimos para decidir qual número mostrar. */
+export interface ProntuarioExibivel {
+  codigo_prontuario?: string | null;
+  codigo_prontuario_anterior?: string | null;
+}
+
+/**
+ * Número de prontuário que deve aparecer na tela.
+ *
+ * A importação do sistema antigo (junho/2026) gravou a numeração histórica em
+ * `codigo_prontuario_anterior` e gerou um número interno novo em
+ * `codigo_prontuario`. Para a recepção, o número que vale é o histórico — é ele
+ * que está na ficha de papel e nos documentos antigos. Quem foi cadastrado já
+ * no sistema novo não tem histórico e continua com o número interno.
+ *
+ * Usar só para exibir e imprimir. Cadastro, busca por código e checagem de
+ * duplicidade continuam em `codigo_prontuario`, que é a coluna com índice único.
+ */
+export function prontuarioExibicao(p: ProntuarioExibivel | null | undefined): string | null {
+  const antigo = (p?.codigo_prontuario_anterior ?? "").trim();
+  if (antigo) return antigo;
+  return (p?.codigo_prontuario ?? "").trim() || null;
+}

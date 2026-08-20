@@ -53,6 +53,7 @@ import {
   type FluxoDetalheAg,
 } from "@/components/fluxo/paciente-detalhe-drawer";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { prontuarioExibicao } from "@/lib/prontuario";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -324,15 +325,20 @@ function FluxoPage() {
     if (pacIds.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cidade, codigo_prontuario")
+        .select("id, cidade, codigo_prontuario, codigo_prontuario_anterior")
         .in("id", pacIds);
       const mapa = new Map<string, string | null>();
       const mapaPr = new Map<string, string | null>();
       (
-        (pacs ?? []) as { id: string; cidade: string | null; codigo_prontuario: string | null }[]
+        (pacs ?? []) as {
+          id: string;
+          cidade: string | null;
+          codigo_prontuario: string | null;
+          codigo_prontuario_anterior: string | null;
+        }[]
       ).forEach((p) => {
         mapa.set(p.id, p.cidade);
-        mapaPr.set(p.id, p.codigo_prontuario);
+        mapaPr.set(p.id, prontuarioExibicao(p));
       });
       setCidades(mapa);
       setProntuarios(mapaPr);

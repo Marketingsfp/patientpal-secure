@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 interface Props {
   pacienteId: string | null;
@@ -63,8 +64,7 @@ export function EditarClienteDialog({
     };
   }, [pacienteId]);
 
-  const prontuario =
-    (paciente as any)?.codigo_prontuario || (paciente as any)?.numero_pasta || null;
+  const prontuario = prontuarioExibicao(paciente) || paciente?.numero_pasta || null;
 
   return (
     <Dialog

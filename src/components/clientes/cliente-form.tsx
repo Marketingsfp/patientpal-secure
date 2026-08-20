@@ -62,6 +62,8 @@ export interface Paciente {
   cpf: string | null;
   numero_pasta: string | null;
   codigo_prontuario?: string | null;
+  /** Numeração histórica do sistema antigo. Somente leitura — nunca é gravada. */
+  codigo_prontuario_anterior?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;

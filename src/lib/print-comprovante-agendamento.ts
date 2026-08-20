@@ -19,6 +19,7 @@
  * Sem esses atalhos o comportamento é exatamente o de antes.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
@@ -62,6 +63,7 @@ interface PacienteImpresso {
   telefone: string | null;
   data_nascimento: string | null;
   codigo_prontuario: string | null;
+  codigo_prontuario_anterior: string | null;
 }
 
 export interface DadosRemotosComprovante {
@@ -93,7 +95,7 @@ async function buscarPaciente(pacienteId: string | null): Promise<PacienteImpres
   if (!pacienteId) return null;
   const { data } = await supabase
     .from("pacientes")
-    .select("nome, cpf, telefone, data_nascimento, codigo_prontuario")
+    .select("nome, cpf, telefone, data_nascimento, codigo_prontuario, codigo_prontuario_anterior")
     .eq("id", pacienteId)
     .maybeSingle();
   return (data as PacienteImpresso | null) ?? null;
@@ -289,7 +291,7 @@ export async function printComprovanteAgendamento({
     <div class="sep"></div>
 
     <div class="center" style="font-size:12pt; font-weight:700">${esc(paciente?.nome ?? a.paciente_nome)}</div>
-    ${paciente?.codigo_prontuario ? `<div class="center sm">PRONTUÁRIO: ${esc(paciente.codigo_prontuario)}</div>` : ""}
+    ${prontuarioExibicao(paciente) ? `<div class="center sm">PRONTUÁRIO: ${esc(prontuarioExibicao(paciente)!)}</div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: ${esc(paciente.cpf)}</div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: ${esc(paciente.telefone)}</div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: ${fmtDataSimples(paciente.data_nascimento)}</div>` : ""}

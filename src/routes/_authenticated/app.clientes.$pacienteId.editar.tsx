@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
+import { prontuarioExibicao } from "@/lib/prontuario";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/editar")({
   component: EditarClientePage,
@@ -65,9 +66,9 @@ function EditarClientePage() {
           {paciente && (
             <p className="text-sm text-muted-foreground">
               {paciente.nome}
-              {(paciente as any).codigo_prontuario && (
+              {prontuarioExibicao(paciente) && (
                 <span className="ml-2 font-mono text-xs px-1.5 py-0.5 rounded bg-muted">
-                  Prontuário {(paciente as any).codigo_prontuario}
+                  Prontuário {prontuarioExibicao(paciente)}
                 </span>
               )}
             </p>
