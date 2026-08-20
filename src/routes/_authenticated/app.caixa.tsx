@@ -112,6 +112,32 @@ const FORMA_BUCKETS = [
 ] as const;
 type FormaBucket = (typeof FORMA_BUCKETS)[number] | "misto" | "outros" | "indeterminado";
 
+/** Chaves de forma que os quadros de conferência sempre inicializam em zero. */
+const CHAVES_FORMA = [
+  "dinheiro",
+  "pix",
+  "debito",
+  "credito",
+  "boleto",
+  "transferencia",
+  "convenio",
+  "outros",
+  "indeterminado",
+] as const;
+
+/**
+ * O que entrou e o que saiu de uma forma de pagamento no período.
+ *
+ * Guardar os dois lados separados (em vez de só o líquido) é o que permite ao
+ * comprovante impresso mostrar "Dinheiro: entrou 9.550,55, saiu 9.550,55,
+ * saldo 0,00" em vez de simplesmente omitir a linha por ela ter fechado em
+ * zero depois das sangrias.
+ */
+interface EntradaSaida {
+  entradas: number;
+  saidas: number;
+}
+
 function normalizarForma(f: string | null | undefined): FormaBucket {
   const k = (f ?? "").toLowerCase().trim();
   if (!k) return "outros";
@@ -2274,24 +2300,20 @@ function Page() {
    * não batia para outra. Com uma regra só, a pré-carga não pode divergir do
    * esperado.
    */
-  const porFormaDosMovs = useCallback(
-    (movs: Mov[]): Record<string, number> => {
-      const r: Record<string, number> = {
-        dinheiro: 0,
-        pix: 0,
-        debito: 0,
-        credito: 0,
-        boleto: 0,
-        transferencia: 0,
-        convenio: 0,
-        outros: 0,
-        indeterminado: 0,
+  const detalhePorFormaDosMovs = useCallback(
+    (movs: Mov[]): Record<string, EntradaSaida> => {
+      const r: Record<string, EntradaSaida> = {};
+      for (const k of CHAVES_FORMA) r[k] = { entradas: 0, saidas: 0 };
+      const somar = (chave: string, valor: number, ehSaida: boolean) => {
+        const alvo = (r[chave] ??= { entradas: 0, saidas: 0 });
+        if (ehSaida) alvo.saidas += valor;
+        else alvo.entradas += valor;
       };
       movs.forEach((m) => {
         // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
         // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
-        // também sangria e despesa com sinal negativo. Abertura/fechamento não
-        // entram (abertura é saldo inicial, fechamento é registro contábil).
+        // também sangria e despesa, como saída. Abertura/fechamento não entram
+        // (abertura é saldo inicial, fechamento é registro contábil).
         if (
           m.tipo !== "recebimento" &&
           m.tipo !== "suprimento" &&
@@ -2300,23 +2322,23 @@ function Page() {
           m.tipo !== "despesa"
         )
           return;
-        const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-        const v = Number(m.valor || 0) * sinal;
+        const ehSaida = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa";
+        const v = Number(m.valor || 0);
         const bucket = bucketDeMov(m);
         if (bucket === "misto") {
           const partes = partesDoMov(m);
           let somado = 0;
           for (const [k, val] of Object.entries(partes)) {
-            r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-            somado += (val ?? 0) * sinal;
+            somar(k, val ?? 0, ehSaida);
+            somado += val ?? 0;
           }
           const resto = v - somado;
           // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
           // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
           // recebimentos reais. O operador pode ajustar no modal de fechamento.
-          if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
+          if (Math.abs(resto) > 0.005) somar(residualBucket, resto, ehSaida);
         } else {
-          r[bucket] = (r[bucket] ?? 0) + v;
+          somar(bucket, v, ehSaida);
         }
       });
       return r;
@@ -2324,6 +2346,27 @@ function Page() {
     [partesDoMov, residualBucket],
   );
 
+  /**
+   * Saldo líquido por forma (entradas − saídas). Derivado do detalhado de
+   * propósito: enquanto existirem duas contas paralelas, o "Esperado" da grade
+   * de conferência e o que sai impresso no comprovante podem divergir sem
+   * ninguém perceber.
+   */
+  const porFormaDosMovs = useCallback(
+    (movs: Mov[]): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const [k, d] of Object.entries(detalhePorFormaDosMovs(movs))) {
+        out[k] = d.entradas - d.saidas;
+      }
+      return out;
+    },
+    [detalhePorFormaDosMovs],
+  );
+
+  const detalheDoDiaFechamento = useMemo<Record<string, EntradaSaida>>(
+    () => detalhePorFormaDosMovs(movsDoDiaFechamento),
+    [movsDoDiaFechamento, detalhePorFormaDosMovs],
+  );
   const porFormaDoDiaFechamento = useMemo<Record<string, number>>(
     () => porFormaDosMovs(movsDoDiaFechamento),
     [movsDoDiaFechamento, porFormaDosMovs],
@@ -2483,53 +2526,26 @@ function Page() {
     [agruparPorDia, minhasSessoes, minhasMovs],
   );
 
-  // Total recebido/suprido por forma de pagamento em uma sessão qualquer
-  // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
-  // lançamento já foram carregadas via `mistoObs`.
+  // Entradas e saídas por forma de pagamento em uma sessão qualquer (usa
+  // `todosMovs`). Decompõe pagamentos "misto" quando as observações do
+  // lançamento já foram carregadas via `mistoObs`. Mesma regra de
+  // `detalhePorFormaDosMovs`, só que recortada por sessão.
+  const detalhePorFormaSessao = useCallback(
+    (sid: string) => detalhePorFormaDosMovs(todosMovs.filter((m) => m.sessao_id === sid)),
+    [todosMovs, detalhePorFormaDosMovs],
+  );
+
+  /** Saldo líquido por forma na sessão: entradas − saídas, para bater com o
+   *  saldo do caixa. Usado no modal de fechamento feito pelo gestor. */
   const entradasPorFormaSessao = useCallback(
     (sid: string) => {
-      const r: Record<string, number> = {
-        dinheiro: 0,
-        pix: 0,
-        debito: 0,
-        credito: 0,
-        boleto: 0,
-        transferencia: 0,
-        convenio: 0,
-        outros: 0,
-        indeterminado: 0,
-      };
-      todosMovs.forEach((m) => {
-        if (m.sessao_id !== sid) return;
-        // Saldo líquido por forma na sessão (usado nos modais de fechamento):
-        // entradas − saídas por forma, para bater com o saldo do caixa.
-        if (
-          m.tipo !== "recebimento" &&
-          m.tipo !== "suprimento" &&
-          m.tipo !== "estorno" &&
-          m.tipo !== "sangria" &&
-          m.tipo !== "despesa"
-        )
-          return;
-        const sinal = m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-        const v = Number(m.valor || 0) * sinal;
-        const bucket = bucketDeMov(m);
-        if (bucket === "misto") {
-          const partes = partesDoMov(m);
-          let somado = 0;
-          for (const [k, val] of Object.entries(partes)) {
-            r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-            somado += (val ?? 0) * sinal;
-          }
-          const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-        } else {
-          r[bucket] = (r[bucket] ?? 0) + v;
-        }
-      });
-      return r;
+      const out: Record<string, number> = {};
+      for (const [k, d] of Object.entries(detalhePorFormaSessao(sid))) {
+        out[k] = d.entradas - d.saidas;
+      }
+      return out;
     },
-    [todosMovs, partesDoMov, residualBucket],
+    [detalhePorFormaSessao],
   );
 
   // ===== Resumo do turno atual (cartões por forma + gaveta física) =====
@@ -2915,9 +2931,13 @@ function Page() {
     setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
     // Comprovante escopado ao dia selecionado.
+    // Entradas e saídas de cada forma no dia. Nada é removido aqui: quem
+    // decide o que aparece é o comprovante, que mantém Dinheiro, PIX, Débito e
+    // Crédito sempre visíveis. A limpeza que existia antes ("remove buckets
+    // zerados para não poluir") era o que apagava a linha do Dinheiro nos dias
+    // em que a operadora sangrava toda a gaveta e o líquido dava R$ 0,00.
     const porForma: Record<string, number> = { ...porFormaDoDiaFechamento };
-    // Remove buckets zerados para não poluir o comprovante.
-    for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
+    const porFormaDetalhe = detalheDoDiaFechamento;
     printComprovanteCaixa({
       tipo: "fechamento",
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
@@ -2928,6 +2948,7 @@ function Page() {
       diferenca: diff,
       descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
       porForma,
+      porFormaDetalhe,
       formato: formatoFechamento,
       aberturaEm: minhaSessao.aberto_em,
       fechamentoEm: fechadoEmISO,
@@ -3020,6 +3041,10 @@ function Page() {
       diferenca: diff,
       descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
       porForma: conferidoNum,
+      // O que o sistema apurou na sessão, entrada a entrada — mesmo desenho do
+      // comprovante do próprio operador. O que o gestor conferiu continua
+      // registrado nas observações da sessão (`breakdownStr`).
+      porFormaDetalhe: detalhePorFormaSessao(alvo.id),
     });
     void loadTodos();
     void load();

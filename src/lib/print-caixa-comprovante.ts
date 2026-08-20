@@ -12,6 +12,7 @@
 import {
   assinaturaA4,
   campoA4,
+  CSS_DOC_A4,
   CSS_TOOLBAR_80MM,
   documentoA4,
   esc,
@@ -42,8 +43,24 @@ export interface ComprovanteCaixaInput {
   saldoCalculado?: number;
   valorInformado?: number;
   diferenca?: number;
-  /** Totais por forma de pagamento (somente fechamento). Chave = forma, valor = R$. */
+  /** Totais por forma de pagamento (somente fechamento). Chave = forma, valor
+   *  = saldo LÍQUIDO da forma (entradas − saídas). Mantido por compatibilidade:
+   *  quando `porFormaDetalhe` vem preenchido, é ele que manda. */
   porForma?: Record<string, number>;
+  /**
+   * Entradas e saídas de cada forma de pagamento no fechamento.
+   *
+   * Substitui o antigo bloco "Recebimentos por forma", que na verdade imprimia
+   * o saldo LÍQUIDO — com sangrias, despesas e estornos já descontados — sob um
+   * rótulo de recebimento. Como toda sangria sai em espécie, num dia em que a
+   * operadora sangra tudo o Dinheiro fecha em R$ 0,00 e a linha simplesmente
+   * desaparecia do papel: o comprovante de 20/08/2026 afirmava R$ 0,00 recebidos
+   * em espécie depois de terem passado R$ 9.550,55 pela gaveta. Separando
+   * entradas de saídas, o cupom volta a provar quanto entrou, quanto saiu e o
+   * que sobrou em cada forma — o mesmo desenho do comprovante do sistema antigo,
+   * que é o papel com o qual a tesouraria confere.
+   */
+  porFormaDetalhe?: Record<string, { entradas: number; saidas: number }>;
   /** Data/hora do movimento (default: agora). */
   quando?: Date;
   /** Formato do papel. `a4` (padrão) ou `80mm` (bobina térmica). */
@@ -104,6 +121,89 @@ const FORMA_LABEL: Record<string, string> = {
 const formaLabel = (k: string) =>
   FORMA_LABEL[k?.toLowerCase?.()] ?? (k ? k.charAt(0).toUpperCase() + k.slice(1) : "Outros");
 
+/** Rótulos curtos: na bobina de 72mm "Cartão de Débito" não cabe na coluna. */
+const FORMA_LABEL_CURTO: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  debito: "Débito",
+  credito: "Crédito",
+  boleto: "Boleto",
+  transferencia: "Transfer.",
+  convenio: "Convênio",
+  outros: "Outros",
+  indeterminado: "Indeterm.",
+};
+const formaLabelCurto = (k: string) => FORMA_LABEL_CURTO[k?.toLowerCase?.()] ?? formaLabel(k);
+
+/**
+ * Formas que aparecem SEMPRE no fechamento, mesmo zeradas. Dinheiro está aqui
+ * porque é o único valor físico: se a linha some do papel quando fecha em zero,
+ * some junto a prova de quanto passou pela gaveta.
+ */
+const FORMAS_FIXAS = ["dinheiro", "pix", "debito", "credito"];
+
+/** Ordem fixa das linhas por forma no comprovante de fechamento. */
+const ORDEM_FORMAS_COMPROVANTE = [
+  ...FORMAS_FIXAS,
+  "boleto",
+  "transferencia",
+  "convenio",
+  "outros",
+  "indeterminado",
+];
+
+/**
+ * Número sem "R$": o cabeçalho da tabela já diz que os valores são em reais.
+ *
+ * O arredondamento para centavo antes de formatar não é cosmético: quando a
+ * operadora sangra exatamente tudo o que recebeu, o saldo em dinheiro dá algo
+ * como −0,0000000018 em ponto flutuante e o papel saía com "−0,00", que numa
+ * conferência parece falta.
+ */
+const fmtNum = (v: number) => {
+  const centavos = Math.round((Number(v) || 0) * 100);
+  return (centavos === 0 ? 0 : centavos / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+interface LinhaForma {
+  chave: string;
+  entradas: number;
+  saidas: number;
+  saldo: number;
+}
+
+/**
+ * Linhas da tabela por forma: as quatro fixas sempre, mais qualquer outra que
+ * tenha tido movimento no período. Aceita tanto o formato novo
+ * (`porFormaDetalhe`) quanto o antigo (`porForma`, só o líquido).
+ */
+function linhasPorForma(input: ComprovanteCaixaInput): LinhaForma[] {
+  const detalhe: Record<string, { entradas: number; saidas: number }> =
+    input.porFormaDetalhe ??
+    Object.fromEntries(
+      Object.entries(input.porForma ?? {}).map(([k, v]) => [
+        k,
+        { entradas: Number(v) > 0 ? Number(v) : 0, saidas: Number(v) < 0 ? -Number(v) : 0 },
+      ]),
+    );
+  const extras = Object.keys(detalhe)
+    .filter((k) => !ORDEM_FORMAS_COMPROVANTE.includes(k))
+    .sort();
+  const out: LinhaForma[] = [];
+  for (const chave of [...ORDEM_FORMAS_COMPROVANTE, ...extras]) {
+    const entradas = Number(detalhe[chave]?.entradas ?? 0);
+    const saidas = Number(detalhe[chave]?.saidas ?? 0);
+    if (!FORMAS_FIXAS.includes(chave) && Math.abs(entradas) < 0.005 && Math.abs(saidas) < 0.005) {
+      continue;
+    }
+    out.push({ chave, entradas, saidas, saldo: entradas - saidas });
+  }
+  return out;
+}
+
 /** Monta o HTML do comprovante — exportado para permitir pré-visualização. */
 export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string {
   const quando = input.quando ?? new Date();
@@ -139,11 +239,14 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
     linhas.push({ label: "Valor", valor: fmtBRL(input.valor), destaque: true });
   }
 
-  const formasEntries =
-    isFech && input.porForma
-      ? Object.entries(input.porForma).filter(([, v]) => Number(v) > 0.0009)
-      : [];
-  const totalFormas = formasEntries.reduce((s, [, v]) => s + Number(v || 0), 0);
+  // Tabela por forma: entradas, saídas e saldo. Nenhuma linha é escondida por
+  // ter fechado em zero (era o que apagava o Dinheiro em dia de sangria total)
+  // nem por ter saldo negativo — a linha negativa é justamente a que precisa
+  // ser vista na conferência.
+  const formasLinhas = isFech ? linhasPorForma(input) : [];
+  const totalEntradas = formasLinhas.reduce((s, l) => s + l.entradas, 0);
+  const totalSaidas = formasLinhas.reduce((s, l) => s + l.saidas, 0);
+  const totalSaldo = totalEntradas - totalSaidas;
 
   const movs = isFech ? (input.movimentos ?? []) : [];
   const totalSup = movs
@@ -208,14 +311,37 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
        ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}`
       : destaque80("Valor", fmtBRL(input.valor));
 
-    const formasBlock = formasEntries.length
-      ? `${secao80("Recebimentos por forma")}
-       ${formasEntries.map(([k, v]) => linha80(formaLabel(k), fmtBRL(Number(v)))).join("")}
-       ${linha80("Total recebido", fmtBRL(totalFormas), true)}`
+    const formasBlock = formasLinhas.length
+      ? `${secao80("Por forma de pagamento (R$)")}
+       <table class="formas">
+         <thead>
+           <tr><th>Forma</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>
+         </thead>
+         <tbody>
+           ${formasLinhas
+             .map(
+               (l) => `<tr>
+             <td>${esc(formaLabelCurto(l.chave))}</td>
+             <td class="n">${esc(fmtNum(l.entradas))}</td>
+             <td class="n">${esc(fmtNum(l.saidas))}</td>
+             <td class="n">${esc(fmtNum(l.saldo))}</td>
+           </tr>`,
+             )
+             .join("")}
+         </tbody>
+         <tfoot>
+           <tr>
+             <td>Total</td>
+             <td class="n">${esc(fmtNum(totalEntradas))}</td>
+             <td class="n">${esc(fmtNum(totalSaidas))}</td>
+             <td class="n">${esc(fmtNum(totalSaldo))}</td>
+           </tr>
+         </tfoot>
+       </table>`
       : "";
 
     const movsBlock = movs.length
-      ? `${secao80("Sangrias e suprimentos")}
+      ? `${secao80("Sangrias e suprimentos (detalhe)")}
        ${movs
          .map((m) => {
            const sinal = m.tipo === "sangria" ? "−" : "+";
@@ -290,6 +416,19 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
     letter-spacing: 1.2px; }
   .destaque-val { font-size: 19px; font-weight: 800; line-height: 1.15; margin-top: 1px;
     font-variant-numeric: tabular-nums; }
+
+  /* ---- tabela por forma de pagamento (entradas / saídas / saldo) ----
+     4 colunas em 72mm só cabem com fonte 8px e rótulo curto; os números
+     usam tabular-nums para as casas decimais ficarem alinhadas na coluna. */
+  table.formas { width: 100%; border-collapse: collapse; margin-top: 3px;
+    font-size: 8px; font-variant-numeric: tabular-nums; }
+  table.formas th, table.formas td { padding: 1.5px 0; white-space: nowrap; }
+  table.formas th { font-size: 7.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .3px; border-bottom: 1px solid #000; text-align: right; }
+  table.formas th:first-child, table.formas td:first-child { text-align: left;
+    padding-right: 3px; white-space: normal; overflow-wrap: anywhere; }
+  table.formas td.n { text-align: right; padding-left: 3px; }
+  table.formas tfoot td { border-top: 1px solid #000; font-weight: 800; padding-top: 2px; }
 
   /* ---- itens com descrição (sangrias/suprimentos) ---- */
   .item { margin-top: 3px; }
@@ -376,17 +515,40 @@ ${CSS_TOOLBAR_80MM}`;
         <div class="valor">${esc(fmtBRL(input.valor))}</div>
       </div>`;
 
-  const formasSecao = formasEntries.length
+  const formasSecao = formasLinhas.length
     ? `<div class="secao">
-        <div class="rot">Recebimentos por forma de pagamento</div>
-        ${formasEntries.map(([k, v]) => linhaValorA4(formaLabel(k), fmtBRL(Number(v)))).join("")}
-        ${linhaValorA4("Total recebido", fmtBRL(totalFormas), { total: true })}
+        <div class="rot">Por forma de pagamento (valores em R$)</div>
+        <table class="formas">
+          <thead>
+            <tr><th>Forma</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>
+          </thead>
+          <tbody>
+            ${formasLinhas
+              .map(
+                (l) => `<tr>
+              <td>${esc(formaLabel(l.chave))}</td>
+              <td class="n">${esc(fmtNum(l.entradas))}</td>
+              <td class="n">${esc(fmtNum(l.saidas))}</td>
+              <td class="n">${esc(fmtNum(l.saldo))}</td>
+            </tr>`,
+              )
+              .join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="n">${esc(fmtNum(totalEntradas))}</td>
+              <td class="n">${esc(fmtNum(totalSaidas))}</td>
+              <td class="n">${esc(fmtNum(totalSaldo))}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>`
     : "";
 
   const movsSecao = movs.length
     ? `<div class="secao">
-        <div class="rot">Sangrias e suprimentos do turno</div>
+        <div class="rot">Sangrias e suprimentos do turno (detalhe)</div>
         ${movs
           .map((m) =>
             linhaValorA4(
@@ -439,7 +601,21 @@ ${CSS_TOOLBAR_80MM}`;
     </div>
   </div>`;
 
-  return documentoA4(titulo, corpoA4);
+  /** Tabela por forma na folha A4 — as classes base não têm estilo de tabela. */
+  const cssTabelaA4 = `
+  table.formas { width: 100%; border-collapse: collapse; margin-top: 6px;
+    font-size: 12pt; font-variant-numeric: tabular-nums; }
+  table.formas th, table.formas td { padding: 6px 0; }
+  table.formas th { font-size: 8.5pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: #52525b; text-align: right;
+    border-bottom: 1px solid #a1a1aa; }
+  table.formas th:first-child, table.formas td:first-child { text-align: left; }
+  table.formas td { border-bottom: 1px dotted #a1a1aa; }
+  table.formas td.n { text-align: right; padding-left: 16px; white-space: nowrap; }
+  table.formas tfoot td { border-bottom: none; border-top: 1.5px solid #18181b;
+    font-weight: 800; }`;
+
+  return documentoA4(titulo, corpoA4, CSS_DOC_A4 + cssTabelaA4);
 }
 
 export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
