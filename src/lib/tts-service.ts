@@ -139,16 +139,17 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
 
 /** Busca a configuração atual da clínica no banco. */
 export async function fetchClinicaTtsConfig(clinicaId: string): Promise<ClinicaTtsConfig | null> {
-  const { data, error } = await supabase
-    .from("clinica_tts_config")
-    .select("rate, enabled, piper_voice")
-    .eq("clinica_id", clinicaId)
-    .maybeSingle();
-  if (error || !data) return null;
+  // Leitura via função restrita: devolve só velocidade/ativo/voz, sem expor
+  // colunas internas da tabela (quem alterou, ids etc.) a visitantes públicos.
+  const { data, error } = await supabase.rpc("tts_config_publico", {
+    _clinica_id: clinicaId,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) return null;
   return {
-    rate: Number(data.rate),
-    enabled: !!data.enabled,
-    piperVoice: (data as { piper_voice?: string | null }).piper_voice ?? "",
+    rate: Number(row.rate),
+    enabled: !!row.enabled,
+    piperVoice: (row as { piper_voice?: string | null }).piper_voice ?? "",
   };
 }
 
@@ -205,7 +206,15 @@ export function subscribeClinicaTtsConfig(clinicaId: string): () => void {
       },
     )
     .subscribe();
+  // O painel público não tem acesso ao Realtime desta tabela; um refetch leve
+  // garante que a mudança de voz chegue nas telas anônimas.
+  const poll = setInterval(() => {
+    void fetchClinicaTtsConfig(clinicaId).then((cfg) => {
+      if (cfg) applyClinicaTtsConfig(cfg);
+    });
+  }, 60_000);
   return () => {
+    clearInterval(poll);
     void supabase.removeChannel(ch);
   };
 }
