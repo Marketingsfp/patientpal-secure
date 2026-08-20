@@ -118,9 +118,10 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     especialidades: "read",
     procedimentos: "read",
     disponibilidades: "write",
-    // Só "read": a mesclagem em si é restrita a administradores pela função
-    // merge_pacientes no banco, então dar "write" aqui só geraria erro.
-    "clientes-duplicados": "read",
+    // "write": desde a migration 20260820160000 a função merge_pacientes segue
+    // esta matriz em vez de exigir admin. Gestor já pode excluir paciente pela
+    // policy do banco, e mesclar é a operação mais conservadora das duas.
+    "clientes-duplicados": "write",
     "prontuario-modelos": "read",
     "modelos-documentos": "read",
     planos: "read",
@@ -157,9 +158,10 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     agenda: "write",
     recepcao: "write",
     clientes: "write",
-    // Enxerga a lista de possíveis duplicados para corrigir os cadastros,
-    // mas sem o botão de mesclar (só "Leitura").
-    "clientes-duplicados": "read",
+    // Recepção é quem encontra o cadastro repetido no balcão. Excluir paciente
+    // continua barrado no banco para este perfil; mesclar é o caminho liberado,
+    // porque preserva agenda, financeiro e prontuário e fica auditado.
+    "clientes-duplicados": "write",
     fluxo: "write",
     orcamentos: "write",
     "consulta-rapida": "read",
@@ -179,6 +181,9 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   caixa: {
     caixa: "write",
     clientes: "read",
+    // Mesmo com Clientes em "Leitura" no padrão, o Caixa precisa resolver o
+    // cadastro repetido que ele mesmo detecta na hora de receber.
+    "clientes-duplicados": "write",
     recepcao: "read",
     financeiro: "read",
     "consulta-rapida": "read",

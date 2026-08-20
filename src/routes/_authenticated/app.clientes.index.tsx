@@ -167,9 +167,25 @@ function formatPhone(valor: string | null | undefined): string {
   return valor ?? "—";
 }
 
+/**
+ * Mensagem única para o caso em que o banco recusa a exclusão.
+ *
+ * A policy `pacientes_manager_delete` só aceita admin e gestor. Quando outro
+ * perfil tenta apagar, o Postgres não devolve erro: ele simplesmente apaga
+ * zero linhas. Sem conferir a contagem, a tela mostrava "Cliente excluído."
+ * e o paciente continuava na lista — foi o que travou o Caixa.
+ */
+const SEM_PERMISSAO_EXCLUIR =
+  "Você não tem permissão para excluir cadastro de paciente. Para juntar cadastros repetidos use Clientes → Duplicados, ou peça a um administrador.";
+
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
+  // Escrita em Clientes libera cadastrar/editar; excluir é mais restrito que
+  // isso no banco. Espelhamos a regra do banco aqui para o botão não aparecer
+  // para quem vai levar recusa silenciosa ao clicar.
+  const papel = clinicaAtual?.role ?? null;
+  const podeExcluir = podeEscrever && (papel === "admin" || papel === "gestor");
   // Cache de dados (React Query) — só São Francisco de Paula. Desligada,
   // segue 100% no caminho manual abaixo (idêntico ao comportamento anterior).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
@@ -371,7 +387,9 @@ function ClientesPage() {
     });
     if (!ok) return;
     setExcluindoId(p.id);
-    const { error } = await supabase.from("pacientes").delete().eq("id", p.id);
+    // `.select("id")` é o que permite saber se a linha foi mesmo apagada:
+    // recusa por RLS volta sem erro e com lista vazia.
+    const { data, error } = await supabase.from("pacientes").delete().eq("id", p.id).select("id");
     setExcluindoId(null);
     if (error) {
       if ((error as { code?: string }).code === "23503") {
@@ -381,6 +399,10 @@ function ClientesPage() {
       } else {
         mostrarErro(error);
       }
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error(SEM_PERMISSAO_EXCLUIR);
       return;
     }
     setItemsManual((cur) => cur.filter((x) => x.id !== p.id));
@@ -401,14 +423,20 @@ function ClientesPage() {
     setExcluindoLote(true);
     const excluidos: string[] = [];
     let bloqueados = 0;
+    let semPermissao = 0;
     for (const id of selecionados) {
-      const { error } = await supabase.from("pacientes").delete().eq("id", id);
+      const { data, error } = await supabase.from("pacientes").delete().eq("id", id).select("id");
       if (error) {
         if ((error as { code?: string }).code === "23503") bloqueados++;
         else {
           mostrarErro(error);
           break;
         }
+      } else if (!data || data.length === 0) {
+        // Recusa por RLS: não é erro, é linha nenhuma apagada. Para não repetir
+        // a mesma recusa em todos os selecionados, interrompemos no primeiro.
+        semPermissao++;
+        break;
       } else {
         excluidos.push(id);
       }
@@ -422,6 +450,9 @@ function ClientesPage() {
       toast.error(
         `${bloqueados} cliente(s) possuem registros vinculados e não puderam ser excluídos.`,
       );
+    }
+    if (semPermissao > 0) {
+      toast.error(SEM_PERMISSAO_EXCLUIR);
     }
     setSelecionados([]);
     refrescar();
@@ -787,7 +818,7 @@ function ClientesPage() {
                           <Pencil className="h-4 w-4" />
                         </button>
                       )}
-                      {podeEscrever && (
+                      {podeExcluir && (
                         <button
                           type="button"
                           title="Excluir cliente"
@@ -821,7 +852,7 @@ function ClientesPage() {
             >
               Limpar
             </Button>
-            {podeEscrever && (
+            {podeExcluir ? (
               <Button
                 variant="destructive"
                 size="sm"
@@ -832,6 +863,13 @@ function ClientesPage() {
                 <Trash2 className="h-4 w-4 mr-1.5" />
                 {excluindoLote ? "Excluindo…" : "Excluir selecionados"}
               </Button>
+            ) : (
+              <Link
+                to="/app/clientes/duplicados"
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
+              >
+                Cadastro repetido? Use Duplicados →
+              </Link>
             )}
           </div>
         </div>
