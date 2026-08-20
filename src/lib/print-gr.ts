@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
 import { prontuarioExibicao } from "@/lib/prontuario";
 
@@ -92,6 +93,27 @@ async function semFalhar<T>(p: PromiseLike<{ data: T }>, vazio: T): Promise<{ da
     return await p;
   } catch {
     return { data: vazio };
+  }
+}
+
+/**
+ * Nome de quem FATUROU o(s) atendimento(s), resolvido no servidor.
+ *
+ * O caminho do navegador (fin_lancamentos -> profiles) volta vazio quando o
+ * lançamento foi gravado em outra clínica ou quando o perfil do colega não é
+ * legível pelo RLS. Nesses casos a guia acabava caindo no último fallback e
+ * imprimindo o nome de quem estava IMPRIMINDO. Aqui a consulta roda no
+ * servidor, com a chave de serviço, então não volta vazia por permissão.
+ *
+ * Nunca derruba a impressão: qualquer falha devolve null e a guia segue pelos
+ * fallbacks de sempre.
+ */
+async function nomeFaturouServidor(clinicaId: string, ids: string[]): Promise<string | null> {
+  try {
+    const r = await nomeDeQuemFaturou({ data: { clinicaId, agendamentoIds: ids } });
+    return ((r?.nome ?? "") as string).trim() || null;
+  } catch {
+    return null;
   }
 }
 
@@ -486,7 +508,7 @@ async function printGuiaAtendimentoCore({
   // orçamento saem todos juntos. Antes isso eram quatro etapas em série antes
   // de qualquer outra coisa começar — e cada ida e volta ao Supabase custa
   // ~250ms de rede, contra ~2ms de execução no banco.
-  const [visRes, ag, cli, lancsRes, orcLinksRes] = await Promise.all([
+  const [visRes, ag, cli, lancsRes, orcLinksRes, nomeFaturouServidorRes] = await Promise.all([
     // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
     supabase
       .from("gr_impressoes" as never)
@@ -528,6 +550,8 @@ async function printGuiaAtendimentoCore({
         .eq("agendamento_id", agendamentoId),
       null,
     ),
+    // Quem faturou, resolvido no servidor (ver nomeFaturouServidor).
+    nomeFaturouServidor(clinicaId, [agendamentoId]),
   ]);
 
   const { data: visExistentes, error: errVias } = visRes;
@@ -634,8 +658,18 @@ async function printGuiaAtendimentoCore({
   ]);
 
   const nomeAutor = (profRes.data as { nome: string | null } | null)?.nome;
+  // Ordem: nome resolvido no servidor (única fonte que enxerga lançamento de
+  // outra clínica e perfil de colega) → caminho antigo pelo navegador → nome
+  // gravado na 1ª via. Se sabemos que quem faturou foi OUTRA pessoa e ainda
+  // assim não conseguimos o nome dela, a linha "Atendente" some: melhor sem o
+  // campo do que com o nome de quem está imprimindo, que é o erro que esta
+  // ordem existe para evitar.
+  const outroFaturou = !!criadoPor && criadoPor !== (usuarioId ?? null);
   const usuarioFinalNome: string | null | undefined =
-    nomeAutor || (primeiraVia?.impresso_por_nome ?? usuarioNome);
+    nomeFaturouServidorRes ||
+    nomeAutor ||
+    primeiraVia?.impresso_por_nome ||
+    (outroFaturou ? null : usuarioNome);
 
   const paciente = pac.data as {
     nome: string;
@@ -1514,7 +1548,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // (vias → lançamentos → autor do lançamento) só para depois começar a buscar
   // agendamento e clínica. Como cada ida e volta ao Supabase custa ~250ms de
   // rede (a consulta em si roda em ~2ms no banco), serializar era o gargalo.
-  const [visRes, agsRes, cliRes, lancsRes] = await Promise.all([
+  const [visRes, agsRes, cliRes, lancsRes, nomeFaturouServidorRes] = await Promise.all([
     supabase
       .from("gr_impressoes" as never)
       .select("via_numero, impresso_por_nome")
@@ -1545,6 +1579,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .order("created_at", { ascending: true }),
       null,
     ),
+    // Quem faturou, resolvido no servidor (ver nomeFaturouServidor).
+    nomeFaturouServidor(clinicaId, ids),
   ]);
 
   const { data: visExistentes, error: errVias } = visRes;
@@ -1666,8 +1702,18 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ]);
 
   const nomeAutor = (profRes.data as { nome: string | null } | null)?.nome;
+  // Ordem: nome resolvido no servidor (única fonte que enxerga lançamento de
+  // outra clínica e perfil de colega) → caminho antigo pelo navegador → nome
+  // gravado na 1ª via. Se sabemos que quem faturou foi OUTRA pessoa e ainda
+  // assim não conseguimos o nome dela, a linha "Atendente" some: melhor sem o
+  // campo do que com o nome de quem está imprimindo, que é o erro que esta
+  // ordem existe para evitar.
+  const outroFaturou = !!criadoPor && criadoPor !== (usuarioId ?? null);
   const usuarioFinalNome: string | null | undefined =
-    nomeAutor || (primeiraVia?.impresso_por_nome ?? usuarioNome);
+    nomeFaturouServidorRes ||
+    nomeAutor ||
+    primeiraVia?.impresso_por_nome ||
+    (outroFaturou ? null : usuarioNome);
 
   const paciente = pacienteRes.data as {
     nome: string;
