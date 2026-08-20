@@ -529,8 +529,11 @@ function FluxoPage() {
       toast.error(insErr.message);
       return;
     }
-    await setEtapa(a.id, "atendimento", { silencioso: true });
+    // O aviso sai assim que a senha entra no banco (é esse registro que acende
+    // o painel). Mover o paciente de coluna é consequência e roda em seguida,
+    // sem segurar a resposta na tela de quem clicou.
     toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
+    void setEtapa(a.id, "atendimento", { silencioso: true });
   }
 
   // Cronômetros vivos: recalcula a cada 30s sem recarregar dados.

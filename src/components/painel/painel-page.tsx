@@ -27,6 +27,12 @@ export function PainelPage() {
   const { clinicaAtual, loading } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
+  // Espelho da senha em exibição. Serve para a atualização instantânea vinda do
+  // Realtime saber o que já estava na tela sem depender do ciclo do React.
+  const atualRef = useRef<Senha | null>(null);
+  // Impede consultas sobrepostas e redesenhos sem mudança real na tela.
+  const buscandoRef = useRef(false);
+  const assinaturaRef = useRef<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const jaFaladoRef = useRef<Set<string>>(new Set());
   const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
@@ -219,14 +225,33 @@ export function PainelPage() {
     const clinicaId = clinicaAtual.clinica_id;
 
     const carregar = async () => {
-      const { data } = await supabase.rpc("painel_senhas_publicas", { _clinica_id: clinicaId });
-      const lista = (data ?? []) as Senha[];
+      // Evita empilhar consultas: se a anterior ainda não voltou, esta rodada
+      // é descartada (a próxima já traz o estado mais novo mesmo assim).
+      if (buscandoRef.current) return;
+      buscandoRef.current = true;
+      let lista: Senha[] = [];
+      try {
+        const { data } = await supabase.rpc("painel_senhas_publicas", { _clinica_id: clinicaId });
+        lista = (data ?? []) as Senha[];
+      } finally {
+        buscandoRef.current = false;
+      }
+
+      // Com a checagem correndo a cada instante, só redesenhamos a TV quando
+      // algo realmente mudou — a tela fica leve mesmo ligada o dia inteiro.
+      const assinatura = lista
+        .map((s) => `${s.id}:${s.status}:${s.chamada_em ?? ""}:${s.guiche ?? ""}`)
+        .join("|");
+      if (assinatura === assinaturaRef.current) return;
+      assinaturaRef.current = assinatura;
+
+      atualRef.current = lista[0] ?? null;
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
 
       const chamadaMaisRecente = lista[0];
       if (chamadaMaisRecente?.status === "chamada") {
-        anunciarSenha(chamadaMaisRecente);
+        agendarAnuncio(chamadaMaisRecente);
       }
     };
 
@@ -237,7 +262,11 @@ export function PainelPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaId}` },
-        () => {
+        (payload) => {
+          // A tela troca no mesmo instante em que o banco avisa, usando os dados
+          // que já vêm no aviso. A consulta completa (que traz o nome do
+          // paciente) continua rodando logo atrás e só complementa o que falta.
+          mostrarChamadaImediata(payload.new as Record<string, unknown> | null);
           void carregar();
         },
       )
@@ -245,11 +274,15 @@ export function PainelPage() {
         console.info("[painel] realtime status:", status);
       });
 
-    // Fallback de polling: garante atualização mesmo se o canal de realtime
-    // cair silenciosamente (proxy, sleep de aba, RLS bloqueando o socket).
+    // Checagem contínua. Não é só um "plano B": no painel público (TV aberta
+    // sem login) o canal de tempo real NÃO entrega nada, porque o visitante
+    // anônimo não tem — e não deve ter — permissão de ler a tabela de senhas.
+    // Ou seja, é esta checagem que faz a chamada aparecer. Ela roda a cada
+    // 700 ms porque a consulta é minúscula (no máximo 6 linhas, já indexada)
+    // e só redesenha a tela quando algo muda.
     const poll = window.setInterval(() => {
       void carregar();
-    }, 3000);
+    }, 700);
     const onVis = () => {
       if (document.visibilityState === "visible") void carregar();
     };
@@ -264,6 +297,60 @@ export function PainelPage() {
 
   function chaveSenha(s: Senha) {
     return `${s.id}:${s.chamada_em ?? ""}`;
+  }
+
+  /**
+   * Pinta a chamada na tela no exato momento em que o banco avisa, sem esperar
+   * a consulta que traz o nome completo do paciente.
+   *
+   * O aviso do Realtime já traz código, guichê e horário — que é tudo o que o
+   * destaque "Chamando agora" precisa. O nome do paciente (quando a senha é
+   * numérica) chega alguns instantes depois, pela consulta normal, e apenas
+   * completa a tela. Nada aqui dispara voz: o anúncio continua saindo só do
+   * caminho completo, para nunca falar uma chamada pela metade.
+   */
+  function mostrarChamadaImediata(row: Record<string, unknown> | null) {
+    if (!row || typeof row.id !== "string" || row.status !== "chamada") return;
+    const anterior = atualRef.current;
+    const chamadaEm = typeof row.chamada_em === "string" ? row.chamada_em : null;
+    if (anterior?.id === row.id && anterior.chamada_em === chamadaEm) return;
+
+    const nova: Senha = {
+      id: row.id,
+      codigo: typeof row.codigo === "string" ? row.codigo : "",
+      tipo: (typeof row.tipo === "string" ? row.tipo : "N") as Senha["tipo"],
+      status: "chamada",
+      guiche: typeof row.guiche === "string" ? row.guiche : null,
+      chamada_em: chamadaEm,
+      paciente_id: typeof row.paciente_id === "string" ? row.paciente_id : null,
+      // Rechamada da mesma senha: aproveita o nome que já estava na tela.
+      paciente_nome: anterior?.id === row.id ? (anterior.paciente_nome ?? null) : null,
+    };
+
+    atualRef.current = nova;
+    setAtual(nova);
+    if (anterior && anterior.id !== nova.id) {
+      setHistorico((h) => [anterior, ...h.filter((s) => s.id !== anterior.id)].slice(0, 10));
+    }
+  }
+
+  /**
+   * Agenda o anúncio (ding + voz) para DEPOIS que o navegador desenhar a tela.
+   *
+   * A API de voz do navegador é síncrona: chamar `speak`/`cancel` no mesmo
+   * instante em que o React atualiza o estado segura o desenho da tela por
+   * centenas de milissegundos em máquinas modestas. O requestAnimationFrame
+   * espera o quadro atual e o setTimeout(0) roda logo após a pintura — o nome
+   * aparece primeiro, a voz sai em seguida.
+   */
+  function agendarAnuncio(s: Senha) {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      anunciarSenha(s);
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => anunciarSenha(s), 0);
+    });
   }
 
   function anunciarSenha(s: Senha) {
