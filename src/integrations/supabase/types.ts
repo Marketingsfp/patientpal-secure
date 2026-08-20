@@ -9157,6 +9157,10 @@ export type Database = {
         }
         Returns: string
       }
+      aplicar_tipo_convenio_lote: {
+        Args: { _ids: string[] }
+        Returns: Json
+      }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
@@ -9775,6 +9779,35 @@ export type Database = {
           total: number
         }[]
       }
+      listar_atendimentos_convenio_pendentes: {
+        Args: { _ate?: string; _clinica_ids: string[]; _de?: string; _limite?: number }
+        Returns: {
+          clinica_id: string
+          contrato_numero: number
+          convenio_nome: string
+          id: string
+          inicio: string
+          ja_pago: boolean
+          medico_nome: string
+          paciente_id: string
+          paciente_nome: string
+          procedimento: string
+          status: string
+        }[]
+      }
+      listar_contratos_sem_convenio: {
+        Args: { _clinica_ids: string[] }
+        Returns: {
+          clinica_id: string
+          data_inicio: string
+          id: string
+          numero: number
+          paciente_id: string
+          paciente_nome: string
+          qtd_dependentes: number
+          valor_mensal: number
+        }[]
+      }
       listar_duplicados_pacientes: {
         Args: { _clinica_ids: string[]; _limite?: number; _tipo?: string }
         Returns: {
@@ -10242,6 +10275,10 @@ export type Database = {
         }
         Returns: string
       }
+      tipo_atendimento_padrao: {
+        Args: { p_clinica_id: string; p_paciente_id: string }
+        Returns: string
+      }
       trocar_convenio_contrato: {
         Args: {
           _contrato_id: string
@@ -10264,6 +10301,10 @@ export type Database = {
       unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
+      vincular_convenio_contrato: {
+        Args: { _contrato_id: string; _convenio_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       agendamento_prioridade: "normal" | "prioritario" | "urgente"

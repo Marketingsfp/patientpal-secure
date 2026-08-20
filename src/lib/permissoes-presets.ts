@@ -50,6 +50,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Cadastros
   "equipe",
   "clientes-duplicados",
+  "revisao-convenio",
   "especialidades",
   "disponibilidades",
   "prontuario-modelos",
@@ -122,6 +123,10 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     // esta matriz em vez de exigir admin. Gestor já pode excluir paciente pela
     // policy do banco, e mesclar é a operação mais conservadora das duas.
     "clientes-duplicados": "write",
+    // Corrige em lote a classificação de atendimentos antigos e vincula
+    // convênio a contrato. Fica com Gestor e Financeiro (além de admin), que
+    // são quem responde pelos relatórios e pelo cadastro do cartão.
+    "revisao-convenio": "write",
     "prontuario-modelos": "read",
     "modelos-documentos": "read",
     planos: "read",
@@ -200,6 +205,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     orcamentos: "read",
     clientes: "read",
     "cartao-beneficios": "write",
+    "revisao-convenio": "write",
     boletos: "write",
     nfse: "write",
     contratos: "write",

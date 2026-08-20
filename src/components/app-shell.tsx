@@ -415,6 +415,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
       { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
       { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
+      { to: "/app/revisao-convenio", label: "Revisão de convênio", icon: ShieldCheck },
     ],
   },
   {

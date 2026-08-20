@@ -43,6 +43,7 @@ import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
 import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
+import { Route as AuthenticatedAppRevisaoConvenioRouteImport } from './routes/_authenticated/app.revisao-convenio'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
@@ -324,6 +325,12 @@ const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
   path: '/setores',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppRevisaoConvenioRoute =
+  AuthenticatedAppRevisaoConvenioRouteImport.update({
+    id: '/revisao-convenio',
+    path: '/revisao-convenio',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppRelatoriosRoute =
   AuthenticatedAppRelatoriosRouteImport.update({
     id: '/relatorios',
@@ -1030,6 +1037,7 @@ export interface FileRoutesByFullPath {
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
@@ -1168,6 +1176,7 @@ export interface FileRoutesByTo {
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
@@ -1312,6 +1321,7 @@ export interface FileRoutesById {
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
+  '/_authenticated/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
   '/_authenticated/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
@@ -1456,6 +1466,7 @@ export interface FileRouteTypes {
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/app/relatorios'
+    | '/app/revisao-convenio'
     | '/app/setores'
     | '/app/tipos-servico'
     | '/app/treinamentos'
@@ -1594,6 +1605,7 @@ export interface FileRouteTypes {
     | '/app/prontuarios'
     | '/app/recepcao'
     | '/app/relatorios'
+    | '/app/revisao-convenio'
     | '/app/setores'
     | '/app/tipos-servico'
     | '/app/treinamentos'
@@ -1737,6 +1749,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
     | '/_authenticated/app/relatorios'
+    | '/_authenticated/app/revisao-convenio'
     | '/_authenticated/app/setores'
     | '/_authenticated/app/tipos-servico'
     | '/_authenticated/app/treinamentos'
@@ -2068,6 +2081,13 @@ declare module '@tanstack/react-router' {
       path: '/setores'
       fullPath: '/app/setores'
       preLoaderRoute: typeof AuthenticatedAppSetoresRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/revisao-convenio': {
+      id: '/_authenticated/app/revisao-convenio'
+      path: '/revisao-convenio'
+      fullPath: '/app/revisao-convenio'
+      preLoaderRoute: typeof AuthenticatedAppRevisaoConvenioRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/relatorios': {
@@ -3010,6 +3030,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
+  AuthenticatedAppRevisaoConvenioRoute: typeof AuthenticatedAppRevisaoConvenioRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
   AuthenticatedAppTiposServicoRoute: typeof AuthenticatedAppTiposServicoRoute
   AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
@@ -3103,6 +3124,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
+  AuthenticatedAppRevisaoConvenioRoute: AuthenticatedAppRevisaoConvenioRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
   AuthenticatedAppTiposServicoRoute: AuthenticatedAppTiposServicoRoute,
   AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,

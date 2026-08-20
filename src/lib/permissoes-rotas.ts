@@ -25,6 +25,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // destrutiva e de gestão, então precisa poder ser escondida de perfis
   // que têm acesso normal à lista de clientes (ex.: Caixa).
   "/app/clientes/duplicados": "clientes-duplicados",
+  // Módulo próprio: a tela altera em lote a classificação de atendimentos já
+  // gravados e vincula convênio a contrato — mexe em relatório e em preço do
+  // cartão, então não acompanha o acesso normal a Clientes ou Agenda.
+  "/app/revisao-convenio": "revisao-convenio",
   // O sidebar rotula esta rota "Dashboard" (LayoutDashboard) e ela é a
   // página de indicadores — nada a ver com o módulo "painel" (Painel de
   // Senhas, painel público de chamadas em src/routes/painel.tsx, fora da

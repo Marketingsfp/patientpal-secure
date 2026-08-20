@@ -207,6 +207,12 @@ const GRUPOS_BASE: Grupo[] = [
         descricao:
           "Conferência de cadastros duplicados (mesclar continua restrito a administradores)",
       },
+      {
+        key: "revisao-convenio",
+        nome: "Revisão de convênio",
+        descricao:
+          "Corrige atendimentos antigos marcados como Particular apesar do cartão ativo e vincula convênio a contratos incompletos",
+      },
       { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
       {
         key: "especialidades",
