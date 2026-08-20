@@ -10010,6 +10010,14 @@ export type Database = {
         }
         Returns: Json
       }
+      tts_config_publico: {
+        Args: { _clinica_id: string }
+        Returns: {
+          enabled: boolean
+          piper_voice: string
+          rate: number
+        }[]
+      }
       unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
