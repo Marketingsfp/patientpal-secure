@@ -68,6 +68,7 @@ import {
   ArrowRightLeft,
   Inbox,
   FileBarChart2,
+  Receipt,
   Menu as MenuIcon,
   Columns3,
 } from "lucide-react";
@@ -498,7 +499,28 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           },
         ],
       },
-      { to: "/app/odontologia", label: "Odontologia", icon: Tooth },
+      {
+        // Odontologia virou grupo expansível (mesmo padrão da Nina): os dois
+        // filhos apontam para a mesma rota e a tela escolhe a aba pelo hash.
+        // Assim "Orçamentos de Odonto" tem entrada própria no menu em vez de
+        // ficar escondido numa aba interna.
+        label: "Odontologia",
+        icon: Tooth,
+        children: [
+          {
+            to: "/app/odontologia",
+            hash: "prontuario",
+            label: "Odontograma & Prontuário",
+            icon: Tooth,
+          },
+          {
+            to: "/app/odontologia",
+            hash: "orcamento",
+            label: "Orçamentos de Odonto",
+            icon: Receipt,
+          },
+        ],
+      },
       { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     ],
   },

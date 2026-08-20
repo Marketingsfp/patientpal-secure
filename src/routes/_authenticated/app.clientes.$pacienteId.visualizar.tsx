@@ -4,12 +4,13 @@ import { ArrowLeft, Pencil, Users } from "lucide-react";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { useAcessoModulo, usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
+import { PacienteOdontoPanel } from "@/components/clientes/paciente-odonto-panel";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
@@ -25,11 +26,16 @@ function VisualizarClientePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
   const podeHiperdia = usePodeEscrever("hiperdia");
+  // A aba de Odontologia só aparece para quem tem o módulo liberado no perfil
+  // de acesso — dado clínico não deve vazar para quem não atende odonto.
+  const acessoOdonto = useAcessoModulo("odontologia");
+  const verOdonto = acessoOdonto !== "none";
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
   >(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [aba, setAba] = useState("cadastro");
 
   useEffect(() => {
     let active = true;
@@ -90,37 +96,80 @@ function VisualizarClientePage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
-        {loading ? (
+      {loading ? (
+        <div className="rounded-lg border border-border bg-card p-6">
           <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : notFound || !paciente ? (
+        </div>
+      ) : notFound || !paciente ? (
+        <div className="rounded-lg border border-border bg-card p-6">
           <p className="text-sm text-muted-foreground">Paciente não encontrado.</p>
-        ) : !clinicaAtual ? (
+        </div>
+      ) : !clinicaAtual ? (
+        <div className="rounded-lg border border-border bg-card p-6">
           <p className="text-sm text-muted-foreground">Selecione uma clínica.</p>
-        ) : (
-          <ClienteForm
-            clinicaId={clinicaAtual.clinica_id}
-            paciente={paciente}
-            onCancel={voltar}
-            onSaved={voltar}
-            readOnly
-          />
-        )}
-      </div>
-      {!loading && paciente && clinicaAtual && (
-        <PacienteCartoesBeneficios pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
+        </div>
+      ) : (
+        // Antes esta página empilhava cadastro, cartões, atendimentos e hiperdia
+        // num scroll único e muito longo. As abas mantêm exatamente os mesmos
+        // painéis, só que um de cada vez — e abrem espaço para as abas por
+        // especialidade (Odontologia hoje, Fisioterapia depois).
+        <Tabs value={aba} onValueChange={setAba} className="space-y-4">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+            <TabsTrigger value="cartoes">Cartões</TabsTrigger>
+            <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+            <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
+            {verOdonto && <TabsTrigger value="odontologia">Odontologia</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="cadastro">
+            <div className="rounded-lg border border-border bg-card p-6">
+              <ClienteForm
+                clinicaId={clinicaAtual.clinica_id}
+                paciente={paciente}
+                onCancel={voltar}
+                onSaved={voltar}
+                readOnly
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="cartoes">
+            <PacienteCartoesBeneficios
+              pacienteId={paciente.id}
+              clinicaId={clinicaAtual.clinica_id}
+            />
+          </TabsContent>
+
+          <TabsContent value="atendimentos">
+            <PacienteAtendimentosResumo
+              pacienteId={paciente.id}
+              clinicaId={clinicaAtual.clinica_id}
+            />
+          </TabsContent>
+
+          <TabsContent value="hiperdia" className="space-y-6">
+            <HiperdiaPanel
+              pacienteId={paciente.id}
+              clinicaId={clinicaAtual.clinica_id}
+              readOnly={!podeHiperdia}
+            />
+            <CriteriosSbd2025 />
+          </TabsContent>
+
+          {verOdonto && (
+            <TabsContent value="odontologia">
+              <div className="rounded-lg border border-border bg-card p-6">
+                <PacienteOdontoPanel
+                  pacienteId={paciente.id}
+                  clinicaId={clinicaAtual.clinica_id}
+                  readOnly={acessoOdonto !== "write"}
+                />
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
       )}
-      {!loading && paciente && clinicaAtual && (
-        <PacienteAtendimentosResumo pacienteId={paciente.id} clinicaId={clinicaAtual.clinica_id} />
-      )}
-      {!loading && paciente && clinicaAtual && (
-        <HiperdiaPanel
-          pacienteId={paciente.id}
-          clinicaId={clinicaAtual.clinica_id}
-          readOnly={!podeHiperdia}
-        />
-      )}
-      {!loading && paciente && clinicaAtual && <CriteriosSbd2025 />}
     </div>
   );
 }

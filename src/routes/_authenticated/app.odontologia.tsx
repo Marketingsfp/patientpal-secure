@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Smile, Save, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -41,6 +41,11 @@ import { GaleriaOdontoTab } from "@/components/odontologia/galeria-odonto-tab";
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
   head: () => ({ meta: [{ title: "Odontologia — ClinicaOS" }] }),
+  // ?paciente=<uuid> abre a tela já com o paciente escolhido — usado pelo
+  // botão "Abrir módulo completo" da aba Odontologia na ficha do paciente.
+  validateSearch: (s: Record<string, unknown>): { paciente?: string } => ({
+    paciente: typeof s.paciente === "string" ? s.paciente : undefined,
+  }),
 });
 
 interface DenteRow {
@@ -91,6 +96,49 @@ function OdontologiaPage() {
   >([]);
   const [especialidadeOdontoId, setEspecialidadeOdontoId] = useState<string | null>(null);
   const [addOrcOpen, setAddOrcOpen] = useState(false);
+
+  // Aba principal controlada pelo hash da URL (#prontuario / #orcamento), no
+  // mesmo padrão da tela da Nina. É o que permite os dois itens do menu
+  // lateral apontarem para esta rota e caírem cada um na sua aba.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hashAba = (location.hash ?? "").replace(/^#/, "");
+  const abaAtiva = hashAba === "orcamento" ? "orcamento" : "prontuario";
+  const setAbaAtiva = (v: string) => {
+    navigate({
+      to: "/app/odontologia",
+      hash: v,
+      search: (prev) => prev,
+      replace: true,
+    });
+  };
+
+  // Paciente vindo por ?paciente=<uuid>. O ref garante que a pré-seleção
+  // aconteça uma única vez por valor: sem ele, trocar de paciente na tela
+  // seria desfeito pelo próprio efeito na renderização seguinte.
+  const { paciente: pacienteParam } = Route.useSearch();
+  const paramAplicado = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pacienteParam || !clinicaAtual) return;
+    if (paramAplicado.current === pacienteParam) return;
+    paramAplicado.current = pacienteParam;
+    void (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select(
+          "id,nome,cpf,telefone,data_nascimento,clinica_id,codigo_prontuario,codigo_prontuario_anterior",
+        )
+        .eq("id", pacienteParam)
+        .maybeSingle();
+      if (!data) return;
+      const opt = data as unknown as PatientOption;
+      setPacienteSel(opt);
+      setPacienteId(opt.id);
+      setPacienteSelOrc(opt);
+      setPacienteIdOrc(opt.id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteParam, clinicaAtual?.clinica_id]);
 
   useEffect(() => {
     void (async () => {
@@ -315,7 +363,7 @@ function OdontologiaPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="prontuario" className="space-y-4">
+      <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-4">
         <TabsList>
           <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
           <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
