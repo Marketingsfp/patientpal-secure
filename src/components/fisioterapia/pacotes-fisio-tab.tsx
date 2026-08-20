@@ -92,7 +92,7 @@ export function PacotesFisioTab({
       )
       .order("numero");
     const porPacote: Record<string, SessaoRow[]> = {};
-    for (const s of ((ss ?? []) as Array<SessaoRow & { pacote_id: string }>) ?? []) {
+    for (const s of (ss ?? []) as Array<SessaoRow & { pacote_id: string }>) {
       (porPacote[s.pacote_id] ??= []).push(s);
     }
     setSessoes(porPacote);
