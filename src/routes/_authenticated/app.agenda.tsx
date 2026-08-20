@@ -214,6 +214,9 @@ type Agendamento = {
   edit_lock_at?: string | null;
   origem_externa?: boolean | null;
   origem_clinica_nome?: string | null;
+  sinalizado_em?: string | null;
+  sinalizado_por?: string | null;
+  sinalizado_por_nome?: string | null;
 };
 type Medico = {
   id: string;
@@ -284,7 +287,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -327,6 +330,23 @@ const mapAgendaRows = (rows: AgendaRowBruta[]): Agendamento[] =>
     medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
     orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
   }));
+
+// Texto do balãozinho da bandeira de sinalização (quem marcou e quando).
+const rotuloSinalizacao = (a: {
+  sinalizado_em?: string | null;
+  sinalizado_por_nome?: string | null;
+}) => {
+  if (!a.sinalizado_em) return "";
+  const d = new Date(a.sinalizado_em);
+  const quando = d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const quem = (a.sinalizado_por_nome ?? "").trim();
+  return quem ? `Sinalizado por ${quem} em ${quando}` : `Sinalizado em ${quando}`;
+};
 
 // Busca robusta de procedimento por nome. Usa lista pré-carregada (lookup local)
 // e, se não achar OU vier sem valores, faz fallback direto no banco com ilike.
@@ -5581,6 +5601,46 @@ function AgendaPage() {
     }
   };
 
+  // Sinalização manual do atendimento (bandeira laranja na lista).
+  // Serve para a recepção destacar um paciente que precisa de atenção. É uma
+  // marca da linha da Agenda — não altera status, financeiro nem o cadastro do
+  // paciente — e some junto com o agendamento quando o dia passa.
+  const alternarSinalizacao = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      avisoSemPermissaoAgenda();
+      return;
+    }
+    const marcar = !a.sinalizado_em;
+    const nomeUsuario =
+      (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        sinalizado_em: marcar ? new Date().toISOString() : null,
+        sinalizado_por: marcar ? (user?.id ?? null) : null,
+        sinalizado_por_nome: marcar ? nomeUsuario : null,
+      } as never)
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    // Atualização otimista: a bandeira aparece na hora, sem esperar o load().
+    const patch = (lista: Agendamento[]) =>
+      lista.map((it) =>
+        it.id === a.id
+          ? {
+              ...it,
+              sinalizado_em: marcar ? new Date().toISOString() : null,
+              sinalizado_por: marcar ? (user?.id ?? null) : null,
+              sinalizado_por_nome: marcar ? nomeUsuario : null,
+            }
+          : it,
+      );
+    setItems(patch);
+    toast.success(marcar ? "Paciente sinalizado na agenda." : "Sinalização removida.");
+  };
+
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -9515,11 +9575,15 @@ function AgendaPage() {
               // o sólido fica quase branco e, no modo escuro, o texto claro
               // (--foreground) perde contraste sobre ele. O overlay se mistura
               // com o fundo real da linha e funciona nos dois temas.
+              const sinalizado = !!a.sinalizado_em;
               let bgClass = "bg-card";
               let borderLeft = "border-l-4 border-transparent";
               if (estornoPend) {
                 bgClass = "bg-rose-500/10";
                 borderLeft = "border-l-4 border-rose-500";
+              } else if (sinalizado) {
+                bgClass = "bg-amber-500/10";
+                borderLeft = "border-l-4 border-amber-500";
               } else if (a.origem_externa) {
                 bgClass = "bg-violet-500/10";
                 borderLeft = "border-l-4 border-violet-400";
@@ -9583,6 +9647,11 @@ function AgendaPage() {
                         onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
                         className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
                       >
+                        {sinalizado && (
+                          <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
+                            <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                          </span>
+                        )}
                         {a.status === "confirmado" && (
                           <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                         )}
@@ -9698,6 +9767,15 @@ function AgendaPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
+                            {!ehLivre && podeEscrever && (
+                              <>
+                                <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
+                                  <Flag className="h-4 w-4 mr-2" />
+                                  {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
                             {podeEscrever && (
                               <DropdownMenuItem
                                 onClick={() => iniciarReagendamento(a)}
@@ -9843,11 +9921,17 @@ function AgendaPage() {
                   // no modo escuro, o texto claro (--foreground) perde contraste
                   // sobre ele. O overlay se mistura com o fundo real da linha e
                   // funciona nos dois temas.
+                  // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
+                  // estorno (mais crítico) e acima das demais cores.
+                  const sinalizado = !!a.sinalizado_em;
                   let bgClass = "";
                   let borderLeft = "";
                   if (estornoPend) {
                     bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                     borderLeft = "border-l-4 border-rose-500";
+                  } else if (sinalizado) {
+                    bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
+                    borderLeft = "border-l-4 border-amber-500";
                   } else if (a.origem_externa) {
                     bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
                     borderLeft = "border-l-4 border-violet-400";
@@ -9937,6 +10021,11 @@ function AgendaPage() {
                             title={a.paciente_nome}
                           >
                             <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
+                              {sinalizado && (
+                                <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
+                                  <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                                </span>
+                              )}
                               {a.status === "confirmado" && (
                                 <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                               )}
@@ -10166,6 +10255,15 @@ function AgendaPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56">
+                                {!ehLivre && podeEscrever && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
+                                      <Flag className="h-4 w-4 mr-2" />
+                                      {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
                                 {/* NFS-e */}
                                 {!ehLivre &&
                                   (() => {
