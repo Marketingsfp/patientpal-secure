@@ -4560,7 +4560,7 @@ export type Database = {
           {
             foreignKeyName: "fisio_sessoes_agendamento_id_fkey"
             columns: ["agendamento_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "agendamentos"
             referencedColumns: ["id"]
           },
