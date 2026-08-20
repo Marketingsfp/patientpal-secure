@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { buscarProfissionaisFisio } from "@/lib/fisio-profissionais";
+import { buscarProfissionaisFisio } from "@/lib/fisio-catalogo";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Dialog,

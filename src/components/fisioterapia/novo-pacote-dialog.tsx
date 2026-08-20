@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { buscarProfissionaisFisio } from "@/lib/fisio-profissionais";
+import {
+  buscarProcedimentosFisio,
+  buscarProfissionaisFisio,
+  type ProcedimentoFisio,
+} from "@/lib/fisio-catalogo";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   Dialog,
@@ -33,11 +37,6 @@ interface Props {
   onCreated: () => void;
 }
 
-interface Procedimento {
-  id: string;
-  nome: string;
-  valor_padrao: number;
-}
 interface OrcamentoAberto {
   id: string;
   numero: number;
@@ -72,7 +71,7 @@ export function NovoPacoteDialog({
   const [orcamentoId, setOrcamentoId] = useState(SEM);
   const [observacoes, setObservacoes] = useState("");
 
-  const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
+  const [procedimentos, setProcedimentos] = useState<ProcedimentoFisio[]>([]);
   const [profissionais, setProfissionais] = useState<{ id: string; nome: string }[]>([]);
   const [orcamentos, setOrcamentos] = useState<OrcamentoAberto[]>([]);
   const [salvando, setSalvando] = useState(false);
@@ -92,13 +91,8 @@ export function NovoPacoteDialog({
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const [{ data: proc }, med, { data: orc }] = await Promise.all([
-        supabase
-          .from("procedimentos")
-          .select("id, nome, valor_padrao")
-          .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .order("nome"),
+      const [proc, med, { data: orc }] = await Promise.all([
+        buscarProcedimentosFisio(clinicaId),
         buscarProfissionaisFisio(clinicaId),
         supabase
           .from("orcamentos")
@@ -108,7 +102,7 @@ export function NovoPacoteDialog({
           .eq("status", "aberto")
           .order("numero", { ascending: false }),
       ]);
-      setProcedimentos((proc as Procedimento[]) ?? []);
+      setProcedimentos(proc);
       setProfissionais(med);
       setOrcamentos((orc as OrcamentoAberto[]) ?? []);
     })();
