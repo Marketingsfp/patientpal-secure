@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { hojeBR } from "@/lib/date-utils";
 import { precoAtendimentoParaCaixa, type PrecoCaixa } from "@/lib/convenio/info-convenio-paciente";
 import { useClinica } from "@/hooks/use-clinica";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
@@ -419,6 +420,21 @@ const SESSAO_FIELDS =
 const MOV_FIELDS =
   "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
+/**
+ * Movimentos do caixa incluindo o dono da sessão, para poder filtrar por ele.
+ *
+ * O recorte de "Meu caixa" é por DONO DA SESSÃO, e não por
+ * `caixa_movimentos.user_id`: quando um gestor fecha o caixa de outra pessoa,
+ * a linha de fechamento fica gravada na sessão dela com o user_id do gestor.
+ */
+const MOV_FIELDS_COM_SESSAO = `${MOV_FIELDS}, caixa_sessoes!inner(user_id)`;
+
+/** Teto de linhas por consulta de movimentos (o PostgREST corta em 1.000). */
+const LIMITE_MOVS = 2000;
+
+/** Teto de dias recalculados para a coluna "Ficha" em períodos largos. */
+const LIMITE_DIAS_FICHA = 45;
+
 /** "YYYY-MM-DD" no fuso local a partir de um ISO. */
 function localYMDStr(iso: string): string {
   const d = new Date(iso);
@@ -642,6 +658,8 @@ function Page() {
   // cálculos de Saldo/Totais — esses continuam presos à sessão aberta atual
   // via `minhasMovs`.
   const [minhasMovsHist, setMinhasMovsHist] = useState<Mov[]>([]);
+  /** Verdadeiro quando a consulta do período bateu no teto de linhas. */
+  const [movsNoTeto, setMovsNoTeto] = useState(false);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Solicitações de estorno vinculadas às movimentações visíveis
   // (chave = lancamento_id, valor = status). Usado para trocar o botão
@@ -675,41 +693,66 @@ function Page() {
   const [meuMedico, setMeuMedico] = useState<string>("__all__");
   const [meuPaciente, setMeuPaciente] = useState<string>("");
   const [openCal, setOpenCal] = useState(false);
+  /**
+   * Janela de datas do filtro "Período" da aba Movimentos.
+   *
+   * Ficou fora do useMemo da lista porque agora ela manda em DUAS coisas: no
+   * recorte feito na tela e, principalmente, no que é buscado no banco.
+   *
+   * Antes o período só recortava o que já estava carregado — e o que estava
+   * carregado eram as 5 últimas sessões de caixa do usuário. Escolher "Mês",
+   * "Todos" ou um intervalo antigo devolvia lista vazia mesmo existindo
+   * movimento: o recebimento de um caixa de abril, por exemplo, nunca chegava
+   * a ser buscado.
+   *
+   * `null` = "Todos" (sem recorte de data).
+   */
+  const janelaMeusMovs = useMemo<{ ini: Date; fim: Date } | null>(() => {
+    if (meuPeriodo === "todos") return null;
+    const now = new Date();
+    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let ini: Date;
+    let fimP: Date = fim;
+    if (meuPeriodo === "hoje") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else if (meuPeriodo === "semana") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    } else if (meuPeriodo === "quinzena") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+    } else if (meuPeriodo === "mes") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+    } else {
+      // Validação defensiva: se o intervalo estiver em branco/mal
+      // formatado, cai para o dia de hoje em vez de gerar Date(NaN)
+      // e sumir com todas as linhas silenciosamente.
+      const parseIso = (s: string): [number, number, number] | null => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
+        if (!m) return null;
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        if (!y || !mo || !d) return null;
+        return [y, mo, d];
+      };
+      const pi = parseIso(meuDataIni);
+      const pf = parseIso(meuDataFim);
+      if (pi) ini = new Date(pi[0], pi[1] - 1, pi[2], 0, 0, 0, 0);
+      else ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      if (pf) fimP = new Date(pf[0], pf[1] - 1, pf[2], 23, 59, 59, 999);
+    }
+    return { ini, fim: fimP };
+  }, [meuPeriodo, meuDataIni, meuDataFim]);
+
+  // A janela vira string para entrar nas dependências do `load`: um objeto
+  // Date muda de identidade a cada render e refaria a consulta sem parar.
+  const janelaIniISO = janelaMeusMovs ? janelaMeusMovs.ini.toISOString() : null;
+  const janelaFimISO = janelaMeusMovs ? janelaMeusMovs.fim.toISOString() : null;
+
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
     // 1) filtro de período (data)
     let base: Mov[] = minhasMovsHist;
-    if (meuPeriodo !== "todos") {
-      const now = new Date();
-      const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      let ini: Date;
-      let fimP: Date = fim;
-      if (meuPeriodo === "hoje") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      } else if (meuPeriodo === "semana") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
-      } else if (meuPeriodo === "quinzena") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
-      } else if (meuPeriodo === "mes") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
-      } else {
-        // Validação defensiva: se o intervalo estiver em branco/mal
-        // formatado, cai para o dia de hoje em vez de gerar Date(NaN)
-        // e sumir com todas as linhas silenciosamente.
-        const parseIso = (s: string): [number, number, number] | null => {
-          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
-          if (!m) return null;
-          const y = Number(m[1]);
-          const mo = Number(m[2]);
-          const d = Number(m[3]);
-          if (!y || !mo || !d) return null;
-          return [y, mo, d];
-        };
-        const pi = parseIso(meuDataIni);
-        const pf = parseIso(meuDataFim);
-        if (pi) ini = new Date(pi[0], pi[1] - 1, pi[2], 0, 0, 0, 0);
-        else ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-        if (pf) fimP = new Date(pf[0], pf[1] - 1, pf[2], 23, 59, 59, 999);
-      }
+    if (janelaMeusMovs) {
+      const { ini, fim: fimP } = janelaMeusMovs;
       base = base.filter((m) => {
         const d = new Date(m.created_at);
         return d >= ini && d <= fimP;
@@ -737,7 +780,7 @@ function Page() {
       });
     }
     return base;
-  }, [minhasMovsHist, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+  }, [minhasMovsHist, janelaMeusMovs, meuMedico, meuPaciente, enrichPorLanc]);
 
   // Lista de médicos distintos presentes nos movimentos carregados.
   const medicosDisponiveis = useMemo<string[]>(() => {
@@ -1222,7 +1265,15 @@ function Page() {
         if (day) diasFicha.add(day);
       }
       if (diasFicha.size > 0) {
-        const dias = Array.from(diasFicha);
+        // Teto de dias: agora que a lista pode cobrir meses inteiros, sem esta
+        // trava um período largo dispararia uma consulta por dia (centenas de
+        // idas ao banco de uma vez) só para numerar fichas antigas. Acima do
+        // teto, os dias mais recentes são calculados e os mais antigos ficam
+        // com a ficha gravada no próprio agendamento — a linha do movimento
+        // continua aparecendo normalmente, que é o que importa aqui.
+        const dias = Array.from(diasFicha)
+          .sort((a, b) => b.localeCompare(a))
+          .slice(0, LIMITE_DIAS_FICHA);
         const diaResults = await Promise.all(
           dias.map((day) => {
             const range = saoPauloDayRange(day);
@@ -1312,20 +1363,51 @@ function Page() {
     //   - minhasMovsHist  → todas as sessões recentes (base para a aba
     //                       "Meu caixa → Movimentos", permitindo ver e
     //                       solicitar estorno de lançamentos retroativos)
-    const histSessoes = (histRes.data ?? []) as Sessao[];
-    const sessaoIds = new Set<string>(histSessoes.map((s) => s.id));
-    if (aberta) sessaoIds.add((aberta as Sessao).id);
-    const idsArr = Array.from(sessaoIds);
-    let movsHist: Mov[] = [];
-    if (idsArr.length > 0) {
-      const { data: movs } = await supabase
-        .from("caixa_movimentos")
-        .select(MOV_FIELDS)
-        .in("sessao_id", idsArr)
-        .order("created_at", { ascending: false });
-      movsHist = (movs ?? []) as Mov[];
+    // A lista "Meus movimentos" passa a ser buscada pelo PERÍODO escolhido no
+    // filtro da aba, e não pelas 5 sessões de caixa mais recentes.
+    //
+    // Era isto que sumia com movimento antigo: o filtro de período só
+    // recortava o que já estava na memória, e o que estava na memória vinha
+    // das 5 últimas sessões. Um recebimento de abril não aparecia nem
+    // escolhendo "Todos", porque nunca chegava a ser buscado no banco.
+    //
+    // Duas consultas, de propósito:
+    //   - período  → alimenta SÓ a lista de movimentos;
+    //   - sessão aberta → entra sempre, seja qual for o período, porque o
+    //     Saldo e os totais do "Meu caixa" saem dela e não podem mudar por
+    //     causa de um filtro de listagem.
+    let queryPeriodo = supabase
+      .from("caixa_movimentos")
+      .select(MOV_FIELDS_COM_SESSAO)
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("caixa_sessoes.user_id", user.id)
+      .order("created_at", { ascending: false })
+      .range(0, LIMITE_MOVS - 1);
+    if (janelaIniISO && janelaFimISO) {
+      queryPeriodo = queryPeriodo.gte("created_at", janelaIniISO).lte("created_at", janelaFimISO);
     }
+    const [movsPeriodoRes, movsAbertaRes] = await Promise.all([
+      queryPeriodo,
+      aberta
+        ? supabase
+            .from("caixa_movimentos")
+            .select(MOV_FIELDS)
+            .eq("sessao_id", (aberta as Sessao).id)
+            .order("created_at", { ascending: false })
+            .range(0, LIMITE_MOVS - 1)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (movsPeriodoRes.error) {
+      console.warn("[caixa] falha ao buscar movimentos do período", movsPeriodoRes.error);
+    }
+    const porIdMov = new Map<string, Mov>();
+    for (const m of (movsPeriodoRes.data ?? []) as unknown as Mov[]) porIdMov.set(m.id, m);
+    for (const m of (movsAbertaRes.data ?? []) as unknown as Mov[]) porIdMov.set(m.id, m);
+    const movsHist: Mov[] = Array.from(porIdMov.values()).sort((a, b) =>
+      b.created_at.localeCompare(a.created_at),
+    );
     setMinhasMovsHist(movsHist);
+    setMovsNoTeto(((movsPeriodoRes.data ?? []) as unknown as Mov[]).length >= LIMITE_MOVS);
     if (aberta) {
       // Sessão aberta: `minhasMovs` recebe apenas os movimentos da sessão
       // atual (ordem crescente, como antes) para manter Saldo/Totais
@@ -1351,7 +1433,7 @@ function Page() {
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
-  }, [clinicaAtual, user]);
+  }, [clinicaAtual, user, janelaIniISO, janelaFimISO]);
 
   // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
   // às movimentações atuais para trocar o botão pelo rótulo
@@ -1451,7 +1533,10 @@ function Page() {
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
     if (!clinicaAtual) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    // Dia de Brasília, não o dia de Greenwich. Com toISOString() a data virava
+    // a do dia seguinte a partir das 21h, e a fila de cobrança esvaziava no
+    // meio do expediente da noite: passava a pedir os agendamentos de amanhã.
+    const hoje = hojeBR();
     // P1-CAIXA-001 Etapa 4: uma única RPC substitui 7 queries em cascata.
     // A função `fila_caixa_hoje` calcula valores (particular/convênio/CB)
     // e `ja_pago` server-side. Ver migration 20260704171043.
@@ -3629,6 +3714,12 @@ function Page() {
                             ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
                           </span>
                         )}
+                        {movsNoTeto && (
+                          <span className="ml-2 text-xs font-normal text-amber-700">
+                            mostrando os {LIMITE_MOVS.toLocaleString("pt-BR")} movimentos mais
+                            recentes do período
+                          </span>
+                        )}
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <Button
@@ -3781,6 +3872,16 @@ function Page() {
                               {filtrosAtivos
                                 ? "Nenhum movimento corresponde aos filtros"
                                 : "Sem movimentos no período"}
+                              {/* O escopo desta aba é o caixa DO USUÁRIO. Sem
+                                  esta linha, quem procurava aqui um
+                                  recebimento feito por outro operador concluía
+                                  que o registro tinha sumido do sistema. */}
+                              <div className="mt-1 text-xs">
+                                Esta lista mostra apenas o seu caixa.
+                                {isManager
+                                  ? ' O que outro operador recebeu aparece na aba "Todos (Financeiro)".'
+                                  : ""}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ) : (
