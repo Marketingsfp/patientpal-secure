@@ -26,6 +26,14 @@
 --
 -- O dinheiro NÃO ganha estrutura paralela: o pacote referencia o orçamento e o
 -- item de orçamento já existentes, como a Odontologia faz com `orcamento_itens.dentes`.
+--
+-- ATENÇÃO ao aplicar do zero: os gatilhos deste módulo (updated_at, sincronia
+-- com a agenda e auditoria) NÃO estão neste arquivo. Eles foram aplicados pelo
+-- agente do Lovable e ficaram registrados em
+-- 20260820101921_a1391a4e-f1df-4041-a99e-36efdd52361e.sql, cujo timestamp é
+-- ANTERIOR ao deste arquivo. Numa reexecução da pasta em ordem cronológica
+-- aquele arquivo rodaria antes destas tabelas existirem e falharia — rode este
+-- primeiro. O banco de produção já está com os dois aplicados (20/08/2026).
 -- ============================================================================
 
 -- ── Tipos ───────────────────────────────────────────────────────────────────
