@@ -411,7 +411,7 @@ async function handleListar(
   }
   if (f.paciente_id) query = query.eq("paciente_id", f.paciente_id);
   if (f.medico_id) query = query.eq("medico_id", f.medico_id);
-  if (f.status) query = query.eq("status", f.status);
+  if (f.status) query = query.eq("status", f.status as never);
   if (f.de) query = query.gte("inicio", new Date(f.de).toISOString());
   if (f.ate) query = query.lte("inicio", new Date(f.ate).toISOString());
 
