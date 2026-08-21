@@ -141,6 +141,9 @@ export type Database = {
           pacote_id: string | null
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
+          sinalizado_em: string | null
+          sinalizado_por: string | null
+          sinalizado_por_nome: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
           tipo_atendimento: string
@@ -187,6 +190,9 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          sinalizado_em?: string | null
+          sinalizado_por?: string | null
+          sinalizado_por_nome?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
@@ -233,6 +239,9 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          sinalizado_em?: string | null
+          sinalizado_por?: string | null
+          sinalizado_por_nome?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
