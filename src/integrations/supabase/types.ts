@@ -9956,6 +9956,28 @@ export type Database = {
         }
         Returns: string
       }
+      integracao_criar_api_key: {
+        Args: {
+          _clinica_id: string
+          _escopos?: string[]
+          _expira_em?: string
+          _limite_por_dia?: number
+          _limite_por_minuto?: number
+          _nome: string
+          _origem_integracao: string
+        }
+        Returns: Json
+      }
+      integracao_rate_limit_consumir: {
+        Args: {
+          _api_key_id: string
+          _janela: string
+          _janela_inicio: string
+          _limite: number
+        }
+        Returns: Json
+      }
+      integracao_revogar_api_key: { Args: { _id: string }; Returns: boolean }
       is_admin_global: { Args: { _user_id: string }; Returns: boolean }
       is_admin_ou_gestor: { Args: { _user_id: string }; Returns: boolean }
       is_chat_member: {
