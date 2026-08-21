@@ -1,31 +1,12 @@
-// Fonte única para MUDANÇA DE STATUS de agendamentos.
+// Ponto de entrada AUTENTICADO (funcionário logado) da mudança de status.
 //
-// Espelha 1:1 as regras do `mudarStatus` clássico
-// (`src/routes/_authenticated/app.agenda.tsx`, linhas ~2581-2630) + a
-// gravação de `executado_por/executado_em` usada por `iniciarAtendimentoEnf`
-// e `concluirAtendimentoManual` (linhas ~2632-2665).
-//
-// Regras preservadas literalmente:
-//   1. "Realizado" só por médico da clínica OU por admin/gestor/financeiro/
-//      recepcao (linha 2582-2593).
-//   2. "Realizado" bloqueado se a data do agendamento for futura (linha
-//      2594-2601).
-//   3. Ao cancelar, o vínculo com `orcamento_id` é liberado (linha 2604-2605).
-//   4. Cancelamento em cascata opcional quando o agendamento faz parte de
-//      um pacote (linha 2606-2624). A decisão é do caller — este handler
-//      só recebe `cascatear_pacote`.
-//   5. Ao marcar como "Realizado", registra `executado_por` = user logado
-//      e `executado_em` = agora (necessário para o repasse médico).
-//
-// Nenhuma regra nova. Nenhuma mensagem nova. Este arquivo NÃO faz toasts,
-// NÃO invalida queries e NÃO fecha modais — responsabilidade do caller.
-// SRP: só altera o status persistido.
+// Toda a regra vive em `status-agendamento.core.server.ts`; aqui só entram a
+// autenticação, a validação do payload e o repasse do cliente Supabase do
+// usuário. Nenhuma regra ou mensagem mudou.
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
-import { limparExternoCore } from "./atendimento-externo.server";
 
 export const STATUS_AGENDAMENTO = [
   "agendado",
@@ -51,97 +32,25 @@ export const atualizarStatusAgendamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => schema.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { agendamento_ids, novo_status, cascatear_pacote } = data;
-    const primaryId = agendamento_ids[0];
-
-    const { data: ag, error: e0 } = await supabase
-      .from("agendamentos")
-      .select("id,clinica_id,inicio,status,pacote_id,orcamento_id,paciente_nome")
-      .eq("id", primaryId)
-      .maybeSingle();
-    if (e0) throw new Error(e0.message);
-    if (!ag) throw new Error("Agendamento não encontrado.");
-
-    // Regras 1 e 2 — "Realizado".
-    if (novo_status === "realizado") {
-      const { data: link } = await supabase
-        .from("clinica_memberships")
-        .select("role")
-        .eq("clinica_id", ag.clinica_id)
-        .eq("user_id", userId)
-        .eq("ativo", true)
-        .maybeSingle();
-      const role = (link?.role ?? "").toLowerCase();
-      const podeRealizar =
-        role === "medico" || ["admin", "gestor", "financeiro", "recepcao"].includes(role);
-      if (!podeRealizar) {
-        throw new Error("Sem permissão para marcar como 'Realizado'.");
-      }
-      // Fim do dia civil da CLÍNICA (America/Sao_Paulo), não do fuso do
-      // runtime. Este código roda no Worker do Cloudflare, que está em UTC:
-      // com `new Date()` + `setHours(23,59,...)` o limite caía às 20:59 de
-      // Brasília, e a partir das 21h ficava impossível baixar como Realizado
-      // um atendimento da própria noite.
-      const { fimExclusivo } = janelaDiaClinica(hojeBR());
-      if (new Date(ag.inicio).getTime() >= new Date(fimExclusivo).getTime()) {
-        throw new Error("Não é possível baixar como Realizado um atendimento de data futura.");
-      }
-    }
-
-    // Payload — regras 3 e 5.
-    const payload: {
-      status: StatusAgendamento;
-      orcamento_id?: null;
-      executado_por?: string;
-      executado_em?: string;
-    } = { status: novo_status };
-    if (novo_status === "cancelado" && ag.orcamento_id) {
-      payload.orcamento_id = null;
-    }
-    if (novo_status === "realizado") {
-      payload.executado_por = userId;
-      payload.executado_em = new Date().toISOString();
-    }
-
-    // Regra 4 — cascata de pacote.
-    let ids: string[] = [...new Set(agendamento_ids)];
-    if (novo_status === "cancelado" && ag.pacote_id && cascatear_pacote) {
-      const { data: irmaos } = await supabase
-        .from("agendamentos")
-        .select("id")
-        .eq("pacote_id", ag.pacote_id)
-        .neq("status", "cancelado");
-      const irmaoIds = (irmaos ?? []).map((x) => x.id);
-      ids = Array.from(new Set([...ids, ...irmaoIds]));
-    }
-
-    const { error } = await supabase
-      .from("agendamentos")
-      .update(payload as never)
-      .in("id", ids);
-    if (error) throw new Error(error.message);
-
-    // Cancelamento também desfaz o atendimento externo (remove o registro no
-    // Financeiro e zera as marcações de origem), deixando só o histórico.
-    if (novo_status === "cancelado") {
-      const claims = context.claims as { email?: string; user_metadata?: { nome?: string } } | null;
-      for (const id of ids) {
-        const res = await limparExternoCore(supabase as never, id, {
+    const { atualizarStatusAgendamentoCore } = await import("./status-agendamento.core.server");
+    const claims = context.claims as { email?: string; user_metadata?: { nome?: string } } | null;
+    return atualizarStatusAgendamentoCore(
+      {
+        db: context.supabase,
+        ator: {
+          tipo: "usuario",
+          userId: context.userId,
           email: claims?.email ?? null,
           nome: claims?.user_metadata?.nome ?? null,
-        });
-        if (!res.ok) throw new Error(res.message);
-      }
-    }
-
-    return { ids, count: ids.length };
+        },
+      },
+      data,
+    );
   });
 
 /**
  * Lista agendamentos "irmãos" de pacote (mesmo `pacote_id`, ainda ativos)
  * para o caller decidir se pergunta ao usuário sobre cascata de cancelamento.
- * Espelha o SELECT feito inline em `mudarStatus` (linhas ~2610-2615).
  */
 export const listarIrmaosDoPacote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
