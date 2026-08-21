@@ -114,6 +114,7 @@ import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
+import { Route as ApiIntegrationsV1SplatRouteImport } from './routes/api/integrations/v1/$'
 import { Route as AuthenticatedAppOdontologiaOrcamentosRouteImport } from './routes/_authenticated/app.odontologia.orcamentos'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
@@ -733,6 +734,11 @@ const ApiPublicFocusnfeWebhookRoute =
     path: '/api/public/focusnfe/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsV1SplatRoute = ApiIntegrationsV1SplatRouteImport.update({
+  id: '/api/integrations/v1/$',
+  path: '/api/integrations/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppOdontologiaOrcamentosRoute =
   AuthenticatedAppOdontologiaOrcamentosRouteImport.update({
     id: '/odontologia/orcamentos',
@@ -1090,6 +1096,7 @@ export interface FileRoutesByFullPath {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1230,6 +1237,7 @@ export interface FileRoutesByTo {
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1376,6 +1384,7 @@ export interface FileRoutesById {
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/_authenticated/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
+  '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
@@ -1522,6 +1531,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/app/odontologia/orcamentos'
+    | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1662,6 +1672,7 @@ export interface FileRouteTypes {
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/app/odontologia/orcamentos'
+    | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1807,6 +1818,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
     | '/_authenticated/app/odontologia/orcamentos'
+    | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
@@ -1851,6 +1863,7 @@ export interface RootRouteChildren {
   PContratoTokenRoute: typeof PContratoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
+  ApiIntegrationsV1SplatRoute: typeof ApiIntegrationsV1SplatRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
@@ -2594,6 +2607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFocusnfeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/v1/$': {
+      id: '/api/integrations/v1/$'
+      path: '/api/integrations/v1/$'
+      fullPath: '/api/integrations/v1/$'
+      preLoaderRoute: typeof ApiIntegrationsV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/odontologia/orcamentos': {
       id: '/_authenticated/app/odontologia/orcamentos'
       path: '/odontologia/orcamentos'
@@ -3234,6 +3254,7 @@ const rootRouteChildren: RootRouteChildren = {
   PContratoTokenRoute: PContratoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,
+  ApiIntegrationsV1SplatRoute: ApiIntegrationsV1SplatRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
