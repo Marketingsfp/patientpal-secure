@@ -141,9 +141,6 @@ export type Database = {
           pacote_id: string | null
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
-          sinalizado_em: string | null
-          sinalizado_por: string | null
-          sinalizado_por_nome: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
           tipo_atendimento: string
@@ -190,9 +187,6 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
-          sinalizado_em?: string | null
-          sinalizado_por?: string | null
-          sinalizado_por_nome?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
@@ -239,9 +233,6 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
-          sinalizado_em?: string | null
-          sinalizado_por?: string | null
-          sinalizado_por_nome?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
@@ -9166,10 +9157,7 @@ export type Database = {
         }
         Returns: string
       }
-      aplicar_tipo_convenio_lote: {
-        Args: { _ids: string[] }
-        Returns: Json
-      }
+      aplicar_tipo_convenio_lote: { Args: { _ids: string[] }; Returns: Json }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
@@ -9789,7 +9777,12 @@ export type Database = {
         }[]
       }
       listar_atendimentos_convenio_pendentes: {
-        Args: { _ate?: string; _clinica_ids: string[]; _de?: string; _limite?: number }
+        Args: {
+          _ate?: string
+          _clinica_ids: string[]
+          _de?: string
+          _limite?: number
+        }
         Returns: {
           clinica_id: string
           contrato_numero: number
@@ -10241,6 +10234,10 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_accents: { Args: { _text: string }; Returns: string }
+      tipo_atendimento_padrao: {
+        Args: { p_clinica_id: string; p_paciente_id: string }
+        Returns: string
+      }
       top_procedimentos_agendamento: {
         Args: {
           _clinica_id: string
@@ -10282,10 +10279,6 @@ export type Database = {
           _nome: string
           _telefone?: string
         }
-        Returns: string
-      }
-      tipo_atendimento_padrao: {
-        Args: { p_clinica_id: string; p_paciente_id: string }
         Returns: string
       }
       trocar_convenio_contrato: {
