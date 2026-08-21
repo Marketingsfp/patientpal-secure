@@ -148,6 +148,7 @@ import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
 import { Route as AuthenticatedAppCartaoBeneficiosConferenciaRouteImport } from './routes/_authenticated/app.cartao-beneficios.conferencia'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
+import { Route as ApiPublicIntegrationsV1SplatRouteImport } from './routes/api/public/integrations/v1/$'
 import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
@@ -936,6 +937,12 @@ const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
     path: '/$agendamentoId',
     getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
   } as any)
+const ApiPublicIntegrationsV1SplatRoute =
+  ApiPublicIntegrationsV1SplatRouteImport.update({
+    id: '/api/public/integrations/v1/$',
+    path: '/api/public/integrations/v1/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppClientesPacienteIdVisualizarRoute =
   AuthenticatedAppClientesPacienteIdVisualizarRouteImport.update({
     id: '/clientes/$pacienteId/visualizar',
@@ -1096,6 +1103,7 @@ export interface FileRoutesByFullPath {
   '/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesByTo {
@@ -1235,6 +1243,7 @@ export interface FileRoutesByTo {
   '/app/odontologia': typeof AuthenticatedAppOdontologiaIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesById {
@@ -1380,6 +1389,7 @@ export interface FileRoutesById {
   '/_authenticated/app/odontologia/': typeof AuthenticatedAppOdontologiaIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/api/public/integrations/v1/$': typeof ApiPublicIntegrationsV1SplatRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRouteTypes {
@@ -1525,6 +1535,7 @@ export interface FileRouteTypes {
     | '/app/odontologia/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
+    | '/api/public/integrations/v1/$'
     | '/app/equipe/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1664,6 +1675,7 @@ export interface FileRouteTypes {
     | '/app/odontologia'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
+    | '/api/public/integrations/v1/$'
     | '/app/equipe/medico/$medicoId/editar'
   id:
     | '__root__'
@@ -1808,6 +1820,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/odontologia/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/clientes/$pacienteId/visualizar'
+    | '/api/public/integrations/v1/$'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
 }
@@ -1841,6 +1854,7 @@ export interface RootRouteChildren {
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
+  ApiPublicIntegrationsV1SplatRoute: typeof ApiPublicIntegrationsV1SplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2818,6 +2832,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
       parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
     }
+    '/api/public/integrations/v1/$': {
+      id: '/api/public/integrations/v1/$'
+      path: '/api/public/integrations/v1/$'
+      fullPath: '/api/public/integrations/v1/$'
+      preLoaderRoute: typeof ApiPublicIntegrationsV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/clientes/$pacienteId/visualizar': {
       id: '/_authenticated/app/clientes/$pacienteId/visualizar'
       path: '/clientes/$pacienteId/visualizar'
@@ -3216,6 +3237,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
+  ApiPublicIntegrationsV1SplatRoute: ApiPublicIntegrationsV1SplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
