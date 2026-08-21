@@ -77,8 +77,20 @@ Todos sob `/api/integrations/v1/...`. Prefixo `/v1` fixo na URL; mudança incomp
 | GET | `/availability` | RPC `get_horarios_disponiveis` |
 | POST | `/appointments` | núcleo de `criarAgendamento` |
 | GET | `/appointments/:id` | leitura escopada por clínica |
+| GET | `/appointments?id_externo=AGD-99812` | busca pela chave externa do parceiro |
 | POST | `/appointments/:id/cancel` | núcleo de `atualizarStatusAgendamento` |
 | POST | `/appointments/:id/reschedule` | núcleo de `reagendarAgendamento` |
+
+**Consulta pela chave externa.** O parceiro nem sempre guarda o nosso UUID. Então:
+
+- `GET /appointments?id_externo=<valor>` devolve o agendamento cujo par
+  `(origem_integracao, id_externo)` bate — e `origem_integracao` vem **da chave**, não da query.
+  Um parceiro nunca alcança o `id_externo` de outro.
+- Além disso, `:id` nas rotas de leitura, cancelamento e reagendamento aceita as duas formas:
+  um UUID (id interno) ou o prefixo `ext:` (ex.: `/appointments/ext:AGD-99812/cancel`). Assim o
+  parceiro trabalha só com a própria numeração se quiser.
+- Não encontrado, ou encontrado em outra clínica/outra integração → `404 NOT_FOUND` (mesma resposta
+  nos dois casos, para não revelar existência).
 
 Observação sobre o local: essas rotas **não** vão para `/api/public/*`. Aquele prefixo pula a
 autenticação da plataforma; aqui queremos um caminho próprio, autenticado por chave. Se na prática o
