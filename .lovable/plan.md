@@ -4,14 +4,18 @@ Objetivo: permitir que um sistema externo consulte horários, crie, consulte, ca
 atendimentos **usando exatamente as mesmas regras de negócio já validadas** hoje na Agenda,
 sem nenhum INSERT/UPDATE direto na tabela `agendamentos` e sem enfraquecer a autenticação atual.
 
-## Antes de implementar — preciso confirmar com você
+## Decisões já confirmadas
 
-1. **Clínica-alvo:** a integração vale só para a POLICLINICA MENINO JESUS ou para todas as clínicas?
-   (A chave de API é sempre amarrada a uma clínica; a pergunta é quantas chaves emitimos.)
-2. **Quem paga:** o agendamento criado pela API entra como não pago (o paciente paga na chegada,
-   regra global) — confirma? A API **não** vai registrar pagamento nem mexer no caixa.
-3. **Paciente inexistente:** se o sistema externo mandar um CPF que não existe na base, a API deve
-   (a) recusar com erro, ou (b) criar o paciente automaticamente? Recomendo (a) no v1.
+1. **Homologação em uma única clínica.** Emitimos uma chave para a clínica de homologação
+   (POLICLINICA MENINO JESUS, salvo indicação contrária no momento da emissão). A modelagem já é
+   "uma chave por clínica" — expandir depois é só emitir mais chaves, sem tocar em código.
+2. **Sem dinheiro no v1.** O agendamento nasce não pago. A API não registra pagamento, não abre
+   movimento de caixa, não cria lançamento e não altera nenhuma regra financeira.
+3. **Paciente inexistente é recusado.** Sem criação automática de paciente. CPF que não existe na
+   base da clínica da chave → `422 PATIENT_NOT_FOUND`.
+4. **Consulta também por chave externa** (ver endpoints abaixo).
+5. **Toda operação com service role valida `clinica_id` explicitamente** (ver seção dedicada).
+
 
 ## Eixos de impacto (governança)
 
@@ -73,8 +77,20 @@ Todos sob `/api/integrations/v1/...`. Prefixo `/v1` fixo na URL; mudança incomp
 | GET | `/availability` | RPC `get_horarios_disponiveis` |
 | POST | `/appointments` | núcleo de `criarAgendamento` |
 | GET | `/appointments/:id` | leitura escopada por clínica |
+| GET | `/appointments?id_externo=AGD-99812` | busca pela chave externa do parceiro |
 | POST | `/appointments/:id/cancel` | núcleo de `atualizarStatusAgendamento` |
 | POST | `/appointments/:id/reschedule` | núcleo de `reagendarAgendamento` |
+
+**Consulta pela chave externa.** O parceiro nem sempre guarda o nosso UUID. Então:
+
+- `GET /appointments?id_externo=<valor>` devolve o agendamento cujo par
+  `(origem_integracao, id_externo)` bate — e `origem_integracao` vem **da chave**, não da query.
+  Um parceiro nunca alcança o `id_externo` de outro.
+- Além disso, `:id` nas rotas de leitura, cancelamento e reagendamento aceita as duas formas:
+  um UUID (id interno) ou o prefixo `ext:` (ex.: `/appointments/ext:AGD-99812/cancel`). Assim o
+  parceiro trabalha só com a própria numeração se quiser.
+- Não encontrado, ou encontrado em outra clínica/outra integração → `404 NOT_FOUND` (mesma resposta
+  nos dois casos, para não revelar existência).
 
 Observação sobre o local: essas rotas **não** vão para `/api/public/*`. Aquele prefixo pula a
 autenticação da plataforma; aqui queremos um caminho próprio, autenticado por chave. Se na prática o
@@ -289,6 +305,61 @@ chamando as mesmas funções, com as mesmas mensagens.
   clínica; `anon` não recebe nada.
 - Segredo necessário: `INTEGRACAO_HASH_PEPPER` (gerado por nós, guardado no cofre).
 - Nenhum dado do parceiro é aceito para decidir clínica, preço ou pagamento.
+
+## Escopo de clínica sob service role — regra obrigatória
+
+O service role ignora RLS. Como a RLS deixa de ser a rede de proteção nesse caminho, o escopo passa a
+ser verificado no código, sem exceção:
+
+- O núcleo recebe um `ator` do tipo `{ tipo: "integracao", clinica_id, origem_integracao }` e
+  **rejeita** qualquer payload cujo `clinica_id` não seja idêntico ao da chave. O `clinica_id` do
+  corpo da requisição é ignorado; vale sempre o da chave.
+- Toda leitura e toda gravação feitas pelo caminho da integração carregam `.eq("clinica_id", …)`
+  explícito — inclusive as consultas auxiliares (paciente, médico, procedimento, slot, agendamento
+  alvo). Nada de "busca por id e confia".
+- Antes de cancelar ou reagendar, o agendamento alvo é relido e conferido em três pontos:
+  clínica da chave, `origem_integracao` da chave e existência. Falhou qualquer um → `404`.
+- Paciente, médico e procedimento informados precisam pertencer à mesma clínica; caso contrário
+  `422`, e não um agendamento cruzado entre clínicas.
+- Um utilitário único (`assertEscopoClinica`) centraliza essa checagem, para não depender de alguém
+  lembrar de repetir o filtro. Ele lança erro em vez de retornar `false` — não dá para ignorar por
+  esquecimento.
+- Teste automatizado de regressão: chave da clínica A tentando ler, cancelar e reagendar um
+  agendamento da clínica B, esperando `404` nos três casos.
+
+## Implementação em etapas
+
+A extração mexe em código crítico, então vai por partes, com validação entre elas.
+
+**Etapa 1 — banco.** Migração com colunas `origem_integracao`/`id_externo`, índice UNIQUE parcial e
+as tabelas de chave, log, idempotência e rate limit. Nada de código de aplicação. Sem impacto na
+Agenda.
+
+**Etapa 2 — extração do núcleo.** Mover as regras para os três `*.core.server.ts`, com as server
+functions atuais virando invólucros finos. Extração 1:1: mesmas mensagens, mesma ordem de checagem.
+Ao final desta etapa, antes de qualquer coisa nova:
+
+- rodar a suíte de testes existente (`bunx vitest run`), incluindo os testes da Agenda já no
+  repositório (`aviso-limite-pendentes.test.ts`, `tempo-limite.test.ts`, `date-utils.test.ts`,
+  `repasse-calc.test.ts`, entre outros);
+- rodar o roteiro de 12 testes do Passo B (`docs/agenda/criar-agendamento-shared.md`) na Agenda
+  clássica e o roteiro da Fase F na V2;
+- conferir por consulta ao banco: zero agendamento duplicado, zero vínculo indevido de orçamento,
+  zero pagamento e zero `fin_atendimentos` criados pelos testes.
+
+Só sigo para a etapa 3 depois que essa validação passar e você confirmar. Se algo divergir, a etapa 2
+é revertida isoladamente, sem afetar a etapa 1.
+
+**Etapa 3 — camada de integração.** Autenticação por chave, rate limit, idempotência, schemas,
+mapa de erros e log. Ainda sem endpoint exposto.
+
+**Etapa 4 — endpoints.** As rotas `/api/integrations/v1/*`, uma a uma, começando pelas de leitura
+(`availability`, `appointments`), depois as de escrita.
+
+**Etapa 5 — homologação.** Emissão da chave da clínica de homologação, documentação para o parceiro e
+teste ponta a ponta com dados rastreáveis, limpos ao final (a base é de produção; nenhum disparo real
+de WhatsApp, NFS-e ou financeiro é acionado por este fluxo).
+
 
 ## Riscos e o que fica de fora do v1
 
