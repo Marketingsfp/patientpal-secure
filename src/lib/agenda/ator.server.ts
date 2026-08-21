@@ -31,7 +31,14 @@ export type AtorAgenda =
       api_key_id: string;
       clinica_id: string;
       origem_integracao: string;
+      /**
+       * Chave com escopo `appointments:write:all` — pode alterar qualquer
+       * agendamento da própria clínica, não só os que ela mesma criou.
+       * Sem isso (padrão), a integração só mexe no que nasceu dela.
+       */
+      pode_gerenciar_todos?: boolean;
     };
+
 
 /** Contexto passado para todo núcleo de regra de agenda. */
 export type CtxAgenda = {
