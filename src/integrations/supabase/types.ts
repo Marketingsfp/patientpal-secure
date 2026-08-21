@@ -124,6 +124,7 @@ export type Database = {
           fluxo_etapa: Database["public"]["Enums"]["fluxo_etapa"]
           forma_pagamento_prevista: string | null
           id: string
+          id_externo: string | null
           inicio: string
           is_mock_data: boolean
           link_teleconsulta: string | null
@@ -135,6 +136,7 @@ export type Database = {
           origem_clinica_nome: string | null
           origem_externa: boolean
           origem_gr_numero: string | null
+          origem_integracao: string | null
           origem_valor: number | null
           paciente_id: string | null
           paciente_nome: string
@@ -173,6 +175,7 @@ export type Database = {
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
           forma_pagamento_prevista?: string | null
           id?: string
+          id_externo?: string | null
           inicio: string
           is_mock_data?: boolean
           link_teleconsulta?: string | null
@@ -184,6 +187,7 @@ export type Database = {
           origem_clinica_nome?: string | null
           origem_externa?: boolean
           origem_gr_numero?: string | null
+          origem_integracao?: string | null
           origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome: string
@@ -222,6 +226,7 @@ export type Database = {
           fluxo_etapa?: Database["public"]["Enums"]["fluxo_etapa"]
           forma_pagamento_prevista?: string | null
           id?: string
+          id_externo?: string | null
           inicio?: string
           is_mock_data?: boolean
           link_teleconsulta?: string | null
@@ -233,6 +238,7 @@ export type Database = {
           origem_clinica_nome?: string | null
           origem_externa?: boolean
           origem_gr_numero?: string | null
+          origem_integracao?: string | null
           origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome?: string
@@ -5138,6 +5144,203 @@ export type Database = {
             columns: ["unidade_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracao_api_keys: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          escopos: string[]
+          expira_em: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          limite_por_dia: number
+          limite_por_minuto: number
+          nome: string
+          origem_integracao: string
+          ultima_utilizacao_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          escopos?: string[]
+          expira_em?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          limite_por_dia?: number
+          limite_por_minuto?: number
+          nome: string
+          origem_integracao: string
+          ultima_utilizacao_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          escopos?: string[]
+          expira_em?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          limite_por_dia?: number
+          limite_por_minuto?: number
+          nome?: string
+          origem_integracao?: string
+          ultima_utilizacao_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_api_keys_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracao_idempotencia: {
+        Row: {
+          api_key_id: string
+          body_hash: string
+          concluido: boolean
+          created_at: string
+          id: string
+          idempotency_key: string
+          response_json: Json | null
+          status_http: number | null
+          updated_at: string
+        }
+        Insert: {
+          api_key_id: string
+          body_hash: string
+          concluido?: boolean
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          response_json?: Json | null
+          status_http?: number | null
+          updated_at?: string
+        }
+        Update: {
+          api_key_id?: string
+          body_hash?: string
+          concluido?: boolean
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          response_json?: Json | null
+          status_http?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_idempotencia_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "integracao_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracao_rate_limit: {
+        Row: {
+          api_key_id: string
+          contador: number
+          id: string
+          janela: string
+          janela_inicio: string
+          updated_at: string
+        }
+        Insert: {
+          api_key_id: string
+          contador?: number
+          id?: string
+          janela: string
+          janela_inicio: string
+          updated_at?: string
+        }
+        Update: {
+          api_key_id?: string
+          contador?: number
+          id?: string
+          janela?: string
+          janela_inicio?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_rate_limit_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "integracao_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integracao_requisicoes: {
+        Row: {
+          api_key_id: string | null
+          clinica_id: string | null
+          created_at: string
+          duracao_ms: number | null
+          erro_codigo: string | null
+          erro_resumo: string | null
+          id: string
+          id_externo: string | null
+          ip: string | null
+          metodo: string
+          request_id: string
+          rota: string
+          status_http: number
+        }
+        Insert: {
+          api_key_id?: string | null
+          clinica_id?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          erro_codigo?: string | null
+          erro_resumo?: string | null
+          id?: string
+          id_externo?: string | null
+          ip?: string | null
+          metodo: string
+          request_id: string
+          rota: string
+          status_http: number
+        }
+        Update: {
+          api_key_id?: string | null
+          clinica_id?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          erro_codigo?: string | null
+          erro_resumo?: string | null
+          id?: string
+          id_externo?: string | null
+          ip?: string | null
+          metodo?: string
+          request_id?: string
+          rota?: string
+          status_http?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracao_requisicoes_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "integracao_api_keys"
             referencedColumns: ["id"]
           },
         ]
