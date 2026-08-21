@@ -4,14 +4,18 @@ Objetivo: permitir que um sistema externo consulte horários, crie, consulte, ca
 atendimentos **usando exatamente as mesmas regras de negócio já validadas** hoje na Agenda,
 sem nenhum INSERT/UPDATE direto na tabela `agendamentos` e sem enfraquecer a autenticação atual.
 
-## Antes de implementar — preciso confirmar com você
+## Decisões já confirmadas
 
-1. **Clínica-alvo:** a integração vale só para a POLICLINICA MENINO JESUS ou para todas as clínicas?
-   (A chave de API é sempre amarrada a uma clínica; a pergunta é quantas chaves emitimos.)
-2. **Quem paga:** o agendamento criado pela API entra como não pago (o paciente paga na chegada,
-   regra global) — confirma? A API **não** vai registrar pagamento nem mexer no caixa.
-3. **Paciente inexistente:** se o sistema externo mandar um CPF que não existe na base, a API deve
-   (a) recusar com erro, ou (b) criar o paciente automaticamente? Recomendo (a) no v1.
+1. **Homologação em uma única clínica.** Emitimos uma chave para a clínica de homologação
+   (POLICLINICA MENINO JESUS, salvo indicação contrária no momento da emissão). A modelagem já é
+   "uma chave por clínica" — expandir depois é só emitir mais chaves, sem tocar em código.
+2. **Sem dinheiro no v1.** O agendamento nasce não pago. A API não registra pagamento, não abre
+   movimento de caixa, não cria lançamento e não altera nenhuma regra financeira.
+3. **Paciente inexistente é recusado.** Sem criação automática de paciente. CPF que não existe na
+   base da clínica da chave → `422 PATIENT_NOT_FOUND`.
+4. **Consulta também por chave externa** (ver endpoints abaixo).
+5. **Toda operação com service role valida `clinica_id` explicitamente** (ver seção dedicada).
+
 
 ## Eixos de impacto (governança)
 
