@@ -74,7 +74,8 @@ export function assertEscopoClinica(ator: AtorAgenda, clinicaId: string | null |
 /**
  * Mesma checagem, aplicada a um registro que acabou de ser lido do banco.
  * Confere clínica E parceiro: uma integração nunca alcança o agendamento
- * criado por outra, mesmo dentro da mesma clínica.
+ * criado por outra, mesmo dentro da mesma clínica — salvo quando a chave tem
+ * o escopo `appointments:write:all`, concedido caso a caso.
  */
 export function assertEscopoRegistro(
   ator: AtorAgenda,
@@ -83,7 +84,9 @@ export function assertEscopoRegistro(
   if (ator.tipo !== "integracao") return;
   if (!registro) throw new EscopoClinicaError();
   assertEscopoClinica(ator, registro.clinica_id);
+  if (ator.pode_gerenciar_todos) return;
   if ((registro.origem_integracao ?? null) !== ator.origem_integracao) {
     throw new EscopoClinicaError();
   }
 }
+
