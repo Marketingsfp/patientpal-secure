@@ -107,6 +107,7 @@ import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AuthenticatedAppOdontologiaIndexRouteImport } from './routes/_authenticated/app.odontologia.index'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
@@ -695,6 +696,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppOdontologiaIndexRoute =
   AuthenticatedAppOdontologiaIndexRouteImport.update({
     id: '/odontologia/',
@@ -1021,6 +1027,7 @@ export interface FileRoutesByFullPath {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
@@ -1169,6 +1176,7 @@ export interface FileRoutesByTo {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
@@ -1317,6 +1325,7 @@ export interface FileRoutesById {
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
@@ -1468,6 +1477,7 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-medicos'
@@ -1616,6 +1626,7 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-medicos'
@@ -1763,6 +1774,7 @@ export interface FileRouteTypes {
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/agenda-medicos'
@@ -1912,6 +1924,7 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
@@ -2611,6 +2624,13 @@ declare module '@tanstack/react-router' {
       path: '/.mcp/invoke-tool/$tool'
       fullPath: '/.mcp/invoke-tool/$tool'
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/odontologia/': {
@@ -3336,6 +3356,7 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
