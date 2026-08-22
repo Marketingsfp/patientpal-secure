@@ -439,6 +439,22 @@ export function LancamentoDialog({
       toast.error("Selecione a forma de pagamento.");
       return;
     }
+    // Despesa sem categoria e sem conta cega a DRE e os relatórios: não dá
+    // para responder "quanto gastei com o quê" nem "saiu de qual conta".
+    // Os campos existiam mas eram opcionais, e na prática quase ninguém
+    // preenchia — em agosto/2026, 76 das 90 despesas do mês (84%) entraram
+    // sem categoria e 33 sem conta. Receita não é travada aqui: ela vem do
+    // atendimento, com categoria definida pelo serviço.
+    if (tipo === "despesa") {
+      if (!categoriaId) {
+        toast.error("Selecione a categoria da despesa.");
+        return;
+      }
+      if (!contaId) {
+        toast.error("Selecione a conta de onde a despesa saiu.");
+        return;
+      }
+    }
     // ----- Cortesia: exige justificativa + autorização de supervisor -----
     const norm0 = (s: string) =>
       s
@@ -1309,7 +1325,10 @@ export function LancamentoDialog({
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>Categoria</Label>
+              <Label>
+                Categoria
+                {tipo === "despesa" && <span className="text-destructive"> *</span>}
+              </Label>
               <Select
                 value={categoriaId}
                 onValueChange={setCategoriaId}
@@ -1369,7 +1388,10 @@ export function LancamentoDialog({
             })()}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Conta</Label>
+                <Label>
+                  Conta
+                  {tipo === "despesa" && <span className="text-destructive"> *</span>}
+                </Label>
                 <Select value={contaId} onValueChange={setContaId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Conta" />

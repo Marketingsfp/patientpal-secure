@@ -800,6 +800,21 @@ function Page() {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
+    // Despesa sem categoria e sem conta cega a DRE e os relatórios: não dá
+    // para responder "quanto gastei com o quê" nem "saiu de qual conta". Os
+    // campos existiam mas eram opcionais e quase ninguém preenchia — em
+    // agosto/2026, 76 das 90 despesas do mês (84%) entraram sem categoria e 33
+    // sem conta. Mesma regra aplicada no diálogo de lançamento do financeiro.
+    if (form.tipo === "despesa") {
+      if (!form.categoria_id) {
+        toast.error("Selecione a categoria da despesa.");
+        return;
+      }
+      if (!form.conta_id) {
+        toast.error("Selecione a conta de onde a despesa saiu.");
+        return;
+      }
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -1533,7 +1548,10 @@ function Page() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Categoria</Label>
+                    <Label>
+                      Categoria
+                      {form.tipo === "despesa" && <span className="text-destructive"> *</span>}
+                    </Label>
                     <Select
                       value={form.categoria_id || "none"}
                       onValueChange={(v) =>
@@ -1554,7 +1572,10 @@ function Page() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Conta</Label>
+                    <Label>
+                      Conta
+                      {form.tipo === "despesa" && <span className="text-destructive"> *</span>}
+                    </Label>
                     <Select
                       value={form.conta_id || "none"}
                       onValueChange={(v) => setForm({ ...form, conta_id: v === "none" ? "" : v })}
