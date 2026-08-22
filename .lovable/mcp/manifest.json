@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.3",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://odllhxwadsrnhphzoevl.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "health-hub-pro",
+      "version": "0.1.0",
+      "title": "Health Hub Pro"
+    },
+    "tools": [
+      {
+        "name": "listar_clinicas",
+        "title": "Listar clínicas",
+        "description": "Lista as clínicas às quais o usuário autenticado tem acesso, com id, nome, cidade e estado. Use o id retornado para filtrar as demais ferramentas.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_medicos",
+        "title": "Listar médicos",
+        "description": "Lista os médicos cadastrados nas clínicas do usuário autenticado, com CRM e duração padrão de consulta. Não retorna dados bancários.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "clinica_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Filtra por uma clínica específica."
+            },
+            "apenas_ativos": {
+              "type": "boolean",
+              "description": "Se verdadeiro, retorna só médicos ativos."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "buscar_pacientes",
+        "title": "Buscar pacientes",
+        "description": "Busca pacientes por nome ou CPF dentro das clínicas do usuário autenticado. Retorna dados básicos de contato, sem dados clínicos.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "termo": {
+              "type": "string",
+              "minLength": 2,
+              "description": "Parte do nome ou CPF do paciente."
+            },
+            "clinica_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Filtra por uma clínica específica."
+            },
+            "limite": {
+              "type": "integer",
+              "description": "Máximo de resultados (padrão 20, teto 50)."
+            }
+          },
+          "required": [
+            "termo"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "listar_agendamentos",
+        "title": "Listar agendamentos",
+        "description": "Lista os agendamentos de um período (data inicial e final, formato AAAA-MM-DD) nas clínicas do usuário autenticado. Permite filtrar por clínica, médico e status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "data_inicio": {
+              "type": "string",
+              "description": "Data inicial no formato AAAA-MM-DD."
+            },
+            "data_fim": {
+              "type": "string",
+              "description": "Data final AAAA-MM-DD (padrão: igual à inicial)."
+            },
+            "clinica_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Filtra por uma clínica específica."
+            },
+            "medico_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Filtra por um médico específico."
+            },
+            "status": {
+              "type": "string",
+              "description": "Filtra por status do agendamento."
+            },
+            "limite": {
+              "type": "integer",
+              "description": "Máximo de resultados (padrão 100, teto 300)."
+            }
+          },
+          "required": [
+            "data_inicio"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
