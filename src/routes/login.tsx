@@ -14,11 +14,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
   // `next` preserva um destino interno (ex.: a tela de consentimento OAuth)
   // para onde o usuário volta depois de entrar.
-  validateSearch: (s: Record<string, unknown>) => ({
-    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//")
-      ? s.next
-      : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { next?: string } => {
+    const next = typeof s.next === "string" ? s.next : "";
+    return next.startsWith("/") && !next.startsWith("//") ? { next } : {};
+  },
   head: () => ({
     meta: [
       { title: "Entrar — ClinicaOS" },
