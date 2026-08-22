@@ -1,0 +1,415 @@
+openapi: 3.1.0
+info:
+  title: Health Hub Pro — API de Agendamentos v1
+  version: "1.0.0"
+  description: |
+    API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
+    Congelada como v1: nenhum endpoint novo até haver necessidade real de um consumidor.
+
+    Toda escrita passa pelos mesmos núcleos de regra de negócio usados pela tela
+    da Agenda. A API nunca grava direto em `agendamentos` (exceto anexar o motivo
+    de cancelamento às observações) e nunca executa DELETE.
+
+    A clínica NUNCA é enviada no corpo: é deduzida da chave e verificada no
+    código em toda operação (o acesso é service role, sem RLS).
+servers:
+  - url: https://patientpal-secure.lovable.app/api/public/integrations/v1
+    description: Produção (base canônica)
+  - url: https://project--9cab2db5-e9b1-4209-b352-fc7a438da482-dev.lovable.app/api/public/integrations/v1
+    description: Prévia
+  - url: https://patientpal-secure.lovable.app/api/integrations/v1
+    description: Atalho interno (mesmo handler; passa pelo login do site publicado)
+
+security:
+  - bearerApiKey: []
+  - apiKeyHeader: []
+
+tags:
+  - name: Disponibilidade
+  - name: Agendamentos
+
+paths:
+  /availability:
+    get:
+      tags: [Disponibilidade]
+      summary: Horários livres da clínica
+      description: "Escopo exigido: `availability:read`."
+      parameters:
+        - { name: medico_id, in: query, schema: { type: string, format: uuid } }
+        - { name: especialidade_id, in: query, schema: { type: string, format: uuid } }
+        - { name: dias, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 7 } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 60 } }
+      responses:
+        "200":
+          description: Lista de slots livres
+          headers:
+            X-Request-Id: { $ref: "#/components/headers/XRequestId" }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      slots:
+                        type: array
+                        items: { $ref: "#/components/schemas/Slot" }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/Upstream" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
+  /appointments:
+    get:
+      tags: [Agendamentos]
+      summary: Lista agendamentos da clínica
+      description: "Escopo exigido: `appointments:read`. Com `id_externo`, a busca é sempre restrita à origem da própria chave."
+      parameters:
+        - { name: id_externo, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: paciente_id, in: query, schema: { type: string, format: uuid } }
+        - { name: medico_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { type: string, maxLength: 30 } }
+        - { name: de, in: query, schema: { type: string, format: date-time } }
+        - { name: ate, in: query, schema: { type: string, format: date-time } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+      responses:
+        "200":
+          description: Página de agendamentos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      appointments:
+                        type: array
+                        items: { $ref: "#/components/schemas/Agendamento" }
+                      total: { type: integer }
+                      limite: { type: integer }
+                      offset: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Agendamentos]
+      summary: Cria um agendamento (sempre não pago)
+      description: |
+        Escopo exigido: `appointments:write`.
+        O agendamento entra com `status: agendado` e `data_pagamento: null` — a API
+        não registra pagamento, caixa nem financeiro.
+        Reenviar o mesmo `id_externo` devolve `200` com `replay: true`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CriarAgendamento" }
+      responses:
+        "201":
+          description: Criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Agendamento"
+                      - type: object
+                        properties:
+                          agendamentos_irmaos:
+                            type: array
+                            items: { type: string, format: uuid }
+                            description: Presente no modo multi-exames de imagem (1 agendamento por exame).
+        "200":
+          description: Replay — `id_externo` (ou Idempotency-Key) já processado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Agendamento"
+                      - type: object
+                        properties: { replay: { type: boolean, const: true } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
+  /appointments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AppointmentRef"
+    get:
+      tags: [Agendamentos]
+      summary: Consulta um agendamento
+      description: "Escopo exigido: `appointments:read`. `{id}` aceita o UUID interno ou `ext:<id_externo>`."
+      responses:
+        "200":
+          description: Agendamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Agendamento" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /appointments/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/AppointmentRef"
+    post:
+      tags: [Agendamentos]
+      summary: Cancela um agendamento
+      description: |
+        Escopo exigido: `appointments:write`.
+        Apenas muda o status para `cancelado` (nenhum DELETE, o registro permanece
+        no banco e no histórico). Cancelar algo já cancelado devolve `200` com `replay: true`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivo:
+                  type: string
+                  maxLength: 500
+                  description: Anexado ao final das observações do agendamento.
+      responses:
+        "200":
+          description: Cancelado (ou já estava cancelado)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Agendamento" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /appointments/{id}/reschedule:
+    parameters:
+      - $ref: "#/components/parameters/AppointmentRef"
+    post:
+      tags: [Agendamentos]
+      summary: Reagenda um agendamento
+      description: "Escopo exigido: `appointments:write`. Passa pelas mesmas validações de conflito/slot da tela da Agenda."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inicio, fim]
+              properties:
+                inicio: { type: string, format: date-time }
+                fim: { type: string, format: date-time }
+                medico_id: { type: [string, "null"], format: uuid }
+      responses:
+        "200":
+          description: Reagendado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { $ref: "#/components/schemas/Agendamento" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    bearerApiKey:
+      type: http
+      scheme: bearer
+      description: "`Authorization: Bearer hh_xxxxxxxx_<segredo>`"
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  headers:
+    XRequestId:
+      description: Identificador da requisição, também gravado na auditoria.
+      schema: { type: string }
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 200 }
+      description: Repetir a mesma chave com o mesmo corpo devolve a resposta original.
+    AppointmentRef:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: UUID interno do agendamento ou `ext:<id_externo>`.
+
+  schemas:
+    Slot:
+      type: object
+      properties:
+        medico_id: { type: [string, "null"], format: uuid }
+        medico_nome: { type: [string, "null"] }
+        especialidade_id: { type: [string, "null"], format: uuid }
+        especialidade_nome: { type: [string, "null"] }
+        agenda_id: { type: [string, "null"], format: uuid }
+        agenda_nome: { type: [string, "null"] }
+        inicio: { type: string, format: date-time }
+        fim: { type: string, format: date-time }
+        vagas: { type: integer }
+
+    Agendamento:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        clinica_id: { type: string, format: uuid }
+        paciente_id: { type: [string, "null"], format: uuid }
+        paciente_nome: { type: [string, "null"] }
+        medico_id: { type: [string, "null"], format: uuid }
+        especialidade_id: { type: [string, "null"], format: uuid }
+        inicio: { type: string, format: date-time }
+        fim: { type: [string, "null"], format: date-time }
+        procedimento: { type: [string, "null"] }
+        status: { type: string, examples: [agendado, cancelado, realizado] }
+        observacoes: { type: [string, "null"] }
+        tipo_atendimento: { type: [string, "null"] }
+        data_pagamento:
+          type: [string, "null"]
+          description: Sempre `null` no que a API cria — pagamento é ato da recepção/caixa.
+        origem_integracao: { type: [string, "null"] }
+        id_externo: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: [string, "null"], format: date-time }
+
+    CriarAgendamento:
+      type: object
+      required: [id_externo, paciente_id, inicio, fim]
+      properties:
+        id_externo: { type: string, minLength: 1, maxLength: 120 }
+        paciente_id:
+          type: string
+          format: uuid
+          description: O paciente já precisa existir na clínica — a v1 não cadastra paciente.
+        medico_id: { type: [string, "null"], format: uuid }
+        especialidade_id: { type: [string, "null"], format: uuid }
+        inicio: { type: string, format: date-time }
+        fim: { type: string, format: date-time }
+        procedimento: { type: [string, "null"], maxLength: 300 }
+        procedimentos:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 300 }
+        multi_exames_modo:
+          type: [string, "null"]
+          enum: [laboratorio, imagem, null]
+          description: laboratório conta 1 atendimento; imagem gera 1 agendamento por exame.
+        tipo_atendimento:
+          type: string
+          enum: [particular, convenio]
+          default: particular
+        observacoes: { type: [string, "null"], maxLength: 2000 }
+
+    Erro:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              enum:
+                - invalid_json
+                - request_failed
+                - missing_api_key
+                - invalid_api_key
+                - api_key_revoked
+                - api_key_expired
+                - insufficient_scope
+                - route_not_found
+                - appointment_not_found
+                - idempotency_key_reuse
+                - request_in_progress
+                - invalid_body
+                - invalid_query
+                - invalid_period
+                - patient_not_found
+                - business_rule_violation
+                - appointment_rejected
+                - rate_limit_exceeded
+                - auth_lookup_failed
+                - idempotency_failed
+                - read_failed
+                - availability_failed
+            message: { type: string }
+            details: {}
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: "400 — `invalid_json`, `request_failed`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    Unauthorized:
+      description: "401 — `missing_api_key`, `invalid_api_key`, `api_key_revoked`, `api_key_expired`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    Forbidden:
+      description: "403 — `insufficient_scope`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    NotFound:
+      description: "404 — `route_not_found`, `appointment_not_found` (inclui tentativa de alcançar outra clínica ou outra origem)"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    Conflict:
+      description: "409 — `idempotency_key_reuse`, `request_in_progress`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    Unprocessable:
+      description: "422 — `invalid_body`, `invalid_query`, `invalid_period`, `patient_not_found`, `business_rule_violation`, `appointment_rejected`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    RateLimited:
+      description: "429 — `rate_limit_exceeded`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    ServerError:
+      description: "500 — `read_failed`, `auth_lookup_failed`, `idempotency_failed`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
+    Upstream:
+      description: "502 — `availability_failed`"
+      content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
