@@ -56,9 +56,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { laboratorioMedicoIdsFrom, contarAtendimentos } from "@/lib/agenda/contagem";
-import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
-
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDatePura } from "@/lib/date-utils";
@@ -69,39 +66,6 @@ export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
 });
 
 // ---------- Types ----------
-type Ag = {
-  id: string;
-  status: string;
-  medico_id: string | null;
-  paciente_id: string | null;
-  inicio: string | null;
-  fim: string | null;
-  executado_em: string | null;
-  fluxo_etapa: string | null;
-  procedimento: string | null;
-  tipo_atendimento: string | null;
-  orcamento_id: string | null;
-};
-type Lanc = {
-  id: string;
-  tipo: string;
-  status: string;
-  valor: number;
-  data: string;
-  data_vencimento: string | null;
-  empresa_id: string | null;
-};
-type Atend = {
-  id: string;
-  valor_total: number;
-  valor_medico: number;
-  valor_laudo: number | null;
-  medico_id: string | null;
-  status: string;
-  procedimento: string | null;
-  data: string;
-};
-
 type Bloco = {
   producao: {
     agendados: number;
@@ -234,242 +198,91 @@ const presets: { label: string; hint: string; make: () => Periodo }[] = [
 ];
 
 // ---------- Carrega bloco ----------
-async function carregarBloco(
-  cid: string,
-  periodo: Periodo,
-): Promise<Bloco & { pacientesNovosSet: Set<string> }> {
+/**
+ * Os indicadores do período vêm prontos do banco, pela RPC
+ * `painel_executivo_periodo`
+ * (supabase/migrations/20260822160000_painel_executivo_periodo.sql).
+ *
+ * Antes a tela buscava as linhas cruas e somava dentro do navegador — só que
+ * cada consulta traz no máximo 1.000 linhas, e a clínica tem ~24.100
+ * agendamentos e ~3.500 lançamentos em 30 dias. O painel contava apenas um
+ * pedaço e não avisava: mostrava 999 agendamentos onde havia 24.123, e
+ * R$ 93.204,40 de recebimentos onde havia R$ 367.442,46. É o mesmo motivo que
+ * já tinha levado o card de GRs/Guias para o banco (`painel_grs_periodo`).
+ *
+ * As duas listas do botão "Estornar" (receita por médico e por procedimento)
+ * continuam sendo lidas aqui: elas saem de `fin_atendimentos`, que tem poucas
+ * centenas de linhas no total e é a tabela que o estorno realmente altera.
+ */
+type BlocoRpc = {
+  producao?: Partial<Bloco["producao"]>;
+  financeiro?: Partial<Bloco["financeiro"]>;
+  comercial?: Partial<Bloco["comercial"]>;
+  qualidade?: Partial<Bloco["qualidade"]>;
+};
+
+const num = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco> {
   const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
   const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
-  // GRs emitidas no período + pacientes distintos que as geraram. A conta é
-  // feita no banco (supabase/migrations/20260819180000_painel_grs_periodo.sql):
-  // no navegador ela sairia truncada, porque cada consulta traz no máximo 1.000
-  // linhas. Disparada aqui e aguardada abaixo, para rodar junto com as demais.
-  const grsPromise = supabase.rpc(
-    "painel_grs_periodo" as never,
-    {
-      p_clinica: cid,
-      p_ini: ini,
-      p_fim: fim,
-    } as never,
-  );
-
-  const [agsR, lancR, atendR, medicosR, dispR, orcR, especR, medEspR, procR] = await Promise.all([
-    supabase
-      .from("agendamentos")
-      .select(
-        "id,status,medico_id,paciente_id,inicio,fim,executado_em,fluxo_etapa,procedimento,tipo_atendimento,orcamento_id",
-      )
-      .eq("clinica_id", cid)
-      .gte("inicio", ini)
-      .lte("inicio", fim),
-    supabase
-      .from("fin_lancamentos")
-      .select("id,tipo,status,valor,data,data_vencimento,empresa_id")
-      .eq("clinica_id", cid)
-      .or(
-        `and(data.gte.${periodo.de},data.lte.${periodo.ate}),and(data_vencimento.gte.${periodo.de},data_vencimento.lte.${periodo.ate})`,
-      ),
+  const [blocoR, grsR, atendR, medicosR] = await Promise.all([
+    supabase.rpc(
+      "painel_executivo_periodo" as never,
+      {
+        p_clinica: cid,
+        p_ini: ini,
+        p_fim: fim,
+        p_de: periodo.de,
+        p_ate: periodo.ate,
+      } as never,
+    ),
+    supabase.rpc(
+      "painel_grs_periodo" as never,
+      { p_clinica: cid, p_ini: ini, p_fim: fim } as never,
+    ),
     supabase
       .from("fin_atendimentos")
-      .select("id,valor_total,valor_medico,valor_laudo,medico_id,status,procedimento,data")
+      .select("valor_total,valor_medico,valor_laudo,medico_id,procedimento")
       .eq("clinica_id", cid)
       .gte("data", periodo.de)
       .lte("data", periodo.ate),
-    supabase
-      .from("medicos")
-      .select("id,nome,especialidade_id,duracao_consulta_min")
-      .eq("clinica_id", cid)
-      .eq("ativo", true),
-    supabase
-      .from("medico_disponibilidades")
-      .select("dia_semana,hora_inicio,hora_fim,medico_id,ativo,vigencia_inicio,vigencia_fim")
-      .eq("clinica_id", cid)
-      .eq("ativo", true),
-    supabase
-      .from("orcamentos")
-      .select("id,status,paciente_id,created_at")
-      .eq("clinica_id", cid)
-      .gte("created_at", ini)
-      .lte("created_at", fim),
-    supabase.from("especialidades").select("id,nome"),
-    supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
-    supabase
-      .from("procedimentos")
-      .select("nome,tipo_procedimento")
-      .eq("clinica_id", cid)
-      .eq("ativo", true),
+    supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
   ]);
-  const grsR = await grsPromise;
 
-  const ags = (agsR.data ?? []) as Ag[];
-  const lancs = (lancR.data ?? []) as Lanc[];
-  const atends = (atendR.data ?? []) as Atend[];
-  const meds = (medicosR.data ?? []) as {
-    id: string;
-    nome: string;
-    especialidade_id: string | null;
-    duracao_consulta_min: number | null;
-  }[];
-  const disps = (dispR.data ?? []) as {
-    dia_semana: number;
-    hora_inicio: string;
-    hora_fim: string;
-    medico_id: string;
-    vigencia_inicio: string | null;
-    vigencia_fim: string | null;
-  }[];
-  const orcs = (orcR.data ?? []) as {
-    id: string;
-    status: string;
-    paciente_id: string | null;
-    created_at: string;
-  }[];
-  // A RPC devolve uma única linha. Se a função ainda não existir no banco, o
-  // painel continua abrindo — o card só mostra zero em vez de quebrar a tela.
+  const vazio = emptyBloco();
+  // Se a função ainda não existir no banco, o painel continua abrindo com zeros
+  // em vez de quebrar a tela — mesma proteção já usada no card de GRs.
+  const rpc = (blocoR.data ?? {}) as BlocoRpc;
+  const rProd = rpc.producao ?? {};
+  const rFin = rpc.financeiro ?? {};
+  const rCom = rpc.comercial ?? {};
+  const rQua = rpc.qualidade ?? {};
+
   const grLinha = (
-    (grsR.data ?? []) as {
-      grs: number;
-      pacientes: number;
-      novos: number;
-      recorrentes: number;
-    }[]
+    (grsR.data ?? []) as { grs: number; pacientes: number; novos: number; recorrentes: number }[]
   )[0];
-  const espLista = (especR.data ?? []) as { id: string; nome: string }[];
-  const medEsp = (medEspR.data ?? []) as { medico_id: string; especialidade_id: string }[];
 
-  const medNome = new Map(meds.map((m) => [m.id, m.nome] as const));
-  const espNome = new Map(espLista.map((e) => [e.id, e.nome] as const));
-  const medEspIdx: Record<string, string[]> = {};
-  for (const me of medEsp) (medEspIdx[me.medico_id] ||= []).push(me.especialidade_id);
-  const labMedicoIds = laboratorioMedicoIdsFrom(espLista, medEsp);
-  const catResolver = buildCategoriaResolver(
-    (procR.data ?? []) as { nome: string; tipo_procedimento: string | null }[],
+  const atends = (atendR.data ?? []) as {
+    valor_total: number | null;
+    valor_medico: number | null;
+    valor_laudo: number | null;
+    medico_id: string | null;
+    procedimento: string | null;
+  }[];
+  const medNome = new Map(
+    ((medicosR.data ?? []) as { id: string; nome: string }[]).map((m) => [m.id, m.nome] as const),
   );
 
-  // --- Produção ---
-  const naoCancelados = ags.filter((a) => a.status !== "cancelado");
-  const realizadosArr = ags.filter((a) => a.status === "realizado" || a.executado_em);
-  const faltasArr = ags.filter((a) => a.status === "faltou");
-  const canceladosArr = ags.filter((a) => a.status === "cancelado");
-  const confirmadosArr = ags.filter(
-    (a) =>
-      ["confirmado", "realizado", "faltou"].includes(a.status) ||
-      (a.fluxo_etapa && a.fluxo_etapa !== "aguardando"),
-  );
-
-  // Regra de contagem (lab = 1 por paciente/dia, imagem/consulta = 1 por linha)
-  const cAgendados = contarAtendimentos(naoCancelados, labMedicoIds, catResolver);
-  const cConfirmados = contarAtendimentos(confirmadosArr, labMedicoIds, catResolver);
-  const cCompareceram = contarAtendimentos(realizadosArr, labMedicoIds, catResolver);
-  const cFaltaram = contarAtendimentos(faltasArr, labMedicoIds, catResolver);
-  const cCancelaram = contarAtendimentos(canceladosArr, labMedicoIds, catResolver);
-
-  // Capacidade em minutos no período (soma de janelas de disponibilidade por dia)
-  const iniDt = new Date(`${periodo.de}T00:00:00`);
-  const fimDt = new Date(`${periodo.ate}T00:00:00`);
-  let capacidadeMin = 0;
-  for (let dt = new Date(iniDt); dt <= fimDt; dt.setDate(dt.getDate() + 1)) {
-    const dow = dt.getDay();
-    const iso = dt.toISOString().slice(0, 10);
-    for (const d of disps) {
-      if (d.dia_semana !== dow) continue;
-      if (d.vigencia_inicio && iso < d.vigencia_inicio) continue;
-      if (d.vigencia_fim && iso > d.vigencia_fim) continue;
-      const [h1, m1] = d.hora_inicio.split(":").map(Number);
-      const [h2, m2] = d.hora_fim.split(":").map(Number);
-      capacidadeMin += h2 * 60 + m2 - (h1 * 60 + m1);
-    }
-  }
-
-  let agendadoMin = 0;
-  let tempoTotalMin = 0,
-    tempoCount = 0;
-  for (const a of naoCancelados) {
-    if (!a.inicio || !a.fim) continue;
-    const dur = (new Date(a.fim).getTime() - new Date(a.inicio).getTime()) / 60000;
-    if (dur > 0 && dur < 24 * 60) {
-      agendadoMin += dur;
-      if (a.status === "realizado" || a.executado_em) {
-        tempoTotalMin += dur;
-        tempoCount++;
-      }
-    }
-  }
-
-  const porMedicoMap = new Map<string, { total: number; realizados: number }>();
-  for (const a of ags) {
-    if (!a.medico_id) continue;
-    const cur = porMedicoMap.get(a.medico_id) ?? { total: 0, realizados: 0 };
-    if (a.status !== "cancelado") cur.total++;
-    if (a.status === "realizado" || a.executado_em) cur.realizados++;
-    porMedicoMap.set(a.medico_id, cur);
-  }
-  // Reaplica regra por médico: se lab, agrupa por (paciente,dia).
-  const porMedicoAj = [...porMedicoMap.keys()]
-    .map((id) => {
-      const doMed = ags.filter((a) => a.medico_id === id);
-      const total = contarAtendimentos(
-        doMed.filter((a) => a.status !== "cancelado"),
-        labMedicoIds,
-        catResolver,
-      );
-      const realizados = contarAtendimentos(
-        doMed.filter((a) => a.status === "realizado" || a.executado_em),
-        labMedicoIds,
-        catResolver,
-      );
-      return { nome: medNome.get(id) ?? "—", total, realizados };
-    })
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 12);
-
-  const porEspMap = new Map<string, number>();
-  for (const a of ags) {
-    if (a.status === "cancelado" || !a.medico_id) continue;
-    const espIds = medEspIdx[a.medico_id];
-    if (!espIds || espIds.length === 0) continue;
-    const eid = espIds[0]; // usa a primeira para evitar dupla contagem
-    porEspMap.set(eid, (porEspMap.get(eid) ?? 0) + 1);
-  }
-  const porEspecialidade = [...porEspMap.entries()]
-    .map(([id, total]) => ({ nome: espNome.get(id) ?? "—", total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 12);
-
-  // --- Financeiro ---
-  const receitasPrev = lancs.filter((l) => l.tipo === "receita" && l.status === "previsto");
-  const receitasReal = lancs.filter(
-    (l) =>
-      l.tipo === "receita" &&
-      l.status === "confirmado" &&
-      l.data >= periodo.de &&
-      l.data <= periodo.ate,
-  );
-  const despesasPrev = lancs.filter((l) => l.tipo === "despesa" && l.status === "previsto");
-  const despesasReal = lancs.filter(
-    (l) =>
-      l.tipo === "despesa" &&
-      l.status === "confirmado" &&
-      l.data >= periodo.de &&
-      l.data <= periodo.ate,
-  );
-  const receitaPrevista = receitasPrev.reduce((s, l) => s + Number(l.valor || 0), 0);
-  const receitaRealizada = receitasReal.reduce((s, l) => s + Number(l.valor || 0), 0);
-  const despesaPrevista = despesasPrev.reduce((s, l) => s + Number(l.valor || 0), 0);
-  const despesaRealizada = despesasReal.reduce((s, l) => s + Number(l.valor || 0), 0);
-  const ticketMedio =
-    atends.length > 0
-      ? atends.reduce((s, a) => s + Number(a.valor_total || 0), 0) / atends.length
-      : 0;
-
+  // Receita por médico e por procedimento — base do botão "Estornar".
   const finPorMedicoMap = new Map<string, number>();
   for (const a of atends) {
     if (!a.medico_id) continue;
-    finPorMedicoMap.set(
-      a.medico_id,
-      (finPorMedicoMap.get(a.medico_id) ?? 0) + Number(a.valor_total || 0),
-    );
+    finPorMedicoMap.set(a.medico_id, (finPorMedicoMap.get(a.medico_id) ?? 0) + num(a.valor_total));
   }
   const finPorMedico = [...finPorMedicoMap.entries()]
     .map(([id, valor]) => ({ nome: medNome.get(id) ?? "—", valor, medicoId: id }))
@@ -480,8 +293,8 @@ async function carregarBloco(
   for (const a of atends) {
     const key = (a.procedimento ?? "—").trim() || "—";
     const cur = procMap.get(key) ?? { receita: 0, custo: 0 };
-    cur.receita += Number(a.valor_total || 0);
-    cur.custo += Number(a.valor_medico || 0) + Number(a.valor_laudo || 0);
+    cur.receita += num(a.valor_total);
+    cur.custo += num(a.valor_medico) + num(a.valor_laudo);
     procMap.set(key, cur);
   }
   const porProcedimento = [...procMap.entries()]
@@ -489,126 +302,64 @@ async function carregarBloco(
     .sort((a, b) => b.margem - a.margem)
     .slice(0, 12);
 
-  // Receita particular vs convênio (proxy via agendamentos.tipo_atendimento)
-  const idsParticular = new Set(
-    ags.filter((a) => (a.tipo_atendimento ?? "particular") === "particular").map((a) => a.id),
-  );
-  const idsConvenio = new Set(
-    ags
-      .filter((a) =>
-        ["convenio", "cartao_beneficio", "contrato"].includes(a.tipo_atendimento ?? ""),
-      )
-      .map((a) => a.id),
-  );
-  // fin_atendimentos não tem agendamento_id garantido; usamos empresa_id em lancs como proxy adicional
-  // Simplificação v1: particular = atends sem procedimento de convênio conhecido; convênio = lancs com empresa_id.
-  const receitaConvenio = receitasReal
-    .filter((l) => l.empresa_id)
-    .reduce((s, l) => s + Number(l.valor || 0), 0);
-  const receitaParticular = Math.max(0, receitaRealizada - receitaConvenio);
-  // idsParticular/idsConvenio ficam para futura conciliação — evita warning
-  void idsParticular;
-  void idsConvenio;
-
-  // --- Comercial ---
-  const pacIds = [...new Set(ags.map((a) => a.paciente_id).filter(Boolean) as string[])];
-  let pacientesNovosSet = new Set<string>();
-  if (pacIds.length > 0) {
-    const { data: hist } = await supabase
-      .from("agendamentos")
-      .select("paciente_id")
-      .eq("clinica_id", cid)
-      .in("paciente_id", pacIds)
-      .lt("inicio", ini);
-    const existentes = new Set((hist ?? []).map((h: any) => h.paciente_id) as string[]);
-    pacientesNovosSet = new Set(pacIds.filter((p) => !existentes.has(p)));
-  }
-  const novos = pacientesNovosSet.size;
-  const recorrentes = pacIds.length - novos;
-
-  const orcAprovados = orcs.filter((o) => o.status === "aprovado");
-  let comAgend = 0;
-  if (orcAprovados.length > 0) {
-    const orcIds = orcAprovados.map((o) => o.id);
-    const { data: agsOrc } = await supabase
-      .from("agendamentos")
-      .select("orcamento_id")
-      .eq("clinica_id", cid)
-      .in("orcamento_id", orcIds);
-    const setOrc = new Set(((agsOrc ?? []) as any[]).map((x) => x.orcamento_id));
-    comAgend = orcAprovados.filter((o) => setOrc.has(o.id)).length;
-  }
-  const conversaoOrcamento = orcs.length > 0 ? (comAgend / orcs.length) * 100 : 0;
-
-  // --- Qualidade ---
-  const noShowDen = cCompareceram + cFaltaram;
-  const noShowPct = noShowDen > 0 ? (cFaltaram / noShowDen) * 100 : 0;
-
-  // Atraso médio: executado_em - inicio (só quando executado_em > inicio)
-  let atrasoTotal = 0,
-    atrasoCount = 0;
-  for (const a of realizadosArr) {
-    if (!a.inicio || !a.executado_em) continue;
-    const diff = (new Date(a.executado_em).getTime() - new Date(a.inicio).getTime()) / 60000;
-    if (diff > 0 && diff < 12 * 60) {
-      atrasoTotal += diff;
-      atrasoCount++;
-    }
-  }
-
-  const ocupacaoPct = capacidadeMin > 0 ? (agendadoMin / capacidadeMin) * 100 : 0;
-  const tempoMedioMin = tempoCount > 0 ? tempoTotalMin / tempoCount : 0;
-  const atrasoMedioMin = atrasoCount > 0 ? atrasoTotal / atrasoCount : 0;
-
   return {
     producao: {
-      agendados: cAgendados,
-      confirmados: cConfirmados,
-      compareceram: cCompareceram,
-      faltaram: cFaltaram,
-      cancelaram: cCancelaram,
-      ocupacaoPct,
-      tempoMedioMin,
-      capacidadeMin,
-      agendadoMin,
-      porMedico: porMedicoAj,
-      porEspecialidade,
+      agendados: num(rProd.agendados),
+      confirmados: num(rProd.confirmados),
+      compareceram: num(rProd.compareceram),
+      faltaram: num(rProd.faltaram),
+      cancelaram: num(rProd.cancelaram),
+      ocupacaoPct: num(rProd.ocupacaoPct),
+      tempoMedioMin: num(rProd.tempoMedioMin),
+      capacidadeMin: num(rProd.capacidadeMin),
+      agendadoMin: num(rProd.agendadoMin),
+      porMedico: rProd.porMedico ?? vazio.producao.porMedico,
+      porEspecialidade: rProd.porEspecialidade ?? vazio.producao.porEspecialidade,
     },
     financeiro: {
-      receitaPrevista,
-      receitaRealizada,
-      ticketMedio,
-      despesaPrevista,
-      despesaRealizada,
-      resultado: receitaRealizada - despesaRealizada,
+      receitaPrevista: num(rFin.receitaPrevista),
+      receitaRealizada: num(rFin.receitaRealizada),
+      ticketMedio: num(rFin.ticketMedio),
+      despesaPrevista: num(rFin.despesaPrevista),
+      despesaRealizada: num(rFin.despesaRealizada),
+      resultado: num(rFin.resultado),
       porMedico: finPorMedico,
       porProcedimento,
-      receitaParticular,
-      receitaConvenio,
+      receitaParticular: num(rFin.receitaParticular),
+      receitaConvenio: num(rFin.receitaConvenio),
     },
     comercial: {
-      novos,
-      recorrentes,
-      conversaoOrcamento,
-      orcamentosNoPeriodo: orcs.length,
+      novos: num(rCom.novos),
+      recorrentes: num(rCom.recorrentes),
+      conversaoOrcamento: num(rCom.conversaoOrcamento),
+      orcamentosNoPeriodo: num(rCom.orcamentosNoPeriodo),
     },
     grs: {
-      total: Number(grLinha?.grs ?? 0),
-      pacientes: Number(grLinha?.pacientes ?? 0),
-      novos: Number(grLinha?.novos ?? 0),
-      recorrentes: Number(grLinha?.recorrentes ?? 0),
+      total: num(grLinha?.grs),
+      pacientes: num(grLinha?.pacientes),
+      novos: num(grLinha?.novos),
+      recorrentes: num(grLinha?.recorrentes),
     },
     qualidade: {
-      noShowPct,
-      atrasoMedioMin,
+      noShowPct: num(rQua.noShowPct),
+      atrasoMedioMin: num(rQua.atrasoMedioMin),
     },
-    pacientesNovosSet,
   };
 }
 
 // ---------- Delta helpers ----------
-const delta = (atual: number, ant: number): number => {
-  if (!ant) return 0;
+/**
+ * Variação percentual contra o período anterior.
+ *
+ * Devolve `undefined` quando o período anterior é zero: nesse caso não existe
+ * base de comparação, e a variação seria infinita. Antes a função devolvia 0
+ * nessa situação, o que fazia o card exibir um "0,0% vs. período anterior"
+ * falso — parecia estabilidade quando na verdade não havia com o que comparar.
+ * Quem consome trata `undefined` escondendo o número (`HhpKpiCard`) ou
+ * avisando que não há base (`BigCard`).
+ */
+const delta = (atual: number, ant: number): number | undefined => {
+  if (!ant) return undefined;
   return Number((((atual - ant) / ant) * 100).toFixed(1));
 };
 
@@ -1206,13 +957,17 @@ function BigCard({
             </div>
           ))}
         </div>
-        {typeof d === "number" && (
+        {typeof d === "number" ? (
           <p
             className={`mt-2.5 text-xs font-medium ${positivo ? "text-emerald-600" : "text-rose-600"}`}
           >
             {d > 0 ? "+" : ""}
             {d.toFixed(1)}% <span className="text-slate-400 font-normal">vs. período anterior</span>
           </p>
+        ) : (
+          // Período anterior zerado: não existe base de comparação. Antes isso
+          // aparecia como "0,0%", que se lê como estabilidade e engana.
+          <p className="mt-2.5 text-xs font-normal text-slate-400">Sem base de comparação</p>
         )}
       </CardContent>
     </Card>
