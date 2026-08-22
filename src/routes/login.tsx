@@ -12,6 +12,13 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
+  // `next` preserva um destino interno (ex.: a tela de consentimento OAuth)
+  // para onde o usuário volta depois de entrar.
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//")
+      ? s.next
+      : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Entrar — ClinicaOS" },
@@ -34,6 +41,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,11 +52,15 @@ function LoginPage() {
   useEffect(() => {
     if (!authLoading && user) {
       (async () => {
+        if (next) {
+          window.location.replace(next);
+          return;
+        }
         const soMedico = await isMedicoOnlyUser(user.id);
         navigate({ to: soMedico ? "/medico" : "/app", replace: true });
       })();
     }
-  }, [authLoading, navigate, user]);
+  }, [authLoading, navigate, next, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,6 +72,10 @@ function LoginPage() {
       return;
     }
     toast.success("Bem-vindo!");
+    if (next) {
+      window.location.replace(next);
+      return;
+    }
     const uid = data.user?.id;
     const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
     navigate({ to: soMedico ? "/medico" : "/app", replace: true });
