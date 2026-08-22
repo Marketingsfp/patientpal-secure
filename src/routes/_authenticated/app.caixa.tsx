@@ -22,6 +22,8 @@ import {
   CalendarIcon,
   X,
   Search,
+  AlertTriangle,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -677,6 +679,23 @@ function Page() {
   }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
+  /**
+   * TODAS as sessões abertas do próprio usuário, da mais recente para a mais
+   * antiga.
+   *
+   * Antes a tela carregava só a mais recente (`limit(1)`). Como o registro de
+   * pagamento abre uma sessão nova quando não existe uma daquele DIA
+   * (fn_registrar_lancamento_e_caixa), quem não fechou o caixa na véspera
+   * chegava no dia seguinte, recebia um caixa novo e o da véspera sumia da
+   * tela — sem aviso e sem como fechá-lo a não ser pedindo a um gestor. Em
+   * 22/08/2026 havia 10 caixas nesse estado, o mais antigo de 20/05.
+   */
+  const [sessoesAbertas, setSessoesAbertas] = useState<Sessao[]>([]);
+  /**
+   * Qual das sessões abertas a aba "Meu caixa" está exibindo. `null` = a mais
+   * recente (o caixa de hoje), que é o comportamento normal do dia a dia.
+   */
+  const [sessaoAtivaId, setSessaoAtivaId] = useState<string | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   // Movimentos do próprio usuário ao longo das ~20 sessões mais recentes
   // (aberta + fechadas). Usado APENAS na aba "Meu caixa → Movimentos" para
@@ -1166,9 +1185,7 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", user.id)
         .eq("status", "aberto")
-        .order("aberto_em", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .order("aberto_em", { ascending: false }),
       supabase
         .from("caixa_sessoes")
         .select(SESSAO_FIELDS)
@@ -1177,8 +1194,13 @@ function Page() {
         .order("aberto_em", { ascending: false })
         .limit(5),
     ]);
-    const aberta = abertaRes.data;
-    setMinhaSessao((aberta ?? null) as Sessao | null);
+    // A sessão exibida é a escolhida pelo operador (quando ele trocou para um
+    // caixa pendente de outro dia) ou, no caso normal, a mais recente.
+    const abertas = (abertaRes.data ?? []) as Sessao[];
+    setSessoesAbertas(abertas);
+    const aberta =
+      (sessaoAtivaId ? abertas.find((s) => s.id === sessaoAtivaId) : null) ?? abertas[0] ?? null;
+    setMinhaSessao(aberta);
 
     // Enriquecimento compartilhado entre os dois ramos (com/sem sessão
     // aberta). Puxa serviço, médico E paciente a partir de
@@ -1459,7 +1481,7 @@ function Page() {
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
-  }, [clinicaAtual, user, janelaIniISO, janelaFimISO]);
+  }, [clinicaAtual, user, janelaIniISO, janelaFimISO, sessaoAtivaId]);
 
   // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
   // às movimentações atuais para trocar o botão pelo rótulo
@@ -1739,6 +1761,14 @@ function Page() {
   const cobrar = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
+    // Ver `modoConferencia`: cobrar um paciente com o caixa de ontem na tela
+    // jogaria o recebimento de hoje no dia errado.
+    if (modoConferencia) {
+      toast.error(
+        "Você está vendo o caixa de um dia anterior. Volte ao caixa de hoje para cobrar.",
+      );
+      return;
+    }
     // Valida cada linha
     const linhasValidadas: Array<{
       forma: string;
@@ -2252,6 +2282,45 @@ function Page() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
+  /**
+   * Caixas de dias ANTERIORES que ficaram abertos.
+   *
+   * O dia é comparado no fuso local (o mesmo do `<DateInputBR>` do fechamento),
+   * nunca em UTC: às 21h de Brasília o UTC já virou o dia seguinte e o caixa de
+   * hoje apareceria como pendente.
+   */
+  const hojeYMD = localYMD(new Date().toISOString());
+  const sessoesPendentes = useMemo(
+    () => sessoesAbertas.filter((s) => localYMD(s.aberto_em) < hojeYMD),
+    [sessoesAbertas, hojeYMD],
+  );
+  /** Dia (YYYY-MM-DD) da sessão que a tela está exibindo. */
+  const diaSessaoAtiva = minhaSessao ? localYMD(minhaSessao.aberto_em) : null;
+  /**
+   * A tela está exibindo um caixa de dia anterior — modo conferência.
+   *
+   * Nesse modo o operador só pode CONFERIR e FECHAR. Lançar sangria,
+   * suprimento, estorno, recebimento ou cobrança fica bloqueado: esses
+   * lançamentos gravam com `sessao_id = minhaSessao.id` e cairiam num dia que
+   * já acabou, recriando exatamente o tipo de bagunça que este recurso existe
+   * para resolver. O dinheiro de hoje pertence ao caixa de hoje.
+   */
+  const modoConferencia = !!minhaSessao && !!diaSessaoAtiva && diaSessaoAtiva !== hojeYMD;
+  /** Caixa de hoje, quando já existe — o destino do botão "voltar". */
+  const sessaoDeHoje = useMemo(
+    () => sessoesAbertas.find((s) => localYMD(s.aberto_em) === hojeYMD) ?? null,
+    [sessoesAbertas, hojeYMD],
+  );
+
+  /**
+   * Ao trocar de caixa, o modal de fechamento passa a sugerir o dia daquele
+   * caixa — senão a atendente abriria o fechamento do caixa de ontem com a
+   * data de hoje selecionada e veria uma grade vazia.
+   */
+  useEffect(() => {
+    if (diaSessaoAtiva) setDataFechamento(diaSessaoAtiva);
+  }, [diaSessaoAtiva]);
+
   // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
   // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
   const movsDoDiaFechamento = useMemo(() => {
@@ -2741,6 +2810,14 @@ function Page() {
   const lancarMov = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
+    // Ver `modoConferencia`: caixa de dia anterior só pode ser conferido e
+    // fechado, nunca movimentado.
+    if (modoConferencia) {
+      toast.error(
+        "Você está vendo o caixa de um dia anterior. Volte ao caixa de hoje para lançar.",
+      );
+      return;
+    }
     const v = Number(movValor) || 0;
     if (v <= 0) {
       toast.error("Informe um valor");
@@ -2928,6 +3005,9 @@ function Page() {
     const obsFinal = obsFechamento;
     setObsFechamento("");
     setConferidoOwn({});
+    // Fechou um caixa pendente de outro dia: a tela volta sozinha para o caixa
+    // de hoje, senão ficaria presa numa sessão que não existe mais como aberta.
+    setSessaoAtivaId(null);
     setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
     // Comprovante escopado ao dia selecionado.
@@ -3456,6 +3536,99 @@ function Page() {
 
         {/* ===================== MEU CAIXA ===================== */}
         <TabsContent value="meu" className="space-y-4 pt-4">
+          {/*
+            Aviso de caixa de dia anterior em aberto.
+            Fica FORA das sub-abas de propósito: a atendente costuma abrir a
+            tela já na aba Saldo e nunca chegaria a um aviso escondido em
+            Histórico. Sem ele, o caixa da véspera simplesmente sumia — a tela
+            passa a mostrar o caixa novo do dia e o antigo não aparece em lugar
+            nenhum.
+          */}
+          {sessoesPendentes.length > 0 && (
+            <div className="border border-amber-300 bg-amber-50 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">
+                      {sessoesPendentes.length === 1
+                        ? "Você tem um caixa de outro dia sem fechar"
+                        : `Você tem ${sessoesPendentes.length} caixas de outros dias sem fechar`}
+                    </p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Enquanto não for fechado, o dinheiro daquele dia continua sem conferência.
+                      Confira o valor com o cupom e feche — o caixa de hoje não é afetado.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {sessoesPendentes.map((s) => {
+                      const dia = localYMD(s.aberto_em);
+                      const emExibicao = minhaSessao?.id === s.id;
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-xs font-semibold text-slate-700">
+                            Caixa de {new Date(`${dia}T00:00:00`).toLocaleDateString("pt-BR")}
+                            <span className="ml-2 font-normal text-slate-500">
+                              aberto às{" "}
+                              {new Date(s.aberto_em).toLocaleTimeString("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </span>
+                          {emExibicao ? (
+                            <span className="text-xs font-bold text-amber-700">
+                              Em exibição abaixo
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer"
+                              onClick={() => setSessaoAtivaId(s.id)}
+                            >
+                              <Lock className="h-3.5 w-3.5" /> Conferir e fechar
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/*
+            Faixa do modo conferência: deixa explícito de qual DIA é o caixa na
+            tela. Sem isso a atendente veria saldos que não batem com a gaveta
+            dela e acharia que o sistema errou de novo.
+          */}
+          {modoConferencia && diaSessaoAtiva && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-slate-300 bg-slate-100 rounded-xl px-4 py-3">
+              <p className="text-sm font-bold text-slate-800">
+                Você está vendo o caixa de{" "}
+                {new Date(`${diaSessaoAtiva}T00:00:00`).toLocaleDateString("pt-BR")} — somente
+                conferência e fechamento.
+              </p>
+              {sessaoDeHoje ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-lg cursor-pointer"
+                  onClick={() => setSessaoAtivaId(sessaoDeHoje.id)}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao caixa de hoje
+                </button>
+              ) : (
+                <span className="text-xs text-slate-600">
+                  Nenhum caixa aberto hoje ainda — ele abre sozinho na primeira cobrança.
+                </span>
+              )}
+            </div>
+          )}
+
           {loading && (
             <ListSkeleton
               rows={4}
@@ -3498,47 +3671,53 @@ function Page() {
                   <>
                     {/* Barra de ações — sangria/suprimento em destaque no topo */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-xs">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
-                          onClick={() => setOpenMov({ tipo: "suprimento" })}
-                        >
-                          <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
-                          onClick={() => setOpenMov({ tipo: "sangria" })}
-                        >
-                          <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
-                          onClick={() => setOpenMov({ tipo: "estorno" })}
-                        >
-                          <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
-                        </button>
-                        {podeLancarRecebDespesa && (
-                          <>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
-                              onClick={() => setOpenMov({ tipo: "recebimento" })}
-                            >
-                              <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
-                              onClick={() => setOpenMov({ tipo: "despesa" })}
-                            >
-                              <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      {modoConferencia ? (
+                        <p className="text-xs font-semibold text-slate-500">
+                          Lançamentos bloqueados: este caixa é de um dia que já passou.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                            onClick={() => setOpenMov({ tipo: "suprimento" })}
+                          >
+                            <ArrowDownToLine className="h-4 w-4" /> Novo suprimento
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm cursor-pointer transition-colors"
+                            onClick={() => setOpenMov({ tipo: "sangria" })}
+                          >
+                            <ArrowUpFromLine className="h-4 w-4" /> Nova sangria
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                            onClick={() => setOpenMov({ tipo: "estorno" })}
+                          >
+                            <Undo2 className="h-4 w-4 text-fuchsia-600" /> Estorno
+                          </button>
+                          {podeLancarRecebDespesa && (
+                            <>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                                onClick={() => setOpenMov({ tipo: "recebimento" })}
+                              >
+                                <PlusCircle className="h-4 w-4 text-emerald-600" /> Recebimento
+                              </button>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+                                onClick={() => setOpenMov({ tipo: "despesa" })}
+                              >
+                                <MinusCircle className="h-4 w-4 text-rose-600" /> Despesa
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
@@ -3604,8 +3783,12 @@ function Page() {
                     {/* Linha do tempo de sangrias e suprimentos do turno */}
                     <TimelineGaveta
                       movimentos={movsGaveta}
-                      onNovaSangria={() => setOpenMov({ tipo: "sangria" })}
-                      onNovoSuprimento={() => setOpenMov({ tipo: "suprimento" })}
+                      onNovaSangria={
+                        modoConferencia ? undefined : () => setOpenMov({ tipo: "sangria" })
+                      }
+                      onNovoSuprimento={
+                        modoConferencia ? undefined : () => setOpenMov({ tipo: "suprimento" })
+                      }
                     />
 
                     <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs mt-4 space-y-3">
