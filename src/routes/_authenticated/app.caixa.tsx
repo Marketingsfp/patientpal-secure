@@ -726,10 +726,21 @@ function Page() {
   // (fin_lancamentos.criado_por) — que podem divergir em cobranças
   // centralizadas (ex.: financeiro/laboratório).
   const [userNamesById, setUserNamesById] = useState<Map<string, string>>(new Map());
-  // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
-  // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
-  // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
-  const [lancsCancelados, setLancsCancelados] = useState<Set<string>>(new Set());
+  /**
+   * Lançamentos ANULADOS: cancelados no financeiro E com a devolução já
+   * registrada no caixa (movimento de estorno, ou sangria antiga descrita
+   * como "Estorno —"). Só esses formam um par que se anula.
+   *
+   * A versão anterior guardava todo lançamento cancelado, com ou sem reverso,
+   * e o saldo descontava o valor de qualquer jeito. Mas cancelar no financeiro
+   * não tira dinheiro da gaveta: sem estorno registrado, a cédula continua
+   * lá. O resultado era o card "Saldo atual" e a grade "Conferência por forma
+   * de pagamento" mostrando números diferentes do MESMO caixa — em 22/08/2026
+   * eram 42 recebimentos nessa situação, R$ 7.164,00, e no caixa aberto da
+   * Fadila o card dizia R$ 890,00 enquanto o fechamento dizia R$ 1.490,00.
+   * Quem fechava via um número e gravava outro.
+   */
+  const [lancsAnulados, setLancsAnulados] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
@@ -1210,14 +1221,14 @@ function Page() {
       movsList: Mov[],
     ): Promise<{
       enrich: Map<string, MovEnrich>;
-      cancelados: Set<string>;
+      anulados: Set<string>;
     }> => {
       const enrich = new Map<string, MovEnrich>();
-      const cancelados = new Set<string>();
+      const anulados = new Set<string>();
       const lancIds = Array.from(
         new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)),
       );
-      if (lancIds.length === 0) return { enrich, cancelados };
+      if (lancIds.length === 0) return { enrich, anulados };
       const lancRows: LancamentoEnrichRow[] = [];
       for (const ids of chunkArray(lancIds, 200)) {
         const { data, error } = await supabase
@@ -1230,8 +1241,36 @@ function Page() {
         }
         lancRows.push(...((data ?? []) as LancamentoEnrichRow[]));
       }
+      // Quais desses lançamentos já tiveram a devolução gravada no caixa.
+      // A consulta vai ao banco em vez de olhar só os movimentos carregados
+      // na tela: quando o caixa do recebimento já estava fechado, o estorno é
+      // lançado no caixa aberto do dia, que pode estar fora do período
+      // filtrado. Ver `lancsAnulados`.
+      const comDevolucao = new Set<string>();
+      for (const ids of chunkArray(lancIds, 200)) {
+        const { data, error } = await supabase
+          .from("caixa_movimentos")
+          .select("lancamento_id, tipo, descricao")
+          .in("lancamento_id", ids)
+          .in("tipo", ["estorno", "sangria"]);
+        if (error) {
+          console.warn("Falha ao verificar devoluções dos lançamentos do caixa", error);
+          continue;
+        }
+        for (const r of (data ?? []) as Array<{
+          lancamento_id: string | null;
+          tipo: string;
+          descricao: string | null;
+        }>) {
+          if (!r.lancamento_id) continue;
+          const ehDevolucao =
+            r.tipo === "estorno" ||
+            (r.tipo === "sangria" && (r.descricao ?? "").toLowerCase().startsWith("estorno"));
+          if (ehDevolucao) comDevolucao.add(r.lancamento_id);
+        }
+      }
       for (const l of lancRows) {
-        if (l.status === "cancelado") cancelados.add(l.id);
+        if (l.status === "cancelado" && comDevolucao.has(l.id)) anulados.add(l.id);
       }
       const medIds = new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x));
       const agIds = Array.from(
@@ -1401,7 +1440,7 @@ function Page() {
           faturado_por_id: l.criado_por ?? null,
         });
       }
-      return { enrich, cancelados };
+      return { enrich, anulados };
     };
 
     // Sessões recentes do usuário (aberta + últimas fechadas).
@@ -1475,9 +1514,9 @@ function Page() {
     } else {
       setMinhasMovs([]);
     }
-    const { enrich, cancelados } = await enrichMovsList(movsHist);
+    const { enrich, anulados } = await enrichMovsList(movsHist);
     setEnrichPorLanc(enrich);
-    setLancsCancelados(cancelados);
+    setLancsAnulados(anulados);
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
@@ -1997,23 +2036,30 @@ function Page() {
 
   // Calculos
 
-  // Movimento cujo lançamento foi cancelado (estornado) não é dinheiro do dia:
-  // fica fora do saldo, do resumo por tipo e da conferência por forma de
-  // pagamento. Vale para o recebimento original e para a sangria/estorno que o
-  // reverte — o par se anula, e se o reverso ainda não foi gravado (dados
-  // antigos) a conta já sai certa. Antes só o saldo aplicava essa regra, então
-  // uma taxa de adesão cobrada e depois cancelada sumia do saldo mas continuava
-  // inflando as Entradas e o "Resumo por forma de pagamento" do fechamento.
+  /**
+   * Movimento que faz parte de um par recebimento + devolução já anulado.
+   *
+   * Some do saldo, do resumo por tipo e das Entradas, porque as duas pernas se
+   * cancelam e mantê-las só inflaria os totais: uma taxa de adesão cobrada e
+   * depois devolvida apareceria como entrada de dinheiro que já não está no
+   * caixa.
+   *
+   * Exige a devolução REGISTRADA — ver `lancsAnulados`. Cancelar o lançamento
+   * no financeiro não abre a gaveta: enquanto não houver estorno lançado, a
+   * cédula continua lá e o dinheiro tem que continuar contando, exatamente
+   * como a grade de conferência do fechamento sempre contou. É essa exigência
+   * que faz o card "Saldo atual" e o fechamento pararem de divergir.
+   */
   const movEstornado = useCallback(
     (m: Mov) => {
-      if (!m.lancamento_id || !lancsCancelados.has(m.lancamento_id)) return false;
+      if (!m.lancamento_id || !lancsAnulados.has(m.lancamento_id)) return false;
       if (m.tipo === "recebimento" || m.tipo === "estorno") return true;
       if (m.tipo === "sangria" && (m.descricao ?? "").toLowerCase().startsWith("estorno")) {
         return true;
       }
       return false;
     },
-    [lancsCancelados],
+    [lancsAnulados],
   );
 
   const saldoAtual = useMemo(() => {
