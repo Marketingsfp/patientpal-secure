@@ -15,6 +15,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as MedicoRouteImport } from './routes/medico'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
@@ -32,6 +33,8 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
@@ -103,6 +106,7 @@ import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/
 import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
 import { Route as AuthenticatedAppAgendaMedicosRouteImport } from './routes/_authenticated/app.agenda-medicos'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AuthenticatedAppOdontologiaIndexRouteImport } from './routes/_authenticated/app.odontologia.index'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
@@ -182,6 +186,11 @@ const PainelRoute = PainelRouteImport.update({
 const MedicoRoute = MedicoRouteImport.update({
   id: '/medico',
   path: '/medico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -268,6 +277,18 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -668,6 +689,12 @@ const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   path: '/agenda',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppOdontologiaIndexRoute =
   AuthenticatedAppOdontologiaIndexRouteImport.update({
     id: '/odontologia/',
@@ -973,12 +1000,15 @@ export interface FileRoutesByFullPath {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -991,6 +1021,7 @@ export interface FileRoutesByFullPath {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1118,12 +1149,15 @@ export interface FileRoutesByTo {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1135,6 +1169,7 @@ export interface FileRoutesByTo {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1261,12 +1296,15 @@ export interface FileRoutesById {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1279,6 +1317,7 @@ export interface FileRoutesById {
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/agenda-medicos': typeof AuthenticatedAppAgendaMedicosRoute
   '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1408,12 +1447,15 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/mcp'
     | '/medico'
     | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/app'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1426,6 +1468,7 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-medicos'
     | '/app/agenda-v2'
@@ -1553,12 +1596,15 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/mcp'
     | '/medico'
     | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1570,6 +1616,7 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
+    | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-medicos'
     | '/app/agenda-v2'
@@ -1695,12 +1742,15 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/mcp'
     | '/medico'
     | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_authenticated/app'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1713,6 +1763,7 @@ export interface FileRouteTypes {
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/agenda-medicos'
     | '/_authenticated/app/agenda-v2'
@@ -1842,12 +1893,15 @@ export interface RootRouteChildren {
   AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
+  McpRoute: typeof McpRoute
   MedicoRoute: typeof MedicoRoute
   PainelRoute: typeof PainelRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1858,6 +1912,7 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
@@ -1912,6 +1967,13 @@ declare module '@tanstack/react-router' {
       path: '/medico'
       fullPath: '/medico'
       preLoaderRoute: typeof MedicoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -2032,6 +2094,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app'
       preLoaderRoute: typeof AuthenticatedAppRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/': {
       id: '/_authenticated/app/'
@@ -2529,6 +2605,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/agenda'
       preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/odontologia/': {
       id: '/_authenticated/app/odontologia/'
@@ -3233,12 +3316,16 @@ const rootRouteChildren: RootRouteChildren = {
   AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
+  McpRoute: McpRoute,
   MedicoRoute: MedicoRoute,
   PainelRoute: PainelRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
@@ -3249,6 +3336,7 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,
