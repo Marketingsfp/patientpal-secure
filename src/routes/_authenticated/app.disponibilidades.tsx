@@ -85,6 +85,11 @@ const fmtTimeLocal = new Intl.DateTimeFormat("en-GB", {
 const toLocalDate = (v: Date | string) => fmtDateLocal.format(new Date(v));
 const toLocalTime = (v: Date | string) => fmtTimeLocal.format(new Date(v));
 
+// Normaliza "13:00:00" (formato do banco) e "13:00" (input da tela) para
+// HH:MM. Sem isso as comparações de texto entre os dois formatos erram
+// (ex.: "13:00" > "13:00:00" é falso, apesar de serem o mesmo horário).
+const hhmm = (v: string | null | undefined) => (v ? v.slice(0, 5) : "");
+
 interface Disp {
   id: string;
   medico_id: string;
@@ -560,17 +565,48 @@ function Page() {
     setDisps((xs) => xs.filter((x) => x.id !== id));
   };
 
-  // Pré-visualização dos slots gerados
-  const slotsPreview = useMemo(() => {
+  // Pré-visualização dos slots gerados.
+  // Além dos horários, devolve os dias em que NADA foi gerado porque a data
+  // já tinha fichas criadas depois da janela pedida (o "piso") — a tela usa
+  // isso para explicar o motivo em vez de mostrar só "~0 horários".
+  const geracaoPreview = useMemo(() => {
     type Slot = { data: string; medico_id: string; agenda_id: string; inicio: string; fim: string };
-    if (!gerar.data_inicio || !gerar.data_fim) return [] as Slot[];
+    type BloqueioPiso = { data: string; piso: string; janelaFim: string };
+    const vazio = { slots: [] as Slot[], bloqueiosPorPiso: [] as BloqueioPiso[] };
+    if (!gerar.data_inicio || !gerar.data_fim) return vazio;
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
     const fimD = new Date(`${gerar.data_fim}T00:00:00`);
-    if (fimD < ini) return [] as Slot[];
+    if (fimD < ini) return vazio;
     const dias = Math.floor((fimD.getTime() - ini.getTime()) / 86400000) + 1;
     const alvo =
       gerar.medico_id === "all" ? medicos : medicos.filter((m) => m.id === gerar.medico_id);
+    const overrideIni = hhmm(gerar.hora_inicio);
+    const overrideFim = hhmm(gerar.hora_fim);
+    // A janela digitada na tela só vale como bloco próprio quando as duas
+    // pontas foram preenchidas e fazem sentido entre si.
+    const janelaManual = Boolean(overrideIni && overrideFim && overrideIni < overrideFim);
+    const blocoAvulso = (
+      medicoId: string,
+      agendaId: string,
+      dow: number,
+      hi: string,
+      hf: string,
+      modelo?: DispRow,
+    ): DispRow => ({
+      id: `__default_${medicoId}_${dow}`,
+      medico_id: medicoId,
+      agenda_id: agendaId,
+      dia_semana: dow,
+      hora_inicio: hi,
+      hora_fim: hf,
+      observacoes: null,
+      limite_pacientes: modelo?.limite_pacientes ?? null,
+      intervalo_min: modelo?.intervalo_min ?? null,
+      vigencia_inicio: null,
+      vigencia_fim: null,
+    });
     const out: Slot[] = [];
+    const bloqueiosPorPiso: BloqueioPiso[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini);
       d.setDate(d.getDate() + i);
@@ -596,48 +632,60 @@ function Page() {
           );
           const fallbackDur =
             m.duracao_consulta_min && m.duracao_consulta_min > 0 ? m.duracao_consulta_min : 15;
-          // Fallback: se o médico não tem disponibilidade semanal cadastrada para o dia,
-          // gera um bloco padrão 08:00–17:00 para que o usuário consiga criar a agenda
-          // mesmo sem configurar a disponibilidade semanal antes.
-          const overrideIni = gerar.hora_inicio || "";
-          const overrideFim = gerar.hora_fim || "";
-          const baseDs =
-            ds.length > 0
-              ? ds
-              : [
-                  {
-                    id: `__default_${m.id}_${dow}`,
-                    medico_id: m.id,
-                    agenda_id: ag.id ?? "",
-                    dia_semana: dow,
-                    hora_inicio: "08:00",
-                    hora_fim: "17:00",
-                    observacoes: null,
-                    limite_pacientes: null,
-                    intervalo_min: null,
-                    vigencia_inicio: null,
-                    vigencia_fim: null,
-                  } as DispRow,
-                ];
-          // Aplica filtros/overrides de horário e intervalo do formulário
-          const dsEfetivo = baseDs
+          // A geração de um dia segue esta ordem:
+          // 1) a disponibilidade semanal cadastrada, recortada pelos horários
+          //    digitados na tela;
+          // 2) se não sobrar nada — o médico não tem disponibilidade nesse dia,
+          //    a janela digitada cai fora dela, ou o que sobrou já está tomado
+          //    por fichas existentes — vale a janela digitada na tela;
+          // 3) se também não houver janela digitada, um bloco padrão 08:00–17:00.
+          const blocosDaDisp = ds
             .map((x) => {
-              const hiOverride = overrideIni
-                ? overrideIni > x.hora_inicio
-                  ? overrideIni
-                  : x.hora_inicio
-                : x.hora_inicio;
-              // Se já existem slots criados nessa data para esse médico/agenda,
-              // a nova geração começa DEPOIS do último `fim` existente.
-              const hiComPiso = piso && piso > hiOverride ? piso : hiOverride;
-              const hf = overrideFim
-                ? overrideFim < x.hora_fim
-                  ? overrideFim
-                  : x.hora_fim
-                : x.hora_fim;
-              return { ...x, hora_inicio: hiComPiso, hora_fim: hf };
+              const hi0 = hhmm(x.hora_inicio);
+              const hf0 = hhmm(x.hora_fim);
+              const hi = overrideIni && overrideIni > hi0 ? overrideIni : hi0;
+              const hf = overrideFim && overrideFim < hf0 ? overrideFim : hf0;
+              return { ...x, hora_inicio: hi, hora_fim: hf };
             })
             .filter((x) => x.hora_inicio < x.hora_fim);
+          const blocosManuais = janelaManual
+            ? [blocoAvulso(m.id, ag.id ?? "", dow, overrideIni, overrideFim, ds[0])]
+            : [];
+          const padraoIni = overrideIni && overrideIni > "08:00" ? overrideIni : "08:00";
+          const padraoFim = overrideFim && overrideFim < "17:00" ? overrideFim : "17:00";
+          const blocosPadrao =
+            padraoIni < padraoFim
+              ? [blocoAvulso(m.id, ag.id ?? "", dow, padraoIni, padraoFim, ds[0])]
+              : [];
+          // Se já existem slots criados nessa data para esse médico/agenda,
+          // a nova geração começa DEPOIS do último `fim` existente, para não
+          // sobrepor ficha marcada nem embaralhar a numeração.
+          const aplicarPiso = (xs: DispRow[]) =>
+            xs
+              .map((x) => ({
+                ...x,
+                hora_inicio: piso && piso > x.hora_inicio ? piso : x.hora_inicio,
+              }))
+              .filter((x) => x.hora_inicio < x.hora_fim);
+          let blocos =
+            blocosDaDisp.length > 0
+              ? blocosDaDisp
+              : blocosManuais.length > 0
+                ? blocosManuais
+                : blocosPadrao;
+          let dsEfetivo = aplicarPiso(blocos);
+          if (dsEfetivo.length === 0 && blocosManuais.length > 0 && blocos !== blocosManuais) {
+            blocos = blocosManuais;
+            dsEfetivo = aplicarPiso(blocosManuais);
+          }
+          if (blocos.length > 0 && dsEfetivo.length === 0 && piso) {
+            bloqueiosPorPiso.push({
+              data: diaIso,
+              piso,
+              janelaFim: blocos.reduce((acc, x) => (x.hora_fim > acc ? x.hora_fim : acc), ""),
+            });
+            continue;
+          }
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
           const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
           let limiteDia: number;
@@ -683,8 +731,10 @@ function Page() {
         }
       }
     }
-    return out;
+    return { slots: out, bloqueiosPorPiso };
   }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
+
+  const slotsPreview = geracaoPreview.slots;
 
   // Menor duração (em minutos) entre os slots pré-visualizados — usada para
   // avisar quando a configuração gera vagas de 1–4 min (sobrepostas).
@@ -734,6 +784,49 @@ function Page() {
   const duracaoInvalida =
     duracaoInformada !== null && (Number.isNaN(duracaoInformada) || duracaoInformada < 5);
 
+  // Quando a estimativa dá zero, a tela precisa dizer POR QUE. Antes mostrava
+  // apenas "~0 horários" e o usuário não tinha como descobrir o que corrigir —
+  // o motivo mais comum é a data já ter fichas criadas depois da janela pedida.
+  const motivoSemHorarios = useMemo(() => {
+    if (slotsPreview.length > 0) return null;
+    if (!gerar.medico_id) return "Selecione um médico para ver a estimativa.";
+    if (!gerar.data_inicio || !gerar.data_fim) return "Preencha a data inicial e a data final.";
+    if (gerar.data_fim < gerar.data_inicio) return "A data final é anterior à data inicial.";
+    if (gerarDias.length === 0) return "Marque pelo menos um dia da semana.";
+    if (resumoGeracao.diasNoPeriodo === 0)
+      return "Nenhuma data do período cai nos dias da semana marcados. Domingos e feriados nunca recebem horários.";
+    const hi = hhmm(gerar.hora_inicio);
+    const hf = hhmm(gerar.hora_fim);
+    if (hi && hf && hi >= hf) return "A hora fim precisa ser maior que a hora início.";
+    if (duracaoInvalida) return "A duração de cada atendimento precisa ser de no mínimo 5 minutos.";
+    const bloqueio = geracaoPreview.bloqueiosPorPiso[0];
+    if (bloqueio) {
+      const [ano, mes, dia] = bloqueio.data.split("-");
+      const outros = geracaoPreview.bloqueiosPorPiso.length - 1;
+      return (
+        `Em ${dia}/${mes}/${ano} já existem horários criados até ${bloqueio.piso}, e os novos só entram depois do último horário do dia. Como a janela pedida termina às ${bloqueio.janelaFim}, não sobra espaço.` +
+        ` Coloque uma "Hora fim" depois de ${bloqueio.piso} ou escolha outra data.` +
+        (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
+      );
+    }
+    return "Nenhum horário cabe nessa configuração. Confira a hora início, a hora fim e a duração de cada atendimento.";
+  }, [
+    slotsPreview.length,
+    gerar.medico_id,
+    gerar.data_inicio,
+    gerar.data_fim,
+    gerar.hora_inicio,
+    gerar.hora_fim,
+    gerarDias,
+    resumoGeracao.diasNoPeriodo,
+    duracaoInvalida,
+    geracaoPreview.bloqueiosPorPiso,
+  ]);
+
+  // Dias que a geração vai pular por já terem fichas criadas depois da janela
+  // pedida — avisados na tela mesmo quando o restante do período gera normal.
+  const diasIgnoradosPorPiso = new Set(geracaoPreview.bloqueiosPorPiso.map((b) => b.data)).size;
+
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
   const cidadesDisponiveis = Array.from(
@@ -757,7 +850,7 @@ function Page() {
     }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) {
-      toast.error("Sem horários para gerar");
+      toast.error(motivoSemHorarios ?? "Sem horários para gerar");
       return;
     }
     if (duracaoInvalida) {
@@ -1205,9 +1298,15 @@ function Page() {
                       .
                     </>
                   ) : (
-                    "Selecione um médico e o período para ver a estimativa."
+                    motivoSemHorarios
                   )}
                 </p>
+                {slotsPreview.length > 0 && diasIgnoradosPorPiso > 0 && (
+                  <p className="mt-2 text-xs font-medium text-amber-600">
+                    {diasIgnoradosPorPiso} dia(s) do período não vão receber horários novos porque
+                    já têm fichas criadas depois do horário pedido.
+                  </p>
+                )}
               </section>
 
               {podeEscrever && (
