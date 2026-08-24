@@ -82,6 +82,8 @@ import { ResumoFormas } from "@/components/caixa/resumo-formas";
 import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
 import {
   saldoEsperadoGaveta,
+  saldoDeMovimentos,
+  SINAL_NO_SALDO,
   classificarDiferenca,
   totalConferido,
   statusCaixa,
@@ -390,6 +392,16 @@ const TIPO_LABEL: Record<MovTipo, string> = {
   estorno: "Estorno",
   reabertura: "Reabertura",
 };
+/**
+ * Sinal de EXIBIÇÃO de cada movimento nas tabelas e no comprovante: define a
+ * cor da linha e se o valor sai com "−" na frente. A abertura aparece como
+ * entrada porque é assim que o operador a lê no extrato.
+ *
+ * Para SOMAR o saldo de um caixa use `saldoDeMovimentos`/`SINAL_NO_SALDO` de
+ * `@/lib/caixa/fechamento`, onde a abertura vale zero — o troco não é receita
+ * do dia. Manter as duas contas separadas e nomeadas é o que impede o saldo de
+ * divergir do fechamento.
+ */
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1,
   suprimento: 1,
@@ -2064,10 +2076,7 @@ function Page() {
 
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
-    return minhasMovs.reduce((acc, m) => {
-      if (movEstornado(m)) return acc;
-      return acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0);
-    }, 0);
+    return saldoDeMovimentos(minhasMovs.filter((m) => !movEstornado(m)));
   }, [minhaSessao, minhasMovs, movEstornado]);
 
   const resumoTipos = useMemo(() => {
@@ -2296,8 +2305,7 @@ function Page() {
         mapa.set(dia, r);
       }
       const v = Number(m.valor || 0);
-      const sinal = TIPO_SINAL[m.tipo];
-      r.saldo += sinal * v;
+      r.saldo += (SINAL_NO_SALDO[m.tipo] ?? 0) * v;
       if (m.tipo === "recebimento" || m.tipo === "suprimento") {
         r.entradas += v;
         const bucket = bucketDeMov(m);
@@ -2426,16 +2434,14 @@ function Page() {
    * Medido na base: em 60 dias, 1 dia-operador tinha troco > 0 (11/08/2026,
    * R$ 110,00, que viraria uma falta fantasma de R$ 110,00).
    *
-   * Os demais tipos não precisam de filtro: fechamento e reabertura já têm
-   * TIPO_SINAL 0.
+   * A regra de "quanto cada tipo pesa no saldo" mora em `SINAL_NO_SALDO`, onde
+   * abertura, fechamento e reabertura valem zero — a mesma conta que o gestor
+   * usa em `calcSaldoSessao`.
    */
-  const saldoDoDiaFechamento = useMemo(() => {
-    const soma = movsDoDiaFechamento.reduce(
-      (acc, m) => (m.tipo === "abertura" ? acc : acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0)),
-      0,
-    );
-    return Number(soma.toFixed(2));
-  }, [movsDoDiaFechamento]);
+  const saldoDoDiaFechamento = useMemo(
+    () => saldoDeMovimentos(movsDoDiaFechamento),
+    [movsDoDiaFechamento],
+  );
   /**
    * Saldo líquido por forma de pagamento de um conjunto de movimentos.
    *
@@ -2537,13 +2543,17 @@ function Page() {
     return inicial;
   }, []);
 
-  // Calculo por sessao (todos)
+  /**
+   * Saldo calculado de uma sessão inteira — é o "calculado" que o gestor vê e
+   * grava ao fechar o caixa de outra pessoa, sozinho ou em lote.
+   *
+   * Usa a mesma conta de `saldoDoDiaFechamento`, via `saldoDeMovimentos`. Antes
+   * eram duas contas paralelas e esta somava a abertura: o mesmo caixa fechava
+   * com um valor pela mão da operadora e outro pela mão do gestor, e a
+   * diferença era exatamente o troco.
+   */
   const calcSaldoSessao = useCallback(
-    (sid: string) => {
-      return todosMovs
-        .filter((m) => m.sessao_id === sid)
-        .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
-    },
+    (sid: string) => saldoDeMovimentos(todosMovs.filter((m) => m.sessao_id === sid)),
     [todosMovs],
   );
 
@@ -2658,7 +2668,7 @@ function Page() {
       if (!s) continue;
       const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
       const b = get(s.user_id, nome, d);
-      b.calculado += TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+      b.calculado += (SINAL_NO_SALDO[m.tipo] ?? 0) * Number(m.valor || 0);
       if (m.tipo === "sangria") b.sangria += Number(m.valor || 0);
       if ((m.descricao ?? "").toLowerCase().includes("estorno")) b.estorno += Number(m.valor || 0);
     }
@@ -5978,11 +5988,7 @@ function Page() {
                 // com recebimentos na tela. Sessão fechada continua mostrando o
                 // valor gravado, que é o registro de auditoria daquele
                 // fechamento e não deve ser recalculado.
-                const saldoLiquido = Number(
-                  detalheMovs
-                    .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0)
-                    .toFixed(2),
-                );
+                const saldoLiquido = saldoDeMovimentos(detalheMovs);
                 const cards = [
                   {
                     key: "abertura",

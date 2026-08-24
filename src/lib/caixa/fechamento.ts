@@ -6,6 +6,53 @@
  * mas não no saldo esperado em espécie.
  */
 
+/**
+ * Tipos de movimento de caixa, e o peso de cada um no SALDO do caixa.
+ *
+ * A abertura vale ZERO aqui de propósito. O troco que a operadora encontra na
+ * gaveta ao abrir não é receita do dia: ele é conferido no quadro "Dinheiro na
+ * gaveta", que já o soma via `saldoInicial` em `saldoEsperadoGaveta`. Se
+ * entrasse também no saldo, seria contado duas vezes.
+ *
+ * Não confundir com o sinal usado para PINTAR cada linha da tabela de
+ * movimentos (verde/vermelho, com ou sem "−" na frente): lá a abertura é uma
+ * entrada e aparece positiva. São duas perguntas diferentes — "de que cor sai
+ * esta linha" e "quanto vale este caixa".
+ */
+export const SINAL_NO_SALDO: Record<string, 1 | -1 | 0> = {
+  abertura: 0,
+  suprimento: 1,
+  recebimento: 1,
+  sangria: -1,
+  despesa: -1,
+  fechamento: 0,
+  estorno: -1,
+  reabertura: 0,
+};
+
+/**
+ * Saldo de um conjunto de movimentos: entradas − saídas, arredondado.
+ *
+ * É a fonte única do "calculado" de um caixa, e existe porque havia duas contas
+ * paralelas fazendo isso com regras diferentes. Ao fechar o PRÓPRIO caixa, a
+ * abertura ficava de fora; ao fechar o caixa de OUTRA pessoa (ou fechar em
+ * lote), ela entrava. O mesmo caixa mostrava dois valores conforme quem
+ * fechasse, e a diferença era exatamente o troco de abertura — uma sobra
+ * fantasma. Aconteceu em 11/08/2026: caixa com R$ 10,00 de troco gravou
+ * R$ 100,00 no fechamento contra R$ 90,00 de movimento real.
+ *
+ * Movimento de tipo desconhecido vale zero, em vez de quebrar a conta.
+ */
+export function saldoDeMovimentos(
+  movs: Array<{ tipo: string; valor: number | string | null | undefined }>,
+): number {
+  const soma = movs.reduce(
+    (acc, m) => acc + (SINAL_NO_SALDO[m.tipo] ?? 0) * (Number(m.valor) || 0),
+    0,
+  );
+  return Number(soma.toFixed(2));
+}
+
 export interface ComposicaoGaveta {
   /** Troco/fundo informado na abertura do caixa. */
   saldoInicial: number;
