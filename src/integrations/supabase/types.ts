@@ -10308,6 +10308,16 @@ export type Database = {
         }
         Returns: Json
       }
+      painel_executivo_periodo: {
+        Args: {
+          p_ate: string
+          p_clinica: string
+          p_de: string
+          p_fim: string
+          p_ini: string
+        }
+        Returns: Json
+      }
       painel_grs_periodo: {
         Args: { p_clinica: string; p_fim: string; p_ini: string }
         Returns: {
