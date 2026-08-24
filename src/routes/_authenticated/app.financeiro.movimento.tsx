@@ -874,7 +874,11 @@ function Page() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    void salvarLancamento(false);
+    // O diálogo tem uma única ação de confirmação ("Salvar e imprimir"), então
+    // o submit — no clique ou no Enter — sempre grava e manda o recibo para a
+    // impressora. Se a impressão falhar, o lançamento já está gravado: o erro
+    // é tratado dentro de salvarLancamento e vira um aviso na tela.
+    void salvarLancamento(true);
   };
 
   /** Segunda via do recibo de um lançamento já gravado. Só monta o papel de
@@ -1640,17 +1644,15 @@ function Page() {
                   />
                 </div>
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => void salvarLancamento(true)}
-                  >
+                  {/* Ação única de propósito. Até 24/08 existiam dois botões
+                      aqui ("Salvar e imprimir" e, em destaque, "Salvar"); as
+                      atendentes clicavam no colorido da direita e o
+                      comprovante nunca saía. O botão que não imprime foi
+                      removido para que gravar e imprimir sejam sempre o mesmo
+                      gesto — inclusive pelo Enter, que cai no mesmo submit. */}
+                  <Button type="submit" disabled={saving}>
                     <Printer className="h-4 w-4 mr-2" />
                     {saving ? "Salvando..." : "Salvar e imprimir"}
-                  </Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Salvando..." : "Salvar"}
                   </Button>
                 </DialogFooter>
               </form>
