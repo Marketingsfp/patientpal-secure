@@ -2800,7 +2800,13 @@ function Page() {
       sangrias,
       despesas,
     };
-  }, [movsDoDiaFechamento, detalhePorFormaDosMovs, minhaSessao, dataFechamento, fechamentoCobreTudo]);
+  }, [
+    movsDoDiaFechamento,
+    detalhePorFormaDosMovs,
+    minhaSessao,
+    dataFechamento,
+    fechamentoCobreTudo,
+  ]);
 
   const esperadoGavetaFechamento = useMemo(
     () => saldoEsperadoGaveta(gavetaDoDiaFechamento),
