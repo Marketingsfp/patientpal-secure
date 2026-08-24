@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { hojeBR } from "@/lib/date-utils";
 
 /**
  * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
@@ -61,12 +62,31 @@ export interface PrintGRInput {
     forma_pagamento: string | null;
     parcelas: number | null;
     bandeira_cartao: string | null;
-    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+    detalhe?: Array<{
+      forma: string;
+      pago: number;
+      troco: number;
+      recebido: number;
+      /** Data (YYYY-MM-DD) em que a parcela foi recebida, quando diferente do dia da cobrança. */
+      data?: string;
+    }>;
   };
 }
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+/**
+ * Sufixo " (EM DD/MM/AAAA)" nas linhas do pagamento dividido, quando a parcela
+ * foi recebida em outro dia (entrada paga antes e registrada só agora). No dia
+ * da própria cobrança não imprime nada — seria ruído em toda guia normal.
+ */
+const dataParcelaTxt = (d: { data?: string }): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.data ?? "");
+  if (!m) return "";
+  if (d.data === hojeBR()) return "";
+  return ` (EM ${m[3]}/${m[2]}/${m[1]})`;
+};
 
 const fmtData = (iso: string) => {
   const d = new Date(iso);
@@ -854,7 +874,13 @@ async function printGuiaAtendimentoCore({
     if (formaResolvida) {
       // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
       let detalhe:
-        | Array<{ forma: string; pago: number; troco: number; recebido: number }>
+        | Array<{
+            forma: string;
+            pago: number;
+            troco: number;
+            recebido: number;
+            data?: string;
+          }>
         | undefined;
       if (formaResolvida === "misto" && obsResolvida) {
         const idx = obsResolvida.indexOf("Pagamento misto:");
@@ -876,13 +902,27 @@ async function printGuiaAtendimentoCore({
             .split(";")
             .map((s) => s.trim())
             .filter(Boolean);
-          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          const acc: Array<{
+            forma: string;
+            pago: number;
+            troco: number;
+            recebido: number;
+            data?: string;
+          }> = [];
           for (const p of partes) {
             const match = LABEL_TO_KEY.find(([re]) => re.test(p));
             if (!match) continue;
             const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
             if (!valMatch) continue;
-            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+            // "(recebido em DD/MM/AAAA)" — parcela paga em outro dia.
+            const dMatch = p.match(/recebido em (\d{2})\/(\d{2})\/(\d{4})/i);
+            acc.push({
+              forma: match[1],
+              pago: parseBRL(valMatch[1]),
+              troco: 0,
+              recebido: 0,
+              data: dMatch ? `${dMatch[3]}-${dMatch[2]}-${dMatch[1]}` : undefined,
+            });
           }
           if (acc.length > 0) detalhe = acc;
         }
@@ -1111,7 +1151,7 @@ async function printGuiaAtendimentoCore({
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return `<tr><td class="label">${esc(lbl)}${esc(dataParcelaTxt(d))}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
@@ -1395,7 +1435,14 @@ export interface PrintGRAgrupadaInput {
     forma_pagamento: string | null;
     parcelas: number | null;
     bandeira_cartao: string | null;
-    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+    detalhe?: Array<{
+      forma: string;
+      pago: number;
+      troco: number;
+      recebido: number;
+      /** Data (YYYY-MM-DD) em que a parcela foi recebida, quando diferente do dia da cobrança. */
+      data?: string;
+    }>;
   };
 }
 
@@ -1921,7 +1968,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return `<tr><td class="label">${esc(lbl)}${esc(dataParcelaTxt(d))}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
@@ -2120,7 +2167,14 @@ export interface PrintGRMensalidadeInput {
     forma_pagamento: string | null;
     parcelas: number | null;
     bandeira_cartao: string | null;
-    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+    detalhe?: Array<{
+      forma: string;
+      pago: number;
+      troco: number;
+      recebido: number;
+      /** Data (YYYY-MM-DD) em que a parcela foi recebida, quando diferente do dia da cobrança. */
+      data?: string;
+    }>;
   };
 }
 
@@ -2323,7 +2377,7 @@ async function printGuiaMensalidadeCore({
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return `<tr><td class="label">${esc(lbl)}${esc(dataParcelaTxt(d))}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
@@ -2484,7 +2538,14 @@ export interface PrintGRTaxaAdesaoInput {
     forma_pagamento: string | null;
     parcelas: number | null;
     bandeira_cartao: string | null;
-    detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+    detalhe?: Array<{
+      forma: string;
+      pago: number;
+      troco: number;
+      recebido: number;
+      /** Data (YYYY-MM-DD) em que a parcela foi recebida, quando diferente do dia da cobrança. */
+      data?: string;
+    }>;
   };
 }
 
@@ -2602,7 +2663,7 @@ async function printGuiaTaxaAdesaoCore({
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return `<tr><td class="label">${esc(lbl)}${esc(dataParcelaTxt(d))}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";
@@ -2854,7 +2915,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt =
             d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return `<tr><td class="label">${esc(lbl)}${esc(dataParcelaTxt(d))}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
         })
         .join("")
     : "";

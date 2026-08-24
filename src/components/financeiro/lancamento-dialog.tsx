@@ -62,7 +62,20 @@ export interface LancamentoSavedData {
   /** Data (YYYY-MM-DD) escolhida no diálogo — permite que quem chama repasse
    *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
   data: string;
-  pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
+  pagamentos_detalhe?: Array<{
+    forma: string;
+    pago: number;
+    troco: number;
+    recebido: number;
+    /** Data (YYYY-MM-DD) em que ESTA parcela foi recebida. Igual à data do
+     *  lançamento na esmagadora maioria dos casos; diferente quando a entrada
+     *  foi paga em outro dia e só está sendo registrada agora. */
+    data?: string;
+  }>;
+  /** Ids de TODOS os lançamentos gravados (o principal e, quando o pagamento
+   *  tem parcelas de outras datas, um por data). Serve para telas que precisam
+   *  estornar/auditar o pagamento inteiro, não só a parte de hoje. */
+  lancamentos_ids?: string[];
   /** false quando o usuário clicou apenas em "Salvar" (sem imprimir a guia). */
   imprimir?: boolean;
 }
@@ -97,6 +110,15 @@ interface Props {
   pacienteIdFixo?: string | null;
   /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
   categoriaFixaNome?: string;
+  /**
+   * Libera a data por parcela no pagamento dividido (padrão: liberado).
+   *
+   * Passe `false` em fluxos que gravam UM lançamento por atendimento a partir
+   * deste (cobrança agrupada de vários atendimentos, por exemplo): lá o
+   * pagamento é rateado depois, e mais de um lançamento na origem confundiria
+   * o rateio. Nesses casos todas as parcelas seguem a data do lançamento.
+   */
+  permiteParcelasEmOutrasDatas?: boolean;
   /** Orçamento com entrada (sinal): mostra Já pago / Pagando agora / Falta pagar. */
   resumoSaldo?: {
     total: number;
@@ -126,6 +148,7 @@ export function LancamentoDialog({
   initialFormaPagamento,
   pacienteIdFixo,
   categoriaFixaNome,
+  permiteParcelasEmOutrasDatas = true,
   resumoSaldo,
 }: Props) {
   const { clinicaAtual } = useClinica();
@@ -158,8 +181,17 @@ export function LancamentoDialog({
   const emAndamentoRef = useRef(false);
   const [valorRecebido, setValorRecebido] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
+  // Cada linha do pagamento dividido pode ter a SUA data de recebimento
+  // (`data`). Vazio = a data do lançamento (campo "Data" no topo). É isso que
+  // permite registrar hoje uma entrada que o paciente pagou dias atrás.
   const [pagamentos, setPagamentos] = useState<
-    Array<{ forma: string; recebido: string; bandeira?: string; parcelas?: string }>
+    Array<{
+      forma: string;
+      recebido: string;
+      bandeira?: string;
+      parcelas?: string;
+      data?: string;
+    }>
   >([{ forma: "dinheiro", recebido: "" }]);
   // ----- Desconto (apenas para gerente/admin/financeiro) -----
   const [descontoAtivo, setDescontoAtivo] = useState(false);
@@ -406,6 +438,36 @@ export function LancamentoDialog({
     transferencia: "Transferência",
     manual: "Manual",
   };
+  // ----- Datas por parcela ------------------------------------------------
+  // A data efetiva de uma linha é a dela; em branco, a do lançamento.
+  const dataDaLinha = (p: { data?: string }) => (p.data && p.data.trim() ? p.data : data);
+  const formatarDataBR = (iso: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+  };
+  // Linhas recebidas em data diferente da do lançamento — o dinheiro delas não
+  // passou pela gaveta de hoje, então elas não entram no caixa.
+  const totalOutrasDatas = linhasCalc.reduce(
+    (s, l, i) => (dataDaLinha(pagamentos[i]) !== data ? s + l.pago : s),
+    0,
+  );
+  const totalNaDataDoLancamento = Math.round((totalPagoMisto - totalOutrasDatas) * 100) / 100;
+  const temParcelaEmOutraData = pagamentoMisto && totalOutrasDatas > 0.004;
+  /** Texto de UMA linha do pagamento dividido, como aparece na observação. */
+  const descreverLinha = (i: number) => {
+    const p = pagamentos[i];
+    const { pago, troco } = linhasCalc[i];
+    const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+    if (p.forma === "dinheiro" && troco > 0) {
+      return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+    }
+    if (p.forma === "cartao_credito") {
+      const parc = Number(p.parcelas || 1) || 1;
+      const band = (p.bandeira ?? "").toUpperCase();
+      return `${base} (${band} ${parc}x)`;
+    }
+    return base;
+  };
 
   // Porta de entrada dos botões do rodapé: garante que só existe UMA gravação
   // em andamento por vez, do clique até a guia sair.
@@ -612,12 +674,31 @@ export function LancamentoDialog({
     let obsExtra = "";
     // Composição estruturada do pagamento (fonte de verdade para o caixa).
     // A observação em texto passa a ser apenas exibição / fallback legado.
-    let composicao: {
+    type Composicao = {
       versao: number;
       origem: string;
       troco: number;
       partes: Array<{ forma: string; valor: number }>;
-    } | null = null;
+    };
+    let composicao: Composicao | null = null;
+    // Valor que de fato entra HOJE (na data do lançamento) — é ele que vai
+    // para o caixa. Só difere do total quando o pagamento tem parcelas
+    // recebidas em outros dias.
+    let valorPrincipal = valorNum;
+    // Data do lançamento principal. É a do campo "Data"; só muda quando NENHUMA
+    // parcela foi recebida nesse dia (aí o principal passa a ser o lote da
+    // data mais recente, para o lançamento não nascer com uma data em que
+    // nada entrou).
+    let dataDoPrincipal = data;
+    // Parcelas recebidas em outras datas: cada uma vira um lançamento próprio,
+    // com a sua data de competência e SEM movimento de caixa.
+    let lotesExtras: Array<{
+      data: string;
+      valor: number;
+      forma: string | null;
+      obs: string;
+      composicao: Composicao;
+    }> = [];
     if (pagamentoMisto) {
       // Linhas com valor aplicado (compõem o total) e linhas só com troco
       // (dinheiro recebido acima do restante) — estas últimas não somam ao
@@ -656,6 +737,30 @@ export function LancamentoDialog({
         setSaving(false);
         return;
       }
+      // Data por parcela: nunca no futuro (dinheiro que ainda não entrou não é
+      // pagamento) e nunca vazia/malformada.
+      const hojeIso = hojeBR();
+      const dataInvalida = [...validIdx, ...trocoIdx].find(({ p }) => {
+        const d = dataDaLinha(p);
+        return !/^\d{4}-\d{2}-\d{2}$/.test(d) || d > hojeIso;
+      });
+      if (dataInvalida) {
+        toast.error(
+          "A data de cada parcela precisa ser válida e não pode ser futura — informe o dia em que o dinheiro foi recebido.",
+        );
+        setSaving(false);
+        return;
+      }
+      if (!permiteParcelasEmOutrasDatas) {
+        const foraDaData = [...validIdx, ...trocoIdx].find(({ p }) => dataDaLinha(p) !== data);
+        if (foraDaData) {
+          toast.error(
+            "Nesta cobrança todas as parcelas precisam ter a mesma data do lançamento. Para registrar um recebimento de outro dia, cobre um atendimento por vez.",
+          );
+          setSaving(false);
+          return;
+        }
+      }
       // Compara o valor APLICADO (líquido de troco) com o total — nunca o
       // valor bruto recebido, e independente da ordem das linhas.
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
@@ -664,53 +769,108 @@ export function LancamentoDialog({
         setSaving(false);
         return;
       }
-      composicao = {
-        versao: 1,
-        origem: "lancamento_dialog",
-        troco: Math.round(trocoMisto * 100) / 100,
-        partes: validIdx.map(({ p, i }) => ({
-          forma: p.forma,
-          valor: Math.round(linhasCalc[i].pago * 100) / 100,
-        })),
-      };
-      // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
-      // (evita marcar como "misto" quando na prática só houve uma forma).
-      if (validIdx.length === 1) {
-        const { p, i } = validIdx[0];
-        formaFinal = p.forma;
-        const { pago, troco } = linhasCalc[i];
-        if (p.forma === "dinheiro" && troco > 0) {
-          obsExtra = `Recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)}`;
-        } else if (p.forma === "cartao_credito") {
-          const parc = Number(p.parcelas || 1) || 1;
-          const band = (p.bandeira ?? "").toUpperCase();
-          obsExtra = `Cartão Crédito ${band} ${parc}x — ${formatBRL(pago)}`;
+      // ----- Lotes por data de recebimento -----------------------------
+      // Cada data vira um lançamento próprio. O lote da data do lançamento
+      // (campo "Data" no topo) é o PRINCIPAL: é ele que passa pelo caixa,
+      // imprime a guia e carrega o repasse. Os demais são recebimentos de
+      // outros dias — o dinheiro deles não passou pela gaveta de hoje, então
+      // entram só no histórico financeiro, com a data em que foram pagos.
+      const datasUsadas = Array.from(
+        new Set([...validIdx, ...trocoIdx].map(({ p }) => dataDaLinha(p))),
+      ).sort();
+      const dataPrincipal = datasUsadas.includes(data) ? data : datasUsadas[datasUsadas.length - 1];
+      const itensDaData = (d: string) => validIdx.filter(({ p }) => dataDaLinha(p) === d);
+      const trocosDaData = (d: string) => trocoIdx.filter(({ p }) => dataDaLinha(p) === d);
+
+      // Monta forma / observação / composição de UM lote. Com uma única data
+      // (o caso normal), o lote é o pagamento inteiro e o resultado é
+      // exatamente o que o diálogo já gravava antes desta função existir.
+      const descreverLote = (
+        itens: typeof validIdx,
+        trocos: typeof trocoIdx,
+      ): { valor: number; forma: string | null; obs: string; composicao: Composicao } => {
+        const valorLote =
+          Math.round(itens.reduce((s, { i }) => s + linhasCalc[i].pago, 0) * 100) / 100;
+        const trocoLote =
+          Math.round([...itens, ...trocos].reduce((s, { i }) => s + linhasCalc[i].troco, 0) * 100) /
+          100;
+        const comp: Composicao = {
+          versao: 1,
+          origem: "lancamento_dialog",
+          troco: trocoLote,
+          partes: itens.map(({ p, i }) => ({
+            forma: p.forma,
+            valor: Math.round(linhasCalc[i].pago * 100) / 100,
+          })),
+        };
+        let forma: string | null = null;
+        let obs = "";
+        // Lote com só 1 linha válida é gravado com aquela forma direta
+        // (evita marcar como "misto" quando na prática só houve uma forma).
+        if (itens.length === 1) {
+          const { p, i } = itens[0];
+          forma = p.forma;
+          const { pago, troco } = linhasCalc[i];
+          if (p.forma === "dinheiro" && troco > 0) {
+            obs = `Recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)}`;
+          } else if (p.forma === "cartao_credito") {
+            const parc = Number(p.parcelas || 1) || 1;
+            const band = (p.bandeira ?? "").toUpperCase();
+            obs = `Cartão Crédito ${band} ${parc}x — ${formatBRL(pago)}`;
+          }
+        } else {
+          forma = "misto";
+          obs = "Pagamento misto: " + itens.map(({ i }) => descreverLinha(i)).join("; ");
         }
-      } else {
+        // Troco de linhas de dinheiro que não aplicaram valor (excedente puro)
+        // — antes eram descartadas silenciosamente.
+        if (trocos.length > 0) {
+          const somaTroco = trocos.reduce((s, { i }) => s + linhasCalc[i].troco, 0);
+          obs += `${obs ? " " : ""}| Troco em dinheiro: ${formatBRL(somaTroco)} (recebido a mais)`;
+        }
+        return { valor: valorLote, forma, obs, composicao: comp };
+      };
+
+      const principal = descreverLote(itensDaData(dataPrincipal), trocosDaData(dataPrincipal));
+      dataDoPrincipal = dataPrincipal;
+      formaFinal = principal.forma;
+      obsExtra = principal.obs;
+      composicao = principal.composicao;
+      valorPrincipal = principal.valor;
+      lotesExtras = datasUsadas
+        .filter((d) => d !== dataPrincipal)
+        .map((d) => ({ data: d, ...descreverLote(itensDaData(d), trocosDaData(d)) }));
+
+      // Com parcelas de outras datas, o lançamento principal passa a
+      // representar o pagamento inteiro na guia: forma "misto" e a descrição
+      // completa (com as datas) na observação. A `composicao_pagamento` dele,
+      // que é o que o caixa lê, continua contendo SÓ o dinheiro de hoje.
+      if (lotesExtras.length > 0) {
         formaFinal = "misto";
-        obsExtra =
+        const textoCompleto =
           "Pagamento misto: " +
           validIdx
             .map(({ p, i }) => {
-              const { pago, troco } = linhasCalc[i];
-              const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
-              if (p.forma === "dinheiro" && troco > 0) {
-                return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
-              }
-              if (p.forma === "cartao_credito") {
-                const parc = Number(p.parcelas || 1) || 1;
-                const band = (p.bandeira ?? "").toUpperCase();
-                return `${base} (${band} ${parc}x)`;
-              }
-              return base;
+              const base = descreverLinha(i);
+              const dl = dataDaLinha(p);
+              return dl === data ? base : `${base} (recebido em ${formatarDataBR(dl)})`;
             })
             .join("; ");
-      }
-      // Troco de linhas de dinheiro que não aplicaram valor (excedente puro)
-      // — antes eram descartadas silenciosamente.
-      if (trocoIdx.length > 0) {
-        const somaTroco = trocoIdx.reduce((s, { i }) => s + linhasCalc[i].troco, 0);
-        obsExtra += `${obsExtra ? " " : ""}| Troco em dinheiro: ${formatBRL(somaTroco)} (recebido a mais)`;
+        const resumoDatas = lotesExtras
+          .map((l) => `${formatBRL(l.valor)} em ${formatarDataBR(l.data)}`)
+          .join(", ");
+        // O detalhe das formas já está em `textoCompleto`; de `principal.obs`
+        // só sobra o troco de linhas de dinheiro que não aplicaram valor.
+        const marcaTroco = "| Troco em dinheiro:";
+        const idxTroco = principal.obs.indexOf(marcaTroco);
+        const trocoAvulso = idxTroco >= 0 ? principal.obs.slice(idxTroco + 2) : "";
+        obsExtra = [
+          textoCompleto,
+          `Parcelas de outras datas (${resumoDatas}) lançadas na data em que foram recebidas — fora do caixa de hoje.`,
+          trocoAvulso,
+        ]
+          .filter(Boolean)
+          .join(" | ");
       }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
@@ -759,7 +919,14 @@ export function LancamentoDialog({
     // da primeira linha de crédito para os campos de topo do lançamento
     // (usados por relatórios e pela impressão da GR).
     const mistoCredito = pagamentoMisto
-      ? pagamentos.find((p) => p.forma === "cartao_credito" && Number(p.recebido || 0) > 0)
+      ? pagamentos.find(
+          (p) =>
+            p.forma === "cartao_credito" &&
+            Number(p.recebido || 0) > 0 &&
+            // Só as linhas do próprio lançamento principal: bandeira/parcelas
+            // de uma parcela paga em outro dia pertencem ao lançamento dela.
+            dataDaLinha(p) === dataDoPrincipal,
+        )
       : null;
     const bandeiraFinal = isCredito ? bandeiraCartao : (mistoCredito?.bandeira ?? null);
     const parcelasFinal = isCredito
@@ -774,7 +941,21 @@ export function LancamentoDialog({
     // próprio banco (zero janela de inconsistência).
     // -------------------------------------------------------------------
     const registraNoCaixa =
-      !!user?.id && (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+      !!user?.id && (valorPrincipal > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+
+    const descricaoFinal = (() => {
+      const desc = descricao.trim();
+      const nome = agPrefetch?.paciente_nome?.trim();
+      if (!nome) return desc;
+      const sep = " — ";
+      // Se já começa com o nome certo, mantém.
+      if (desc.toUpperCase().startsWith(nome.toUpperCase())) return desc;
+      // Se começa com outro nome (padrão "NOME — RESTO"), troca o prefixo.
+      const idx = desc.indexOf(sep);
+      if (idx > 0) return `${nome}${desc.slice(idx)}`;
+      // Caso contrário, prefixa o nome.
+      return desc ? `${nome}${sep}${desc}` : nome;
+    })();
 
     const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
@@ -782,21 +963,12 @@ export function LancamentoDialog({
       // Blindagem: quando o lançamento está vinculado a um agendamento,
       // garantimos que o nome do paciente presente na descrição seja o
       // do agendamento (evita herdar nome antigo do formulário).
-      descricao: (() => {
-        const desc = descricao.trim();
-        const nome = agPrefetch?.paciente_nome?.trim();
-        if (!nome) return desc;
-        const sep = " — ";
-        // Se já começa com o nome certo, mantém.
-        if (desc.toUpperCase().startsWith(nome.toUpperCase())) return desc;
-        // Se começa com outro nome (padrão "NOME — RESTO"), troca o prefixo.
-        const idx = desc.indexOf(sep);
-        if (idx > 0) return `${nome}${desc.slice(idx)}`;
-        // Caso contrário, prefixa o nome.
-        return desc ? `${nome}${sep}${desc}` : nome;
-      })(),
-      valor: Number(valor),
-      data,
+      descricao: descricaoFinal,
+      // Só o dinheiro recebido NA DATA deste lançamento. As parcelas pagas em
+      // outros dias viram lançamentos próprios logo abaixo — assim o total
+      // continua quitado sem inflar a receita (nem o caixa) de hoje.
+      valor: valorPrincipal,
+      data: dataDoPrincipal,
       status: "confirmado",
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
@@ -818,7 +990,7 @@ export function LancamentoDialog({
           user_id: user!.id,
           user_nome: (user!.user_metadata as { nome?: string } | null)?.nome ?? user!.email ?? null,
           tipo: tipo === "receita" ? "recebimento" : "despesa",
-          valor: Number(valor),
+          valor: valorPrincipal,
           descricao: descricao.trim(),
           forma_pagamento: formaFinal,
           // Lançamento retroativo cai no caixa do dia escolhido — não no
@@ -849,6 +1021,66 @@ export function LancamentoDialog({
       return;
     }
     const lancInserido: { id: string } = { id: rpcResult.lancamento_id };
+    // -------------------------------------------------------------------
+    // Parcelas recebidas em outras datas.
+    //
+    // Cada data vira um lançamento próprio, com a SUA data de competência e
+    // SEM movimento de caixa (`p_movimento: null`): aquele dinheiro entrou em
+    // outro dia — muitas vezes fora deste sistema — e não está na gaveta de
+    // hoje. Somar no caixa de hoje criaria uma sobra que ninguém consegue
+    // conferir no cupom impresso.
+    // -------------------------------------------------------------------
+    const lancamentosGravados: Array<{ id: string; valor: number }> = [
+      { id: lancInserido.id, valor: valorPrincipal },
+    ];
+    const lotesQueFalharam: string[] = [];
+    for (const lote of lotesExtras) {
+      const marcador = `Parcela recebida em ${formatarDataBR(lote.data)} e registrada em ${formatarDataBR(hojeBR())} junto da cobrança de ${formatarDataBR(dataDoPrincipal)} — não entra no caixa (o dinheiro não passou pela gaveta de hoje).`;
+      const pLote = {
+        ...pLancamento,
+        descricao: `${descricaoFinal} — parcela de ${formatarDataBR(lote.data)}`,
+        valor: lote.valor,
+        data: lote.data,
+        forma_pagamento: lote.forma,
+        // Bandeira/parcelas do topo pertencem ao lote principal; aqui só valem
+        // se a própria parcela foi em cartão de crédito.
+        bandeira_cartao:
+          lote.composicao.partes.length === 1 &&
+          lote.composicao.partes[0].forma === "cartao_credito"
+            ? (pagamentos.find((p) => dataDaLinha(p) === lote.data && p.forma === "cartao_credito")
+                ?.bandeira ?? null)
+            : null,
+        parcelas: null,
+        // A nota fiscal sai uma vez só, pelo lançamento principal.
+        emitir_nfse: false,
+        observacoes: [marcador, lote.obs].filter(Boolean).join(" | "),
+        composicao_pagamento: lote.composicao,
+      };
+      const { data: rpcLote, error: errLote } = await (
+        supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>
+      )("fn_registrar_lancamento_e_caixa", {
+        p_lancamento: pLote,
+        p_movimento: null,
+      });
+      const idLote = (rpcLote as { lancamento_id?: string } | null)?.lancamento_id;
+      if (errLote || !idLote) {
+        console.error("Falha ao gravar parcela de outra data:", errLote);
+        lotesQueFalharam.push(`${formatBRL(lote.valor)} de ${formatarDataBR(lote.data)}`);
+      } else {
+        lancamentosGravados.push({ id: idLote, valor: lote.valor });
+      }
+    }
+    if (lotesQueFalharam.length > 0) {
+      toast.error(
+        `Atenção: ${lotesQueFalharam.join(", ")} NÃO foi(ram) registrada(s). O atendimento está pago só em parte — lance a diferença no Financeiro.`,
+        { duration: 15000 },
+      );
+    }
+    const valorGravado =
+      Math.round(lancamentosGravados.reduce((s, l) => s + l.valor, 0) * 100) / 100;
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
@@ -898,7 +1130,7 @@ export function LancamentoDialog({
     // histórico de repasses fique rastreável e somável por consulta direta.
     let splitFalhou = false;
     try {
-      if (tipo === "receita" && lancInserido?.id && Number(valor) > 0) {
+      if (tipo === "receita" && lancInserido?.id && valorGravado > 0) {
         const splits: Array<{
           clinica_id: string;
           pagamento_id: string;
@@ -945,7 +1177,7 @@ export function LancamentoDialog({
                   reg.valor_fixo != null
                     ? Number(reg.valor_fixo)
                     : reg.percentual != null
-                      ? +((Number(valor) * Number(reg.percentual)) / 100).toFixed(2)
+                      ? +((valorGravado * Number(reg.percentual)) / 100).toFixed(2)
                       : 0;
                 splits.push({
                   clinica_id: clinicaAtual.clinica_id,
@@ -978,7 +1210,7 @@ export function LancamentoDialog({
             const vMed =
               m.tipo_repasse === "valor_fixo" && m.valor_repasse_padrao != null
                 ? Number(m.valor_repasse_padrao)
-                : +((Number(valor) * Number(m.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
+                : +((valorGravado * Number(m.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
             if (vMed > 0) {
               splits.push({
                 clinica_id: clinicaAtual.clinica_id,
@@ -996,7 +1228,7 @@ export function LancamentoDialog({
         }
         // 3) Linha residual da clínica (diferença entre total e somatório)
         const totalSplit = splits.reduce((s, x) => s + Number(x.valor || 0), 0);
-        const restoClinica = +(Number(valor) - totalSplit).toFixed(2);
+        const restoClinica = +(valorGravado - totalSplit).toFixed(2);
         if (restoClinica > 0) {
           splits.push({
             clinica_id: clinicaAtual.clinica_id,
@@ -1009,10 +1241,31 @@ export function LancamentoDialog({
             valor: restoClinica,
           });
         }
-        if (splits.length > 0) {
+        // Quando o pagamento virou mais de um lançamento (parcelas em datas
+        // diferentes), o repasse é calculado UMA vez sobre o total e depois
+        // rateado entre os lançamentos, na proporção do valor de cada um. A
+        // soma continua sendo o repasse cheio do atendimento — o que muda é
+        // que cada parte fica presa ao lançamento (e à data) a que pertence.
+        const splitsPorLancamento =
+          lancamentosGravados.length <= 1
+            ? splits
+            : splits.flatMap((s) => {
+                let acumulado = 0;
+                return lancamentosGravados
+                  .map((l, idx) => {
+                    const ultimo = idx === lancamentosGravados.length - 1;
+                    const parte = ultimo
+                      ? +(Number(s.valor) - acumulado).toFixed(2)
+                      : +((Number(s.valor) * l.valor) / valorGravado).toFixed(2);
+                    acumulado = +(acumulado + parte).toFixed(2);
+                    return { ...s, pagamento_id: l.id, valor: parte };
+                  })
+                  .filter((x) => Math.abs(x.valor) > 0.004);
+              });
+        if (splitsPorLancamento.length > 0) {
           const { error: errSplit } = await supabase
             .from("pagamento_splits")
-            .insert(splits as never);
+            .insert(splitsPorLancamento as never);
           if (errSplit) {
             console.error("Falha ao gravar splits:", errSplit);
             splitFalhou = true;
@@ -1035,7 +1288,11 @@ export function LancamentoDialog({
         { duration: 10000 },
       );
     } else {
-      toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+      toast.success(
+        lotesExtras.length > 0 && lotesQueFalharam.length === 0
+          ? `Quitado ${formatBRL(valorGravado)}. Entrou no caixa de hoje apenas ${formatBRL(valorPrincipal)} — o restante ficou lançado nas datas em que foi recebido.`
+          : `${tipo === "receita" ? "Receita" : "Despesa"} registrada`,
+      );
     }
     // Impressão do recibo: telas que possuem fluxo próprio de impressão
     // (guia de atendimento, carnê, etc.) tratam isso via onSavedWithData.
@@ -1059,8 +1316,9 @@ export function LancamentoDialog({
             (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null,
           pacienteNome,
           descricao,
-          valor: Number(valor),
-          data,
+          // Recibo do paciente: mostra o total quitado, não só a parte de hoje.
+          valor: valorGravado,
+          data: dataDoPrincipal,
           categoriaNome: categorias.find((c) => c.id === categoriaId)?.nome ?? null,
           contaNome: contas.find((c) => c.id === contaId)?.nome ?? null,
           formaPagamentoLabel: pagamentoMisto
@@ -1078,12 +1336,15 @@ export function LancamentoDialog({
     }
     const posSalvar = onSavedWithData?.({
       lancamento_id: lancInserido.id,
-      valor: Number(valor),
+      lancamentos_ids: lancamentosGravados.map((l) => l.id),
+      // Total efetivamente quitado (todas as datas) — é o que a guia de
+      // atendimento imprime e o que abate o saldo do orçamento.
+      valor: valorGravado,
       forma_pagamento: formaFinal,
       parcelas: parcelasFinal,
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
-      data,
+      data: dataDoPrincipal,
       imprimir,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
@@ -1092,6 +1353,7 @@ export function LancamentoDialog({
               pago: linhasCalc[i].pago,
               troco: linhasCalc[i].troco,
               recebido: Number(p.recebido || 0),
+              data: dataDaLinha(p),
             }))
             .filter((x) => x.forma && x.pago > 0)
         : undefined,
@@ -1550,6 +1812,50 @@ export function LancamentoDialog({
                           )}
                         </div>
                       </div>
+                      {permiteParcelasEmOutrasDatas && (
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-end">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Data em que foi paga</Label>
+                            <DateInputBR
+                              value={dataDaLinha(p)}
+                              onChange={(e) =>
+                                setPagamentos((xs) =>
+                                  xs.map((q, i) =>
+                                    i === idx ? { ...q, data: e.target.value } : q,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          {dataDaLinha(p) !== data && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setPagamentos((xs) =>
+                                  xs.map((q, i) => (i === idx ? { ...q, data: data } : q)),
+                                )
+                              }
+                            >
+                              Hoje
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {permiteParcelasEmOutrasDatas && dataDaLinha(p) > hojeBR() && (
+                        <p className="text-xs text-destructive">
+                          Data futura. Informe o dia em que o dinheiro foi realmente recebido.
+                        </p>
+                      )}
+                      {permiteParcelasEmOutrasDatas &&
+                        dataDaLinha(p) !== data &&
+                        dataDaLinha(p) <= hojeBR() && (
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            Recebida em {formatarDataBR(dataDaLinha(p))}: entra no histórico
+                            financeiro nessa data e <strong>não</strong> soma no caixa de hoje.
+                          </p>
+                        )}
                       {p.forma === "dinheiro" && trocoP > 0 && (
                         <div className="text-xs text-muted-foreground">
                           Troco: <strong>{formatBRL(trocoP)}</strong>
@@ -1644,6 +1950,23 @@ export function LancamentoDialog({
                   <p className="text-xs text-muted-foreground">
                     Troco total: {formatBRL(trocoMisto)}
                   </p>
+                )}
+                {temParcelaEmOutraData && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                    <div className="flex justify-between">
+                      <span>Entra no caixa de {formatarDataBR(data)}:</span>
+                      <strong className="tabular-nums">{formatBRL(totalNaDataDoLancamento)}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Recebido em outras datas (fora do caixa):</span>
+                      <strong className="tabular-nums">{formatBRL(totalOutrasDatas)}</strong>
+                    </div>
+                    <p className="mt-1">
+                      O atendimento fica quitado em {formatBRL(totalPagoMisto)}. As parcelas de
+                      outros dias são lançadas no financeiro com a data em que foram pagas, sem
+                      mexer no saldo do caixa de hoje.
+                    </p>
+                  </div>
                 )}
               </div>
             )}

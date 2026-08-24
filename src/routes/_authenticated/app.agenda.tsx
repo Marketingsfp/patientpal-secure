@@ -8125,6 +8125,12 @@ function AgendaPage() {
         initialFormaPagamento={pagamentoForma}
         agendamentoId={pagamentoAgId}
         resumoSaldo={saldoOrcResumo}
+        // Cobrança de um atendimento só: o pagamento pode ter parcelas pagas
+        // em outros dias (ex.: entrada dada semanas atrás). Na cobrança
+        // agrupada isso fica bloqueado — lá o valor é rateado depois entre os
+        // atendimentos do grupo, e mais de um lançamento na origem
+        // atrapalharia o rateio.
+        permiteParcelasEmOutrasDatas={pagamentoExtraIds.length === 0}
         aguardarImpressao
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
