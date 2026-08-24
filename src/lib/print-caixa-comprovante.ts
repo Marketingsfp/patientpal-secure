@@ -73,6 +73,28 @@ export interface ComprovanteCaixaInput {
   saldoInicial?: number;
   /** Esperado em espécie na gaveta (fechamento). */
   esperadoGaveta?: number;
+  /**
+   * Composição do dinheiro físico do turno, para o bloco "Dinheiro na gaveta".
+   *
+   * Antes o cupom trazia só o resultado (`esperadoGaveta`) numa linha discreta
+   * do bloco "Turno", enquanto o número grande do papel era o total do dia —
+   * que soma cartão e PIX e não tem relação com o que está na gaveta. Numa
+   * conferência de 22/08/2026 o total impresso foi R$ 6.526,89 e o dinheiro
+   * esperado em espécie era R$ 391,90 (2.841,90 recebidos menos 2.450,00 de
+   * sangria): quem contou a gaveta contra o número em destaque concluiu que o
+   * caixa não batia, quando ele batia com diferença zero.
+   *
+   * Com a conta aberta no papel — troco, entradas em espécie, suprimentos,
+   * sangrias e despesas — o valor a conferir na gaveta deixa de depender de
+   * quem lembra que cartão e PIX não passam por ela.
+   */
+  composicaoGaveta?: {
+    saldoInicial: number;
+    recebimentosDinheiro: number;
+    suprimentos: number;
+    sangrias: number;
+    despesas: number;
+  };
   /** Sangrias e suprimentos do turno (fechamento). */
   movimentos?: Array<{
     tipo: "sangria" | "suprimento";
@@ -204,6 +226,46 @@ function linhasPorForma(input: ComprovanteCaixaInput): LinhaForma[] {
   return out;
 }
 
+interface LinhaGaveta {
+  label: string;
+  /** Valor com sinal: positivo entra na gaveta, negativo sai dela. */
+  valor: number;
+}
+
+/**
+ * Linhas da conta do dinheiro em espécie. Sangria aparece mesmo zerada: é a
+ * subtração que explica por que a gaveta tem menos do que o total do dia, e
+ * some justamente do papel de quem nunca sangrou e por isso estranha a conta.
+ * As demais parcelas só entram quando existem, para o bloco não virar uma
+ * lista de zeros na bobina.
+ */
+function linhasGaveta(input: ComprovanteCaixaInput): LinhaGaveta[] {
+  const c = input.composicaoGaveta;
+  if (!c) return [];
+  const relevante = (v: number) => Math.abs(Number(v) || 0) > 0.005;
+  const out: LinhaGaveta[] = [];
+  if (relevante(c.saldoInicial)) out.push({ label: "Troco de abertura", valor: c.saldoInicial });
+  out.push({ label: "Recebido em dinheiro", valor: Number(c.recebimentosDinheiro) || 0 });
+  if (relevante(c.suprimentos)) out.push({ label: "Suprimentos", valor: c.suprimentos });
+  out.push({ label: "Sangrias (retiradas)", valor: -(Number(c.sangrias) || 0) });
+  if (relevante(c.despesas)) out.push({ label: "Despesas em espécie", valor: -c.despesas });
+  return out;
+}
+
+/** Esperado em espécie: o número informado manda; sem ele, soma a composição. */
+function esperadoEmEspecie(input: ComprovanteCaixaInput): number | undefined {
+  if (typeof input.esperadoGaveta === "number") return input.esperadoGaveta;
+  const c = input.composicaoGaveta;
+  if (!c) return undefined;
+  return (
+    (Number(c.saldoInicial) || 0) +
+    (Number(c.recebimentosDinheiro) || 0) +
+    (Number(c.suprimentos) || 0) -
+    (Number(c.sangrias) || 0) -
+    (Number(c.despesas) || 0)
+  );
+}
+
 /** Monta o HTML do comprovante — exportado para permitir pré-visualização. */
 export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string {
   const quando = input.quando ?? new Date();
@@ -222,12 +284,15 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
 
   const linhas: Array<{ label: string; valor: string; destaque?: boolean }> = [];
   if (isFech) {
+    // Os rótulos dizem "todas as formas" porque este total soma cartão e PIX,
+    // que não estão na gaveta. O valor conferível fisicamente é o do bloco
+    // "Dinheiro na gaveta".
     linhas.push({
-      label: "Saldo calculado pelo sistema",
+      label: "Total do dia calculado pelo sistema (todas as formas)",
       valor: fmtBRL(input.saldoCalculado ?? 0),
     });
     linhas.push({
-      label: "Valor conferido em caixa",
+      label: "Total do dia conferido (todas as formas)",
       valor: fmtBRL(input.valorInformado ?? input.valor),
     });
     linhas.push({
@@ -247,6 +312,10 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
   const totalEntradas = formasLinhas.reduce((s, l) => s + l.entradas, 0);
   const totalSaidas = formasLinhas.reduce((s, l) => s + l.saidas, 0);
   const totalSaldo = totalEntradas - totalSaidas;
+
+  const gavetaLinhas = isFech ? linhasGaveta(input) : [];
+  const esperadoGaveta = isFech ? esperadoEmEspecie(input) : undefined;
+  const temBlocoGaveta = gavetaLinhas.length > 0 && typeof esperadoGaveta === "number";
 
   const movs = isFech ? (input.movimentos ?? []) : [];
   const totalSup = movs
@@ -300,14 +369,31 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       ? `${secao80("Turno")}
        ${input.aberturaEm ? linha80("Início do turno", fmtDT(new Date(input.aberturaEm))) : ""}
        ${input.fechamentoEm ? linha80("Fim do turno", fmtDT(new Date(input.fechamentoEm))) : ""}
-       ${typeof input.saldoInicial === "number" ? linha80("Saldo inicial (troco)", fmtBRL(input.saldoInicial)) : ""}
-       ${typeof input.esperadoGaveta === "number" ? linha80("Esperado em espécie", fmtBRL(input.esperadoGaveta)) : ""}`
+       ${!temBlocoGaveta && typeof input.saldoInicial === "number" ? linha80("Saldo inicial (troco)", fmtBRL(input.saldoInicial)) : ""}
+       ${!temBlocoGaveta && typeof input.esperadoGaveta === "number" ? linha80("Esperado em espécie", fmtBRL(input.esperadoGaveta)) : ""}`
+      : "";
+
+    // Vem antes da conferência do dia porque é o único valor que a atendente
+    // confere contando: o total do dia, logo abaixo, inclui cartão e PIX.
+    const gavetaBlock = temBlocoGaveta
+      ? `${secao80("Dinheiro na gaveta (espécie)")}
+       ${gavetaLinhas
+         .map((l) =>
+           linha80(
+             l.label,
+             `${l.valor < 0 ? "− " : "+ "}${fmtBRL(Math.abs(l.valor))}`,
+             l.valor < 0,
+           ),
+         )
+         .join("")}
+       ${destaque80("Esperado na gaveta (só dinheiro)", fmtBRL(esperadoGaveta))}
+       <div class="nota">Conte a gaveta contra este valor. Cartões e PIX não passam pela gaveta.</div>`
       : "";
 
     const conferenciaBlock = isFech
-      ? `${secao80("Conferência do caixa")}
-       ${linha80("Saldo calculado pelo sistema", fmtBRL(input.saldoCalculado ?? 0))}
-       ${linha80("Valor conferido em caixa", fmtBRL(input.valorInformado ?? input.valor), true)}
+      ? `${secao80("Conferência do dia (todas as formas)")}
+       ${linha80("Total do dia calculado (com cartão e PIX)", fmtBRL(input.saldoCalculado ?? 0))}
+       ${linha80("Total do dia conferido (com cartão e PIX)", fmtBRL(input.valorInformado ?? input.valor), true)}
        ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}`
       : destaque80("Valor", fmtBRL(input.valor));
 
@@ -337,7 +423,8 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
              <td class="n">${esc(fmtNum(totalSaldo))}</td>
            </tr>
          </tfoot>
-       </table>`
+       </table>
+       <div class="nota">Entradas = bruto recebido na forma. Saldo = entradas − saídas.</div>`
       : "";
 
     const movsBlock = movs.length
@@ -437,6 +524,9 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
   .desc { font-size: 9.5px; line-height: 1.45; margin-top: 3px;
     white-space: pre-wrap; word-break: break-word; }
 
+  /* ---- nota explicativa curta abaixo de um bloco ---- */
+  .nota { font-size: 8px; line-height: 1.35; margin-top: 3px; font-style: italic; }
+
   /* ---- assinaturas ---- */
   .assinaturas { margin-top: 12px; }
   .sig { margin-top: 24px; }
@@ -467,8 +557,9 @@ ${CSS_TOOLBAR_80MM}`;
 
     ${identBlock}
     ${turnoBlock}
-    ${conferenciaBlock}
+    ${gavetaBlock}
     ${formasBlock}
+    ${conferenciaBlock}
     ${movsBlock}
     ${descBlock}
 
@@ -497,17 +588,36 @@ ${CSS_TOOLBAR_80MM}`;
       campos.push(campoA4("Início do turno", fmtDT(new Date(input.aberturaEm))));
     if (input.fechamentoEm)
       campos.push(campoA4("Fim do turno", fmtDT(new Date(input.fechamentoEm))));
-    if (typeof input.saldoInicial === "number")
+    // Sem o bloco da gaveta (comprovante antigo, sem composição informada)
+    // estes dois campos continuam sendo a única pista do dinheiro físico.
+    if (!temBlocoGaveta && typeof input.saldoInicial === "number")
       campos.push(campoA4("Saldo inicial (troco)", fmtBRL(input.saldoInicial)));
-    if (typeof input.esperadoGaveta === "number")
+    if (!temBlocoGaveta && typeof input.esperadoGaveta === "number")
       campos.push(campoA4("Esperado em espécie", fmtBRL(input.esperadoGaveta)));
   } else if (input.destinoNome) {
     campos.push(campoA4(rotuloDestino, input.destinoNome));
   }
 
+  /** Conta do dinheiro físico, aberta linha a linha, com o esperado em total. */
+  const gavetaSecao = temBlocoGaveta
+    ? `<div class="secao">
+        <div class="rot">Dinheiro na gaveta (espécie)</div>
+        ${gavetaLinhas
+          .map((l) =>
+            linhaValorA4(l.label, `${l.valor < 0 ? "− " : "+ "}${fmtBRL(Math.abs(l.valor))}`),
+          )
+          .join("")}
+        ${linhaValorA4("Esperado na gaveta (só dinheiro)", fmtBRL(esperadoGaveta), {
+          total: true,
+          destaque: true,
+          descricao: "Conte a gaveta contra este valor — cartões e PIX não passam por ela.",
+        })}
+      </div>`
+    : "";
+
   const valorBox = isFech
     ? `<div class="secao">
-        <div class="rot">Conferência do caixa</div>
+        <div class="rot">Conferência do dia (todas as formas)</div>
         ${linhas.map((l) => linhaValorA4(l.label, l.valor, { destaque: l.destaque })).join("")}
       </div>`
     : `<div class="valor-box">
@@ -520,7 +630,7 @@ ${CSS_TOOLBAR_80MM}`;
         <div class="rot">Por forma de pagamento (valores em R$)</div>
         <table class="formas">
           <thead>
-            <tr><th>Forma</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>
+            <tr><th>Forma</th><th>Entradas (bruto)</th><th>Saídas</th><th>Saldo</th></tr>
           </thead>
           <tbody>
             ${formasLinhas
@@ -570,13 +680,15 @@ ${CSS_TOOLBAR_80MM}`;
 
       <div class="titulo">${esc(titulo)}</div>
 
-      ${valorBox}
+      ${isFech ? "" : valorBox}
 
       <div class="grade">
         ${campos.join("")}
       </div>
 
+      ${gavetaSecao}
       ${formasSecao}
+      ${isFech ? valorBox : ""}
       ${movsSecao}
 
       ${

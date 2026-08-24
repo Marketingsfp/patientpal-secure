@@ -2321,8 +2321,8 @@ function Page() {
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
   }, [minhasMovs, partesDoMov, residualBucket, movEstornado]);
 
-  // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
-  // com o `<DateInputBR>` do modal de fechamento.
+  // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, o mesmo
+  // formato em que o dia do fechamento é comparado.
   const localYMD = (iso: string) => {
     const d = new Date(iso);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -2331,7 +2331,7 @@ function Page() {
   /**
    * Caixas de dias ANTERIORES que ficaram abertos.
    *
-   * O dia é comparado no fuso local (o mesmo do `<DateInputBR>` do fechamento),
+   * O dia é comparado no fuso local (o mesmo do fechamento),
    * nunca em UTC: às 21h de Brasília o UTC já virou o dia seguinte e o caixa de
    * hoje apareceria como pendente.
    */
@@ -2359,13 +2359,47 @@ function Page() {
   );
 
   /**
+   * Dias (YYYY-MM-DD) em que o caixa exibido tem movimento de dinheiro.
+   *
+   * Abertura, fechamento e reabertura ficam de fora: são marcos do próprio
+   * caixa, não dinheiro. Um caixa aberto e não usado tem esta lista vazia e
+   * continua podendo ser encerrado zerado.
+   */
+  const diasComMovimento = useMemo(() => {
+    const dias = new Set<string>();
+    for (const m of minhasMovs) {
+      if (m.id.startsWith("fin:")) continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
+      dias.add(localYMD(m.created_at));
+    }
+    return Array.from(dias).sort();
+  }, [minhasMovs]);
+
+  /**
+   * O caixa acumulou movimento em mais de um dia — então o fechamento cobre
+   * TODOS eles de uma vez.
+   *
+   * Fechar só um dia encerra a sessão inteira do mesmo jeito, e o movimento
+   * dos outros dias fica preso dentro de um caixa já fechado: fora do
+   * fechamento, fora do cupom e invisível na tela. Foi assim que o caixa de
+   * 19/08/2026 acabou fechado "no dia 18/08", com R$ 299,99 de movimento que
+   * nunca entrou em fechamento nenhum e uma diferença de R$ 1.554,00 que não
+   * existia.
+   */
+  const fechamentoCobreTudo = diasComMovimento.length > 1;
+
+  /**
    * Ao trocar de caixa, o modal de fechamento passa a sugerir o dia daquele
    * caixa — senão a atendente abriria o fechamento do caixa de ontem com a
    * data de hoje selecionada e veria uma grade vazia.
+   *
+   * A preferência é pelo último dia COM MOVIMENTO: num caixa que ficou aberto
+   * da véspera para hoje, o dia do dinheiro é o que importa, não o da abertura.
    */
   useEffect(() => {
-    if (diaSessaoAtiva) setDataFechamento(diaSessaoAtiva);
-  }, [diaSessaoAtiva]);
+    const dia = diasComMovimento[diasComMovimento.length - 1] ?? diaSessaoAtiva;
+    if (dia) setDataFechamento(dia);
+  }, [diasComMovimento, diaSessaoAtiva]);
 
   // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
   // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
@@ -2374,9 +2408,11 @@ function Page() {
     // não entram na conferência de fechamento — o dinheiro em gaveta não foi
     // afetado por elas.
     const reais = minhasMovs.filter((m) => !m.id.startsWith("fin:"));
-    if (!dataFechamento) return reais;
+    // Caixa com movimento em mais de um dia fecha inteiro, sem recorte por
+    // dia — ver `fechamentoCobreTudo`.
+    if (fechamentoCobreTudo || !dataFechamento) return reais;
     return reais.filter((m) => localYMD(m.created_at) === dataFechamento);
-  }, [minhasMovs, dataFechamento]);
+  }, [minhasMovs, dataFechamento, fechamentoCobreTudo]);
   /**
    * Saldo do dia no escopo da conferência: exatamente os mesmos movimentos que
    * porFormaDoDiaFechamento distribui por forma de pagamento.
@@ -2727,6 +2763,78 @@ function Page() {
   const esperadoGaveta = useMemo(() => saldoEsperadoGaveta(gavetaSessaoAtual), [gavetaSessaoAtual]);
 
   /**
+   * Composição da gaveta do DIA que está sendo fechado — a mesma janela de
+   * `detalheDoDiaFechamento`, não a do turno inteiro.
+   *
+   * `gavetaSessaoAtual` serve à tela (limite de sangria, quadro do turno) e
+   * cobre sempre o turno inteiro. No comprovante isso imprimiria a conta de um
+   * dia e a tabela por forma de outro. O troco só entra quando o dia fechado é
+   * o dia em que a sessão foi aberta — ou quando o fechamento cobre todos os
+   * dias do caixa; em qualquer outro caso ele não estava nesta gaveta.
+   */
+  const gavetaDoDiaFechamento = useMemo(() => {
+    // Só recebimento e estorno: sangria e despesa aparecem em linha própria da
+    // conta, e somá-las aqui as descontaria duas vezes.
+    const dinheiro = detalhePorFormaDosMovs(
+      movsDoDiaFechamento.filter((m) => m.tipo === "recebimento" || m.tipo === "estorno"),
+    ).dinheiro ?? { entradas: 0, saidas: 0 };
+    let suprimentos = 0;
+    let sangrias = 0;
+    let despesas = 0;
+    movsDoDiaFechamento.forEach((m) => {
+      const v = Number(m.valor || 0);
+      if (m.tipo === "suprimento") suprimentos += v;
+      else if (m.tipo === "sangria") sangrias += v;
+      else if (m.tipo === "despesa" && bucketDeMov(m) === "dinheiro") despesas += v;
+    });
+    // Quando o caixa fecha todos os seus dias de uma vez (`fechamentoCobreTudo`),
+    // o troco da abertura está na gaveta que está sendo conferida agora, mesmo
+    // que ela tenha sido aberta num dia anterior.
+    const abriuNoDiaFechado =
+      fechamentoCobreTudo ||
+      (!!minhaSessao?.aberto_em && localYMD(minhaSessao.aberto_em) === dataFechamento);
+    return {
+      saldoInicial: abriuNoDiaFechado ? Number(minhaSessao?.valor_abertura || 0) : 0,
+      recebimentosDinheiro: dinheiro.entradas - dinheiro.saidas,
+      suprimentos,
+      sangrias,
+      despesas,
+    };
+  }, [movsDoDiaFechamento, detalhePorFormaDosMovs, minhaSessao, dataFechamento, fechamentoCobreTudo]);
+
+  const esperadoGavetaFechamento = useMemo(
+    () => saldoEsperadoGaveta(gavetaDoDiaFechamento),
+    [gavetaDoDiaFechamento],
+  );
+
+  /** Mesma conta para o caixa de outra pessoa, fechado pelo gestor. */
+  const composicaoGavetaSessao = useCallback(
+    (sid: string, valorAbertura: number) => {
+      const movs = todosMovs.filter((m) => m.sessao_id === sid && !m.id.startsWith("fin:"));
+      const dinheiro = detalhePorFormaDosMovs(
+        movs.filter((m) => m.tipo === "recebimento" || m.tipo === "estorno"),
+      ).dinheiro ?? { entradas: 0, saidas: 0 };
+      let suprimentos = 0;
+      let sangrias = 0;
+      let despesas = 0;
+      movs.forEach((m) => {
+        const v = Number(m.valor || 0);
+        if (m.tipo === "suprimento") suprimentos += v;
+        else if (m.tipo === "sangria") sangrias += v;
+        else if (m.tipo === "despesa" && bucketDeMov(m) === "dinheiro") despesas += v;
+      });
+      return {
+        saldoInicial: Number(valorAbertura || 0),
+        recebimentosDinheiro: dinheiro.entradas - dinheiro.saidas,
+        suprimentos,
+        sangrias,
+        despesas,
+      };
+    },
+    [todosMovs, detalhePorFormaDosMovs],
+  );
+
+  /**
    * Total conferido no fechamento do próprio caixa: soma de TODAS as formas
    * de pagamento informadas na grade de conferência (dinheiro, PIX, cartões,
    * boleto, transferência, convênio...).
@@ -3007,10 +3115,28 @@ function Page() {
       );
       return;
     }
+    // Trava: o dia a fechar tem de ser um dia com movimento deste caixa.
+    // O campo do dia já é fixo na tela; esta é a segunda barreira, para o caso
+    // de o estado ficar defasado (o operador abre o modal, o caixa recebe um
+    // lançamento e a lista de dias muda embaixo dele). Sem ela, o fechamento
+    // grava calculado R$ 0,00 e joga o conferido inteiro na diferença.
+    if (diasComMovimento.length > 0 && !diasComMovimento.includes(dataFechamento)) {
+      toast.error(
+        `Este caixa não tem movimento no dia ${dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "escolhido"}. Feche a tela e abra o fechamento de novo.`,
+      );
+      return;
+    }
     const informado = totalConferidoOwn;
-    // Escopo por dia selecionado: fecha apenas os valores do dia escolhido.
+    // Escopo do fechamento: o dia do caixa, ou todos os dias dele quando ficou
+    // aberto de um dia para o outro (ver `fechamentoCobreTudo`).
     const saldoRef = saldoDoDiaFechamento;
     const diff = informado - saldoRef;
+    const rotuloDias = fechamentoCobreTudo
+      ? `dos dias ${diasComMovimento.join(" + ")}`
+      : `do dia ${dataFechamento}`;
+    const rotuloObs = fechamentoCobreTudo
+      ? `Dias ${diasComMovimento.join(" + ")}`
+      : `Dia ${dataFechamento}`;
     // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
     const hoje = new Date().toISOString().slice(0, 10);
     const fechadoEmISO =
@@ -3027,8 +3153,8 @@ function Page() {
         valor_fechamento_calculado: saldoRef,
         diferenca: diff,
         observacoes: obsFechamento
-          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}] ${obsFechamento}`
-          : `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}]`,
+          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[${rotuloObs}] ${obsFechamento}`
+          : `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[${rotuloObs}]`,
       })
       .eq("id", minhaSessao.id);
     if (!error) {
@@ -3039,7 +3165,7 @@ function Page() {
         tipo: "fechamento",
         valor: informado,
         created_at: fechadoEmISO,
-        descricao: `Fechamento do dia ${dataFechamento}. Calculado: ${fmt(saldoRef)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+        descricao: `Fechamento ${rotuloDias}. Calculado: ${fmt(saldoRef)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
       });
     }
     setSaving(false);
@@ -3072,14 +3198,17 @@ function Page() {
       saldoCalculado: saldoRef,
       valorInformado: informado,
       diferenca: diff,
-      descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
+      descricao: `Fechamento ${rotuloDias}${obsFinal ? " — " + obsFinal : ""}`,
       porForma,
       porFormaDetalhe,
       formato: formatoFechamento,
       aberturaEm: minhaSessao.aberto_em,
       fechamentoEm: fechadoEmISO,
-      saldoInicial: Number(minhaSessao.valor_abertura || 0),
-      esperadoGaveta,
+      // Conta da gaveta escopada ao dia fechado, para não divergir da tabela
+      // por forma impressa logo abaixo dela.
+      saldoInicial: gavetaDoDiaFechamento.saldoInicial,
+      esperadoGaveta: esperadoGavetaFechamento,
+      composicaoGaveta: gavetaDoDiaFechamento,
       movimentos: movsGaveta.map((m) => ({
         tipo: m.tipo,
         valor: m.valor,
@@ -3171,6 +3300,9 @@ function Page() {
       // comprovante do próprio operador. O que o gestor conferiu continua
       // registrado nas observações da sessão (`breakdownStr`).
       porFormaDetalhe: detalhePorFormaSessao(alvo.id),
+      aberturaEm: alvo.aberto_em,
+      fechamentoEm: fechadoEmISO,
+      composicaoGaveta: composicaoGavetaSessao(alvo.id, Number(alvo.valor_abertura || 0)),
     });
     void loadTodos();
     void load();
@@ -5063,30 +5195,30 @@ function Page() {
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
               <Label>Dia a fechar</Label>
-              <DateInputBR
-                value={dataFechamento}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => {
-                  const novo = e.target.value;
-                  setDataFechamento(novo);
-                  // Ao trocar o dia, pré-preenche a conferência com os valores
-                  // esperados daquele dia (o operador ajusta em seguida).
-                  // Mesmo escopo e mesma regra de `movsDoDiaFechamento` e
-                  // `porFormaDoDiaFechamento`: fora as despesas virtuais do
-                  // Financeiro (que não passam pela gaveta) e com sangria e
-                  // despesa abatendo o Dinheiro. Enquanto esta pré-carga tinha
-                  // regra própria — pulando sangria e despesa —, trocar o dia
-                  // reescrevia o campo Dinheiro com o valor bruto recebido e o
-                  // fechamento abria acusando uma sobra do tamanho da sangria.
-                  const reais = minhasMovs.filter((m) => !m.id.startsWith("fin:"));
-                  const filtrados = novo
-                    ? reais.filter((m) => localYMD(m.created_at) === novo)
-                    : reais;
-                  setConferidoOwn(conferenciaInicial(porFormaDosMovs(filtrados)));
-                }}
-              />
+              {/* Campo fixo, de propósito.
+                  Enquanto o dia era digitável, dava para encerrar o caixa
+                  apontando para um dia sem movimento nenhum: o calculado saía
+                  R$ 0,00, o conferido entrava inteiro e o sistema gravava uma
+                  diferença que nunca existiu — foi o que aconteceu com o caixa
+                  de 19/08/2026, fechado "no dia 18/08" com R$ 1.554,00 de
+                  falta fantasma. O dia agora vem do próprio movimento do
+                  caixa, e caixa com movimento em mais de um dia fecha todos
+                  juntos. */}
+              <div className="flex min-h-10 items-center rounded-md border bg-muted/40 px-3 py-2 text-sm font-semibold">
+                {diasComMovimento.length > 0
+                  ? diasComMovimento
+                      .map((d) => new Date(`${d}T00:00:00`).toLocaleDateString("pt-BR"))
+                      .join(" + ")
+                  : dataFechamento
+                    ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR")
+                    : "—"}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Só os movimentos deste dia serão considerados no fechamento.
+                {fechamentoCobreTudo
+                  ? `Este caixa tem movimento em ${diasComMovimento.length} dias e será fechado com todos eles juntos. Fechar um dia só encerraria o caixa do mesmo jeito e deixaria o resto do dinheiro preso dentro dele.`
+                  : diasComMovimento.length === 0
+                    ? "Este caixa não teve movimento. Ele será encerrado zerado."
+                    : "O dia vem do movimento deste caixa e não pode ser trocado."}
               </p>
             </div>
             {minhaSessao &&
