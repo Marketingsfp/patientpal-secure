@@ -1808,7 +1808,7 @@ function NovoContratoForm({
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
       // demais seguem mês a mês, cobrindo exatamente 12 meses até
-      // data_termino (data_inicio + 1 ano). Ex.: início 01/02/2026 →
+      // data_fim (data_inicio + 1 ano). Ex.: início 01/02/2026 →
       // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
       const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
@@ -2695,7 +2695,7 @@ function DetalheContrato({
       numero: string | number | null;
       convenio: string | null;
       data_inicio: string | null;
-      data_termino: string | null;
+      data_fim: string | null;
       status: string | null;
       parcelas: number;
       pagas: number;
@@ -3567,7 +3567,7 @@ function DetalheContrato({
     if (pacienteId) {
       const { data: antRows } = await supabase
         .from("contratos_assinatura")
-        .select("id, numero, status, data_inicio, data_termino, convenio_id, created_at")
+        .select("id, numero, status, data_inicio, data_fim, convenio_id, created_at")
         .eq("paciente_id", pacienteId)
         .neq("id", contrato.id)
         .order("created_at", { ascending: false });
@@ -3601,7 +3601,7 @@ function DetalheContrato({
             numero: c.numero ?? null,
             convenio: c.convenio_id ? (convMap[c.convenio_id] ?? null) : null,
             data_inicio: c.data_inicio ?? null,
-            data_termino: c.data_termino ?? null,
+            data_fim: c.data_fim ?? null,
             status: c.status ?? null,
             parcelas: counts[c.id]?.parcelas ?? 0,
             pagas: counts[c.id]?.pagas ?? 0,
@@ -5040,7 +5040,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             <TableCell className="font-mono text-xs">{c.numero ?? "—"}</TableCell>
                             <TableCell>{c.convenio ?? "—"}</TableCell>
                             <TableCell>{c.data_inicio ? fmtD(c.data_inicio) : "—"}</TableCell>
-                            <TableCell>{c.data_termino ? fmtD(c.data_termino) : "—"}</TableCell>
+                            <TableCell>{c.data_fim ? fmtD(c.data_fim) : "—"}</TableCell>
                             <TableCell>
                               {c.parcelas > 0 ? `${c.pagas}/${c.parcelas}` : "—"}
                             </TableCell>
