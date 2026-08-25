@@ -142,10 +142,15 @@ export const chatNina = createServerFn({ method: "POST" })
     if (!key) return { reply: "", error: "LOVABLE_API_KEY ausente" };
 
     const { supabase, userId } = context;
+    const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
+    if (await ninaDesativadaNaClinica(data.clinicaId)) {
+      return { reply: "", error: "A Nina está desativada nesta clínica." };
+    }
     const { assertMembership, contextoClinicaTexto, systemPromptNina } = await import(
       "@/lib/nina-contexto.server"
     );
     await assertMembership(supabase, userId, data.clinicaId);
+
     // Janela do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC), o
     // par `new Date()` + `setHours` fazia a Nina enxergar a agenda do dia
     // deslocada em 3 horas.
