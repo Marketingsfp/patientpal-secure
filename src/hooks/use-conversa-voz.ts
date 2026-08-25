@@ -67,7 +67,8 @@ export function useConversaVoz({ onFrase, idioma = "pt-BR" }: Opcoes) {
 
   const entregar = useCallback(() => {
     limparTimer();
-    const t = bufferRef.current.trim();
+    // Corrige nomes/jargão antes de entregar (ex.: "nine" → "Nina").
+    const t = corrigirFala(bufferRef.current);
     bufferRef.current = "";
     setParcial("");
     if (t.length > 1) onFraseRef.current(t);
@@ -82,6 +83,8 @@ export function useConversaVoz({ onFrase, idioma = "pt-BR" }: Opcoes) {
     }
     rec.continuous = true;
     rec.interimResults = true;
+    // Com várias hipóteses podemos escolher a que casa com o vocabulário da clínica.
+    rec.maxAlternatives = 4;
     rec.lang = idioma;
 
     rec.onresult = (e: any) => {
@@ -90,9 +93,16 @@ export function useConversaVoz({ onFrase, idioma = "pt-BR" }: Opcoes) {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const r = e.results[i];
-        if (r.isFinal) finalTxt += r[0].transcript;
-        else interim += r[0].transcript;
+        const alternativas: string[] = [];
+        for (let k = 0; k < (r.length ?? 1); k += 1) {
+          const alt = r[k]?.transcript;
+          if (alt) alternativas.push(alt);
+        }
+        const texto = r.isFinal ? melhorAlternativa(alternativas) : (alternativas[0] ?? "");
+        if (r.isFinal) finalTxt += texto;
+        else interim += texto;
       }
+
       if (finalTxt) bufferRef.current = `${bufferRef.current} ${finalTxt}`.trim();
       setParcial(`${bufferRef.current} ${interim}`.trim());
       limparTimer();
