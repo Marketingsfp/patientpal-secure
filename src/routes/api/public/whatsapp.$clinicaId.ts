@@ -91,8 +91,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 raw: msg,
               });
 
-              // Modo híbrido: Nina responde fora do horário humano (apenas texto)
-              if (tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
+              // Modo híbrido: Nina responde fora do horário humano (apenas texto).
+              // Se a clínica desligou a Nina (flag `nina_desativada`), não responde nada.
+              const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
+              const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
+              if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
+
                 try {
                   const reply = await gerarRespostaNina(params.clinicaId, body, from);
                   if (reply) {
