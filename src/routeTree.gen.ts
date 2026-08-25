@@ -13,6 +13,7 @@ import { Route as TotemRouteImport } from './routes/totem'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as MedicoRouteImport } from './routes/medico'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -180,6 +181,11 @@ const SignupRoute = SignupRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelRoute = PainelRouteImport.update({
@@ -1028,6 +1034,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1181,6 +1188,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1332,6 +1340,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/medico': typeof MedicoRoute
   '/painel': typeof PainelRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1487,6 +1496,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/medico'
     | '/painel'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1640,6 +1650,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/medico'
     | '/painel'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1790,6 +1801,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/medico'
     | '/painel'
+    | '/privacy'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1945,6 +1957,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MedicoRoute: typeof MedicoRoute
   PainelRoute: typeof PainelRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -2005,6 +2018,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel': {
@@ -3402,6 +3422,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MedicoRoute: MedicoRoute,
   PainelRoute: PainelRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

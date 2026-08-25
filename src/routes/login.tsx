@@ -217,6 +217,11 @@ function LoginPage() {
               </Button>
             </form>
           </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            <Link to="/privacy" className="hover:underline">
+              Política de Privacidade
+            </Link>
+          </p>
         </div>
       </div>
     </div>
