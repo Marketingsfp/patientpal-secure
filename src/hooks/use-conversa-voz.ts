@@ -24,11 +24,13 @@ type Reconhecimento = {
   abort: () => void;
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives: number;
   lang: string;
   onresult: ((e: any) => void) | null;
   onerror: ((e: any) => void) | null;
   onend: (() => void) | null;
 };
+
 
 function criarReconhecimento(): Reconhecimento | null {
   if (typeof window === "undefined") return null;
