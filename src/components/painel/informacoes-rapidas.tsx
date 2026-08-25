@@ -5,6 +5,9 @@ import {
   Bot,
   Clock,
   Loader2,
+  Mic,
+  MicOff,
+
   Search,
   Send,
   Sparkles,
@@ -26,8 +29,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClinica } from "@/hooks/use-clinica";
 import { getContextoClinica, chatNina } from "@/lib/nina.functions";
+import { toast } from "sonner";
 import { VoiceInput } from "@/components/voice-input";
+
+import { useConversaVoz, suportaConversaVoz } from "@/hooks/use-conversa-voz";
 import { falarNina, isNinaVozOn, pararNina, setNinaVozOn } from "@/lib/nina-voz";
+
 import { cn } from "@/lib/utils";
 
 type Medico = {
@@ -249,14 +256,25 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   const fim = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [voz, setVoz] = useState(false);
+  // Guarda a versão atual de `perguntar` para o reconhecimento de voz sempre
+  // chamar o estado mais recente da conversa.
+  const perguntarRef = useRef<(texto: string) => Promise<void>>(async () => {});
+  /** `parar()` da conversa por voz, para encerrar ao fechar o chat. */
+  const conversaRef = useRef<(() => void) | null>(null);
+
+
 
   useEffect(() => {
     setVoz(isNinaVozOn());
   }, []);
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80);
-    else pararNina();
+    else {
+      pararNina();
+      conversaRef.current?.();
+    }
   }, [open]);
+
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, loading]);
@@ -268,6 +286,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     if (!novo) pararNina();
   };
 
+  const conversa = useConversaVoz({
+    onFrase: (t) => void perguntarRef.current(t),
+  });
+
   const perguntar = async (texto: string) => {
     const t = texto.trim();
     if (!t || loading || !clinicaAtual) return;
@@ -276,13 +298,20 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     setMsgs(novas);
     setInput("");
     setLoading(true);
+    // Enquanto a Nina pensa e fala, o microfone fica silenciado para não
+    // captar a própria voz dela.
+    if (conversa.ativo) conversa.pausar();
     try {
       const r: any = await enviar({
-        data: { clinicaId: clinicaAtual.clinica_id, messages: novas.slice(-20) },
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          messages: novas.slice(-20),
+          modoVoz: conversa.ativo,
+        },
       });
       const resposta = r?.reply || r?.error || "Não consegui responder agora.";
       setMsgs([...novas, { role: "assistant", content: resposta }]);
-      if (voz) void falarNina(resposta);
+      if (voz || conversa.ativo) await falarNina(resposta);
     } catch {
       setMsgs([
         ...novas,
@@ -290,15 +319,39 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       ]);
     } finally {
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      if (conversa.ativo) conversa.retomar();
+      else setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
+  perguntarRef.current = perguntar;
+
+  conversaRef.current = conversa.parar;
+
+  const alternarConversa = () => {
+    if (conversa.ativo) {
+      conversa.parar();
+      pararNina();
+      return;
+    }
+    if (!suportaConversaVoz()) {
+      toast.error("Conversa por voz disponível no Chrome ou Edge.");
+      return;
+    }
+    setVoz(true);
+    setNinaVozOn(true);
+    conversa.iniciar();
+  };
+
+  useEffect(() => {
+    if (conversa.erro) toast.error(conversa.erro);
+  }, [conversa.erro]);
 
   const sugestoes = [
     "Qual o valor do ultrassom?",
     "Quais médicos atendem hoje?",
     "Horários da cardiologia",
   ];
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -308,21 +361,44 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             <SheetTitle className="flex items-center gap-2">
               <Bot className="h-4 w-4" /> Nina — assistente da clínica
             </SheetTitle>
-            <Button
-              type="button"
-              size="sm"
-              variant={voz ? "secondary" : "ghost"}
-              className="h-8 gap-1.5 text-[11px]"
-              onClick={alternarVoz}
-              title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
-              aria-label="Voz da Nina"
-            >
-              {voz ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
-              {voz ? "Voz ligada" : "Voz desligada"}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={conversa.ativo ? "default" : "outline"}
+                className="h-8 gap-1.5 text-[11px]"
+                onClick={alternarConversa}
+                title={
+                  conversa.ativo
+                    ? "Encerrar conversa por voz"
+                    : "Conversar por voz, sem apertar botões"
+                }
+              >
+                {conversa.ativo ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {conversa.ativo ? "Encerrar conversa" : "Modo conversa"}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant={voz ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                onClick={alternarVoz}
+                title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
+                aria-label="Voz da Nina"
+              >
+                {voz ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4 opacity-60" />
+                )}
+              </Button>
+            </div>
           </div>
           <SheetDescription>
-            Pergunte sobre valores, especialidades e horários dos médicos.
+            {conversa.ativo
+              ? "Fale normalmente — a Nina escuta, responde em voz alta e volta a ouvir."
+              : "Pergunte sobre valores, especialidades e horários dos médicos."}
+
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
@@ -369,8 +445,18 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Nina está pensando...
             </div>
           )}
+          {conversa.ativo && !loading && (
+            <div className="flex items-center gap-2 text-xs text-primary" aria-live="polite">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/70" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              {conversa.parcial || "Ouvindo... fale quando quiser"}
+            </div>
+          )}
           <div ref={fim} />
         </div>
+
         <form
           className="border-t border-slate-100 p-3 flex items-center gap-2"
           onSubmit={(e) => {

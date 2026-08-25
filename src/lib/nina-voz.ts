@@ -40,17 +40,21 @@ export function limparParaFala(texto: string): string {
     .trim();
 }
 
-function falarNativo(texto: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(texto);
-    u.lang = "pt-BR";
-    u.rate = 1;
-    window.speechSynthesis.speak(u);
-  } catch {
-    /* noop */
-  }
+function falarNativo(texto: string): Promise<void> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(texto);
+      u.lang = "pt-BR";
+      u.rate = 1.05;
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    } catch {
+      resolve();
+    }
+  });
 }
 
 /** Lê o texto em voz alta, com fallback para a voz do navegador. */
@@ -58,13 +62,14 @@ export async function falarNina(texto: string) {
   const t = limparParaFala(texto).slice(0, 1200);
   if (!t) return;
   if (!isUserTtsEnabled()) {
-    falarNativo(t);
+    await falarNativo(t);
     return;
   }
   let falhou = false;
   await speak(t, { onError: () => (falhou = true) });
-  if (falhou) falarNativo(t);
+  if (falhou) await falarNativo(t);
 }
+
 
 export function pararNina() {
   stopSpeaking();

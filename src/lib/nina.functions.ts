@@ -28,7 +28,10 @@ const ChatSchema = z.object({
     )
     .min(1)
     .max(40),
+  /** Modo conversa por voz: resposta curta e modelo mais rápido. */
+  modoVoz: z.boolean().optional(),
 });
+
 
 /**
  * Carrega contexto da clínica (médicos com horários + procedimentos) para
@@ -344,6 +347,10 @@ LIMITES:
 ${contextoTexto}
 === FIM DA BASE ===`;
 
+    const instrucaoVoz = data.modoVoz
+      ? `\n\n=== MODO CONVERSA POR VOZ ===\nA resposta será lida em voz alta. Responda em no máximo 3 frases curtas, em texto corrido, sem listas, sem tabelas, sem markdown e sem repetir a pergunta.`
+      : "";
+
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -351,10 +358,15 @@ ${contextoTexto}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: systemPrompt }, ...data.messages],
+        // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
+        model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt + instrucaoVoz },
+          ...data.messages,
+        ],
       }),
     });
+
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
