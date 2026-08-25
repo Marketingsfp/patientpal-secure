@@ -33,6 +33,7 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
+import { Route as ApiNinaFalaRouteImport } from './routes/api/nina-fala'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -278,6 +279,11 @@ const CheckinTokenRoute = CheckinTokenRouteImport.update({
 const ApiNinaVozRoute = ApiNinaVozRouteImport.update({
   id: '/api/nina-voz',
   path: '/api/nina-voz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNinaFalaRoute = ApiNinaFalaRouteImport.update({
+  id: '/api/nina-fala',
+  path: '/api/nina-fala',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -1029,6 +1035,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1180,6 +1187,7 @@ export interface FileRoutesByTo {
   '/totem': typeof TotemRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1331,6 +1339,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1485,6 +1494,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/app'
+    | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1636,6 +1646,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1786,6 +1797,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/app'
+    | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
@@ -1939,6 +1951,7 @@ export interface RootRouteChildren {
   TotemRoute: typeof TotemRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiNinaFalaRoute: typeof ApiNinaFalaRoute
   ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
@@ -2132,6 +2145,13 @@ declare module '@tanstack/react-router' {
       path: '/api/nina-voz'
       fullPath: '/api/nina-voz'
       preLoaderRoute: typeof ApiNinaVozRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nina-fala': {
+      id: '/api/nina-fala'
+      path: '/api/nina-fala'
+      fullPath: '/api/nina-fala'
+      preLoaderRoute: typeof ApiNinaFalaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -3389,6 +3409,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiNinaFalaRoute: ApiNinaFalaRoute,
   ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,

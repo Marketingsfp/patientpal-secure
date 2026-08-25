@@ -33,7 +33,16 @@ import { toast } from "sonner";
 import { VoiceInput } from "@/components/voice-input";
 
 import { useConversaVoz, suportaConversaVoz } from "@/hooks/use-conversa-voz";
-import { falarNina, isNinaVozOn, pararNina, setNinaVozOn } from "@/lib/nina-voz";
+import {
+  conversarComNina,
+  falarNina,
+  isNinaVozOn,
+  pararNina,
+  prepararAudioNina,
+  setNinaVozOn,
+} from "@/lib/nina-voz";
+import { supabase } from "@/integrations/supabase/client";
+
 
 import { cn } from "@/lib/utils";
 
@@ -302,6 +311,34 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     // captar a própria voz dela.
     if (conversa.ativo) conversa.pausar();
     try {
+      if (conversa.ativo || voz) {
+        // Caminho rápido: texto e voz no mesmo stream, então a Nina começa a
+        // falar já na primeira frase.
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          let parcial = "";
+          const r = await conversarComNina({
+            clinicaId: clinicaAtual.clinica_id,
+            messages: novas.slice(-20),
+            token,
+            onTexto: (acc) => {
+              parcial = acc;
+              setMsgs([...novas, { role: "assistant", content: acc }]);
+            },
+          });
+          const final = r.texto || parcial;
+          if (final) {
+            setMsgs([...novas, { role: "assistant", content: final }]);
+            if (!r.falou) await falarNina(final);
+            return;
+          }
+          if (r.erro) {
+            setMsgs([...novas, { role: "assistant", content: r.erro }]);
+            return;
+          }
+        }
+      }
       const r: any = await enviar({
         data: {
           clinicaId: clinicaAtual.clinica_id,
@@ -323,6 +360,7 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       else setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
+
   perguntarRef.current = perguntar;
 
   conversaRef.current = conversa.parar;
@@ -339,7 +377,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     }
     setVoz(true);
     setNinaVozOn(true);
+    // Libera o áudio dentro do clique: depois o navegador atrasaria o começo da fala.
+    void prepararAudioNina();
     conversa.iniciar();
+
   };
 
   useEffect(() => {
