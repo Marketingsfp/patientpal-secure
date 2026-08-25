@@ -260,6 +260,10 @@ function VozConfigPage() {
         </p>
       </div>
 
+      <NinaLigaDesliga />
+
+
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
