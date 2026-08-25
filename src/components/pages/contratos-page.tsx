@@ -21,8 +21,10 @@ import {
   AlertTriangle,
   Loader2,
   Info,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { IsencaoCarenciaLoteDialog } from "@/components/contratos/isencao-carencia-lote-dialog";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -408,6 +410,12 @@ export function ContratosPage({
   // /app/cartao-beneficios/contratos (módulo "cartao-beneficios") — cada
   // rota informa o módulo certo via prop, propagado aos componentes filhos.
   const podeEscrever = usePodeEscrever(modulo);
+  // Isenção de carência é decisão de Admin/Gestor — mesma regra da isenção
+  // individual, dentro do detalhe do contrato.
+  const podeIsentarCarencia = ["admin", "gestor"].includes(
+    (clinicaAtual?.role ?? "").toLowerCase(),
+  );
+  const [isencaoLoteOpen, setIsencaoLoteOpen] = useState(false);
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
@@ -952,6 +960,14 @@ export function ContratosPage({
         </h1>
         {podeEscrever && (
           <div className="flex items-center gap-2">
+            {/* Correção de migração: mesma permissão da isenção individual
+                (Admin/Gestor), porque é a mesma decisão, só que em lote. */}
+            {podeIsentarCarencia && (
+              <Button variant="outline" onClick={() => setIsencaoLoteOpen(true)}>
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                Isenção de carência (migrados)
+              </Button>
+            )}
             <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
               <Plus className="h-4 w-4 mr-2" />
               Vendas
@@ -1370,6 +1386,12 @@ export function ContratosPage({
           </div>
         ) : null}
       </div>
+
+      <IsencaoCarenciaLoteDialog
+        open={isencaoLoteOpen}
+        onOpenChange={setIsencaoLoteOpen}
+        onAplicado={() => load()}
+      />
 
       {/* Passo 1: pergunta "É renovação?" antes de abrir a nova venda */}
       <AlertDialog open={perguntaRenovOpen} onOpenChange={setPerguntaRenovOpen}>
