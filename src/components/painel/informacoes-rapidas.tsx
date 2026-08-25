@@ -33,7 +33,16 @@ import { toast } from "sonner";
 import { VoiceInput } from "@/components/voice-input";
 
 import { useConversaVoz, suportaConversaVoz } from "@/hooks/use-conversa-voz";
-import { falarNina, isNinaVozOn, pararNina, setNinaVozOn } from "@/lib/nina-voz";
+import {
+  conversarComNina,
+  falarNina,
+  isNinaVozOn,
+  pararNina,
+  prepararAudioNina,
+  setNinaVozOn,
+} from "@/lib/nina-voz";
+import { supabase } from "@/integrations/supabase/client";
+
 
 import { cn } from "@/lib/utils";
 
