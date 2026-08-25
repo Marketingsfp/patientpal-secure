@@ -28,7 +28,10 @@ const ChatSchema = z.object({
     )
     .min(1)
     .max(40),
+  /** Modo conversa por voz: resposta curta e modelo mais rápido. */
+  modoVoz: z.boolean().optional(),
 });
+
 
 /**
  * Carrega contexto da clínica (médicos com horários + procedimentos) para
