@@ -320,12 +320,33 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   };
   perguntarRef.current = perguntar;
 
+  conversaRef.current = conversa.parar;
+
+  const alternarConversa = () => {
+    if (conversa.ativo) {
+      conversa.parar();
+      pararNina();
+      return;
+    }
+    if (!suportaConversaVoz()) {
+      toast.error("Conversa por voz disponível no Chrome ou Edge.");
+      return;
+    }
+    setVoz(true);
+    setNinaVozOn(true);
+    conversa.iniciar();
+  };
+
+  useEffect(() => {
+    if (conversa.erro) toast.error(conversa.erro);
+  }, [conversa.erro]);
 
   const sugestoes = [
     "Qual o valor do ultrassom?",
     "Quais médicos atendem hoje?",
     "Horários da cardiologia",
   ];
+
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
