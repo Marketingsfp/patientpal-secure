@@ -170,6 +170,10 @@ const FORMA_LABEL: Record<string, string> = {
   convenio: "CONVÊNIO",
   convenio_gratuidade: "CONVÊNIO GRATUIDADE",
   transferencia: "TRANSFERÊNCIA",
+  // Transição de sistemas: o paciente pagou adiantado na Clínica Total e só
+  // agora fez o atendimento. A guia sai quitada, com a forma dizendo onde o
+  // dinheiro entrou — sem esta linha o rótulo sairia "PAGO_SISTEMA_ANTERIOR".
+  pago_sistema_anterior: "PAGO NO SISTEMA ANTERIOR",
 };
 
 // Número de vias da GR conforme a forma de pagamento:

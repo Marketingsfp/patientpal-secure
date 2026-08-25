@@ -5,6 +5,7 @@ import {
   categoriaZeraRepasse,
   classificarLiberacao,
   classificarForma,
+  ehPagoNoSistemaAnterior,
   formaCasaComFiltro,
   partesDoPagamentoMisto,
   filtroFormaPostgrest,
@@ -142,6 +143,28 @@ describe("classificarForma", () => {
     expect(classificarForma("CARTAO DEBITO MAESTRO")).toBe("debito");
   });
 
+  it("pagamento feito no sistema anterior tem balde próprio", () => {
+    // O paciente pagou adiantado na Clínica Total e só agora fez o
+    // atendimento. Não é importação (aquilo é `legado_cartao`): é digitado
+    // hoje, pela recepção, e não pode ser somado a nenhuma forma que a gaveta
+    // de hoje precise conferir.
+    expect(classificarForma("pago_sistema_anterior")).toBe("pago_sistema_anterior");
+    expect(classificarForma("PAGO NO SISTEMA ANTERIOR")).toBe("pago_sistema_anterior");
+    expect(classificarForma("Pago no sistema antigo")).toBe("pago_sistema_anterior");
+    expect(classificarForma("CLINICA TOTAL")).toBe("pago_sistema_anterior");
+    expect(ehPagoNoSistemaAnterior("pago_sistema_anterior")).toBe(true);
+    expect(ehPagoNoSistemaAnterior("dinheiro")).toBe(false);
+    expect(ehPagoNoSistemaAnterior(null)).toBe(false);
+  });
+
+  it("o texto do sistema anterior vence a forma citada dentro dele", () => {
+    // Um lançamento avulso digitado como "PAGO NO SISTEMA ANTERIOR (DINHEIRO)"
+    // cairia em `dinheiro` e voltaria a ser cobrado na conferência da gaveta —
+    // exatamente a sobra falsa que esta forma existe para evitar.
+    expect(classificarForma("PAGO NO SISTEMA ANTERIOR (DINHEIRO)")).toBe("pago_sistema_anterior");
+    expect(classificarForma("SISTEMA ANTERIOR - CARTAO VISA")).toBe("pago_sistema_anterior");
+  });
+
   it("trata ausência de forma como sem informação", () => {
     expect(classificarForma(null)).toBe("sem_informacao");
     expect(classificarForma("")).toBe("sem_informacao");
@@ -213,6 +236,17 @@ describe("filtros de forma", () => {
       expect(formaCasaComFiltro(f, "cartao")).toBe(true);
     }
     expect(formaCasaComFiltro("dinheiro", "cartao")).toBe(false);
+  });
+
+  it("o pagamento do sistema anterior não se mistura a nenhuma forma da gaveta", () => {
+    const f = "pago_sistema_anterior";
+    for (const filtro of ["dinheiro", "pix", "debito", "credito", "cartao", "legado"] as const) {
+      expect(formaCasaComFiltro(f, filtro)).toBe(false);
+    }
+    expect(formaCasaComFiltro(f, "pago_anterior")).toBe(true);
+    expect(formaCasaComFiltro("dinheiro", "pago_anterior")).toBe(false);
+    const expr = filtroFormaPostgrest("pago_anterior", false) ?? "";
+    expect(expr).toContain("pago_sistema_anterior%");
   });
 
   it("o recorte enviado ao banco busca cada bandeira só no filtro que a usa", () => {

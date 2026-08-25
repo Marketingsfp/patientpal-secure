@@ -38,6 +38,15 @@
  * O débito segue a mesma regra por coerência, embora na prática não mude o
  * dia a dia: MAESTRO, o débito do sistema antigo, não tem lançamento depois
  * de 02/06/2026 — débito não é parcelado.
+ *
+ * A virada de sistema deixou ainda um quarto caso, que não é importação: o
+ * paciente PAGOU ADIANTADO no sistema antigo (Clínica Total) e só agora vem
+ * fazer a consulta ou o exame. A recepção precisa liberar a guia hoje, e o
+ * médico precisa receber o repasse — mas o dinheiro entrou lá atrás, em outro
+ * sistema, e não está na gaveta de hoje. Esse pagamento tem forma própria
+ * (`pago_sistema_anterior`, ver `FORMA_PAGO_SISTEMA_ANTERIOR`), linha própria
+ * no relatório e, principalmente, NÃO gera movimento de caixa — senão o
+ * fechamento do dia acusaria uma sobra que ninguém consegue conferir.
  */
 
 export type FormaCanonica =
@@ -46,6 +55,7 @@ export type FormaCanonica =
   | "debito"
   | "credito"
   | "legado_cartao"
+  | "pago_sistema_anterior"
   | "boleto"
   | "transferencia"
   | "convenio"
@@ -59,6 +69,7 @@ export const LABEL_FORMA: Record<FormaCanonica, string> = {
   debito: "Cartão de Débito",
   credito: "Cartão de Crédito",
   legado_cartao: "Parcelas do sistema antigo",
+  pago_sistema_anterior: "Pago no sistema anterior",
   boleto: "Boleto",
   transferencia: "Transferência / Depósito",
   convenio: "Convênio / Gratuidade",
@@ -74,6 +85,7 @@ export const ORDEM_FORMAS: FormaCanonica[] = [
   "debito",
   "credito",
   "legado_cartao",
+  "pago_sistema_anterior",
   "boleto",
   "transferencia",
   "convenio",
@@ -111,6 +123,38 @@ const BANDEIRAS_LEGADO =
   /\b(maestro|electron|master|mastercard|visa|elo|american|amex|hipercard|diners)\b/;
 
 /**
+ * Valor gravado em `fin_lancamentos.forma_pagamento` quando o paciente pagou a
+ * consulta/exame ADIANTADO no sistema antigo (Clínica Total), antes da virada,
+ * e está fazendo o atendimento agora no sistema novo.
+ *
+ * Não confundir com `legado_cartao`: aquilo são parcelas IMPORTADAS do sistema
+ * antigo, gravadas pela migração. Esta forma é digitada hoje, pela recepção,
+ * num atendimento de hoje.
+ */
+export const FORMA_PAGO_SISTEMA_ANTERIOR = "pago_sistema_anterior";
+
+/** Rótulo mostrado ao operador e impresso na guia. */
+export const LABEL_PAGO_SISTEMA_ANTERIOR = "Pago no sistema anterior";
+
+/**
+ * Textos que significam "o dinheiro entrou no sistema antigo, não na gaveta de
+ * hoje". Casa tanto a chave que o sistema grava (`pago_sistema_anterior`)
+ * quanto variações digitadas à mão em lançamentos avulsos.
+ */
+const PAGO_NO_SISTEMA_ANTERIOR = /\bsistema (anterior|antigo)\b|\bclinica total\b/;
+
+/**
+ * true → o lançamento representa dinheiro recebido ANTES da virada de sistema.
+ *
+ * É a pergunta que decide se o valor pode entrar no caixa do dia: quem paga
+ * `true` aqui nunca gera movimento em `caixa_movimentos`, porque não há
+ * dinheiro correspondente na gaveta para a recepção conferir no fechamento.
+ */
+export function ehPagoNoSistemaAnterior(raw: string | null | undefined): boolean {
+  return classificarForma(raw) === "pago_sistema_anterior";
+}
+
+/**
  * Classifica qualquer texto de forma de pagamento em um único balde.
  *
  * A ordem dos testes importa: o TIPO escrito por extenso ("debito",
@@ -123,6 +167,11 @@ export function classificarForma(raw: string | null | undefined): FormaCanonica 
   const k = normalizar(raw);
   if (!k) return "sem_informacao";
   if (k === "misto") return "misto";
+  // Antes de qualquer outro teste: "PAGO NO SISTEMA ANTERIOR (DINHEIRO)",
+  // digitado assim num lançamento avulso, cairia em `dinheiro` e voltaria a
+  // ser cobrado na conferência da gaveta — que é exatamente o que esta forma
+  // existe para evitar.
+  if (PAGO_NO_SISTEMA_ANTERIOR.test(k)) return "pago_sistema_anterior";
   if (/\bdinheiro\b/.test(k) || /^caixa\b/.test(k) || /^cx\b/.test(k) || /\bespecie\b/.test(k)) {
     return "dinheiro";
   }
@@ -303,6 +352,7 @@ export type FiltroForma =
   | "credito"
   | "cartao"
   | "legado"
+  | "pago_anterior"
   | "boleto"
   | "sem";
 
@@ -319,6 +369,7 @@ const FILTRO_ACEITA: Record<Exclude<FiltroForma, "todos">, FormaCanonica[]> = {
   credito: ["credito"],
   cartao: ["debito", "credito", "legado_cartao"],
   legado: ["legado_cartao"],
+  pago_anterior: ["pago_sistema_anterior"],
   boleto: ["boleto", "transferencia"],
   sem: ["sem_informacao"],
 };
@@ -381,6 +432,14 @@ export function filtroFormaPostgrest(filtro: FiltroForma, incluirMisto: boolean)
       return [...credito, ...misto].join(",");
     case "legado":
       return legado.join(",");
+    case "pago_anterior":
+      return [
+        like("pago_sistema_anterior%"),
+        like("%sistema anterior%"),
+        like("%sistema antigo%"),
+        like("%clinica total%"),
+        like("%clínica total%"),
+      ].join(",");
     case "cartao":
       return [...debito, ...credito, ...legado, ...misto].join(",");
     case "boleto":

@@ -1841,6 +1841,7 @@ function Page() {
                 <SelectItem value="credito">Cartão crédito</SelectItem>
                 <SelectItem value="cartao">Cartão (qualquer)</SelectItem>
                 <SelectItem value="legado">Parcelas do sistema antigo</SelectItem>
+                <SelectItem value="pago_anterior">Pago no sistema anterior</SelectItem>
                 <SelectItem value="boleto">Boleto / Transferência</SelectItem>
                 <SelectItem value="sem">Sem informação</SelectItem>
               </SelectContent>

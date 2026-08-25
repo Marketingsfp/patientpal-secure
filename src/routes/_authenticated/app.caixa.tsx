@@ -90,6 +90,10 @@ import {
   STATUS_CAIXA_LABEL,
   STATUS_CAIXA_CLASS,
 } from "@/lib/caixa/fechamento";
+import {
+  FORMA_PAGO_SISTEMA_ANTERIOR,
+  LABEL_PAGO_SISTEMA_ANTERIOR,
+} from "@/lib/financeiro/formas-pagamento";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
@@ -908,12 +912,27 @@ function Page() {
   const [detalheMovs, setDetalheMovs] = useState<Mov[]>([]);
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
-  type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
+  /**
+   * Uma forma de pagamento da cobrança. `pagoEm`/`recibo` só valem para a
+   * forma "pago no sistema anterior" (transição da Clínica Total): guardam o
+   * dia em que o paciente pagou lá atrás e o número do recibo antigo, que é
+   * todo o rastro que liga esta guia àquele recebimento.
+   */
+  type LinhaPag = {
+    forma: string;
+    valor: string;
+    bandeira: string;
+    parcelas: string;
+    pagoEm?: string;
+    recibo?: string;
+  };
   const linhaVazia = (): LinhaPag => ({
     forma: "dinheiro",
     valor: "0",
     bandeira: "",
     parcelas: "1",
+    pagoEm: "",
+    recibo: "",
   });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
   /**
@@ -1826,7 +1845,10 @@ function Page() {
       valor: number;
       bandeira: string;
       parcelas: string;
+      pagoEm: string;
+      recibo: string;
     }> = [];
+    const hojeIso = new Date().toLocaleDateString("en-CA");
     for (const l of cobrancaLinhas) {
       const v = Number(l.valor) || 0;
       if (v <= 0) {
@@ -1837,11 +1859,32 @@ function Page() {
         toast.error("Selecione a bandeira do cartão em todas as linhas");
         return;
       }
+      // Pago adiantado na Clínica Total: sem a data ou o número do recibo
+      // antigo não sobra nada ligando a guia liberada agora ao dinheiro que
+      // entrou lá atrás — e este valor, de propósito, não aparece em nenhum
+      // movimento de caixa para ser conferido depois.
+      if (l.forma === FORMA_PAGO_SISTEMA_ANTERIOR) {
+        const pagoEm = (l.pagoEm ?? "").trim();
+        const recibo = (l.recibo ?? "").trim();
+        if (!pagoEm && !recibo) {
+          toast.error(
+            "Informe a data em que o paciente pagou no sistema anterior ou o número do recibo antigo.",
+            { duration: 8000 },
+          );
+          return;
+        }
+        if (pagoEm && (!/^\d{4}-\d{2}-\d{2}$/.test(pagoEm) || pagoEm > hojeIso)) {
+          toast.error("Data do pagamento no sistema anterior inválida ou no futuro.");
+          return;
+        }
+      }
       linhasValidadas.push({
         forma: l.forma,
         valor: v,
         bandeira: l.bandeira,
         parcelas: l.parcelas,
+        pagoEm: (l.pagoEm ?? "").trim(),
+        recibo: (l.recibo ?? "").trim(),
       });
     }
     if (linhasValidadas.length === 0) {
@@ -1909,6 +1952,22 @@ function Page() {
       // janela para lançamento órfão sem movimento correspondente.
       for (const l of linhasValidadas) {
         const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
+        // Pago adiantado no sistema anterior: o lançamento existe e confirma a
+        // quitação (a guia sai, o repasse é apurado), mas NÃO nasce movimento
+        // de caixa. O dinheiro entrou na Clínica Total, antes da virada, e não
+        // está na gaveta de hoje — somá-lo criaria uma sobra que a recepção
+        // nunca conseguiria conferir contra o cupom impresso.
+        const ehPagoAnterior = l.forma === FORMA_PAGO_SISTEMA_ANTERIOR;
+        const obsPagoAnterior = ehPagoAnterior
+          ? [
+              "PAGO NO SISTEMA ANTERIOR (Clínica Total) — atendimento quitado antes da virada de sistema",
+              l.pagoEm ? `Pago em ${l.pagoEm.split("-").reverse().join("/")}` : "",
+              l.recibo ? `Recibo anterior nº ${l.recibo}` : "",
+              "Não entra no caixa de hoje: o dinheiro foi recebido no sistema anterior. Repasse do prestador calculado normalmente.",
+            ]
+              .filter(Boolean)
+              .join(" — ")
+          : null;
         const { data: rpcData, error: rpcErr } = await supabase.rpc(
           "fn_registrar_lancamento_e_caixa",
           {
@@ -1920,18 +1979,21 @@ function Page() {
               data: hoje,
               status: "confirmado",
               forma_pagamento: l.forma,
+              observacoes: obsPagoAnterior,
               paciente_id: openCobranca.paciente_id,
               agendamento_id: openCobranca.id,
               medico_id: medicoId,
               criado_por: user.id,
             },
-            p_movimento: {
-              user_id: user.id,
-              tipo: "recebimento",
-              valor: l.valor,
-              descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}${sufixoConvenio}`,
-              forma_pagamento: l.forma,
-            },
+            p_movimento: ehPagoAnterior
+              ? null
+              : {
+                  user_id: user.id,
+                  tipo: "recebimento",
+                  valor: l.valor,
+                  descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}${sufixoConvenio}`,
+                  forma_pagamento: l.forma,
+                },
           },
         );
         if (rpcErr) throw rpcErr;
@@ -5773,7 +5835,19 @@ function Page() {
                         onValueChange={(v) =>
                           setCobrancaLinhas((prev) =>
                             prev.map((x, i) =>
-                              i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x,
+                              i === idx
+                                ? {
+                                    ...x,
+                                    forma: v,
+                                    bandeira: "",
+                                    parcelas: "1",
+                                    // Rastro do pagamento antigo só vale para
+                                    // a forma que o pede — trocar de forma
+                                    // não pode deixar data/recibo órfãos.
+                                    pagoEm: "",
+                                    recibo: "",
+                                  }
+                                : x,
                             ),
                           )
                         }
@@ -5787,6 +5861,12 @@ function Page() {
                           <SelectItem value="debito">Débito</SelectItem>
                           <SelectItem value="credito">Crédito</SelectItem>
                           <SelectItem value="boleto">Boleto</SelectItem>
+                          {/* Transição de sistemas: paciente já pagou na
+                              Clínica Total. Por último porque é exceção — e
+                              porque tira o valor do fechamento do dia. */}
+                          <SelectItem value={FORMA_PAGO_SISTEMA_ANTERIOR}>
+                            {LABEL_PAGO_SISTEMA_ANTERIOR}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -5802,6 +5882,48 @@ function Page() {
                       />
                     </div>
                   </div>
+                  {l.forma === FORMA_PAGO_SISTEMA_ANTERIOR && (
+                    <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2">
+                      <p className="text-[11px] text-amber-900">
+                        <strong>Já pago na Clínica Total.</strong> A guia é liberada e o repasse do
+                        prestador é apurado normalmente, mas este valor{" "}
+                        <strong>não entra no fechamento do caixa de hoje</strong>.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label>Pago em</Label>
+                          <DateInputBR
+                            value={l.pagoEm ?? ""}
+                            onChange={(e) =>
+                              setCobrancaLinhas((prev) =>
+                                prev.map((x, i) =>
+                                  i === idx ? { ...x, pagoEm: e.target.value } : x,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Nº do recibo anterior</Label>
+                          <Input
+                            value={l.recibo ?? ""}
+                            onChange={(e) =>
+                              setCobrancaLinhas((prev) =>
+                                prev.map((x, i) =>
+                                  i === idx ? { ...x, recibo: e.target.value } : x,
+                                ),
+                              )
+                            }
+                            placeholder="Ex.: 48213"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-amber-800">
+                        Preencha ao menos um dos dois — é o que liga esta guia ao recebimento feito
+                        no sistema antigo.
+                      </p>
+                    </div>
+                  )}
                   {(l.forma === "credito" || l.forma === "debito") && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>

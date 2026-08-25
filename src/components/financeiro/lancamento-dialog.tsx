@@ -33,6 +33,8 @@ import {
   categoriaEhSemCobranca,
   categoriaExigeAutorizacao,
   classificarLiberacao,
+  FORMA_PAGO_SISTEMA_ANTERIOR,
+  LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
 import { hojeBR } from "@/lib/date-utils";
 
@@ -191,6 +193,13 @@ export function LancamentoDialog({
   // checagem de estado e gravariam o pagamento duas vezes.
   const emAndamentoRef = useRef(false);
   const [valorRecebido, setValorRecebido] = useState("");
+  // ----- Pago no sistema anterior (transição Clínica Total) ---------------
+  // Rastro de auditoria do pagamento que aconteceu FORA deste sistema: em que
+  // dia o paciente pagou e qual o número do recibo antigo. Vão para a
+  // observação do lançamento — é o único vínculo entre a guia liberada hoje e
+  // o dinheiro que entrou no caixa do sistema velho.
+  const [pagoAnteriorData, setPagoAnteriorData] = useState("");
+  const [pagoAnteriorRecibo, setPagoAnteriorRecibo] = useState("");
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
   // Cada linha do pagamento dividido pode ter a SUA data de recebimento
   // (`data`). Vazio = a data do lançamento (campo "Data" no topo). É isso que
@@ -264,6 +273,8 @@ export function LancamentoDialog({
     setBandeiraCartao("");
     setParcelas("1");
     setValorRecebido("");
+    setPagoAnteriorData("");
+    setPagoAnteriorRecibo("");
     setPagamentoMisto(false);
     setPagamentos([{ forma: "dinheiro", recebido: "" }]);
     setEmitirNfse(false);
@@ -458,6 +469,17 @@ export function LancamentoDialog({
     setParcelas("1");
     setFormaPagamento("convenio_gratuidade");
   }, [open, ehCategoriaGratuidade]);
+  /**
+   * O paciente pagou este atendimento ADIANTADO, no sistema antigo, antes da
+   * virada. Consequências, todas nesta tela:
+   *   - o atendimento é gravado QUITADO pelo valor cheio, então a guia sai e o
+   *     repasse do prestador é calculado normalmente pela regra do
+   *     procedimento;
+   *   - nenhum movimento de caixa é criado: o dinheiro não está na gaveta de
+   *     hoje, e somá-lo criaria uma sobra falsa no fechamento;
+   *   - a tela pede o rastro do pagamento antigo (data e/ou recibo).
+   */
+  const ehPagoSistemaAnterior = !pagamentoMisto && formaPagamento === FORMA_PAGO_SISTEMA_ANTERIOR;
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro =
     formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
@@ -501,6 +523,7 @@ export function LancamentoDialog({
     convenio: "Convênio",
     transferencia: "Transferência",
     manual: "Manual",
+    [FORMA_PAGO_SISTEMA_ANTERIOR]: LABEL_PAGO_SISTEMA_ANTERIOR,
   };
   // ----- Datas por parcela ------------------------------------------------
   // A data efetiva de uma linha é a dela; em branco, a do lançamento.
@@ -580,6 +603,30 @@ export function LancamentoDialog({
     if (tipo === "receita" && !pagamentoMisto && !formaPagamento && !ehSemCobranca) {
       toast.error("Selecione a forma de pagamento.");
       return;
+    }
+    // ----- Pago no sistema anterior: exige rastro do pagamento antigo -------
+    // Este lançamento nasce quitado sem nenhum dinheiro entrando hoje. Sem a
+    // data do pagamento ou o número do recibo, não sobra nada que ligue a guia
+    // liberada agora ao recebimento feito lá atrás — e a conferência com o
+    // sistema antigo fica impossível. Basta um dos dois: quem tem o recibo em
+    // mãos nem sempre lembra a data, e quem confirmou pela listagem antiga nem
+    // sempre tem o número.
+    if (ehPagoSistemaAnterior) {
+      if (!pagoAnteriorData.trim() && !pagoAnteriorRecibo.trim()) {
+        toast.error(
+          "Informe a data em que o paciente pagou no sistema anterior ou o número do recibo antigo.",
+          { duration: 8000 },
+        );
+        return;
+      }
+      if (pagoAnteriorData && !/^\d{4}-\d{2}-\d{2}$/.test(pagoAnteriorData)) {
+        toast.error("Data do pagamento anterior inválida — use o formato DD/MM/AAAA.");
+        return;
+      }
+      if (pagoAnteriorData && pagoAnteriorData > hojeBR()) {
+        toast.error("A data do pagamento no sistema anterior não pode estar no futuro.");
+        return;
+      }
     }
     // Despesa sem categoria e sem conta cega a DRE e os relatórios: não dá
     // para responder "quanto gastei com o quê" nem "saiu de qual conta".
@@ -952,6 +999,24 @@ export function LancamentoDialog({
           .filter(Boolean)
           .join(" | ");
       }
+    } else if (ehPagoSistemaAnterior) {
+      // Rastro completo em uma linha só: o que aconteceu, quando, com qual
+      // recibo, e por que este valor não aparece na gaveta de hoje. É o texto
+      // que o financeiro lê quando cruza a guia de hoje com o caixa antigo.
+      obsExtra = [
+        "PAGO NO SISTEMA ANTERIOR (Clínica Total) — atendimento quitado antes da virada de sistema",
+        pagoAnteriorData ? `Pago em ${formatarDataBR(pagoAnteriorData)}` : "",
+        pagoAnteriorRecibo.trim() ? `Recibo anterior nº ${pagoAnteriorRecibo.trim()}` : "",
+        "Não entra no caixa de hoje: o dinheiro foi recebido no sistema anterior. Repasse do prestador calculado normalmente.",
+      ]
+        .filter(Boolean)
+        .join(" — ");
+      composicao = {
+        versao: 1,
+        origem: "lancamento_dialog",
+        troco: 0,
+        partes: [{ forma: FORMA_PAGO_SISTEMA_ANTERIOR, valor: Math.round(valorNum * 100) / 100 }],
+      };
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
       composicao = {
@@ -1034,8 +1099,18 @@ export function LancamentoDialog({
     // transação Postgres — se qualquer um falhar, ambos são revertidos pelo
     // próprio banco (zero janela de inconsistência).
     // -------------------------------------------------------------------
+    //
+    // `ehPagoSistemaAnterior` fica de fora do caixa pelo mesmo motivo das
+    // parcelas recebidas em outras datas, logo abaixo: o dinheiro entrou em
+    // outro dia e em outro sistema. Se entrasse aqui, o fechamento acusaria
+    // uma sobra do valor do atendimento — dinheiro que a recepção nunca
+    // encontraria na gaveta para conferir contra o cupom impresso. O
+    // lançamento financeiro continua existindo e confirmado, então o
+    // atendimento segue QUITADO e o repasse é calculado normalmente.
     const registraNoCaixa =
-      !!user?.id && (valorPrincipal > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+      !!user?.id &&
+      !ehPagoSistemaAnterior &&
+      (valorPrincipal > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
 
     const descricaoFinal = (() => {
       const desc = descricao.trim();
@@ -1811,6 +1886,10 @@ export function LancamentoDialog({
                       setParcelas("1");
                     }
                     if (v !== "dinheiro") setValorRecebido("");
+                    if (v !== FORMA_PAGO_SISTEMA_ANTERIOR) {
+                      setPagoAnteriorData("");
+                      setPagoAnteriorRecibo("");
+                    }
                   }}
                   disabled={pagamentoMisto || ehCategoriaGratuidade}
                 >
@@ -1832,6 +1911,13 @@ export function LancamentoDialog({
                     <SelectItem value="convenio">Convênio</SelectItem>
                     <SelectItem value="transferencia">Transferência</SelectItem>
                     <SelectItem value="manual">Manual</SelectItem>
+                    {/* Transição de sistemas: o paciente já pagou lá atrás, na
+                        Clínica Total. Fica por último porque é exceção, não
+                        rotina — e porque escolher por engano tira o valor do
+                        fechamento do dia. */}
+                    <SelectItem value={FORMA_PAGO_SISTEMA_ANTERIOR}>
+                      {LABEL_PAGO_SISTEMA_ANTERIOR}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1858,8 +1944,43 @@ export function LancamentoDialog({
                 )}
               </div>
             )}
-            {/* Não há o que dividir num total zerado — some da tela na gratuidade. */}
-            {!ehCategoriaGratuidade && (
+            {/* Pago adiantado no sistema antigo: a tela deixa claro o efeito no
+                caixa e recolhe o rastro do recebimento antigo. */}
+            {ehPagoSistemaAnterior && (
+              <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+                <p className="text-xs text-amber-900">
+                  <strong>Atendimento já pago na Clínica Total.</strong> A guia é liberada e o
+                  repasse do prestador é calculado normalmente, mas o valor{" "}
+                  <strong>não entra no fechamento do caixa de hoje</strong> — o dinheiro foi
+                  recebido no sistema anterior e não está na gaveta.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Data do pagamento anterior</Label>
+                    <DateInputBR
+                      value={pagoAnteriorData}
+                      onChange={(e) => setPagoAnteriorData(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Nº do recibo anterior</Label>
+                    <Input
+                      value={pagoAnteriorRecibo}
+                      onChange={(e) => setPagoAnteriorRecibo(e.target.value)}
+                      placeholder="Ex.: 48213"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  Preencha ao menos um dos dois — é o que liga esta guia ao recebimento feito no
+                  sistema antigo.
+                </p>
+              </div>
+            )}
+            {/* Não há o que dividir num total zerado — some da tela na gratuidade.
+                Também não há o que dividir num pagamento que já foi feito
+                inteiro, em outro sistema. */}
+            {!ehCategoriaGratuidade && !ehPagoSistemaAnterior && (
               <div className="flex items-center gap-2 rounded-md border p-3">
                 <Checkbox
                   id="pgto-misto"
