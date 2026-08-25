@@ -114,6 +114,9 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/lembretes": "financeiro",
   "/app/financeiro/movimento": "financeiro-movcaixa",
   "/app/financeiro/notas": "financeiro",
+  // "A Receber" acompanha o módulo de Atendimentos: quem cobra o atendimento
+  // é quem precisa enxergar e quitar o saldo devedor dele.
+  "/app/financeiro/pendencias": "financeiro-atendimentos",
   "/app/financeiro/regras-ia": "financeiro",
   "/app/financeiro/relatorios": "financeiro",
   "/app/configuracoes/nfse": "nfse",

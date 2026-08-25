@@ -120,8 +120,13 @@ interface Props {
    * o rateio. Nesses casos todas as parcelas seguem a data do lançamento.
    */
   permiteParcelasEmOutrasDatas?: boolean;
-  /** Orçamento com entrada (sinal): mostra Já pago / Pagando agora / Falta pagar. */
+  /**
+   * Pagamento com saldo: mostra Total / Já pago / Pagando agora / Falta pagar.
+   * Usado tanto pelo orçamento com entrada (sinal) quanto pelo pagamento
+   * parcial de um atendimento comum — daí o `titulo` ser variável.
+   */
   resumoSaldo?: {
+    titulo?: string;
     total: number;
     pago: number;
     restante: number;
@@ -1480,7 +1485,9 @@ export function LancamentoDialog({
             </div>
             {resumoSaldo && (
               <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-1">
-                <div className="font-medium">Orçamento com entrada — pagamento parcelado</div>
+                <div className="font-medium">
+                  {resumoSaldo.titulo ?? "Orçamento com entrada — pagamento parcelado"}
+                </div>
                 {resumoSaldo.itens && resumoSaldo.itens.length > 0 && (
                   <div className="divide-y rounded-md border bg-background">
                     {resumoSaldo.itens.map((it) => (
@@ -1521,8 +1528,8 @@ export function LancamentoDialog({
                 </div>
                 {valorNum > resumoSaldo.restante + 0.004 && (
                   <p className="text-xs text-destructive">
-                    O valor informado é maior que o saldo do orçamento. O excedente (
-                    {formatBRL(valorNum - resumoSaldo.restante)}) não será abatido do orçamento.
+                    O valor informado é maior que o saldo em aberto. O excedente (
+                    {formatBRL(valorNum - resumoSaldo.restante)}) não será abatido do saldo.
                   </p>
                 )}
               </div>

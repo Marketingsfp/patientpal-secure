@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Undo2,
   Stethoscope,
+  HandCoins,
 } from "lucide-react";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
@@ -29,6 +30,7 @@ const subnav = [
   { to: "/app/financeiro", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/app/financeiro/movimento", label: "Mov. Caixa", icon: ArrowLeftRight },
   { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
+  { to: "/app/financeiro/pendencias", label: "A Receber", icon: HandCoins },
   { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
   { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
   { to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 },

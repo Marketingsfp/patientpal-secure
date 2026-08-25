@@ -1,0 +1,63 @@
+import { describe, expect, it } from "bun:test";
+import { calcularSaldoAtendimento, rotuloSaldo } from "./saldo-atendimento";
+
+describe("calcularSaldoAtendimento", () => {
+  it("é o cenário da coordenadora: R$ 100,00 com R$ 50,00 de entrada", () => {
+    const s = calcularSaldoAtendimento(100, 50)!;
+    expect(s.total).toBe(100);
+    expect(s.pago).toBe(50);
+    expect(s.restante).toBe(50);
+    expect(s.parcial).toBe(true);
+    expect(s.quitado).toBe(false);
+  });
+
+  it("fica quitado quando o saldo é pago na semana seguinte", () => {
+    const s = calcularSaldoAtendimento(100, 100)!;
+    expect(s.restante).toBe(0);
+    expect(s.parcial).toBe(false);
+    expect(s.quitado).toBe(true);
+  });
+
+  it("não trata como parcial o atendimento que ainda não recebeu nada", () => {
+    // Sem nenhum recebimento não existe "parcialmente pago" — é só pendente.
+    const s = calcularSaldoAtendimento(100, 0)!;
+    expect(s.parcial).toBe(false);
+    expect(s.restante).toBe(100);
+  });
+
+  it("ignora sobra de centavo de arredondamento", () => {
+    // Rateio de R$ 100,00 em 3 partes deixa resíduo; isso não é saldo devedor.
+    const s = calcularSaldoAtendimento(100, 99.999)!;
+    expect(s.quitado).toBe(true);
+    expect(s.restante).toBe(0);
+  });
+
+  it("nunca devolve saldo negativo quando se recebe a mais", () => {
+    const s = calcularSaldoAtendimento(100, 120)!;
+    expect(s.restante).toBe(0);
+    expect(s.quitado).toBe(true);
+  });
+
+  it("devolve null para atendimento sem total combinado", () => {
+    // Comportamento antigo preservado: quem não tem valor_cobranca continua
+    // sendo considerado pago pela simples existência do lançamento.
+    expect(calcularSaldoAtendimento(null, 50)).toBeNull();
+    expect(calcularSaldoAtendimento(0, 0)).toBeNull();
+    expect(calcularSaldoAtendimento(undefined, 0)).toBeNull();
+  });
+
+  it("arredonda o saldo para centavos", () => {
+    const s = calcularSaldoAtendimento(100, 33.333)!;
+    expect(s.restante).toBe(66.67);
+  });
+});
+
+describe("rotuloSaldo", () => {
+  it("mostra o que falta em reais", () => {
+    const s = calcularSaldoAtendimento(100, 50)!;
+    // Intl separa "R$" do número com espaço não separável, então a asserção
+    // olha as duas partes em vez de comparar a string inteira.
+    expect(rotuloSaldo(s).startsWith("Falta R$")).toBe(true);
+    expect(rotuloSaldo(s)).toContain("50,00");
+  });
+});

@@ -175,6 +175,12 @@ import {
   aplicarFatoresEtapa,
   type EtapaSinal,
 } from "@/lib/agenda/sinal-orcamento";
+import {
+  calcularSaldoAtendimento,
+  registrarTotalCombinado,
+  rotuloSaldo,
+  type SaldoAtendimento,
+} from "@/lib/agenda/saldo-atendimento";
 import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
@@ -217,6 +223,12 @@ type Agendamento = {
   sinalizado_em?: string | null;
   sinalizado_por?: string | null;
   sinalizado_por_nome?: string | null;
+  /**
+   * Total combinado da cobrança. Só é preenchido quando o paciente paga
+   * parcialmente (entrada/sinal) — é ele que permite calcular o saldo devedor.
+   * NULL no atendimento normal, que continua "pago" por ter lançamento.
+   */
+  valor_cobranca?: number | null;
 };
 type Medico = {
   id: string;
@@ -287,7 +299,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -911,6 +923,34 @@ function AgendaPage() {
   const [pagoInfoMap, setPagoInfoMap] = useState<
     Map<string, { valor: number; forma: string | null }>
   >(new Map());
+  /**
+   * Saldo devedor por atendimento (pagamento parcial / entrada).
+   *
+   * Derivado, nunca guardado: o total combinado vem de `valor_cobranca` e o
+   * quanto já entrou vem da soma dos lançamentos confirmados (pagoInfoMap).
+   * Se um pagamento for estornado, o lançamento sai da soma e o saldo
+   * reaparece sozinho na tela.
+   */
+  const saldoMap = useMemo(() => {
+    const m = new Map<string, SaldoAtendimento>();
+    for (const a of items) {
+      const s = calcularSaldoAtendimento(a.valor_cobranca, pagoInfoMap.get(a.id)?.valor ?? 0);
+      if (s) m.set(a.id, s);
+    }
+    return m;
+  }, [items, pagoInfoMap]);
+  /** Atendimentos que já receberam alguma coisa mas ainda têm saldo em aberto. */
+  const parciaisSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const [id, saldo] of saldoMap) if (saldo.parcial) s.add(id);
+    return s;
+  }, [saldoMap]);
+  /** Total que a clínica ainda tem a receber dos atendimentos listados hoje. */
+  const totalAReceber = useMemo(() => {
+    let t = 0;
+    for (const id of parciaisSet) t += saldoMap.get(id)?.restante ?? 0;
+    return Math.round(t * 100) / 100;
+  }, [parciaisSet, saldoMap]);
   // Mapa agendamento_id → NFS-e mais recente (id/status/url_pdf).
   const [nfseMap, setNfseMap] = useState<
     Map<
@@ -1395,6 +1435,8 @@ function AgendaPage() {
   const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
   /** Orçamento odontológico com entrada: resumo pago/falta para o caixa. */
   const [saldoOrcResumo, setSaldoOrcResumo] = useState<{
+    /** Cabeçalho do quadro no diálogo de pagamento. */
+    titulo?: string;
     total: number;
     pago: number;
     restante: number;
@@ -1703,6 +1745,27 @@ function AgendaPage() {
   };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
+  /**
+   * Pagamento parcial: o paciente entrega hoje só parte do valor e o restante
+   * fica como saldo devedor. Ligado pelo operador na tela de forma de
+   * pagamento, antes de escolher a forma.
+   */
+  const [cobrarParcial, setCobrarParcial] = useState(false);
+  /**
+   * Saldo já existente do atendimento que está sendo cobrado — preenchido
+   * quando a cobrança é a quitação de uma entrada dada em outro dia.
+   */
+  const saldoAtualRef = useRef<SaldoAtendimento | null>(null);
+  /**
+   * Contexto do pagamento parcial em andamento, lido depois que o lançamento
+   * é gravado. `total` é sempre o valor CHEIO combinado (nunca o saldo), para
+   * que a quitação não regrave um total menor por engano.
+   */
+  const cobrancaParcialRef = useRef<{
+    total: number;
+    jaPago: number;
+    ativo: boolean;
+  } | null>(null);
   const [formaPagCtx, setFormaPagCtx] = useState<FormaPagCtx | null>(null);
   // Cobrança com desconto do cartão × valor cheio (ver `CobrancaAlternativa`).
   const [cobrancaAlt, setCobrancaAlt] = useState<CobrancaAlternativa | null>(null);
@@ -2082,7 +2145,8 @@ function AgendaPage() {
       filtroStatus !== "todos" &&
       filtroStatus !== "livres" &&
       filtroStatus !== "agendado" &&
-      filtroStatus !== "pago";
+      filtroStatus !== "pago" &&
+      filtroStatus !== "parcial";
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
@@ -3524,6 +3588,10 @@ function AgendaPage() {
       } else if (filtroStatus === "pago") {
         if (ehLivre) return false;
         if (!a.data_pagamento) return false;
+      } else if (filtroStatus === "parcial") {
+        // "Falta receber": já recebeu alguma coisa e ainda tem saldo aberto.
+        if (ehLivre) return false;
+        if (!parciaisSet.has(a.id)) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
@@ -3589,6 +3657,7 @@ function AgendaPage() {
     agendaNomePorId,
     medicoEspec,
     fichaPorId,
+    parciaisSet,
   ]);
 
   const totais = useMemo(
@@ -3832,6 +3901,9 @@ function AgendaPage() {
         { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
       ];
+      // Cobrança agrupada: nunca é quitação de saldo de um atendimento só.
+      saldoAtualRef.current = null;
+      setCobrarParcial(false);
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
         agId: itens.map((i) => i.id).join(","),
@@ -5380,6 +5452,9 @@ function AgendaPage() {
         especialidade:
           medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
+      // Atendimento recém-criado: não há saldo anterior a quitar.
+      saldoAtualRef.current = null;
+      setCobrarParcial(false);
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx(montarCtxNovo(descSuffix));
       // Só oferece a troca para valor cheio quando o desconto do cartão foi de
@@ -5867,6 +5942,7 @@ function AgendaPage() {
       opcoes.map((o) => [o.forma, aplicarFatoresEtapa(etapaSinal, fatoresForma(o.forma))]),
     );
     setSaldoOrcResumo({
+      titulo: "Orçamento com entrada — pagamento parcelado",
       total: etapaSinalExib.total,
       pago: etapaSinalExib.pago,
       restante: etapaSinalExib.restante,
@@ -5907,7 +5983,15 @@ function AgendaPage() {
       // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
       // a 2ª o saldo restante.
       const etapaSinal = await obterEtapaSinal(a.id);
-      if (pagosSet.has(a.id) && !etapaSinal) {
+      // Saldo devedor de um pagamento parcial (entrada dada em outro dia).
+      // Enquanto houver saldo, a cobrança continua liberada para que a
+      // recepção possa receber o restante — cada recebimento vira um
+      // lançamento próprio, no caixa do dia em que for pago.
+      const saldoParcial = saldoMap.get(a.id) ?? null;
+      const temSaldoAberto = !!saldoParcial && !saldoParcial.quitado;
+      saldoAtualRef.current = temSaldoAberto ? saldoParcial : null;
+      setCobrarParcial(false);
+      if (pagosSet.has(a.id) && !etapaSinal && !temSaldoAberto) {
         toast.info("Este agendamento já foi pago.");
         return;
       }
@@ -5955,7 +6039,7 @@ function AgendaPage() {
       ]);
       // Reatribuído adiante quando o usuário adia o desconto do convênio.
       let info = infoInicial;
-      if ((jaPagos ?? []).length > 0 && !etapaSinal) {
+      if ((jaPagos ?? []).length > 0 && !etapaSinal && !temSaldoAberto) {
         toast.info("Este agendamento já foi pago.");
         setPagosSet((prev) => {
           const n = new Set(prev);
@@ -6085,6 +6169,26 @@ function AgendaPage() {
       const etapaAplicada = await aplicarEtapaSinal(opcoes, a.id, etapaSinal);
       opcoes = etapaAplicada.opcoes;
       descSuffix += etapaAplicada.descSuffix;
+      // Quitação do saldo de um pagamento parcial já registrado (a entrada foi
+      // paga em outro dia). Sugere apenas o que falta, e não o valor cheio do
+      // procedimento — senão a recepção cobraria os R$ 100,00 de novo.
+      // O fluxo de sinal do orçamento tem tratamento próprio acima e ganha
+      // precedência; aqui só entra o parcial de atendimento comum.
+      if (temSaldoAberto && saldoParcial && !etapaSinal) {
+        opcoes = opcoes.map((o) => ({ ...o, valor: saldoParcial.restante }));
+        descSuffix += " — SALDO DEVEDOR";
+        setSaldoOrcResumo({
+          titulo: "Saldo devedor deste atendimento",
+          total: saldoParcial.total,
+          pago: saldoParcial.pago,
+          restante: saldoParcial.restante,
+          itens: [],
+        });
+        setAvisoConvenio({
+          tom: "warning",
+          mensagem: `Atendimento parcialmente pago — Total R$ ${saldoParcial.total.toFixed(2)} • Já pago R$ ${saldoParcial.pago.toFixed(2)} • Falta pagar R$ ${saldoParcial.restante.toFixed(2)}. O valor pode ser alterado se o paciente pagar só uma parte agora.`,
+        });
+      }
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
       // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
       // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
@@ -6289,12 +6393,44 @@ function AgendaPage() {
     });
   };
 
+  /**
+   * Guarda o total combinado da cobrança antes de abrir o diálogo de
+   * lançamento, para que a gravação do saldo devedor use o valor CHEIO e não o
+   * que o paciente entregou agora.
+   *
+   * Quando a cobrança é a quitação de um saldo anterior, o total vem do saldo
+   * já registrado — `valorDaForma` aí é só o restante e não pode virar total.
+   */
+  const prepararParcial = (valorDaForma: number, ehGrupo: boolean) => {
+    const saldoAnterior = saldoAtualRef.current;
+    // Parcial não se aplica à cobrança agrupada: lá o valor é rateado depois
+    // entre vários atendimentos e não há um total por atendimento para abater.
+    const ativo = !ehGrupo && (cobrarParcial || !!saldoAnterior);
+    cobrancaParcialRef.current = {
+      total: saldoAnterior ? saldoAnterior.total : valorDaForma,
+      jaPago: saldoAnterior ? saldoAnterior.pago : 0,
+      ativo,
+    };
+    if (ativo && !saldoAnterior) {
+      // Primeira cobrança parcial: mostra o quadro de saldo já no diálogo,
+      // para o operador ver o que vai ficar faltando enquanto digita.
+      setSaldoOrcResumo({
+        titulo: "Entrada com saldo a receber",
+        total: valorDaForma,
+        pago: 0,
+        restante: valorDaForma,
+        itens: [],
+      });
+    }
+  };
+
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
     const ids = formaPagCtx.agId.split(",").filter(Boolean);
     const principal = ids[0] ?? null;
     const extras = ids.slice(1);
     const valorFinal = aplicarDescontoPendente(op.valor);
+    prepararParcial(valorFinal, extras.length > 0);
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma(op.forma);
@@ -6315,6 +6451,7 @@ function AgendaPage() {
     // pega o maior valor disponível como referência (geralmente todas as formas têm valor próximo)
     const valorRef = Math.max(0, ...formaPagOpcoes.map((o) => o.valor));
     const valorFinal = aplicarDescontoPendente(valorRef);
+    prepararParcial(valorFinal, extras.length > 0);
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma("__misto__");
@@ -6351,7 +6488,10 @@ function AgendaPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [formaPagOpen, formaPagOpcoes, formaPagCtx]);
+    // `cobrarParcial` entra nas dependências porque `escolherForma` lê esse
+    // estado: sem ele, o atalho de teclado usaria o valor de antes de o
+    // operador marcar "pagamento parcial" e o saldo não seria registrado.
+  }, [formaPagOpen, formaPagOpcoes, formaPagCtx, cobrarParcial]);
 
   // Atalhos da tela Agenda:
   // N = novo encaixe, F = focar filtro de profissional, R = recarregar
@@ -6877,6 +7017,7 @@ function AgendaPage() {
             <SelectItem value="todos">TODOS</SelectItem>
             <SelectItem value="livres">Livres</SelectItem>
             <SelectItem value="pago">Pago</SelectItem>
+            <SelectItem value="parcial">Falta receber (parcial)</SelectItem>
             {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
               <SelectItem key={s} value={s}>
                 {STATUS_LABEL[s]}
@@ -8027,6 +8168,40 @@ function AgendaPage() {
             </span>
           </div>
           <div className="grid gap-2 mt-2">
+            {/* Pagamento parcial (entrada com saldo). Fica escondido na
+                cobrança agrupada — lá o valor é rateado entre vários
+                atendimentos e não existe um total por atendimento para abater —
+                e também na quitação de um saldo, que já é parcial por
+                natureza. */}
+            {formaPagCtx && !formaPagCtx.agId.includes(",") && !saldoAtualRef.current ? (
+              <label className="flex items-start gap-2 rounded-md border border-dashed px-2 py-2 text-[11px] cursor-pointer">
+                <Checkbox
+                  checked={cobrarParcial}
+                  onCheckedChange={(v) => setCobrarParcial(v === true)}
+                  className="mt-0.5"
+                />
+                <span className="leading-snug">
+                  <b>Pagamento parcial (entrada)</b> — o paciente paga só uma parte hoje. Escolha a
+                  forma e digite o valor recebido; o restante fica como <b>saldo devedor</b> e pode
+                  ser quitado em outro dia.
+                </span>
+              </label>
+            ) : null}
+            {saldoAtualRef.current ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-2 text-[11px] leading-snug text-amber-900">
+                <b>Quitando saldo devedor.</b> Total combinado{" "}
+                {saldoAtualRef.current.total.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}{" "}
+                · já pago{" "}
+                {saldoAtualRef.current.pago.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+                . Os valores abaixo já são só o que falta.
+              </div>
+            ) : null}
             {formaPagOpcoes.map((op, idx) => (
               <Button
                 key={op.forma}
@@ -8137,6 +8312,10 @@ function AgendaPage() {
           const agId = pagamentoAgId;
           const clinicaIdCarimbo = clinicaAtual.clinica_id;
           const idsCarimbo = [agId, ...pagamentoExtraIds];
+          // Só o pagamento parcial precisa de recarga da lista no fim: é ele
+          // que muda `valor_cobranca` no banco e faz o selo "Falta R$ ..."
+          // aparecer. O pagamento normal continua sem recarregar a agenda.
+          let houveParcial = false;
           // Sinal/saldo dos itens de orçamento: abate o valor efetivamente pago.
           try {
             // O valor recebido pode estar com desconto do convênio; a baixa no
@@ -8152,6 +8331,47 @@ function AgendaPage() {
           } catch (err) {
             console.error("[sinal-orcamento]", err);
           }
+          // Pagamento parcial: grava o total combinado no atendimento para que
+          // o saldo devedor (total − recebido) fique visível na agenda e na
+          // tela Financeiro > A Receber. Só grava quando de fato sobra saldo;
+          // pagamento integral segue sem `valor_cobranca`, como sempre foi.
+          //
+          // Roda depois do lançamento já gravado: o dinheiro que entrou no
+          // caixa de hoje é o que o paciente entregou agora, e nada aqui mexe
+          // nisso. Uma falha nesta gravação não desfaz o pagamento — apenas
+          // avisa, para que o operador saiba que o saldo não ficou registrado.
+          const ctxParcial = cobrancaParcialRef.current;
+          if (ctxParcial?.ativo) {
+            houveParcial = true;
+            const res = await registrarTotalCombinado(
+              agId,
+              ctxParcial.total,
+              Number(dados.valor) || 0,
+              ctxParcial.jaPago,
+            );
+            if (!res.ok) {
+              mostrarErro(
+                res.erro,
+                "pagamento registrado no caixa, mas o saldo devedor NÃO foi gravado",
+              );
+            } else {
+              const falta =
+                Math.round(
+                  (ctxParcial.total - ctxParcial.jaPago - (Number(dados.valor) || 0)) * 100,
+                ) / 100;
+              if (falta > 0.004) {
+                toast.warning(
+                  `Pagamento parcial registrado. Falta receber ${falta.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })} — o atendimento fica em "Parcialmente pago".`,
+                  { duration: 8000 },
+                );
+              }
+            }
+          }
+          cobrancaParcialRef.current = null;
+          saldoAtualRef.current = null;
           // Fluxo original do pagamento — encapsulado para que o carimbo do
           // convênio (convenio_id/contrato_id/modalidade) rode sempre no fim,
           // inclusive quando o fluxo sai mais cedo.
@@ -8454,6 +8674,9 @@ function AgendaPage() {
             await executarPagamento();
           } finally {
             await carimbarConvenioNosLancamentos(clinicaIdCarimbo, idsCarimbo);
+            // Recarrega para o saldo devedor (ou a quitação dele) aparecer na
+            // linha imediatamente, sem o operador precisar atualizar a tela.
+            if (houveParcial) await load();
           }
         }}
       />
@@ -9538,6 +9761,39 @@ function AgendaPage() {
             </div>
           </div>
         )}
+        {/* Pendências / A Receber: atendimentos desta listagem que receberam
+            uma entrada e ainda têm saldo. O botão liga o filtro para isolar
+            só eles; o histórico completo, de qualquer data, fica em
+            Financeiro > A Receber. */}
+        {parciaisSet.size > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold">A receber</span>
+                <span className="mx-1.5 text-amber-400">·</span>
+                {parciaisSet.size}{" "}
+                {parciaisSet.size === 1
+                  ? "atendimento parcialmente pago"
+                  : "atendimentos parcialmente pagos"}
+                <span className="mx-1.5 text-amber-400">·</span>
+                <span className="font-semibold tabular-nums">
+                  falta{" "}
+                  {totalAReceber.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFiltroStatus(filtroStatus === "parcial" ? "todos" : "parcial")}
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                {filtroStatus === "parcial" ? "Mostrar todos" : "Ver só as pendências"}
+              </button>
+            </div>
+          </div>
+        )}
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
           {loading && items.length === 0 ? (
@@ -9737,23 +9993,31 @@ function AgendaPage() {
                           className={`h-8 flex-1 text-xs ${
                             a.origem_externa
                               ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                              : pagosSet.has(a.id)
-                                ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                                : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                              : parciaisSet.has(a.id)
+                                ? "border-amber-400 bg-amber-50 text-amber-700"
+                                : pagosSet.has(a.id)
+                                  ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                                  : "border-rose-200 text-rose-600 hover:bg-rose-50"
                           }`}
                           title={
                             a.origem_externa
                               ? "Atendimento externo — sem lançamento em caixa"
-                              : pagosSet.has(a.id)
-                                ? "Pago"
-                                : "Cobrar"
+                              : parciaisSet.has(a.id)
+                                ? "Parcialmente pago — clique para receber o saldo"
+                                : pagosSet.has(a.id)
+                                  ? "Pago"
+                                  : "Cobrar"
                           }
                         >
                           <DollarSign
                             className="h-3.5 w-3.5 mr-1"
                             strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
                           />
-                          {pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                          {parciaisSet.has(a.id)
+                            ? rotuloSaldo(saldoMap.get(a.id)!)
+                            : pagosSet.has(a.id)
+                              ? "Pago"
+                              : "Cobrar"}
                         </Button>
                         {podeEscrever && (
                           <Button
@@ -10133,6 +10397,27 @@ function AgendaPage() {
                             {STATUS_LABEL[a.status]}
                           </Badge>
                         )}
+                        {/* Saldo devedor de um pagamento parcial. Fica logo
+                            abaixo da situação para a recepção ver, na própria
+                            linha, que o paciente ainda deve. */}
+                        {(() => {
+                          const saldoLinha = saldoMap.get(a.id);
+                          if (!saldoLinha?.parcial || ehLivre) return null;
+                          return (
+                            <Badge
+                              className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[10px] text-amber-800"
+                              title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
+                                "pt-BR",
+                                { style: "currency", currency: "BRL" },
+                              )}, já pago ${saldoLinha.pago.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}`}
+                            >
+                              {rotuloSaldo(saldoLinha)}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
 
                       {/* Ações - Botões na linha + Menu */}
@@ -10220,9 +10505,13 @@ function AgendaPage() {
                                     className={`h-7 w-7 shrink-0 rounded-md border-2 ${
                                       a.origem_externa
                                         ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                        : pagosSet.has(a.id)
-                                          ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                          : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                        : parciaisSet.has(a.id)
+                                          ? // Parcialmente pago: âmbar, para não
+                                            // se confundir com o verde de quitado.
+                                            "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                          : pagosSet.has(a.id)
+                                            ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                            : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
                                     }`}
                                   >
                                     <DollarSign
@@ -10235,6 +10524,12 @@ function AgendaPage() {
                                   {(() => {
                                     if (a.origem_externa)
                                       return "Atendimento externo — sem lançamento em caixa";
+                                    const saldoLinha = saldoMap.get(a.id);
+                                    if (saldoLinha?.parcial)
+                                      return `Parcialmente pago — ${rotuloSaldo(saldoLinha)} de ${saldoLinha.total.toLocaleString(
+                                        "pt-BR",
+                                        { style: "currency", currency: "BRL" },
+                                      )}. Clique para receber o saldo.`;
                                     if (!pagosSet.has(a.id)) return "Registrar pagamento";
                                     const info = pagoInfoMap.get(a.id);
                                     if (!info) return "Pago";
