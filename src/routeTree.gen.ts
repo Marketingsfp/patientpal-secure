@@ -32,6 +32,7 @@ import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -272,6 +273,11 @@ const LpSlugRoute = LpSlugRouteImport.update({
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNinaVozRoute = ApiNinaVozRouteImport.update({
+  id: '/api/nina-voz',
+  path: '/api/nina-voz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -1023,6 +1029,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1173,6 +1180,7 @@ export interface FileRoutesByTo {
   '/totem': typeof TotemRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1323,6 +1331,7 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1476,6 +1485,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/app'
+    | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1626,6 +1636,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1775,6 +1786,7 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/app'
+    | '/api/nina-voz'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1927,6 +1939,7 @@ export interface RootRouteChildren {
   TotemRoute: typeof TotemRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -2112,6 +2125,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nina-voz': {
+      id: '/api/nina-voz'
+      path: '/api/nina-voz'
+      fullPath: '/api/nina-voz'
+      preLoaderRoute: typeof ApiNinaVozRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -3369,6 +3389,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
