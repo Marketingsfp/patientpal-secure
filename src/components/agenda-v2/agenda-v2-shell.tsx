@@ -279,6 +279,10 @@ export function AgendaV2Shell() {
     queryKey: ["agenda-v2", "especialidades", clinicaId],
     enabled: !!clinicaId,
     staleTime: 10 * 60 * 1000,
+    // Duas consultas pequenas. Relê ao abrir a Agenda para não exibir o
+    // vínculo médico↔especialidade antigo depois de uma alteração feita por um
+    // administrador em outra máquina.
+    refetchOnMount: "always",
     queryFn: async () => {
       const [esps, links] = await Promise.all([
         supabase.from("especialidades").select("id,nome").order("nome"),

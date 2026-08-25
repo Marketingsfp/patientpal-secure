@@ -76,6 +76,7 @@ import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { useCatalogoAtualizado } from "@/hooks/use-catalogo-atualizado";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import {
   ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
@@ -603,6 +604,10 @@ function AppShellInner() {
     configured: configuredModules,
     loading: permsLoading,
   } = usePermissoes();
+  // Catálogo (especialidades, serviços e médicos) alterado por um
+  // administrador em OUTRA máquina só chegava aqui depois de recarregar a
+  // página inteira. Revalida quando a janela volta ao foco.
+  useCatalogoAtualizado(clinicaAtual?.clinica_id ?? null);
   // Efeito "expandir ao passar o mouse" nos itens do menu clássico — ligado
   // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
   const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");

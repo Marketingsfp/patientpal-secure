@@ -341,6 +341,10 @@ export function NovoAgendamentoWizard({
     queryKey: ["agenda-v2", "wizard-especialidades", medico?.id],
     enabled: !!medico && open,
     staleTime: 5 * 60 * 1000,
+    // A especialidade do médico pode ter sido alterada por um administrador em
+    // outra máquina. É uma consulta pequena: relê sempre que o assistente abre,
+    // como a Agenda clássica já faz ao abrir o diálogo de agendamento.
+    refetchOnMount: "always",
     queryFn: async (): Promise<EspecialidadeOpt[]> => {
       if (!medico) return [];
       const { data: sec, error } = await supabase
