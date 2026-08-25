@@ -1,12 +1,11 @@
 /**
  * Voz da Nina (leitura em voz alta das respostas do chat).
  *
- * Usa o mesmo motor do sistema (Piper / voz do navegador) quando o TTS global
- * está ligado; se estiver desligado ou o servidor Piper não responder, cai na
- * voz nativa do navegador para que o chat sempre consiga falar.
+ * Usa o motor de voz do sistema (Piper) quando o TTS global está ligado; se
+ * estiver desligado ou o servidor não responder, cai na voz nativa do
+ * navegador para que o chat sempre consiga falar.
  *
- * A preferência da voz da Nina é local (localStorage "nina:voz") e independe
- * do toggle global do header.
+ * A preferência é local (localStorage "nina:voz") e independe do toggle global.
  */
 import { isUserTtsEnabled, speak, stopSpeaking } from "@/lib/tts-service";
 

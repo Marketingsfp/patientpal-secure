@@ -246,27 +246,26 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [voz, setVoz] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Preferência lida só no cliente (evita divergência na hidratação).
-  useEffect(() => setVoz(isNinaVozOn()), []);
+  const [voz, setVoz] = useState(false);
 
   useEffect(() => {
+    setVoz(isNinaVozOn());
+  }, []);
+  useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80);
-    if (!open) pararNina();
+    else pararNina();
   }, [open]);
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, loading]);
-  useEffect(() => () => pararNina(), []);
 
   const alternarVoz = () => {
-    const next = !voz;
-    setVoz(next);
-    setNinaVozOn(next);
-    if (!next) pararNina();
+    const novo = !voz;
+    setVoz(novo);
+    setNinaVozOn(novo);
+    if (!novo) pararNina();
   };
 
   const perguntar = async (texto: string) => {
@@ -285,9 +284,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       setMsgs([...novas, { role: "assistant", content: resposta }]);
       if (voz) void falarNina(resposta);
     } catch {
-      const erro = "Não foi possível falar com a Nina agora.";
-      setMsgs([...novas, { role: "assistant", content: erro }]);
-      if (voz) void falarNina(erro);
+      setMsgs([
+        ...novas,
+        { role: "assistant", content: "Não foi possível falar com a Nina agora." },
+      ]);
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -304,24 +304,25 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
-          <SheetTitle className="flex items-center gap-2">
-            <Bot className="h-4 w-4" /> Nina — assistente da clínica
+          <div className="flex items-center justify-between gap-2 pr-8">
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4" /> Nina — assistente da clínica
+            </SheetTitle>
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="ml-auto mr-8 h-8 w-8 rounded-full"
+              size="sm"
+              variant={voz ? "secondary" : "ghost"}
+              className="h-8 gap-1.5 text-[11px]"
               onClick={alternarVoz}
-              title={voz ? "Desativar a voz da Nina" : "Ativar a voz da Nina"}
+              title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
               aria-label="Voz da Nina"
             >
               {voz ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
+              {voz ? "Voz ligada" : "Voz desligada"}
             </Button>
-          </SheetTitle>
+          </div>
           <SheetDescription>
-            {voz
-              ? "Fale pelo microfone e ouça a resposta em voz alta."
-              : "Pergunte sobre valores, especialidades e horários dos médicos."}
+            Pergunte sobre valores, especialidades e horários dos médicos.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
