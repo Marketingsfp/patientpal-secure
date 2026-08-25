@@ -36,6 +36,7 @@ import {
   FORMA_PAGO_SISTEMA_ANTERIOR,
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
+import { deveRegistrarNoCaixa } from "@/lib/financeiro/registro-no-caixa";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -200,6 +201,23 @@ export function LancamentoDialog({
   // o dinheiro que entrou no caixa do sistema velho.
   const [pagoAnteriorData, setPagoAnteriorData] = useState("");
   const [pagoAnteriorRecibo, setPagoAnteriorRecibo] = useState("");
+  /**
+   * Guia retroativa cujo dinheiro JÁ FOI RECEBIDO antes — não entra na gaveta
+   * de hoje.
+   *
+   * É o mesmo mecanismo de "Pago no sistema anterior" e das parcelas recebidas
+   * em outras datas: o lançamento é gravado confirmado (então o atendimento
+   * fica quitado e o repasse do prestador é apurado normalmente, porque o
+   * repasse lê `fin_lancamentos`), mas a RPC é chamada com `p_movimento: null`
+   * e nada toca em `caixa_movimentos`.
+   *
+   * Diferente de "Pago no sistema anterior" em um ponto: aqui a FORMA DE
+   * PAGAMENTO real é preservada (dinheiro, PIX, cartão...). Aquela opção é
+   * específica da virada da Clínica Total e aparece assim nos relatórios;
+   * usá-la para um recebimento feito neste sistema, em outro dia, registraria
+   * uma origem falsa.
+   */
+  const [recebidoAntes, setRecebidoAntes] = useState(false);
   const [pagamentoMisto, setPagamentoMisto] = useState(false);
   // Cada linha do pagamento dividido pode ter a SUA data de recebimento
   // (`data`). Vazio = a data do lançamento (campo "Data" no topo). É isso que
@@ -275,6 +293,7 @@ export function LancamentoDialog({
     setValorRecebido("");
     setPagoAnteriorData("");
     setPagoAnteriorRecibo("");
+    setRecebidoAntes(false);
     setPagamentoMisto(false);
     setPagamentos([{ forma: "dinheiro", recebido: "" }]);
     setEmitirNfse(false);
@@ -496,6 +515,27 @@ export function LancamentoDialog({
    *   - a tela pede o rastro do pagamento antigo (data e/ou recibo).
    */
   const ehPagoSistemaAnterior = !pagamentoMisto && formaPagamento === FORMA_PAGO_SISTEMA_ANTERIOR;
+  /**
+   * Guia de um atendimento de dia anterior sendo faturada agora.
+   *
+   * Duas situações completamente diferentes se escondem aqui, e o sistema não
+   * tem como adivinhar qual é — só quem está no balcão sabe:
+   *
+   *   a) o paciente está pagando AGORA, atrasado. O dinheiro entra na gaveta
+   *      de hoje e tem que somar no fechamento de hoje;
+   *   b) o paciente JÁ PAGOU, em outro dia (ou no sistema anterior), e a guia
+   *      só está sendo emitida agora. O dinheiro não está na gaveta de hoje,
+   *      e somá-lo cria uma sobra que ninguém consegue conferir no cupom.
+   *
+   * Por isso a tela pergunta, em vez de escolher sozinha. Ver `recebidoAntes`.
+   */
+  const ehDataRetroativa = tipo === "receita" && !!data && data < hojeBR();
+  // Operador corrigiu a data de volta para hoje: a pergunta perde o sentido e
+  // a resposta anterior não pode continuar valendo em silêncio — senão um
+  // pagamento de hoje ficaria fora do caixa sem ninguém perceber.
+  useEffect(() => {
+    if (!ehDataRetroativa) setRecebidoAntes(false);
+  }, [ehDataRetroativa]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro =
     formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
@@ -620,6 +660,28 @@ export function LancamentoDialog({
       toast.error("Selecione a forma de pagamento.");
       return;
     }
+    // ----- Guia retroativa já quitada: exige o mesmo rastro -----------------
+    // Mesma razão do bloco abaixo: o lançamento nasce quitado sem nenhum
+    // dinheiro entrando hoje. Sem a data do recebimento ou o número do recibo,
+    // nada liga a guia emitida agora ao dinheiro que entrou lá atrás, e o
+    // financeiro não tem como conferir depois.
+    if (recebidoAntes && !ehPagoSistemaAnterior) {
+      if (!pagoAnteriorData.trim() && !pagoAnteriorRecibo.trim()) {
+        toast.error(
+          "Informe a data em que o valor foi pago ou o número do recibo — é o que liga esta guia ao recebimento já feito.",
+          { duration: 8000 },
+        );
+        return;
+      }
+      if (pagoAnteriorData && !/^\d{4}-\d{2}-\d{2}$/.test(pagoAnteriorData)) {
+        toast.error("Data do pagamento inválida — use o formato DD/MM/AAAA.");
+        return;
+      }
+      if (pagoAnteriorData && pagoAnteriorData > hojeBR()) {
+        toast.error("A data do pagamento não pode ser no futuro.");
+        return;
+      }
+    }
     // ----- Pago no sistema anterior: exige rastro do pagamento antigo -------
     // Este lançamento nasce quitado sem nenhum dinheiro entrando hoje. Sem a
     // data do pagamento ou o número do recibo, não sobra nada que ligue a guia
@@ -731,9 +793,14 @@ export function LancamentoDialog({
       const ok = await confirmDialog(
         `Atenção: este atendimento é do dia ${dd}/${mm}/${aaaa}.\n\n` +
           `A receita será contabilizada em ${dd}/${mm}/${aaaa} (data do atendimento).\n\n` +
-          `O dinheiro entra no caixa do dia ${dd}/${mm}/${aaaa} se aquele caixa ainda ` +
-          `estiver aberto. Se já tiver sido fechado e conferido, ele entra no caixa de ` +
-          `HOJE, marcado como retroativo — um fechamento já impresso nunca é alterado.\n\n` +
+          (recebidoAntes
+            ? `Você marcou que este valor JÁ FOI PAGO antes. Ele NÃO entra no caixa ` +
+              `de hoje e não soma no fechamento. A guia é liberada e o repasse do ` +
+              `prestador é calculado normalmente.\n\n`
+            : `Você marcou que o paciente está PAGANDO AGORA. O dinheiro entra no caixa ` +
+              `do dia ${dd}/${mm}/${aaaa} se aquele caixa ainda estiver aberto; se já ` +
+              `tiver sido fechado e conferido, entra no caixa de HOJE marcado como ` +
+              `retroativo — um fechamento já impresso nunca é alterado.\n\n`) +
           `Deseja continuar?`,
       );
       if (!ok) return;
@@ -1080,8 +1147,24 @@ export function LancamentoDialog({
         break;
       }
     }
+    // Rastro da guia retroativa já quitada: por que este valor não aparece na
+    // gaveta de hoje, e de quando é o dinheiro. É o que o financeiro lê ao
+    // cruzar a guia emitida hoje com o caixa do dia em que o valor entrou.
+    let recebidoAntesObs = "";
+    if (recebidoAntes && !ehPagoSistemaAnterior) {
+      recebidoAntesObs = [
+        `RECEBIDO ANTES — guia do atendimento de ${formatarDataBR(data)} emitida em ${formatarDataBR(hojeBR())}`,
+        pagoAnteriorData ? `Valor recebido em ${formatarDataBR(pagoAnteriorData)}` : "",
+        pagoAnteriorRecibo.trim() ? `Recibo/referência nº ${pagoAnteriorRecibo.trim()}` : "",
+        "Não entra no caixa de hoje: o dinheiro não passou pela gaveta de hoje. Repasse do prestador calculado normalmente.",
+      ]
+        .filter(Boolean)
+        .join(" — ");
+    }
     const obsFinal =
-      [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+      [observacoes.trim(), cortesiaObs, descontoObs, recebidoAntesObs, obsExtra]
+        .filter(Boolean)
+        .join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -1125,10 +1208,19 @@ export function LancamentoDialog({
     // encontraria na gaveta para conferir contra o cupom impresso. O
     // lançamento financeiro continua existindo e confirmado, então o
     // atendimento segue QUITADO e o repasse é calculado normalmente.
-    const registraNoCaixa =
-      !!user?.id &&
-      !ehPagoSistemaAnterior &&
-      (valorPrincipal > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+    // `recebidoAntes` entra pelo mesmo motivo: guia retroativa cujo dinheiro
+    // já tinha sido recebido em outro dia. A receita fica na competência do
+    // atendimento e o repasse é apurado normalmente (a apuração lê
+    // `fin_lancamentos`), mas a gaveta de hoje não é tocada — movimento de
+    // caixa R$ 0,00 no dia de hoje.
+    const registraNoCaixa = deveRegistrarNoCaixa({
+      temOperador: !!user?.id,
+      valorPrincipal,
+      formaPagamento: formaFinal,
+      temAgendamento: !!agendamentoId,
+      ehPagoSistemaAnterior,
+      recebidoAntes,
+    });
 
     const descricaoFinal = (() => {
       const desc = descricao.trim();
@@ -1959,6 +2051,84 @@ export function LancamentoDialog({
                   <p className="col-span-2 text-xs text-destructive">
                     Valor recebido é menor que o total. Faltam {formatBRL(valorNum - recebidoNum)}.
                   </p>
+                )}
+              </div>
+            )}
+            {/* Guia de atendimento de outro dia: o sistema NÃO adivinha se o
+                dinheiro está entrando agora ou se já entrou antes. Perguntar é
+                a blindagem — sem isso, todo recebimento antigo vira sobra
+                fantasma no fechamento de hoje. Só aparece quando a data é
+                retroativa; no dia a dia normal a tela não muda em nada. */}
+            {ehDataRetroativa && !ehPagoSistemaAnterior && !ehCategoriaGratuidade && (
+              <div className="space-y-3 rounded-md border border-sky-300 bg-sky-50 p-3">
+                <p className="text-xs text-sky-900">
+                  <strong>
+                    Atendimento do dia {formatarDataBR(data)} — guia sendo emitida hoje.
+                  </strong>{" "}
+                  A receita fica contabilizada em {formatarDataBR(data)} nos dois casos. O que muda
+                  é o caixa:
+                </p>
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md border bg-background p-2">
+                    <input
+                      type="radio"
+                      name="quando-recebeu"
+                      className="mt-1"
+                      checked={!recebidoAntes}
+                      onChange={() => setRecebidoAntes(false)}
+                    />
+                    <span className="text-xs">
+                      <strong>O paciente está pagando agora.</strong> O dinheiro entra no caixa de
+                      hoje e soma no fechamento — é o caso de quem ficou devendo e voltou para
+                      pagar.
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md border bg-background p-2">
+                    <input
+                      type="radio"
+                      name="quando-recebeu"
+                      className="mt-1"
+                      checked={recebidoAntes}
+                      onChange={() => {
+                        setRecebidoAntes(true);
+                        // Sugere a data do próprio atendimento — quase sempre é
+                        // o dia em que o paciente pagou.
+                        setPagoAnteriorData((cur) => cur || data);
+                      }}
+                    />
+                    <span className="text-xs">
+                      <strong>Já foi pago antes — não entra no caixa de hoje.</strong> A guia é
+                      liberada e o repasse do prestador é calculado normalmente, mas o valor{" "}
+                      <strong>não soma no fechamento de hoje</strong>, porque esse dinheiro não está
+                      na gaveta.
+                    </span>
+                  </label>
+                </div>
+                {recebidoAntes && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Data em que foi pago</Label>
+                        <DateInputBR
+                          value={pagoAnteriorData}
+                          onChange={(e) => setPagoAnteriorData(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Nº do recibo / referência</Label>
+                        <Input
+                          value={pagoAnteriorRecibo}
+                          onChange={(e) => setPagoAnteriorRecibo(e.target.value)}
+                          placeholder="Ex.: 48213"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-sky-800">
+                      Preencha ao menos um dos dois — é o que liga esta guia ao recebimento já
+                      feito. Se o pagamento foi na Clínica Total, antes da virada, use a forma
+                      &quot;{LABEL_PAGO_SISTEMA_ANTERIOR}&quot; em vez desta opção.
+                    </p>
+                  </>
                 )}
               </div>
             )}
