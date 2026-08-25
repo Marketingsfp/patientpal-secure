@@ -445,8 +445,18 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Nina está pensando...
             </div>
           )}
+          {conversa.ativo && !loading && (
+            <div className="flex items-center gap-2 text-xs text-primary" aria-live="polite">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/70" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              {conversa.parcial || "Ouvindo... fale quando quiser"}
+            </div>
+          )}
           <div ref={fim} />
         </div>
+
         <form
           className="border-t border-slate-100 p-3 flex items-center gap-2"
           onSubmit={(e) => {
