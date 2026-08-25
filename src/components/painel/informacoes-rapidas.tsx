@@ -5,6 +5,9 @@ import {
   Bot,
   Clock,
   Loader2,
+  Mic,
+  MicOff,
+
   Search,
   Send,
   Sparkles,
