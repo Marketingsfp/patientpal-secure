@@ -954,31 +954,18 @@ function AppShellInner() {
   // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
   // "Atendimento Múltiplo" do menu para a clínica atual.
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
-  // Feature flag por clínica: `nina_desativada` remove tudo da Nina do menu.
-  const { desativada: ninaDesativada } = useNinaDesativada();
-  const semNina = (rows: typeof permissionFilteredRows) =>
-    ninaDesativada
-      ? rows
-          .map((row) => ({
-            ...row,
-            items: row.items.filter((it) =>
-              isParent(it)
-                ? !/nina/i.test(it.label)
-                : !it.to.startsWith("/app/nina") && it.to !== "/app/consulta-rapida",
-            ),
-          }))
-          .filter((row) => row.items.length > 0)
-      : rows;
-  const flagFilteredRows = semNina(
-    atendimentoMultiploDisabled
-      ? permissionFilteredRows
-          .map((row) => ({
-            ...row,
-            items: row.items.filter((it) => isParent(it) || it.to !== "/app/atendimento-multiplo"),
-          }))
-          .filter((row) => row.items.length > 0)
-      : permissionFilteredRows,
-  );
+  // Obs.: a flag `nina_desativada` desliga apenas a ASSISTENTE de IA (chat e
+  // respostas automáticas). A ferramenta de atendimento do WhatsApp continua
+  // no menu, pois é usada pela equipe manualmente.
+  const flagFilteredRows = atendimentoMultiploDisabled
+    ? permissionFilteredRows
+        .map((row) => ({
+          ...row,
+          items: row.items.filter((it) => isParent(it) || it.to !== "/app/atendimento-multiplo"),
+        }))
+        .filter((row) => row.items.length > 0)
+    : permissionFilteredRows;
+
 
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
