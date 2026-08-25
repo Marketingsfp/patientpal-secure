@@ -134,83 +134,6 @@ export const getContextoClinica = createServerFn({ method: "POST" })
     return { medicos, procedimentos };
   });
 
-function montarContextoTexto(ctx: {
-  medicos: Array<{
-    nome: string;
-    especialidades?: string[];
-    horarios: Array<{ dia: string; inicio: string; fim: string; obs: string | null }>;
-  }>;
-  procedimentos: Array<{
-    nome: string;
-    valor_dinheiro_pix: number;
-    valor_cartao: number;
-    grupo: string | null;
-    preparo?: string | null;
-  }>;
-  especialidades?: string[];
-  convenios?: Array<{
-    nome: string;
-    modalidade: string;
-    valor_mensal: number;
-    max_dependentes: number;
-    descricao: string | null;
-  }>;
-  clinica?: {
-    nome: string;
-    endereco: string | null;
-    cidade: string | null;
-    estado: string | null;
-    telefone: string | null;
-    email: string | null;
-  } | null;
-  agendaResumo?: Array<{ medico: string; total: number; livres: number; ocupados: number }>;
-}) {
-  const meds = ctx.medicos
-    .map((m) => {
-      const horarios =
-        m.horarios.length > 0
-          ? m.horarios.map((h) => `${h.dia} ${h.inicio}-${h.fim}`).join("; ")
-          : "(sem horários cadastrados)";
-      const esps = (m.especialidades ?? []).filter(Boolean).join(", ");
-      return `- ${m.nome}${esps ? ` (${esps})` : ""}: ${horarios}`;
-    })
-    .join("\n");
-
-  const procs = ctx.procedimentos
-    .map(
-      (p) =>
-        `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: dinheiro/PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}${p.preparo ? ` | PREPARO: ${p.preparo.replace(/\s+/g, " ").trim()}` : ""}`,
-    )
-    .join("\n");
-
-  const espText = (ctx.especialidades ?? []).join(", ") || "(nenhuma)";
-  const convText =
-    (ctx.convenios ?? [])
-      .map(
-        (c) =>
-          `- ${c.nome} [${c.modalidade}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao ? ` | ${c.descricao.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
-      )
-      .join("\n") || "(nenhum)";
-  const clinicaText = ctx.clinica
-    ? `Nome: ${ctx.clinica.nome}\nEndereço: ${[ctx.clinica.endereco, ctx.clinica.cidade, ctx.clinica.estado].filter(Boolean).join(", ") || "(não informado)"}\nTelefone: ${ctx.clinica.telefone || "(não informado)"}\nE-mail: ${ctx.clinica.email || "(não informado)"}`
-    : "(não informado)";
-  const agendaText =
-    (ctx.agendaResumo ?? [])
-      .map(
-        (a) => `- ${a.medico}: ${a.ocupados} ocupado(s), ${a.livres} livre(s) (total ${a.total})`,
-      )
-      .join("\n") || "(sem dados do dia)";
-
-  return [
-    `CLÍNICA:\n${clinicaText}`,
-    `ESPECIALIDADES ATENDIDAS:\n${espText}`,
-    `MÉDICOS E HORÁRIOS:\n${meds || "(nenhum)"}`,
-    `PROCEDIMENTOS E VALORES:\n${procs || "(nenhum)"}`,
-    `CONVÊNIOS / CARTÃO BENEFÍCIO:\n${convText}`,
-    `AGENDA DE HOJE (resumo anonimizado, sem nomes de pacientes):\n${agendaText}`,
-  ].join("\n\n");
-}
-
 export const chatNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ChatSchema.parse(input))
@@ -219,137 +142,16 @@ export const chatNina = createServerFn({ method: "POST" })
     if (!key) return { reply: "", error: "LOVABLE_API_KEY ausente" };
 
     const { supabase, userId } = context;
+    const { assertMembership, contextoClinicaTexto, systemPromptNina } = await import(
+      "@/lib/nina-contexto.server"
+    );
     await assertMembership(supabase, userId, data.clinicaId);
     // Janela do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC), o
     // par `new Date()` + `setHours` fazia a Nina enxergar a agenda do dia
     // deslocada em 3 horas.
-    const { inicio: inicioDia, fimExclusivo: fimDia } = janelaDiaClinica(hojeBR());
-
-    const carregarProcedimentos = async () => {
-      const pageSize = 1000;
-      const rows: any[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data: page, error } = await supabase
-          .from("procedimentos")
-          .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
-          .eq("clinica_id", data.clinicaId)
-          .eq("ativo", true)
-          .order("nome")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        rows.push(...(page ?? []));
-        if (!page || page.length < pageSize) break;
-      }
-      return rows;
-    };
-
-    const [medR, dispR, procedimentosRows, espR, planR, cliR, agR, meR] = await Promise.all([
-      supabase
-        .from("medicos")
-        .select("id, nome, crm, crm_uf")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true),
-      supabase
-        .from("medico_disponibilidades")
-        .select("medico_id, dia_semana, hora_inicio, hora_fim, observacoes")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true),
-      carregarProcedimentos(),
-      supabase.from("especialidades").select("id, nome").eq("ativo", true),
-      supabase
-        .from("cb_convenios")
-        .select("nome, modalidade, valor_mensal, max_dependentes, descricao")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true),
-      supabase
-        .from("clinicas")
-        .select("nome, endereco, cidade, estado, telefone, email")
-        .eq("id", data.clinicaId)
-        .maybeSingle(),
-      supabase
-        .from("agendamentos")
-        .select("medico_id, status")
-        .eq("clinica_id", data.clinicaId)
-        .gte("inicio", inicioDia)
-        .lt("inicio", fimDia),
-      supabase.from("medico_especialidades").select("medico_id, especialidade_id"),
-    ]);
-
-    const espMap = new Map<string, string>();
-    for (const e of espR.data ?? []) espMap.set(e.id, e.nome);
-
-    const medEsp = new Map<string, string[]>();
-    for (const r of meR.data ?? []) {
-      const nome = espMap.get(r.especialidade_id);
-      if (!nome) continue;
-      const arr = medEsp.get(r.medico_id) ?? [];
-      arr.push(nome);
-      medEsp.set(r.medico_id, arr);
-    }
-
-    const medicos = (medR.data ?? []).map((m) => ({
-      nome: m.nome,
-      crm: m.crm,
-      crm_uf: m.crm_uf,
-      especialidades: medEsp.get(m.id) ?? [],
-      horarios: (dispR.data ?? [])
-        .filter((d) => d.medico_id === m.id)
-        .map((d) => ({
-          dia: DIAS[d.dia_semana] ?? "?",
-          inicio: d.hora_inicio?.slice(0, 5),
-          fim: d.hora_fim?.slice(0, 5),
-          obs: d.observacoes,
-        })),
-    }));
-
-    const nomeMedico = new Map<string, string>();
-    for (const m of medR.data ?? []) nomeMedico.set(m.id, m.nome);
-    const agendaAgg = new Map<string, { total: number; livres: number; ocupados: number }>();
-    for (const a of agR.data ?? []) {
-      const nome = a.medico_id ? (nomeMedico.get(a.medico_id) ?? "Sem médico") : "Sem médico";
-      const cur = agendaAgg.get(nome) ?? { total: 0, livres: 0, ocupados: 0 };
-      cur.total += 1;
-      if (a.status === "cancelado" || a.status === "faltou") cur.livres += 1;
-      else cur.ocupados += 1;
-      agendaAgg.set(nome, cur);
-    }
-    const agendaResumo = Array.from(agendaAgg.entries()).map(([medico, v]) => ({ medico, ...v }));
-
-    const contextoTexto = montarContextoTexto({
-      medicos,
-      procedimentos: procedimentosRows as Array<{
-        nome: string;
-        valor_dinheiro_pix: number;
-        valor_cartao: number;
-        grupo: string | null;
-        preparo: string | null;
-      }>,
-      especialidades: (espR.data ?? []).map((e: any) => e.nome),
-      convenios: (planR.data ?? []) as any,
-      clinica: (cliR.data ?? null) as any,
-      agendaResumo,
-    });
-
-    const systemPrompt = `Você é a Nina, assistente virtual interna da clínica, falando com a EQUIPE autenticada (gestão/recepção/médicos). Responda SEMPRE em português do Brasil, de forma curta, direta e amigável.
-
-CONTEXTO DE USO:
-- Este canal é o painel interno do sistema. Quem pergunta é um colaborador autenticado da clínica.
-- Você TEM acesso aos dados operacionais da clínica (médicos, especialidades, horários, procedimentos, valores, convênios, agenda do dia) e pode responder livremente sobre eles para a equipe.
-- Quando solicitado, pode informar resumos da agenda, valores de procedimentos, horários de médicos, convênios e dados gerais da clínica.
-
-LIMITES:
-1. Você é SOMENTE LEITURA — não agenda, não cancela, não cobra, não altera nada. Para ações, oriente a equipe a fazer pelo próprio sistema.
-2. Use APENAS as informações da base abaixo. Não invente dados, valores, horários ou preparos.
-3. Quando o exame tiver PREPARO cadastrado, SEMPRE inclua o preparo na resposta.
-4. Lembre-se que esta resposta é para uso INTERNO. NÃO repasse este conteúdo bruto para pacientes — para pacientes, a Nina do WhatsApp tem regras próprias mais restritas.
-
-=== BASE DE DADOS DA CLÍNICA ===
-${contextoTexto}
-=== FIM DA BASE ===`;
-
-    const instrucaoVoz = data.modoVoz
-      ? `\n\n=== MODO CONVERSA POR VOZ ===\nA resposta será lida em voz alta. Responda em no máximo 2 frases curtas e diretas, em texto corrido, sem listas, sem tabelas, sem markdown e sem repetir a pergunta.`
-      : "";
+    const janela = janelaDiaClinica(hojeBR());
+    const contextoTexto = await contextoClinicaTexto(supabase, data.clinicaId, janela);
+    const systemPrompt = systemPromptNina(contextoTexto, data.modoVoz);
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -363,12 +165,10 @@ ${contextoTexto}
         // Resposta curta também acelera: menos tokens gerados, menos espera
         // antes de a voz começar.
         ...(data.modoVoz ? { max_tokens: 220 } : {}),
-        messages: [
-          { role: "system", content: systemPrompt + instrucaoVoz },
-          ...data.messages,
-        ],
+        messages: [{ role: "system", content: systemPrompt }, ...data.messages],
       }),
     });
+
 
 
 
