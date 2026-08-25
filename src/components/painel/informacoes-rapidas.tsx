@@ -251,6 +251,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   const fim = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [voz, setVoz] = useState(false);
+  // Guarda a versão atual de `perguntar` para o reconhecimento de voz sempre
+  // chamar o estado mais recente da conversa.
+  const perguntarRef = useRef<(texto: string) => Promise<void>>(async () => {});
+
 
   useEffect(() => {
     setVoz(isNinaVozOn());
