@@ -61,6 +61,8 @@ Regras: mantenha nomes próprios de pessoas com inicial maiúscula; escreva núm
       return { text: "", error: `Falha na transcrição (${res.status})` };
     }
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+    const bruto = json.choices?.[0]?.message?.content?.trim() ?? "";
+    const text = bruto ? corrigirFala(bruto) : "";
     return { text, error: null as string | null };
+
   });
