@@ -70,6 +70,7 @@ const money = (n: number) =>
 export function InformacoesRapidasCard({ className }: { className?: string }) {
   const [tabela, setTabela] = useState(false);
   const [nina, setNina] = useState(false);
+  const { desativada: ninaOff } = useNinaDesativada();
 
   return (
     <section className={cn("rounded-2xl border border-slate-100 bg-white p-4", className)}>
@@ -88,16 +89,19 @@ export function InformacoesRapidasCard({ className }: { className?: string }) {
         <Button size="sm" onClick={() => setTabela(true)}>
           <Search className="h-4 w-4 mr-1.5" /> Abrir tabela de preços/horários
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setNina(true)}>
-          <Bot className="h-4 w-4 mr-1.5" /> Perguntar à Nina
-        </Button>
+        {!ninaOff && (
+          <Button size="sm" variant="outline" onClick={() => setNina(true)}>
+            <Bot className="h-4 w-4 mr-1.5" /> Perguntar à Nina
+          </Button>
+        )}
       </div>
 
       <TabelaRapidaDrawer open={tabela} onOpenChange={setTabela} />
-      <NinaDrawer open={nina} onOpenChange={setNina} />
+      {!ninaOff && <NinaDrawer open={nina} onOpenChange={setNina} />}
     </section>
   );
 }
+
 
 function TabelaRapidaDrawer({
   open,
