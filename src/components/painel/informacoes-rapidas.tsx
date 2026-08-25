@@ -15,6 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClinica } from "@/hooks/use-clinica";
 import { getContextoClinica, chatNina } from "@/lib/nina.functions";
+import { VoiceInput } from "@/components/voice-input";
 import { cn } from "@/lib/utils";
 
 type Medico = {
@@ -343,7 +344,14 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Digite sua pergunta..."
+            placeholder="Digite ou fale sua pergunta..."
+          />
+          {/* Fala com a Nina: grava o áudio, transcreve e já envia a pergunta. */}
+          <VoiceInput
+            append={false}
+            title="Falar com a Nina"
+            prompt="Transcreva a pergunta do usuário em português do Brasil, sem comentários."
+            onTranscript={(t) => void perguntar(t)}
           />
           <Button type="submit" size="icon" disabled={loading || !input.trim()}>
             <Send className="h-4 w-4" />
