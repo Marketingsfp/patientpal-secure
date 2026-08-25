@@ -110,6 +110,7 @@ import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
+import { useNinaDesativada } from "@/hooks/use-nina-desativada";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
