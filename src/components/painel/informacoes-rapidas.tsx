@@ -246,19 +246,33 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [voz, setVoz] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Preferência lida só no cliente (evita divergência na hidratação).
+  useEffect(() => setVoz(isNinaVozOn()), []);
+
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80);
+    if (!open) pararNina();
   }, [open]);
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, loading]);
+  useEffect(() => () => pararNina(), []);
+
+  const alternarVoz = () => {
+    const next = !voz;
+    setVoz(next);
+    setNinaVozOn(next);
+    if (!next) pararNina();
+  };
 
   const perguntar = async (texto: string) => {
     const t = texto.trim();
     if (!t || loading || !clinicaAtual) return;
+    pararNina();
     const novas: Msg[] = [...msgs, { role: "user", content: t }];
     setMsgs(novas);
     setInput("");
@@ -267,15 +281,13 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       const r: any = await enviar({
         data: { clinicaId: clinicaAtual.clinica_id, messages: novas.slice(-20) },
       });
-      setMsgs([
-        ...novas,
-        { role: "assistant", content: r?.reply || r?.error || "Não consegui responder agora." },
-      ]);
+      const resposta = r?.reply || r?.error || "Não consegui responder agora.";
+      setMsgs([...novas, { role: "assistant", content: resposta }]);
+      if (voz) void falarNina(resposta);
     } catch {
-      setMsgs([
-        ...novas,
-        { role: "assistant", content: "Não foi possível falar com a Nina agora." },
-      ]);
+      const erro = "Não foi possível falar com a Nina agora.";
+      setMsgs([...novas, { role: "assistant", content: erro }]);
+      if (voz) void falarNina(erro);
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
