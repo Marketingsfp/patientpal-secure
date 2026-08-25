@@ -268,6 +268,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     if (!novo) pararNina();
   };
 
+  const conversa = useConversaVoz({
+    onFrase: (t) => void perguntarRef.current(t),
+  });
+
   const perguntar = async (texto: string) => {
     const t = texto.trim();
     if (!t || loading || !clinicaAtual) return;
@@ -276,13 +280,20 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     setMsgs(novas);
     setInput("");
     setLoading(true);
+    // Enquanto a Nina pensa e fala, o microfone fica silenciado para não
+    // captar a própria voz dela.
+    if (conversa.ativo) conversa.pausar();
     try {
       const r: any = await enviar({
-        data: { clinicaId: clinicaAtual.clinica_id, messages: novas.slice(-20) },
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          messages: novas.slice(-20),
+          modoVoz: conversa.ativo,
+        },
       });
       const resposta = r?.reply || r?.error || "Não consegui responder agora.";
       setMsgs([...novas, { role: "assistant", content: resposta }]);
-      if (voz) void falarNina(resposta);
+      if (voz || conversa.ativo) await falarNina(resposta);
     } catch {
       setMsgs([
         ...novas,
@@ -290,9 +301,12 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       ]);
     } finally {
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      if (conversa.ativo) conversa.retomar();
+      else setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
+  perguntarRef.current = perguntar;
+
 
   const sugestoes = [
     "Qual o valor do ultrassom?",
