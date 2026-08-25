@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { corrigirFala, melhorAlternativa } from "@/lib/voz-correcoes";
+
 
 /**
  * Escuta contínua do microfone para conversar por voz sem apertar botões.
