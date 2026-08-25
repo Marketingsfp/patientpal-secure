@@ -151,6 +151,7 @@ export type Database = {
           tipo_atendimento: string
           token_publico: string | null
           updated_at: string
+          valor_cobranca: number | null
         }
         Insert: {
           agenda_id?: string | null
@@ -202,6 +203,7 @@ export type Database = {
           tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
+          valor_cobranca?: number | null
         }
         Update: {
           agenda_id?: string | null
@@ -253,6 +255,7 @@ export type Database = {
           tipo_atendimento?: string
           token_publico?: string | null
           updated_at?: string
+          valor_cobranca?: number | null
         }
         Relationships: [
           {
@@ -10093,6 +10096,21 @@ export type Database = {
           uf: string
           updated_at: string
           usar_ambiente_nacional: boolean
+        }[]
+      }
+      listar_saldos_em_aberto: {
+        Args: { _busca?: string; _clinica_id: string; _limite?: number }
+        Returns: {
+          agendamento_id: string
+          inicio: string
+          medico_nome: string
+          paciente_id: string
+          paciente_nome: string
+          procedimento: string
+          saldo: number
+          ultimo_pagamento: string
+          valor_cobranca: number
+          valor_pago: number
         }[]
       }
       listar_unidades_basico: {
