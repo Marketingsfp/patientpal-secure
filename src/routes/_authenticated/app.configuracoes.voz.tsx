@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2 } from "lucide-react";
+import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
+import { setClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { FLAG_NINA_DESATIVADA, useNinaDesativada } from "@/hooks/use-nina-desativada";
 import {
   DEFAULT_TTS_RATE,
   MAX_TTS_RATE,
@@ -259,6 +261,10 @@ function VozConfigPage() {
           anamnese. As preferências são salvas neste navegador.
         </p>
       </div>
+
+      <NinaLigaDesliga />
+
+
 
       <Card>
         <CardHeader>
@@ -558,6 +564,61 @@ function TesteServidorLocalCard() {
         <p className="text-xs text-muted-foreground">
           Faz uma requisição POST direta para <code>{TTS_ENDPOINT}</code>.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Botão único para ligar/desligar a assistente Nina na clínica atual.
+ * Grava a feature flag `nina_desativada` (somente admin/gestor pela RLS).
+ */
+function NinaLigaDesliga() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
+  const { desativada, loading } = useNinaDesativada();
+  const [salvando, setSalvando] = useState(false);
+  const ativa = !desativada;
+
+  async function alternar(novoAtiva: boolean) {
+    if (!clinicaId) return;
+    setSalvando(true);
+    try {
+      await setClinicFeatureFlag(
+        clinicaId,
+        FLAG_NINA_DESATIVADA,
+        !novoAtiva,
+        "Desliga a assistente Nina nesta clínica",
+      );
+      toast.success(novoAtiva ? "Nina ativada" : "Nina desativada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bot className="h-4 w-4" /> Assistente Nina
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-medium">Nina ativa</div>
+            <p className="text-xs text-muted-foreground">
+              Desligado, o botão “Perguntar à Nina” some para todos desta clínica.
+            </p>
+          </div>
+          <Switch
+            checked={ativa}
+            disabled={loading || salvando || !clinicaId}
+            onCheckedChange={(v) => void alternar(v)}
+          />
+        </div>
       </CardContent>
     </Card>
   );
