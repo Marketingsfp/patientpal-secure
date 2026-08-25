@@ -132,7 +132,20 @@ export async function metaSendText(
         "Token do WhatsApp inválido ou expirado. Gere um novo Access Token no Meta Business Manager e salve em Configurações → WhatsApp.",
       );
     }
+    // 133010 = número existe no app, mas não foi registrado na Cloud API
+    if (code === 133010 || /not registered/i.test(String(msg))) {
+      throw new Error(
+        "O número do WhatsApp ainda não está registrado na Cloud API da Meta. No Meta Business Manager, abra WhatsApp → Configuração da API e clique em “Registrar” no número (informando o PIN de verificação em duas etapas). Depois tente enviar novamente.",
+      );
+    }
+    // 131030 = destinatário não está na lista de números de teste
+    if (code === 131030) {
+      throw new Error(
+        "Este número de destino não está autorizado no ambiente de testes do WhatsApp. Adicione-o à lista de destinatários permitidos na Meta ou use um número de produção.",
+      );
+    }
     throw new Error(`WhatsApp: ${msg}`);
+
   }
   const wa_message_id = (json as any)?.messages?.[0]?.id ?? null;
   return { wa_message_id };
