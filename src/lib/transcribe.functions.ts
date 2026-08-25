@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { VOCABULARIO_DICA, corrigirFala } from "@/lib/voz-correcoes";
 import { z } from "zod";
 
 const Schema = z.object({
@@ -15,9 +16,16 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) return { text: "", error: "LOVABLE_API_KEY ausente" };
 
-    const sys =
+    // A dica de vocabulário reduz muito o erro em nomes próprios e jargão
+    // da clínica (ex.: "nine" no lugar de "Nina", "sabadim" por "sabadinho").
+    const sys = `${
       data.prompt ??
-      "Transcreva o áudio em português do Brasil com pontuação correta. Retorne apenas o texto transcrito, sem comentários, sem aspas, sem prefixos.";
+      "Transcreva o áudio em português do Brasil com pontuação correta. Retorne apenas o texto transcrito, sem comentários, sem aspas, sem prefixos."
+    }
+
+VOCABULÁRIO ESPERADO (prefira estas grafias quando o som for parecido): ${VOCABULARIO_DICA}.
+Regras: mantenha nomes próprios de pessoas com inicial maiúscula; escreva números em dígitos; horários como 14:30; NÃO traduza nem invente termos; se um trecho estiver inaudível, omita-o em vez de adivinhar.`;
+
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
