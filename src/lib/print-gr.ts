@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
-import { categoriaEhGratuidade } from "@/lib/financeiro/formas-pagamento";
+import { categoriaEhGratuidade, classificarForma } from "@/lib/financeiro/formas-pagamento";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { hojeBR } from "@/lib/date-utils";
 
@@ -624,6 +624,13 @@ async function printGuiaAtendimentoCore({
   // convênio: lá o paciente não paga, mas a mensalidade do cartão remunera o
   // atendimento, e por isso clínica e prestador seguem recebendo. Na cortesia
   // ninguém pagou nada, então a guia sai com tudo zerado.
+  //
+  // ATENÇÃO ao mexer em `categoriaEhGratuidade`: é ela que decide aqui se o
+  // repasse do médico vai a zero. Ampliar a função para abranger outra
+  // categoria de valor zero — RETORNO DE CONSULTA, por exemplo — corta o
+  // repasse dessa categoria junto, sem que a mudança apareça neste arquivo.
+  // Se o retorno deve ou não remunerar o médico é regra de negócio da clínica
+  // e precisa ser decidida com a equipe antes, não herdada por acidente.
   const ehCortesiaClinica = lancs.some(
     (l) => l.status === "confirmado" && categoriaEhGratuidade(nomeCategoriaLancamento(l)),
   );
@@ -1060,7 +1067,15 @@ async function printGuiaAtendimentoCore({
   // A cortesia da clínica é o caso oposto e tem prioridade sobre ela: não
   // entrou dinheiro de ninguém, nem do paciente nem de mensalidade, então a
   // base de cálculo é zero e o atendimento não gera repasse.
-  const isGratuidade = !pagamento && valor === 0 && !ehCortesiaClinica;
+  //
+  // A gratuidade também chega por outro caminho: a agenda, ao reconhecer que o
+  // convênio cobre o exame, grava o atendimento por R$ 0,00 com a forma
+  // `convenio_gratuidade` e manda imprimir passando esse pagamento. Como havia
+  // pagamento informado, `isGratuidade` dava falso e a guia saía SEM nenhuma
+  // caixa de valores — nem "Valor recebido", nem a divisão CLÍNICA/PRESTADOR,
+  // justamente na 1ª via, que é a do médico e existe para mostrar o repasse.
+  const formaEhGratuidade = classificarForma(pagamento?.forma_pagamento) === "convenio";
+  const isGratuidade = valor === 0 && !ehCortesiaClinica && (!pagamento || formaEhGratuidade);
   const valorBase = ehCortesiaClinica
     ? 0
     : isGratuidade
