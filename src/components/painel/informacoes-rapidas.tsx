@@ -254,6 +254,9 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   // Guarda a versão atual de `perguntar` para o reconhecimento de voz sempre
   // chamar o estado mais recente da conversa.
   const perguntarRef = useRef<(texto: string) => Promise<void>>(async () => {});
+  /** `parar()` da conversa por voz, para encerrar ao fechar o chat. */
+  const conversaRef = useRef<(() => void) | null>(null);
+
 
 
   useEffect(() => {
