@@ -1,0 +1,40 @@
+-- ---------------------------------------------------------------------------
+-- Tipo de movimento 'registro': aparece no extrato, vale ZERO na gaveta
+--
+-- A recepção estranhou o comportamento novo porque o sistema antigo (Clínica
+-- Total) fazia uma coisa que este ainda não fazia. Lá, uma guia retroativa já
+-- quitada:
+--
+--   1. faturava na data original do atendimento (competência), alimentando os
+--      relatórios médicos e o histórico do paciente;
+--   2. APARECIA no extrato de movimentações do dia da digitação, como
+--      registro/histórico — dava para ver que a guia tinha sido emitida;
+--   3. mas NÃO entrava na soma do "dinheiro esperado na gaveta" do fechamento
+--      daquele dia.
+--
+-- A primeira versão desta correção resolvia (1) e (3) simplesmente NÃO criando
+-- movimento de caixa nenhum. Isso zera a gaveta corretamente, mas perde (2): a
+-- guia some do extrato do dia, e a atendente não consegue provar que emitiu.
+--
+-- Este tipo novo fecha os três ao mesmo tempo. Um movimento 'registro' é uma
+-- linha de histórico: existe, aparece, é auditável, e pesa zero em qualquer
+-- conta de dinheiro.
+--
+-- POR QUE UM TIPO NOVO, E NÃO UMA MARCA NA DESCRIÇÃO
+-- Regra de dinheiro não pode depender de um trecho de texto. Com um tipo
+-- próprio, qualquer soma que já existe no sistema ignora a linha sozinha:
+-- todas elas usam LISTA BRANCA de tipos
+-- ('recebimento','suprimento','estorno','sangria','despesa'), e
+-- `SINAL_NO_SALDO` trata tipo desconhecido como zero. Foi conferido caminho a
+-- caminho antes desta migração — nenhum lugar soma por exclusão.
+--
+-- ORDEM DE APLICAÇÃO — IMPORTA
+-- Rode este SQL ANTES de publicar o código novo. O código passa a gravar
+-- 'registro', e sem o valor no enum o banco recusa o pagamento com erro. Na
+-- ordem certa não há janela de falha: enquanto o código antigo estiver no ar,
+-- o valor novo simplesmente não é usado por ninguém.
+--
+-- `ADD VALUE IF NOT EXISTS` é idempotente: rodar duas vezes não dá erro.
+-- ---------------------------------------------------------------------------
+
+ALTER TYPE public.caixa_mov_tipo ADD VALUE IF NOT EXISTS 'registro';

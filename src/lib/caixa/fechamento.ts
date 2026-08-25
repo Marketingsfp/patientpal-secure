@@ -28,6 +28,11 @@ export const SINAL_NO_SALDO: Record<string, 1 | -1 | 0> = {
   fechamento: 0,
   estorno: -1,
   reabertura: 0,
+  // Linha de histórico, não de dinheiro: a guia de um atendimento anterior,
+  // já quitada em outro dia, aparece no extrato do dia da digitação para ser
+  // auditável, mas não há dinheiro nenhum entrando na gaveta. Ver
+  // `resumoRegistros`.
+  registro: 0,
 };
 
 /**
@@ -206,6 +211,26 @@ export interface ResumoRetroativos {
  * paralela — se um retroativo for estornado e o estorno também estiver
  * marcado, os dois se anulam, como acontece no total.
  */
+/** Movimento de histórico: aparece no extrato, não soma em conta de dinheiro. */
+export const TIPO_REGISTRO = "registro";
+
+/**
+ * As linhas de histórico do dia: guias de atendimentos anteriores, já quitadas
+ * em outro dia, emitidas hoje.
+ *
+ * Diferente de `resumoRetroativos`, aqui a soma é do valor BRUTO, não do peso
+ * no saldo — o peso é zero por definição. O número existe para a atendente ver
+ * quanto foi emitido de guia antiga hoje, e entender por que aquelas linhas
+ * estão no extrato sem mexer no total.
+ */
+export function resumoRegistros(
+  movs: Array<{ tipo: string; valor: number | string | null | undefined }>,
+): { total: number; quantidade: number } {
+  const regs = movs.filter((m) => m.tipo === TIPO_REGISTRO);
+  const total = Number(regs.reduce((acc, m) => acc + (Number(m.valor) || 0), 0).toFixed(2));
+  return { total, quantidade: regs.length };
+}
+
 export function resumoRetroativos(
   movs: Array<{
     tipo: string;

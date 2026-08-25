@@ -3,6 +3,7 @@ import {
   classificarDiferenca,
   dataRetroativaDe,
   ehMovimentoRetroativo,
+  resumoRegistros,
   resumoRetroativos,
   saldoDeMovimentos,
   saldoEsperadoGaveta,
@@ -198,5 +199,50 @@ describe("resumoRetroativos", () => {
     expect(ehMovimentoRetroativo("PEDRO | [DATA CORRIGIDA EM 25/08/2026] ...")).toBe(false);
     expect(ehMovimentoRetroativo(null)).toBe(false);
     expect(dataRetroativaDe("PEDRO [Data retroativa: 19/08/2026]")).toBe("19/08/2026");
+  });
+});
+
+// A guia de um atendimento anterior, JA QUITADA em outro dia, emitida hoje.
+// O sistema antigo mostrava a linha no extrato do dia da digitacao mas nao a
+// somava no dinheiro esperado da gaveta. E o que o tipo 'registro' reproduz.
+describe("movimento de tipo 'registro'", () => {
+  const dia = [
+    { tipo: "abertura", valor: 100, descricao: "Abertura" },
+    { tipo: "recebimento", valor: 200, descricao: "MARIA — CONSULTA" },
+    { tipo: "registro", valor: 130, descricao: "PEDRO — CONSULTA [Data retroativa: 19/08/2026]" },
+    { tipo: "sangria", valor: 50, descricao: "Sangria" },
+  ];
+
+  it("não entra no saldo do caixa", () => {
+    // 200 recebidos − 50 de sangria. Os 130 do registro não contam.
+    expect(saldoDeMovimentos(dia)).toBe(150);
+  });
+
+  it("removê-lo do extrato daria o mesmo saldo — é a prova de que pesa zero", () => {
+    const semRegistro = dia.filter((m) => m.tipo !== "registro");
+    expect(saldoDeMovimentos(dia)).toBe(saldoDeMovimentos(semRegistro));
+  });
+
+  it("é somado à parte, pelo valor bruto, para aparecer na conferência", () => {
+    expect(resumoRegistros(dia)).toEqual({ total: 130, quantidade: 1 });
+  });
+
+  it("dia sem nenhuma guia antiga não mostra a linha", () => {
+    expect(resumoRegistros([{ tipo: "recebimento", valor: 90 }])).toEqual({
+      total: 0,
+      quantidade: 0,
+    });
+  });
+
+  it("um caixa só de registros fecha em zero", () => {
+    // Caso do dia em que a atendente só emitiu guias antigas: a gaveta dela
+    // tem exatamente o troco de abertura, e o fechamento não pode acusar sobra.
+    const so = [
+      { tipo: "abertura", valor: 100, descricao: "Abertura" },
+      { tipo: "registro", valor: 777, descricao: "guia antiga" },
+      { tipo: "registro", valor: 154.99, descricao: "outra guia antiga" },
+    ];
+    expect(saldoDeMovimentos(so)).toBe(0);
+    expect(resumoRegistros(so).total).toBe(931.99);
   });
 });

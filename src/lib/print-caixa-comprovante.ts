@@ -107,6 +107,16 @@ export interface ComprovanteCaixaInput {
    * hoje corresponde a atendimento de outro dia.
    */
   retroativos?: { total: number; quantidade: number; dias?: string[] };
+  /**
+   * Guias de atendimentos anteriores, JA QUITADAS em outro dia, emitidas hoje
+   * (movimentos de tipo `registro`).
+   *
+   * Ao contrário de `retroativos`, este valor NÃO está somado no total: ele
+   * aparece no extrato do dia da digitação apenas como histórico, e vale
+   * R$ 0,00 no dinheiro esperado da gaveta. É o comportamento que o sistema
+   * antigo tinha e que a recepção conhece.
+   */
+  registros?: { total: number; quantidade: number };
   /** Sangrias e suprimentos do turno (fechamento). */
   movimentos?: Array<{
     tipo: "sangria" | "suprimento";
@@ -308,6 +318,18 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       ? `Já incluído no total acima. Dias de origem: ${retro!.dias.join(", ")}.`
       : "Já incluído no total acima.";
 
+  // Guias antigas ja pagas, emitidas hoje. NAO estao somadas no total — estao
+  // no extrato so como historico do dia da digitacao.
+  const regs = input.registros;
+  const temRegs = !!regs && regs.quantidade > 0;
+  const regsRotulo = temRegs
+    ? `Guias de dias anteriores já pagas (${regs!.quantidade} ${
+        regs!.quantidade === 1 ? "guia" : "guias"
+      })`
+    : "";
+  const regsNota =
+    "NÃO somado no total acima e NÃO entra na contagem da gaveta — recebido em outro dia.";
+
   const linhas: Array<{ label: string; valor: string; destaque?: boolean; descricao?: string }> =
     [];
   if (isFech) {
@@ -334,6 +356,13 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       valor: fmtBRL(difValor),
       destaque: Math.abs(difValor) > 0.009,
     });
+    if (temRegs) {
+      linhas.push({
+        label: regsRotulo,
+        valor: fmtBRL(regs!.total),
+        descricao: regsNota,
+      });
+    }
   } else {
     linhas.push({ label: "Valor", valor: fmtBRL(input.valor), destaque: true });
   }
@@ -430,7 +459,9 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
        ${temRetro ? linha80(retroRotulo, fmtBRL(retro!.total)) : ""}
        ${temRetro ? `<div class="nota">${esc(retroNota)}</div>` : ""}
        ${linha80("Total do dia conferido (com cartão e PIX)", fmtBRL(input.valorInformado ?? input.valor), true)}
-       ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}`
+       ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}
+       ${temRegs ? linha80(regsRotulo, fmtBRL(regs!.total)) : ""}
+       ${temRegs ? `<div class="nota">${esc(regsNota)}</div>` : ""}`
       : destaque80("Valor", fmtBRL(input.valor));
 
     const formasBlock = formasLinhas.length

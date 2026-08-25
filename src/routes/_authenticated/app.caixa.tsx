@@ -85,6 +85,7 @@ import {
   saldoDeMovimentos,
   SINAL_NO_SALDO,
   classificarDiferenca,
+  resumoRegistros,
   resumoRetroativos,
   totalConferido,
   statusCaixa,
@@ -314,7 +315,11 @@ type MovTipo =
   | "despesa"
   | "fechamento"
   | "estorno"
-  | "reabertura";
+  | "reabertura"
+  // Linha de historico: guia de atendimento anterior, ja quitada em outro dia,
+  // emitida hoje. Aparece no extrato para auditoria e pesa ZERO em qualquer
+  // conta de dinheiro. Ver `SINAL_NO_SALDO` em @/lib/caixa/fechamento.
+  | "registro";
 interface Sessao {
   id: string;
   clinica_id: string;
@@ -396,6 +401,7 @@ const TIPO_LABEL: Record<MovTipo, string> = {
   fechamento: "Fechamento",
   estorno: "Estorno",
   reabertura: "Reabertura",
+  registro: "Registro",
 };
 /**
  * Sinal de EXIBIÇÃO de cada movimento nas tabelas e no comprovante: define a
@@ -416,6 +422,8 @@ const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   fechamento: 0,
   estorno: -1,
   reabertura: 0,
+  // Nao move dinheiro: e so a prova de que a guia antiga foi emitida hoje.
+  registro: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura:
@@ -434,6 +442,9 @@ const TIPO_CLASS: Record<MovTipo, string> = {
     "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
   reabertura:
     "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
+  // Cinza de proposito: nao e entrada nem saida, e historico.
+  registro:
+    "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
 };
 
 /**
@@ -458,6 +469,7 @@ const TIPO_CLASS_SUAVE: Record<MovTipo, string> = {
     "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:text-fuchsia-300",
   reabertura:
     "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300",
+  registro: "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/50 dark:text-slate-300",
 };
 
 const SESSAO_FIELDS =
@@ -2152,6 +2164,7 @@ function Page() {
       fechamento: 0,
       estorno: 0,
       reabertura: 0,
+      registro: 0,
     };
     minhasMovs.forEach((m) => {
       if (movEstornado(m)) return;
@@ -2908,6 +2921,25 @@ function Page() {
     [todosMovs],
   );
 
+  /**
+   * Guias de atendimentos anteriores, JÁ QUITADAS em outro dia, emitidas hoje.
+   *
+   * São os movimentos de tipo `registro`. Não confundir com os retroativos
+   * acima: aqueles são dinheiro que ENTROU nesta gaveta e continua somando;
+   * estes valem R$ 0,00 na conta e aparecem só como histórico do dia da
+   * digitação, como fazia o sistema antigo. A linha existe para a atendente
+   * não estranhar ver a guia no extrato sem ela mexer no total.
+   */
+  const registrosDoDiaFechamento = useMemo(
+    () => resumoRegistros(movsDoDiaFechamento),
+    [movsDoDiaFechamento],
+  );
+  const registrosDaSessao = useCallback(
+    (sid: string) =>
+      resumoRegistros(todosMovs.filter((m) => m.sessao_id === sid && !m.id.startsWith("fin:"))),
+    [todosMovs],
+  );
+
   /** Mesma conta para o caixa de outra pessoa, fechado pelo gestor. */
   const composicaoGavetaSessao = useCallback(
     (sid: string, valorAbertura: number) => {
@@ -3311,6 +3343,7 @@ function Page() {
       esperadoGaveta: esperadoGavetaFechamento,
       composicaoGaveta: gavetaDoDiaFechamento,
       retroativos: retroativosDoDiaFechamento,
+      registros: registrosDoDiaFechamento,
       movimentos: movsGaveta.map((m) => ({
         tipo: m.tipo,
         valor: m.valor,
@@ -3406,6 +3439,7 @@ function Page() {
       fechamentoEm: fechadoEmISO,
       composicaoGaveta: composicaoGavetaSessao(alvo.id, Number(alvo.valor_abertura || 0)),
       retroativos: retroativosDaSessao(alvo.id),
+      registros: registrosDaSessao(alvo.id),
     });
     void loadTodos();
     void load();
@@ -5276,6 +5310,20 @@ function Page() {
                 {retroativosDoDiaFechamento.quantidade === 1 ? "guia" : "guias"} de{" "}
                 {retroativosDoDiaFechamento.dias.join(", ")}). Já está somado acima — o dinheiro
                 entrou nesta gaveta porque o caixa daquele dia já estava fechado. Não desconte.
+              </p>
+            )}
+            {/* Guias antigas JÁ PAGAS, emitidas hoje. Ao contrário da linha
+                acima, estas NÃO estão somadas no total — aparecem no extrato
+                só como histórico do dia da digitação. */}
+            {registrosDoDiaFechamento.quantidade > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Além disso, <strong>{fmt(registrosDoDiaFechamento.total)}</strong> em{" "}
+                {registrosDoDiaFechamento.quantidade}{" "}
+                {registrosDoDiaFechamento.quantidade === 1
+                  ? "guia de dia anterior já paga"
+                  : "guias de dias anteriores já pagas"}{" "}
+                aparecem no extrato de hoje, mas <strong>não estão somados acima</strong> e não
+                entram na contagem da gaveta — esse dinheiro foi recebido em outro dia.
               </p>
             )}
           </DialogHeader>

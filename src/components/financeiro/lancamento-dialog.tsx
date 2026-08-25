@@ -36,7 +36,7 @@ import {
   FORMA_PAGO_SISTEMA_ANTERIOR,
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
-import { deveRegistrarNoCaixa } from "@/lib/financeiro/registro-no-caixa";
+import { planoDeMovimento } from "@/lib/financeiro/registro-no-caixa";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -1213,8 +1213,9 @@ export function LancamentoDialog({
     // atendimento e o repasse é apurado normalmente (a apuração lê
     // `fin_lancamentos`), mas a gaveta de hoje não é tocada — movimento de
     // caixa R$ 0,00 no dia de hoje.
-    const registraNoCaixa = deveRegistrarNoCaixa({
+    const plano = planoDeMovimento({
       temOperador: !!user?.id,
+      tipoLancamento: tipo,
       valorPrincipal,
       formaPagamento: formaFinal,
       temAgendamento: !!agendamentoId,
@@ -1264,18 +1265,24 @@ export function LancamentoDialog({
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
     };
-    const pMovimento = registraNoCaixa
+    const pMovimento = plano.registra
       ? {
           user_id: user!.id,
           user_nome: (user!.user_metadata as { nome?: string } | null)?.nome ?? user!.email ?? null,
-          tipo: tipo === "receita" ? "recebimento" : "despesa",
+          // "recebimento" / "despesa" mexem na gaveta. "registro" é linha de
+          // histórico: aparece no extrato do dia da digitação e pesa zero no
+          // dinheiro esperado — ver `planoDeMovimento`.
+          tipo: plano.tipo,
           valor: valorPrincipal,
-          descricao: descricao.trim(),
+          descricao:
+            plano.tipo === "registro"
+              ? `${descricao.trim()} — JÁ PAGO ANTES (não entra na gaveta)`
+              : descricao.trim(),
           forma_pagamento: formaFinal,
-          // Lançamento retroativo cai no caixa do dia escolhido — não no
-          // caixa de hoje. Quando a data é hoje, o backend usa a sessão
-          // aberta atual normalmente.
-          forcar_sessao_hoje: false,
+          // Retroativo pago AGORA cai no caixa do dia escolhido se ele ainda
+          // estiver aberto. A linha de histórico vai sempre para o caixa de
+          // hoje, que é o dia da digitação.
+          forcar_sessao_hoje: plano.forcarSessaoHoje,
         }
       : null;
 
@@ -2097,10 +2104,11 @@ export function LancamentoDialog({
                       }}
                     />
                     <span className="text-xs">
-                      <strong>Já foi pago antes — não entra no caixa de hoje.</strong> A guia é
-                      liberada e o repasse do prestador é calculado normalmente, mas o valor{" "}
-                      <strong>não soma no fechamento de hoje</strong>, porque esse dinheiro não está
-                      na gaveta.
+                      <strong>Já foi pago antes — não entra na gaveta de hoje.</strong> A guia é
+                      liberada e o repasse do prestador é calculado normalmente. A linha{" "}
+                      <strong>aparece no extrato do caixa de hoje</strong> para a auditoria ver que
+                      a guia foi emitida, mas vale <strong>R$ 0,00 no dinheiro esperado</strong> do
+                      fechamento — igual ao sistema antigo.
                     </span>
                   </label>
                 </div>
