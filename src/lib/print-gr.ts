@@ -1,7 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
-import { categoriaEhGratuidade, classificarForma } from "@/lib/financeiro/formas-pagamento";
+import {
+  categoriaEhRetorno,
+  categoriaEhSemCobranca,
+  categoriaZeraRepasse,
+  classificarForma,
+} from "@/lib/financeiro/formas-pagamento";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { hojeBR } from "@/lib/date-utils";
 
@@ -619,21 +624,40 @@ async function printGuiaAtendimentoCore({
     status: string | null;
     categoria?: { nome: string | null } | Array<{ nome: string | null }> | null;
   }>;
-  // Cortesia da clínica: o atendimento foi liberado pela CATEGORIA financeira
-  // (CORTESIA, GRATUIDADE, ISENTO...). Não confundir com a gratuidade do
-  // convênio: lá o paciente não paga, mas a mensalidade do cartão remunera o
-  // atendimento, e por isso clínica e prestador seguem recebendo. Na cortesia
-  // ninguém pagou nada, então a guia sai com tudo zerado.
+  // O atendimento foi liberado pela CATEGORIA financeira do lançamento, e o
+  // paciente não pagou nada. São três situações com efeitos DIFERENTES na
+  // divisão CLÍNICA/PRESTADOR desta guia:
   //
-  // ATENÇÃO ao mexer em `categoriaEhGratuidade`: é ela que decide aqui se o
-  // repasse do médico vai a zero. Ampliar a função para abranger outra
-  // categoria de valor zero — RETORNO DE CONSULTA, por exemplo — corta o
-  // repasse dessa categoria junto, sem que a mudança apareça neste arquivo.
-  // Se o retorno deve ou não remunerar o médico é regra de negócio da clínica
-  // e precisa ser decidida com a equipe antes, não herdada por acidente.
-  const ehCortesiaClinica = lancs.some(
-    (l) => l.status === "confirmado" && categoriaEhGratuidade(nomeCategoriaLancamento(l)),
+  //   - RETORNO DE CONSULTA → tudo zerado. O retorno já foi pago na consulta
+  //     que o originou, e lá o médico já recebeu o repasse; pagar de novo
+  //     remuneraria duas vezes o mesmo atendimento.
+  //   - CORTESIA da diretoria → tudo zerado. Não entrou dinheiro de ninguém,
+  //     nem do paciente nem de mensalidade, então não há o que dividir.
+  //   - GRATUIDADE do convênio/plano → clínica e prestador RECEBEM
+  //     normalmente, com base no valor de tabela do procedimento: quem
+  //     remunera o atendimento é a mensalidade do cartão do paciente.
+  //
+  // Por isso são duas perguntas separadas, e não uma só: `ehSemCobranca` diz
+  // que o paciente pagou zero (vale para as três) e `ehSemRepasse` diz que
+  // ninguém recebe (só retorno e cortesia). Trocar uma pela outra aqui volta a
+  // cortar o repasse da gratuidade de convênio, que é justamente o caso em que
+  // o médico tem de receber.
+  const ehSemCobranca = lancs.some(
+    (l) => l.status === "confirmado" && categoriaEhSemCobranca(nomeCategoriaLancamento(l)),
   );
+  const ehSemRepasse = lancs.some(
+    (l) => l.status === "confirmado" && categoriaZeraRepasse(nomeCategoriaLancamento(l)),
+  );
+  // Rótulo impresso na tarja da guia. O retorno é rotina e direito do
+  // paciente; imprimir "CORTESIA" nele daria a entender que a diretoria abriu
+  // uma exceção, que é justamente o que ele não é.
+  const ehRetornoClinica = lancs.some(
+    (l) => l.status === "confirmado" && categoriaEhRetorno(nomeCategoriaLancamento(l)),
+  );
+  const rotuloLiberacao = ehRetornoClinica ? "RETORNO DE CONSULTA" : "CORTESIA";
+  const subtituloLiberacao = ehRetornoClinica
+    ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
+    : "ATENDIMENTO LIBERADO — SEM COBRANÇA";
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -902,11 +926,14 @@ async function printGuiaAtendimentoCore({
       }
     }
     // Sem nada pago, a guia cai no valor de tabela — é o caso de imprimir a
-    // guia ANTES de cobrar. Numa cortesia isso estaria errado: o atendimento
+    // guia ANTES de cobrar. Num atendimento liberado isso estaria errado: ele
     // já foi fechado por R$ 0,00, e a reimpressão precisa repetir zero em vez
-    // de ressuscitar o preço cheio do procedimento.
+    // de ressuscitar o preço cheio do procedimento. Vale para as três
+    // liberações, inclusive a gratuidade de convênio — nela o paciente também
+    // não pagou nada; o valor de tabela reaparece adiante só como BASE do
+    // repasse (`valorBase`), nunca como valor recebido.
     valor =
-      valorPago > 0 ? valorPago : ehCortesiaClinica ? 0 : Number(procData?.valor_dinheiro_pix ?? 0);
+      valorPago > 0 ? valorPago : ehSemCobranca ? 0 : Number(procData?.valor_dinheiro_pix ?? 0);
     if (formaResolvida) {
       // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
       let detalhe:
@@ -1074,9 +1101,13 @@ async function printGuiaAtendimentoCore({
   // pagamento informado, `isGratuidade` dava falso e a guia saía SEM nenhuma
   // caixa de valores — nem "Valor recebido", nem a divisão CLÍNICA/PRESTADOR,
   // justamente na 1ª via, que é a do médico e existe para mostrar o repasse.
+  //
+  // A categoria GRATUIDADE entra por aqui junto com esse caminho da agenda: em
+  // ambos o paciente é isento e o repasse é calculado sobre o valor de tabela.
+  // Quem fica de fora é só quem zera repasse (retorno e cortesia).
   const formaEhGratuidade = classificarForma(pagamento?.forma_pagamento) === "convenio";
-  const isGratuidade = valor === 0 && !ehCortesiaClinica && (!pagamento || formaEhGratuidade);
-  const valorBase = ehCortesiaClinica
+  const isGratuidade = valor === 0 && !ehSemRepasse && (!pagamento || formaEhGratuidade);
+  const valorBase = ehSemRepasse
     ? 0
     : isGratuidade
       ? Number(procData?.valor_dinheiro_pix ?? 0)
@@ -1177,11 +1208,11 @@ async function printGuiaAtendimentoCore({
   if (!repasseFixoConvenio) {
     prestador = Math.min(prestador, valorBase);
   }
-  // Trava final da cortesia. O repasse do Cartão Consulta é FIXO e de
-  // propósito não é limitado pelo valor pago (`repasseFixoConvenio`), então
-  // sem esta linha um médico com repasse fixo cadastrado ainda apareceria
-  // recebendo numa guia de cortesia.
-  if (ehCortesiaClinica) prestador = 0;
+  // Trava final do retorno e da cortesia. O repasse do Cartão Consulta é FIXO
+  // e de propósito não é limitado pelo valor pago (`repasseFixoConvenio`),
+  // então sem esta linha um médico com repasse fixo cadastrado ainda
+  // apareceria recebendo numa guia que não pagou nada a ninguém.
+  if (ehSemRepasse) prestador = 0;
   const clinica = +Math.max(0, valorBase - prestador).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
@@ -1387,18 +1418,22 @@ async function printGuiaAtendimentoCore({
     ${
       ehExterno
         ? externoValoresHtml
-        : // A cortesia entra por aqui de propósito, e não numa caixa própria:
-          // o pedido da clínica é que a guia mantenha o formato de sempre —
-          // "Valor recebido" e a divisão CLÍNICA/PRESTADOR — apenas com tudo
-          // zerado. A forma impressa é "CONVÊNIO GRATUIDADE", então a guia
-          // nunca sugere cobrança em dinheiro ou cartão.
-          valor > 0 || ehCortesiaClinica
+        : // Retorno e cortesia entram por aqui de propósito, e não numa caixa
+          // própria: o pedido da clínica é que a guia mantenha o formato de
+          // sempre — "Valor recebido" e a divisão CLÍNICA/PRESTADOR — apenas
+          // com tudo zerado. A forma impressa é "CONVÊNIO GRATUIDADE", então a
+          // guia nunca sugere cobrança em dinheiro ou cartão.
+          //
+          // A gratuidade do convênio NÃO entra aqui: com valor zero e repasse
+          // a mostrar, ela cai na caixa "GRATUIDADE / PACIENTE ISENTO" logo
+          // abaixo, que é a que exibe clínica e prestador.
+          valor > 0 || ehSemRepasse
           ? `
     <div class="box-total">
       ${
-        ehCortesiaClinica
-          ? `<div class="center bold lg" style="letter-spacing:2px">CORTESIA</div>
-      <div class="center sm">ATENDIMENTO LIBERADO — SEM COBRANÇA</div>`
+        ehSemRepasse
+          ? `<div class="center bold lg" style="letter-spacing:2px">${rotuloLiberacao}</div>
+      <div class="center sm">${subtituloLiberacao}</div>`
           : ""
       }
       <div class="linha-principal">
@@ -1736,10 +1771,16 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // Agendamentos que têm lançamento confirmado mas com valor total 0 →
   // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
   const gratuidadeByAg = new Map<string, boolean>();
-  // Cortesia da clínica (categoria CORTESIA / GRATUIDADE / ISENTO): aqui nem
-  // clínica nem prestador recebem — ver o comentário equivalente na guia
-  // individual.
-  const cortesiaByAg = new Map<string, boolean>();
+  // Retorno de consulta e cortesia da diretoria: aqui nem clínica nem
+  // prestador recebem — ver o comentário equivalente na guia individual. A
+  // categoria GRATUIDADE de propósito NÃO entra neste mapa: ela é isenção do
+  // convênio, o prestador continua recebendo, e o item segue pelo caminho
+  // normal de gratuidade (`gratuidadeByAg`), com o valor de tabela como base
+  // do repasse.
+  const semRepasseByAg = new Map<string, boolean>();
+  // Rótulo da tarja impressa, por agendamento: retorno tem o seu próprio, para
+  // não sair "GRATUIDADE" numa guia que é direito do paciente.
+  const retornoByAg = new Map<string, boolean>();
   for (const l of lancs) {
     if (!l.agendamento_id) continue;
     if (l.status !== "confirmado") continue;
@@ -1748,8 +1789,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor),
     );
     gratuidadeByAg.set(l.agendamento_id, true);
-    if (categoriaEhGratuidade(nomeCategoriaLancamento(l))) {
-      cortesiaByAg.set(l.agendamento_id, true);
+    if (categoriaZeraRepasse(nomeCategoriaLancamento(l))) {
+      semRepasseByAg.set(l.agendamento_id, true);
+    }
+    if (categoriaEhRetorno(nomeCategoriaLancamento(l))) {
+      retornoByAg.set(l.agendamento_id, true);
     }
   }
   // Depois de somar, mantém true só quando o total é 0.
@@ -1933,6 +1977,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     inicioRef: string;
     allGratuidade: boolean;
     anyPago: boolean;
+    ehRetorno: boolean;
   };
   const grupos = new Map<string, Grupo>();
 
@@ -1942,10 +1987,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
     const procNome = formatServicoLinha(procNomeBase, espNome);
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de
-    // procedimentos. Cortesia nunca cai na tabela: já foi fechada por R$ 0,00.
-    const ehCortesiaItem = cortesiaByAg.get(a.id) === true;
+    // procedimentos. Retorno e cortesia nunca caem na tabela: já foram
+    // fechados por R$ 0,00 e não dividem nada. Numa gratuidade de convênio a
+    // tabela é usada, mas como BASE do repasse — o item continua marcado como
+    // gratuidade e a guia não imprime valor recebido.
+    const ehSemRepasseItem = semRepasseByAg.get(a.id) === true;
     const valorPago = valorPagoByAg.get(a.id);
-    const valor = ehCortesiaItem
+    const valor = ehSemRepasseItem
       ? 0
       : valorPago != null && valorPago > 0
         ? valorPago
@@ -1999,8 +2047,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         }
       }
     }
-    // Cortesia não gera repasse: ninguém pagou nada por este item.
-    if (ehCortesiaItem) prestador = 0;
+    // Retorno e cortesia não geram repasse: ninguém pagou nada por este item.
+    if (ehSemRepasseItem) prestador = 0;
     prestador = Math.min(prestador, valor);
     const clin = +(valor - prestador).toFixed(2);
 
@@ -2023,6 +2071,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       inicioRef: a.inicio,
       allGratuidade: true,
       anyPago: false,
+      ehRetorno: retornoByAg.get(a.id) === true,
     };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
     if (!gratuidade) g.anyPago = true;
@@ -2150,8 +2199,14 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ${
           g.allGratuidade
             ? `
-        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
-        <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">${
+          g.ehRetorno ? "RETORNO DE CONSULTA" : "GRATUIDADE"
+        }</div>
+        <div class="center sm">${
+          g.ehRetorno
+            ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
+            : "PACIENTE ISENTO DE PAGAMENTO"
+        }</div>
         ${
           g.clinica > 0 || g.prestador > 0
             ? `

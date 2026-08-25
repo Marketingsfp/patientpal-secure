@@ -28,7 +28,12 @@ import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
-import { categoriaEhGratuidade } from "@/lib/financeiro/formas-pagamento";
+import {
+  categoriaEhRetorno,
+  categoriaEhSemCobranca,
+  categoriaExigeAutorizacao,
+  classificarLiberacao,
+} from "@/lib/financeiro/formas-pagamento";
 import { hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -380,11 +385,19 @@ export function LancamentoDialog({
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  // Categoria de gratuidade escolhida (CORTESIA, GRATUIDADE, ISENTO...). É o
-  // sinal de que este atendimento sai liberado, sem nada a receber: o total
-  // vai a R$ 0,00 e a tela deixa de pedir dinheiro, cartão ou valor recebido.
+  // Categoria que libera o atendimento sem cobrar nada do paciente. É o sinal
+  // de que o total vai a R$ 0,00 e a tela deixa de pedir dinheiro, cartão ou
+  // valor recebido. São três situações, e nesta tela elas só diferem no que é
+  // pedido ao operador (ver `classificarLiberacao`):
+  //   - RETORNO DE CONSULTA → nada a preencher: é direito do paciente;
+  //   - CORTESIA da diretoria → justificativa escrita + supervisor;
+  //   - GRATUIDADE do convênio → nada a preencher: quem paga é a mensalidade
+  //     do cartão do paciente, e o repasse do prestador segue normal na guia.
   const categoriaAtual = categorias.find((c) => c.id === categoriaId) ?? null;
-  const ehCategoriaGratuidade = categoriaEhGratuidade(categoriaAtual?.nome);
+  const ehCategoriaGratuidade = categoriaEhSemCobranca(categoriaAtual?.nome);
+  const tipoLiberacao = classificarLiberacao(categoriaAtual?.nome);
+  const ehCategoriaRetorno = tipoLiberacao === "retorno";
+  const ehCategoriaConvenio = tipoLiberacao === "convenio";
   const valorNum = Number(valor || 0);
   // Calcula desconto efetivo em R$ a partir do tipo selecionado.
   const origNum = Number(valorOriginal || initialValor || 0);
@@ -539,18 +552,18 @@ export function LancamentoDialog({
     // imprimir" de uma cortesia, exigindo um total maior que zero e um meio de
     // pagamento que, num atendimento liberado, não existem.
     const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
-    const ehCortesia = categoriaEhGratuidade(catAtual?.nome);
-    if (!descricao.trim() || (!valor && !ehCortesia)) {
+    const ehSemCobranca = categoriaEhSemCobranca(catAtual?.nome);
+    if (!descricao.trim() || (!valor && !ehSemCobranca)) {
       toast.error("Descrição e valor são obrigatórios");
       return;
     }
-    if (valorNum <= 0 && !ehCortesia) {
+    if (valorNum <= 0 && !ehSemCobranca) {
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
     // Trava o inverso: categoria de gratuidade com valor cobrado esconderia um
     // recebimento dentro de uma linha que o financeiro lê como isenção.
-    if (ehCortesia && valorNum > 0) {
+    if (ehSemCobranca && valorNum > 0) {
       toast.error(
         `Categoria "${catAtual?.nome ?? "gratuidade"}" não pode ter valor a cobrar — o total precisa ser R$ 0,00.`,
       );
@@ -564,7 +577,7 @@ export function LancamentoDialog({
     // pagamento real foi em débito/pix/etc, divergindo do que de fato ocorreu.
     // Gratuidade fica de fora: a forma dela é fixada automaticamente como
     // "Convênio / Gratuidade" e não há meio de pagamento a escolher.
-    if (tipo === "receita" && !pagamentoMisto && !formaPagamento && !ehCortesia) {
+    if (tipo === "receita" && !pagamentoMisto && !formaPagamento && !ehSemCobranca) {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
@@ -584,10 +597,16 @@ export function LancamentoDialog({
         return;
       }
     }
-    // ----- Cortesia: exige justificativa + autorização de supervisor -----
-    // Zerar o valor ficou automático, mas a liberação continua sendo uma
-    // decisão de quem manda: sem justificativa e sem supervisor, não grava.
-    if (ehCortesia) {
+    // ----- Cortesia manual: exige justificativa + autorização de supervisor --
+    // Zerar o valor ficou automático, mas abrir mão de um valor devido segue
+    // sendo decisão de quem manda: sem justificativa e sem supervisor, não
+    // grava.
+    //
+    // O RETORNO DE CONSULTA não passa por aqui de propósito. Ele é direito do
+    // paciente, já pago na consulta de origem, e não uma exceção concedida
+    // pela diretoria — pedir justificativa e supervisor a cada retorno
+    // travava a recepção num atendimento que é rotina.
+    if (categoriaExigeAutorizacao(catAtual?.nome)) {
       if (!cortesiaJustificativa.trim()) {
         toast.error("Informe a justificativa da cortesia.");
         return;
@@ -959,10 +978,24 @@ export function LancamentoDialog({
         `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}` +
         (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
+    // Retorno e gratuidade de convênio não têm autorizador nem justificativa:
+    // o rastro é o próprio registro do atendimento, e a observação só explica
+    // por que o lançamento nasceu zerado. Só a cortesia manual grava quem
+    // autorizou.
     let cortesiaObs = "";
-    if (ehCortesia) {
-      const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
-      cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+    switch (classificarLiberacao(catAtual?.nome)) {
+      case "retorno":
+        cortesiaObs = "Retorno de consulta — sem cobrança (retorno incluso na consulta de origem)";
+        break;
+      case "convenio":
+        cortesiaObs =
+          "Gratuidade do convênio/plano — paciente isento; repasse do prestador mantido";
+        break;
+      case "cortesia": {
+        const autor = supervisorInfo?.nome ?? (ehSupervisor ? (user?.email ?? "supervisor") : "");
+        cortesiaObs = `Cortesia — Autorizado por: ${autor} — Justificativa: ${cortesiaJustificativa.trim()}`;
+        break;
+      }
     }
     const obsFinal =
       [observacoes.trim(), cortesiaObs, descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
@@ -1688,6 +1721,37 @@ export function LancamentoDialog({
             </div>
             {(() => {
               if (!ehCategoriaGratuidade) return null;
+              // Retorno de consulta: só informa por que o total está zerado.
+              // Nada a preencher, nada a autorizar — "Salvar e imprimir" já
+              // está liberado.
+              if (ehCategoriaRetorno) {
+                return (
+                  <div className="rounded-md border border-dashed border-emerald-400 p-3 bg-emerald-50/40">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Retorno de consulta</strong>: total zerado em <strong>R$ 0,00</strong>{" "}
+                      e registrado como Convênio / Gratuidade. O retorno já está incluso na consulta
+                      de origem — não há nada a receber, nem justificativa ou autorização a pedir. É
+                      só salvar e imprimir.
+                    </p>
+                  </div>
+                );
+              }
+              // Gratuidade do convênio/plano: o paciente é isento porque a
+              // mensalidade do cartão dele já remunera o atendimento. Também
+              // não há nada a autorizar — e, ao contrário do retorno e da
+              // cortesia, o prestador continua recebendo o repasse na guia.
+              if (ehCategoriaConvenio) {
+                return (
+                  <div className="rounded-md border border-dashed border-sky-400 p-3 bg-sky-50/40">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Gratuidade do convênio/plano</strong>: total zerado em{" "}
+                      <strong>R$ 0,00</strong> — o atendimento é coberto pela mensalidade do
+                      paciente. Não há justificativa nem autorização a pedir, e o repasse do
+                      prestador sai normalmente na guia.
+                    </p>
+                  </div>
+                );
+              }
               return (
                 <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
                   <p className="text-xs text-muted-foreground">
@@ -1712,7 +1776,7 @@ export function LancamentoDialog({
                     rows={2}
                     value={cortesiaJustificativa}
                     onChange={(e) => setCortesiaJustificativa(e.target.value)}
-                    placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                    placeholder="Ex: paciente encaminhado pela diretoria, campanha social, acordo institucional..."
                   />
                 </div>
               );

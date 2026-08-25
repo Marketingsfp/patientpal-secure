@@ -137,29 +137,102 @@ export function classificarForma(raw: string | null | undefined): FormaCanonica 
 }
 
 /**
- * Reconhece uma CATEGORIA financeira de gratuidade — "CORTESIA",
- * "GRATUIDADE", "ISENTO"/"ISENÇÃO", "SEM COBRANÇA".
+ * As três situações em que o paciente não paga nada pelo atendimento.
  *
- * Serve à tela de cobrança (Nova Receita): nessas categorias o atendimento é
- * liberado sem cobrar nada, então o total é zerado automaticamente e a tela
- * para de exigir dinheiro, cartão ou valor recebido. Antes disso, escolher
- * "CORTESIA" mantinha o valor cheio do procedimento e o rodapé acusava
- * "Falta: R$ 148,50", travando o "Salvar e imprimir" de um atendimento que
- * por definição não tem nada a receber.
+ * Elas terminam iguais no caixa — total R$ 0,00, forma "Convênio /
+ * Gratuidade", nada a conferir na gaveta — mas são decisões diferentes, e o
+ * que muda entre elas é quem autoriza e quem continua recebendo:
+ *
+ *   - "retorno": RETORNO DE CONSULTA. Direito do paciente, já pago na consulta
+ *     que o originou. A recepção grava sozinha, sem justificativa e sem
+ *     supervisor. Não gera repasse: o médico já foi remunerado na consulta de
+ *     origem, e pagar de novo seria pagar duas vezes o mesmo atendimento.
+ *
+ *   - "cortesia": CORTESIA da diretoria e suas variantes (ISENTO, ISENÇÃO,
+ *     SEM COBRANÇA). Aqui a clínica abre mão de um valor que o paciente devia
+ *     de verdade. Exige justificativa escrita e autorização de supervisor, e
+ *     zera repasse: não entrou dinheiro de ninguém, nem do paciente nem de
+ *     mensalidade.
+ *
+ *   - "convenio": GRATUIDADE do convênio/plano. O paciente é isento porque a
+ *     mensalidade do cartão dele já remunera o atendimento. Não exige
+ *     autorização nenhuma e o prestador RECEBE O REPASSE NORMAL, calculado
+ *     sobre o valor de tabela do procedimento.
  *
  * O casamento é por palavra inteira, de propósito: categoria que apenas
  * menciona convênio ("CONVENIOS", "EXAME CARTAO CONSULTA") continua sendo
- * cobrança normal e não pode cair aqui — quem concede gratuidade pelo
- * convênio é a regra do Cartão Benefícios, não o nome da categoria.
+ * cobrança normal e não pode cair aqui.
  *
  * Não confundir com `classificarForma`, que classifica a FORMA de pagamento
- * gravada no lançamento; esta função olha o nome da categoria.
+ * gravada no lançamento; estas funções olham o nome da CATEGORIA.
  */
-export function categoriaEhGratuidade(nome: string | null | undefined): boolean {
+export type LiberacaoCategoria = "retorno" | "cortesia" | "convenio";
+
+/**
+ * Classifica o nome da categoria numa das três liberações — ou `null` quando
+ * é cobrança normal.
+ *
+ * A ordem dos testes importa: retorno vence cortesia, e cortesia vence a
+ * gratuidade de convênio. Assim um nome ambíguo como "CORTESIA / GRATUIDADE"
+ * cai no caso mais restritivo (pede autorização e não gera repasse) em vez do
+ * mais permissivo — errar para o lado de pedir autorização a mais é barato;
+ * errar para o lado de pagar repasse indevido, não.
+ */
+export function classificarLiberacao(nome: string | null | undefined): LiberacaoCategoria | null {
   const k = normalizar(nome);
-  if (!k) return false;
-  if (/sem cobranca/.test(k)) return true;
-  return /\b(cortesia|gratuidade|gratuito|gratuita|gratis|isento|isenta|isencao)\b/.test(k);
+  if (!k) return null;
+  // "RETORNO DE CHEQUE", estorno e devolução são movimento bancário com valor
+  // real: não podem ser zerados só por conterem a palavra "retorno".
+  const movimentoBancario = /\b(cheque|devolucao|devolvido|devolvida|estorno)\b/.test(k);
+  if (!movimentoBancario && /\bretorno\b/.test(k)) return "retorno";
+  if (/sem cobranca/.test(k)) return "cortesia";
+  if (/\b(cortesia|isento|isenta|isencao)\b/.test(k)) return "cortesia";
+  if (/\b(gratuidade|gratuito|gratuita|gratis)\b/.test(k)) return "convenio";
+  return null;
+}
+
+/**
+ * O atendimento sai sem cobrar nada do paciente (qualquer uma das três
+ * liberações).
+ *
+ * Serve à tela de cobrança (Nova Receita): o total é zerado automaticamente e
+ * a tela para de exigir dinheiro, cartão ou valor recebido. Antes disso,
+ * escolher "CORTESIA" mantinha o valor cheio do procedimento e o rodapé
+ * acusava "Falta: R$ 148,50", travando o "Salvar e imprimir" de um atendimento
+ * que por definição não tem nada a receber.
+ */
+export function categoriaEhSemCobranca(nome: string | null | undefined): boolean {
+  return classificarLiberacao(nome) !== null;
+}
+
+/** Categoria de RETORNO DE CONSULTA. */
+export function categoriaEhRetorno(nome: string | null | undefined): boolean {
+  return classificarLiberacao(nome) === "retorno";
+}
+
+/**
+ * Exige justificativa escrita e autorização de supervisor para gravar.
+ *
+ * Só a cortesia manual: ali alguém decidiu abrir mão de um valor devido, e
+ * essa decisão tem um responsável. Retorno e gratuidade de convênio ficam de
+ * fora — exigir supervisor neles transformava rotina em exceção e parava a
+ * fila da recepção.
+ */
+export function categoriaExigeAutorizacao(nome: string | null | undefined): boolean {
+  return classificarLiberacao(nome) === "cortesia";
+}
+
+/**
+ * Zera também o repasse: nem clínica nem prestador recebem.
+ *
+ * Vale para retorno e cortesia, onde não entrou dinheiro de ninguém. A
+ * gratuidade do convênio é o caso oposto e por isso não entra: quem remunera
+ * o atendimento é a mensalidade do cartão do paciente, então o prestador
+ * recebe o repasse normal sobre o valor de tabela.
+ */
+export function categoriaZeraRepasse(nome: string | null | undefined): boolean {
+  const t = classificarLiberacao(nome);
+  return t === "retorno" || t === "cortesia";
 }
 
 export interface ParteMisto {

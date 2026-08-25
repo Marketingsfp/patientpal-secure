@@ -1,33 +1,103 @@
 import { describe, expect, it } from "bun:test";
 import {
-  categoriaEhGratuidade,
+  categoriaEhSemCobranca,
+  categoriaExigeAutorizacao,
+  categoriaZeraRepasse,
+  classificarLiberacao,
   classificarForma,
   formaCasaComFiltro,
   partesDoPagamentoMisto,
   filtroFormaPostgrest,
 } from "./formas-pagamento";
 
-describe("categoriaEhGratuidade", () => {
-  it("reconhece as categorias que liberam o atendimento", () => {
+describe("classificarLiberacao", () => {
+  it("separa as três situações em que o paciente não paga", () => {
     // "CORTESIA" é a categoria real cadastrada em fin_categorias.
-    expect(categoriaEhGratuidade("CORTESIA")).toBe(true);
-    expect(categoriaEhGratuidade("Gratuidade")).toBe(true);
-    expect(categoriaEhGratuidade("EXAME GRATUITO")).toBe(true);
-    expect(categoriaEhGratuidade("ISENTO")).toBe(true);
-    expect(categoriaEhGratuidade("ISENÇÃO SOCIAL")).toBe(true);
-    expect(categoriaEhGratuidade("SEM COBRANÇA")).toBe(true);
+    expect(classificarLiberacao("CORTESIA")).toBe("cortesia");
+    expect(classificarLiberacao("ISENTO")).toBe("cortesia");
+    expect(classificarLiberacao("ISENÇÃO SOCIAL")).toBe("cortesia");
+    expect(classificarLiberacao("SEM COBRANÇA")).toBe("cortesia");
+    expect(classificarLiberacao("RETORNO")).toBe("retorno");
+    expect(classificarLiberacao("RETORNO DE CONSULTA")).toBe("retorno");
+    expect(classificarLiberacao("GRATUIDADE")).toBe("convenio");
+    expect(classificarLiberacao("EXAME GRATUITO")).toBe("convenio");
   });
 
-  it("não confunde categoria de convênio com gratuidade", () => {
+  it("nome ambíguo cai no caso mais restritivo", () => {
+    // Pedir autorização a mais é barato; pagar repasse indevido, não.
+    expect(classificarLiberacao("CORTESIA / GRATUIDADE")).toBe("cortesia");
+  });
+
+  it("não confunde categoria de convênio nem movimento bancário com liberação", () => {
     // Estas são cobranças normais: quem concede gratuidade pelo convênio é a
     // regra do Cartão Benefícios, não o nome da categoria. Se caíssem aqui, o
     // atendimento de convênio sairia zerado por engano.
-    expect(categoriaEhGratuidade("CONVENIOS")).toBe(false);
-    expect(categoriaEhGratuidade("EXAME CARTAO CONSULTA")).toBe(false);
-    expect(categoriaEhGratuidade("PARTICULAR")).toBe(false);
-    expect(categoriaEhGratuidade("MENSALIDADE CARTAO CONSULTA")).toBe(false);
-    expect(categoriaEhGratuidade(null)).toBe(false);
-    expect(categoriaEhGratuidade("")).toBe(false);
+    expect(classificarLiberacao("CONVENIOS")).toBe(null);
+    expect(classificarLiberacao("EXAME CARTAO CONSULTA")).toBe(null);
+    expect(classificarLiberacao("PARTICULAR")).toBe(null);
+    expect(classificarLiberacao("MENSALIDADE CARTAO CONSULTA")).toBe(null);
+    // "RETORNO DE CHEQUE" tem valor real: se caísse aqui, seria zerado.
+    expect(classificarLiberacao("RETORNO DE CHEQUE")).toBe(null);
+    expect(classificarLiberacao("ESTORNO")).toBe(null);
+    expect(classificarLiberacao(null)).toBe(null);
+    expect(classificarLiberacao("")).toBe(null);
+  });
+});
+
+describe("categoriaEhSemCobranca", () => {
+  it("as três liberações zeram o total do paciente", () => {
+    expect(categoriaEhSemCobranca("RETORNO DE CONSULTA")).toBe(true);
+    expect(categoriaEhSemCobranca("CORTESIA")).toBe(true);
+    expect(categoriaEhSemCobranca("GRATUIDADE")).toBe(true);
+  });
+
+  it("cobrança normal continua cobrando", () => {
+    expect(categoriaEhSemCobranca("PARTICULAR")).toBe(false);
+    expect(categoriaEhSemCobranca("CONVENIOS")).toBe(false);
+    expect(categoriaEhSemCobranca(null)).toBe(false);
+  });
+});
+
+describe("categoriaExigeAutorizacao", () => {
+  it("exige justificativa e supervisor só na cortesia manual", () => {
+    expect(categoriaExigeAutorizacao("CORTESIA")).toBe(true);
+    expect(categoriaExigeAutorizacao("ISENÇÃO SOCIAL")).toBe(true);
+    expect(categoriaExigeAutorizacao("SEM COBRANÇA")).toBe(true);
+  });
+
+  it("libera retorno e gratuidade de convênio sem autorização", () => {
+    // Retorno é direito do paciente e gratuidade é cobertura do plano: parar a
+    // recepção para chamar um supervisor nesses dois é o defeito.
+    expect(categoriaExigeAutorizacao("RETORNO")).toBe(false);
+    expect(categoriaExigeAutorizacao("RETORNO DE CONSULTA")).toBe(false);
+    expect(categoriaExigeAutorizacao("GRATUIDADE")).toBe(false);
+  });
+
+  it("não pede autorização em categoria que cobra normalmente", () => {
+    expect(categoriaExigeAutorizacao("PARTICULAR")).toBe(false);
+    expect(categoriaExigeAutorizacao(null)).toBe(false);
+  });
+});
+
+describe("categoriaZeraRepasse", () => {
+  it("retorno e cortesia não remuneram ninguém", () => {
+    // No retorno o médico já recebeu na consulta de origem; na cortesia não
+    // entrou dinheiro de ninguém.
+    expect(categoriaZeraRepasse("RETORNO DE CONSULTA")).toBe(true);
+    expect(categoriaZeraRepasse("CORTESIA")).toBe(true);
+    expect(categoriaZeraRepasse("ISENTO")).toBe(true);
+  });
+
+  it("gratuidade de convênio mantém o repasse do prestador", () => {
+    // Quem remunera o atendimento é a mensalidade do cartão do paciente, então
+    // clínica e prestador continuam recebendo pelo valor de tabela.
+    expect(categoriaZeraRepasse("GRATUIDADE")).toBe(false);
+    expect(categoriaZeraRepasse("EXAME GRATUITO")).toBe(false);
+  });
+
+  it("cobrança normal não é assunto desta regra", () => {
+    expect(categoriaZeraRepasse("PARTICULAR")).toBe(false);
+    expect(categoriaZeraRepasse(null)).toBe(false);
   });
 });
 
