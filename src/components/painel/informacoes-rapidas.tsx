@@ -358,21 +358,44 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             <SheetTitle className="flex items-center gap-2">
               <Bot className="h-4 w-4" /> Nina — assistente da clínica
             </SheetTitle>
-            <Button
-              type="button"
-              size="sm"
-              variant={voz ? "secondary" : "ghost"}
-              className="h-8 gap-1.5 text-[11px]"
-              onClick={alternarVoz}
-              title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
-              aria-label="Voz da Nina"
-            >
-              {voz ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
-              {voz ? "Voz ligada" : "Voz desligada"}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={conversa.ativo ? "default" : "outline"}
+                className="h-8 gap-1.5 text-[11px]"
+                onClick={alternarConversa}
+                title={
+                  conversa.ativo
+                    ? "Encerrar conversa por voz"
+                    : "Conversar por voz, sem apertar botões"
+                }
+              >
+                {conversa.ativo ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {conversa.ativo ? "Encerrar conversa" : "Modo conversa"}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant={voz ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                onClick={alternarVoz}
+                title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
+                aria-label="Voz da Nina"
+              >
+                {voz ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4 opacity-60" />
+                )}
+              </Button>
+            </div>
           </div>
           <SheetDescription>
-            Pergunte sobre valores, especialidades e horários dos médicos.
+            {conversa.ativo
+              ? "Fale normalmente — a Nina escuta, responde em voz alta e volta a ouvir."
+              : "Pergunte sobre valores, especialidades e horários dos médicos."}
+
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
