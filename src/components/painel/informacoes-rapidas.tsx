@@ -377,7 +377,10 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     }
     setVoz(true);
     setNinaVozOn(true);
+    // Libera o áudio dentro do clique: depois o navegador atrasaria o começo da fala.
+    void prepararAudioNina();
     conversa.iniciar();
+
   };
 
   useEffect(() => {
