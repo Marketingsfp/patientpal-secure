@@ -153,36 +153,81 @@ export const chatNina = createServerFn({ method: "POST" })
     const contextoTexto = await contextoClinicaTexto(supabase, data.clinicaId, janela);
     const systemPrompt = systemPromptNina(contextoTexto, data.modoVoz);
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
-        model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
-        // Resposta curta também acelera: menos tokens gerados, menos espera
-        // antes de a voz começar.
-        ...(data.modoVoz ? { max_tokens: 220 } : {}),
-        messages: [{ role: "system", content: systemPrompt }, ...data.messages],
-      }),
-    });
+    const { FERRAMENTAS_NINA, executarFerramentaNina } = await import(
+      "@/lib/nina-ferramentas.server"
+    );
 
+    type Msg = { role: string; content: string | null; tool_calls?: any[]; tool_call_id?: string };
+    const historico: Msg[] = [
+      { role: "system", content: systemPrompt },
+      ...data.messages.map((m) => ({ role: m.role, content: m.content })),
+    ];
 
+    // Até 6 rodadas: a Nina consulta/executa ferramentas e volta com a resposta.
+    const MAX_RODADAS = data.modoVoz ? 3 : 6;
+    for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
+          model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
+          ...(data.modoVoz ? { max_tokens: 220 } : {}),
+          tools: FERRAMENTAS_NINA,
+          messages: historico,
+        }),
+      });
 
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("Nina AI error", res.status, body);
+        if (res.status === 429)
+          return { reply: "", error: "Limite de uso atingido. Tente em alguns segundos." };
+        if (res.status === 402)
+          return { reply: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
+        return { reply: "", error: `Falha na resposta da Nina (${res.status})` };
+      }
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error("Nina AI error", res.status, body);
-      if (res.status === 429)
-        return { reply: "", error: "Limite de uso atingido. Tente em alguns segundos." };
-      if (res.status === 402)
-        return { reply: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
-      return { reply: "", error: `Falha na resposta da Nina (${res.status})` };
+      const json = (await res.json()) as {
+        choices?: Array<{
+          message?: { content?: string; tool_calls?: any[] };
+        }>;
+      };
+      const msg = json.choices?.[0]?.message;
+      const chamadas = msg?.tool_calls ?? [];
+
+      if (chamadas.length === 0) {
+        return { reply: (msg?.content ?? "").trim(), error: null as string | null };
+      }
+
+      historico.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
+      for (const c of chamadas) {
+        let resultado: unknown;
+        try {
+          resultado = await executarFerramentaNina(
+            supabase,
+            userId,
+            data.clinicaId,
+            c.function?.name,
+            c.function?.arguments,
+          );
+        } catch (e) {
+          resultado = { erro: e instanceof Error ? e.message : "falha na ferramenta" };
+        }
+        historico.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify(resultado).slice(0, 12000),
+        });
+      }
     }
 
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const reply = json.choices?.[0]?.message?.content?.trim() ?? "";
-    return { reply, error: null as string | null };
+    return {
+      reply: "",
+      error: "A Nina não conseguiu concluir a tarefa em poucas etapas. Tente pedir de forma mais direta.",
+    };
   });
+
