@@ -27,7 +27,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClinica } from "@/hooks/use-clinica";
 import { getContextoClinica, chatNina } from "@/lib/nina.functions";
 import { VoiceInput } from "@/components/voice-input";
+import { useConversaVoz, suportaConversaVoz } from "@/hooks/use-conversa-voz";
 import { falarNina, isNinaVozOn, pararNina, setNinaVozOn } from "@/lib/nina-voz";
+
 import { cn } from "@/lib/utils";
 
 type Medico = {
