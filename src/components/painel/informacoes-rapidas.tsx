@@ -261,8 +261,12 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   }, []);
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80);
-    else pararNina();
+    else {
+      pararNina();
+      conversaRef.current?.();
+    }
   }, [open]);
+
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, loading]);
