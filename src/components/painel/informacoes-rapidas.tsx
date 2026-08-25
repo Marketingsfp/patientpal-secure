@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClinica } from "@/hooks/use-clinica";
+import { useNinaDesativada } from "@/hooks/use-nina-desativada";
 import { getContextoClinica, chatNina } from "@/lib/nina.functions";
 import { toast } from "sonner";
 import { VoiceInput } from "@/components/voice-input";
