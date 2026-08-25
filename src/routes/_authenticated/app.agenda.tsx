@@ -34,7 +34,7 @@ import {
 } from "@/lib/prontuario";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
-import { hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6220,13 +6220,19 @@ function AgendaPage() {
         // revertido pelo Postgres — não há mais janela para lançamento órfão.
         const nomeUsuario =
           (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+        // Competência da linha-sombra: o dia do atendimento quando ele já
+        // passou (GR retroativa liberada só agora), nunca uma data futura.
+        // Mesma regra do LancamentoDialog — ver o comentário lá.
+        const dataAtendSemCobranca = dataClinicaDe(a.inicio);
+        const dataCompetencia =
+          dataAtendSemCobranca && dataAtendSemCobranca < hojeBR() ? dataAtendSemCobranca : hojeBR();
         const { error: errRpc } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
           p_lancamento: {
             clinica_id: clinicaAtual.clinica_id,
             tipo: "receita",
             descricao: desc,
             valor: 0,
-            data: new Date().toISOString().slice(0, 10),
+            data: dataCompetencia,
             status: "confirmado",
             agendamento_id: a.id,
             forma_pagamento: isGrat ? "convenio_gratuidade" : null,

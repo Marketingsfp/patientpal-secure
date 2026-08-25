@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { janelaDiaClinica, zonedDateStringToUtcISO, TZ_CLINICA } from "./date-utils";
+import { dataClinicaDe, janelaDiaClinica, zonedDateStringToUtcISO, TZ_CLINICA } from "./date-utils";
 
 // Loop 1 (filtro "apenas data selecionada" na Agenda) e Loop 4 (data
 // retroativa caindo na sessão errada do caixa) — ambos rastreados ao mesmo
@@ -53,5 +53,28 @@ describe("zonedDateStringToUtcISO", () => {
     // `(data || ' 12:00:00+00')::timestamptz` — meio-dia UTC vira 09:00 BRT,
     // não meio-dia BRT como o nome sugere.
     expect(zonedDateStringToUtcISO("2026-07-24", "12:00:00")).toBe("2026-07-24T15:00:00.000Z");
+  });
+});
+
+// GR retroativa: a competência do lançamento é o DIA CIVIL DA CLÍNICA em que
+// o atendimento aconteceu. O erro clássico aqui é usar
+// `new Date(inicio).toISOString().slice(0, 10)`, que devolve o dia em UTC e
+// empurra qualquer atendimento a partir das 21:00 para o dia seguinte.
+describe("dataClinicaDe", () => {
+  it("devolve o dia civil de São Paulo, não o dia em UTC", () => {
+    // 19/08/2026 às 21:30 em São Paulo = 20/08 às 00:30 UTC.
+    const inicio = zonedDateStringToUtcISO("2026-08-19", "21:30:00");
+    expect(inicio.slice(0, 10)).toBe("2026-08-20"); // o que o jeito errado daria
+    expect(dataClinicaDe(inicio)).toBe("2026-08-19"); // o dia real do atendimento
+  });
+
+  it("mantém o dia em horário comercial (caso da GR de 19/08 faturada em 25/08)", () => {
+    expect(dataClinicaDe(zonedDateStringToUtcISO("2026-08-19", "09:00:00"))).toBe("2026-08-19");
+  });
+
+  it("devolve null para valor ausente ou inválido, para o chamador cair no padrão (hoje)", () => {
+    expect(dataClinicaDe(null)).toBeNull();
+    expect(dataClinicaDe("")).toBeNull();
+    expect(dataClinicaDe("data-que-nao-existe")).toBeNull();
   });
 });

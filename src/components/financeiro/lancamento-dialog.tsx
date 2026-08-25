@@ -36,7 +36,7 @@ import {
   FORMA_PAGO_SISTEMA_ANTERIOR,
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
-import { hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
@@ -339,12 +339,28 @@ export function LancamentoDialog({
           const tipoAg =
             (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
           setTipoAgendamento(tipoAg);
-          // IMPORTANTE: a "data" do lançamento é a data do RECEBIMENTO
-          // (hoje), nunca a data do atendimento. Sobrescrever com
-          // `agendamentos.inicio` fazia pagamentos nascerem com data futura
-          // (agendamento à frente) ou falsamente retroativa, jogando o
-          // movimento no caixa de outro dia. A data do atendimento continua
-          // rastreável pelo vínculo `agendamento_id`.
+          // ----- Data de competência de uma GR retroativa -----------------
+          // Quando a guia de um atendimento de DIAS ATRÁS só é faturada hoje,
+          // a competência do lançamento é o dia do atendimento, não o dia da
+          // digitação. Sem isto o campo "Data" nascia sempre em hoje e o
+          // atendimento de 19/08 aparecia como receita de 25/08 — que é o
+          // problema relatado (paciente EDNALDA PAULINA DE OLIVEIRA).
+          //
+          // Duas travas, que são o motivo pelo qual esta linha já foi
+          // removida uma vez no passado:
+          //   1. NUNCA usa data futura. Agendamento marcado para frente e
+          //      pago adiantado continua com a data de hoje — dinheiro que
+          //      já entrou não pode nascer com data que ainda não chegou.
+          //   2. A gaveta do caixa NÃO segue automaticamente para trás. Quem
+          //      decide isso é `fn_registrar_lancamento_e_caixa`: se o caixa
+          //      daquele dia ainda estiver aberto o movimento entra nele; se
+          //      já estiver fechado, entra no caixa de HOJE, porque um
+          //      fechamento já conferido e impresso é intocável.
+          // O operador continua podendo corrigir o campo "Data" na tela.
+          const dataAtend = dataClinicaDe(
+            (ag as { inicio?: string | null } | null)?.inicio ?? null,
+          );
+          if (dataAtend && dataAtend < hojeBR()) setData(dataAtend);
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
@@ -693,10 +709,11 @@ export function LancamentoDialog({
       }
     }
     // ------------------------------------------------------------------
-    // Data retroativa: avisa o operador e envia o movimento para o caixa
-    // do dia escolhido (não para o de hoje). Se a sessão daquele dia já
-    // estiver fechada, o backend soma o valor ao fechamento existente e
-    // registra observação de "retroativo lançado em ...".
+    // Data retroativa: avisa o operador. A competência do lançamento é o dia
+    // escolhido; a gaveta do caixa é decidida por
+    // `fn_registrar_lancamento_e_caixa` — caixa daquele dia ainda aberto
+    // recebe o movimento, caixa já fechado nunca é reescrito e o movimento
+    // entra no caixa de hoje, marcado com "[Data retroativa: DD/MM/AAAA]".
     // ------------------------------------------------------------------
     const _hojeISO = hojeBR();
     // Data futura nunca é válida em caixa: bloqueia antes de gravar.
@@ -712,10 +729,11 @@ export function LancamentoDialog({
     if (_ehRetroativo) {
       const [aaaa, mm, dd] = data.split("-");
       const ok = await confirmDialog(
-        `Atenção: a data escolhida é retroativa (${dd}/${mm}/${aaaa}).\n\n` +
-          `O movimento será registrado no caixa do dia ${dd}/${mm}/${aaaa} ` +
-          `(não no caixa de hoje). Se o caixa daquele dia já estiver fechado, ` +
-          `o valor será somado ao fechamento com observação de retroativo.\n\n` +
+        `Atenção: este atendimento é do dia ${dd}/${mm}/${aaaa}.\n\n` +
+          `A receita será contabilizada em ${dd}/${mm}/${aaaa} (data do atendimento).\n\n` +
+          `O dinheiro entra no caixa do dia ${dd}/${mm}/${aaaa} se aquele caixa ainda ` +
+          `estiver aberto. Se já tiver sido fechado e conferido, ele entra no caixa de ` +
+          `HOJE, marcado como retroativo — um fechamento já impresso nunca é alterado.\n\n` +
           `Deseja continuar?`,
       );
       if (!ok) return;

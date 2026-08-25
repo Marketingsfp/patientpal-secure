@@ -137,3 +137,27 @@ export function janelaDiaClinica(
   const fimExclusivo = zonedDateStringToUtcISO(proxDia, "00:00:00", timeZone);
   return { inicio, fimExclusivo };
 }
+
+/**
+ * Dia civil da clínica (YYYY-MM-DD) em que um timestamp caiu.
+ *
+ * Use para responder "em que DIA esse atendimento aconteceu?" a partir de
+ * `agendamentos.inicio` (timestamptz). Nunca use
+ * `new Date(inicio).toISOString().slice(0, 10)` para isso: aquilo devolve o
+ * dia em UTC, e um atendimento das 21:00 em São Paulo vira o dia seguinte —
+ * exatamente o tipo de erro de um dia que joga a competência no lugar errado.
+ */
+export function dataClinicaDe(
+  value: string | Date | null | undefined,
+  timeZone: string = TZ_CLINICA,
+): string | null {
+  if (!value) return null;
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
