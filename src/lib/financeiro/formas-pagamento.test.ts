@@ -1,10 +1,35 @@
 import { describe, expect, it } from "bun:test";
 import {
+  categoriaEhGratuidade,
   classificarForma,
   formaCasaComFiltro,
   partesDoPagamentoMisto,
   filtroFormaPostgrest,
 } from "./formas-pagamento";
+
+describe("categoriaEhGratuidade", () => {
+  it("reconhece as categorias que liberam o atendimento", () => {
+    // "CORTESIA" é a categoria real cadastrada em fin_categorias.
+    expect(categoriaEhGratuidade("CORTESIA")).toBe(true);
+    expect(categoriaEhGratuidade("Gratuidade")).toBe(true);
+    expect(categoriaEhGratuidade("EXAME GRATUITO")).toBe(true);
+    expect(categoriaEhGratuidade("ISENTO")).toBe(true);
+    expect(categoriaEhGratuidade("ISENÇÃO SOCIAL")).toBe(true);
+    expect(categoriaEhGratuidade("SEM COBRANÇA")).toBe(true);
+  });
+
+  it("não confunde categoria de convênio com gratuidade", () => {
+    // Estas são cobranças normais: quem concede gratuidade pelo convênio é a
+    // regra do Cartão Benefícios, não o nome da categoria. Se caíssem aqui, o
+    // atendimento de convênio sairia zerado por engano.
+    expect(categoriaEhGratuidade("CONVENIOS")).toBe(false);
+    expect(categoriaEhGratuidade("EXAME CARTAO CONSULTA")).toBe(false);
+    expect(categoriaEhGratuidade("PARTICULAR")).toBe(false);
+    expect(categoriaEhGratuidade("MENSALIDADE CARTAO CONSULTA")).toBe(false);
+    expect(categoriaEhGratuidade(null)).toBe(false);
+    expect(categoriaEhGratuidade("")).toBe(false);
+  });
+});
 
 describe("classificarForma", () => {
   it("classifica o que o sistema atual grava", () => {

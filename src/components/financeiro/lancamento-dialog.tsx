@@ -28,6 +28,7 @@ import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
+import { categoriaEhGratuidade } from "@/lib/financeiro/formas-pagamento";
 import { hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -374,6 +375,11 @@ export function LancamentoDialog({
 
   const formatBRL = (n: number) =>
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  // Categoria de gratuidade escolhida (CORTESIA, GRATUIDADE, ISENTO...). É o
+  // sinal de que este atendimento sai liberado, sem nada a receber: o total
+  // vai a R$ 0,00 e a tela deixa de pedir dinheiro, cartão ou valor recebido.
+  const categoriaAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+  const ehCategoriaGratuidade = categoriaEhGratuidade(categoriaAtual?.nome);
   const valorNum = Number(valor || 0);
   // Calcula desconto efetivo em R$ a partir do tipo selecionado.
   const origNum = Number(valorOriginal || initialValor || 0);
@@ -390,10 +396,50 @@ export function LancamentoDialog({
   // Mantém o `valor` (total a pagar) sincronizado com o desconto.
   useEffect(() => {
     if (!open) return;
+    // Gratuidade manda acima de tudo: zera o total independentemente do valor
+    // sugerido pelo serviço e de qualquer desconto digitado. Sem isto, marcar
+    // "CORTESIA" deixava o valor cheio na tela (ex.: R$ 148,50) e o pagamento
+    // nascia devendo o atendimento inteiro.
+    if (ehCategoriaGratuidade) {
+      setValor("0.00");
+      return;
+    }
     if (!valorOriginal) return;
     const novo = Math.max(0, origNum - descontoNum);
     setValor(novo.toFixed(2));
-  }, [descontoAtivo, descontoInput, descontoTipo, valorOriginal, origNum, descontoNum, open]);
+  }, [
+    descontoAtivo,
+    descontoInput,
+    descontoTipo,
+    valorOriginal,
+    origNum,
+    descontoNum,
+    open,
+    ehCategoriaGratuidade,
+  ]);
+  // Gratuidade não tem o que dividir nem descontar. Ao entrar na categoria,
+  // desliga desconto e pagamento misto (que exigiriam autorização e soma de
+  // linhas para um total zero) e fixa a forma como "Convênio / Gratuidade" —
+  // a mesma que a agenda já grava quando o convênio do paciente cobre o exame,
+  // e que o Fechamento de Caixa lê como linha própria, sem dinheiro a conferir.
+  // Ao sair, a forma volta a ser escolhida pelo operador.
+  useEffect(() => {
+    if (!open) return;
+    if (!ehCategoriaGratuidade) {
+      setFormaPagamento((cur) => (cur === "convenio_gratuidade" ? "" : cur));
+      return;
+    }
+    setDescontoAtivo(false);
+    setDescontoInput("");
+    setDescontoAutorizado("");
+    setDescontoMotivo("");
+    setPagamentoMisto(false);
+    setPagamentos([{ forma: "dinheiro", recebido: "" }]);
+    setValorRecebido("");
+    setBandeiraCartao("");
+    setParcelas("1");
+    setFormaPagamento("convenio_gratuidade");
+  }, [open, ehCategoriaGratuidade]);
   const recebidoNum = Number(valorRecebido || 0);
   const trocoDinheiro =
     formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
@@ -483,12 +529,26 @@ export function LancamentoDialog({
 
   async function handleSaveInterno(imprimir = true) {
     if (!clinicaAtual) return;
-    if (!descricao.trim() || !valor) {
+    // A gratuidade precisa ser reconhecida ANTES das validações de valor e de
+    // forma de pagamento: eram justamente elas que travavam o "Salvar e
+    // imprimir" de uma cortesia, exigindo um total maior que zero e um meio de
+    // pagamento que, num atendimento liberado, não existem.
+    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
+    const ehCortesia = categoriaEhGratuidade(catAtual?.nome);
+    if (!descricao.trim() || (!valor && !ehCortesia)) {
       toast.error("Descrição e valor são obrigatórios");
       return;
     }
-    if (valorNum <= 0) {
+    if (valorNum <= 0 && !ehCortesia) {
       toast.error("O valor do pagamento deve ser maior que zero.");
+      return;
+    }
+    // Trava o inverso: categoria de gratuidade com valor cobrado esconderia um
+    // recebimento dentro de uma linha que o financeiro lê como isenção.
+    if (ehCortesia && valorNum > 0) {
+      toast.error(
+        `Categoria "${catAtual?.nome ?? "gratuidade"}" não pode ter valor a cobrar — o total precisa ser R$ 0,00.`,
+      );
       return;
     }
     // Forma de pagamento é obrigatória para receitas fora do fluxo "misto"
@@ -497,7 +557,9 @@ export function LancamentoDialog({
     // propositalmente em branco) permitia salvar com forma_pagamento NULL —
     // a guia impressa então caía num fallback "DINHEIRO" mesmo quando o
     // pagamento real foi em débito/pix/etc, divergindo do que de fato ocorreu.
-    if (tipo === "receita" && !pagamentoMisto && !formaPagamento) {
+    // Gratuidade fica de fora: a forma dela é fixada automaticamente como
+    // "Convênio / Gratuidade" e não há meio de pagamento a escolher.
+    if (tipo === "receita" && !pagamentoMisto && !formaPagamento && !ehCortesia) {
       toast.error("Selecione a forma de pagamento.");
       return;
     }
@@ -518,14 +580,8 @@ export function LancamentoDialog({
       }
     }
     // ----- Cortesia: exige justificativa + autorização de supervisor -----
-    const norm0 = (s: string) =>
-      s
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim();
-    const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
-    const ehCortesia = !!(catAtual && norm0(catAtual.nome) === "cortesia");
+    // Zerar o valor ficou automático, mas a liberação continua sendo uma
+    // decisão de quem manda: sem justificativa e sem supervisor, não grava.
     if (ehCortesia) {
       if (!cortesiaJustificativa.trim()) {
         toast.error("Informe a justificativa da cortesia.");
@@ -1474,9 +1530,17 @@ export function LancamentoDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Valor *</Label>
-                <CurrencyInput value={valor} onChange={setValor} />
-                {!!initialValor && (
-                  <p className="text-xs text-muted-foreground">Sugerido pelo serviço — editável</p>
+                <CurrencyInput value={valor} onChange={setValor} disabled={ehCategoriaGratuidade} />
+                {ehCategoriaGratuidade ? (
+                  <p className="text-xs text-success font-medium">
+                    Zerado pela categoria "{categoriaAtual?.nome}"
+                  </p>
+                ) : (
+                  !!initialValor && (
+                    <p className="text-xs text-muted-foreground">
+                      Sugerido pelo serviço — editável
+                    </p>
+                  )
                 )}
               </div>
               <div className="space-y-1.5">
@@ -1484,7 +1548,8 @@ export function LancamentoDialog({
                 <DateInputBR value={data} onChange={(e) => setData(e.target.value)} />
               </div>
             </div>
-            {tipo === "receita" && !!initialValor && (
+            {/* Desconto não se aplica a uma gratuidade: o total já é zero. */}
+            {tipo === "receita" && !!initialValor && !ehCategoriaGratuidade && (
               <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -1615,17 +1680,14 @@ export function LancamentoDialog({
               )}
             </div>
             {(() => {
-              const norm = (s: string) =>
-                s
-                  .normalize("NFD")
-                  .replace(/[\u0300-\u036f]/g, "")
-                  .toLowerCase()
-                  .trim();
-              const cat = categorias.find((c) => c.id === categoriaId);
-              const ehCortesia = !!(cat && norm(cat.nome) === "cortesia");
-              if (!ehCortesia) return null;
+              if (!ehCategoriaGratuidade) return null;
               return (
                 <div className="space-y-2 rounded-md border border-dashed border-amber-400 p-3 bg-amber-50/40">
+                  <p className="text-xs text-muted-foreground">
+                    Atendimento liberado por <strong>{categoriaAtual?.nome}</strong>: total zerado
+                    em <strong>R$ 0,00</strong> e registrado como Convênio / Gratuidade. Não há
+                    dinheiro nem cartão a receber — basta justificar e salvar.
+                  </p>
                   <div className="flex items-center justify-between gap-2">
                     <Label className="text-sm font-medium">
                       Justificativa da cortesia *{" "}
@@ -1679,12 +1741,18 @@ export function LancamentoDialog({
                     }
                     if (v !== "dinheiro") setValorRecebido("");
                   }}
-                  disabled={pagamentoMisto}
+                  disabled={pagamentoMisto || ehCategoriaGratuidade}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Forma" />
                   </SelectTrigger>
                   <SelectContent>
+                    {/* Só aparece na gratuidade: é a forma que o sistema fixa
+                        sozinho, não uma opção que o operador escolhe num
+                        atendimento cobrado. */}
+                    {ehCategoriaGratuidade && (
+                      <SelectItem value="convenio_gratuidade">Convênio / Gratuidade</SelectItem>
+                    )}
                     <SelectItem value="dinheiro">Dinheiro</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
@@ -1719,25 +1787,28 @@ export function LancamentoDialog({
                 )}
               </div>
             )}
-            <div className="flex items-center gap-2 rounded-md border p-3">
-              <Checkbox
-                id="pgto-misto"
-                checked={pagamentoMisto}
-                onCheckedChange={(v) => {
-                  const on = !!v;
-                  setPagamentoMisto(on);
-                  if (on) {
-                    setFormaPagamento("");
-                    setBandeiraCartao("");
-                    setParcelas("1");
-                    setValorRecebido("");
-                  }
-                }}
-              />
-              <Label htmlFor="pgto-misto" className="cursor-pointer">
-                Dividir em mais de uma forma de pagamento
-              </Label>
-            </div>
+            {/* Não há o que dividir num total zerado — some da tela na gratuidade. */}
+            {!ehCategoriaGratuidade && (
+              <div className="flex items-center gap-2 rounded-md border p-3">
+                <Checkbox
+                  id="pgto-misto"
+                  checked={pagamentoMisto}
+                  onCheckedChange={(v) => {
+                    const on = !!v;
+                    setPagamentoMisto(on);
+                    if (on) {
+                      setFormaPagamento("");
+                      setBandeiraCartao("");
+                      setParcelas("1");
+                      setValorRecebido("");
+                    }
+                  }}
+                />
+                <Label htmlFor="pgto-misto" className="cursor-pointer">
+                  Dividir em mais de uma forma de pagamento
+                </Label>
+              </div>
+            )}
             {pagamentoMisto && (
               <div className="space-y-2 rounded-md border bg-muted/30 p-3">
                 {pagamentos.map((p, idx) => {

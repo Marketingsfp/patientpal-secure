@@ -136,6 +136,32 @@ export function classificarForma(raw: string | null | undefined): FormaCanonica 
   return "outros";
 }
 
+/**
+ * Reconhece uma CATEGORIA financeira de gratuidade — "CORTESIA",
+ * "GRATUIDADE", "ISENTO"/"ISENÇÃO", "SEM COBRANÇA".
+ *
+ * Serve à tela de cobrança (Nova Receita): nessas categorias o atendimento é
+ * liberado sem cobrar nada, então o total é zerado automaticamente e a tela
+ * para de exigir dinheiro, cartão ou valor recebido. Antes disso, escolher
+ * "CORTESIA" mantinha o valor cheio do procedimento e o rodapé acusava
+ * "Falta: R$ 148,50", travando o "Salvar e imprimir" de um atendimento que
+ * por definição não tem nada a receber.
+ *
+ * O casamento é por palavra inteira, de propósito: categoria que apenas
+ * menciona convênio ("CONVENIOS", "EXAME CARTAO CONSULTA") continua sendo
+ * cobrança normal e não pode cair aqui — quem concede gratuidade pelo
+ * convênio é a regra do Cartão Benefícios, não o nome da categoria.
+ *
+ * Não confundir com `classificarForma`, que classifica a FORMA de pagamento
+ * gravada no lançamento; esta função olha o nome da categoria.
+ */
+export function categoriaEhGratuidade(nome: string | null | undefined): boolean {
+  const k = normalizar(nome);
+  if (!k) return false;
+  if (/sem cobranca/.test(k)) return true;
+  return /\b(cortesia|gratuidade|gratuito|gratuita|gratis|isento|isenta|isencao)\b/.test(k);
+}
+
 export interface ParteMisto {
   forma: FormaCanonica;
   valor: number;

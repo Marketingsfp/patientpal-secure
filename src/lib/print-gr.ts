@@ -1,8 +1,23 @@
 import { supabase } from "@/integrations/supabase/client";
 import { nomeDeQuemFaturou } from "@/lib/agenda/gr-atendente.functions";
 import { valorCelulaRepasse } from "@/lib/repasse-calc";
+import { categoriaEhGratuidade } from "@/lib/financeiro/formas-pagamento";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { hojeBR } from "@/lib/date-utils";
+
+/**
+ * Nome da categoria financeira de um lançamento embutido via PostgREST.
+ * O embed pode voltar como objeto (relação um-para-um) ou como array de um
+ * item, dependendo de como o PostgREST resolve a relação — os dois são
+ * aceitos aqui para a guia nunca deixar de reconhecer uma cortesia por causa
+ * do formato da resposta.
+ */
+function nomeCategoriaLancamento(l: { categoria?: unknown }): string | null {
+  const c = l.categoria as { nome?: string | null } | Array<{ nome?: string | null }> | null;
+  if (!c) return null;
+  if (Array.isArray(c)) return c[0]?.nome ?? null;
+  return c.nome ?? null;
+}
 
 /**
  * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
@@ -555,7 +570,7 @@ async function printGuiaAtendimentoCore({
       supabase
         .from("fin_lancamentos")
         .select(
-          "valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes, criado_por, created_at, status",
+          "valor, descricao, forma_pagamento, parcelas, bandeira_cartao, observacoes, criado_por, created_at, status, categoria:categoria_id(nome)",
         )
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
@@ -602,7 +617,16 @@ async function printGuiaAtendimentoCore({
     observacoes: string | null;
     criado_por: string | null;
     status: string | null;
+    categoria?: { nome: string | null } | Array<{ nome: string | null }> | null;
   }>;
+  // Cortesia da clínica: o atendimento foi liberado pela CATEGORIA financeira
+  // (CORTESIA, GRATUIDADE, ISENTO...). Não confundir com a gratuidade do
+  // convênio: lá o paciente não paga, mas a mensalidade do cartão remunera o
+  // atendimento, e por isso clínica e prestador seguem recebendo. Na cortesia
+  // ninguém pagou nada, então a guia sai com tudo zerado.
+  const ehCortesiaClinica = lancs.some(
+    (l) => l.status === "confirmado" && categoriaEhGratuidade(nomeCategoriaLancamento(l)),
+  );
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -870,7 +894,12 @@ async function printGuiaAtendimentoCore({
         obsResolvida = l.observacoes;
       }
     }
-    valor = valorPago > 0 ? valorPago : Number(procData?.valor_dinheiro_pix ?? 0);
+    // Sem nada pago, a guia cai no valor de tabela — é o caso de imprimir a
+    // guia ANTES de cobrar. Numa cortesia isso estaria errado: o atendimento
+    // já foi fechado por R$ 0,00, e a reimpressão precisa repetir zero em vez
+    // de ressuscitar o preço cheio do procedimento.
+    valor =
+      valorPago > 0 ? valorPago : ehCortesiaClinica ? 0 : Number(procData?.valor_dinheiro_pix ?? 0);
     if (formaResolvida) {
       // Reconstrói detalhe do misto a partir de "Pagamento misto: X R$ 1,00; Y R$ 2,00 | ..."
       let detalhe:
@@ -1023,11 +1052,20 @@ async function printGuiaAtendimentoCore({
     return Array.from(out).filter(Boolean);
   };
 
-  // Gratuidade: paciente isento (nenhum lançamento pago). Clínica e prestador
-  // continuam recebendo normalmente, usando o valor de tabela do procedimento
-  // como base do cálculo.
-  const isGratuidade = !pagamento && valor === 0;
-  const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;
+  // Gratuidade do convênio: paciente isento (nenhum lançamento pago). Clínica e
+  // prestador continuam recebendo normalmente, usando o valor de tabela do
+  // procedimento como base do cálculo — quem remunera o atendimento é a
+  // mensalidade do cartão do paciente.
+  //
+  // A cortesia da clínica é o caso oposto e tem prioridade sobre ela: não
+  // entrou dinheiro de ninguém, nem do paciente nem de mensalidade, então a
+  // base de cálculo é zero e o atendimento não gera repasse.
+  const isGratuidade = !pagamento && valor === 0 && !ehCortesiaClinica;
+  const valorBase = ehCortesiaClinica
+    ? 0
+    : isGratuidade
+      ? Number(procData?.valor_dinheiro_pix ?? 0)
+      : valor;
   let prestador = 0;
   let repasseFixoConvenio = false;
   // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico. Se esse
@@ -1124,6 +1162,11 @@ async function printGuiaAtendimentoCore({
   if (!repasseFixoConvenio) {
     prestador = Math.min(prestador, valorBase);
   }
+  // Trava final da cortesia. O repasse do Cartão Consulta é FIXO e de
+  // propósito não é limitado pelo valor pago (`repasseFixoConvenio`), então
+  // sem esta linha um médico com repasse fixo cadastrado ainda apareceria
+  // recebendo numa guia de cortesia.
+  if (ehCortesiaClinica) prestador = 0;
   const clinica = +Math.max(0, valorBase - prestador).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
@@ -1329,9 +1372,20 @@ async function printGuiaAtendimentoCore({
     ${
       ehExterno
         ? externoValoresHtml
-        : valor > 0
+        : // A cortesia entra por aqui de propósito, e não numa caixa própria:
+          // o pedido da clínica é que a guia mantenha o formato de sempre —
+          // "Valor recebido" e a divisão CLÍNICA/PRESTADOR — apenas com tudo
+          // zerado. A forma impressa é "CONVÊNIO GRATUIDADE", então a guia
+          // nunca sugere cobrança em dinheiro ou cartão.
+          valor > 0 || ehCortesiaClinica
           ? `
     <div class="box-total">
+      ${
+        ehCortesiaClinica
+          ? `<div class="center bold lg" style="letter-spacing:2px">CORTESIA</div>
+      <div class="center sm">ATENDIMENTO LIBERADO — SEM COBRANÇA</div>`
+          : ""
+      }
       <div class="linha-principal">
         <div>
           <span class="k label">Valor recebido</span>
@@ -1619,7 +1673,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     semFalhar<any[] | null>(
       supabase
         .from("fin_lancamentos")
-        .select("agendamento_id, valor, status, tipo, criado_por, created_at")
+        .select(
+          "agendamento_id, valor, status, tipo, criado_por, created_at, categoria:categoria_id(nome)",
+        )
         .in("agendamento_id", ids)
         .eq("tipo", "receita")
         .neq("status", "cancelado")
@@ -1654,6 +1710,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     valor: number | string;
     status: string | null;
     criado_por: string | null;
+    categoria?: { nome: string | null } | Array<{ nome: string | null }> | null;
   }>;
   // "USUÁRIO:" = quem faturou (autor do lançamento), sempre. Ordem: criador do
   // fin_lancamento → nome gravado na 1ª via → usuarioNome do caller.
@@ -1664,6 +1721,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // Agendamentos que têm lançamento confirmado mas com valor total 0 →
   // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
   const gratuidadeByAg = new Map<string, boolean>();
+  // Cortesia da clínica (categoria CORTESIA / GRATUIDADE / ISENTO): aqui nem
+  // clínica nem prestador recebem — ver o comentário equivalente na guia
+  // individual.
+  const cortesiaByAg = new Map<string, boolean>();
   for (const l of lancs) {
     if (!l.agendamento_id) continue;
     if (l.status !== "confirmado") continue;
@@ -1672,6 +1733,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor),
     );
     gratuidadeByAg.set(l.agendamento_id, true);
+    if (categoriaEhGratuidade(nomeCategoriaLancamento(l))) {
+      cortesiaByAg.set(l.agendamento_id, true);
+    }
   }
   // Depois de somar, mantém true só quando o total é 0.
   for (const [k, total] of valorPagoByAg.entries()) {
@@ -1862,10 +1926,15 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const proc = procByNome.get(normalizar(procNomeBase));
     const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
     const procNome = formatServicoLinha(procNomeBase, espNome);
-    // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
+    // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de
+    // procedimentos. Cortesia nunca cai na tabela: já foi fechada por R$ 0,00.
+    const ehCortesiaItem = cortesiaByAg.get(a.id) === true;
     const valorPago = valorPagoByAg.get(a.id);
-    const valor =
-      valorPago != null && valorPago > 0 ? valorPago : Number(proc?.valor_dinheiro_pix ?? 0);
+    const valor = ehCortesiaItem
+      ? 0
+      : valorPago != null && valorPago > 0
+        ? valorPago
+        : Number(proc?.valor_dinheiro_pix ?? 0);
 
     // Repasse: convenio por nome do procedimento → senão padrão do médico
     let prestador = 0;
@@ -1915,6 +1984,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         }
       }
     }
+    // Cortesia não gera repasse: ninguém pagou nada por este item.
+    if (ehCortesiaItem) prestador = 0;
     prestador = Math.min(prestador, valor);
     const clin = +(valor - prestador).toFixed(2);
 
