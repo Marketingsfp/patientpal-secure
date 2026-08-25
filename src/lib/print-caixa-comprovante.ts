@@ -95,6 +95,18 @@ export interface ComprovanteCaixaInput {
     sangrias: number;
     despesas: number;
   };
+  /**
+   * Quanto do total deste caixa veio de atendimento de DIA ANTERIOR
+   * (fechamento). Só aparece no cupom quando há pelo menos um.
+   *
+   * Uma guia de dias atrás faturada hoje entra no caixa de hoje sempre que o
+   * caixa do dia original já estiver fechado — um fechamento já impresso nunca
+   * é reescrito. O dinheiro está mesmo na gaveta de hoje, então este valor
+   * JÁ ESTÁ SOMADO no total acima e não deve ser descontado de nada. A linha
+   * existe para a atendente saber, na hora de conferir, que parte do caixa de
+   * hoje corresponde a atendimento de outro dia.
+   */
+  retroativos?: { total: number; quantidade: number; dias?: string[] };
   /** Sangrias e suprimentos do turno (fechamento). */
   movimentos?: Array<{
     tipo: "sangria" | "suprimento";
@@ -282,7 +294,22 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       ? "Diferença (SOBRA)"
       : "Diferença (FALTA)";
 
-  const linhas: Array<{ label: string; valor: string; destaque?: boolean }> = [];
+  // Parcela do caixa que veio de atendimento de outro dia. Já está somada no
+  // total — a linha é informativa, para a conferência não estranhar.
+  const retro = input.retroativos;
+  const temRetro = !!retro && retro.quantidade > 0;
+  const retroRotulo = temRetro
+    ? `— dos quais de atendimento de outro dia (${retro!.quantidade} ${
+        retro!.quantidade === 1 ? "guia" : "guias"
+      })`
+    : "";
+  const retroNota =
+    temRetro && retro!.dias?.length
+      ? `Já incluído no total acima. Dias de origem: ${retro!.dias.join(", ")}.`
+      : "Já incluído no total acima.";
+
+  const linhas: Array<{ label: string; valor: string; destaque?: boolean; descricao?: string }> =
+    [];
   if (isFech) {
     // Os rótulos dizem "todas as formas" porque este total soma cartão e PIX,
     // que não estão na gaveta. O valor conferível fisicamente é o do bloco
@@ -291,6 +318,13 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
       label: "Total do dia calculado pelo sistema (todas as formas)",
       valor: fmtBRL(input.saldoCalculado ?? 0),
     });
+    if (temRetro) {
+      linhas.push({
+        label: retroRotulo,
+        valor: fmtBRL(retro!.total),
+        descricao: retroNota,
+      });
+    }
     linhas.push({
       label: "Total do dia conferido (todas as formas)",
       valor: fmtBRL(input.valorInformado ?? input.valor),
@@ -393,6 +427,8 @@ export function buildComprovanteCaixaHtml(input: ComprovanteCaixaInput): string 
     const conferenciaBlock = isFech
       ? `${secao80("Conferência do dia (todas as formas)")}
        ${linha80("Total do dia calculado (com cartão e PIX)", fmtBRL(input.saldoCalculado ?? 0))}
+       ${temRetro ? linha80(retroRotulo, fmtBRL(retro!.total)) : ""}
+       ${temRetro ? `<div class="nota">${esc(retroNota)}</div>` : ""}
        ${linha80("Total do dia conferido (com cartão e PIX)", fmtBRL(input.valorInformado ?? input.valor), true)}
        ${destaque80(difRotulo, fmtBRL(difValor), !difConfere)}`
       : destaque80("Valor", fmtBRL(input.valor));
@@ -618,7 +654,7 @@ ${CSS_TOOLBAR_80MM}`;
   const valorBox = isFech
     ? `<div class="secao">
         <div class="rot">Conferência do dia (todas as formas)</div>
-        ${linhas.map((l) => linhaValorA4(l.label, l.valor, { destaque: l.destaque })).join("")}
+        ${linhas.map((l) => linhaValorA4(l.label, l.valor, { destaque: l.destaque, descricao: l.descricao })).join("")}
       </div>`
     : `<div class="valor-box">
         <div class="rot">Valor</div>

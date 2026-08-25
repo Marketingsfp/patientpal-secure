@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
   classificarDiferenca,
+  dataRetroativaDe,
+  ehMovimentoRetroativo,
+  resumoRetroativos,
   saldoDeMovimentos,
   saldoEsperadoGaveta,
   totalConferido,
@@ -151,5 +154,49 @@ describe("saldoDeMovimentos", () => {
       { tipo: "recebimento", valor: 0.2 },
     ];
     expect(saldoDeMovimentos(movs)).toBe(0.3);
+  });
+});
+
+// Guia de um atendimento de dias atrás faturada hoje. O dinheiro entra na
+// gaveta de hoje (o caixa do dia original está fechado e é intocável), então
+// ele continua somando no total — o que faltava era a atendente enxergar
+// quanto do caixa de hoje veio de outro dia na hora de conferir.
+describe("resumoRetroativos", () => {
+  const marca = (dia: string) => ` [Data retroativa: ${dia}]`;
+
+  it("separa o que veio de outro dia sem alterar o total do caixa", () => {
+    const movs = [
+      { tipo: "recebimento", valor: 200, descricao: "MARIA — CONSULTA" },
+      { tipo: "recebimento", valor: 130, descricao: `PEDRO — CONSULTA${marca("19/08/2026")}` },
+      { tipo: "recebimento", valor: 52, descricao: `TANIA — ITB${marca("14/08/2026")}` },
+    ];
+    const r = resumoRetroativos(movs);
+    expect(r.total).toBe(182); // 130 + 52
+    expect(r.quantidade).toBe(2);
+    expect(r.dias).toEqual(["14/08/2026", "19/08/2026"]); // mais antigo primeiro
+    // O total do caixa não muda: o retroativo é uma PARCELA dele, não um extra.
+    expect(saldoDeMovimentos(movs)).toBe(382);
+  });
+
+  it("usa o mesmo peso do saldo: estorno marcado abate o retroativo", () => {
+    const movs = [
+      { tipo: "recebimento", valor: 130, descricao: `PEDRO${marca("19/08/2026")}` },
+      { tipo: "estorno", valor: 130, descricao: `PEDRO${marca("19/08/2026")}` },
+    ];
+    expect(resumoRetroativos(movs).total).toBe(0);
+    expect(saldoDeMovimentos(movs)).toBe(0);
+  });
+
+  it("caixa sem nenhum retroativo devolve zero, e não uma linha vazia enganosa", () => {
+    const r = resumoRetroativos([{ tipo: "recebimento", valor: 90, descricao: "ANA — CONSULTA" }]);
+    expect(r).toEqual({ total: 0, quantidade: 0, dias: [] });
+  });
+
+  it("não confunde a marca de data corrigida com a de data retroativa", () => {
+    // Os scripts de correção gravam "[DATA CORRIGIDA EM ...]" na descrição.
+    // Isso não é um retroativo e não pode entrar na conta.
+    expect(ehMovimentoRetroativo("PEDRO | [DATA CORRIGIDA EM 25/08/2026] ...")).toBe(false);
+    expect(ehMovimentoRetroativo(null)).toBe(false);
+    expect(dataRetroativaDe("PEDRO [Data retroativa: 19/08/2026]")).toBe("19/08/2026");
   });
 });

@@ -159,3 +159,72 @@ export const STATUS_CAIXA_CLASS: Record<StatusCaixa, string> = {
   fechado: "bg-slate-100 text-slate-600 border-slate-300",
   em_conferencia: "bg-amber-100 text-amber-700 border-amber-300",
 };
+
+// ---------------------------------------------------------------------------
+// Retroativos dentro de um caixa
+//
+// Uma guia de um atendimento de dias atrás faturada hoje entra no caixa de
+// HOJE sempre que o caixa do dia original já estiver fechado e conferido — um
+// fechamento já impresso nunca é reescrito. O dinheiro está mesmo na gaveta de
+// hoje, então ele PRECISA continuar somando no total; o que faltava era a
+// atendente conseguir ver quanto do caixa de hoje veio de outro dia na hora de
+// conferir.
+//
+// O banco marca esses movimentos na própria descrição, em
+// `fn_registrar_lancamento_e_caixa`: " [Data retroativa: DD/MM/AAAA]".
+// Nada aqui altera valor — é só leitura para exibição.
+// ---------------------------------------------------------------------------
+
+/** Marca que o banco grava na descrição do movimento retroativo. */
+const MARCA_RETROATIVA = /\[Data retroativa:\s*(\d{2}\/\d{2}\/\d{4})\]/i;
+
+/** Data (DD/MM/AAAA) do atendimento de um movimento retroativo, ou null. */
+export function dataRetroativaDe(descricao: string | null | undefined): string | null {
+  const m = MARCA_RETROATIVA.exec(descricao ?? "");
+  return m ? m[1] : null;
+}
+
+/** Este movimento veio de um atendimento de outro dia? */
+export function ehMovimentoRetroativo(descricao: string | null | undefined): boolean {
+  return dataRetroativaDe(descricao) !== null;
+}
+
+export interface ResumoRetroativos {
+  /** Quanto do saldo deste caixa veio de atendimento de outro dia. */
+  total: number;
+  /** Quantos movimentos retroativos existem no recorte. */
+  quantidade: number;
+  /** Dias de origem (DD/MM/AAAA), do mais antigo para o mais recente. */
+  dias: string[];
+}
+
+/**
+ * Quanto de um conjunto de movimentos veio de atendimento de dia anterior.
+ *
+ * Usa o MESMO peso de `saldoDeMovimentos` (`SINAL_NO_SALDO`), para que o
+ * número exibido seja uma parcela real do total do caixa e não uma soma bruta
+ * paralela — se um retroativo for estornado e o estorno também estiver
+ * marcado, os dois se anulam, como acontece no total.
+ */
+export function resumoRetroativos(
+  movs: Array<{
+    tipo: string;
+    valor: number | string | null | undefined;
+    descricao?: string | null;
+  }>,
+): ResumoRetroativos {
+  const retro = movs.filter((m) => ehMovimentoRetroativo(m.descricao));
+  const total = Number(
+    retro
+      .reduce((acc, m) => acc + (SINAL_NO_SALDO[m.tipo] ?? 0) * (Number(m.valor) || 0), 0)
+      .toFixed(2),
+  );
+  const dias = Array.from(
+    new Set(retro.map((m) => dataRetroativaDe(m.descricao)).filter((d): d is string => !!d)),
+  ).sort((a, b) => {
+    const [da, ma, aa] = a.split("/");
+    const [db, mb, ab] = b.split("/");
+    return `${aa}${ma}${da}`.localeCompare(`${ab}${mb}${db}`);
+  });
+  return { total, quantidade: retro.length, dias };
+}

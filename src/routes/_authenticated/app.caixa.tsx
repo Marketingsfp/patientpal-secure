@@ -85,6 +85,7 @@ import {
   saldoDeMovimentos,
   SINAL_NO_SALDO,
   classificarDiferenca,
+  resumoRetroativos,
   totalConferido,
   statusCaixa,
   STATUS_CAIXA_LABEL,
@@ -2885,6 +2886,28 @@ function Page() {
     [gavetaDoDiaFechamento],
   );
 
+  /**
+   * Quanto do caixa que está sendo fechado veio de atendimento de OUTRO DIA.
+   *
+   * Guia retroativa faturada hoje entra no caixa de hoje sempre que o caixa do
+   * dia original já estiver fechado — um fechamento já impresso é intocável. O
+   * dinheiro está mesmo na gaveta de hoje, então este valor continua somado no
+   * total e nada aqui muda a conta. É só exibição: sem isso, a atendente
+   * confere a gaveta contra um total que inclui atendimento de outro dia sem
+   * ter como saber disso.
+   */
+  const retroativosDoDiaFechamento = useMemo(
+    () => resumoRetroativos(movsDoDiaFechamento),
+    [movsDoDiaFechamento],
+  );
+
+  /** Mesma leitura para o caixa de outra pessoa, fechado pelo gestor. */
+  const retroativosDaSessao = useCallback(
+    (sid: string) =>
+      resumoRetroativos(todosMovs.filter((m) => m.sessao_id === sid && !m.id.startsWith("fin:"))),
+    [todosMovs],
+  );
+
   /** Mesma conta para o caixa de outra pessoa, fechado pelo gestor. */
   const composicaoGavetaSessao = useCallback(
     (sid: string, valorAbertura: number) => {
@@ -3287,6 +3310,7 @@ function Page() {
       saldoInicial: gavetaDoDiaFechamento.saldoInicial,
       esperadoGaveta: esperadoGavetaFechamento,
       composicaoGaveta: gavetaDoDiaFechamento,
+      retroativos: retroativosDoDiaFechamento,
       movimentos: movsGaveta.map((m) => ({
         tipo: m.tipo,
         valor: m.valor,
@@ -3381,6 +3405,7 @@ function Page() {
       aberturaEm: alvo.aberto_em,
       fechamentoEm: fechadoEmISO,
       composicaoGaveta: composicaoGavetaSessao(alvo.id, Number(alvo.valor_abertura || 0)),
+      retroativos: retroativosDaSessao(alvo.id),
     });
     void loadTodos();
     void load();
@@ -5239,6 +5264,20 @@ function Page() {
                 ao esperado em espécie — confira manualmente antes de fechar.
               </p>
             )}
+            {/* Parcela do caixa que veio de atendimento de outro dia. NÃO é um
+                aviso de erro nem um valor a descontar: o dinheiro está mesmo
+                nesta gaveta, porque o caixa do dia original já estava fechado e
+                fechamento impresso não se reescreve. É só para a conferência
+                saber de onde vem parte do total. */}
+            {retroativosDoDiaFechamento.quantidade > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Deste total, <strong>{fmt(retroativosDoDiaFechamento.total)}</strong> são de
+                atendimento de outro dia ({retroativosDoDiaFechamento.quantidade}{" "}
+                {retroativosDoDiaFechamento.quantidade === 1 ? "guia" : "guias"} de{" "}
+                {retroativosDoDiaFechamento.dias.join(", ")}). Já está somado acima — o dinheiro
+                entrou nesta gaveta porque o caixa daquele dia já estava fechado. Não desconte.
+              </p>
+            )}
           </DialogHeader>
           {/* Bloqueio duro: alguma forma fechou negativa. Fica no topo porque o
               caixa não pode ser encerrado enquanto isso não for corrigido. */}
@@ -5513,6 +5552,19 @@ function Page() {
                 </strong>
                 <br />
                 Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
+                {/* Mesma leitura do fechamento do próprio operador. */}
+                {retroativosDaSessao(openFecharTerceiro.id).quantidade > 0 && (
+                  <>
+                    <br />
+                    <span className="text-muted-foreground">
+                      Deste total,{" "}
+                      <strong>{fmt(retroativosDaSessao(openFecharTerceiro.id).total)}</strong> são
+                      de atendimento de outro dia (
+                      {retroativosDaSessao(openFecharTerceiro.id).dias.join(", ")}). Já está somado
+                      — não desconte.
+                    </span>
+                  </>
+                )}
               </DialogDescription>
             )}
           </DialogHeader>
