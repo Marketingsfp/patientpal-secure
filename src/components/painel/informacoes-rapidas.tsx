@@ -306,9 +306,22 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
           <SheetTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4" /> Nina — assistente da clínica
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="ml-auto mr-8 h-8 w-8 rounded-full"
+              onClick={alternarVoz}
+              title={voz ? "Desativar a voz da Nina" : "Ativar a voz da Nina"}
+              aria-label="Voz da Nina"
+            >
+              {voz ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
+            </Button>
           </SheetTitle>
           <SheetDescription>
-            Pergunte sobre valores, especialidades e horários dos médicos.
+            {voz
+              ? "Fale pelo microfone e ouça a resposta em voz alta."
+              : "Pergunte sobre valores, especialidades e horários dos médicos."}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
