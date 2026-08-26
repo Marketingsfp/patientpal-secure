@@ -142,6 +142,59 @@ export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
     }
   });
 
+/** Consulta o status real do número na Cloud API (nunca expõe o token). */
+export const statusNumeroWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    if (!cfg?.phone_number_id || !cfg?.access_token) {
+      return { ok: false as const, error: "Preencha Phone Number ID e Access Token." };
+    }
+    const { metaFetchPhoneStatus } = await import("./whatsapp.server");
+    try {
+      const info = await metaFetchPhoneStatus(cfg.phone_number_id, cfg.access_token);
+      if (info.display_phone_number && info.display_phone_number !== cfg.display_phone_number) {
+        await supabaseAdmin
+          .from("whatsapp_configs")
+          .update({ display_phone_number: info.display_phone_number })
+          .eq("clinica_id", data.clinicaId);
+      }
+      return { ok: true as const, ...info };
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message ?? e) };
+    }
+  });
+
+/** Registra o número na Cloud API usando o PIN de verificação em duas etapas. */
+export const registrarNumeroWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({ clinicaId: z.string().uuid(), pin: z.string().regex(/^\d{6}$/) })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    if (!cfg?.phone_number_id || !cfg?.access_token) {
+      return { ok: false as const, error: "Preencha Phone Number ID e Access Token." };
+    }
+    const { metaRegisterPhone, metaFetchPhoneStatus } = await import("./whatsapp.server");
+    try {
+      await metaRegisterPhone(cfg.phone_number_id, cfg.access_token, data.pin);
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message ?? e) };
+    }
+    try {
+      const info = await metaFetchPhoneStatus(cfg.phone_number_id, cfg.access_token);
+      return { ok: true as const, ...info };
+    } catch {
+      return { ok: true as const, status: null, name_status: null };
+    }
+  });
+
 export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
