@@ -1720,16 +1720,16 @@ export function LancamentoDialog({
                         <div className="flex items-start justify-between gap-2">
                           <span className="text-xs font-medium">{it.descricao}</span>
                           {it.sinal > 0 ? (
-                            <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
                               Entrada {formatBRL(it.sinal)}
                             </span>
                           ) : (
-                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                            <span className="shrink-0 text-[11px] text-muted-foreground">
                               sem entrada
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-muted-foreground tabular-nums">
+                        <div className="text-[12px] text-muted-foreground tabular-nums">
                           Total {formatBRL(it.total)} · Já pago {formatBRL(it.pago)} · Falta{" "}
                           {formatBRL(it.restante)}
                         </div>
@@ -2131,7 +2131,7 @@ export function LancamentoDialog({
                         />
                       </div>
                     </div>
-                    <p className="text-[11px] text-sky-800">
+                    <p className="text-[12px] text-sky-800">
                       Preencha ao menos um dos dois — é o que liga esta guia ao recebimento já
                       feito. Se o pagamento foi na Clínica Total, antes da virada, use a forma
                       &quot;{LABEL_PAGO_SISTEMA_ANTERIOR}&quot; em vez desta opção.
@@ -2167,7 +2167,7 @@ export function LancamentoDialog({
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-amber-800">
+                <p className="text-[12px] text-amber-800">
                   Preencha ao menos um dos dois — é o que liga esta guia ao recebimento feito no
                   sistema antigo.
                 </p>

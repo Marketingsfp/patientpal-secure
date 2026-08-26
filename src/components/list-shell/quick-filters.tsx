@@ -61,7 +61,7 @@ export function QuickFilters<V extends string>({
             {typeof opt.count === "number" && (
               <span
                 className={cn(
-                  "rounded-full px-1.5 py-0 text-[10px] tabular-nums",
+                  "rounded-full px-1.5 py-0 text-[11px] tabular-nums",
                   active ? "bg-primary-foreground/20" : "bg-muted",
                 )}
               >

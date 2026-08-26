@@ -176,13 +176,13 @@ function HhpShowcase() {
 
       <div className="flex-1 overflow-y-auto p-3 md:p-6 grid gap-6 md:grid-cols-2">
         <section className="rounded-3xl border border-slate-100 bg-white p-5">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
             Skeletons
           </div>
           <HhpSkeletonList count={4} density={density} />
         </section>
         <section className="rounded-3xl border border-slate-100 bg-white p-5">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
             Empty state
           </div>
           <HhpEmptyState

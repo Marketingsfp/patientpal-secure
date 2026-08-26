@@ -143,7 +143,7 @@ function NfseConfigPage() {
             className: "w-32",
             render: (r) => (
               <span
-                className={`font-medium px-2.5 py-0.5 rounded-full text-[11px] border ${
+                className={`font-medium px-2.5 py-0.5 rounded-full text-[12px] border ${
                   r.focus_ambiente === "producao"
                     ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                     : "bg-amber-500/10 text-amber-600 border-amber-500/20"
@@ -159,7 +159,7 @@ function NfseConfigPage() {
             className: "w-24",
             render: (r) =>
               r.padrao ? (
-                <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 border border-amber-500/20 font-semibold px-2 py-0.5 rounded-full text-[10px]">
+                <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 border border-amber-500/20 font-semibold px-2 py-0.5 rounded-full text-[11px]">
                   <Star className="h-3 w-3 fill-current" /> Padrão
                 </span>
               ) : (

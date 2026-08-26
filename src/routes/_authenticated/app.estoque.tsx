@@ -440,7 +440,7 @@ function EstoquePage() {
                         </span>
                         <Badge
                           variant="outline"
-                          className={cn("text-[11px]", STATUS_ESTOQUE_CLASS[p.st])}
+                          className={cn("text-[12px]", STATUS_ESTOQUE_CLASS[p.st])}
                         >
                           {STATUS_ESTOQUE_LABEL[p.st]}
                         </Badge>

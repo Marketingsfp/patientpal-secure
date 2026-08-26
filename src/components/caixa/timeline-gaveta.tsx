@@ -36,7 +36,7 @@ export function TimelineGaveta({
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
           Sangrias e suprimentos do turno
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold tabular-nums">
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold tabular-nums">
           <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
             Suprimentos {fmt(totalSup)}
           </span>
@@ -94,7 +94,7 @@ export function TimelineGaveta({
                   <div className="text-sm font-semibold text-slate-800">
                     {sup ? "Suprimento" : "Sangria"}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate">
+                  <div className="text-[12px] text-slate-500 truncate">
                     {hora}
                     {m.descricao ? ` · ${m.descricao}` : ""}
                   </div>

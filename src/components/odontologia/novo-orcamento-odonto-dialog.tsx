@@ -725,7 +725,7 @@ export function NovoOrcamentoOdontoDialog({
                                     <Badge
                                       key={d}
                                       variant="secondary"
-                                      className="font-mono text-[11px]"
+                                      className="font-mono text-[12px]"
                                     >
                                       {d}
                                     </Badge>
@@ -755,7 +755,7 @@ export function NovoOrcamentoOdontoDialog({
                             />
                             {it.procedimento_id == null ? (
                               <div className="space-y-0.5 md:col-span-2">
-                                <div className="text-[10px] text-muted-foreground">
+                                <div className="text-[11px] text-muted-foreground">
                                   Valor unitário
                                 </div>
                                 <CurrencyInput
@@ -768,11 +768,11 @@ export function NovoOrcamentoOdontoDialog({
                             ) : (
                               <>
                                 <div className="space-y-0.5">
-                                  <div className="text-[10px] text-muted-foreground">Dinheiro</div>
+                                  <div className="text-[11px] text-muted-foreground">Dinheiro</div>
                                   <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
                                 </div>
                                 <div className="space-y-0.5">
-                                  <div className="text-[10px] text-muted-foreground">
+                                  <div className="text-[11px] text-muted-foreground">
                                     Cartão/PIX
                                   </div>
                                   <div className="text-sm tabular-nums">
@@ -788,7 +788,7 @@ export function NovoOrcamentoOdontoDialog({
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2 items-center rounded-md bg-muted/30 p-2">
                             <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">
+                              <div className="text-[11px] text-muted-foreground">
                                 Sinal (entrada) R$
                               </div>
                               <CurrencyInput

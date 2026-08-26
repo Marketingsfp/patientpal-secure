@@ -70,6 +70,43 @@
   --color-status-refunded: var(--status-refunded);
 }
 
+/* =====================================================================
+ * Escala tipográfica — legibilidade na recepção
+ *
+ * A equipe da recepção relatou que o texto das telas de atendimento, das
+ * tabelas e do faturamento estava pequeno demais para ler no balcão. A
+ * escala de fontes do Tailwind foi subida ~10–15% onde dói (xs/sm/base) e
+ * o aumento vai afinando nos tamanhos grandes: títulos já eram legíveis e
+ * crescê-los na mesma proporção estouraria cabeçalhos e cards em telas
+ * médias.
+ *
+ * Por que aqui e não em `html { font-size }`: no Tailwind o rem também
+ * governa espaçamento, altura e raio (p-4, h-9, gap-2). Mexer na raiz
+ * daria um zoom na interface inteira, quebraria layouts de largura fixa e
+ * ainda aumentaria os contratos em A4 do editor, que precisam continuar
+ * paginando igual. Trocando só os tokens --text-*, o texto cresce e a
+ * geometria fica intacta.
+ *
+ * As alturas de linha do Tailwind v4 são razões sem unidade
+ * (ex.: calc(1.25 / 0.875)), então acompanham sozinhas o novo tamanho —
+ * por isso não são redeclaradas aqui.
+ *
+ * Antes → depois:
+ *   xs  12px → 13.6px     base 16px → 18px     2xl 24px → 26px
+ *   sm  14px → 16px       lg   18px → 20px     3xl 30px → 32px
+ *                         xl   20px → 22px
+ * De 4xl para cima ficam como estavam (uso decorativo e de telão).
+ * ===================================================================== */
+@theme {
+  --text-xs: 0.85rem;
+  --text-sm: 1rem;
+  --text-base: 1.125rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.625rem;
+  --text-3xl: 2rem;
+}
+
 :root {
   --radius: 0.875rem;
   --background: oklch(0.985 0.003 240);
@@ -233,13 +270,21 @@
     }
   }
 
+  /* Dígitos de largura fixa nas tabelas. Com a fonte maior, as colunas de
+   * R$ ficavam com os centavos desencontrados na vertical, porque na fonte
+   * do sistema o "1" é mais estreito que os demais algarismos. Vale para
+   * qualquer tabela do app — extrato do caixa, faturamento, repasses. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Dialogs / sheets that hardcode large widths shouldn't overflow viewport */
   [role="dialog"] { max-width: 100vw; }
 
   /* Common heading sizes shrink on small screens */
   @media (max-width: 640px) {
-    main h1 { font-size: 1.25rem; line-height: 1.75rem; }
-    main h2 { font-size: 1.125rem; line-height: 1.5rem; }
+    main h1 { font-size: 1.375rem; line-height: 1.875rem; }
+    main h2 { font-size: 1.25rem; line-height: 1.75rem; }
   }
 }
 

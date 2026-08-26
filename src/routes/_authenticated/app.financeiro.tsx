@@ -89,7 +89,7 @@ function FinLayout() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[13px] font-medium",
+                  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[14px] font-medium",
                   "transition-all duration-200",
                   active
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"

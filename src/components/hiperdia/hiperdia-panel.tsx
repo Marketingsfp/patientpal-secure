@@ -113,7 +113,7 @@ function Sparkline({
         <p className="text-xs font-medium text-muted-foreground">{titulo}</p>
         <p className="text-sm font-semibold tabular-nums">
           {ultimo.y}
-          <span className="text-[10px] font-normal text-muted-foreground ml-1">{unidade}</span>
+          <span className="text-[11px] font-normal text-muted-foreground ml-1">{unidade}</span>
         </p>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-14 mt-1" preserveAspectRatio="none">
@@ -129,7 +129,7 @@ function Sparkline({
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <p className="text-[10px] text-muted-foreground">
+      <p className="text-[11px] text-muted-foreground">
         mín {min} · máx {max} · {valores.length} aferições
       </p>
     </div>
@@ -304,12 +304,12 @@ export function HiperdiaPanel({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="text-[11px] uppercase tracking-wider">Data</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Pressão</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Glicemia jejum</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Glicemia pós</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Peso</TableHead>
-              <TableHead className="text-[11px] uppercase tracking-wider">Observações</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Data</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Pressão</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Glicemia jejum</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Glicemia pós</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Peso</TableHead>
+              <TableHead className="text-[12px] uppercase tracking-wider">Observações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -337,9 +337,9 @@ export function HiperdiaPanel({
                       {r.pressao_sistolica != null && r.pressao_diastolica != null ? (
                         <span>
                           {r.pressao_sistolica}/{r.pressao_diastolica}
-                          <span className="text-[10px] text-muted-foreground ml-1">mmHg</span>
+                          <span className="text-[11px] text-muted-foreground ml-1">mmHg</span>
                           {cls && (
-                            <span className={`ml-2 text-[11px] font-medium ${cls.tone}`}>
+                            <span className={`ml-2 text-[12px] font-medium ${cls.tone}`}>
                               {cls.label}
                             </span>
                           )}

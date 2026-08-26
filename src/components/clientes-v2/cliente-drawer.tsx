@@ -109,7 +109,7 @@ export function ClienteDrawer({ paciente, onClose }: Props) {
 function Info({ k, v }: { k: string; v: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{k}</div>
       <div className="truncate">{v}</div>
     </div>
   );

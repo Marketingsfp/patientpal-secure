@@ -262,7 +262,7 @@ function DuplicadosPage() {
                 >
                   <Merge className="h-3.5 w-3.5" />
                   Mesclar selecionados
-                  <span className="bg-primary-foreground/20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                  <span className="bg-primary-foreground/20 rounded-full px-1.5 py-0.5 text-[11px] font-bold">
                     {sel[groupKey(g, i)]?.size ?? 0}
                   </span>
                 </button>

@@ -778,7 +778,7 @@ export function CaixaShellV2({
             <div
               className={cn(
                 "grid items-center gap-3 border-b border-border/50 px-3",
-                compact ? "h-8 text-[13px]" : "h-10 text-sm",
+                compact ? "h-8 text-[14px]" : "h-10 text-sm",
                 compact
                   ? "grid-cols-[118px_100px_1fr_90px]"
                   : "grid-cols-[140px_120px_1fr_100px_100px]",
@@ -797,7 +797,7 @@ export function CaixaShellV2({
               </span>
               <span
                 className={cn(
-                  "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium w-fit",
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-[12px] font-medium w-fit",
                   TIPO_CLASS[m.tipo],
                 )}
               >
@@ -897,7 +897,7 @@ export function CaixaShellV2({
             data-testid="toggle-compact"
           >
             {compact ? "Modo normal" : "Modo compacto"}
-            <span className="ml-2 text-[10px] text-muted-foreground hidden sm:inline">
+            <span className="ml-2 text-[11px] text-muted-foreground hidden sm:inline">
               Ctrl+Shift+C
             </span>
           </Button>
@@ -1024,7 +1024,7 @@ export function CaixaShellV2({
                 {drawerItem.alertas.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {drawerItem.alertas.map((a) => (
-                      <span key={a.tipo} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                      <span key={a.tipo} className="rounded-full bg-muted px-2 py-0.5 text-[12px]">
                         {a.emoji} {a.label}
                       </span>
                     ))}

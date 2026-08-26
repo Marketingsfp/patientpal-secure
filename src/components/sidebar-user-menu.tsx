@@ -142,7 +142,7 @@ export function SidebarUserMenu({
                   {userName || email}
                 </span>
                 {userName && email && (
-                  <span className="block truncate text-[10px] text-white/60">{email}</span>
+                  <span className="block truncate text-[11px] text-white/60">{email}</span>
                 )}
               </span>
             </button>

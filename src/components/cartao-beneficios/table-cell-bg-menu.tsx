@@ -53,7 +53,7 @@ export function TableCellBgMenu({ editor }: { editor: Editor }) {
       <PopoverContent align="start" className="w-auto p-3 space-y-3">
         {PALETA.map((grupo) => (
           <div key={grupo.nome} className="space-y-1">
-            <div className="text-[11px] font-medium text-muted-foreground">{grupo.nome}</div>
+            <div className="text-[12px] font-medium text-muted-foreground">{grupo.nome}</div>
             <div className="flex gap-1">
               {grupo.cores.map((cor) => (
                 <button

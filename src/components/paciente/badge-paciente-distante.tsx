@@ -21,7 +21,7 @@ export function BadgePacienteDistante({
       title={`Paciente de outro município: ${nome}`}
       className={`shrink-0 max-w-full overflow-hidden bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 tracking-wide flex items-center gap-1 animate-pulse ${
         compact
-          ? "px-1 py-0.5 text-[9px] font-semibold rounded"
+          ? "px-1 py-0.5 text-[10px] font-semibold rounded"
           : "px-3 py-1 text-xs font-bold rounded-full"
       } ${className}`}
     >

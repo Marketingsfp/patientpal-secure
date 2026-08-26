@@ -84,7 +84,7 @@ export function PacienteResumoBar({
 
   if (isLoading) {
     return (
-      <div className="rounded-md border bg-muted/40 px-2 py-1.5 text-[11px] text-muted-foreground animate-pulse">
+      <div className="rounded-md border bg-muted/40 px-2 py-1.5 text-[12px] text-muted-foreground animate-pulse">
         Carregando resumo do paciente…
       </div>
     );
@@ -103,14 +103,14 @@ export function PacienteResumoBar({
   };
 
   return (
-    <div className="rounded-md border bg-card px-2 py-1.5 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1">
+    <div className="rounded-md border bg-card px-2 py-1.5 text-[12px] flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="inline-flex items-center gap-1 font-medium">
         <User className="h-3 w-3" />
         {data.nome ?? "—"}
         {data.idade != null && <span className="text-muted-foreground">· {data.idade}a</span>}
       </span>
 
-      <Badge variant={tipoAssociado ? "default" : "secondary"} className="h-4 px-1.5 text-[10px]">
+      <Badge variant={tipoAssociado ? "default" : "secondary"} className="h-4 px-1.5 text-[11px]">
         {tipoAssociado ? "Associado" : "Particular"}
       </Badge>
 
@@ -154,7 +154,7 @@ export function PacienteResumoBar({
       )}
 
       {temPendencia && (
-        <Badge variant="destructive" className="h-4 px-1.5 text-[10px] gap-1">
+        <Badge variant="destructive" className="h-4 px-1.5 text-[11px] gap-1">
           <Wallet className="h-3 w-3" /> Pendência {brl(data.pendencia_valor ?? 0)}
         </Badge>
       )}
@@ -164,7 +164,7 @@ export function PacienteResumoBar({
           type="button"
           size="sm"
           variant="outline"
-          className="h-5 px-1.5 text-[10px] border-amber-400 text-amber-700 hover:bg-amber-50 gap-1"
+          className="h-5 px-1.5 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-50 gap-1"
           onClick={onCompletarCadastro}
           title={`Faltam: ${(data.faltantes ?? []).join(", ") || "dados"}`}
         >

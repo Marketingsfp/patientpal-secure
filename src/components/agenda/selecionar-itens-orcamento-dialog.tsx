@@ -124,7 +124,7 @@ export function SelecionarItensOrcamentoDialog(props: {
                   {it.dentes && it.dentes.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {it.dentes.map((d) => (
-                        <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        <Badge key={d} variant="secondary" className="text-[11px] px-1.5 py-0">
                           Dente {d}
                         </Badge>
                       ))}
@@ -134,7 +134,7 @@ export function SelecionarItensOrcamentoDialog(props: {
                 <div className="text-sm font-semibold whitespace-nowrap">
                   {fmtBRL(Number(it.valor_total || 0))}
                   {Number(it.valor_pago || 0) > 0 ? (
-                    <div className="mt-0.5 text-[10px] font-semibold text-amber-600">
+                    <div className="mt-0.5 text-[11px] font-semibold text-amber-600">
                       Entrada paga {fmtBRL(Number(it.valor_pago))} · Falta{" "}
                       {fmtBRL(
                         Math.max(0, Number(it.valor_total || 0) - Number(it.valor_pago || 0)),
@@ -142,7 +142,7 @@ export function SelecionarItensOrcamentoDialog(props: {
                     </div>
                   ) : (
                     Number(it.sinal_valor || 0) > 0 && (
-                      <div className="mt-0.5 text-[10px] font-semibold text-primary">
+                      <div className="mt-0.5 text-[11px] font-semibold text-primary">
                         Entrada {fmtBRL(Number(it.sinal_valor))}
                       </div>
                     )

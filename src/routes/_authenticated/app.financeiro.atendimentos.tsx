@@ -2809,7 +2809,7 @@ function AtendimentosPage() {
                   <div className="flex gap-1.5 min-w-[140px]">
                     <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
                       <div>
-                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                        <div className="text-[9px] text-muted-foreground uppercase leading-tight">
                           A receber
                         </div>
                         <div className="text-xs font-bold text-primary leading-tight">
@@ -2819,7 +2819,7 @@ function AtendimentosPage() {
                     </div>
                     <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
                       <div>
-                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                        <div className="text-[9px] text-muted-foreground uppercase leading-tight">
                           Recebido
                         </div>
                         <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
@@ -2830,7 +2830,7 @@ function AtendimentosPage() {
                   <div className="flex gap-1.5 min-w-[140px]">
                     <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
                       <div>
-                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                        <div className="text-[9px] text-muted-foreground uppercase leading-tight">
                           A pagar
                         </div>
                         <div className="text-xs font-bold text-amber-600 leading-tight">
@@ -2840,7 +2840,7 @@ function AtendimentosPage() {
                     </div>
                     <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
                       <div>
-                        <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                        <div className="text-[9px] text-muted-foreground uppercase leading-tight">
                           Pago
                         </div>
                         <div className="text-xs font-bold text-emerald-600 leading-tight">
@@ -2856,7 +2856,7 @@ function AtendimentosPage() {
                         title="Repasse de terceiro (dono do equipamento) — sai em lançamento separado do repasse do médico executante"
                       >
                         <div>
-                          <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                          <div className="text-[9px] text-muted-foreground uppercase leading-tight">
                             Terceiros
                           </div>
                           <div className="text-xs font-bold text-amber-700 leading-tight">
@@ -2901,39 +2901,39 @@ function AtendimentosPage() {
                           />
                         </TableHead>
                       )}
-                      <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">
+                      <TableHead className="text-[12px] font-medium px-2 whitespace-nowrap text-center w-10">
                         Ficha
                       </TableHead>
-                      <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">
+                      <TableHead className="text-[12px] font-medium px-2 whitespace-nowrap">
                         Data
                       </TableHead>
-                      <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
-                      <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
-                      <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
+                      <TableHead className="text-[12px] font-medium px-2">Médico</TableHead>
+                      <TableHead className="text-[12px] font-medium px-2">Paciente</TableHead>
+                      <TableHead className="text-[12px] font-medium px-2">Serviço</TableHead>
                       {!isMedicoOnly && (
-                        <TableHead className="text-right text-[11px] font-medium px-2">
+                        <TableHead className="text-right text-[12px] font-medium px-2">
                           Total
                         </TableHead>
                       )}
-                      <TableHead className="text-right text-[11px] font-medium px-2">
+                      <TableHead className="text-right text-[12px] font-medium px-2">
                         {isMedicoOnly ? "Repasse" : "Médico"}
                       </TableHead>
                       {!isMedicoOnly && (
-                        <TableHead className="text-right text-[11px] font-medium px-2">
+                        <TableHead className="text-right text-[12px] font-medium px-2">
                           Clínica
                         </TableHead>
                       )}
-                      <TableHead className="text-center text-[11px] font-medium px-2">
+                      <TableHead className="text-center text-[12px] font-medium px-2">
                         Status
                       </TableHead>
-                      <TableHead className="text-center text-[11px] font-medium px-2">
+                      <TableHead className="text-center text-[12px] font-medium px-2">
                         Pgto
                       </TableHead>
-                      <TableHead className="text-center text-[11px] font-medium px-2">
+                      <TableHead className="text-center text-[12px] font-medium px-2">
                         Laudo
                       </TableHead>
                       {!isMedicoOnly && (
-                        <TableHead className="text-center text-[11px] font-medium px-2">
+                        <TableHead className="text-center text-[12px] font-medium px-2">
                           Ações
                         </TableHead>
                       )}
@@ -2989,7 +2989,7 @@ function AtendimentosPage() {
                               ) : (
                                 <span
                                   title="Sem valor de repasse cadastrado para este médico/procedimento"
-                                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                                  className="text-[11px] text-muted-foreground whitespace-nowrap"
                                 >
                                   Sem repasse
                                 </span>
@@ -3039,7 +3039,7 @@ function AtendimentosPage() {
                                 para o operador ver a divisão antes de pagar. */}
                             {a.terceiro_medico_id && (Number(a.terceiro_valor) || 0) > 0 && (
                               <div
-                                className="mt-0.5 font-normal text-[10px] text-amber-700 dark:text-amber-500"
+                                className="mt-0.5 font-normal text-[11px] text-amber-700 dark:text-amber-500"
                                 title={`Repasse de terceiro (dono do equipamento): ${
                                   medMap.get(a.terceiro_medico_id) ?? "—"
                                 } — ${a.terceiro_percentual ?? "?"}% do valor do atendimento`}
@@ -3064,7 +3064,7 @@ function AtendimentosPage() {
                             {a.repasse_pago ? (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-nowrap px-1.5 py-0"
+                                className="text-[11px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
                                 Pago
@@ -3072,7 +3072,7 @@ function AtendimentosPage() {
                             ) : (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-nowrap px-1.5 py-0"
+                                className="text-[11px] bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <Clock className="h-3 w-3 mr-0.5 inline" />A receber
                               </Badge>
@@ -3096,7 +3096,7 @@ function AtendimentosPage() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                      className="h-6 text-[11px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
                                       title={
                                         laudadorNome
                                           ? `Laudador: ${laudadorNome}. Clique para desvincular.`
@@ -3109,7 +3109,7 @@ function AtendimentosPage() {
                                     </Button>
                                     {laudadorNome && (
                                       <span
-                                        className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                        className="text-[10px] leading-tight text-muted-foreground max-w-[110px] truncate"
                                         title={laudadorNome}
                                       >
                                         {laudadorNome}
@@ -3120,14 +3120,14 @@ function AtendimentosPage() {
                                   <div className="flex flex-col items-center gap-0.5">
                                     <Badge
                                       variant="outline"
-                                      className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                      className="text-[11px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
                                     >
                                       <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
                                       Vinculado
                                     </Badge>
                                     {laudadorNome && (
                                       <span
-                                        className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                        className="text-[10px] leading-tight text-muted-foreground max-w-[110px] truncate"
                                         title={laudadorNome}
                                       >
                                         {laudadorNome}
@@ -3136,14 +3136,14 @@ function AtendimentosPage() {
                                   </div>
                                 );
                               if (!exigeLaudo)
-                                return <span className="text-muted-foreground text-[10px]">—</span>;
+                                return <span className="text-muted-foreground text-[11px]">—</span>;
                               if (!podeEstornar || !podeEscrever)
-                                return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                                return <span className="text-amber-600 text-[11px]">Pendente</span>;
                               return (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-6 text-[10px] px-2"
+                                  className="h-6 text-[11px] px-2"
                                   onClick={() => openLaudo(a)}
                                 >
                                   Vincular
@@ -3162,7 +3162,7 @@ function AtendimentosPage() {
                             >
                               {a.origem === "agenda" ? (
                                 <div className="flex items-center justify-end gap-0.5">
-                                  <span className="text-[9px] text-muted-foreground uppercase mr-1">
+                                  <span className="text-[10px] text-muted-foreground uppercase mr-1">
                                     Agenda
                                   </span>
                                   {podeEscrever && (
@@ -3192,7 +3192,7 @@ function AtendimentosPage() {
                                     <Button
                                       size="sm"
                                       disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
-                                      className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                      className="h-6 px-2 text-[11px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                       title={
                                         a.repasse_pago
                                           ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
@@ -3209,7 +3209,7 @@ function AtendimentosPage() {
                                       <Button
                                         size="sm"
                                         className={cn(
-                                          "h-6 px-2 text-[10px] gap-1 border",
+                                          "h-6 px-2 text-[11px] gap-1 border",
                                           isSelected
                                             ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
                                             : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
@@ -3305,7 +3305,7 @@ function AtendimentosPage() {
                                     <Button
                                       size="sm"
                                       disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
-                                      className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
+                                      className="h-6 px-2 text-[11px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                       title={
                                         a.repasse_pago
                                           ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
@@ -3322,7 +3322,7 @@ function AtendimentosPage() {
                                       <Button
                                         size="sm"
                                         className={cn(
-                                          "h-6 px-2 text-[10px] gap-1 border",
+                                          "h-6 px-2 text-[11px] gap-1 border",
                                           isSelected
                                             ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
                                             : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
@@ -3494,7 +3494,7 @@ function AtendimentosPage() {
                         <span className="font-semibold">{fmt(t.total)}</span>
                       </div>
                     ))}
-                    <p className="text-[11px] text-muted-foreground pt-1">
+                    <p className="text-[12px] text-muted-foreground pt-1">
                       Cada médico executante recebe o lançamento dele e cada terceiro acima recebe
                       um lançamento próprio — {terceirosSelecionados.length} a mais. Tudo é gravado
                       de uma vez só: ou entram todos, ou não entra nenhum.
@@ -4005,7 +4005,7 @@ function AtendimentosPage() {
                   {fmt(Number(editRepasse.atend?.valor_total) || 0)}
                 </div>
                 {editRepasse.atend?.repasse_pago && (
-                  <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
+                  <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[12px] p-2 leading-snug">
                     Este repasse já foi pago. Ao salvar, a despesa vinculada (fin_lancamentos) será
                     ajustada pela diferença para o caixa continuar batendo. Confirme com o médico
                     antes de gravar.
@@ -4017,7 +4017,7 @@ function AtendimentosPage() {
                     value={editRepasse.valor}
                     onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     Só ajusta este atendimento. Não altera a regra padrão do médico.
                   </p>
                 </div>

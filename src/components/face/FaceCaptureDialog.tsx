@@ -214,7 +214,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
           <div className="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
             <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
             <div className="absolute inset-x-16 inset-y-6 border-4 border-white/60 rounded-[50%] pointer-events-none" />
-            <span className="absolute bottom-2 inset-x-0 text-center text-[11px] text-white/85 pointer-events-none">
+            <span className="absolute bottom-2 inset-x-0 text-center text-[12px] text-white/85 pointer-events-none">
               Enquadre o rosto do paciente aqui
             </span>
           </div>

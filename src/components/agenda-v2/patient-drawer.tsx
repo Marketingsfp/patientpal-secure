@@ -194,7 +194,7 @@ export function PatientDrawer({
                 >
                   {data.paciente_nome}
                 </h2>
-                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-slate-500">
                   <MetaChip
                     label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`}
                   />
@@ -209,7 +209,7 @@ export function PatientDrawer({
                   )}
                 </div>
                 {data.chegou_em && (
-                  <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
+                  <p className="mt-2 text-[12px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
                     Chegou {data.chegou_em}
                   </p>
                 )}
@@ -255,10 +255,10 @@ export function PatientDrawer({
           {/* 5. Sugestões IA (estrutura visual) */}
           <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-b from-indigo-50/40 to-white">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-indigo-600">
                 <Sparkles className="h-3 w-3" /> Sugestões da IA
               </div>
-              <span className="text-[10px] text-slate-600 dark:text-slate-400">3 sinais</span>
+              <span className="text-[11px] text-slate-600 dark:text-slate-400">3 sinais</span>
             </div>
             <div className="space-y-1.5">
               <AiChip
@@ -299,7 +299,7 @@ export function PatientDrawer({
                   type="button"
                   onClick={() => setTab(t.key)}
                   className={cn(
-                    "flex-1 h-8 rounded-lg text-[11px] font-medium transition-all",
+                    "flex-1 h-8 rounded-lg text-[12px] font-medium transition-all",
                     tab === t.key
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-700",
@@ -354,7 +354,7 @@ export function PatientDrawer({
           </div>
 
           {openMs !== null && (
-            <div className="px-6 pb-4 -mt-2 text-[10px] text-slate-500 dark:text-slate-400 tabular-nums text-right">
+            <div className="px-6 pb-4 -mt-2 text-[11px] text-slate-500 dark:text-slate-400 tabular-nums text-right">
               aberto em {openMs}ms
             </div>
           )}
@@ -366,7 +366,7 @@ export function PatientDrawer({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
+    <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-3">
       {children}
     </div>
   );
@@ -419,7 +419,7 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
             <div key={e.key} className="flex flex-col items-center gap-2">
               <div
                 className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
+                  "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold z-10",
                   past && "bg-emerald-500 text-white",
                   current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
                   !past &&
@@ -431,7 +431,7 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
               </div>
               <div
                 className={cn(
-                  "text-[10px] leading-tight text-center max-w-full truncate px-1",
+                  "text-[11px] leading-tight text-center max-w-full truncate px-1",
                   current
                     ? "font-semibold text-slate-900"
                     : past
@@ -472,7 +472,7 @@ function QuickAction({
       className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
     >
       <span className="text-slate-500">{icon}</span>
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-[11px] font-medium">{label}</span>
     </button>
   );
 }
@@ -494,8 +494,8 @@ function ProntuarioPanel({
       <div className="flex items-start gap-2">
         <Stethoscope className="h-4 w-4 text-indigo-500 mt-0.5" />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold text-slate-700">Prontuário do atendimento</div>
-          <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+          <div className="text-[12px] font-semibold text-slate-700">Prontuário do atendimento</div>
+          <p className="text-[12px] text-slate-500 leading-relaxed mt-0.5">
             {proc
               ? `Abrir o prontuário deste atendimento (${proc}) para registrar evolução, exames e conduta.`
               : "Abrir o prontuário deste atendimento para registrar evolução, exames e conduta."}
@@ -507,7 +507,7 @@ function ProntuarioPanel({
         onClick={onOpen}
         disabled={!canOpen}
         className={cn(
-          "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-[12px] font-medium",
+          "inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-[13px] font-medium",
           "bg-slate-900 text-white hover:bg-slate-800 transition-colors",
           "disabled:opacity-40 disabled:cursor-not-allowed",
         )}
@@ -515,7 +515,7 @@ function ProntuarioPanel({
         <ArrowUpRight className="h-3.5 w-3.5" />
         Abrir prontuário completo
       </button>
-      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
+      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
         A tela do prontuário abre no mesmo destino usado pela Agenda clássica e pela fila de
         Atendimento IA — nenhuma regra clínica é alterada.
       </p>
@@ -546,8 +546,8 @@ function AiChip({
     <div className={cn("flex items-start gap-2 rounded-xl border px-3 py-2", toneCls)}>
       <span className={cn("mt-0.5", iconCls)}>{icon}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium leading-tight">{label}</div>
-        <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>
+        <div className="text-[13px] font-medium leading-tight">{label}</div>
+        <div className="text-[12px] text-slate-500 mt-0.5">{hint}</div>
       </div>
     </div>
   );
@@ -556,7 +556,7 @@ function AiChip({
 function TabPlaceholder({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4 space-y-2">
-      <div className="text-[11px] font-semibold text-slate-700">{title}</div>
+      <div className="text-[12px] font-semibold text-slate-700">{title}</div>
       <p className="text-xs text-slate-500 leading-relaxed">{children}</p>
       <div className="pt-2 space-y-2">
         <Skeleton className="h-3 w-4/5" />
@@ -637,7 +637,7 @@ function StatusActions({
             type="button"
             onClick={() => onChange(a.key)}
             className={cn(
-              "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-[11px] font-medium",
+              "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-[12px] font-medium",
               "border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors",
               a.cls,
             )}
@@ -703,10 +703,10 @@ function PanelCard({
         tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
       )}
     >
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
         <span className="text-slate-500">{icon}</span> {title}
       </div>
-      <p className="text-[11px] text-slate-600 leading-snug">{body}</p>
+      <p className="text-[12px] text-slate-600 leading-snug">{body}</p>
     </div>
   );
 }

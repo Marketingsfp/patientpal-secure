@@ -175,7 +175,7 @@ function MeusCartoesPage() {
                         : c.papel}
                     </p>
                     {c.papel === "titular" && c.titular_apenas_financeiro ? (
-                      <p className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wider bg-white/20 rounded px-2 py-0.5">
+                      <p className="mt-1 inline-block text-[11px] font-semibold uppercase tracking-wider bg-white/20 rounded px-2 py-0.5">
                         Não utiliza benefícios
                       </p>
                     ) : null}
@@ -255,7 +255,7 @@ function MeusCartoesPage() {
                           <span className="flex items-center gap-2">
                             {fmtMoeda(Number(m.valor))}
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] uppercase ${m.status === "pago" ? "bg-emerald-100 text-emerald-700" : m.status === "atrasado" ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}
+                              className={`px-1.5 py-0.5 rounded text-[11px] uppercase ${m.status === "pago" ? "bg-emerald-100 text-emerald-700" : m.status === "atrasado" ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}
                             >
                               {m.status}
                             </span>

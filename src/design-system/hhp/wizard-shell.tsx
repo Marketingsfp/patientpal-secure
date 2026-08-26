@@ -47,7 +47,7 @@ export function HhpWizardShell({
         </VisuallyHidden.Root>
 
         <div className="px-5 md:px-8 pt-6 md:pt-8 pb-4">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">
             {stepLabel}
           </div>
           <h2

@@ -1394,14 +1394,14 @@ function ProcedimentosPage() {
                       })()}
                     </TableCell>
                     <TableCell>
-                      <span className={`text-[10px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>
+                      <span className={`text-[11px] px-1.5 py-0 rounded-full ${tipoCor(p.tipo)}`}>
                         {tipoLabel(p.tipo)}
                       </span>
                     </TableCell>
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {p.valor_variavel ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
                           Variável
                         </span>
                       ) : (
@@ -1435,7 +1435,7 @@ function ProcedimentosPage() {
                                 {fmtBRL(v.valor_dinheiro)}
                               </div>
                               <div
-                                className="text-[10px] text-muted-foreground"
+                                className="text-[11px] text-muted-foreground"
                                 title={`Pix / Débito / Crédito: ${fmtBRL(v.valor_outros)}`}
                               >
                                 <span className="mr-1">C</span>
@@ -1448,7 +1448,7 @@ function ProcedimentosPage() {
                     })}
                     <TableCell>
                       <span
-                        className={`text-[10px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
+                        className={`text-[11px] px-1.5 py-0 rounded-full ${p.ativo ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
                       >
                         {p.ativo ? "Ativo" : "Inativo"}
                       </span>
@@ -1652,7 +1652,7 @@ function ProcedimentosPage() {
                 <p className="text-xs font-medium text-muted-foreground uppercase">
                   Especialidades em que este serviço aparece
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   Marque todas as especialidades que devem listar este serviço. A especialidade do
                   campo "Especialidade" acima é a principal e já é incluída automaticamente.
                 </p>
@@ -1690,7 +1690,7 @@ function ProcedimentosPage() {
                       Valores por forma de pagamento
                     </p>
                     {form.valor_variavel && (
-                      <p className="text-[11px] text-muted-foreground mt-1">
+                      <p className="text-[12px] text-muted-foreground mt-1">
                         Valor variável ativo — o valor será informado na hora da cobrança.
                       </p>
                     )}
@@ -1721,7 +1721,7 @@ function ProcedimentosPage() {
                       disabled={form.valor_variavel}
                       onChange={(v) => setForm({ ...form, valor_pix_cartao: v })}
                     />
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       Mesmo valor para Pix, Cartão de Débito e Crédito.
                     </p>
                   </div>
@@ -1742,7 +1742,7 @@ function ProcedimentosPage() {
                             <p className="text-sm font-medium">
                               {c.nome}
                               {!formConvManual[c.id] && (
-                                <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
                                   (auto pela regra)
                                 </span>
                               )}
@@ -1750,7 +1750,7 @@ function ProcedimentosPage() {
                             {formConvManual[c.id] && (
                               <button
                                 type="button"
-                                className="text-[10px] text-primary hover:underline"
+                                className="text-[11px] text-primary hover:underline"
                                 onClick={() =>
                                   setFormConvManual((prev) => ({ ...prev, [c.id]: false }))
                                 }
@@ -1806,7 +1806,7 @@ function ProcedimentosPage() {
                   <p className="text-xs font-medium text-muted-foreground uppercase">
                     Regras do procedimento
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     Como este procedimento se comporta na Agenda, Caixa, Financeiro e NFS-e. Vale
                     para todas as unidades — a unidade pode sobrescrever.
                   </p>
@@ -1889,7 +1889,7 @@ function ProcedimentosPage() {
                     Permite encaixe
                   </label>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   O modo de emissão de NFS-e (por item ou agrupada) é definido na configuração da
                   clínica em <strong>Configurações → NFS-e</strong>.
                 </p>

@@ -293,13 +293,13 @@ export function SimpleCrud<T extends { id: string }, F>({
               {columns.map((c) => (
                 <TableHead
                   key={c.key}
-                  className={`${premium ? "text-[11px] font-semibold uppercase tracking-wider text-muted-foreground " : ""}${c.className ?? ""}`}
+                  className={`${premium ? "text-[12px] font-semibold uppercase tracking-wider text-muted-foreground " : ""}${c.className ?? ""}`}
                 >
                   {c.header}
                 </TableHead>
               ))}
               <TableHead
-                className={`w-28 text-right${premium ? " text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" : ""}`}
+                className={`w-28 text-right${premium ? " text-[12px] font-semibold uppercase tracking-wider text-muted-foreground" : ""}`}
               >
                 Ações
               </TableHead>

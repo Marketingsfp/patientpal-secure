@@ -350,7 +350,7 @@ function OrcamentosCompactList({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{o.paciente_nome}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">
+                    <p className="text-[12px] text-muted-foreground truncate">
                       {new Date(o.created_at).toLocaleDateString("pt-BR")}
                       {o.medico_nome?.trim() ? ` · ${o.medico_nome}` : ""}
                     </p>
@@ -361,7 +361,7 @@ function OrcamentosCompactList({
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                       realizado
                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
@@ -764,7 +764,7 @@ function OrcamentosPage() {
                 {label}
                 {count !== null && (
                   <span
-                    className={`rounded-full px-1.5 py-0 text-[10px] tabular-nums ${active ? "bg-primary/15" : "bg-muted"}`}
+                    className={`rounded-full px-1.5 py-0 text-[11px] tabular-nums ${active ? "bg-primary/15" : "bg-muted"}`}
                   >
                     {count}
                   </span>
@@ -789,7 +789,7 @@ function OrcamentosPage() {
         <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
-              <thead className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:border-b [&_th]:border-border/60">
+              <thead className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:border-b [&_th]:border-border/60">
                 <tr className="text-left h-11">
                   <th className="px-3 w-24">Nº</th>
                   <th className="px-3 w-32">Data</th>
@@ -844,7 +844,7 @@ function OrcamentosPage() {
                                     <CheckCircle2 className="h-4 w-4" />
                                   )}
                                   {total > 0 && (
-                                    <span className="text-[10px] font-semibold">
+                                    <span className="text-[11px] font-semibold">
                                       {usados}/{total}
                                     </span>
                                   )}
@@ -860,11 +860,11 @@ function OrcamentosPage() {
                         <div className="flex items-center gap-2">
                           <span>{o.paciente_nome}</span>
                           {o.categoria === "laboratorio" ? (
-                            <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 font-medium px-2.5 py-0.5 rounded-full text-[11px] uppercase">
+                            <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 font-medium px-2.5 py-0.5 rounded-full text-[12px] uppercase">
                               Laboratório
                             </span>
                           ) : o.categoria === "demais" ? (
-                            <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium px-2.5 py-0.5 rounded-full text-[11px] uppercase">
+                            <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium px-2.5 py-0.5 rounded-full text-[12px] uppercase">
                               Serviços
                             </span>
                           ) : null}
@@ -887,7 +887,7 @@ function OrcamentosPage() {
                       <td className="px-3 text-right pr-4 font-semibold text-foreground tabular-nums">
                         {BRL(Number(o.valor_total))}
                         {o.valores_pagamento && Object.keys(o.valores_pagamento).length > 1 && (
-                          <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
+                          <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
                             {Object.entries(o.valores_pagamento).map(([f, v]) => (
                               <div key={f}>
                                 <span className="uppercase">{f.replace("Cartão de ", "")}:</span>{" "}
@@ -1579,9 +1579,9 @@ function NovoOrcamentoDialog({
                     return (
                       <div className="rounded-md border p-2 bg-muted/40">
                         <div className="flex items-center justify-between mb-1">
-                          <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                          <div className="text-[12px] font-semibold uppercase text-muted-foreground">
                             🧪 Laboratório — Top 60
-                            <span className="ml-2 text-[10px] font-normal normal-case text-muted-foreground/80">
+                            <span className="ml-2 text-[11px] font-normal normal-case text-muted-foreground/80">
                               ({top60.length} disponíveis no seu cadastro)
                             </span>
                           </div>
@@ -1589,7 +1589,7 @@ function NovoOrcamentoDialog({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-6 text-[11px]"
+                            className="h-6 text-[12px]"
                             onClick={() => setMostrarTop60((v) => !v)}
                           >
                             {mostrarTop60 ? "ocultar" : "mostrar"}
@@ -1612,7 +1612,7 @@ function NovoOrcamentoDialog({
                             ))}
                           </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-1">
                           Os demais exames continuam disponíveis pela busca abaixo.
                         </p>
                       </div>
@@ -1638,7 +1638,7 @@ function NovoOrcamentoDialog({
                           <span className="text-sm flex items-center gap-2">
                             {p.nome}
                             {p.preparo && p.preparo.trim() && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
                                 <AlertTriangle className="h-3 w-3" /> PREPARO
                               </span>
                             )}
@@ -1650,7 +1650,7 @@ function NovoOrcamentoDialog({
                                   key={f}
                                   className={i === 0 ? "text-primary" : "text-muted-foreground"}
                                 >
-                                  <span className="text-[10px] uppercase mr-1">{abreviar(f)}</span>
+                                  <span className="text-[11px] uppercase mr-1">{abreviar(f)}</span>
                                   {BRL(valorPorForma(p, f))}
                                 </span>
                               ),
@@ -1752,7 +1752,7 @@ function NovoOrcamentoDialog({
                           <td className="px-2 py-1 text-right font-medium">
                             {BRL(it.quantidade * it.valor_unitario)}
                             {formasPagamento.length > 1 && (
-                              <div className="mt-1 text-[11px] font-normal text-muted-foreground space-y-0.5">
+                              <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
                                 {formasPagamento.map((f) => {
                                   const v = Number(
                                     it.valores_formas?.[f] ?? it.valor_unitario ?? 0,
@@ -1788,7 +1788,7 @@ function NovoOrcamentoDialog({
                   <div className="flex items-center justify-between">
                     <Label>Observações</Label>
                     <span
-                      className={`text-[11px] ${observacoes.length > 1000 ? "text-destructive" : "text-muted-foreground"}`}
+                      className={`text-[12px] ${observacoes.length > 1000 ? "text-destructive" : "text-muted-foreground"}`}
                     >
                       {observacoes.length} / 1000
                     </span>

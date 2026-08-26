@@ -285,7 +285,7 @@ function DashboardOperacional() {
         eyebrow={`${clinicaAtual?.clinica.nome ?? "Clínica"} · ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}`}
         actions={
           <>
-            <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+            <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] font-medium text-emerald-600">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> ao vivo
             </span>
             <Button variant="outline" size="sm" onClick={refresh} disabled={q.isFetching}>
@@ -372,16 +372,16 @@ function DashboardOperacional() {
                         <div className="text-sm font-medium text-slate-800 truncate">
                           {a.paciente_nome ?? "Paciente"}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">
+                        <div className="text-[12px] text-slate-500 truncate">
                           {a.procedimento ?? "—"}
                         </div>
                       </div>
                       {a.prioridade && a.prioridade !== "normal" && (
-                        <Badge variant="destructive" className="text-[10px]">
+                        <Badge variant="destructive" className="text-[11px]">
                           {a.prioridade}
                         </Badge>
                       )}
-                      <Badge variant="secondary" className="text-[10px] shrink-0">
+                      <Badge variant="secondary" className="text-[11px] shrink-0">
                         {ETAPA_LABEL[a.fluxo_etapa ?? ""] ?? a.fluxo_etapa}
                       </Badge>
                     </li>
@@ -424,11 +424,11 @@ function DashboardOperacional() {
                         <div className="text-sm text-slate-800 truncate">
                           {a.paciente_nome ?? "Paciente"}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">
+                        <div className="text-[12px] text-slate-500 truncate">
                           {a.procedimento ?? "—"}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
+                      <Badge variant="outline" className="text-[11px] shrink-0">
                         {a.status}
                       </Badge>
                     </li>
@@ -470,7 +470,7 @@ function DashboardOperacional() {
                         <span className="font-semibold tabular-nums text-slate-800 text-sm">
                           {s.codigo ?? `${s.tipo}${s.numero}`}
                         </span>
-                        <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                        <span className="text-[12px] text-slate-600 dark:text-slate-400">
                           {hhmm(s.emitida_em)}
                         </span>
                       </li>
@@ -504,7 +504,7 @@ function DashboardOperacional() {
                       <div className="text-xs font-medium text-amber-800 truncate">
                         {a.titulo ?? "Alerta"}
                       </div>
-                      <div className="text-[11px] text-amber-700/80 truncate">
+                      <div className="text-[12px] text-amber-700/80 truncate">
                         {a.paciente_nome ?? "—"}
                       </div>
                     </div>
@@ -554,7 +554,7 @@ function DashboardOperacional() {
                     {(d?.caixas ?? []).length > 5 && (
                       <Link
                         to="/app/caixa"
-                        className="block pt-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
+                        className="block pt-1 text-[12px] font-medium text-slate-500 hover:text-slate-800"
                       >
                         +{(d?.caixas ?? []).length - 5} caixa(s) aberto(s) — ver todos
                       </Link>
@@ -603,7 +603,7 @@ function DashboardOperacional() {
                         >
                           {m.nome}
                         </div>
-                        <Badge variant="secondary" className="mt-1 text-[10px]">
+                        <Badge variant="secondary" className="mt-1 text-[11px]">
                           {m.especialidade ?? "Sem especialidade"}
                         </Badge>
                       </div>
@@ -622,18 +622,18 @@ function DashboardOperacional() {
                     <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">
                       {m.total}
                     </div>
-                    <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">
+                    <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
                       Atendimentos
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
-                        <div className="text-[10px] font-semibold text-emerald-700">Pagos</div>
+                        <div className="text-[11px] font-semibold text-emerald-700">Pagos</div>
                         <div className="text-sm font-bold tabular-nums text-emerald-800">
                           {pct}%
                         </div>
                       </div>
                       <div className="rounded-lg bg-sky-50 px-2 py-1.5">
-                        <div className="text-[10px] font-semibold text-sky-700">Clientes novos</div>
+                        <div className="text-[11px] font-semibold text-sky-700">Clientes novos</div>
                         <div className="text-sm font-bold tabular-nums text-sky-800">{m.novos}</div>
                       </div>
                     </div>
@@ -644,7 +644,7 @@ function DashboardOperacional() {
           )}
         </Painel>
 
-        <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+        <p className="text-[12px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
           <Megaphone className="h-3.5 w-3.5" />
           Indicadores estratégicos, financeiros e comparativos estão no{" "}
           <Link
@@ -697,7 +697,7 @@ function Painel({
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
           {subtitle && (
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{subtitle}</p>
+            <p className="text-[12px] text-slate-600 dark:text-slate-400 truncate">{subtitle}</p>
           )}
         </div>
         {action}
@@ -711,7 +711,7 @@ function LinkMais({ to }: { to: string }) {
   return (
     <Link
       to={to as never}
-      className="text-[11px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 shrink-0"
+      className="text-[12px] font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 shrink-0"
     >
       abrir <ArrowRight className="h-3 w-3" />
     </Link>
@@ -729,7 +729,7 @@ function MiniStat({
 }) {
   return (
     <div className={cn("rounded-xl px-3 py-2", tone === "warn" ? "bg-amber-50" : "bg-sky-50")}>
-      <div className="text-[10px] uppercase tracking-widest font-semibold text-slate-600 dark:text-slate-400">
+      <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-600 dark:text-slate-400">
         {label}
       </div>
       <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>

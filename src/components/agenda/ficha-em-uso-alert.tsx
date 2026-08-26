@@ -39,7 +39,7 @@ export function FichaEmUsoAlert({ agendamentoId }: { agendamentoId: string | nul
     <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2 text-xs mb-3">
       <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
       <div className="flex-1">
-        <div className="font-semibold uppercase tracking-wide text-[11px]">
+        <div className="font-semibold uppercase tracking-wide text-[12px]">
           Ficha em uso simultâneo
         </div>
         <div>{texto}. Alterações feitas ao mesmo tempo podem se sobrescrever.</div>

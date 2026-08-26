@@ -256,7 +256,7 @@ function FluxoPage() {
   // proposital.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const acaoBtnCls = uxMelhorias ? "h-9 sm:h-6 px-2.5 sm:px-1.5" : "h-6 px-1.5";
-  const acaoTxtCls = uxMelhorias ? "text-xs sm:text-[9px]" : "text-[9px]";
+  const acaoTxtCls = uxMelhorias ? "text-xs sm:text-[10px]" : "text-[10px]";
   const acaoIconCls = cn(
     "inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer disabled:cursor-not-allowed",
     uxMelhorias && "p-2 sm:p-1.5",
@@ -801,7 +801,7 @@ function FluxoPage() {
                       {col.label}
                     </span>
                     {media !== null && ehHoje && col.id !== "finalizado" && (
-                      <span className="block whitespace-nowrap text-[10px] font-medium text-slate-500">
+                      <span className="block whitespace-nowrap text-[11px] font-medium text-slate-500">
                         Média: {formatDuracao(media)}
                       </span>
                     )}
@@ -883,12 +883,12 @@ function FluxoPage() {
                           {a.paciente_nome}
                         </span>
                         <div className="mt-1 flex items-center gap-1">
-                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-medium text-slate-500">
                             {h}
                           </span>
                           {prontuario && (
                             <span
-                              className="truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600"
+                              className="truncate rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600"
                               title={`Prontuário ${prontuario}`}
                             >
                               #{prontuario}
@@ -933,7 +933,7 @@ function FluxoPage() {
                       {col.id !== "finalizado" && ehHoje && (
                         <span
                           className={cn(
-                            "mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px]",
+                            "mt-2 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
                             CLASSE_ESPERA[faixa],
                           )}
                           title="Tempo desde a última movimentação no fluxo"
@@ -954,7 +954,7 @@ function FluxoPage() {
                       {a.prioridade && a.prioridade !== "normal" && (
                         <Badge
                           className={cn(
-                            "mt-2 w-fit gap-0.5 border px-1.5 py-0 text-[9px]",
+                            "mt-2 w-fit gap-0.5 border px-1.5 py-0 text-[10px]",
                             prioridadeInfo.badge,
                           )}
                         >

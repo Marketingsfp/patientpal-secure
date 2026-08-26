@@ -72,7 +72,7 @@ export function Cid10Autocomplete({ selecionados = [], onAdd, onRemove, placehol
                 onMouseEnter={() => setIdx(i)}
                 className={`w-full text-left px-3 py-2 flex items-start gap-2 border-b border-border/50 last:border-0 ${i === idx ? "bg-muted" : "hover:bg-muted/60"}`}
               >
-                <Badge variant="secondary" className="font-mono text-[11px] shrink-0 mt-0.5">
+                <Badge variant="secondary" className="font-mono text-[12px] shrink-0 mt-0.5">
                   {c.codigo}
                 </Badge>
                 <span className="text-sm flex-1">{c.descricao}</span>
@@ -87,7 +87,7 @@ export function Cid10Autocomplete({ selecionados = [], onAdd, onRemove, placehol
           {selecionados.map((c) => (
             <Badge key={c.codigo} variant="outline" className="gap-1 pr-1">
               <Stethoscope className="h-3 w-3 text-primary" />
-              <span className="font-mono text-[11px]">{c.codigo}</span>
+              <span className="font-mono text-[12px]">{c.codigo}</span>
               <span className="max-w-[220px] truncate">{c.descricao}</span>
               {onRemove && (
                 <button

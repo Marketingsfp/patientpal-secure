@@ -841,7 +841,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           onClick={() => editor.chain().focus().addRowBefore().run()}
           disabled={!editor.can().addRowBefore()}
         >
-          <span className="text-[10px] font-bold">↑L</span>
+          <span className="text-[11px] font-bold">↑L</span>
         </ToolbarButton>
         <ToolbarButton
           title="Adicionar linha abaixo"
@@ -855,7 +855,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           onClick={() => editor.chain().focus().addColumnBefore().run()}
           disabled={!editor.can().addColumnBefore()}
         >
-          <span className="text-[10px] font-bold">←C</span>
+          <span className="text-[11px] font-bold">←C</span>
         </ToolbarButton>
         <ToolbarButton
           title="Adicionar coluna à direita"
@@ -869,14 +869,14 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           onClick={() => editor.chain().focus().deleteRow().run()}
           disabled={!editor.can().deleteRow()}
         >
-          <span className="text-[10px] font-bold">−L</span>
+          <span className="text-[11px] font-bold">−L</span>
         </ToolbarButton>
         <ToolbarButton
           title="Excluir coluna"
           onClick={() => editor.chain().focus().deleteColumn().run()}
           disabled={!editor.can().deleteColumn()}
         >
-          <span className="text-[10px] font-bold">−C</span>
+          <span className="text-[11px] font-bold">−C</span>
         </ToolbarButton>
         <ToolbarButton
           title="Excluir tabela"
@@ -890,28 +890,28 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           onClick={() => editor.chain().focus().toggleHeaderRow().run()}
           disabled={!editor.can().toggleHeaderRow()}
         >
-          <span className="text-[10px] font-bold">↥H</span>
+          <span className="text-[11px] font-bold">↥H</span>
         </ToolbarButton>
         <ToolbarButton
           title="Alternar coluna de cabeçalho"
           onClick={() => editor.chain().focus().toggleHeaderColumn().run()}
           disabled={!editor.can().toggleHeaderColumn()}
         >
-          <span className="text-[10px] font-bold">↤H</span>
+          <span className="text-[11px] font-bold">↤H</span>
         </ToolbarButton>
         <ToolbarButton
           title="Mesclar células selecionadas"
           onClick={() => editor.chain().focus().mergeCells().run()}
           disabled={!editor.can().mergeCells()}
         >
-          <span className="text-[10px] font-bold">⊞→▭</span>
+          <span className="text-[11px] font-bold">⊞→▭</span>
         </ToolbarButton>
         <ToolbarButton
           title="Desmesclar célula"
           onClick={() => editor.chain().focus().splitCell().run()}
           disabled={!editor.can().splitCell()}
         >
-          <span className="text-[10px] font-bold">▭→⊞</span>
+          <span className="text-[11px] font-bold">▭→⊞</span>
         </ToolbarButton>
         <ToolbarButton
           title="Centralizar conteúdo da célula (horizontal + vertical)"
@@ -925,28 +925,28 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           }}
           disabled={!editor.can().setCellAttribute("verticalAlign", "middle")}
         >
-          <span className="text-[10px] font-bold">⊕</span>
+          <span className="text-[11px] font-bold">⊕</span>
         </ToolbarButton>
         <ToolbarButton
           title="Alinhar célula ao topo"
           onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "top").run()}
           disabled={!editor.can().setCellAttribute("verticalAlign", "top")}
         >
-          <span className="text-[10px] font-bold">⤒</span>
+          <span className="text-[11px] font-bold">⤒</span>
         </ToolbarButton>
         <ToolbarButton
           title="Alinhar célula ao meio (vertical)"
           onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "middle").run()}
           disabled={!editor.can().setCellAttribute("verticalAlign", "middle")}
         >
-          <span className="text-[10px] font-bold">↕</span>
+          <span className="text-[11px] font-bold">↕</span>
         </ToolbarButton>
         <ToolbarButton
           title="Alinhar célula à base"
           onClick={() => editor.chain().focus().setCellAttribute("verticalAlign", "bottom").run()}
           disabled={!editor.can().setCellAttribute("verticalAlign", "bottom")}
         >
-          <span className="text-[10px] font-bold">⤓</span>
+          <span className="text-[11px] font-bold">⤓</span>
         </ToolbarButton>
         <TableCellBgMenu editor={editor} />
 
@@ -1075,7 +1075,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                     .run();
                 }}
               >
-                <span className="text-[10px] font-bold">✥</span>
+                <span className="text-[11px] font-bold">✥</span>
               </ToolbarButton>
               <Select
                 value=""
@@ -1223,7 +1223,7 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
                 <SelectItem key={v.token} value={v.token}>
                   <span className="flex flex-col">
                     <span className="text-xs">{v.label}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">{`{{${v.token}}}`}</span>
+                    <span className="text-[11px] text-muted-foreground font-mono">{`{{${v.token}}}`}</span>
                   </span>
                 </SelectItem>
               ))}
@@ -1481,7 +1481,7 @@ function HorizontalRuler({
             style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
           >
             <span
-              className={`text-[9px] leading-none mt-0.5 ${inMargin ? "text-background/90" : "text-muted-foreground"}`}
+              className={`text-[10px] leading-none mt-0.5 ${inMargin ? "text-background/90" : "text-muted-foreground"}`}
             >
               {cm}
             </span>

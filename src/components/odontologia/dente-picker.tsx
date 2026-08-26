@@ -56,7 +56,7 @@ export function DentePicker({ value, onChange, disabled, inline, grade }: Props)
                 type="button"
                 disabled={disabled}
                 onClick={() => toggle(d)}
-                className={`h-9 w-8 rounded-md border-2 text-[11px] font-mono transition ${
+                className={`h-9 w-8 rounded-md border-2 text-[12px] font-mono transition ${
                   on
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border hover:border-primary/40 text-foreground/70"
@@ -102,7 +102,7 @@ export function DentePicker({ value, onChange, disabled, inline, grade }: Props)
           ) : (
             <>
               <span>Dentes</span>
-              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+              <Badge variant="secondary" className="h-5 px-1.5 text-[11px]">
                 {value.length}
               </Badge>
               <span className="text-xs text-muted-foreground truncate max-w-[9rem]">

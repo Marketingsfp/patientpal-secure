@@ -256,7 +256,7 @@ function PacoteCard({
               {(Object.keys(SESSAO_LABEL) as FisioSessaoStatus[]).map((st) => (
                 <span
                   key={st}
-                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                  className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
                 >
                   <span
                     className={`inline-block h-2.5 w-2.5 rounded-sm border ${SESSAO_CLASSE[st]}`}

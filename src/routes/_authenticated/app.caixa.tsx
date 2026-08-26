@@ -4163,7 +4163,7 @@ function Page() {
                                       key={it.label}
                                       className="bg-slate-50/70 border border-slate-200/60 rounded-lg p-3"
                                     >
-                                      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
+                                      <div className="text-[12px] uppercase tracking-wider font-semibold text-slate-500">
                                         {it.label}
                                       </div>
                                       <div className="text-base font-bold tabular-nums text-slate-800">
@@ -4221,7 +4221,7 @@ function Page() {
                                     {hora}
                                   </span>
                                   {f.ja_pago ? (
-                                    <Badge variant="secondary" className="text-[10px]">
+                                    <Badge variant="secondary" className="text-[11px]">
                                       PAGO
                                     </Badge>
                                   ) : (
@@ -4233,7 +4233,7 @@ function Page() {
                                 <div className="font-medium uppercase leading-tight line-clamp-1">
                                   {f.paciente_nome}
                                 </div>
-                                <div className="text-[11px] text-muted-foreground line-clamp-1">
+                                <div className="text-[12px] text-muted-foreground line-clamp-1">
                                   {f.procedimento ?? "—"}
                                   {f.medico_nome ? ` · ${f.medico_nome}` : ""}
                                 </div>
@@ -4709,7 +4709,7 @@ function Page() {
                                 <TableCell>
                                   <Badge
                                     variant="outline"
-                                    className={`text-[11px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}
+                                    className={`text-[12px] font-semibold ${STATUS_CAIXA_CLASS[st]}`}
                                   >
                                     {STATUS_CAIXA_LABEL[st]}
                                   </Badge>
@@ -5184,7 +5184,7 @@ function Page() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground mt-1">
+                <p className="text-[12px] text-muted-foreground mt-1">
                   {openMov.tipo === "sangria"
                     ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
                     : "Registre de quem o dinheiro está sendo recebido."}
@@ -5456,7 +5456,7 @@ function Page() {
               return (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className={`rounded-lg border p-3 ${difGaveta.cls}`}>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                    <div className="text-[12px] font-semibold uppercase tracking-wider opacity-80">
                       Dinheiro na gaveta
                     </div>
                     <div className="text-xs mt-0.5">
@@ -5468,7 +5468,7 @@ function Page() {
                     </div>
                   </div>
                   <div className={`rounded-lg border p-3 ${difTotal.cls}`}>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">
+                    <div className="text-[12px] font-semibold uppercase tracking-wider opacity-80">
                       Total do dia (todas as formas)
                     </div>
                     <div className="text-xs mt-0.5">
@@ -5839,7 +5839,7 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
-            <p className="text-[11px] text-muted-foreground -mt-2">
+            <p className="text-[12px] text-muted-foreground -mt-2">
               Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro ·{" "}
               <kbd className="px-1 border rounded">2</kbd> PIX ·{" "}
               <kbd className="px-1 border rounded">3</kbd> débito ·{" "}
@@ -5984,7 +5984,7 @@ function Page() {
                   </div>
                   {l.forma === FORMA_PAGO_SISTEMA_ANTERIOR && (
                     <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2">
-                      <p className="text-[11px] text-amber-900">
+                      <p className="text-[12px] text-amber-900">
                         <strong>Já pago na Clínica Total.</strong> A guia é liberada e o repasse do
                         prestador é apurado normalmente, mas este valor{" "}
                         <strong>não entra no fechamento do caixa de hoje</strong>.
@@ -6018,7 +6018,7 @@ function Page() {
                           />
                         </div>
                       </div>
-                      <p className="text-[11px] text-amber-800">
+                      <p className="text-[12px] text-amber-800">
                         Preencha ao menos um dos dois — é o que liga esta guia ao recebimento feito
                         no sistema antigo.
                       </p>
@@ -6257,18 +6257,18 @@ function Page() {
                           key={c.key}
                           className="rounded-lg border bg-card shadow-sm p-3.5 space-y-1 min-w-0"
                         >
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                             {c.label}
                           </p>
                           <p className={`text-base font-bold tabular-nums ${c.cls}`}>{c.valor}</p>
-                          {c.nota && <p className="text-[11px] text-muted-foreground">{c.nota}</p>}
+                          {c.nota && <p className="text-[12px] text-muted-foreground">{c.nota}</p>}
                         </div>
                       ))}
                     </div>
                     <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 px-4 py-3.5">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                         <div className="space-y-0.5">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                             {sessaoAberta ? "Saldo atual (em tempo real)" : "Calculado"}
                           </p>
                           <p className="text-lg font-bold tabular-nums">
@@ -6280,7 +6280,7 @@ function Page() {
                           </p>
                         </div>
                         <div className="space-y-0.5">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                             Informado
                           </p>
                           <p className="text-lg font-bold tabular-nums">
@@ -6288,7 +6288,7 @@ function Page() {
                           </p>
                         </div>
                         <div className="space-y-0.5">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                             Diferença
                           </p>
                           <p
@@ -6307,7 +6307,7 @@ function Page() {
                         </div>
                       </div>
                       {sessaoAberta && (
-                        <p className="text-[11px] text-muted-foreground mt-2.5">
+                        <p className="text-[12px] text-muted-foreground mt-2.5">
                           Sessão em andamento: nada foi conferido ainda, então Informado e Diferença
                           só existem depois do fechamento.
                         </p>

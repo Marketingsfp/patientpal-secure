@@ -154,7 +154,7 @@ export function MarcacaoDialog({
                 step={1}
                 className="mt-3"
               />
-              <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
+              <div className="flex justify-between text-[12px] text-muted-foreground mt-1">
                 <span>0 — sem dor</span>
                 <span>10 — dor máxima</span>
               </div>

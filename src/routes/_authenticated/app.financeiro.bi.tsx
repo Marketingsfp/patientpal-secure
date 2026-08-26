@@ -197,14 +197,14 @@ function Page() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Receitas (6m)</p>
             <p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("despesas")}>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Despesas (6m)</p>
             <p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("saldo")}>
@@ -215,7 +215,7 @@ function Page() {
             >
               {fmt(totalR - totalD)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
       </div>
@@ -268,7 +268,7 @@ function Page() {
               formatY={(n) => String(Math.round(n))}
             />
           )}
-          <p className="text-[11px] text-muted-foreground mt-2">
+          <p className="text-[12px] text-muted-foreground mt-2">
             Total no período exibido:{" "}
             <b>{atend12.reduce((s, r) => s + r.cartao + r.particular + r.exames, 0)}</b>{" "}
             atendimentos (cartão: {atend12.reduce((s, r) => s + r.cartao, 0)}, particular:{" "}
@@ -346,10 +346,10 @@ function Page() {
                     <TableHead></TableHead>
                     {atendMatriz.anos.map((a) => (
                       <Fragment key={a}>
-                        <TableHead className="text-right text-[10px]">Cartão</TableHead>
-                        <TableHead className="text-right text-[10px]">Part.</TableHead>
-                        <TableHead className="text-right text-[10px]">Exames</TableHead>
-                        <TableHead className="text-right text-[10px] font-bold">Total</TableHead>
+                        <TableHead className="text-right text-[11px]">Cartão</TableHead>
+                        <TableHead className="text-right text-[11px]">Part.</TableHead>
+                        <TableHead className="text-right text-[11px]">Exames</TableHead>
+                        <TableHead className="text-right text-[11px] font-bold">Total</TableHead>
                       </Fragment>
                     ))}
                   </TableRow>

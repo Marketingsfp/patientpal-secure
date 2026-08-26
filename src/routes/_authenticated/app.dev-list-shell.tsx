@@ -159,7 +159,7 @@ function DevListShellPreview() {
         <strong>Preview A1 — List Shell (não é tela de produção).</strong> Componentes:{" "}
         <code>ListShell</code>, <code>VirtualList</code>, <code>QuickFilters</code>,{" "}
         <code>CommandPalette</code>. Pressione{" "}
-        <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl/⌘+K</kbd> para abrir a Busca
+        <kbd className="px-1 py-0.5 rounded bg-muted text-[11px]">Ctrl/⌘+K</kbd> para abrir a Busca
         Universal.
       </div>
 
@@ -249,14 +249,14 @@ function StatusBadge({ value }: { value: Status }) {
     concluido: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
     cancelado: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
   };
-  return <span className={`px-2 py-0.5 rounded-full text-[10px] ${map[value]}`}>{value}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-[11px] ${map[value]}`}>{value}</span>;
 }
 
 function ModalidadeBadge({ value }: { value: DemoRow["modalidade"] }) {
   const label =
     value === "particular" ? "Particular" : value === "associado" ? "Associado" : "Cartão";
   return (
-    <span className="px-2 py-0.5 rounded-full text-[10px] border border-border text-muted-foreground">
+    <span className="px-2 py-0.5 rounded-full text-[11px] border border-border text-muted-foreground">
       {label}
     </span>
   );

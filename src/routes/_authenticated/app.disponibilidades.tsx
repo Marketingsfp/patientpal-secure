@@ -1118,7 +1118,7 @@ function Page() {
               </p>
               {/* Grupo 1 — Alvo e período */}
               <section className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                   1 · Médico e período
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1156,7 +1156,7 @@ function Page() {
 
               {/* Grupo 2 — Horários e regras de vaga */}
               <section className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                   2 · Horários e fichas
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1192,7 +1192,7 @@ function Page() {
                       onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })}
                     />
                     {duracaoInvalida && (
-                      <p className="mt-1 text-[11px] font-medium text-destructive">
+                      <p className="mt-1 text-[12px] font-medium text-destructive">
                         A duração mínima deve ser de 5 minutos
                       </p>
                     )}
@@ -1215,7 +1215,7 @@ function Page() {
 
               {/* Grupo 3 — Dias da semana */}
               <section className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                   3 · Dias da semana
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -1270,19 +1270,19 @@ function Page() {
               <section className="rounded-lg border border-primary/30 bg-primary/5 p-3">
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                       Médicos selecionados
                     </p>
                     <p className="text-sm font-semibold">{resumoGeracao.medicosSelecionados}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                       Dias no período
                     </p>
                     <p className="text-sm font-semibold">{resumoGeracao.diasNoPeriodo}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                       Estimativa por médico
                     </p>
                     <p className="text-sm font-semibold">~{resumoGeracao.porMedico} horários</p>

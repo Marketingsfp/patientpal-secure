@@ -61,7 +61,7 @@ function idade(nasc?: string | null) {
 function Info({ k, v }: { k: string; v: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{k}</div>
       <div className="truncate text-sm text-slate-800">{v}</div>
     </div>
   );
@@ -178,7 +178,7 @@ export function PacienteDetalheDrawer({
 
             {hist && (
               <div className="mt-4">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
                   Histórico de agendamentos
                 </div>
                 {hist.length === 0 && (

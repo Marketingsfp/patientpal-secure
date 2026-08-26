@@ -104,7 +104,7 @@ export function ListShell<S extends string>({
                   <TabsTrigger key={t.value} value={t.value} className="text-xs gap-1.5">
                     {t.label}
                     {typeof t.count === "number" && (
-                      <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] tabular-nums text-muted-foreground data-[state=active]:bg-primary-foreground/20">
+                      <span className="rounded-full bg-muted px-1.5 py-0 text-[11px] tabular-nums text-muted-foreground data-[state=active]:bg-primary-foreground/20">
                         {t.count.toLocaleString("pt-BR")}
                       </span>
                     )}

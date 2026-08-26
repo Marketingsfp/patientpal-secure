@@ -993,7 +993,7 @@ function AtendimentoEditorPage() {
               <HeartPulse className="h-5 w-5 text-rose-500" />
               <h2 className="font-semibold">Triagem da enfermagem</h2>
               {triagem.enfermeira_nome && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-[11px]">
                   Por {triagem.enfermeira_nome}
                 </Badge>
               )}
@@ -1022,7 +1022,7 @@ function AtendimentoEditorPage() {
               .filter(([, v]) => v !== null && v !== undefined && v !== "")
               .map(([label, value, unit]) => (
                 <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">
+                  <div className="text-[11px] uppercase text-muted-foreground">
                     {label as string}
                   </div>
                   <div className="font-semibold tabular-nums">
@@ -1042,7 +1042,7 @@ function AtendimentoEditorPage() {
             <div className="grid sm:grid-cols-2 gap-2 text-sm">
               {triagem.queixa_principal && (
                 <div className="rounded-md border p-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">
+                  <div className="text-[11px] uppercase text-muted-foreground">
                     Queixa principal
                   </div>
                   <div>{triagem.queixa_principal}</div>
@@ -1050,12 +1050,12 @@ function AtendimentoEditorPage() {
               )}
               {triagem.doencas && triagem.doencas.length > 0 && (
                 <div className="rounded-md border p-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">
+                  <div className="text-[11px] uppercase text-muted-foreground">
                     Doenças pré-existentes
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {triagem.doencas.map((d, i) => (
-                      <Badge key={i} variant="outline" className="text-[10px]">
+                      <Badge key={i} variant="outline" className="text-[11px]">
                         {d}
                       </Badge>
                     ))}
@@ -1064,7 +1064,7 @@ function AtendimentoEditorPage() {
               )}
               {triagem.medicamentos && (
                 <div className="rounded-md border p-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">
+                  <div className="text-[11px] uppercase text-muted-foreground">
                     Medicamentos em uso
                   </div>
                   <div>{triagem.medicamentos}</div>
@@ -1072,13 +1072,13 @@ function AtendimentoEditorPage() {
               )}
               {triagem.alergias && (
                 <div className="rounded-md border p-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">Alergias</div>
+                  <div className="text-[11px] uppercase text-muted-foreground">Alergias</div>
                   <div>{triagem.alergias}</div>
                 </div>
               )}
               {triagem.observacoes && (
                 <div className="rounded-md border p-2 sm:col-span-2">
-                  <div className="text-[10px] uppercase text-muted-foreground">
+                  <div className="text-[11px] uppercase text-muted-foreground">
                     Observações da enfermagem
                   </div>
                   <div className="whitespace-pre-wrap">{triagem.observacoes}</div>
@@ -1086,7 +1086,7 @@ function AtendimentoEditorPage() {
               )}
             </div>
           )}
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <div className="text-[12px] text-muted-foreground flex items-center gap-1">
             <FileHeart className="h-3.5 w-3.5" />
             Dados aplicados automaticamente ao prontuário
           </div>
@@ -1138,7 +1138,7 @@ function AtendimentoEditorPage() {
               <FileHeart className="h-5 w-5 text-primary" />
               <h2 className="font-semibold">Prontuário ({especialidade})</h2>
             </div>
-            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <span className="text-[12px] text-muted-foreground flex items-center gap-1">
               {rascunhoEm ? (
                 <>
                   <Cloud className="h-3.5 w-3.5 text-emerald-500" /> Rascunho salvo{" "}
@@ -1156,7 +1156,7 @@ function AtendimentoEditorPage() {
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
               <div className="text-sm">
-                <span className="font-semibold text-destructive uppercase text-[11px] tracking-wide">
+                <span className="font-semibold text-destructive uppercase text-[12px] tracking-wide">
                   Alergias (triagem)
                 </span>
                 <div className="text-foreground">{triagem.alergias}</div>
@@ -1196,7 +1196,7 @@ function AtendimentoEditorPage() {
                 <div className="grid sm:grid-cols-2 gap-2 text-sm">
                   {triagem.medicamentos && (
                     <div className="rounded-md border p-2">
-                      <div className="text-[10px] uppercase text-muted-foreground">
+                      <div className="text-[11px] uppercase text-muted-foreground">
                         Medicamentos em uso
                       </div>
                       <div>{triagem.medicamentos}</div>
@@ -1204,12 +1204,12 @@ function AtendimentoEditorPage() {
                   )}
                   {triagem.doencas && triagem.doencas.length > 0 && (
                     <div className="rounded-md border p-2">
-                      <div className="text-[10px] uppercase text-muted-foreground">
+                      <div className="text-[11px] uppercase text-muted-foreground">
                         Comorbidades
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {triagem.doencas.map((d, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px]">
+                          <Badge key={i} variant="outline" className="text-[11px]">
                             {d}
                           </Badge>
                         ))}
@@ -1218,7 +1218,7 @@ function AtendimentoEditorPage() {
                   )}
                   {triagem.alergias && (
                     <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2 sm:col-span-2">
-                      <div className="text-[10px] uppercase text-destructive font-semibold">
+                      <div className="text-[11px] uppercase text-destructive font-semibold">
                         Alergias
                       </div>
                       <div>{triagem.alergias}</div>
@@ -1323,7 +1323,7 @@ function AtendimentoEditorPage() {
                     key={m.rotulo}
                     type="button"
                     onClick={() => aplicarMacro(m)}
-                    className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
+                    className="text-[12px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
                   >
                     <Zap className="h-3 w-3" /> {m.rotulo}
                   </button>
@@ -1348,7 +1348,7 @@ function AtendimentoEditorPage() {
         <div className="flex items-center gap-2">
           <ClipboardCheck className="h-5 w-5 text-primary" />
           <h2 className="font-semibold">Apoio Clínico</h2>
-          <span className="text-[11px] text-muted-foreground">Sugestões sob julgamento médico</span>
+          <span className="text-[12px] text-muted-foreground">Sugestões sob julgamento médico</span>
         </div>
 
         {/* Duas frentes do mesmo apoio à decisão, lado a lado em vez de
@@ -1547,7 +1547,7 @@ function CampoClinico({
                 key={m.rotulo}
                 type="button"
                 onClick={() => onMacro?.(m)}
-                className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
+                className="text-[12px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors flex items-center gap-1"
               >
                 <Zap className="h-3 w-3" /> {m.rotulo}
               </button>

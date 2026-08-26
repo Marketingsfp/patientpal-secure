@@ -690,7 +690,7 @@ export function NovoAgendamentoWizard({
                       className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
                     />
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[12px] text-slate-500">
                     Nome, sexo, nascimento e telefone são obrigatórios porque o agendamento exige
                     paciente com cadastro completo. O prontuário em branco recebe um número
                     automático.
@@ -720,14 +720,14 @@ export function NovoAgendamentoWizard({
           {paciente && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm">
               <div className="font-semibold text-slate-900">{paciente.nome}</div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[12px] text-slate-500">
                 {paciente.telefone ?? "sem telefone"} ·{" "}
                 {paciente.data_nascimento
                   ? paciente.data_nascimento.split("-").reverse().join("/")
                   : "sem nascimento"}
               </div>
               {(!paciente.telefone || !paciente.data_nascimento) && (
-                <div className="mt-2 text-[11px] text-amber-700">
+                <div className="mt-2 text-[12px] text-amber-700">
                   ⚠ Cadastro incompleto — a criação será bloqueada. Complete o paciente antes de
                   salvar.
                 </div>
@@ -752,7 +752,7 @@ export function NovoAgendamentoWizard({
           {procedimento && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-sm">
               <div className="font-semibold text-slate-900">{procedimento.nome}</div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[12px] text-slate-500">
                 {procedimento.duracao_minutos
                   ? `${procedimento.duracao_minutos} min`
                   : "duração padrão"}
@@ -797,13 +797,13 @@ export function NovoAgendamentoWizard({
               </button>
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-slate-600 dark:text-slate-400">
+          <p className="mt-4 text-[12px] text-slate-600 dark:text-slate-400">
             Fase F: recursos de enfermagem ainda não estão disponíveis pelo wizard V2 — use a Agenda
             clássica.
           </p>
           {medico && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
                 Especialidade deste atendimento
               </div>
               {especialidadesQuery.isLoading ? (
@@ -829,7 +829,7 @@ export function NovoAgendamentoWizard({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-2 text-[11px] text-slate-500">
+                  <p className="mt-2 text-[12px] text-slate-500">
                     Define a especialidade que aparece no comprovante e nas guias deste agendamento.
                   </p>
                 </>
@@ -842,7 +842,7 @@ export function NovoAgendamentoWizard({
       {step === "horario" && (
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
+            <label className="text-[12px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400">
               Data
             </label>
             <DateInputBR
@@ -921,7 +921,7 @@ export function NovoAgendamentoWizard({
           </div>
 
           <div className="pt-3 border-t border-slate-200">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2">
               Tipo de atendimento
             </div>
             <div className="flex gap-2">
@@ -950,7 +950,7 @@ export function NovoAgendamentoWizard({
             </div>
 
             {contratoDetectado && tipoAtendimento === "convenio" && (
-              <p className="mt-2 text-[11px] text-slate-600 dark:text-slate-400">
+              <p className="mt-2 text-[12px] text-slate-600 dark:text-slate-400">
                 Paciente com contrato ativo do <b>{contratoDetectado.nome}</b> — a cobrança segue a
                 tabela do cartão.
               </p>
@@ -958,12 +958,12 @@ export function NovoAgendamentoWizard({
 
             {tipoAtendimento === "externo" && (
               <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
-                <p className="text-[11px] text-orange-800">
+                <p className="text-[12px] text-orange-800">
                   Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui — gera
                   apenas o registro de repasse para o médico.
                 </p>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Clínica de origem
                   </label>
                   <input
@@ -1001,7 +1001,7 @@ export function NovoAgendamentoWizard({
                   )}
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Repasse do médico
                   </label>
                   <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
@@ -1019,11 +1019,11 @@ export function NovoAgendamentoWizard({
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-[10px] text-slate-500">
+                  <p className="mt-1 text-[11px] text-slate-500">
                     Calculado pelo cadastro de repasse do médico
                     {externoTemConvenio ? " (regras de convênio)" : " (particular)"} — não editável.
                   </p>
-                  <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-900">
+                  <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <span>
                       Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no
@@ -1035,7 +1035,7 @@ export function NovoAgendamentoWizard({
             )}
           </div>
 
-          <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-3 border-t border-slate-200">
+          <p className="text-[12px] text-slate-600 dark:text-slate-400 pt-3 border-t border-slate-200">
             Rastreabilidade: o agendamento será gravado com{" "}
             <code>observacoes = &quot;[V2]&quot;</code> durante o piloto da Agenda V2.
           </p>

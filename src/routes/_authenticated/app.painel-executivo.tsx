@@ -437,7 +437,7 @@ function PainelExecutivoPage() {
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
                 De
               </Label>
               <DateInputBR
@@ -447,7 +447,7 @@ function PainelExecutivoPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
                 Até
               </Label>
               <DateInputBR
@@ -940,7 +940,7 @@ function BigCard({
   return (
     <Card className="overflow-hidden border-slate-200/70 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+        <CardTitle className="text-[12px] font-semibold uppercase tracking-wider text-slate-600">
           {title}
         </CardTitle>
         <Icon className="h-4 w-4 text-slate-400" />
@@ -952,7 +952,7 @@ function BigCard({
         <div className="mt-3 grid grid-cols-2 gap-2">
           {subs.map((s) => (
             <div key={s.label} className="rounded-lg bg-slate-50 px-2.5 py-1.5">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500">{s.label}</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">{s.label}</p>
               <p className="text-sm font-medium tabular-nums text-slate-800">{s.value}</p>
             </div>
           ))}
@@ -1327,7 +1327,7 @@ function EstornoDrawer({
                   <TableCell>
                     <Badge
                       variant={r.status === "cancelado" ? "secondary" : "outline"}
-                      className="text-[10px]"
+                      className="text-[11px]"
                     >
                       {r.status}
                     </Badge>

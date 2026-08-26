@@ -276,7 +276,7 @@ export function NovoPacoteDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[12px] text-muted-foreground mt-1">
               Só aparecem orçamentos em aberto deste paciente. O pacote não cria cobrança: quem
               cobra continua sendo o financeiro.
             </p>

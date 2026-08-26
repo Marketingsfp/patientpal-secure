@@ -79,7 +79,7 @@ function StatusBadge({ status }: { status: string }) {
     rejeitado: "Recusado",
   };
   return (
-    <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", map[status] ?? "")}>
+    <Badge variant="outline" className={cn("text-[11px] h-5 px-1.5", map[status] ?? "")}>
       {label[status] ?? status}
     </Badge>
   );
@@ -552,7 +552,7 @@ function Page() {
                         <div className="text-xs text-muted-foreground">{s.descricao}</div>
                       )}
                       {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
                           {s.data_pagamento_original && (
                             <>
                               Pago em{" "}
@@ -574,7 +574,7 @@ function Page() {
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[10px] h-5 px-1.5",
+                            "text-[11px] h-5 px-1.5",
                             s.tipo === "devolucao"
                               ? "border-amber-400 text-amber-900 bg-amber-100"
                               : "border-rose-400 text-rose-900 bg-rose-100",
@@ -589,12 +589,12 @@ function Page() {
                     <TableCell className="text-xs italic max-w-[260px]">
                       <div className="line-clamp-3">"{s.motivo}"</div>
                       {s.resposta && (
-                        <div className="not-italic text-[10px] text-muted-foreground mt-1">
+                        <div className="not-italic text-[11px] text-muted-foreground mt-1">
                           Resposta: {s.resposta}
                         </div>
                       )}
                       {s.resolvido_em && (
-                        <div className="not-italic text-[10px] text-muted-foreground">
+                        <div className="not-italic text-[11px] text-muted-foreground">
                           Resolvido em {new Date(s.resolvido_em).toLocaleString("pt-BR")}
                           {s.resolvido_por && <> por {nomesUsuarios[s.resolvido_por] ?? "—"}</>}
                         </div>

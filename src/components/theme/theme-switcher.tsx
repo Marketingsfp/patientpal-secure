@@ -47,7 +47,7 @@ export function ThemeSwitcher() {
     <div className="fixed bottom-4 right-4 z-[60]">
       {open && (
         <div className="mb-2 w-60 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-          <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-100">
+          <div className="px-3 py-2 text-[12px] font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-100">
             Tema
           </div>
           <ul className="p-1">

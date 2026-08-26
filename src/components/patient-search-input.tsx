@@ -300,7 +300,7 @@ export function PatientSearchInput({
                     </div>
                   )}
                   {p.cadastro_incompleto && (
-                    <div className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-400">
+                    <div className="text-[12px] mt-0.5 text-amber-700 dark:text-amber-400">
                       ⚠ Cadastro incompleto — clique para completar
                     </div>
                   )}

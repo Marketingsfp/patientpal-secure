@@ -165,21 +165,21 @@ export function HistoricoAtendimentoDialog({
                       Por: <span className="text-foreground">{a.nome}</span>
                     </span>
                     {a.papel === "medico" && (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[11px]">
                         Médico
                       </Badge>
                     )}
                     {a.papel === "funcionario" && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[11px]">
                         Funcionário
                       </Badge>
                     )}
                     {a.papel === "sistema" && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[11px]">
                         Sistema
                       </Badge>
                     )}
-                    <span className="ml-auto text-[10px] opacity-60">{r.table_name}</span>
+                    <span className="ml-auto text-[11px] opacity-60">{r.table_name}</span>
                   </div>
                 </div>
               );

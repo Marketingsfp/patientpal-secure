@@ -56,7 +56,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
   const cardCls =
     "rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]";
   const labelCls =
-    "text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400";
+    "text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400";
 
   return (
     <aside className="w-64 shrink-0 bg-gradient-to-b from-[#FAFBFC] to-[#F5F6F8] border-r border-slate-200/60 flex flex-col overflow-y-auto">
@@ -64,7 +64,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
       <div className="px-4 pt-5 pb-3">
         <div className="flex items-center gap-3">
           <div
-            className="h-9 w-9 rounded-xl border flex items-center justify-center text-[11px] font-bold shadow-sm text-[color:var(--clinic-accent-strong)]"
+            className="h-9 w-9 rounded-xl border flex items-center justify-center text-[12px] font-bold shadow-sm text-[color:var(--clinic-accent-strong)]"
             style={{
               background: "var(--clinic-accent-soft)",
               borderColor: "color-mix(in oklab, var(--clinic-accent) 25%, transparent)",
@@ -79,7 +79,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             >
               {clinicaNome}
             </div>
-            <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider">
               {dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             </div>
           </div>
@@ -92,7 +92,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
           <div className="flex items-center justify-between mb-3">
             <span className={labelCls}>Turno</span>
             <span
-              className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}
+              className={cn("inline-flex items-center gap-1 text-[12px] font-semibold", turno.tone)}
             >
               <TurnoIcon className="h-3 w-3" /> {turno.label}
             </span>
@@ -105,7 +105,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               >
                 {sessoes.length}
               </div>
-              <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1.5">sessões</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5">sessões</div>
             </div>
             <div className="text-right">
               <div
@@ -118,7 +118,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               >
                 {ocupacao}%
               </div>
-              <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1.5">ocupação</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5">ocupação</div>
             </div>
           </div>
           <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
@@ -166,7 +166,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
                 pct >= 90 ? "bg-rose-400" : pct >= 60 ? "bg-amber-400" : "bg-emerald-400";
               return (
                 <li key={r.id}>
-                  <div className="flex items-center justify-between text-[11px] mb-1">
+                  <div className="flex items-center justify-between text-[12px] mb-1">
                     <span className="text-slate-600 truncate mr-2">{r.nome}</span>
                     <span className="tabular-nums text-slate-600 dark:text-slate-400 shrink-0">
                       {r.usados}/{r.total}
@@ -188,7 +188,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         <section className={cardCls}>
           <div className="flex items-center justify-between mb-3">
             <span className={labelCls}>Escala do dia</span>
-            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400">
               <Users className="h-3 w-3" /> {equipeOnline.length}
             </span>
           </div>
@@ -196,7 +196,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             {equipeOnline.slice(0, 8).map((m) => (
               <div
                 key={m.id}
-                className="relative h-7 w-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600 shadow-sm"
+                className="relative h-7 w-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[11px] font-semibold text-slate-600 shadow-sm"
                 title={m.nome}
               >
                 {initials(m.nome)}
@@ -207,7 +207,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
               </div>
             ))}
             {equipeOnline.length > 8 && (
-              <div className="h-7 w-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-semibold border border-slate-200">
+              <div className="h-7 w-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[11px] font-semibold border border-slate-200">
                 +{equipeOnline.length - 8}
               </div>
             )}

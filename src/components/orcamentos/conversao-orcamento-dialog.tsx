@@ -429,7 +429,7 @@ function ItemCard({
     <span
       key={label}
       className={
-        "px-1.5 py-0.5 rounded text-[10px] border " +
+        "px-1.5 py-0.5 rounded text-[11px] border " +
         (ativa
           ? "border-primary/50 text-primary bg-primary/5"
           : "border-muted-foreground/30 text-muted-foreground")
@@ -514,7 +514,7 @@ function ItemCard({
           <XCircle className="h-3.5 w-3.5" /> Cancelar
         </Button>
         {item.status_financeiro === "pago" && !item.regra_invalida && (
-          <span className="text-[11px] text-emerald-700 flex items-center gap-1 self-center">
+          <span className="text-[12px] text-emerald-700 flex items-center gap-1 self-center">
             <CheckCircle2 className="h-3 w-3" /> pagamento registrado
           </span>
         )}

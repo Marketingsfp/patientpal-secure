@@ -134,11 +134,11 @@ export function AgendaPorMedicoDia({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-slate-900">{m.nome}</p>
-                    <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {m.especialidade_nome || "Profissional"}
                     </p>
                   </div>
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
                     <span className="text-emerald-700">{livres.length} livres</span>
                     <span className="mx-1 text-slate-300">·</span>
                     <span className="text-indigo-700">{ocupados.length} agend.</span>
@@ -147,7 +147,7 @@ export function AgendaPorMedicoDia({
 
                 <div className="scrollbar-thin max-h-96 w-full min-w-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto p-2">
                   {ags.length === 0 && (
-                    <p className="px-2 py-6 text-center text-[11px] text-slate-400">Sem horários</p>
+                    <p className="px-2 py-6 text-center text-[12px] text-slate-400">Sem horários</p>
                   )}
                   {ags.map((a) => {
                     const livre = !!a.livre;
@@ -175,8 +175,8 @@ export function AgendaPorMedicoDia({
                             <p
                               className={
                                 somenteLeitura
-                                  ? "text-[11px] font-semibold text-emerald-900"
-                                  : "text-[11px] font-medium text-slate-400"
+                                  ? "text-[12px] font-semibold text-emerald-900"
+                                  : "text-[12px] font-medium text-slate-400"
                               }
                             >
                               {fmtHora(a.inicio)} – {fmtHora(a.fim)}
@@ -184,8 +184,8 @@ export function AgendaPorMedicoDia({
                             <p
                               className={
                                 somenteLeitura
-                                  ? "text-[10px] font-semibold text-emerald-700"
-                                  : "text-[10px] font-semibold text-slate-400"
+                                  ? "text-[11px] font-semibold text-emerald-700"
+                                  : "text-[11px] font-semibold text-slate-400"
                               }
                             >
                               {somenteLeitura ? "Livre" : "+ Agendar"}
@@ -201,7 +201,7 @@ export function AgendaPorMedicoDia({
                                 {fmtHora(a.fim)}
                               </span>
                               <span
-                                className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold ${
                                   STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600"
                                 }`}
                               >
@@ -218,7 +218,7 @@ export function AgendaPorMedicoDia({
                                 </span>
                               )}
                             </p>
-                            <p className="mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-[11px] font-medium text-slate-500">
+                            <p className="mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-[12px] font-medium text-slate-500">
                               <Stethoscope className="h-3 w-3 shrink-0 text-slate-400" />
                               <span className="truncate">{a.procedimento || "Consulta"}</span>
                             </p>
@@ -229,7 +229,7 @@ export function AgendaPorMedicoDia({
                   })}
                 </div>
 
-                <footer className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500">
+                <footer className="border-t border-slate-100 px-3 py-1.5 text-[12px] text-slate-500">
                   {livres.length} livre{livres.length === 1 ? "" : "s"} · {ocupados.length} agendado
                   {ocupados.length === 1 ? "" : "s"}
                 </footer>

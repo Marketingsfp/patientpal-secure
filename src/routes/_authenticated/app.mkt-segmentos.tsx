@@ -52,7 +52,7 @@ function SegmentosPage() {
           key: "filt",
           header: "Filtros",
           render: (r) => (
-            <code className="text-[11px] text-muted-foreground line-clamp-1">
+            <code className="text-[12px] text-muted-foreground line-clamp-1">
               {JSON.stringify(r.filtros)}
             </code>
           ),

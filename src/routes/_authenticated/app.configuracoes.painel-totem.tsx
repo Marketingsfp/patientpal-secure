@@ -253,7 +253,7 @@ function LinkBlock({ url }: { url: string }) {
             gerando…
           </div>
         )}
-        <span className="text-[10px] text-muted-foreground">Aponte a câmera</span>
+        <span className="text-[11px] text-muted-foreground">Aponte a câmera</span>
       </div>
     </div>
   );

@@ -98,7 +98,7 @@ export function FilaCard({
             </div>
           )}
           <div className={cn("mt-1 flex items-center gap-2 text-xs", compact && "flex-wrap")}>
-            <Badge variant="outline" className="h-5 text-[10px] font-normal">
+            <Badge variant="outline" className="h-5 text-[11px] font-normal">
               {data.tipoCobranca}
             </Badge>
             <span className="text-muted-foreground tabular-nums">{hora}</span>
@@ -110,7 +110,7 @@ export function FilaCard({
                 <span
                   key={a.tipo}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
                     a.severity === "danger" && "bg-status-canceled/15 text-status-canceled",
                     a.severity === "warn" && "bg-status-waiting/20 text-foreground",
                     a.severity === "info" && "bg-status-in-service/15 text-status-in-service",

@@ -483,7 +483,7 @@ export function RenovarContratoDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 {isTroca
                   ? "Sem taxa de adesão e sem carência. O contrato atual será cancelado."
                   : mode === "extensao"
@@ -507,7 +507,7 @@ export function RenovarContratoDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     Atualiza automaticamente conforme dependentes são incluídos ou removidos.{" "}
                     Contrato atual: <strong>{totalPessoas}</strong> pessoa
                     {totalPessoas === 1 ? "" : "s"}.
@@ -519,7 +519,7 @@ export function RenovarContratoDialog({
                     value={`${totalPessoas} pessoa${totalPessoas === 1 ? "" : "s"} — ${BRL(valorRenovacao)}`}
                     readOnly
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     Este convênio não possui faixas de preço cadastradas — o valor base é aplicado.
                   </p>
                 </>
@@ -626,13 +626,13 @@ export function RenovarContratoDialog({
               max={hoje}
             />
             {retroativa ? (
-              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                 {isTroca ? "Troca retroativa" : "Renovação retroativa"} — as novas parcelas serão
                 geradas a partir de {formatDatePura(dataRenovacao)}. Use este campo quando a
                 operação foi feita fora do sistema.
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Se a {isTroca ? "troca" : "renovação"} já aconteceu em uma data anterior, informe
                 aqui para registrar corretamente.
               </p>
@@ -750,7 +750,7 @@ export function RenovarContratoDialog({
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900 space-y-1">
                 <div className="font-semibold">{erroRenovacao.titulo}</div>
                 <p className="text-xs">{erroRenovacao.orientacao}</p>
-                <div className="text-[11px] font-mono bg-white/70 rounded px-2 py-1 break-all">
+                <div className="text-[12px] font-mono bg-white/70 rounded px-2 py-1 break-all">
                   Identificação: {erroRenovacao.identificador}
                   <br />
                   Detalhe: {erroRenovacao.detalheTecnico}
@@ -846,11 +846,11 @@ function DepLinha({
                 <UserRound className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <span className="font-medium truncate">{row.paciente_nome}</span>
                 {row.id !== null ? (
-                  <span className="text-[10px] uppercase tracking-wide bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">
+                  <span className="text-[11px] uppercase tracking-wide bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">
                     atual
                   </span>
                 ) : (
-                  <span className="text-[10px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded shrink-0">
+                  <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded shrink-0">
                     novo
                   </span>
                 )}
@@ -950,7 +950,7 @@ function DepLinha({
       </div>
 
       {removido ? (
-        <p className="text-[11px] text-red-600 pl-1">
+        <p className="text-[12px] text-red-600 pl-1">
           Será removido do contrato ao confirmar a renovação.
         </p>
       ) : null}

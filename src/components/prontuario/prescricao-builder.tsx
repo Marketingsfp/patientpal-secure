@@ -79,7 +79,7 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
                   <span className="text-muted-foreground font-normal">— {m.apresentacao}</span>
                 </div>
                 {m.posologia && (
-                  <div className="text-[11px] text-muted-foreground truncate">{m.posologia}</div>
+                  <div className="text-[12px] text-muted-foreground truncate">{m.posologia}</div>
                 )}
               </button>
             ))}
@@ -186,7 +186,7 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
                 className="h-9"
               />
               <div className="flex flex-wrap gap-1">
-                <span className="text-[10px] uppercase text-muted-foreground flex items-center gap-1 mr-1">
+                <span className="text-[11px] uppercase text-muted-foreground flex items-center gap-1 mr-1">
                   <Zap className="h-3 w-3" /> Atalhos
                 </span>
                 {POSOLOGIAS.slice(0, 6).map((p) => (
@@ -194,7 +194,7 @@ export function PrescricaoBuilder({ itens, onChange }: Props) {
                     key={p}
                     type="button"
                     onClick={() => atualizar(it.id, { posologia: p })}
-                    className="text-[11px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors"
+                    className="text-[12px] rounded-full border px-2 py-0.5 hover:bg-primary hover:text-primary-foreground transition-colors"
                   >
                     {p}
                   </button>

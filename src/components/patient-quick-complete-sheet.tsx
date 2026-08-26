@@ -167,7 +167,7 @@ export function PatientQuickCompleteSheet({
             {row?.nome ? <span className="font-medium">{row.nome}</span> : null}
             <div className="mt-1 flex flex-wrap gap-1">
               {faltantes.map((f) => (
-                <Badge key={f} variant="secondary" className="text-[10px]">
+                <Badge key={f} variant="secondary" className="text-[11px]">
                   {f}
                 </Badge>
               ))}

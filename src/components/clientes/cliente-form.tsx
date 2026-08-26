@@ -1738,7 +1738,7 @@ export function ClienteForm({
                               />
                               <div className="flex-1 grid gap-x-4 gap-y-1 md:grid-cols-4 text-sm">
                                 <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                     Data
                                   </div>
                                   <div className="font-semibold text-foreground tabular-nums">
@@ -1746,7 +1746,7 @@ export function ClienteForm({
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                     Especialidade
                                   </div>
                                   <div className="font-medium text-foreground truncate">
@@ -1754,7 +1754,7 @@ export function ClienteForm({
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                     Serviço
                                   </div>
                                   <div className="font-medium text-foreground truncate">
@@ -1762,7 +1762,7 @@ export function ClienteForm({
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                     Médico
                                   </div>
                                   <div className="font-medium text-foreground truncate">
@@ -2003,11 +2003,11 @@ export function ClienteForm({
                             </div>
                             <div className="flex items-center gap-2">
                               <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wide ${statusBadge}`}
+                                className={`text-[11px] px-2 py-0.5 rounded-full border uppercase tracking-wide ${statusBadge}`}
                               >
                                 {c.status.replace(/_/g, " ")}
                               </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wide bg-primary/10 text-primary border-primary/20">
+                              <span className="text-[11px] px-2 py-0.5 rounded-full border uppercase tracking-wide bg-primary/10 text-primary border-primary/20">
                                 {c.papel}
                               </span>
                             </div>
@@ -2015,7 +2015,7 @@ export function ClienteForm({
 
                           <div className="px-4 py-3 grid gap-3 md:grid-cols-4 text-sm">
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Vigência
                               </div>
                               <div className="font-medium tabular-nums">
@@ -2026,13 +2026,13 @@ export function ClienteForm({
                               </div>
                             </div>
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Vencimento
                               </div>
                               <div className="font-medium">Todo dia {c.dia_vencimento}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Valor mensal
                               </div>
                               <div className="font-medium tabular-nums">
@@ -2040,7 +2040,7 @@ export function ClienteForm({
                               </div>
                             </div>
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Parcelas
                               </div>
                               <div className="font-medium">{c.num_parcelas}×</div>
@@ -2049,13 +2049,13 @@ export function ClienteForm({
 
                           <div className="px-4 pb-3 grid gap-3 md:grid-cols-2 text-sm">
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                                 Titular
                               </div>
                               <div>{destacar(c.paciente_nome, c.paciente_id)}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                                 Dependentes ({c.dependentes.length})
                               </div>
                               {c.dependentes.length === 0 ? (
@@ -2079,7 +2079,7 @@ export function ClienteForm({
 
                           <div className="px-4 pb-3 grid gap-2 md:grid-cols-4">
                             <div className="rounded-md border bg-card p-2">
-                              <div className="text-[10px] uppercase text-muted-foreground">
+                              <div className="text-[11px] uppercase text-muted-foreground">
                                 Pagas
                               </div>
                               <div className="text-base font-semibold text-green-700">
@@ -2090,7 +2090,7 @@ export function ClienteForm({
                               </div>
                             </div>
                             <div className="rounded-md border bg-card p-2">
-                              <div className="text-[10px] uppercase text-muted-foreground">
+                              <div className="text-[11px] uppercase text-muted-foreground">
                                 Pendentes
                               </div>
                               <div className="text-base font-semibold">{pendentes.length}</div>
@@ -2099,7 +2099,7 @@ export function ClienteForm({
                               </div>
                             </div>
                             <div className="rounded-md border bg-card p-2">
-                              <div className="text-[10px] uppercase text-muted-foreground">
+                              <div className="text-[11px] uppercase text-muted-foreground">
                                 Em atraso
                               </div>
                               <div className="text-base font-semibold text-red-700">
@@ -2110,7 +2110,7 @@ export function ClienteForm({
                               </div>
                             </div>
                             <div className="rounded-md border bg-muted/40 p-2">
-                              <div className="text-[10px] uppercase text-muted-foreground">
+                              <div className="text-[11px] uppercase text-muted-foreground">
                                 Total do contrato
                               </div>
                               <div className="text-base font-semibold">{c.parcelas.length}</div>

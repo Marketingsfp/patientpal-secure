@@ -179,7 +179,7 @@ export function ApoioClinico({
         }
         className="resize-y leading-relaxed"
       />
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[12px] text-muted-foreground">
         {espelhandoProntuario && montarContexto
           ? "Preenchido automaticamente com o prontuário. Edite à vontade — a partir daí o texto é seu."
           : "Inclua apenas o que for necessário à análise clínica."}{" "}
@@ -187,7 +187,7 @@ export function ApoioClinico({
       </p>
 
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           Perguntas rápidas
         </p>
         <div className="flex flex-wrap gap-2">

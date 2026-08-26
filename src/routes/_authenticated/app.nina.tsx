@@ -1013,7 +1013,7 @@ function ConfiguracaoWhatsApp() {
                       <Icon className={`h-5 w-5 ${active ? "text-primary" : c.color}`} />
                       <span className="font-medium leading-tight text-center">{c.label}</span>
                       {c.disabled && (
-                        <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 border">
+                        <span className="absolute -top-1.5 -right-1.5 text-[10px] bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 border">
                           em breve
                         </span>
                       )}
@@ -1228,7 +1228,7 @@ function InboxWhatsapp({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium truncate text-sm">{c.nome}</div>
-                    <div className="text-[10px] text-muted-foreground shrink-0">{c.quando}</div>
+                    <div className="text-[11px] text-muted-foreground shrink-0">{c.quando}</div>
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
                     <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
@@ -1238,7 +1238,7 @@ function InboxWhatsapp({
                       <span className="truncate">{c.ultima || "—"}</span>
                     </div>
                     {c.naoLidas > 0 && (
-                      <Badge className="bg-emerald-500 text-white h-5 min-w-5 px-1.5 text-[10px]">
+                      <Badge className="bg-emerald-500 text-white h-5 min-w-5 px-1.5 text-[11px]">
                         {c.naoLidas}
                       </Badge>
                     )}
@@ -1401,14 +1401,14 @@ function PainelContatoConteudo({
       </div>
 
       <div>
-        <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
+        <div className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
           <Tag className="h-3 w-3" /> Tags
         </div>
         <div className="flex flex-wrap gap-1">
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-[11px]">
             Paciente
           </Badge>
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-[11px]">
             WhatsApp
           </Badge>
         </div>
@@ -1420,7 +1420,7 @@ function PainelContatoConteudo({
       <PainelInfoCard icon={DollarSign} titulo="Mensalidades em aberto" valor="—" />
 
       <div>
-        <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+        <div className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wider mb-2">
           Notas internas
         </div>
         <Textarea
@@ -1446,7 +1446,7 @@ function PainelInfoCard({
 }) {
   return (
     <div className="rounded-md border border-border p-3 bg-muted/30">
-      <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1 mb-1">
+      <div className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1 mb-1">
         <Icon className="h-3 w-3" /> {titulo}
       </div>
       <div className="text-sm">{valor}</div>
@@ -1465,7 +1465,7 @@ function renderMensagensAgrupadas(msgs: Msg[]) {
   return (
     <>
       <div className="flex justify-center my-2">
-        <span className="text-[10px] text-muted-foreground bg-card border border-border rounded-full px-3 py-0.5">
+        <span className="text-[11px] text-muted-foreground bg-card border border-border rounded-full px-3 py-0.5">
           Hoje
         </span>
       </div>
@@ -1487,7 +1487,7 @@ function renderMensagensAgrupadas(msgs: Msg[]) {
               {formatWhatsappText(m.text)}
             </div>
             <div
-              className={`text-[10px] mt-1 flex items-center gap-1 ${
+              className={`text-[11px] mt-1 flex items-center gap-1 ${
                 m.from === "nina" ? "text-white/80 justify-end" : "text-muted-foreground"
               }`}
             >
@@ -1701,10 +1701,10 @@ function TemplatesWhatsapp() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{t.name}</span>
                       {statusBadge(t.status)}
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[11px]">
                         {t.category}
                       </Badge>
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[11px]">
                         {t.language}
                       </Badge>
                     </div>
@@ -1748,7 +1748,7 @@ function TemplatesWhatsapp() {
                   }
                   placeholder="confirmacao_consulta"
                 />
-                <p className="text-[11px] text-muted-foreground">Minúsculas, números e _</p>
+                <p className="text-[12px] text-muted-foreground">Minúsculas, números e _</p>
               </div>
               <div className="space-y-2">
                 <Label>Categoria *</Label>
@@ -1801,7 +1801,7 @@ function TemplatesWhatsapp() {
                 maxLength={1024}
                 placeholder="Olá {{1}}, sua consulta está marcada para {{2}}."
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 {body.length}/1024 — {varCount} variável(is) detectada(s)
               </p>
             </div>
@@ -1809,7 +1809,7 @@ function TemplatesWhatsapp() {
             {varCount > 0 && (
               <div className="space-y-2">
                 <Label>Exemplos das variáveis *</Label>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   A Meta exige um valor de exemplo para cada {"{{n}}"}.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

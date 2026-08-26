@@ -560,7 +560,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
             <TableRow>
               <TableHead className="w-[160px]">
                 <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Especialidade
                       {filtroEspecialidade !== "todos" && (
@@ -581,7 +581,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="w-[90px]">
                 <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Categoria
                       {filtroTipo !== "todos" && (
@@ -602,7 +602,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="w-[220px]">
                 <Select value={filtroProcedimento} onValueChange={setFiltroProcedimento}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1 truncate">
                       Serviço
                       {filtroProcedimento !== "todos" && (
@@ -623,7 +623,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="w-[100px]">
                 <Select value={filtroModo} onValueChange={setFiltroModo}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Modo
                       {filtroModo !== "todos" && (
@@ -641,7 +641,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableHead className="text-right w-[70px]">Valor / %</TableHead>
               <TableHead className="w-[52px] text-center">
                 <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
                     <span className="inline-flex items-center gap-1">
                       Prio.
                       {filtroPrioridade !== "todos" && (
@@ -661,7 +661,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="w-[100px]">
                 <Select value={filtroLimite} onValueChange={(v) => setFiltroLimite(v as any)}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Limite
                       {filtroLimite !== "todos" && (
@@ -678,7 +678,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="w-[88px]">
                 <Select value={filtroCarencia} onValueChange={setFiltroCarencia}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
                     <span className="inline-flex items-center gap-1">
                       Carência
                       {filtroCarencia !== "todos" && (
@@ -698,7 +698,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               </TableHead>
               <TableHead className="text-center w-[64px] !px-1">
                 <Select value={filtroGratuito} onValueChange={(v) => setFiltroGratuito(v as any)}>
-                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[12px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
                     <span className="inline-flex items-center gap-1">
                       Gratuito
                       {filtroGratuito !== "todos" && (
@@ -770,7 +770,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     </Select>
                     {regraSemServico(r) && (
                       <span
-                        className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                        className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
                         title="Nenhum serviço ativo desta especialidade tem esse tipo. Esta regra não será aplicada em nenhum atendimento."
                       >
                         sem serviço
@@ -846,7 +846,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     <Button
                       size="sm"
                       variant={r.limite_qtd ? "secondary" : "ghost"}
-                      className="text-[11px] h-7 px-2"
+                      className="text-[12px] h-7 px-2"
                       onClick={() => setLimiteIdx(idx)}
                       title="Configurar limite de uso"
                       disabled
@@ -1125,7 +1125,7 @@ function LimiteDialog({
               onChange={(e) => onChange({ grupo_gratuidade: e.target.value })}
               placeholder='Ex.: "mama-preventivo"'
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               Regras com o mesmo grupo dividem a mesma cota. Ex.: uma regra grátis para Mamografia e
               outra para USG Mama, ambas com grupo "mama-preventivo" e limite 1/contrato → usar uma
               consome a outra.
@@ -1438,7 +1438,7 @@ function NovaRegraDialog({
               }
               placeholder="Qualquer serviço"
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               Quando escolhido, esta regra vale apenas para este serviço.
               {r.tipo ? ` Mostrando apenas serviços da categoria "${r.tipo}".` : ""}
             </p>
@@ -1516,11 +1516,11 @@ function NovaRegraDialog({
                   }
                 />
               )}
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Usado quando o pagamento é em PIX, débito ou crédito.
               </p>
               {r.procedimento_id && regraBase && r.modo === "valor_fixo" && (
-                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                <p className="text-[12px] text-amber-700 dark:text-amber-400">
                   Regra do convênio para <b>{regraBase.especialidade_nome}</b>: R${" "}
                   {(regraBase.valor ?? 0).toFixed(2)} dinheiro
                   {regraBase.valor_cartao != null && (
@@ -1686,7 +1686,7 @@ function NovaRegraDialog({
                 onChange={(e) => upd({ grupo_gratuidade: e.target.value })}
                 placeholder='Ex.: "mama-preventivo"'
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis que pode ser
                 Mamografia OU USG Mama).
               </p>

@@ -2279,7 +2279,7 @@ export function MedicoFormDialog({
                                   </div>
                                   <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
                                     <div className="space-y-1">
-                                      <Label className="text-[11px] text-muted-foreground">
+                                      <Label className="text-[12px] text-muted-foreground">
                                         Terceiro (dono do equipamento)
                                       </Label>
                                       <select
@@ -2302,7 +2302,7 @@ export function MedicoFormDialog({
                                       </select>
                                     </div>
                                     <div className="space-y-1">
-                                      <Label className="text-[11px] text-muted-foreground">
+                                      <Label className="text-[12px] text-muted-foreground">
                                         % do terceiro
                                       </Label>
                                       <Input
@@ -2327,7 +2327,7 @@ export function MedicoFormDialog({
                                   {/* Divisão lado a lado — o que cada um recebe deste serviço */}
                                   <div className="flex flex-wrap items-stretch gap-2">
                                     <div className="flex-1 min-w-40 rounded-md border bg-primary/5 px-3 py-2">
-                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                         Médico Executante
                                       </div>
                                       <div className="text-sm font-semibold text-primary">
@@ -2335,7 +2335,7 @@ export function MedicoFormDialog({
                                       </div>
                                     </div>
                                     <div className="flex-1 min-w-40 rounded-md border bg-amber-500/10 px-3 py-2">
-                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                         Terceiro{terceiroNome ? ` (${terceiroNome})` : ""}
                                       </div>
                                       <div className="text-sm font-semibold text-amber-700 dark:text-amber-500">
@@ -2343,7 +2343,7 @@ export function MedicoFormDialog({
                                       </div>
                                     </div>
                                     <div className="flex-1 min-w-40 rounded-md border bg-muted px-3 py-2">
-                                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                         Clínica (fica com o resto)
                                       </div>
                                       <div className="text-sm font-semibold">

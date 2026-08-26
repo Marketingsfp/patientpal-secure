@@ -47,7 +47,7 @@ export function Odontograma({ estados, onClickDente, selecionado, orcadoSet }: P
                 style={{ background: `linear-gradient(to top, ${cor} 60%, transparent 60%)` }}
                 title={`Dente ${d} — ${status}${orcado ? " · orçado" : ""}`}
               >
-                <span className="absolute top-0.5 text-[10px] font-mono text-foreground/70">
+                <span className="absolute top-0.5 text-[11px] font-mono text-foreground/70">
                   {d}
                 </span>
                 {orcado && (

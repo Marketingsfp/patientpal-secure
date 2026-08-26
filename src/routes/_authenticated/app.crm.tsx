@@ -172,7 +172,7 @@ function CrmPage() {
                 value={f.valor_estimado}
                 onChange={(v) => set({ ...f, valor_estimado: v })}
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Digite os centavos: ex. 150000 = R$ 1.500,00
               </p>
             </div>

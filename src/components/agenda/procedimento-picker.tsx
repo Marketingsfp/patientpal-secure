@@ -143,7 +143,7 @@ export function ProcedimentoPicker({
         <div className="space-y-2">
           {top.length > 0 && (
             <div className="rounded-md border p-2 bg-muted/40">
-              <div className="text-[11px] font-semibold uppercase text-muted-foreground mb-1 flex items-center gap-1">
+              <div className="text-[12px] font-semibold uppercase text-muted-foreground mb-1 flex items-center gap-1">
                 <Star className="h-3 w-3" /> Mais solicitados
               </div>
               <div className="flex flex-wrap gap-1">
@@ -159,7 +159,7 @@ export function ProcedimentoPicker({
                       onClick={() => onSelect(p)}
                     >
                       {p.nome}
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                      <Badge variant="secondary" className="ml-1 text-[11px] px-1 py-0">
                         {t.quantidade}
                       </Badge>
                     </Button>
@@ -172,9 +172,9 @@ export function ProcedimentoPicker({
           {top60Lab.length > 0 && (
             <div className="rounded-md border p-2 bg-muted/40">
               <div className="flex items-center justify-between mb-1">
-                <div className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                <div className="text-[12px] font-semibold uppercase text-muted-foreground flex items-center gap-1">
                   🧪 Laboratório — Top 60
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                  <Badge variant="secondary" className="ml-1 text-[11px] px-1 py-0">
                     {top60Lab.length}
                   </Badge>
                 </div>
@@ -182,7 +182,7 @@ export function ProcedimentoPicker({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-[11px]"
+                  className="h-6 text-[12px]"
                   onClick={() => setMostrarTop60((v) => !v)}
                 >
                   {mostrarTop60 ? "ocultar" : "mostrar"}
@@ -223,7 +223,7 @@ export function ProcedimentoPicker({
               <Button
                 size="sm"
                 variant={grupoFiltro === null ? "default" : "outline"}
-                className="h-6 text-[11px]"
+                className="h-6 text-[12px]"
                 onClick={() => setGrupoFiltro(null)}
               >
                 Todos
@@ -233,7 +233,7 @@ export function ProcedimentoPicker({
                   key={g}
                   size="sm"
                   variant={grupoFiltro === g ? "default" : "outline"}
-                  className="h-6 text-[11px]"
+                  className="h-6 text-[12px]"
                   onClick={() => setGrupoFiltro(g)}
                 >
                   {g}
@@ -264,7 +264,7 @@ export function ProcedimentoPicker({
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium truncate">{p.nome}</span>
                     {p.codigo && (
-                      <span className="text-[10px] font-mono text-muted-foreground">
+                      <span className="text-[11px] font-mono text-muted-foreground">
                         {p.codigo}
                       </span>
                     )}

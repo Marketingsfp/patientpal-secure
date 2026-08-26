@@ -243,7 +243,7 @@ function DenteFaces({
         </g>
       </svg>
       <span
-        className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}
+        className={`text-[11px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}
       >
         {dente}
       </span>
@@ -375,7 +375,7 @@ function Legenda() {
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
         <span className="font-medium text-foreground/70">Faces:</span>
         {faces.map((f) => (
           <span key={f}>

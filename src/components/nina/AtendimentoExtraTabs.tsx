@@ -396,7 +396,7 @@ export function AtendInbox() {
         >
           <Coffee className="h-3.5 w-3.5 mr-1" /> Em pausa
           {pausaAtiva?.atend_pause_reasons?.nome && (
-            <span className="ml-1 text-[10px] opacity-90">
+            <span className="ml-1 text-[11px] opacity-90">
               · {pausaAtiva.atend_pause_reasons.nome}
             </span>
           )}
@@ -496,13 +496,13 @@ export function AtendInbox() {
                 <div className="flex items-center gap-1.5 mt-1">
                   {statusBadge(c.status)}
                   {c.protocol_number && (
-                    <code className="text-[10px] text-muted-foreground">#{c.protocol_number}</code>
+                    <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-1">
                   {c.ultima_msg_preview || "—"}
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
+                <div className="text-[11px] text-muted-foreground mt-0.5">
                   {fmtData(c.ultima_msg_em)}
                 </div>
               </button>
@@ -585,7 +585,7 @@ export function AtendInbox() {
                       >
                         <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
                         <div
-                          className={`text-[10px] mt-1 ${out ? "text-emerald-50" : "text-muted-foreground"}`}
+                          className={`text-[11px] mt-1 ${out ? "text-emerald-50" : "text-muted-foreground"}`}
                         >
                           {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                         </div>
@@ -714,7 +714,7 @@ export function AtendInbox() {
                         className="text-xs bg-amber-500/10 border border-amber-500/20 rounded p-2"
                       >
                         <div className="whitespace-pre-wrap">{n.conteudo}</div>
-                        <div className="text-[10px] text-muted-foreground mt-1">
+                        <div className="text-[11px] text-muted-foreground mt-1">
                           {fmtData(n.created_at)}
                         </div>
                       </div>
@@ -965,7 +965,7 @@ export function AtendSupervisor() {
                       <td className="p-2">
                         {r.agente_nome ?? <span className="text-muted-foreground">—</span>}
                         {r.agente_em_pausa && (
-                          <Badge variant="outline" className="ml-1 text-[10px]">
+                          <Badge variant="outline" className="ml-1 text-[11px]">
                             em pausa
                           </Badge>
                         )}

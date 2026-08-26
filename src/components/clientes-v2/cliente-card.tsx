@@ -70,19 +70,19 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
               {p.nome}
             </span>
             {prontuario && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted">
                 Prontuário {prontuario}
               </span>
             )}
             {p.numero_pasta && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted">
                 Pasta {p.numero_pasta}
               </span>
             )}
             <Badge
               variant="outline"
               className={cn(
-                "text-[10px] px-1.5 py-0",
+                "text-[11px] px-1.5 py-0",
                 tipo === "associado" && "bg-emerald-50 text-emerald-800 border-emerald-200",
                 tipo === "cartao" && "bg-sky-50 text-sky-800 border-sky-200",
               )}
@@ -90,32 +90,32 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
               {label}
             </Badge>
             {!p.ativo && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-[11px]">
                 Inativo
               </Badge>
             )}
             {incompleto && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="h-3 w-3" /> Cadastro incompleto
               </span>
             )}
             {sTel && !incompleto && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                 <PhoneOff className="h-3 w-3" /> Sem telefone
               </span>
             )}
             {sCpf && !incompleto && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                 <IdCard className="h-3 w-3" /> Sem CPF
               </span>
             )}
             {aniversariante && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-fuchsia-700 dark:text-fuchsia-400">
                 <Cake className="h-3 w-3" /> Aniversariante hoje
               </span>
             )}
             {p.duplicado_hint && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-400">
+              <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 dark:text-rose-400">
                 <Copy className="h-3 w-3" /> Possível duplicidade
               </span>
             )}
@@ -136,7 +136,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
             </div>
           )}
           {compact && (
-            <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-3">
+            <div className="mt-0.5 text-[12px] text-muted-foreground flex flex-wrap gap-x-3">
               <span>{fmtCPF(p.cpf)}</span>
               <span>{fmtTel(p.telefone)}</span>
               <span>{fmtNasc(p.data_nascimento)}</span>
@@ -144,7 +144,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
           )}
         </div>
 
-        <div className="shrink-0 text-[10px] text-muted-foreground text-right hidden sm:block">
+        <div className="shrink-0 text-[11px] text-muted-foreground text-right hidden sm:block">
           {p.match_reason && <div>{p.match_reason}</div>}
           {p.ultima_consulta && <div>Última: {fmtNasc(p.ultima_consulta)}</div>}
         </div>

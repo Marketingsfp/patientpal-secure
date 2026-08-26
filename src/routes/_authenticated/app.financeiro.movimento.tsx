@@ -1669,7 +1669,7 @@ function Page() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Receitas</p>
             <p className="text-2xl font-semibold text-green-600">{fmt(totais.r)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card
@@ -1679,7 +1679,7 @@ function Page() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Despesas</p>
             <p className="text-2xl font-semibold text-red-600">{fmt(totais.d)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card
@@ -1693,7 +1693,7 @@ function Page() {
             >
               {fmt(totais.saldo)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
       </div>
@@ -1992,7 +1992,7 @@ function Page() {
                               )}
                               <Badge
                                 variant={l.status === "confirmado" ? "default" : "secondary"}
-                                className="text-[10px] px-1.5 py-0"
+                                className="text-[11px] px-1.5 py-0"
                               >
                                 {l.status}
                               </Badge>

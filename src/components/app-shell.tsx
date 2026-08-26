@@ -299,7 +299,7 @@ function LiquidBottomNav({
                 startNav(() => onNavigate(to));
               }}
               className={cn(
-                "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium transition-colors duration-300",
+                "flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[12px] font-medium transition-colors duration-300",
                 active ? "text-white" : "text-blue-200/70 hover:text-white",
               )}
             >
@@ -311,7 +311,7 @@ function LiquidBottomNav({
         <button
           type="button"
           onClick={onMais}
-          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[11px] font-medium text-blue-200/70 transition-colors duration-300 hover:text-white"
+          className="flex-1 flex flex-col items-center justify-end gap-0.5 rounded-full px-2 pb-2 pt-3 text-[12px] font-medium text-blue-200/70 transition-colors duration-300 hover:text-white"
         >
           <MenuIcon className="h-5 w-5 shrink-0" />
           <span className="leading-none">Mais</span>
@@ -1444,7 +1444,7 @@ function AppShellInner() {
                             [row.label]: !(prev[row.label] ?? true),
                           }));
                         }}
-                        className="w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
+                        className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-indigo-200 hover:text-white transition-colors rounded-md"
                         aria-expanded={open}
                       >
                         <span>{row.label}</span>
@@ -1475,7 +1475,7 @@ function AppShellInner() {
                                     [subKey]: !(prev[subKey] ?? false),
                                   }));
                                 }}
-                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${subActive ? "bg-white/10 text-white" : "text-white hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-[18px] w-[18px] shrink-0" />
@@ -1500,7 +1500,7 @@ function AppShellInner() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         data-nav-to={child.to}
-                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[13px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all text-white hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                                       >
                                         <child.icon className="h-[18px] w-[18px] shrink-0" />
                                         <span className="leading-snug break-words">
@@ -1530,7 +1530,7 @@ function AppShellInner() {
                                         fecharSidebar();
                                         irPara(href);
                                       }}
-                                      className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[13px] font-medium tracking-tight transition-all ${
+                                      className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
                                         active
                                           ? "bg-white text-slate-900 shadow-sm"
                                           : "text-white hover:bg-white/10 hover:text-white"
@@ -1574,7 +1574,7 @@ function AppShellInner() {
                             }}
                             {...dragProps(row.label, navItemKey(item))}
                             className={cn(
-                              `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-tight transition-all ${
+                              `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
                                   : "text-white hover:bg-white/10 hover:text-white"

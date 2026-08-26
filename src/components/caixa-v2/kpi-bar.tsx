@@ -20,7 +20,7 @@ function fmtMin(m: number | null) {
 export function KpiBar({ data }: { data: KpiData }) {
   return (
     <div
-      className="text-[11px] text-muted-foreground border-t bg-muted/30 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-1 tabular-nums"
+      className="text-[12px] text-muted-foreground border-t bg-muted/30 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-1 tabular-nums"
       data-testid="caixa-kpi-bar"
     >
       <span>

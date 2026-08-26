@@ -48,7 +48,7 @@ export function Cid10Picker({ onPick, size = "sm" }: Props) {
               className="pl-8 h-9"
             />
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
+          <p className="text-[12px] text-muted-foreground mt-2">
             {resultados.length} resultado(s) — clique para inserir no campo
           </p>
         </div>

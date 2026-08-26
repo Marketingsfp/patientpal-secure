@@ -484,7 +484,7 @@ function ExamesResultadosPage() {
                 {r.ia_resumo && (
                   <div className="text-xs text-muted-foreground line-clamp-2">{r.ia_resumo}</div>
                 )}
-                <div className="text-[11px] text-muted-foreground mt-0.5">
+                <div className="text-[12px] text-muted-foreground mt-0.5">
                   {new Date(r.created_at).toLocaleString("pt-BR")}
                 </div>
               </div>

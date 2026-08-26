@@ -204,7 +204,7 @@ function DateSelector({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <Label className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
         Data do atendimento
       </Label>
       <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ function SearchBar({
         <div className="space-y-1.5">
           <Label
             htmlFor="busca-paciente"
-            className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+            className="text-[12px] font-semibold uppercase tracking-wide text-slate-500"
           >
             Buscar paciente (nome ou CPF)
           </Label>

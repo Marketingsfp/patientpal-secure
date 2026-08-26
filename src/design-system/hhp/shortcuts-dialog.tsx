@@ -40,13 +40,13 @@ export function HhpShortcutsDialog({
           {groups.map((g, gi) => (
             <React.Fragment key={g.group}>
               {gi > 0 && <div className="border-t border-slate-100" />}
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                 {g.group}
               </div>
               {g.items.map((s) => (
                 <div key={s.k} className="flex items-center justify-between">
                   <span className="text-slate-600">{s.label}</span>
-                  <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-mono text-slate-700">
+                  <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[12px] font-mono text-slate-700">
                     {s.k}
                   </kbd>
                 </div>
@@ -54,7 +54,7 @@ export function HhpShortcutsDialog({
             </React.Fragment>
           ))}
         </div>
-        <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-2">
+        <p className="text-[12px] text-slate-600 dark:text-slate-400 pt-2">
           Padrão Health Hub Pro{moduleName ? ` — ${moduleName}` : ""}.
         </p>
       </DialogContent>

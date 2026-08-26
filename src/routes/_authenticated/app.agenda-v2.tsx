@@ -109,7 +109,7 @@ function AgendaV2Page() {
             <code>/app/agenda</code> continua intacta.
           </span>
           {toggleMs !== null && (
-            <span className="ml-2 text-[10px] text-slate-600 dark:text-slate-400 tabular-nums">
+            <span className="ml-2 text-[11px] text-slate-600 dark:text-slate-400 tabular-nums">
               toggle {toggleMs}ms
             </span>
           )}

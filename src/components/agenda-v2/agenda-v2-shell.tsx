@@ -1312,8 +1312,8 @@ export function AgendaV2Shell() {
                         className={cn(
                           "sticky top-0 tabular-nums pt-1",
                           foco
-                            ? "text-[13px] font-semibold text-slate-500"
-                            : "text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400",
+                            ? "text-[14px] font-semibold text-slate-500"
+                            : "text-[12px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400",
                         )}
                       >
                         {String(hora).padStart(2, "0")}:00
@@ -1339,7 +1339,7 @@ export function AgendaV2Shell() {
                             className="flex-1 h-px"
                             style={{ background: "rgba(79, 70, 229, 0.35)" }}
                           />
-                          <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-500/70 pr-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/70 pr-2">
                             agora · {String(nowHour).padStart(2, "0")}:
                             {String(nowMin).padStart(2, "0")}
                           </span>
@@ -1363,7 +1363,7 @@ export function AgendaV2Shell() {
                           <button
                             type="button"
                             onClick={() => openWizardForHora(hora)}
-                            className="group flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                            className="group flex items-center gap-2 text-[12px] text-slate-600 dark:text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                             aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
                             title="Clique para agendar neste horário"
                           >
@@ -1373,7 +1373,7 @@ export function AgendaV2Shell() {
                               {livresPorHora.get(hora)! > 1 ? "s" : ""} livre
                               {livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
                             </span>
-                            <span className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
+                            <span className="opacity-0 group-hover:opacity-100 text-[11px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
                               agendar →
                             </span>
                           </button>

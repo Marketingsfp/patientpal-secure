@@ -6953,7 +6953,7 @@ function AgendaPage() {
     >
       {/* Profissional */}
       <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
-        <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Profissional
         </Label>
         <MedicoFiltroInput
@@ -6973,7 +6973,7 @@ function AgendaPage() {
 
       {/* Tipo de Agenda */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Tipo de agenda
         </Label>
         <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
@@ -7012,7 +7012,7 @@ function AgendaPage() {
 
       {/* Situação */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Situação
         </Label>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -7035,7 +7035,7 @@ function AgendaPage() {
 
       {/* Data */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Data
           <span
             role="button"
@@ -7048,7 +7048,7 @@ function AgendaPage() {
               }
             }}
             className={cn(
-              "ml-1 cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-normal normal-case tracking-normal",
+              "ml-1 cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-normal normal-case tracking-normal",
               apenasData ? "bg-indigo-50 text-indigo-700" : "text-slate-400 hover:text-slate-600",
             )}
             title="Exibir apenas a data selecionada"
@@ -7067,7 +7067,7 @@ function AgendaPage() {
 
       {/* Especialidade */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Especialidade
         </Label>
         <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
@@ -7087,7 +7087,7 @@ function AgendaPage() {
 
       {/* Cliente + Ações rápidas juntos */}
       <div className="flex min-w-0 flex-[1.6] flex-col gap-1">
-        <Label className="flex h-4 items-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <Label className="flex h-4 items-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Cliente
         </Label>
         <Input
@@ -7424,7 +7424,7 @@ function AgendaPage() {
                   data-turbo-novo
                   onClick={openNew}
                   disabled={!clinicaAtual}
-                  className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[11px] px-3 lg:px-2 font-semibold shadow-md lg:shadow-none bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold shadow-md lg:shadow-none bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" /> Adicionar Encaixe
                 </Button>
@@ -7439,7 +7439,7 @@ function AgendaPage() {
                       : "Editar agendamento"
                     : "Novo agendamento"}
                 </DialogTitle>
-                <p className="text-[11px] text-slate-500 leading-tight">
+                <p className="text-[12px] text-slate-500 leading-tight">
                   {editing && pagosSet.has(editing.id)
                     ? "Este agendamento já foi pago. Alterações exigem estorno."
                     : "Preencha os dados abaixo. Campos com * são obrigatórios."}
@@ -7461,7 +7461,7 @@ function AgendaPage() {
                   >
                     <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:flex-wrap">
-                        <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">
+                        <Label className="text-[11px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">
                           Nº do orçamento
                         </Label>
                         <Input
@@ -7508,7 +7508,7 @@ function AgendaPage() {
                           </Button>
                         )}
                         {!form.orcamento_id && (
-                          <span className="hidden sm:block text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
+                          <span className="hidden sm:block text-[12px] text-slate-500 leading-snug flex-1 min-w-[140px]">
                             Opcional — vincula qualquer orçamento (exames, consultas, procedimentos,
                             odontologia) em uma única ficha. Aceita o nº simples ou o código
                             completo (ex.: D-2026-00001).
@@ -7734,13 +7734,13 @@ function AgendaPage() {
                             </>
                           )}
                           {!previaCobranca.carregando && !previaCobranca.aviso && (
-                            <p className="text-[11px] text-muted-foreground pt-0.5 border-t">
+                            <p className="text-[12px] text-muted-foreground pt-0.5 border-t">
                               Tabela aplicada:{" "}
                               <b>{previaCobranca.convenioNome ?? "Particular (valor cheio)"}</b>
                             </p>
                           )}
                           {!previaCobranca.carregando && previaCobranca.aviso && (
-                            <p className="text-[11px] text-amber-700 dark:text-amber-400 pt-0.5 border-t">
+                            <p className="text-[12px] text-amber-700 dark:text-amber-400 pt-0.5 border-t">
                               Cobrando <b>valor particular</b> mesmo com o cartão{" "}
                               {previaCobranca.convenioNome}: {previaCobranca.aviso}.
                             </p>
@@ -7774,7 +7774,7 @@ function AgendaPage() {
                           <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
                         </SelectContent>
                       </Select>
-                      <p className="hidden sm:block text-[11px] text-slate-500">
+                      <p className="hidden sm:block text-[12px] text-slate-500">
                         Registra como o paciente pretende pagar. A forma real ainda é definida na
                         cobrança.
                       </p>
@@ -7883,7 +7883,7 @@ function AgendaPage() {
                           />
                         </div>
                       </div>
-                      <p className="hidden sm:block text-[11px] text-slate-500 pt-0.5">
+                      <p className="hidden sm:block text-[12px] text-slate-500 pt-0.5">
                         Preenchida automaticamente pelo sistema quando o pagamento for registrado.
                       </p>
                     </div>
@@ -7893,11 +7893,11 @@ function AgendaPage() {
                         procOpcoesPorMedico.get(form.medico_id)?.length ||
                         procPorMedico.get(form.medico_id)?.size ||
                         procNomesPorMedico.get(form.medico_id)?.size ? (
-                          <p className="hidden sm:block text-[11px] text-slate-500">
+                          <p className="hidden sm:block text-[12px] text-slate-500">
                             Mostrando apenas serviços configurados para este médico.
                           </p>
                         ) : procedimentoPadraoDoMedico(form.medico_id) ? (
-                          <p className="hidden sm:block text-[11px] text-slate-500">
+                          <p className="hidden sm:block text-[12px] text-slate-500">
                             Mostrando o serviço principal do médico. Cadastre mais serviços no
                             cadastro do médico, se necessário.
                           </p>
@@ -7908,7 +7908,7 @@ function AgendaPage() {
                           </p>
                         )
                       ) : (
-                        <p className="hidden sm:block text-[11px] text-slate-500">
+                        <p className="hidden sm:block text-[12px] text-slate-500">
                           Selecione um médico para ver os serviços disponíveis.
                         </p>
                       )}
@@ -7940,7 +7940,7 @@ function AgendaPage() {
                               searchPlaceholder="Buscar serviço..."
                               options={optsMulti}
                             />
-                            <p className="hidden sm:block text-[11px] text-slate-500">
+                            <p className="hidden sm:block text-[12px] text-slate-500">
                               {optsMulti.length} serviço{optsMulti.length === 1 ? "" : "s"}{" "}
                               disponíve
                               {optsMulti.length === 1 ? "l" : "is"} — role para ver todos.
@@ -7996,7 +7996,7 @@ function AgendaPage() {
                         />
                       )}
                       {(!editing || isSlotLivre(editing.paciente_nome)) && (
-                        <p className="hidden sm:block text-[11px] text-slate-500">
+                        <p className="hidden sm:block text-[12px] text-slate-500">
                           Status definido automaticamente. Pode ser alterado depois pelo menu de
                           ações.
                         </p>
@@ -8180,7 +8180,7 @@ function AgendaPage() {
                 e também na quitação de um saldo, que já é parcial por
                 natureza. */}
             {formaPagCtx && !formaPagCtx.agId.includes(",") && !saldoAtualRef.current ? (
-              <label className="flex items-start gap-2 rounded-md border border-dashed px-2 py-2 text-[11px] cursor-pointer">
+              <label className="flex items-start gap-2 rounded-md border border-dashed px-2 py-2 text-[12px] cursor-pointer">
                 <Checkbox
                   checked={cobrarParcial}
                   onCheckedChange={(v) => setCobrarParcial(v === true)}
@@ -8194,7 +8194,7 @@ function AgendaPage() {
               </label>
             ) : null}
             {saldoAtualRef.current ? (
-              <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-2 text-[11px] leading-snug text-amber-900">
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-2 text-[12px] leading-snug text-amber-900">
                 <b>Quitando saldo devedor.</b> Total combinado{" "}
                 {saldoAtualRef.current.total.toLocaleString("pt-BR", {
                   style: "currency",
@@ -8223,7 +8223,7 @@ function AgendaPage() {
                   <span className="flex flex-col items-start leading-tight">
                     <span>{op.label}</span>
                     {op.memoria ? (
-                      <span className="text-[10px] font-normal text-muted-foreground">
+                      <span className="text-[11px] font-normal text-muted-foreground">
                         {op.memoria}
                       </span>
                     ) : null}
@@ -8248,7 +8248,7 @@ function AgendaPage() {
                 regra do convênio (Cartão Benefícios) para evitar cobranças
                 divergentes do desconto configurado. */}
             {cobrancaAlt ? (
-              <div className="mt-1 rounded-md border bg-muted/40 px-2 py-2 text-[11px] space-y-1.5">
+              <div className="mt-1 rounded-md border bg-muted/40 px-2 py-2 text-[12px] space-y-1.5">
                 <p className="leading-snug">
                   {cobrancaAlt.usandoCheio ? (
                     <>
@@ -8266,7 +8266,7 @@ function AgendaPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 w-full text-[11px]"
+                  className="h-7 w-full text-[12px]"
                   onClick={alternarCobrancaCheia}
                 >
                   {cobrancaAlt.usandoCheio
@@ -8945,7 +8945,7 @@ function AgendaPage() {
                 {novoPac.cpf &&
                   somenteDigitos(novoPac.cpf).length === 11 &&
                   !isCPFValido(novoPac.cpf) && (
-                    <p className="text-[11px] text-rose-600">CPF inválido</p>
+                    <p className="text-[12px] text-rose-600">CPF inválido</p>
                   )}
               </div>
               <div className="space-y-1">
@@ -9070,7 +9070,7 @@ function AgendaPage() {
               className="resize-none"
             />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">{notaTexto.length}/1000</span>
+              <span className="text-[12px] text-muted-foreground">{notaTexto.length}/1000</span>
               <Button
                 size="sm"
                 onClick={adicionarNotaHist}
@@ -9684,7 +9684,7 @@ function AgendaPage() {
               <SlidersHorizontal className="h-4 w-4 text-slate-500" />
               Filtros
               {filtrosAtivosCount > 0 && (
-                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[12px] font-semibold text-primary-foreground">
                   {filtrosAtivosCount}
                 </span>
               )}
@@ -9734,7 +9734,7 @@ function AgendaPage() {
             agenda" nunca seja um mistério: diz quem fechou o dia, quantos
             horários livres saíram da lista e como trazê-los de volta. */}
         {ocultosPorExpediente.length > 0 && (
-          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <span className="font-semibold">Expediente encerrado</span>
@@ -9760,7 +9760,7 @@ function AgendaPage() {
               <button
                 type="button"
                 onClick={() => setMostrarEncerrados((v) => !v)}
-                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
               >
                 {mostrarEncerrados ? "Ocultar novamente" : "Mostrar mesmo assim"}
               </button>
@@ -9772,7 +9772,7 @@ function AgendaPage() {
             só eles; o histórico completo, de qualquer data, fica em
             Financeiro > A Receber. */}
         {parciaisSet.size > 0 && (
-          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <span className="font-semibold">A receber</span>
@@ -9793,7 +9793,7 @@ function AgendaPage() {
               <button
                 type="button"
                 onClick={() => setFiltroStatus(filtroStatus === "parcial" ? "todos" : "parcial")}
-                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
               >
                 {filtroStatus === "parcial" ? "Mostrar todos" : "Ver só as pendências"}
               </button>
@@ -9879,25 +9879,25 @@ function AgendaPage() {
                       <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </span>
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      <span className="text-[12px] text-muted-foreground whitespace-nowrap">
                         {fmtData(a.inicio)}
                       </span>
                       {fichaNum && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
+                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
                           #{fichaNum}
                         </span>
                       )}
                     </div>
                     {ehLivre ? (
-                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50">
+                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50">
                         Livre
                       </Badge>
                     ) : estornoPend ? (
-                      <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] shrink-0">
+                      <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[11px] shrink-0">
                         Estorno
                       </Badge>
                     ) : (
-                      <Badge className={`${STATUS_COR[a.status]} text-[10px] shrink-0`}>
+                      <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
                         {STATUS_LABEL[a.status]}
                       </Badge>
                     )}
@@ -9928,7 +9928,7 @@ function AgendaPage() {
                         )}
                         <span className="truncate">{a.paciente_nome}</span>
                         {a.orcamento_numero && (
-                          <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
+                          <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
                             ORÇ
                           </span>
                         )}
@@ -9937,7 +9937,7 @@ function AgendaPage() {
                   </div>
 
                   {/* Linha 3: profissional + serviço */}
-                  <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground mb-2 min-w-0">
                     <span className="truncate" title={profLabel}>
                       👤 {profLabel}
                     </span>
@@ -9960,7 +9960,7 @@ function AgendaPage() {
                         const lockNome = slotTravadoPorOutro(a);
                         return lockNome ? (
                           <div
-                            className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[11px] px-2 truncate"
+                            className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-2 truncate"
                             title={`Em digitação por ${lockNome}`}
                           >
                             ⏳ Em digitação por {lockNome}
@@ -10113,34 +10113,34 @@ function AgendaPage() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Ficha
                 </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Dia
                 </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Data
                 </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Horário
                 </TableHead>
-                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Situação
                 </TableHead>
-                <TableHead className="w-8 px-1 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-8 px-1 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Obs
                 </TableHead>
-                <TableHead className="w-8 px-1 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-8 px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -10249,12 +10249,12 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[11px] text-muted-foreground">
+                      <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
                         {fmtData(a.inicio)}
                       </TableCell>
 
                       {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-[11px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                      <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
                         {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                       </TableCell>
 
@@ -10270,7 +10270,7 @@ function AgendaPage() {
                                 {label}
                               </span>
                               {manual && (
-                                <span className="shrink-0 text-[9px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                <span className="shrink-0 text-[10px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
                                   Papel
                                 </span>
                               )}
@@ -10331,7 +10331,7 @@ function AgendaPage() {
                                 />
                               )}
                               {a.orcamento_numero && (
-                                <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                                <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
                                   ORÇ
                                 </span>
                               )}
@@ -10372,7 +10372,7 @@ function AgendaPage() {
                             const lockNome = slotTravadoPorOutro(a);
                             return lockNome ? (
                               <Badge
-                                className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full"
+                                className="bg-amber-100 text-amber-800 border-amber-300 text-[12px] font-medium truncate max-w-full"
                                 title={`Em digitação por ${lockNome}`}
                               >
                                 ⏳ {lockNome}
@@ -10411,7 +10411,7 @@ function AgendaPage() {
                           if (!saldoLinha?.parcial || ehLivre) return null;
                           return (
                             <Badge
-                              className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[10px] text-amber-800"
+                              className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[11px] text-amber-800"
                               title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
                                 "pt-BR",
                                 { style: "currency", currency: "BRL" },
@@ -10866,7 +10866,7 @@ function AgendaPage() {
               <DialogTitle className="min-w-0">Informações do cliente</DialogTitle>
               <BadgePacienteDistante
                 cidade={pacEdit.cidade || pacInfo?.cidade}
-                className="whitespace-nowrap text-[11px] shrink-0"
+                className="whitespace-nowrap text-[12px] shrink-0"
               />
             </div>
           </DialogHeader>
@@ -10927,7 +10927,7 @@ function AgendaPage() {
                     maxLength={LIMITES.codigo}
                     className="h-8"
                   />
-                  <p className="text-[11px] leading-tight text-muted-foreground">
+                  <p className="text-[12px] leading-tight text-muted-foreground">
                     {AJUDA_PRONTUARIO}
                   </p>
                 </div>
@@ -11155,13 +11155,13 @@ function AgendaPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                     Paciente
                   </p>
                   <p className="text-sm font-medium break-words">{obsAg.paciente_nome || "—"}</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                     Data / Hora
                   </p>
                   <p className="text-sm font-medium break-words">
@@ -11172,7 +11172,7 @@ function AgendaPage() {
                   </p>
                 </div>
                 <div className="min-w-0 sm:col-span-2">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
                     Profissional
                   </p>
                   <p className="text-sm font-medium break-words">
@@ -11181,7 +11181,7 @@ function AgendaPage() {
                 </div>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                <p className="text-[12px] uppercase tracking-wide text-muted-foreground mb-1">
                   Observação
                 </p>
                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
@@ -11724,7 +11724,7 @@ function FragmentDayCell({
           </button>
         ) : lockNome ? (
           <div
-            className="w-full rounded-md px-2 py-1.5 text-[11px] leading-tight truncate bg-amber-100 text-amber-800 border border-amber-300"
+            className="w-full rounded-md px-2 py-1.5 text-[12px] leading-tight truncate bg-amber-100 text-amber-800 border border-amber-300"
             title={`Em digitação por ${lockNome}`}
           >
             ⏳ {lockNome}
@@ -11880,7 +11880,7 @@ function DataRefField({
             className={cn(
               "font-normal",
               compact
-                ? "h-7 text-[13px] px-2 min-w-[130px] w-full justify-center border border-slate-300/60 hover:border-slate-400 hover:bg-slate-50/50"
+                ? "h-7 text-[14px] px-2 min-w-[130px] w-full justify-center border border-slate-300/60 hover:border-slate-400 hover:bg-slate-50/50"
                 : "h-8 text-xs flex-1 justify-start border-slate-200 hover:border-slate-300 hover:bg-slate-50/50",
             )}
           >

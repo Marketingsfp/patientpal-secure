@@ -375,7 +375,7 @@ function VozConfigPage() {
               step={5}
               onValueChange={(v) => alterarRate((v[0] ?? 55) / 100)}
             />
-            <div className="flex justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="flex justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
               <span>{Math.round(MIN_TTS_RATE * 100)}% (bem lento)</span>
               <span>100% (normal)</span>
               <span>{Math.round(MAX_TTS_RATE * 100)}% (rápido)</span>

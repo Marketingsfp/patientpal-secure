@@ -250,7 +250,7 @@ export function EstornosBell() {
         >
           <Bell className="h-4 w-4" />
           {count > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] leading-[18px] font-bold text-center">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[11px] leading-[18px] font-bold text-center">
               {count > 9 ? "9+" : count}
             </span>
           )}
@@ -270,7 +270,7 @@ export function EstornosBell() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 text-[11px] ml-auto"
+                className="h-6 text-[12px] ml-auto"
                 onClick={marcarTodasLidas}
               >
                 Marcar tudo como visto
@@ -293,7 +293,7 @@ export function EstornosBell() {
                         )}
                       </div>
                       <span
-                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+                        className={`text-[11px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
                           aprovado
                             ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                             : "bg-rose-100 text-rose-900 border border-rose-300"
@@ -315,13 +315,13 @@ export function EstornosBell() {
                       </div>
                     )}
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {r.resolvido_em ? new Date(r.resolvido_em).toLocaleString("pt-BR") : ""}
                       </span>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-6 text-[11px] ml-auto"
+                        className="h-6 text-[12px] ml-auto"
                         onClick={() => marcarLida(r.id)}
                       >
                         <Check className="h-3 w-3 mr-1" /> Ok, vi
@@ -356,7 +356,7 @@ export function EstornosBell() {
                   )}
                 </div>
                 <div className="text-xs italic text-muted-foreground">"{s.motivo}"</div>
-                <div className="text-[10px] text-muted-foreground">
+                <div className="text-[11px] text-muted-foreground">
                   {new Date(s.solicitado_em).toLocaleString("pt-BR")}
                 </div>
                 <div className="flex gap-1.5 pt-1">

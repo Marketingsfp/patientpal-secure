@@ -169,7 +169,7 @@ function AlertaBadge({ alerta, rotulo }: { alerta: Alerta; rotulo: string }) {
   if (!alerta) return null;
   return (
     <span
-      className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${classeBadge(alerta)}`}
+      className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] ${classeBadge(alerta)}`}
     >
       {alerta.nivel !== "ok" && <AlertTriangle className="h-3 w-3" />}
       {rotulo}: {alerta.texto}
@@ -546,7 +546,7 @@ function TriagemEnfermagemConteudo() {
                         {g.paciente_nome}
                       </div>
                       {g.agendamentos.length > 1 && (
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           {g.agendamentos.length} atendimentos no dia
                         </div>
                       )}
@@ -557,13 +557,13 @@ function TriagemEnfermagemConteudo() {
                         compact
                       />
                       {!pago && (
-                        <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-medium px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1">
+                        <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-medium px-2.5 py-0.5 rounded-full text-[12px] flex items-center gap-1">
                           <Wallet className="h-3 w-3" /> PAGAMENTO PENDENTE
                         </span>
                       )}
                       {g.prioridade !== "normal" && (
                         <span
-                          className={`font-semibold px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 ${g.prioridade === "urgente" ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"}`}
+                          className={`font-semibold px-2.5 py-0.5 rounded-full text-[12px] flex items-center gap-1 ${g.prioridade === "urgente" ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"}`}
                         >
                           <AlertTriangle className="h-3 w-3" />
                           {g.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
@@ -680,7 +680,7 @@ function TriagemEnfermagemConteudo() {
                       <span className="font-semibold">
                         {m.emoji} {m.label}
                       </span>
-                      <span className="block text-[10px] opacity-75">{m.tempo}</span>
+                      <span className="block text-[11px] opacity-75">{m.tempo}</span>
                     </button>
                   );
                 })}
@@ -815,13 +815,13 @@ function TriagemEnfermagemConteudo() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-center">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     IMC
                   </div>
                   <div className="text-2xl font-bold tabular-nums">{imc || "—"}</div>
                   {imcClasse && (
                     <span
-                      className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] ${imcClasse.classe}`}
+                      className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[12px] ${imcClasse.classe}`}
                     >
                       {imcClasse.label}
                     </span>
@@ -847,7 +847,7 @@ function TriagemEnfermagemConteudo() {
                   <Label className="text-xs flex items-center gap-1.5">
                     Alergias conhecidas
                     {form.alergias.trim() && (
-                      <span className="bg-rose-600 text-white font-bold px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
+                      <span className="bg-rose-600 text-white font-bold px-2 py-0.5 rounded-full text-[11px] flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> ALERGIA
                       </span>
                     )}

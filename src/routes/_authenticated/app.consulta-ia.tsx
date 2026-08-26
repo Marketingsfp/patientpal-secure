@@ -153,14 +153,14 @@ function ApoioClinicoPage() {
                 placeholder={
                   "Ex.: Paciente feminina, 54 anos, hipertensa, refere cefaleia occipital há 3 dias...\nPA 160/95 mmHg, FC 88 bpm, Tax 36,4 °C, glicemia capilar 132 mg/dL.\nEm uso de losartana 50 mg 1x/dia."
                 }
-                className="min-h-[280px] resize-y rounded-xl border-slate-200 bg-slate-50/60 p-4 text-[0.95rem] leading-relaxed text-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
+                className="min-h-[280px] resize-y rounded-xl border-slate-200 bg-slate-50/60 p-4 text-[1.05rem] leading-relaxed text-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
               />
               <p className="text-xs leading-relaxed text-slate-400">
                 Não inclua dados que não sejam necessários à análise clínica.
               </p>
 
               <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-slate-400">
                   Perguntas rápidas
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -209,7 +209,7 @@ function ApoioClinicoPage() {
                 >
                   <div
                     className={cn(
-                      "max-w-[92%] rounded-2xl px-4 py-3 text-[0.95rem] leading-relaxed",
+                      "max-w-[92%] rounded-2xl px-4 py-3 text-[1.05rem] leading-relaxed",
                       m.role === "user"
                         ? "bg-blue-600 text-white shadow-sm"
                         : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200",

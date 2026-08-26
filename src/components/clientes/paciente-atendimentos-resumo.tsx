@@ -222,7 +222,7 @@ export function PacienteAtendimentosResumo({ pacienteId, clinicaId }: Props) {
                   <TableCell className="text-xs space-y-0.5">
                     {lista.map((l) => (
                       <div key={l.id} className="flex gap-2">
-                        <span className="text-[10px] px-1 rounded bg-muted">{catLabel(l.cat)}</span>
+                        <span className="text-[11px] px-1 rounded bg-muted">{catLabel(l.cat)}</span>
                         <span className="text-muted-foreground">
                           {l.medico_id ? (medicos[l.medico_id] ?? "—") : "—"}
                         </span>

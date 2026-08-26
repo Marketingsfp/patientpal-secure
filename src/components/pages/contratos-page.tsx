@@ -1058,7 +1058,7 @@ export function ContratosPage({
                   title="Ordenar por paciente"
                 >
                   PACIENTE
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[11px] text-muted-foreground">
                     {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
                   </span>
                 </button>
@@ -4961,7 +4961,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="font-bold text-lg">
                     {pagasTotal}/{totalParcelas}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">
+                  <div className="text-[11px] text-muted-foreground mt-1">
                     Clique para ver detalhes
                   </div>
                 </button>
@@ -4972,7 +4972,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">Recebido</div>
                   <div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">
+                  <div className="text-[11px] text-muted-foreground mt-1">
                     Clique para ver detalhes
                   </div>
                 </button>
@@ -4983,7 +4983,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">A receber</div>
                   <div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">
+                  <div className="text-[11px] text-muted-foreground mt-1">
                     Clique para ver detalhes
                   </div>
                 </button>
@@ -5029,7 +5029,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       </TableBody>
                     </Table>
                   </div>
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                  <div className="px-3 py-2 text-[12px] text-muted-foreground border-t">
                     Cada ciclo mantém sua própria contagem de 12 parcelas. O card "Pagas" acima
                     reflete apenas o ciclo atual.
                   </div>
@@ -5076,7 +5076,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       </TableBody>
                     </Table>
                   </div>
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                  <div className="px-3 py-2 text-[12px] text-muted-foreground border-t">
                     Cada contrato mantém sua própria contagem de parcelas. Recebimentos avulsos
                     históricos ficam no card "Recebido".
                   </div>
@@ -6247,7 +6247,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>Total a cobrar</span>
                 <span>{BRL(pagTotalCobrar)}</span>
               </div>
-              <div className="text-[10px] text-muted-foreground pt-1">
+              <div className="text-[11px] text-muted-foreground pt-1">
                 Serão emitidas 2 GRs separadas (mensalidade e taxa de adesão) e 2 lançamentos
                 financeiros distintos.
               </div>

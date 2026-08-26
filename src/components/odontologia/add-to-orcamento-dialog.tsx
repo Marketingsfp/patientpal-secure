@@ -477,7 +477,7 @@ export function AddToOrcamentoDialog({
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground pt-1">
+              <p className="text-[12px] text-muted-foreground pt-1">
                 O item é lançado no orçamento sempre pelo <strong>valor particular</strong>. O
                 desconto do convênio é apurado na hora do pagamento, conforme a situação do contrato
                 naquele momento (mensalidade em dia, carência). Os valores de convênio acima são

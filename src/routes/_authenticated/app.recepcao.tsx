@@ -263,7 +263,7 @@ function RecepcaoPage() {
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2.5 disabled:opacity-60"
           >
             <Bell className="h-4 w-4" /> Chamar próxima
-            <kbd className="hidden md:inline-flex bg-primary-foreground/20 text-primary-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-md">
+            <kbd className="hidden md:inline-flex bg-primary-foreground/20 text-primary-foreground text-[11px] font-mono px-1.5 py-0.5 rounded-md">
               C
             </kbd>
           </button>
@@ -286,7 +286,7 @@ function RecepcaoPage() {
                 {fila.length}
               </span>
             </h2>
-            <span className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/40 px-2.5 py-1 rounded-lg">
+            <span className="text-[12px] text-muted-foreground font-medium bg-muted/40 border border-border/40 px-2.5 py-1 rounded-lg">
               Ordem: C · P · R · N
             </span>
           </div>

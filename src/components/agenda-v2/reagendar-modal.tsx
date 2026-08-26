@@ -188,7 +188,7 @@ export function ReagendarModal({
               emptyText="Nenhum médico encontrado."
             />
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[12px] text-slate-500">
             Apenas ESTA sessão será movida. Se pertencer a um pacote, os demais itens permanecem no
             horário original.
           </p>

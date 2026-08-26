@@ -50,7 +50,7 @@ export function MiniTimeline({ etapas }: { etapas: EtapaTimeline[] }) {
           )}
           <span
             className={cn(
-              "relative z-10 grid place-items-center h-6 w-6 rounded-full border-2 text-[10px]",
+              "relative z-10 grid place-items-center h-6 w-6 rounded-full border-2 text-[11px]",
               e.status === "done" && "bg-status-paid border-status-paid text-white",
               e.status === "current" &&
                 "bg-status-in-service border-status-in-service text-white animate-pulse",
@@ -60,8 +60,8 @@ export function MiniTimeline({ etapas }: { etapas: EtapaTimeline[] }) {
           >
             {e.status === "done" ? <Check className="h-3 w-3" /> : i + 1}
           </span>
-          <span className="mt-1 text-[10px] font-medium text-center">{e.label}</span>
-          <span className="text-[10px] text-muted-foreground tabular-nums">{e.hora ?? "—"}</span>
+          <span className="mt-1 text-[11px] font-medium text-center">{e.label}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{e.hora ?? "—"}</span>
         </li>
       ))}
     </ol>

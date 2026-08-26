@@ -642,16 +642,16 @@ function ChatPage() {
           </div>
           <Tabs value={aba} onValueChange={(v) => setAba(v as typeof aba)}>
             <TabsList className="w-full grid grid-cols-4 h-8">
-              <TabsTrigger value="todas" className="text-[11px] px-1">
+              <TabsTrigger value="todas" className="text-[12px] px-1">
                 Todas
               </TabsTrigger>
-              <TabsTrigger value="diretas" className="text-[11px] px-1">
+              <TabsTrigger value="diretas" className="text-[12px] px-1">
                 Diretas
               </TabsTrigger>
-              <TabsTrigger value="canais" className="text-[11px] px-1">
+              <TabsTrigger value="canais" className="text-[12px] px-1">
                 Canais
               </TabsTrigger>
-              <TabsTrigger value="nao_lidas" className="text-[11px] px-1">
+              <TabsTrigger value="nao_lidas" className="text-[12px] px-1">
                 Não lidas
               </TabsTrigger>
             </TabsList>
@@ -665,7 +665,7 @@ function ChatPage() {
                 <MessageSquarePlus className="h-5 w-5" />
               </div>
               <p className="text-xs font-medium">Nenhuma conversa aqui</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 {canais.length === 0
                   ? "Comece uma conversa com a equipe."
                   : "Ajuste a busca ou o filtro."}
@@ -707,7 +707,7 @@ function ChatPage() {
                     {membro?.avatar_url && (
                       <AvatarImage src={membro.avatar_url} alt={nomeDisplay} />
                     )}
-                    <AvatarFallback className="text-[11px] font-semibold">
+                    <AvatarFallback className="text-[12px] font-semibold">
                       {direto ? iniciais(nomeDisplay) : <Users className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
@@ -724,23 +724,23 @@ function ChatPage() {
                     <span className="text-sm font-medium truncate flex-1">
                       {direto ? nomeDisplay : `#${nomeDisplay}`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
+                    <span className="text-[11px] text-muted-foreground shrink-0">
                       {horaCurta(meta?.ultimaEm ?? null)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground truncate flex-1">
+                    <span className="text-[12px] text-muted-foreground truncate flex-1">
                       {meta?.ultimaTexto ||
                         (direto ? (membro?.setor ?? "Equipe") : "Canal da equipe")}
                     </span>
                     {meta?.naoLidas > 0 && (
-                      <Badge className="h-4 min-w-4 px-1 text-[10px] justify-center rounded-full">
+                      <Badge className="h-4 min-w-4 px-1 text-[11px] justify-center rounded-full">
                         {meta.naoLidas}
                       </Badge>
                     )}
                   </div>
                   {direto && membro?.setor && (
-                    <Badge variant="secondary" className="mt-1 h-4 text-[9px] px-1.5 font-normal">
+                    <Badge variant="secondary" className="mt-1 h-4 text-[10px] px-1.5 font-normal">
                       {membro.setor}
                     </Badge>
                   )}
@@ -814,12 +814,12 @@ function ChatPage() {
                       {canalAtual.tipo === "direto" ? nomeAtual : `#${nomeAtual}`}
                     </h3>
                     {parceiro?.setor && (
-                      <Badge variant="secondary" className="h-4 text-[10px] px-1.5">
+                      <Badge variant="secondary" className="h-4 text-[11px] px-1.5">
                         {parceiro.setor}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     {canalAtual.tipo === "direto"
                       ? parceiroOnline
                         ? "Online agora"
@@ -913,7 +913,7 @@ function ChatPage() {
                 if (m.anexo_tipo === "sistema") {
                   return (
                     <div key={m.id} className="flex justify-center">
-                      <span className="text-[11px] px-3 py-1 rounded-full bg-muted text-muted-foreground border">
+                      <span className="text-[12px] px-3 py-1 rounded-full bg-muted text-muted-foreground border">
                         {m.texto}
                       </span>
                     </div>
@@ -924,7 +924,7 @@ function ChatPage() {
                   <div key={m.id} className={`flex gap-2 ${meu ? "justify-end" : "justify-start"}`}>
                     {!meu && (
                       <Avatar className="h-7 w-7 mt-auto">
-                        <AvatarFallback className="text-[10px]">
+                        <AvatarFallback className="text-[11px]">
                           {iniciais(autores[m.autor_id])}
                         </AvatarFallback>
                       </Avatar>
@@ -937,7 +937,7 @@ function ChatPage() {
                       }`}
                     >
                       {!meu && (
-                        <p className="text-[11px] font-semibold opacity-80 mb-0.5">
+                        <p className="text-[12px] font-semibold opacity-80 mb-0.5">
                           {autores[m.autor_id] ?? "…"}
                         </p>
                       )}
@@ -950,7 +950,7 @@ function ChatPage() {
                         </button>
                       ) : m.anexo_tipo === "paciente" ? (
                         <div className="rounded-lg border border-current/20 bg-background/10 px-2 py-1.5">
-                          <p className="text-[10px] uppercase tracking-wide opacity-70">
+                          <p className="text-[11px] uppercase tracking-wide opacity-70">
                             Ficha de paciente
                           </p>
                           <p className="whitespace-pre-wrap break-words leading-relaxed">
@@ -961,7 +961,7 @@ function ChatPage() {
                         <p className="whitespace-pre-wrap break-words leading-relaxed">{m.texto}</p>
                       )}
                       <p
-                        className={`text-[10px] mt-1 text-right ${meu ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                        className={`text-[11px] mt-1 text-right ${meu ? "text-primary-foreground/70" : "text-muted-foreground"}`}
                       >
                         {formatDateTime(m.created_at)}
                       </p>
@@ -1146,7 +1146,7 @@ function ChatPage() {
                 )}
                 {equipePorSetor.map(([setor, membros]) => (
                   <div key={setor}>
-                    <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50 sticky top-0">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50 sticky top-0">
                       {setor}
                     </div>
                     {membros.map((m) => {
@@ -1171,7 +1171,7 @@ function ChatPage() {
                               {m.avatar_url && (
                                 <AvatarImage src={m.avatar_url} alt={m.nome ?? ""} />
                               )}
-                              <AvatarFallback className="text-[10px]">
+                              <AvatarFallback className="text-[11px]">
                                 {iniciais(m.nome)}
                               </AvatarFallback>
                             </Avatar>
@@ -1183,7 +1183,7 @@ function ChatPage() {
                           </div>
                           <span className="flex-1 truncate">{m.nome ?? "Usuário"}</span>
                           {online.has(m.user_id) && (
-                            <span className="text-[10px] text-emerald-600">online</span>
+                            <span className="text-[11px] text-emerald-600">online</span>
                           )}
                         </button>
                       );

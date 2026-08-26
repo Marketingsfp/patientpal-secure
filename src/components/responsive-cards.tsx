@@ -105,7 +105,7 @@ export function MobileCardRow({
 }) {
   return (
     <div className={cn("flex items-baseline justify-between gap-3 py-1 min-w-0", className)}>
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground shrink-0">
         {label}
       </span>
       <span className="text-sm text-foreground text-right min-w-0 truncate">{value}</span>

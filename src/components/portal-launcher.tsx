@@ -47,7 +47,7 @@ export function PortalLauncher({
 
       <div className="relative w-full max-w-7xl mx-auto">
         <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur-sm">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500 backdrop-blur-sm">
             Bem-vindo de volta
           </span>
           <h1 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
@@ -88,7 +88,7 @@ export function PortalLauncher({
                   {portal.itens.map((item) => (
                     <li
                       key={item}
-                      className="rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-[11px] font-medium tracking-wide text-slate-600 transition-colors duration-300 group-hover:border-indigo-200 group-hover:bg-indigo-50/70 group-hover:text-indigo-700"
+                      className="rounded-full border border-slate-200/80 bg-slate-50/80 px-3 py-1 text-[12px] font-medium tracking-wide text-slate-600 transition-colors duration-300 group-hover:border-indigo-200 group-hover:bg-indigo-50/70 group-hover:text-indigo-700"
                     >
                       {item}
                     </li>

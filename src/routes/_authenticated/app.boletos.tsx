@@ -111,7 +111,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap",
         statusClasses(s),
       )}
     >
@@ -363,7 +363,7 @@ function BoletosPage() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
             Total pendente
           </p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-amber-700">
@@ -371,13 +371,13 @@ function BoletosPage() {
           </p>
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
             Boletos do mês
           </p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{kpis.doMes}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
             Valor do mês
           </p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{brl(kpis.valorMes)}</p>
@@ -390,7 +390,7 @@ function BoletosPage() {
             {ABAS.map((a) => (
               <TabsTrigger key={a.value} value={a.value} className="text-xs gap-1.5">
                 {a.label}
-                <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
+                <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums">
                   {contagem[a.value]}
                 </span>
               </TabsTrigger>
@@ -453,7 +453,7 @@ function BoletosPage() {
                       {r.nosso_numero ? (
                         <span className="tabular-nums text-sm">{r.nosso_numero}</span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground border border-border">
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[12px] text-muted-foreground border border-border">
                           Aguardando emissão
                         </span>
                       )}

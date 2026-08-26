@@ -81,7 +81,7 @@ export function InformacoesRapidasCard({ className }: { className?: string }) {
         </span>
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-800">Informações rápidas</h2>
-          <p className="text-[11px] text-slate-600 dark:text-slate-400">
+          <p className="text-[12px] text-slate-600 dark:text-slate-400">
             Consultar valores de exames, especialidades e horários dos médicos rapidamente.
           </p>
         </div>
@@ -192,7 +192,7 @@ function TabelaRapidaDrawer({
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-slate-800 truncate">{p.nome}</div>
-                      <div className="text-[11px] text-slate-500 truncate">
+                      <div className="text-[12px] text-slate-500 truncate">
                         {p.grupo ?? p.tipo} · {p.duracao_minutos} min
                       </div>
                     </div>
@@ -200,13 +200,13 @@ function TabelaRapidaDrawer({
                       <div className="text-sm font-semibold tabular-nums text-slate-800">
                         {money(p.valor_dinheiro_pix)}
                       </div>
-                      <div className="text-[11px] text-slate-500 tabular-nums">
+                      <div className="text-[12px] text-slate-500 tabular-nums">
                         cartão {money(p.valor_cartao)}
                       </div>
                     </div>
                   </div>
                   {p.preparo && (
-                    <p className="mt-1 text-[11px] text-amber-700">Preparo: {p.preparo}</p>
+                    <p className="mt-1 text-[12px] text-amber-700">Preparo: {p.preparo}</p>
                   )}
                 </div>
               ))
@@ -229,7 +229,7 @@ function TabelaRapidaDrawer({
                     <Stethoscope className="h-4 w-4 text-slate-400 shrink-0" />
                     <span className="text-sm font-medium text-slate-800 truncate">{m.nome}</span>
                     {m.crm && (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[11px]">
                         CRM {m.crm}
                         {m.crm_uf ? `/${m.crm_uf}` : ""}
                       </Badge>
@@ -237,12 +237,12 @@ function TabelaRapidaDrawer({
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {m.horarios.length === 0 ? (
-                      <span className="text-[11px] text-slate-500">Sem horários cadastrados.</span>
+                      <span className="text-[12px] text-slate-500">Sem horários cadastrados.</span>
                     ) : (
                       m.horarios.map((h, i) => (
                         <span
                           key={i}
-                          className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-400"
+                          className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-0.5 text-[12px] text-slate-600 dark:text-slate-400"
                         >
                           <Clock className="h-3 w-3" /> {h.dia} {h.inicio}–{h.fim}
                         </span>
@@ -412,7 +412,7 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
                 type="button"
                 size="sm"
                 variant={conversa.ativo ? "default" : "outline"}
-                className="h-8 gap-1.5 text-[11px]"
+                className="h-8 gap-1.5 text-[12px]"
                 onClick={alternarConversa}
                 title={
                   conversa.ativo
@@ -460,7 +460,7 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
                     key={s}
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px]"
+                    className="h-7 text-[12px]"
                     onClick={() => void perguntar(s)}
                   >
                     {s}

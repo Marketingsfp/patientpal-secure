@@ -15,7 +15,7 @@ export function TurboModeToggle() {
       type="button"
       size="sm"
       variant={on ? "default" : "outline"}
-      className="h-7 text-[11px] px-2 gap-1"
+      className="h-7 text-[12px] px-2 gap-1"
       title="Modo Recepção Turbo: navegação por teclado (F2 buscar, F3 novo, F5 atualizar, F6 próximo horário, F7 Express, F8 Agenda, F9 Caixa, Ctrl+S salvar, Ctrl+Enter salvar+receber)"
       onClick={() => {
         const next = !on;

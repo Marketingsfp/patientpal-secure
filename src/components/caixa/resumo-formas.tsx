@@ -75,7 +75,7 @@ export function ResumoFormas({ porForma, gaveta }: ResumoFormasProps) {
               <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${bg}`}>
                 <Icon className={`h-3.5 w-3.5 ${cls}`} />
               </span>
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
+              <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                 {label}
               </span>
             </div>
@@ -91,7 +91,7 @@ export function ResumoFormas({ porForma, gaveta }: ResumoFormasProps) {
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/10">
               <Wallet className="h-3.5 w-3.5 text-white" />
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70 leading-tight">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-white/70 leading-tight">
               Total do turno
             </span>
           </div>
@@ -114,7 +114,7 @@ export function ResumoFormas({ porForma, gaveta }: ResumoFormasProps) {
             <div key={p.l} className="flex items-center gap-2">
               {p.op && <span className="text-slate-400 font-semibold">{p.op}</span>}
               <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
                   {p.l}
                 </div>
                 <div className="font-semibold text-slate-800">{fmt(p.v)}</div>
@@ -123,7 +123,7 @@ export function ResumoFormas({ porForma, gaveta }: ResumoFormasProps) {
           ))}
           <span className="text-slate-400 font-semibold">=</span>
           <div className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-indigo-600">
+            <div className="text-[11px] uppercase tracking-wider font-semibold text-indigo-600">
               Esperado na gaveta
             </div>
             <div className="font-bold text-indigo-900">{fmt(esperado)}</div>

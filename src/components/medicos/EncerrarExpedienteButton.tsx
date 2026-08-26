@@ -164,7 +164,7 @@ export function EncerrarExpedienteButton({ onMudou }: { onMudou?: () => void } =
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-[11px] px-2"
+          className="h-7 text-[12px] px-2"
           onClick={() => void reabrir(meuMedicoId)}
           disabled={saving}
         >
@@ -174,7 +174,7 @@ export function EncerrarExpedienteButton({ onMudou }: { onMudou?: () => void } =
       );
     }
     return (
-      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" onClick={abrirDialogo}>
+      <Button size="sm" variant="outline" className="h-7 text-[12px] px-2" onClick={abrirDialogo}>
         <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
       </Button>
     );
@@ -182,10 +182,10 @@ export function EncerrarExpedienteButton({ onMudou }: { onMudou?: () => void } =
 
   return (
     <>
-      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" onClick={abrirDialogo}>
+      <Button size="sm" variant="outline" className="h-7 text-[12px] px-2" onClick={abrirDialogo}>
         <Lock className="h-3 w-3 mr-1.5" /> Fechar agenda
         {encerrados.size > 0 && (
-          <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
+          <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[11px]">
             {encerrados.size}
           </Badge>
         )}
@@ -226,7 +226,7 @@ export function EncerrarExpedienteButton({ onMudou }: { onMudou?: () => void } =
                           )}
                           {m.nome}
                           {enc && (
-                            <span className="text-[10px] text-muted-foreground">(encerrado)</span>
+                            <span className="text-[11px] text-muted-foreground">(encerrado)</span>
                           )}
                         </span>
                       </SelectItem>

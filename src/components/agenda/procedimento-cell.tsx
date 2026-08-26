@@ -108,7 +108,7 @@ export function ProcedimentoCell({
       <Badge
         variant="secondary"
         title={tituloAtual}
-        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[11px] font-medium leading-snug text-muted-foreground"
+        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[12px] font-medium leading-snug text-muted-foreground"
       >
         {textoAtual}
       </Badge>
@@ -121,7 +121,7 @@ export function ProcedimentoCell({
         <button
           type="button"
           title={`${tituloAtual} — clique para trocar o serviço`}
-          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[11px] font-medium uppercase leading-snug text-muted-foreground hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[12px] font-medium uppercase leading-snug text-muted-foreground hover:bg-primary/10 hover:text-primary"
         >
           <span
             title={tituloAtual}
@@ -150,7 +150,7 @@ export function ProcedimentoCell({
               }}
             />
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-[11px] text-muted-foreground mt-1">
             {lista.length} serviço(s) — na ordem do cadastro do médico. Tecle 1-9 para selecionar.
           </p>
           {valor && (
@@ -180,17 +180,17 @@ export function ProcedimentoCell({
                   className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b border-border/40 last:border-0 flex items-center gap-2 text-sm"
                 >
                   {mostrarKbd ? (
-                    <kbd className="inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-muted text-[10px] font-mono shrink-0">
+                    <kbd className="inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-muted text-[11px] font-mono shrink-0">
                       {idxNaLista}
                     </kbd>
                   ) : (
-                    <span className="inline-flex h-5 w-5 items-center justify-center text-[10px] text-muted-foreground font-mono shrink-0">
+                    <span className="inline-flex h-5 w-5 items-center justify-center text-[11px] text-muted-foreground font-mono shrink-0">
                       {idxNaLista}
                     </span>
                   )}
                   <span className="flex-1 truncate">{p.nome}</span>
                   {norm(p.nome) === norm(textoReal) && (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-[11px]">
                       atual
                     </Badge>
                   )}

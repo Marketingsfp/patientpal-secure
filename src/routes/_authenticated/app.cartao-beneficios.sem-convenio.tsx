@@ -440,7 +440,7 @@ function SemConvenioPage() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-[11px] text-muted-foreground max-w-[260px] truncate">
+                      <TableCell className="text-[12px] text-muted-foreground max-w-[260px] truncate">
                         {c.observacoes ?? "—"}
                       </TableCell>
                     </TableRow>

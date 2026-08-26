@@ -249,7 +249,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
             pertence a outro paciente. Um campo solto aqui contornaria essa
             checagem e deixaria dois pacientes com a mesma ficha. */}
         <span
-          className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-[11px] leading-none text-muted-foreground"
+          className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-[12px] leading-none text-muted-foreground"
           title="Número da ficha do paciente. Para alterar, use o lápis ao lado do nome."
         >
           <FileText className="h-3.5 w-3.5 shrink-0" />

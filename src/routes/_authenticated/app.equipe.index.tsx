@@ -110,7 +110,7 @@ function KpiCard({
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -362,7 +362,7 @@ function EquipePage() {
                   <Filter className="h-4 w-4 mr-2" />
                   Filtrar por especialidade
                   {espFiltro.length > 0 && (
-                    <Badge className="ml-2 h-5 px-1.5 text-[10px]">{espFiltro.length}</Badge>
+                    <Badge className="ml-2 h-5 px-1.5 text-[11px]">{espFiltro.length}</Badge>
                   )}
                 </Button>
               </PopoverTrigger>

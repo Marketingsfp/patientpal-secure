@@ -27,12 +27,12 @@ function Card({
 }) {
   return (
     <div className="rounded-md border bg-card px-3 py-2 min-w-[110px] flex-1" data-testid={testid}>
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+      <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground uppercase tracking-wide">
         {color && <span className={cn("h-2 w-2 rounded-full", color)} aria-hidden />}
         <span className="truncate">{label}</span>
       </div>
       <div className="text-lg font-semibold tabular-nums leading-tight mt-0.5">{value}</div>
-      {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+      {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }

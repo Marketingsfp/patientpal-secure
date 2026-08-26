@@ -37,7 +37,7 @@ function Card({
         tone === "danger" && "border-rose-500/40",
       )}
     >
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
         {label}
       </div>
       <div className="text-base font-semibold tabular-nums truncate">{value}</div>
@@ -53,7 +53,7 @@ export function PainelResumo({ data, sessaoInfo }: { data: ResumoData; sessaoInf
           className="rounded-lg border bg-primary/5 px-3 py-2 min-w-[210px] shadow-sm"
           title="Total recebido no período filtrado, já descontando estornos."
         >
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
             Recebido no filtro
           </div>
           <div className="text-sm font-medium truncate">Sessão aberta: {sessaoInfo}</div>

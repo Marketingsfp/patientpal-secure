@@ -29,7 +29,7 @@ function Card({
       <div className={cn("text-lg font-semibold tabular-nums leading-tight", tone)}>
         {v === null ? "…" : v.toLocaleString("pt-BR")}
       </div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
     </Cmp>
   );
 }

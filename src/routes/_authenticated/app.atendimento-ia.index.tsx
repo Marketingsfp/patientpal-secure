@@ -418,8 +418,8 @@ function AtendimentoIaPage() {
                             <Badge
                               className={
                                 pag.motivo === "orcamento"
-                                  ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[10px] gap-1"
-                                  : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[10px] gap-1"
+                                  ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[11px] gap-1"
+                                  : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
                               }
                               title={
                                 pag.motivo === "orcamento" ? "Pago via orçamento" : "Pago no caixa"
@@ -430,7 +430,7 @@ function AtendimentoIaPage() {
                             </Badge>
                           ) : (
                             <Badge
-                              className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] gap-1"
+                              className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[11px] gap-1"
                               title="Pagamento pendente — envie ao caixa antes do atendimento"
                             >
                               <DollarSign className="h-3 w-3" />
@@ -464,7 +464,7 @@ function AtendimentoIaPage() {
                             <HoverCardTrigger asChild>
                               <span className="cursor-help inline-flex">
                                 {it.prioridade !== "normal" ? (
-                                  <Badge className={`${prioCls} border-0 text-[10px] gap-1`}>
+                                  <Badge className={`${prioCls} border-0 text-[11px] gap-1`}>
                                     <AlertTriangle className="h-3 w-3" />
                                     {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
                                   </Badge>
@@ -499,23 +499,23 @@ function AtendimentoIaPage() {
                                   <>
                                     <div className="flex items-center justify-between gap-2 pb-1 border-b">
                                       <div className="font-semibold">Triagem da enfermagem</div>
-                                      <div className="text-[10px] text-muted-foreground">
+                                      <div className="text-[11px] text-muted-foreground">
                                         {new Date(t.created_at).toLocaleString("pt-BR")}
                                       </div>
                                     </div>
                                     {t.enfermeira_nome && (
-                                      <div className="text-[11px] text-muted-foreground">
+                                      <div className="text-[12px] text-muted-foreground">
                                         Por {t.enfermeira_nome}
                                       </div>
                                     )}
                                     {sv.length > 0 && (
-                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed">
+                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[12px] leading-relaxed">
                                         {sv.join(" · ")}
                                       </div>
                                     )}
                                     {t.queixa_principal && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                        <span className="text-[11px] uppercase text-muted-foreground">
                                           Queixa
                                         </span>
                                         <div>{t.queixa_principal}</div>
@@ -523,7 +523,7 @@ function AtendimentoIaPage() {
                                     )}
                                     {t.doencas && t.doencas.length > 0 && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                        <span className="text-[11px] uppercase text-muted-foreground">
                                           Doenças
                                         </span>
                                         <div className="flex flex-wrap gap-1 mt-0.5">
@@ -531,7 +531,7 @@ function AtendimentoIaPage() {
                                             <Badge
                                               key={i}
                                               variant="outline"
-                                              className="text-[10px]"
+                                              className="text-[11px]"
                                             >
                                               {d}
                                             </Badge>
@@ -541,7 +541,7 @@ function AtendimentoIaPage() {
                                     )}
                                     {t.medicamentos && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                        <span className="text-[11px] uppercase text-muted-foreground">
                                           Medicamentos
                                         </span>
                                         <div>{t.medicamentos}</div>
@@ -549,7 +549,7 @@ function AtendimentoIaPage() {
                                     )}
                                     {t.alergias && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                        <span className="text-[11px] uppercase text-muted-foreground">
                                           Alergias
                                         </span>
                                         <div>{t.alergias}</div>
@@ -557,7 +557,7 @@ function AtendimentoIaPage() {
                                     )}
                                     {t.observacoes && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                        <span className="text-[11px] uppercase text-muted-foreground">
                                           Observações
                                         </span>
                                         <div className="whitespace-pre-wrap">{t.observacoes}</div>
@@ -572,7 +572,7 @@ function AtendimentoIaPage() {
                         <TableCell className="text-right">
                           {atendido ? (
                             <Badge
-                              className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[10px] gap-1"
+                              className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
                               title="Atendimento finalizado"
                             >
                               <Check className="h-3 w-3" /> ATENDIDO

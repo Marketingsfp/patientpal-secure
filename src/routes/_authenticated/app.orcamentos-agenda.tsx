@@ -231,7 +231,7 @@ function OrcamentosAgendaPage() {
         </div>
 
         {/* Rodapé enxuto */}
-        <div className="px-4 py-1 border-t bg-muted/10 text-[10px] text-muted-foreground flex items-center justify-between shrink-0">
+        <div className="px-4 py-1 border-t bg-muted/10 text-[11px] text-muted-foreground flex items-center justify-between shrink-0">
           <span>
             {modo === "split"
               ? `Dividido · ${Math.round(leftPct)}% / ${Math.round(100 - leftPct)}%`
@@ -241,7 +241,7 @@ function OrcamentosAgendaPage() {
           </span>
           <span>
             Clique em{" "}
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Agendar</kbd> para
             enviar à agenda
           </span>
         </div>

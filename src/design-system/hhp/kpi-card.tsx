@@ -63,7 +63,7 @@ export function HhpKpiCard({
         style={{ background: "var(--clinic-accent)" }}
       />
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 leading-tight line-clamp-2 min-w-0">
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 leading-tight line-clamp-2 min-w-0">
           {label}
         </span>
         <span
@@ -93,7 +93,7 @@ export function HhpKpiCard({
         {delta !== undefined && delta !== 0 && (
           <span
             className={cn(
-              "text-[10px] font-semibold tabular-nums",
+              "text-[11px] font-semibold tabular-nums",
               delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-600 dark:text-slate-400",
             )}
           >

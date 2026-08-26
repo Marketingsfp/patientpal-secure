@@ -458,7 +458,7 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
                         <>
                           <span className="font-medium text-foreground">Sistema</span>
                           {e.user_email && /\(/.test(e.user_email) && (
-                            <span className="text-[10px] opacity-70">
+                            <span className="text-[11px] opacity-70">
                               {e.user_email.replace(/^sistema\s*/i, "")}
                             </span>
                           )}
@@ -474,7 +474,7 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
                       </>
                     );
                   })()}
-                  <Badge variant="outline" className="ml-auto text-[10px]">
+                  <Badge variant="outline" className="ml-auto text-[11px]">
                     {grupoDe(e.tipo)}
                   </Badge>
                 </div>

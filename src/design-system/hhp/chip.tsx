@@ -45,9 +45,9 @@ export function HhpChip({
         "inline-flex items-center font-medium tabular-nums",
         radius === "full" ? "rounded-full" : "rounded-md",
         size === "xs"
-          ? "text-[10px] px-1.5 py-0.5 gap-1"
+          ? "text-[11px] px-1.5 py-0.5 gap-1"
           : size === "sm"
-            ? "text-[11px] px-2 py-0.5 gap-1.5"
+            ? "text-[12px] px-2 py-0.5 gap-1.5"
             : "text-xs px-2.5 py-1 gap-1.5",
         variant === "outline" ? OUTLINE_BG[tone] : HHP_TONE_BG[tone],
         className,

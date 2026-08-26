@@ -656,7 +656,7 @@ function ClientesPage() {
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden mt-4">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
-            <TableRow className="bg-slate-50/80 border-b border-slate-200/80 [&>th]:text-[11px] [&>th]:font-bold [&>th]:text-slate-500 [&>th]:uppercase [&>th]:tracking-wider">
+            <TableRow className="bg-slate-50/80 border-b border-slate-200/80 [&>th]:text-[12px] [&>th]:font-bold [&>th]:text-slate-500 [&>th]:uppercase [&>th]:tracking-wider">
               <TableHead className="w-10">
                 <Checkbox
                   aria-label="Selecionar todos"

@@ -178,8 +178,8 @@ export function SessionCard({
           padY: "py-3",
           padX: "px-4",
           photo: 40,
-          name: "text-[15px]",
-          time: "text-[13px]",
+          name: "text-[16px]",
+          time: "text-[14px]",
           gap: "gap-3",
           radius: "rounded-2xl",
         }
@@ -189,7 +189,7 @@ export function SessionCard({
             padX: "px-6",
             photo: 72,
             name: "text-2xl",
-            time: "text-[16px]",
+            time: "text-[17px]",
             gap: "gap-5",
             radius: "rounded-3xl",
           }
@@ -198,7 +198,7 @@ export function SessionCard({
             padX: "px-5",
             photo: 56,
             name: "text-xl",
-            time: "text-[14px]",
+            time: "text-[15px]",
             gap: "gap-4",
             radius: "rounded-2xl",
           };
@@ -328,7 +328,7 @@ export function SessionCard({
                   },
                 ]}
               />
-              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-400">
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
                 <span className="uppercase tracking-wider">
                   {STATUS_LABEL[data.status] ?? data.status.replace(/_/g, " ")}
                 </span>
@@ -437,7 +437,7 @@ function QuickAction({
       className={cn(
         "inline-flex items-center gap-1 h-7 px-2 rounded-lg",
         "bg-white/95 backdrop-blur-sm border border-slate-200/70 shadow-sm",
-        "text-[11px] font-medium text-slate-600",
+        "text-[12px] font-medium text-slate-600",
         "hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors",
       )}
       aria-label={label}
@@ -481,7 +481,7 @@ function StatusMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
+        <DropdownMenuLabel className="text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
           Alterar status
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
