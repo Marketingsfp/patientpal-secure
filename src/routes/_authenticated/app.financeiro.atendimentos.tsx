@@ -511,6 +511,13 @@ function AtendimentosPage() {
       setTimeout(cleanup, 60000);
     }, 100);
   };
+  // Nome do paciente com o MESMO fallback usado na lista da tela: o combobox só
+  // carrega os 500 primeiros pacientes, então `pacMap` erra na maioria das
+  // linhas. O nome real vem embutido na própria linha (`paciente_nome_extra`,
+  // de `agendamentos.paciente_nome` ou da FK `paciente:pacientes(nome)`).
+  // Sem esse fallback o comprovante impresso saía com "—" em toda a coluna.
+  const nomePaciente = (a: Atend): string =>
+    ((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim();
   const buildComprovante = (
     itens: Atend[],
     meta: {
@@ -526,6 +533,10 @@ function AtendimentosPage() {
     const medicoNome =
       medicoIds.size === 1 ? (medMap.get([...medicoIds][0]) ?? "—") : `${medicoIds.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
+    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
+    // Registros antigos foram backfillados de `date` para timestamptz em
+    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
+    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
     const derivarHora = (iso: string | null | undefined): string | null => {
       if (!iso) return null;
       const d = new Date(iso);
@@ -535,33 +546,26 @@ function AtendimentosPage() {
       if (isBackfill) return null;
       return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     };
-    const rows: CompItem[] = itens.map((a) => ({
-      data: a.data,
-      medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
-      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : (a.paciente_nome_extra ?? "—"),
-      servico: a.procedimento ?? "—",
-      valorMedico: Number(a.valor_medico) || 0,
-      pagoEm: a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null),
-      pagoHora: derivarHora(a.repasse_pago_at ?? null),
-    }));
+    // Data/hora do pagamento do lote. Precisa ser calculada ANTES das linhas
+    // porque serve de fallback para a coluna "Pago em" de cada linha.
+    const horaPagamento = derivarHora(meta.pago_at ?? null);
+    const rows: CompItem[] = itens.map((a) => {
+      const pagoEmLinha =
+        a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : null);
+      return {
+        data: a.data,
+        medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        paciente: nomePaciente(a) || "—",
+        servico: a.procedimento ?? "—",
+        valorMedico: Number(a.valor_medico) || 0,
+        // No comprovante emitido no ato do pagamento a linha em memória ainda
+        // está com `repasse_pago_em` nulo (a lista só recarrega depois), e a
+        // coluna saía "—". Nesse caso vale a data/hora do próprio lote.
+        pagoEm: pagoEmLinha ?? (meta.data || null),
+        pagoHora: pagoEmLinha ? derivarHora(a.repasse_pago_at ?? null) : horaPagamento,
+      };
+    });
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
-    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
-    // Registros antigos foram backfillados de `date` para timestamptz em
-    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
-    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
-    let horaPagamento: string | null = null;
-    if (meta.pago_at) {
-      const d = new Date(meta.pago_at);
-      if (!isNaN(d.getTime())) {
-        const isBackfill =
-          d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
-        if (!isBackfill) {
-          const hh = d.getHours();
-          const mm = d.getMinutes();
-          horaPagamento = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-        }
-      }
-    }
     return {
       clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
       medicoNome,
@@ -2472,7 +2476,7 @@ function AtendimentosPage() {
                     filteredItems.map((a) => ({
                       data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
                       medico: a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
-                      paciente: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "") : "",
+                      paciente: nomePaciente(a),
                       procedimento: a.procedimento ?? "",
                       valor_total: Number(a.valor_total).toFixed(2),
                       valor_medico: Number(a.valor_medico).toFixed(2),
@@ -3829,8 +3833,7 @@ function AtendimentosPage() {
                   <div className="rounded-md border bg-muted/40 p-3 text-xs">
                     <div>
                       <span className="text-muted-foreground">Paciente:</span>{" "}
-                      {laudoTarget.paciente_nome_extra ??
-                        (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}
+                      {nomePaciente(laudoTarget) || "—"}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Serviço:</span>{" "}
@@ -3980,11 +3983,7 @@ function AtendimentosPage() {
                   <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
                     <div>
                       <span className="text-muted-foreground">Paciente:</span>{" "}
-                      <b>
-                        {nfseDialog.atend.paciente_id
-                          ? (pacMap.get(nfseDialog.atend.paciente_id) ?? "—")
-                          : (nfseDialog.atend.paciente_nome_extra ?? "—")}
-                      </b>
+                      <b>{nomePaciente(nfseDialog.atend) || "—"}</b>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Serviço:</span>{" "}
