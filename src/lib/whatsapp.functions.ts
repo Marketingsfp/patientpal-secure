@@ -171,9 +171,7 @@ export const statusNumeroWhatsapp = createServerFn({ method: "POST" })
 export const registrarNumeroWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({ clinicaId: z.string().uuid(), pin: z.string().regex(/^\d{6}$/) })
-      .parse(input),
+    z.object({ clinicaId: z.string().uuid(), pin: z.string().regex(/^\d{6}$/) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);

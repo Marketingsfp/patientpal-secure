@@ -213,7 +213,6 @@ export async function metaSendText(
       );
     }
     throw new Error(`WhatsApp: ${msg}`);
-
   }
   const wa_message_id = (json as any)?.messages?.[0]?.id ?? null;
   return { wa_message_id };

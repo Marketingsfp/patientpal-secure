@@ -671,7 +671,6 @@ function ConfiguracaoWhatsApp() {
   const buscarStatus = useServerFn(statusNumeroWhatsapp);
   const registrarNumero = useServerFn(registrarNumeroWhatsapp);
 
-
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -925,7 +924,10 @@ function ConfiguracaoWhatsApp() {
   ) : null;
 
   const precisaRegistrar = Boolean(
-    cfg.phone_number_id && cfg.has_access_token && metaStatus?.status && metaStatus.status !== "CONNECTED",
+    cfg.phone_number_id &&
+    cfg.has_access_token &&
+    metaStatus?.status &&
+    metaStatus.status !== "CONNECTED",
   );
 
   const botaoRegistrar =
