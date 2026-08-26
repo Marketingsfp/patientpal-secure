@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   loadWhatsAppConfig,
   metaSendText,
@@ -26,6 +25,23 @@ function verifySignature(
   }
 }
 
+function textoLimpo(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text.length > 0 ? text : null;
+}
+
+async function registrarStatusWhatsapp(clinicaId: string, ok: boolean, erro?: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin
+    .from("whatsapp_configs")
+    .update({
+      ultimo_teste_em: new Date().toISOString(),
+      ultimo_teste_ok: ok,
+      ultimo_teste_erro: ok ? null : (erro ?? "Falha ao enviar resposta automática").slice(0, 500),
+    })
+    .eq("clinica_id", clinicaId);
+}
+
 export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
   server: {
     handlers: {
@@ -47,10 +63,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
       // Meta envia POST para cada evento
       POST: async ({ request, params }) => {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const rawBody = await request.text();
         const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
         if (!cfg) return new Response("Not found", { status: 404 });
-        if (!cfg.app_secret || !cfg.phone_number_id || !cfg.access_token) {
+        if (!cfg.app_secret || !cfg.access_token) {
           return new Response("Not configured", { status: 412 });
         }
 
@@ -71,6 +88,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           const changes: any[] = entry?.changes ?? [];
           for (const change of changes) {
             const value = change?.value ?? {};
+            const webhookPhoneNumberId = textoLimpo(value?.metadata?.phone_number_id);
+            const displayPhoneNumber =
+              textoLimpo(value?.metadata?.display_phone_number) ?? cfg.display_phone_number;
+            const phoneNumberId = webhookPhoneNumberId ?? textoLimpo(cfg.phone_number_id);
             const messages: any[] = value?.messages ?? [];
             for (const msg of messages) {
               const from = String(msg.from ?? "");
@@ -83,7 +104,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 wa_message_id,
                 direction: "in",
                 from_number: from,
-                to_number: cfg.display_phone_number,
+                to_number: displayPhoneNumber,
                 body,
                 tipo,
                 status: "received",
@@ -96,12 +117,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
               const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
               if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
-
                 try {
+                  if (!phoneNumberId) {
+                    throw new Error(
+                      "WhatsApp não configurado: Phone Number ID ausente na configuração e no webhook da Meta.",
+                    );
+                  }
                   const reply = await gerarRespostaNina(params.clinicaId, body, from);
                   if (reply) {
                     const { wa_message_id: outId } = await metaSendText(
-                      cfg.phone_number_id,
+                      phoneNumberId,
                       cfg.access_token,
                       from,
                       reply,
@@ -110,16 +135,33 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       clinica_id: params.clinicaId,
                       wa_message_id: outId,
                       direction: "out",
-                      from_number: cfg.display_phone_number,
+                      from_number: displayPhoneNumber,
                       to_number: from,
                       body: reply,
                       tipo: "text",
                       status: "sent",
                       enviada_por: "nina",
                     });
+                    if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
+                      await supabaseAdmin
+                        .from("whatsapp_configs")
+                        .update({
+                          phone_number_id: webhookPhoneNumberId,
+                          display_phone_number: displayPhoneNumber,
+                          ultimo_teste_em: new Date().toISOString(),
+                          ultimo_teste_ok: true,
+                          ultimo_teste_erro: null,
+                        })
+                        .eq("clinica_id", params.clinicaId);
+                    }
                   }
                 } catch (e) {
                   console.error("Nina autoreply error", e);
+                  await registrarStatusWhatsapp(
+                    params.clinicaId,
+                    false,
+                    String((e as Error)?.message ?? e),
+                  );
                 }
               }
             }
