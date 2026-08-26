@@ -117,7 +117,6 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
               const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
               if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
-
                 try {
                   if (!phoneNumberId) {
                     throw new Error(
@@ -158,7 +157,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   }
                 } catch (e) {
                   console.error("Nina autoreply error", e);
-                  await registrarStatusWhatsapp(params.clinicaId, false, String((e as Error)?.message ?? e));
+                  await registrarStatusWhatsapp(
+                    params.clinicaId,
+                    false,
+                    String((e as Error)?.message ?? e),
+                  );
                 }
               }
             }
