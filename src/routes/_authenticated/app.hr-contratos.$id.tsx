@@ -382,7 +382,16 @@ function EditarFuncionarioPage() {
   }
 
   async function salvarAcesso() {
-    if (!membershipId) return;
+    // Sem vínculo de acesso não há o que gravar: antes o botão simplesmente
+    // não fazia nada e a tela dava a impressão de ter salvo o perfil.
+    if (!membershipId) {
+      toast.error(
+        linkedUserId
+          ? "Este login ainda não está vinculado a esta clínica. Vincule o funcionário à clínica antes de definir o perfil."
+          : "Este funcionário ainda não tem login no sistema. Crie o login na aba “Dados do funcionário” antes de definir o perfil.",
+      );
+      return;
+    }
     setSavingAcesso(true);
     try {
       await editarMembroFn({

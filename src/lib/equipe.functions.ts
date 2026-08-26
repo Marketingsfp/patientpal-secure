@@ -34,6 +34,49 @@ async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
   if (!data) throw new Error("Usuário não pertence a esta clínica");
 }
 
+/**
+ * Mantém a tabela legada `user_roles` coerente com o papel gravado em
+ * `clinica_memberships`, que é a ÚNICA fonte de verdade do acesso ao sistema:
+ * todas as políticas RLS e as funções `is_member` / `can_manage_clinica` /
+ * `has_role` leem memberships, nunca `user_roles`.
+ *
+ * `user_roles` sobrou de uma versão anterior e hoje só é lida por
+ * `is_global_admin()` — que ignora o `clinica_id` e portanto vale como
+ * administrador global — nas políticas de `sistema_planos` e
+ * `lab_allowlist_contatos`, além de servir de rótulo de setor no chat interno.
+ * Como a tela de RH gravava só memberships, essa tabela ficou congelada com
+ * "admin" para todo mundo: pessoas que hoje são recepção, caixa ou médica
+ * continuavam marcadas como administradoras globais ali.
+ *
+ * Regra: perfil "admin" na clínica garante a linha; qualquer outro perfil
+ * remove a linha de admin daquela clínica. Linhas com `clinica_id` nulo
+ * (administrador global concedido à mão) não são tocadas.
+ */
+async function sincronizarAdminGlobal(userId: string, clinicaId: string, role: string) {
+  if (role === "admin") {
+    const { data: ja } = await supabaseAdmin
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("clinica_id", clinicaId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (ja) return;
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: userId, clinica_id: clinicaId, role: "admin" });
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { error } = await supabaseAdmin
+    .from("user_roles")
+    .delete()
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .eq("role", "admin");
+  if (error) throw new Error(error.message);
+}
+
 export const listarEquipe = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
@@ -127,6 +170,8 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
     }
 
+    await sincronizarAdminGlobal(userId!, data.clinicaId, data.role);
+
     return { ok: true, userId };
   });
 
@@ -160,6 +205,8 @@ export const editarMembro = createServerFn({ method: "POST" })
       .update({ role: data.role, ativo: data.ativo })
       .eq("id", data.membershipId);
     if (upErr) throw new Error(upErr.message);
+
+    await sincronizarAdminGlobal(mem.user_id, data.clinicaId, data.role);
 
     if (data.nome) {
       await supabaseAdmin.from("profiles").upsert({ id: mem.user_id, nome: data.nome });
