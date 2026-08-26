@@ -773,9 +773,12 @@ export function LancamentoDialog({
     // ------------------------------------------------------------------
     // Data retroativa: avisa o operador. A competência do lançamento é o dia
     // escolhido; a gaveta do caixa é decidida por
-    // `fn_registrar_lancamento_e_caixa` — caixa daquele dia ainda aberto
-    // recebe o movimento, caixa já fechado nunca é reescrito e o movimento
-    // entra no caixa de hoje, marcado com "[Data retroativa: DD/MM/AAAA]".
+    // `fn_registrar_lancamento_e_caixa`:
+    //   * caixa daquele dia ainda ABERTO -> recebe o movimento com valor
+    //     cheio, e o cupom dele sai correto;
+    //   * caixa daquele dia já FECHADO   -> a linha entra no extrato de hoje
+    //     como `registro`, valendo R$ 0,00 na gaveta. Caixa de hoje só
+    //     contém o que é de hoje, e um fechamento impresso nunca é reescrito.
     // ------------------------------------------------------------------
     const _hojeISO = hojeBR();
     // Data futura nunca é válida em caixa: bloqueia antes de gravar.
@@ -798,9 +801,13 @@ export function LancamentoDialog({
               `de hoje e não soma no fechamento. A guia é liberada e o repasse do ` +
               `prestador é calculado normalmente.\n\n`
             : `Você marcou que o paciente está PAGANDO AGORA. O dinheiro entra no caixa ` +
-              `do dia ${dd}/${mm}/${aaaa} se aquele caixa ainda estiver aberto; se já ` +
-              `tiver sido fechado e conferido, entra no caixa de HOJE marcado como ` +
-              `retroativo — um fechamento já impresso nunca é alterado.\n\n`) +
+              `do dia ${dd}/${mm}/${aaaa} se aquele caixa ainda estiver aberto.\n\n` +
+              `Se o caixa daquele dia já estiver fechado, a guia fica registrada na ` +
+              `competência de ${dd}/${mm}/${aaaa} e NÃO soma no caixa de hoje — ela ` +
+              `aparece no extrato de hoje valendo R$ 0,00 na gaveta.\n\n` +
+              `ATENÇÃO: se o paciente está mesmo entregando o dinheiro agora, lance com ` +
+              `a data de HOJE. Com data retroativa o dinheiro fica na gaveta sem o ` +
+              `sistema esperar por ele, e o fechamento vai acusar sobra.\n\n`) +
           `Deseja continuar?`,
       );
       if (!ok) return;

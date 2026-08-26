@@ -74,8 +74,14 @@ export function planoDeMovimento(e: EntradaRegistroNoCaixa): PlanoMovimento {
   return {
     registra: true,
     tipo: e.tipoLancamento === "receita" ? "recebimento" : "despesa",
-    // Data retroativa com pagamento AGORA: a RPC manda para o caixa daquele
-    // dia se ele ainda estiver aberto, e para o de hoje se já estiver fechado.
+    // Data retroativa com pagamento AGORA: quem decide a gaveta é a RPC, que
+    // conhece o estado da sessão daquele dia e esta tela não.
+    //   * caixa daquele dia ainda ABERTO -> recebimento com valor cheio nele;
+    //   * caixa daquele dia já FECHADO   -> a RPC rebaixa o tipo para
+    //     `registro` no caixa de hoje, para não somar um centavo num dia a
+    //     que o dinheiro não pertence.
+    // Por isso o tipo devolvido aqui é a INTENÇÃO, não necessariamente o que
+    // será gravado — ver `fn_registrar_lancamento_e_caixa`.
     forcarSessaoHoje: false,
   };
 }

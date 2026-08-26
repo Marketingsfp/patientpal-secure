@@ -36,6 +36,13 @@ import {
   type FiltroForma,
   type FormaCanonica,
 } from "@/lib/financeiro/formas-pagamento";
+import {
+  ehLancamentoRetroativo,
+  mapaDaGaveta,
+  totaisRetroativos,
+  diaBR,
+  TIPOS_QUE_PESAM_NA_GAVETA,
+} from "@/lib/financeiro/retroativos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -112,6 +119,10 @@ interface Lanc {
   transferSentido?: "entrada" | "saida";
   /** Tipo original do movimento de caixa (só quando origem === "caixa"). */
   caixaTipo?: "sangria" | "suprimento";
+  /** `created_at` do lançamento — o dia em que a linha foi DIGITADA. Junto
+   *  com `data` (a competência) é o que separa dinheiro do caixa do dia de
+   *  ajuste retroativo. Ver `_retroativo`. */
+  created_at?: string | null;
   /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
   hora?: string | null;
   /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
@@ -123,6 +134,10 @@ interface Lanc {
   _mistoParte?: boolean;
   /** id do lançamento pai quando esta linha é uma parte de "misto". */
   _mistoPaiId?: string;
+  /** true → competência de um dia anterior ao da digitação E sem dinheiro na
+   *  gaveta daquele dia: é ajuste gerencial, não caixa físico da recepção.
+   *  Ver `@/lib/financeiro/retroativos`. */
+  _retroativo?: boolean;
 }
 /** Rótulos amigáveis das formas de pagamento (usados no recibo impresso). */
 const FORMA_LABEL: Record<string, string> = {
@@ -194,6 +209,14 @@ function expandMistoItems(items: Lanc[]): Lanc[] {
     });
   }
   return out;
+}
+
+/** "2026-08-19" deslocado em N dias, para alargar janelas de consulta.
+ *  Usa meio-dia UTC para não tropeçar em fuso nem em virada de mês. */
+function diaDeslocado(iso: string, dias: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Balde canônico de uma linha: o já calculado (partes de misto) ou o texto
@@ -282,6 +305,22 @@ function Page() {
       window.localStorage.setItem("financeiro:decomporMisto", decomporMisto ? "1" : "0");
     }
   }, [decomporMisto]);
+  // Preferência do usuário: manter fora do caixa do dia os lançamentos cuja
+  // competência é de outro dia (guia antiga faturada depois, parcela recebida
+  // em outra data, guia já quitada antes). LIGADO por padrão — o Movimento de
+  // Caixa existe para bater com o cupom impresso da recepção, e esses valores
+  // nunca passaram pela gaveta daquele dia. Desligando, eles voltam à lista e
+  // à soma, marcados como retroativos. Persistido por navegador.
+  const [ocultarRetroativos, setOcultarRetroativos] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("financeiro:ocultarRetroativos");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("financeiro:ocultarRetroativos", ocultarRetroativos ? "1" : "0");
+    }
+  }, [ocultarRetroativos]);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
@@ -411,6 +450,76 @@ function Page() {
           ficha_numero: raw.agendamento_id ? (fichaMap.get(raw.agendamento_id) ?? null) : null,
         };
       });
+    }
+    // 1b) Em que gaveta o dinheiro de cada lançamento entrou de verdade
+    //
+    // A lista acima é por COMPETÊNCIA (`fin_lancamentos.data`), que é o dia do
+    // atendimento. A gaveta da recepção é outra coisa: a guia de 19/08
+    // faturada em 25/08 tem competência 19/08, mas o dinheiro cai no caixa de
+    // 25/08, porque um fechamento já conferido e impresso nunca é reescrito
+    // (`fn_registrar_lancamento_e_caixa`). Sem este cruzamento a tela somava
+    // no caixa de 19/08 um valor que nunca passou por aquela gaveta, e o total
+    // deixava de bater com o cupom daquele dia.
+    //
+    // A janela é alargada em um dia de cada lado de propósito: `created_at` é
+    // timestamptz e o recorte é feito em texto, então um movimento das 22h de
+    // Brasília cai no dia seguinte em UTC. Quem decide o dia é
+    // `dataClinicaDe`, no cliente; a consulta só precisa não perder a linha.
+    if (carregarFin && finList.length) {
+      const CHUNK_MV = 1000;
+      const MAX_MV = 20000;
+      const iniJanela = `${diaDeslocado(fromDate, -1)}T00:00:00`;
+      const fimJanela = `${diaDeslocado(toDate, 1)}T23:59:59`;
+      let offMv = 0;
+      const movs: Array<{ lancamento_id: string | null; tipo: string; sessao_id: string }> = [];
+      for (;;) {
+        const { data: mv, error: errMv } = await supabase
+          .from("caixa_movimentos")
+          .select("lancamento_id, tipo, sessao_id")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .in("tipo", [...TIPOS_QUE_PESAM_NA_GAVETA])
+          .not("lancamento_id", "is", null)
+          .gte("created_at", iniJanela)
+          .lte("created_at", fimJanela)
+          .range(offMv, offMv + CHUNK_MV - 1);
+        if (errMv) {
+          mostrarErro(errMv);
+          setLoading(false);
+          return;
+        }
+        const rows = (mv ?? []) as typeof movs;
+        movs.push(...rows);
+        if (rows.length < CHUNK_MV) break;
+        offMv += CHUNK_MV;
+        if (offMv >= MAX_MV) break;
+      }
+      // As sessões dizem duas coisas que o movimento sozinho não diz: de que
+      // dia é a gaveta e a que horas ela foi fechada. A hora do fechamento é
+      // indispensável — até 24/08/2026 a RPC empurrava recebimento para
+      // dentro de sessão já fechada, e esses valores têm a data "certa" sem
+      // estar no cupom que a atendente imprimiu.
+      const { data: ss, error: errSs } = await supabase
+        .from("caixa_sessoes")
+        .select("id, aberto_em, fechado_em")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("aberto_em", iniJanela)
+        .lte("aberto_em", fimJanela)
+        .limit(5000);
+      if (errSs) {
+        mostrarErro(errSs);
+        setLoading(false);
+        return;
+      }
+      const sessoes = (ss ?? []) as Array<{
+        id: string;
+        aberto_em: string;
+        fechado_em: string | null;
+      }>;
+      const gaveta = mapaDaGaveta(movs, sessoes);
+      finList = finList.map((l) => ({
+        ...l,
+        _retroativo: ehLancamentoRetroativo(l, gaveta.get(l.id) ?? null),
+      }));
     }
     // 2) Transferências entre caixas — sangria/suprimento em caixa_movimentos
     //    (só carrega se o filtro Forma não estiver restringindo a algo específico
@@ -746,11 +855,13 @@ function Page() {
     filterPacienteDebounced,
     filterValorDebounced,
     filterFichaDebounced,
+    // Mostrar/ocultar retroativos muda o tamanho da lista: sem isto a tela
+    // podia ficar numa página que deixou de existir.
+    ocultarRetroativos,
   ]);
   useEffect(() => {
     void loadOpts();
   }, [clinicaAtual?.clinica_id]);
-  const totais = resumo;
 
   const openNew = () => {
     setEditing(null);
@@ -1166,9 +1277,32 @@ function Page() {
   // `cancelado` sai em qualquer opção: as três escolhas do filtro são
   // "confirmados", "pendentes" e "confirmados + pendentes". Estorno é assunto
   // da aba Estorno, não do movimento do caixa.
-  const displayItems = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto).filter(
+  const linhasDoPeriodo = linhasVisiveis(items, filterForma as FiltroForma, decomporMisto).filter(
     (l) => l.status !== "cancelado" && (filterStatus === "todos" || l.status === filterStatus),
   );
+  // O que é ajuste de outro dia dentro deste recorte. As partes de um
+  // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
+  // isso a conta fecha igual com a decomposição ligada ou desligada.
+  const retro = totaisRetroativos(linhasDoPeriodo.filter((l) => l._retroativo));
+  const displayItems = ocultarRetroativos
+    ? linhasDoPeriodo.filter((l) => !l._retroativo)
+    : linhasDoPeriodo;
+
+  // Cards de Receita/Despesa/Saldo.
+  //
+  // `resumo` vem do agregado do banco (`fin_resumo_periodo`) ou da contagem
+  // por filtro e cobre TODAS as linhas do período — inclusive as retroativas.
+  // Quando elas estão fora da tela, também precisam sair daqui: dois números
+  // cobrindo conjuntos diferentes de movimentos é exatamente o descasamento
+  // que faz um fechamento acusar diferença que não existe.
+  const totais = ocultarRetroativos
+    ? {
+        r: Number((resumo.r - retro.receitas).toFixed(2)),
+        d: Number((resumo.d - retro.despesas).toFixed(2)),
+        saldo: Number((resumo.saldo - retro.saldo).toFixed(2)),
+        totalRows: Math.max(0, resumo.totalRows - retro.quantidade),
+      }
+    : resumo;
 
   const imprimirRelatorio = () => {
     const source = displayItems;
@@ -1319,7 +1453,11 @@ function Page() {
       "<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>" +
       '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' +
       esc(periodo) +
-      "</span><span>Agrupar: CATEGORIA</span></div>" +
+      "</span><span>Agrupar: CATEGORIA</span><span>" +
+      (ocultarRetroativos
+        ? "Retroativos: EXCLUÍDOS (caixa da recepção)"
+        : "Retroativos: INCLUÍDOS (ajuste gerencial)") +
+      "</span></div>" +
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
       linhasCat +
       "</tbody></table>" +
@@ -1390,6 +1528,7 @@ function Page() {
                   status: l.status,
                   usuario: l.criado_por ? (userMap.get(l.criado_por) ?? "") : "",
                   valor: Number(l.valor).toFixed(2),
+                  retroativo: l._retroativo ? "Sim" : "",
                 })),
                 `movimento-${fromDate}_a_${toDate}`,
                 [
@@ -1406,6 +1545,7 @@ function Page() {
                   { key: "status", label: "Status" },
                   { key: "usuario", label: "Usuário" },
                   { key: "valor", label: "Valor (R$)" },
+                  { key: "retroativo", label: "Retroativo" },
                 ],
               );
             }}
@@ -1698,6 +1838,42 @@ function Page() {
         </Card>
       </div>
 
+      {/* O que não é dinheiro da gaveta deste dia. O aviso é obrigatório
+          quando a lista esconde linhas: some sem explicação, vira "sumiu
+          lançamento" no balcão. */}
+      {retro.quantidade > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-[16rem] text-sm text-amber-900 space-y-1">
+            <p>
+              <strong>
+                {retro.quantidade} lançamento{retro.quantidade === 1 ? "" : "s"} retroativo
+                {retro.quantidade === 1 ? "" : "s"}
+              </strong>{" "}
+              {ocultarRetroativos ? "fora" : "dentro"} do caixa deste período
+              {retro.receitas > 0 ? ` — ${fmt(retro.receitas)} em receitas` : ""}
+              {retro.despesas > 0 ? ` — ${fmt(retro.despesas)} em despesas` : ""}.
+            </p>
+            <p className="text-xs">
+              Competência de {retro.dias.slice(0, 4).map(diaBR).join(", ")}
+              {retro.dias.length > 4 ? ` e mais ${retro.dias.length - 4} dia(s)` : ""}, digitados
+              depois: esses valores não estão no cupom impresso desses dias.{" "}
+              {ocultarRetroativos
+                ? "Eles continuam inteiros no Painel Executivo e nos relatórios por competência."
+                : "Incluídos aqui, o total acima deixa de bater com o cupom impresso da recepção."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-amber-400 bg-white hover:bg-amber-100"
+            onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
+          >
+            {ocultarRetroativos ? "Incluir ajustes retroativos" : "Ocultar retroativos"}
+          </Button>
+        </div>
+      )}
+
       <Dialog open={detalhe !== null} onOpenChange={(v) => !v && setDetalhe(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1893,6 +2069,20 @@ function Page() {
               Decompor pagamentos mistos
             </Label>
           </div>
+          <div className="flex items-center gap-2 pb-1">
+            <Switch
+              id="ocultar-retroativos"
+              checked={ocultarRetroativos}
+              onCheckedChange={setOcultarRetroativos}
+            />
+            <Label
+              htmlFor="ocultar-retroativos"
+              className="text-xs cursor-pointer"
+              title="Ligado (padrão): o Movimento mostra só o que passou pela gaveta da recepção na data, para bater com o cupom impresso. Desligado: entram também os lançamentos com competência de outro dia (guia antiga faturada depois, parcela recebida em outra data), marcados como retroativos."
+            >
+              Ocultar lançamentos retroativos
+            </Label>
+          </div>
         </CardContent>
       </Card>
 
@@ -1948,7 +2138,17 @@ function Page() {
                           </div>
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{l.descricao}</p>
+                              <p className="text-sm font-medium truncate">
+                                {l.descricao}
+                                {l._retroativo && (
+                                  <Badge
+                                    variant="outline"
+                                    className="ml-2 text-[10px] px-1.5 py-0 border-amber-400 bg-amber-50 text-amber-800 align-middle"
+                                  >
+                                    Retroativo
+                                  </Badge>
+                                )}
+                              </p>
                               <span
                                 className={`text-sm font-medium whitespace-nowrap shrink-0 ${
                                   l.tipo === "transferencia"
@@ -2109,7 +2309,18 @@ function Page() {
                                   (l.hora ? " " + l.hora : "")
                                 : ""}
                             </TableCell>
-                            <TableCell>{l.descricao}</TableCell>
+                            <TableCell>
+                              {l.descricao}
+                              {l._retroativo && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-2 text-[10px] px-1.5 py-0 border-amber-400 bg-amber-50 text-amber-800 align-middle"
+                                  title="Competência de outro dia, digitado depois: não passou pela gaveta deste dia."
+                                >
+                                  Retroativo
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell className="text-sm whitespace-nowrap">
                               {l.medico_nome || "—"}
                             </TableCell>
