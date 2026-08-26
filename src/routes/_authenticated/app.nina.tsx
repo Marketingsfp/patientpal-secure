@@ -976,8 +976,21 @@ function ConfiguracaoWhatsApp() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {statusBadge}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex flex-col items-end gap-0.5">
+                  {metaStatusBadge}
+                  {statusDetalhe}
+                </div>
+                {botaoRegistrar}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void atualizarStatusMeta()}
+                  disabled={statusLoading}
+                  title="Atualizar status na Meta"
+                >
+                  <RefreshCw className={`h-4 w-4 ${statusLoading ? "animate-spin" : ""}`} />
+                </Button>
                 {podeEscrever && (
                   <Button variant="ghost" size="icon" onClick={abrirDialog}>
                     <Pencil className="h-4 w-4" />
