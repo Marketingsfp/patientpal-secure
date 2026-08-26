@@ -5,7 +5,7 @@
  * arquivo era baixado às cegas, sem que ninguém visse os dados antes. A equipe
  * pediu para conferir na própria tela, então hoje o fluxo é: "Buscar" carrega o
  * período e mostra a tabela paginada com os totais no rodapé; a partir daí o
- * mesmo resultado pode ser baixado em CSV ou impresso em A4.
+ * mesmo resultado pode ser baixado em Excel/CSV ou impresso em A4.
  *
  * Os totais do rodapé são sempre do período INTEIRO, não da página exibida —
  * quem confere caixa precisa do consolidado, não da soma de 50 linhas.
@@ -13,18 +13,24 @@
  * O tipo "Rateio da Receita" reproduz o relatório de mesmo nome do sistema
  * anterior (Clínica Total): quanto cada dia/profissional/especialidade rendeu,
  * quanto saiu de repasse e quanto sobrou para a clínica. Ele tem filtros
- * próprios (profissional, especialidade, grupo/serviço) e a conta em si vive
- * em `@/lib/financeiro/rateio-receita`.
+ * próprios (profissional, especialidade, grupo/serviço), comparação com outro
+ * período e cards de fechamento. A conta em si vive em
+ * `@/lib/financeiro/rateio-receita`; os períodos, em
+ * `@/lib/financeiro/periodos`.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowDownRight,
+  ArrowUpRight,
   Check,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
   Download,
   FileBarChart,
+  FileSpreadsheet,
+  Minus,
   Printer,
   Search,
 } from "lucide-react";
@@ -34,10 +40,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { brl, fmtDate } from "@/lib/financeiro/format";
 import { imprimirRelatorio } from "@/lib/print-relatorio-financeiro";
+import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
 import {
   agruparRateio,
   carregarContextoRateio,
   carregarRateio,
+  compararRateio,
   totaisRateio,
   type RateioAgruparPor,
   type RateioContexto,
@@ -45,12 +53,23 @@ import {
   type RateioTipo,
   type RateioTotais,
 } from "@/lib/financeiro/rateio-receita";
+import {
+  diffDias,
+  periodoComparacao,
+  presetAtivo,
+  PRESETS_PERIODO,
+  variacao,
+  type ModoComparacao,
+} from "@/lib/financeiro/periodos";
+import { hojeBR } from "@/lib/date-utils";
 // Mesma normalização de nome usada no cálculo de repasse ("ultrassom" acha
 // "ULTRASSONOGRAFIA"), para a busca do combobox casar com o cadastro.
 import { normRepasse } from "@/lib/repasse-calc";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -77,6 +96,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios")({
@@ -93,10 +113,19 @@ const POR_PAGINA = 50;
 /** Quantos serviços o combobox desenha por vez — o cadastro tem milhares. */
 const SERVICOS_VISIVEIS = 60;
 
+type FormatoColuna =
+  | "texto"
+  | "data"
+  | "moeda"
+  | "numero"
+  | "percentual"
+  | "variacao-moeda"
+  | "variacao-percentual";
+
 type Coluna = {
   chave: string;
   rotulo: string;
-  formato: "texto" | "data" | "moeda" | "numero" | "percentual";
+  formato: FormatoColuna;
   /** Colunas de dinheiro somadas no rodapé da tabela e do papel. */
   somar?: boolean;
 };
@@ -145,10 +174,33 @@ const ROTULO_AGRUPADOR: Record<RateioAgruparPor, string> = {
   especialidade: "Especialidade",
 };
 
-/** Colunas do Rateio: no sintético uma linha por agrupador, no analítico uma por atendimento. */
-function colunasRateio(tipoRateio: RateioTipo, agruparPor: RateioAgruparPor): Coluna[] {
+const ROTULO_COMPARACAO: Record<ModoComparacao, string> = {
+  anterior: "Período imediatamente anterior",
+  "ano-anterior": "Mesmo período do ano anterior",
+  personalizado: "Intervalo personalizado",
+};
+
+/**
+ * Colunas do Rateio: no sintético uma linha por agrupador, no analítico uma
+ * por atendimento. Com a comparação ligada entram as três colunas de confronto
+ * — só no sintético, porque atendimento individual não tem par no outro
+ * período.
+ */
+function colunasRateio(
+  tipoRateio: RateioTipo,
+  agruparPor: RateioAgruparPor,
+  comparando: boolean,
+): Coluna[] {
+  const comparacao: Coluna[] = comparando
+    ? [
+        { chave: "receitaAnterior", rotulo: "Receita anterior", formato: "moeda", somar: true },
+        { chave: "variacaoValor", rotulo: "Variação (R$)", formato: "variacao-moeda" },
+        { chave: "variacaoPercentual", rotulo: "Variação (%)", formato: "variacao-percentual" },
+      ]
+    : [];
   const dinheiro: Coluna[] = [
     { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
+    ...comparacao,
     { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
     { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
     { chave: "margem", rotulo: "% clínica", formato: "percentual" },
@@ -169,13 +221,18 @@ function colunasRateio(tipoRateio: RateioTipo, agruparPor: RateioAgruparPor): Co
     { chave: "medico_nome", rotulo: "Profissional", formato: "texto" },
     { chave: "especialidade_nome", rotulo: "Especialidade", formato: "texto" },
     { chave: "procedimento", rotulo: "Serviço", formato: "texto" },
-    ...dinheiro,
+    { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
+    { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
+    { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
+    { chave: "margem", rotulo: "% clínica", formato: "percentual" },
   ];
 }
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
 const pct = (v: number) => `${v.toFixed(1).replace(".", ",")}%`;
+
+const comSinal = (v: number, texto: string) => (v > 0 ? `+${texto}` : texto);
 
 /** Ordena o analítico pelo mesmo critério escolhido em "Agrupar por". */
 function ordenarAnalitico(linhas: RateioLinha[], agruparPor: RateioAgruparPor): RateioLinha[] {
@@ -190,18 +247,54 @@ function ordenarAnalitico(linhas: RateioLinha[], agruparPor: RateioAgruparPor): 
   );
 }
 
-/** Formata uma célula para a tela e para o papel (o CSV leva o valor cru). */
+/** Formata uma célula para a tela e para o papel (o Excel leva o valor cru). */
 function celula(coluna: Coluna, valor: unknown): string {
   if (coluna.formato === "moeda") return brl(num(valor));
   if (coluna.formato === "numero") return num(valor).toLocaleString("pt-BR");
   if (coluna.formato === "percentual") return pct(num(valor));
+  if (coluna.formato === "variacao-moeda") return comSinal(num(valor), brl(num(valor)));
+  if (coluna.formato === "variacao-percentual") {
+    // `null` aqui não é zero: é "não havia nada no período anterior". Mostrar
+    // 0,0% se leria como estabilidade e enganaria quem confere.
+    if (valor === null || valor === undefined) return "—";
+    return comSinal(num(valor), pct(num(valor)));
+  }
   if (coluna.formato === "data") return valor ? fmtDate(String(valor).slice(0, 10)) : "—";
   const texto = String(valor ?? "").trim();
   return texto === "" ? "—" : texto;
 }
 
-const alinhaDireita = (c: Coluna) =>
-  c.formato === "moeda" || c.formato === "numero" || c.formato === "percentual";
+const alinhaDireita = (c: Coluna) => c.formato !== "texto" && c.formato !== "data";
+
+const ehVariacao = (c: Coluna) =>
+  c.formato === "variacao-moeda" || c.formato === "variacao-percentual";
+
+/** Verde para o que subiu, vermelho para o que caiu, cinza para o resto. */
+function corDaVariacao(valor: unknown): string {
+  if (valor === null || valor === undefined) return "text-muted-foreground";
+  const v = num(valor);
+  if (v > 0) return "text-emerald-600";
+  if (v < 0) return "text-rose-600";
+  return "text-muted-foreground";
+}
+
+/** Tipo da coluna na planilha do Excel. */
+function tipoXlsx(c: Coluna): ColunaXlsx["tipo"] {
+  if (c.formato === "moeda" || c.formato === "variacao-moeda") return "moeda";
+  if (c.formato === "percentual" || c.formato === "variacao-percentual") return "percentual";
+  if (c.formato === "numero") return "numero";
+  return "texto";
+}
+
+/** Valor cru para a planilha: número onde é número, texto no resto. */
+function valorXlsx(c: Coluna, valor: unknown): string | number | null {
+  if (c.formato === "data") return valor ? fmtDate(String(valor).slice(0, 10)) : "";
+  if (alinhaDireita(c)) {
+    if (valor === null || valor === undefined) return null;
+    return num(valor);
+  }
+  return String(valor ?? "");
+}
 
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
@@ -236,6 +329,61 @@ async function fetchAll(builder: () => any): Promise<Record<string, unknown>[]> 
   return all;
 }
 
+/** Card de fechamento do rateio, com a variação contra o período comparado. */
+function CardResumo({
+  titulo,
+  valor,
+  detalhe,
+  delta,
+  invertido = false,
+}: {
+  titulo: string;
+  valor: string;
+  detalhe?: string;
+  /** Variação em %; `null` = sem base de comparação; `undefined` = não comparando. */
+  delta?: number | null;
+  /** Para repasse: subir não é boa notícia para a clínica. */
+  invertido?: boolean;
+}) {
+  const bom = delta == null ? true : invertido ? delta <= 0 : delta >= 0;
+  const Icone = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
+  return (
+    <Card className="border-slate-200/70 shadow-sm">
+      <CardHeader className="border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+        <CardTitle className="text-[12px] font-semibold uppercase tracking-wider text-slate-600">
+          {titulo}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 py-3">
+        <p className="text-2xl font-semibold tabular-nums leading-none tracking-tight text-slate-900">
+          {valor}
+        </p>
+        {detalhe && <p className="mt-1.5 text-xs text-muted-foreground">{detalhe}</p>}
+        {delta !== undefined && (
+          <div className="mt-2.5">
+            {delta === null ? (
+              <span className="text-xs text-muted-foreground">Sem base de comparação</span>
+            ) : (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "gap-1 font-medium",
+                  bom
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-rose-200 bg-rose-50 text-rose-700",
+                )}
+              >
+                <Icone className="h-3 w-3" />
+                {comSinal(delta, pct(delta))}
+              </Badge>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [tipo, setTipo] = useState<Tipo>("lancamentos");
@@ -253,10 +401,23 @@ function Page() {
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
   const [servicoAberto, setServicoAberto] = useState(false);
   const [buscaServico, setBuscaServico] = useState("");
+  // --- Comparação de períodos ---------------------------------------------
+  const [comparar, setComparar] = useState(false);
+  const [modoComparacao, setModoComparacao] = useState<ModoComparacao>("anterior");
+  const [compDe, setCompDe] = useState("");
+  const [compAte, setCompAte] = useState("");
   /** Catálogos e grade de repasse; só carregam quando o Rateio é escolhido. */
   const [ctxRateio, setCtxRateio] = useState<RateioContexto | null>(null);
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
+
+  const hoje = hojeBR();
+  const periodoAtual = { de: from, ate: to };
+  const periodoComp = periodoComparacao(periodoAtual, modoComparacao, {
+    de: compDe || from,
+    ate: compAte || to,
+  });
+  const comparandoAgora = tipo === "rateio" && comparar;
 
   /**
    * Resultado carregado junto com o filtro que o gerou. Guardar o filtro é o
@@ -271,14 +432,25 @@ function Page() {
     linhas: Linha[];
     /** Linhas cruas do rateio (uma por atendimento), para agrupar em memória. */
     rateio?: RateioLinha[];
+    /** Mesmas linhas para o período de comparação, quando ligada. */
+    rateioComp?: RateioLinha[];
   } | null>(null);
 
   // "Agrupar por" e "Sintético/Analítico" são recortes do MESMO resultado, então
   // ficam fora da chave: trocar qualquer um deles reorganiza a tabela na hora,
-  // sem ir ao banco de novo.
+  // sem ir ao banco de novo. O período de comparação, não: ele é outra consulta.
   const chaveAtual =
     tipo === "rateio"
-      ? ["rateio", from, to, rMedico, rEspecialidade, rGrupo, rServico].join("|")
+      ? [
+          "rateio",
+          from,
+          to,
+          rMedico,
+          rEspecialidade,
+          rGrupo,
+          rServico,
+          comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
+        ].join("|")
       : `${tipo}|${from}|${to}`;
   const atualizado = resultado !== null && resultado.chave === chaveAtual;
 
@@ -314,7 +486,13 @@ function Page() {
     () => (atualizado && resultado?.rateio ? resultado.rateio : []),
     [atualizado, resultado],
   );
+  const linhasRateioComp = useMemo(
+    () => (atualizado && resultado?.rateioComp ? resultado.rateioComp : []),
+    [atualizado, resultado],
+  );
   const totaisR = useMemo(() => totaisRateio(linhasRateio), [linhasRateio]);
+  const totaisComp = useMemo(() => totaisRateio(linhasRateioComp), [linhasRateioComp]);
+  const comparacaoVisivel = comparandoAgora && atualizado;
 
   const linhas = useMemo<Linha[]>(() => {
     if (!atualizado || !resultado) return [];
@@ -324,19 +502,31 @@ function Page() {
     if (rTipo === "analitico") {
       return ordenarAnalitico(linhasRateio, rAgrupar) as unknown as Linha[];
     }
-    return agruparRateio(linhasRateio, rAgrupar).map((g) => ({
-      agrupador: g.rotulo,
-      qtd: g.qtd,
-      receita: g.receita,
-      repasse: g.repasse,
-      liquido: g.liquido,
-      margem: g.margem,
-    }));
-  }, [atualizado, resultado, linhasRateio, rTipo, rAgrupar]);
+    const grupos = agruparRateio(linhasRateio, rAgrupar);
+    if (!comparacaoVisivel) return grupos as unknown as Linha[];
+    return compararRateio(
+      grupos,
+      agruparRateio(linhasRateioComp, rAgrupar),
+      rAgrupar,
+      // Distância entre os dois inícios: é ela que casa o 1º dia de um período
+      // com o 1º dia do outro quando o agrupamento é por data. Só chega aqui
+      // com o resultado "atualizado", ou seja, carregado com estas datas.
+      diffDias(periodoComp.de, resultado.from),
+    ) as unknown as Linha[];
+  }, [
+    atualizado,
+    resultado,
+    linhasRateio,
+    linhasRateioComp,
+    rTipo,
+    rAgrupar,
+    comparacaoVisivel,
+    periodoComp.de,
+  ]);
 
   const colunas = useMemo(
-    () => (tipo === "rateio" ? colunasRateio(rTipo, rAgrupar) : COLUNAS[tipo]),
-    [tipo, rTipo, rAgrupar],
+    () => (tipo === "rateio" ? colunasRateio(rTipo, rAgrupar, comparacaoVisivel) : COLUNAS[tipo]),
+    [tipo, rTipo, rAgrupar, comparacaoVisivel],
   );
 
   // A troca de agrupamento pode encurtar a lista; voltar para a primeira página
@@ -344,6 +534,16 @@ function Page() {
   useEffect(() => {
     setPagina(1);
   }, [rTipo, rAgrupar]);
+
+  // Ao escolher "Intervalo personalizado" os campos abrem preenchidos com o
+  // período anterior — em branco, o comparativo nasceria comparando o período
+  // com ele mesmo e mostrando 0% em tudo.
+  useEffect(() => {
+    if (modoComparacao !== "personalizado" || compDe || compAte) return;
+    const sugestao = periodoComparacao({ de: from, ate: to }, "anterior");
+    setCompDe(sugestao.de);
+    setCompAte(sugestao.ate);
+  }, [modoComparacao, compDe, compAte, from, to]);
 
   const totais = useMemo(() => {
     const somas: Record<string, number> = {};
@@ -368,12 +568,18 @@ function Page() {
 
   /**
    * Rodapé do Rateio. A margem NÃO é a soma das margens das linhas: é a margem
-   * do período inteiro, calculada sobre os totais.
+   * do período inteiro, calculada sobre os totais. O mesmo vale para a
+   * variação — ela confronta os dois totais, não soma as variações.
    */
-  const rodapeRateio = (cols: Coluna[], t: RateioTotais) =>
-    cols.map((c, i) => {
+  const rodapeRateio = (cols: Coluna[], t: RateioTotais, anterior: RateioTotais) => {
+    const v = variacao(t.receita, anterior.receita);
+    return cols.map((c, i) => {
       if (c.chave === "qtd") return t.qtd.toLocaleString("pt-BR");
       if (c.chave === "receita") return brl(t.receita);
+      if (c.chave === "receitaAnterior") return brl(anterior.receita);
+      if (c.chave === "variacaoValor") return comSinal(v.valor, brl(v.valor));
+      if (c.chave === "variacaoPercentual")
+        return v.percentual === null ? "—" : comSinal(v.percentual, pct(v.percentual));
       if (c.chave === "repasse") return brl(t.repasse);
       if (c.chave === "liquido") return brl(t.liquido);
       if (c.chave === "margem") return pct(t.margem);
@@ -383,11 +589,12 @@ function Page() {
         ? `${t.qtd.toLocaleString("pt-BR")} atendimento(s)`
         : "";
     });
+  };
 
   /** Rodapé da tabela: contagem na 1ª coluna e a soma em cada coluna de dinheiro. */
   const rodape =
     tipo === "rateio"
-      ? rodapeRateio(colunas, totaisR)
+      ? rodapeRateio(colunas, totaisR, totaisComp)
       : colunas.map((c, i) => {
           if (c.somar) {
             // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
@@ -399,6 +606,27 @@ function Page() {
           return i === 0 ? `${linhas.length.toLocaleString("pt-BR")} registro(s)` : "";
         });
 
+  /**
+   * Mesma linha de totais, só que com números crus: na planilha o total tem
+   * que continuar sendo número, senão o Excel não soma nem compara a coluna.
+   */
+  const totaisXlsxRateio = (cols: Coluna[], t: RateioTotais, anterior: RateioTotais) => {
+    const v = variacao(t.receita, anterior.receita);
+    const porChave: Record<string, number | null> = {
+      qtd: t.qtd,
+      receita: t.receita,
+      receitaAnterior: anterior.receita,
+      variacaoValor: v.valor,
+      variacaoPercentual: v.percentual,
+      repasse: t.repasse,
+      liquido: t.liquido,
+      margem: t.margem,
+    };
+    return cols.map((c, i) =>
+      c.chave in porChave ? porChave[c.chave] : i === 0 ? "TOTAL GERAL" : "",
+    );
+  };
+
   /** Quadro de fechamento do rateio, igual na tela e no papel. */
   const resumoDoRateio = (t: RateioTotais) => [
     { rotulo: "Atendimentos", valor: t.qtd.toLocaleString("pt-BR") },
@@ -406,9 +634,8 @@ function Page() {
     { rotulo: "Repasse ao prestador", valor: brl(t.repasse) },
     { rotulo: "Líquido da clínica", valor: `${brl(t.liquido)} (${pct(t.margem)})` },
   ];
-  const resumoRateio = resumoDoRateio(totaisR);
 
-  /** Nome do médico/especialidade/serviço escolhido, para o cabeçalho impresso. */
+  /** Descrição dos filtros escolhidos, para o cabeçalho do papel e da planilha. */
   const descricaoFiltrosRateio = () => {
     if (tipo !== "rateio") return "";
     const partes: string[] = [];
@@ -429,15 +656,23 @@ function Page() {
     return partes.join(" · ");
   };
 
+  const textoPeriodoComparado = `Comparado com ${fmtDate(periodoComp.de)} a ${fmtDate(periodoComp.ate)} (${ROTULO_COMPARACAO[modoComparacao].toLowerCase()})`;
+
   /**
    * Devolve as linhas prontas para a tabela e, no rateio, também as linhas
-   * cruas (uma por atendimento). O papel precisa das cruas porque os totais do
-   * `useMemo` só existem no render seguinte — e imprimir pode ser o primeiro
-   * clique, sem "Buscar" antes.
+   * cruas (uma por atendimento, dos dois períodos). O papel e a planilha
+   * precisam das cruas porque os totais do `useMemo` só existem no render
+   * seguinte — e exportar pode ser o primeiro clique, sem "Buscar" antes.
    */
-  const carregar = async (): Promise<{ linhas: Linha[]; cruas: RateioLinha[] } | null> => {
+  const carregar = async (): Promise<{
+    linhas: Linha[];
+    cruas: RateioLinha[];
+    cruasComp: RateioLinha[];
+  } | null> => {
     if (!clinicaAtual) return null;
-    if (atualizado && resultado) return { linhas, cruas: linhasRateio };
+    if (atualizado && resultado) {
+      return { linhas, cruas: linhasRateio, cruasComp: linhasRateioComp };
+    }
     if (tipo === "rateio" && !ctxRateio) {
       toast.info("Carregando o cadastro de médicos e serviços — tente de novo em instantes");
       return null;
@@ -445,28 +680,41 @@ function Page() {
     setLoading(true);
     let data: Linha[] = [];
     let cruas: RateioLinha[] | undefined;
+    let cruasComp: RateioLinha[] | undefined;
     try {
       if (tipo === "rateio" && ctxRateio) {
-        cruas = await carregarRateio(ctxRateio, {
+        const filtrosComuns = {
           clinicaId: clinicaAtual.clinica_id,
-          de: from,
-          ate: to,
           medicoId: rMedico === "todos" ? null : rMedico,
           especialidadeId: rEspecialidade === "todas" ? null : rEspecialidade,
           grupo: rGrupo === "todos" ? null : rGrupo,
           servico: rServico === "todos" ? null : rServico,
-        });
-        data =
-          rTipo === "analitico"
-            ? (ordenarAnalitico(cruas, rAgrupar) as unknown as Linha[])
-            : agruparRateio(cruas, rAgrupar).map((g) => ({
-                agrupador: g.rotulo,
-                qtd: g.qtd,
-                receita: g.receita,
-                repasse: g.repasse,
-                liquido: g.liquido,
-                margem: g.margem,
-              }));
+        };
+        const [atual, anterior] = await Promise.all([
+          carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
+          comparar
+            ? carregarRateio(ctxRateio, {
+                ...filtrosComuns,
+                de: periodoComp.de,
+                ate: periodoComp.ate,
+              })
+            : Promise.resolve([] as RateioLinha[]),
+        ]);
+        cruas = atual;
+        cruasComp = anterior;
+        if (rTipo === "analitico") {
+          data = ordenarAnalitico(atual, rAgrupar) as unknown as Linha[];
+        } else {
+          const grupos = agruparRateio(atual, rAgrupar);
+          data = (comparar
+            ? compararRateio(
+                grupos,
+                agruparRateio(anterior, rAgrupar),
+                rAgrupar,
+                diffDias(periodoComp.de, from),
+              )
+            : grupos) as unknown as Linha[];
+        }
       } else if (tipo === "lancamentos") {
         data = await fetchAll(() =>
           supabase
@@ -506,9 +754,17 @@ function Page() {
       return null;
     }
     setLoading(false);
-    setResultado({ tipo, chave: chaveAtual, from, to, linhas: data, rateio: cruas });
+    setResultado({
+      tipo,
+      chave: chaveAtual,
+      from,
+      to,
+      linhas: data,
+      rateio: cruas,
+      rateioComp: cruasComp,
+    });
     setPagina(1);
-    return { linhas: data, cruas: cruas ?? [] };
+    return { linhas: data, cruas: cruas ?? [], cruasComp: cruasComp ?? [] };
   };
 
   const buscar = async () => {
@@ -519,6 +775,55 @@ function Page() {
     else if (tipo === "rateio")
       toast.success(`${data.length.toLocaleString("pt-BR")} linha(s) no rateio`);
     else toast.success(`${data.length.toLocaleString("pt-BR")} registro(s) encontrados`);
+  };
+
+  /** Cabeçalho de contexto que vai no topo da planilha e da folha impressa. */
+  const contextoDoRelatorio = () => {
+    const linhasCtx = [
+      `${TITULOS[tipo]} — ${clinicaAtual?.clinica.nome ?? "Clínica"}`,
+      `Período: ${fmtDate(from)} a ${fmtDate(to)}`,
+    ];
+    if (tipo === "rateio") {
+      linhasCtx.push(descricaoFiltrosRateio());
+      if (comparar) linhasCtx.push(textoPeriodoComparado);
+    }
+    return linhasCtx.filter(Boolean);
+  };
+
+  const baixarExcel = async () => {
+    const res = await carregar();
+    if (!res) return;
+    const data = res.linhas;
+    if (data.length === 0) {
+      toast.info("Nenhum dado no período");
+      return;
+    }
+    const t = totaisRateio(res.cruas);
+    const tComp = totaisRateio(res.cruasComp);
+    try {
+      await exportarRelatorioXlsx({
+        arquivo: `${tipo === "rateio" ? "rateio_receita" : `relatorio_${tipo}`}_${from}_${to}`,
+        aba: TITULOS[tipo],
+        cabecalho: contextoDoRelatorio(),
+        colunas: colunas.map((c) => ({ rotulo: c.rotulo, tipo: tipoXlsx(c) })),
+        linhas: data.map((linha) => colunas.map((c) => valorXlsx(c, linha[c.chave]))),
+        totais:
+          tipo === "rateio"
+            ? totaisXlsxRateio(colunas, t, tComp)
+            : colunas.map((c, i) =>
+                c.somar
+                  ? tipo === "lancamentos" && c.chave === "valor"
+                    ? totais.saldo
+                    : totais.somas[c.chave]
+                  : i === 0
+                    ? `${data.length.toLocaleString("pt-BR")} registro(s)`
+                    : "",
+              ),
+      });
+      toast.success(`Planilha gerada (${data.length} linhas)`);
+    } catch (e) {
+      mostrarErro(e);
+    }
   };
 
   const baixarCsv = async () => {
@@ -534,12 +839,7 @@ function Page() {
       // não tem como saber o que significa "liquido" ou "margem".
       const linhasCsv = data.map((linha) => {
         const obj: Record<string, unknown> = {};
-        for (const c of colunas) {
-          obj[c.rotulo] =
-            c.formato === "moeda" || c.formato === "numero" || c.formato === "percentual"
-              ? num(linha[c.chave])
-              : (linha[c.chave] ?? "");
-        }
+        for (const c of colunas) obj[c.rotulo] = valorXlsx(c, linha[c.chave]);
         return obj;
       });
       download(`rateio_receita_${from}_${to}.csv`, toCsv(linhasCsv));
@@ -563,14 +863,25 @@ function Page() {
       // Totais recalculados aqui a partir das linhas cruas: imprimir pode ser
       // o primeiro clique, e aí o `useMemo` dos totais ainda não rodou.
       const t = totaisRateio(res.cruas);
+      const tComp = totaisRateio(res.cruasComp);
+      const resumo = resumoDoRateio(t);
+      if (comparar) {
+        const v = variacao(t.receita, tComp.receita);
+        resumo.push({
+          rotulo: "Receita do período comparado",
+          valor: `${brl(tComp.receita)} (${v.percentual === null ? "sem base" : comSinal(v.percentual, pct(v.percentual))})`,
+        });
+      }
       imprimirRelatorio({
         clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
         titulo: TITULOS.rateio,
-        periodo: `${periodo} · ${descricaoFiltrosRateio()}`,
+        periodo: [periodo, descricaoFiltrosRateio(), comparar ? textoPeriodoComparado : ""]
+          .filter(Boolean)
+          .join(" · "),
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
-        totais: rodapeRateio(colunas, t),
-        resumo: resumoDoRateio(t),
+        totais: rodapeRateio(colunas, t, tComp),
+        resumo,
       });
       return;
     }
@@ -627,6 +938,10 @@ function Page() {
     return out;
   }, [ctxRateio, rGrupo, buscaServico]);
 
+  const atalhoAtivo = presetAtivo({ de: from, ate: to }, hoje);
+  const deltaDe = (atual: number, anterior: number) =>
+    comparacaoVisivel ? variacao(atual, anterior).percentual : undefined;
+
   return (
     <div className="space-y-6">
       <div>
@@ -635,7 +950,7 @@ function Page() {
           Relatórios
         </h1>
         <p className="text-sm text-muted-foreground">
-          Consulte na tela, imprima em A4 ou exporte em CSV para análise externa
+          Consulte na tela, imprima em A4 ou exporte em Excel/CSV para análise externa
         </p>
       </div>
       <Card>
@@ -668,161 +983,256 @@ function Page() {
             </div>
           </div>
 
+          {/* flex-wrap: são oito atalhos e, em tela pequena, eles não cabem numa
+              linha só — sem isso a faixa empurraria o layout para o lado. */}
+          <TooltipProvider delayDuration={200}>
+            <div className="flex flex-wrap items-center gap-0.5 rounded-2xl border border-border bg-muted/60 p-1">
+              {PRESETS_PERIODO.map((pr) => {
+                const ativo = atalhoAtivo === pr.label;
+                return (
+                  <Tooltip key={pr.label}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const alvo = pr.make(hoje);
+                          setFrom(alvo.de);
+                          setTo(alvo.ate);
+                        }}
+                        aria-pressed={ativo}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                          ativo
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:bg-background hover:text-foreground",
+                        )}
+                      >
+                        {pr.label}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{pr.hint}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+
           {tipo === "rateio" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Profissional</Label>
-                <Select value={rMedico} onValueChange={setRMedico} disabled={!ctxRateio}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">TODOS</SelectItem>
-                    {(ctxRateio?.medicos ?? []).map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Especialidade</Label>
-                <Select
-                  value={rEspecialidade}
-                  onValueChange={setREspecialidade}
-                  disabled={!ctxRateio}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODAS"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">TODAS</SelectItem>
-                    {(ctxRateio?.especialidades ?? []).map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Grupo de serviço</Label>
-                <Select
-                  value={rGrupo}
-                  onValueChange={(v) => {
-                    setRGrupo(v);
-                    // O serviço escolhido pode não pertencer ao novo grupo.
-                    setRServico("todos");
-                  }}
-                  disabled={!ctxRateio}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">TODOS</SelectItem>
-                    {(ctxRateio?.grupos ?? []).map((g) => (
-                      <SelectItem key={g.chave} value={g.chave}>
-                        {g.rotulo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Serviço</Label>
-                <Popover open={servicoAberto} onOpenChange={setServicoAberto}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between font-normal"
-                      disabled={!ctxRateio}
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label>Profissional</Label>
+                  <Select value={rMedico} onValueChange={setRMedico} disabled={!ctxRateio}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">TODOS</SelectItem>
+                      {(ctxRateio?.medicos ?? []).map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Especialidade</Label>
+                  <Select
+                    value={rEspecialidade}
+                    onValueChange={setREspecialidade}
+                    disabled={!ctxRateio}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODAS"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">TODAS</SelectItem>
+                      {(ctxRateio?.especialidades ?? []).map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Grupo de serviço</Label>
+                  <Select
+                    value={rGrupo}
+                    onValueChange={(v) => {
+                      setRGrupo(v);
+                      // O serviço escolhido pode não pertencer ao novo grupo.
+                      setRServico("todos");
+                    }}
+                    disabled={!ctxRateio}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">TODOS</SelectItem>
+                      {(ctxRateio?.grupos ?? []).map((g) => (
+                        <SelectItem key={g.chave} value={g.chave}>
+                          {g.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Serviço</Label>
+                  <Popover open={servicoAberto} onOpenChange={setServicoAberto}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal"
+                        disabled={!ctxRateio}
+                      >
+                        <span className="truncate">
+                          {rServico === "todos" ? "TODOS OS SERVIÇOS" : rServico}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="p-0 w-[min(var(--radix-popover-trigger-width),28rem)] max-w-[92vw]"
+                      align="start"
                     >
-                      <span className="truncate">
-                        {rServico === "todos" ? "TODOS OS SERVIÇOS" : rServico}
-                      </span>
-                      <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                    {/* Filtro manual: o cadastro tem milhares de serviços e o
-                        filtro embutido do Command percorreria todos a cada tecla. */}
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Buscar serviço..."
-                        value={buscaServico}
-                        onValueChange={setBuscaServico}
-                      />
-                      <CommandList>
-                        <CommandEmpty>Nenhum serviço encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="todos"
-                            onSelect={() => {
-                              setRServico("todos");
-                              setServicoAberto(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                rServico === "todos" ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                            TODOS OS SERVIÇOS
-                          </CommandItem>
-                          {servicosFiltrados.map((nome) => (
+                      {/* Filtro manual: o cadastro tem milhares de serviços e o
+                          filtro embutido do Command percorreria todos a cada tecla. */}
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Buscar serviço..."
+                          value={buscaServico}
+                          onValueChange={setBuscaServico}
+                        />
+                        <CommandList>
+                          <CommandEmpty>Nenhum serviço encontrado.</CommandEmpty>
+                          <CommandGroup>
                             <CommandItem
-                              key={nome}
-                              value={nome}
+                              value="todos"
                               onSelect={() => {
-                                setRServico(nome);
+                                setRServico("todos");
                                 setServicoAberto(false);
                               }}
                             >
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  rServico === nome ? "opacity-100" : "opacity-0",
+                                  rServico === "todos" ? "opacity-100" : "opacity-0",
                                 )}
                               />
-                              <span className="truncate">{nome}</span>
+                              TODOS OS SERVIÇOS
                             </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                            {servicosFiltrados.map((nome) => (
+                              <CommandItem
+                                key={nome}
+                                value={nome}
+                                onSelect={() => {
+                                  setRServico(nome);
+                                  setServicoAberto(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    rServico === nome ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <span className="truncate">{nome}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo do relatório</Label>
+                  <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sintetico">SINTÉTICO</SelectItem>
+                      <SelectItem value="analitico">ANALÍTICO</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Agrupar por</Label>
+                  <Select
+                    value={rAgrupar}
+                    onValueChange={(v) => setRAgrupar(v as RateioAgruparPor)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="data">DATA</SelectItem>
+                      <SelectItem value="profissional">PROFISSIONAL</SelectItem>
+                      <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Tipo do relatório</Label>
-                <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sintetico">SINTÉTICO</SelectItem>
-                    <SelectItem value="analitico">ANALÍTICO</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <Label
+                    htmlFor="rateio-comparar"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Switch id="rateio-comparar" checked={comparar} onCheckedChange={setComparar} />
+                    <span className="text-sm font-medium">Comparar com</span>
+                  </Label>
+                  <div className="w-full sm:w-72">
+                    <Select
+                      value={modoComparacao}
+                      onValueChange={(v) => setModoComparacao(v as ModoComparacao)}
+                      disabled={!comparar}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="anterior">{ROTULO_COMPARACAO.anterior}</SelectItem>
+                        <SelectItem value="ano-anterior">
+                          {ROTULO_COMPARACAO["ano-anterior"]}
+                        </SelectItem>
+                        <SelectItem value="personalizado">
+                          {ROTULO_COMPARACAO.personalizado}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {comparar && modoComparacao === "personalizado" && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">De</span>
+                      <DateInputBR
+                        className="w-40"
+                        value={compDe || from}
+                        onChange={(e) => setCompDe(e.target.value)}
+                      />
+                      <span className="text-sm text-muted-foreground">até</span>
+                      <DateInputBR
+                        className="w-40"
+                        value={compAte || to}
+                        onChange={(e) => setCompAte(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {comparar
+                    ? `${textoPeriodoComparado}. A comparação aparece nas colunas do relatório sintético e nos cards de fechamento.`
+                    : "Ligue para ver quanto a receita subiu ou caiu contra outro período."}
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Agrupar por</Label>
-                <Select value={rAgrupar} onValueChange={(v) => setRAgrupar(v as RateioAgruparPor)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="data">DATA</SelectItem>
-                    <SelectItem value="profissional">PROFISSIONAL</SelectItem>
-                    <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            </>
           )}
 
           <div className="flex flex-wrap gap-2">
@@ -834,6 +1244,10 @@ function Page() {
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
+            <Button variant="outline" onClick={baixarExcel} disabled={loading || !clinicaAtual}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Baixar Excel
+            </Button>
             <Button variant="outline" onClick={baixarCsv} disabled={loading || !clinicaAtual}>
               <Download className="h-4 w-4 mr-2" />
               Baixar CSV
@@ -842,19 +1256,56 @@ function Page() {
           {tipo === "rateio" && (
             <p className="text-xs text-muted-foreground">
               Considera os atendimentos do período (mesma base da aba Atendimentos). Mensalidades de
-              cartão, adesões e recebimentos avulsos não entram, porque não têm prestador para
+              cartão, adesões e recebimentos avulsos não entram, porque não têm prestador a
               repassar.
             </p>
           )}
         </CardContent>
       </Card>
 
+      {tipo === "rateio" && atualizado && linhas.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <CardResumo
+            titulo="Atendimentos"
+            valor={totaisR.qtd.toLocaleString("pt-BR")}
+            detalhe={
+              comparacaoVisivel ? `${totaisComp.qtd.toLocaleString("pt-BR")} antes` : undefined
+            }
+            delta={deltaDe(totaisR.qtd, totaisComp.qtd)}
+          />
+          <CardResumo
+            titulo="Receita bruta"
+            valor={brl(totaisR.receita)}
+            detalhe={comparacaoVisivel ? `${brl(totaisComp.receita)} antes` : undefined}
+            delta={deltaDe(totaisR.receita, totaisComp.receita)}
+          />
+          <CardResumo
+            titulo="Repasse ao prestador"
+            valor={brl(totaisR.repasse)}
+            detalhe={comparacaoVisivel ? `${brl(totaisComp.repasse)} antes` : undefined}
+            delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
+            invertido
+          />
+          <CardResumo
+            titulo="Líquido da clínica"
+            valor={brl(totaisR.liquido)}
+            detalhe={`Margem de ${pct(totaisR.margem)}`}
+            delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
+          />
+        </div>
+      )}
+
       {atualizado && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-            <CardTitle>
-              {TITULOS[tipo]} — {fmtDate(from)} a {fmtDate(to)}
-            </CardTitle>
+            <div className="space-y-1">
+              <CardTitle>
+                {TITULOS[tipo]} — {fmtDate(from)} a {fmtDate(to)}
+              </CardTitle>
+              {comparacaoVisivel && (
+                <p className="text-xs text-muted-foreground">{textoPeriodoComparado}</p>
+              )}
+            </div>
             <span className="text-sm text-muted-foreground">
               {linhas.length.toLocaleString("pt-BR")} registro(s)
             </span>
@@ -866,54 +1317,61 @@ function Page() {
               </p>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {colunas.map((c) => (
-                        <TableHead
-                          key={c.chave}
-                          className={alinhaDireita(c) ? "text-right" : undefined}
-                        >
-                          {c.rotulo}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {linhasDaPagina.map((linha, i) => (
-                      <TableRow key={inicio + i}>
+                {/* A tabela do rateio comparado passa de dez colunas: em tela
+                    estreita ela rola dentro do card, sem espremer os valores. */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
                         {colunas.map((c) => (
+                          <TableHead
+                            key={c.chave}
+                            className={alinhaDireita(c) ? "text-right" : undefined}
+                          >
+                            {c.rotulo}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {linhasDaPagina.map((linha, i) => (
+                        <TableRow key={inicio + i}>
+                          {colunas.map((c) => (
+                            <TableCell
+                              key={c.chave}
+                              className={cn(
+                                alinhaDireita(c) && "text-right whitespace-nowrap tabular-nums",
+                                ehVariacao(c) && `font-medium ${corDaVariacao(linha[c.chave])}`,
+                                // Linha que só existe no período comparado: o
+                                // agrupador some do período atual, e o cinza
+                                // evita ler zero como se fosse produção real.
+                                linha.somenteAnterior === true && "text-muted-foreground",
+                              )}
+                            >
+                              {celula(c, linha[c.chave])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        {colunas.map((c, i) => (
                           <TableCell
                             key={c.chave}
                             className={
                               alinhaDireita(c)
-                                ? "text-right whitespace-nowrap tabular-nums"
-                                : undefined
+                                ? "text-right whitespace-nowrap tabular-nums font-bold"
+                                : "font-bold"
                             }
                           >
-                            {celula(c, linha[c.chave])}
+                            {rodape[i]}
                           </TableCell>
                         ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      {colunas.map((c, i) => (
-                        <TableCell
-                          key={c.chave}
-                          className={
-                            alinhaDireita(c)
-                              ? "text-right whitespace-nowrap tabular-nums font-bold"
-                              : "font-bold"
-                          }
-                        >
-                          {rodape[i]}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                    </TableFooter>
+                  </Table>
+                </div>
 
                 {tipo === "lancamentos" && (
                   <div className="ml-auto w-full sm:w-72 text-sm space-y-1">
@@ -929,38 +1387,6 @@ function Page() {
                       <span className="font-semibold">Saldo do período</span>
                       <span className="font-bold tabular-nums">{brl(totais.saldo)}</span>
                     </div>
-                  </div>
-                )}
-
-                {tipo === "rateio" && (
-                  <div className="ml-auto w-full sm:w-80 text-sm space-y-1">
-                    {resumoRateio.map((r, i) => (
-                      <div
-                        key={r.rotulo}
-                        className={cn(
-                          "flex justify-between",
-                          i === resumoRateio.length - 1 && "border-t pt-1",
-                        )}
-                      >
-                        <span
-                          className={
-                            i === resumoRateio.length - 1
-                              ? "font-semibold"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {r.rotulo}
-                        </span>
-                        <span
-                          className={cn(
-                            "tabular-nums",
-                            i === resumoRateio.length - 1 ? "font-bold" : "font-medium",
-                          )}
-                        >
-                          {r.valor}
-                        </span>
-                      </div>
-                    ))}
                   </div>
                 )}
 

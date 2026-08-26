@@ -43,6 +43,7 @@ import {
   resolverModalidade,
   type MapaConvenioPaciente,
 } from "@/lib/convenio/modalidade";
+import { addDias, variacao } from "@/lib/financeiro/periodos";
 
 /** O PostgREST devolve no máximo 1.000 linhas por requisição. */
 const PAGINA = 1000;
@@ -550,6 +551,78 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
   const grupos = Array.from(acc.values());
   for (const g of grupos) g.margem = margemClinica(g.receita, g.liquido);
   return grupos.sort((a, b) =>
+    agruparPor === "data"
+      ? a.rotulo.localeCompare(b.rotulo)
+      : a.rotulo.localeCompare(b.rotulo, "pt-BR"),
+  );
+}
+
+/** Uma linha do sintético já confrontada com o período de comparação. */
+export interface RateioGrupoComparado extends RateioGrupo {
+  /** Receita do mesmo agrupador no período de comparação. */
+  receitaAnterior: number;
+  /** Diferença em reais (positiva = subiu). */
+  variacaoValor: number;
+  /** Diferença em %. `null` quando não havia base (período anterior zerado). */
+  variacaoPercentual: number | null;
+  /** Verdadeiro quando o agrupador só existe no período de comparação. */
+  somenteAnterior: boolean;
+}
+
+/**
+ * Confronta o sintético dos dois períodos.
+ *
+ * Agrupado por profissional ou especialidade o par é óbvio (mesmo médico,
+ * mesma especialidade). Agrupado por DATA os dias nunca coincidem — os
+ * períodos são outros —, então cada dia é comparado com o dia de mesma
+ * POSIÇÃO no período de comparação: o 1º dia com o 1º dia, o 2º com o 2º.
+ * `deslocamentoDias` é a distância entre os dois inícios.
+ *
+ * Agrupador que aparece só no período de comparação entra na lista com receita
+ * zero e queda de 100%: um prestador que faturava e parou é exatamente o que a
+ * gestão quer enxergar num comparativo.
+ */
+export function compararRateio(
+  atuais: RateioGrupo[],
+  anteriores: RateioGrupo[],
+  agruparPor: RateioAgruparPor,
+  deslocamentoDias: number,
+): RateioGrupoComparado[] {
+  const chaveAnterior = (g: RateioGrupo) =>
+    agruparPor === "data" ? addDias(g.chave, deslocamentoDias) : g.chave;
+  const porChave = new Map<string, RateioGrupo>();
+  for (const g of anteriores) porChave.set(chaveAnterior(g), g);
+
+  const saida: RateioGrupoComparado[] = atuais.map((g) => {
+    const par = porChave.get(g.chave);
+    porChave.delete(g.chave);
+    const v = variacao(g.receita, par?.receita ?? 0);
+    return {
+      ...g,
+      receitaAnterior: par?.receita ?? 0,
+      variacaoValor: v.valor,
+      variacaoPercentual: v.percentual,
+      somenteAnterior: false,
+    };
+  });
+  for (const [chave, g] of porChave) {
+    const v = variacao(0, g.receita);
+    saida.push({
+      chave,
+      // Na comparação por data o rótulo é o dia equivalente do período atual.
+      rotulo: agruparPor === "data" ? chave : g.rotulo,
+      qtd: 0,
+      receita: 0,
+      repasse: 0,
+      liquido: 0,
+      margem: 0,
+      receitaAnterior: g.receita,
+      variacaoValor: v.valor,
+      variacaoPercentual: v.percentual,
+      somenteAnterior: true,
+    });
+  }
+  return saida.sort((a, b) =>
     agruparPor === "data"
       ? a.rotulo.localeCompare(b.rotulo)
       : a.rotulo.localeCompare(b.rotulo, "pt-BR"),

@@ -2,10 +2,12 @@ import { describe, expect, it } from "bun:test";
 import {
   agruparRateio,
   chaveGrupo,
+  compararRateio,
   filtrarRateio,
   margemClinica,
   totaisRateio,
   type RateioContexto,
+  type RateioGrupo,
   type RateioLinha,
 } from "./rateio-receita";
 
@@ -145,5 +147,79 @@ describe("filtrarRateio", () => {
 
   it("nao mexe nas linhas quando nenhum filtro foi escolhido", () => {
     expect(filtrarRateio(ctx, linhas, base)).toHaveLength(3);
+  });
+});
+
+describe("compararRateio", () => {
+  const grupo = (over: Partial<RateioGrupo>): RateioGrupo => ({
+    chave: "med-1",
+    rotulo: "DRA. ANA",
+    qtd: 1,
+    receita: 100,
+    repasse: 60,
+    liquido: 40,
+    margem: 40,
+    ...over,
+  });
+
+  it("casa o mesmo profissional nos dois periodos e mostra quanto subiu", () => {
+    const r = compararRateio(
+      [grupo({ receita: 150 })],
+      [grupo({ receita: 100 })],
+      "profissional",
+      0,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({
+      receita: 150,
+      receitaAnterior: 100,
+      variacaoValor: 50,
+      variacaoPercentual: 50,
+      somenteAnterior: false,
+    });
+  });
+
+  it("por data compara o dia com o dia de mesma posicao no outro periodo", () => {
+    const atuais = [
+      grupo({ chave: "2026-08-20", rotulo: "2026-08-20", receita: 300 }),
+      grupo({ chave: "2026-08-21", rotulo: "2026-08-21", receita: 200 }),
+    ];
+    // Periodo de comparacao comeca 7 dias antes.
+    const anteriores = [
+      grupo({ chave: "2026-08-13", rotulo: "2026-08-13", receita: 100 }),
+      grupo({ chave: "2026-08-14", rotulo: "2026-08-14", receita: 400 }),
+    ];
+    const r = compararRateio(atuais, anteriores, "data", 7);
+    expect(r.map((g) => [g.rotulo, g.receitaAnterior])).toEqual([
+      ["2026-08-20", 100],
+      ["2026-08-21", 400],
+    ]);
+  });
+
+  it("quem faturava e sumiu aparece com queda de 100%", () => {
+    const r = compararRateio(
+      [grupo({ chave: "med-1", rotulo: "DRA. ANA", receita: 100 })],
+      [
+        grupo({ chave: "med-1", rotulo: "DRA. ANA", receita: 100 }),
+        grupo({ chave: "med-2", rotulo: "DR. BRUNO", receita: 80 }),
+      ],
+      "profissional",
+      0,
+    );
+    const sumiu = r.find((g) => g.rotulo === "DR. BRUNO")!;
+    expect(sumiu).toMatchObject({
+      qtd: 0,
+      receita: 0,
+      receitaAnterior: 80,
+      variacaoValor: -80,
+      variacaoPercentual: -100,
+      somenteAnterior: true,
+    });
+  });
+
+  it("quem nao existia antes fica sem percentual, em vez de 0%", () => {
+    const r = compararRateio([grupo({ receita: 90 })], [], "profissional", 0);
+    expect(r[0].variacaoPercentual).toBeNull();
+    expect(r[0].variacaoValor).toBe(90);
   });
 });
