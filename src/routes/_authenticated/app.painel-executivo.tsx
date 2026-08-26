@@ -1320,6 +1320,17 @@ type GrLinha = {
   valor: number;
   /** Parte já confirmada no caixa. */
   valorConfirmado: number;
+  /**
+   * Valor que foi devolvido — a soma dos lançamentos cancelados desta guia.
+   *
+   * Fica FORA de `valor` e de `valorConfirmado` de propósito: dinheiro
+   * estornado não é receita e não pode entrar em nenhum total do caixa. Mas a
+   * gestão precisa enxergar o número, senão a linha estornada aparece como
+   * "R$ 0,00" e não dá para auditar o que foi devolvido.
+   */
+  valorEstornado: number;
+  /** Motivo registrado no estorno (`estorno_solicitacoes.motivo`). */
+  motivoEstorno: string | null;
 };
 
 type GrsDoDia = {
@@ -1524,7 +1535,7 @@ async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsD
       fichaImpressa.set(i.agendamento_id, i.ficha_numero);
   }
 
-  const [meds, profs, pacs] = await Promise.all([
+  const [meds, profs, pacs, estornos] = await Promise.all([
     // Sem filtro de `ativo`: médico desligado depois do atendimento continua
     // sendo o médico daquela guia.
     emLotes<{ id: string; nome: string; especialidade_id: string | null }>(
@@ -1544,11 +1555,33 @@ async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsD
       100,
       (lote) => supabase.from("pacientes").select("id,nome").in("id", lote),
     ),
+    // Motivo do estorno. Ele não fica no lançamento cancelado — fica em
+    // `estorno_solicitacoes`, ligado pelo `lancamento_id`. Confirmado na base:
+    // os 63 lançamentos de receita cancelados desde 17/08 têm todos a sua
+    // solicitação, com motivos escritos pela recepção ("VALOR ERRADO",
+    // "2X NO SISTEMA", "PACIENTE NÃO CONSEGUIU FAZER O PREVENTIVO").
+    emLotes<{ lancamento_id: string | null; motivo: string; created_at: string }>(
+      soIds(lancs.filter((l) => l.status === "cancelado").map((l) => l.id)),
+      100,
+      (lote) =>
+        supabase
+          .from("estorno_solicitacoes")
+          .select("lancamento_id,motivo,created_at")
+          .in("lancamento_id", lote)
+          .order("created_at", { ascending: true }),
+    ),
   ]);
 
   const medMap = new Map(meds.map((m) => [m.id, m] as const));
   const profMap = new Map(profs.map((p) => [p.id, (p.nome ?? "").trim()] as const));
   const pacMap = new Map(pacs.map((p) => [p.id, p.nome] as const));
+  // Um lançamento pode ter mais de uma solicitação (pedido negado e refeito, por
+  // exemplo). Fica a mais recente, que é a que explica o estorno que valeu.
+  const motivoPorLanc = new Map<string, string>();
+  for (const e of estornos) {
+    const motivo = (e.motivo ?? "").trim();
+    if (e.lancamento_id && motivo) motivoPorLanc.set(e.lancamento_id, motivo);
+  }
 
   // A especialidade da guia sai do agendamento; quando ele não tem, cai na
   // especialidade principal do médico — a mesma ordem que a GR impressa usa.
@@ -1567,11 +1600,21 @@ async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsD
 
     const naoCancelados = doGrupo.filter((l) => l.status !== "cancelado");
     const confirmados = doGrupo.filter((l) => l.status === "confirmado");
+    const cancelados = doGrupo.filter((l) => l.status === "cancelado");
     const financeiro = confirmados.length
       ? "Faturado"
       : naoCancelados.length
         ? "A receber"
         : "Estornado";
+    // O motivo vem do lançamento cancelado mais recente da guia. Quando o
+    // atendimento foi estornado e relançado (o caso de "VALOR ERRADO"), a guia
+    // aparece como Faturada e ainda assim mostra o que foi devolvido no
+    // caminho — que é justamente o que a auditoria precisa enxergar.
+    const motivoEstorno =
+      cancelados
+        .map((l) => motivoPorLanc.get(l.id))
+        .filter((m): m is string => !!m)
+        .at(-1) ?? null;
 
     const medId = a?.medico_id ?? primeiro.medico_id ?? null;
     const med = medId ? medMap.get(medId) : undefined;
@@ -1607,6 +1650,8 @@ async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsD
       financeiro,
       valor: naoCancelados.reduce((s, l) => s + num(l.valor), 0),
       valorConfirmado: confirmados.reduce((s, l) => s + num(l.valor), 0),
+      valorEstornado: cancelados.reduce((s, l) => s + num(l.valor), 0),
+      motivoEstorno,
     };
   });
 
@@ -1614,6 +1659,32 @@ async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsD
 }
 
 const TODOS = "todos";
+
+/**
+ * O selo da situação financeira. "Estornado" sai em âmbar, e não no cinza dos
+ * demais: é dinheiro que voltou para o paciente e precisa saltar aos olhos numa
+ * lista de centenas de linhas. "A receber" fica em azul porque também é uma
+ * pendência, só que sem devolução. "Faturado" é o caso normal e continua
+ * discreto — se tudo chamar atenção, nada chama.
+ */
+function SeloFinanceiro({ situacao }: { situacao: string }) {
+  const cor =
+    situacao === "Estornado"
+      ? "border-amber-300 bg-amber-50 text-amber-800"
+      : situacao === "A receber"
+        ? "border-sky-300 bg-sky-50 text-sky-800"
+        : "border-transparent bg-secondary text-secondary-foreground";
+  return <Badge className={cn("text-[11px] font-semibold", cor)}>{situacao}</Badge>;
+}
+
+/** Linha "estorno R$ x,xx" que acompanha o valor. Riscada, porque não entrou. */
+function ValorEstornado({ valor }: { valor: number }) {
+  return (
+    <span className="block text-[11px] font-medium tabular-nums text-amber-700">
+      estorno <s>{money(valor)}</s>
+    </span>
+  );
+}
 
 function SecaoGrsDoDia({
   clinicaId,
@@ -1683,6 +1754,8 @@ function SecaoGrsDoDia({
 
   const valorTotal = filtradas.reduce((s, l) => s + l.valor, 0);
   const valorConfirmado = filtradas.reduce((s, l) => s + l.valorConfirmado, 0);
+  // Somado à parte, nunca dentro dos dois acima: é dinheiro devolvido.
+  const valorEstornado = filtradas.reduce((s, l) => s + l.valorEstornado, 0);
   const pacientes = new Set(filtradas.map((l) => l.paciente).filter((p) => p !== "—")).size;
   const filtrando = filtradas.length !== dados.linhas.length;
   // Os cards acima contam tudo; a lista abaixo desenha só o começo quando o
@@ -1746,6 +1819,17 @@ function SecaoGrsDoDia({
               tone="ok"
               hint="Parte das guias listadas que já entrou no caixa"
             />
+            {/* Só aparece quando houve devolução no período. Fica de fora dos
+                dois cards acima de propósito: estorno não é receita. */}
+            {valorEstornado > 0 && (
+              <HhpKpiCard
+                label="Estornado"
+                value={money(valorEstornado)}
+                icon={Undo2}
+                tone="warn"
+                hint="Valor devolvido nas guias listadas — não entra nos totais acima"
+              />
+            )}
           </>
         )}
         <HhpKpiCard
@@ -1898,11 +1982,19 @@ function SecaoGrsDoDia({
                         {l.hora} · GR {l.numero}
                         {l.numeroGuia ? ` · guia ${l.numeroGuia}` : ""}
                       </span>
-                      {podeFin && (
-                        <span className="shrink-0 text-sm font-semibold tabular-nums">
-                          {money(l.valor)}
-                        </span>
-                      )}
+                      {podeFin &&
+                        // Guia inteiramente estornada: mostrar "R$ 0,00" esconde
+                        // justamente o que a gestão quer auditar. No lugar vai o
+                        // valor devolvido, riscado — ele não entra em total nenhum.
+                        (l.valor === 0 && l.valorEstornado > 0 ? (
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-amber-700">
+                            <s>{money(l.valorEstornado)}</s>
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-sm font-semibold tabular-nums">
+                            {money(l.valor)}
+                          </span>
+                        ))}
                     </div>
                     <p className="mt-1 text-sm font-medium uppercase leading-tight">{l.paciente}</p>
                     <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
@@ -1917,12 +2009,16 @@ function SecaoGrsDoDia({
                       <Badge variant="outline" className="text-[11px]">
                         {l.situacao}
                       </Badge>
-                      {l.financeiro && (
-                        <Badge variant="secondary" className="text-[11px]">
-                          {l.financeiro}
-                        </Badge>
-                      )}
+                      {l.financeiro && <SeloFinanceiro situacao={l.financeiro} />}
                     </div>
+                    {l.motivoEstorno && (
+                      <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1 text-[11px] leading-snug text-amber-800">
+                        Motivo do estorno: {l.motivoEstorno}
+                        {podeFin && l.valorEstornado > 0 && (
+                          <span className="font-semibold"> — {money(l.valorEstornado)}</span>
+                        )}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1979,16 +2075,37 @@ function SecaoGrsDoDia({
                             <Badge variant="outline" className="text-[11px]">
                               {l.situacao}
                             </Badge>
-                            {l.financeiro && (
-                              <Badge variant="secondary" className="text-[11px]">
-                                {l.financeiro}
-                              </Badge>
-                            )}
+                            {l.financeiro && <SeloFinanceiro situacao={l.financeiro} />}
                           </div>
+                          {/* O motivo fica embaixo do selo, escrito. Deixá-lo só
+                              no balãozinho esconderia a informação de quem
+                              imprime a tela ou passa os olhos pela lista. */}
+                          {l.motivoEstorno && (
+                            <p
+                              className="mt-1 max-w-[220px] text-[11px] leading-snug text-amber-700"
+                              title={l.motivoEstorno}
+                            >
+                              {l.motivoEstorno}
+                            </p>
+                          )}
                         </TableCell>
                         {podeFin && (
-                          <TableCell className="text-right tabular-nums">
-                            {money(l.valor)}
+                          <TableCell className="text-right align-top tabular-nums">
+                            {l.valor === 0 && l.valorEstornado > 0 ? (
+                              <span className="font-semibold text-amber-700">
+                                <s>{money(l.valorEstornado)}</s>
+                              </span>
+                            ) : (
+                              <>
+                                {money(l.valor)}
+                                {/* Guia relançada depois do estorno: o valor de
+                                    cima é o que valeu, e embaixo fica o que foi
+                                    devolvido no caminho. */}
+                                {l.valorEstornado > 0 && (
+                                  <ValorEstornado valor={l.valorEstornado} />
+                                )}
+                              </>
+                            )}
                           </TableCell>
                         )}
                       </TableRow>
