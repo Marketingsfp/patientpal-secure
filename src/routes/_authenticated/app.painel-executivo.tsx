@@ -126,9 +126,23 @@ type Bloco = {
     novos: number;
     recorrentes: number;
   };
+  /**
+   * Indicadores de qualidade.
+   *
+   * `marcacoesFalta` e `marcacoesExecucao` dizem QUANTAS marcações existem por
+   * trás de cada indicador no período. Sem elas, um zero é ambíguo: pode ser
+   * "não houve falta nenhuma" (ótimo) ou "ninguém registra falta" (o
+   * indicador não mede nada). Nesta clínica é o segundo caso — nunca foi
+   * marcada uma falta em toda a história do sistema, e só um agendamento tem
+   * horário de execução preenchido. Com a contagem, a tela esconde o
+   * indicador em vez de exibir um zero que a gestão leria como desempenho.
+   * Quando a recepção passar a registrar, os indicadores voltam sozinhos.
+   */
   qualidade: {
     noShowPct: number;
     atrasoMedioMin: number;
+    marcacoesFalta: number;
+    marcacoesExecucao: number;
   };
 };
 
@@ -160,7 +174,7 @@ const emptyBloco = (): Bloco => ({
   },
   comercial: { novos: 0, recorrentes: 0, conversaoOrcamento: 0, orcamentosNoPeriodo: 0 },
   grs: { total: 0, pacientes: 0, novos: 0, recorrentes: 0 },
-  qualidade: { noShowPct: 0, atrasoMedioMin: 0 },
+  qualidade: { noShowPct: 0, atrasoMedioMin: 0, marcacoesFalta: 0, marcacoesExecucao: 0 },
 });
 
 // ---------- Utils ----------
@@ -359,6 +373,8 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco> {
     qualidade: {
       noShowPct: num(rQua.noShowPct),
       atrasoMedioMin: num(rQua.atrasoMedioMin),
+      marcacoesFalta: num(rQua.marcacoesFalta),
+      marcacoesExecucao: num(rQua.marcacoesExecucao),
     },
   };
 }
@@ -374,6 +390,14 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco> {
  * Quem consome trata `undefined` escondendo o número (`HhpKpiCard`) ou
  * avisando que não há base (`BigCard`).
  */
+/**
+ * Quantas marcações um indicador de qualidade precisa ter no período para
+ * aparecer no painel. Abaixo disso a conta existe, mas não representa a
+ * operação: uma média tirada de um ou dois registros passa a impressão de
+ * medição sem ser uma.
+ */
+const AMOSTRA_MINIMA = 10;
+
 const delta = (atual: number, ant: number): number | undefined => {
   if (!ant) return undefined;
   return Number((((atual - ant) / ant) * 100).toFixed(1));
@@ -434,6 +458,23 @@ function PainelExecutivoPage() {
     qa = anterior.qualidade;
   const g = atual.grs,
     gaAnt = anterior.grs;
+
+  // Indicadores sem base de medição no período — ver o comentário do bloco
+  // `qualidade` em `Bloco`. Enquanto não houver registro, eles saem do painel
+  // em vez de mostrar zero: um "No-show 0,0%" ao lado dos números de produção
+  // é lido como excelência, quando na verdade ninguém registrou nada.
+  //
+  // O piso não é zero, é AMOSTRA_MINIMA. Nos últimos 30 dias a clínica tem
+  // 3.278 marcações e exatamente 1 delas com horário de execução preenchido —
+  // publicar um "atraso médio" tirado de um único atendimento seria pior que
+  // não publicar nada, porque parece uma medição.
+  const semRegistroFalta = q.marcacoesFalta < AMOSTRA_MINIMA;
+  const semRegistroExecucao = q.marcacoesExecucao < AMOSTRA_MINIMA;
+  // Nesta clínica a recepção lança e confirma no mesmo ato, então não existe
+  // "a receber". Mostrar R$ 0,00 fixo só ocupa espaço; o campo volta sozinho
+  // se algum dia houver lançamento pendente.
+  const temPrevistoReceita = f.receitaPrevista > 0;
+  const temPrevistoDespesa = f.despesaPrevista > 0;
 
   return (
     <div className="space-y-6">
@@ -523,7 +564,9 @@ function PainelExecutivoPage() {
           value={int(p.compareceram)}
           delta={delta(p.compareceram, pa.compareceram)}
           subs={[
-            { label: "Faltas", value: int(p.faltaram) },
+            semRegistroFalta
+              ? { label: "Confirmados", value: int(p.confirmados) }
+              : { label: "Faltas", value: int(p.faltaram) },
             { label: "Ocupação", value: pctFmt(p.ocupacaoPct) },
           ]}
         />
@@ -547,19 +590,24 @@ function PainelExecutivoPage() {
             value={money(f.receitaRealizada)}
             delta={delta(f.receitaRealizada, fa.receitaRealizada)}
             subs={[
-              { label: "Previsto", value: money(f.receitaPrevista) },
+              temPrevistoReceita
+                ? { label: "A receber", value: money(f.receitaPrevista) }
+                : { label: "Particular", value: money(f.receitaParticular) },
               { label: "Ticket médio", value: money(f.ticketMedio) },
             ]}
           />
         ) : (
+          // Sem acesso ao financeiro, este espaço mostrava o no-show. Como ele
+          // não tem registro por trás, o card passa a responder pela taxa de
+          // confirmação, que sai de dado que a agenda realmente preenche.
           <BigCard
-            title="Qualidade"
-            icon={AlertTriangle}
-            value={pctFmt(q.noShowPct)}
-            delta={delta(q.noShowPct, qa.noShowPct)}
+            title="Confirmação"
+            icon={CheckCircle2}
+            value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
+            delta={delta(p.confirmados, pa.confirmados)}
             subs={[
-              { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
-              { label: "Faltas", value: int(p.faltaram) },
+              { label: "Agendados", value: int(p.agendados) },
+              { label: "Cancelados", value: int(p.cancelaram) },
             ]}
           />
         )}
@@ -571,7 +619,9 @@ function PainelExecutivoPage() {
               value={money(f.despesaRealizada)}
               delta={delta(f.despesaRealizada, fa.despesaRealizada)}
               subs={[
-                { label: "Previsto", value: money(f.despesaPrevista) },
+                ...(temPrevistoDespesa
+                  ? [{ label: "A pagar", value: money(f.despesaPrevista) }]
+                  : []),
                 { label: "Resultado", value: money(f.resultado) },
               ]}
             />
@@ -601,11 +651,17 @@ function PainelExecutivoPage() {
           title="Qualidade"
           icon={Percent}
           value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
-          delta={delta(q.noShowPct, qa.noShowPct)}
+          // A variação vinha do no-show; sem registro de falta ela seria sempre
+          // "0,0% vs. período anterior", uma estabilidade falsa.
+          delta={semRegistroFalta ? undefined : delta(q.noShowPct, qa.noShowPct)}
           deltaInvertido
           subs={[
-            { label: "No-show", value: pctFmt(q.noShowPct) },
-            { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
+            semRegistroFalta
+              ? { label: "Cancelados", value: int(p.cancelaram) }
+              : { label: "No-show", value: pctFmt(q.noShowPct) },
+            semRegistroExecucao
+              ? { label: "Tempo médio", value: `${p.tempoMedioMin.toFixed(0)} min` }
+              : { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
           ]}
         />
       </div>
@@ -643,13 +699,15 @@ function PainelExecutivoPage() {
               tone="ok"
               delta={delta(p.compareceram, pa.compareceram)}
             />
-            <HhpKpiCard
-              label="Faltaram"
-              value={int(p.faltaram)}
-              icon={UserX}
-              tone="danger"
-              delta={delta(p.faltaram, pa.faltaram)}
-            />
+            {!semRegistroFalta && (
+              <HhpKpiCard
+                label="Faltaram"
+                value={int(p.faltaram)}
+                icon={UserX}
+                tone="danger"
+                delta={delta(p.faltaram, pa.faltaram)}
+              />
+            )}
             <HhpKpiCard
               label="Cancelaram"
               value={int(p.cancelaram)}
@@ -662,7 +720,7 @@ function PainelExecutivoPage() {
               value={pctFmt(p.ocupacaoPct)}
               icon={Percent}
               tone="info"
-              hint={`${int(p.agendadoMin)} / ${int(p.capacidadeMin)} min`}
+              hint={`${int(p.agendadoMin)} de ${int(p.capacidadeMin)} min da agenda publicada`}
             />
           </HhpKpiRow>
           <HhpKpiRow>
@@ -718,13 +776,18 @@ function PainelExecutivoPage() {
                 tone="ok"
                 delta={delta(f.receitaRealizada, fa.receitaRealizada)}
               />
-              <HhpKpiCard
-                label="Receita prevista"
-                value={money(f.receitaPrevista)}
-                icon={TrendingUp}
-                tone="info"
-                delta={delta(f.receitaPrevista, fa.receitaPrevista)}
-              />
+              {/* "A receber" só existe se houver lançamento pendente. Nesta
+                  clínica a recepção lança e confirma no mesmo ato, então o card
+                  ficava fixo em R$ 0,00 — ver o comentário em `temPrevistoReceita`. */}
+              {temPrevistoReceita && (
+                <HhpKpiCard
+                  label="Receita a receber"
+                  value={money(f.receitaPrevista)}
+                  icon={TrendingUp}
+                  tone="info"
+                  delta={delta(f.receitaPrevista, fa.receitaPrevista)}
+                />
+              )}
               <HhpKpiCard
                 label="Ticket médio"
                 value={money(f.ticketMedio)}
@@ -872,57 +935,63 @@ function PainelExecutivoPage() {
               tone="info"
             />
           </HhpKpiRow>
-          <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-6 text-center text-sm text-slate-500">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70">
-              <BarChart3 className="h-5 w-5 text-slate-400" />
-            </div>
-            <h3 className="text-base font-semibold text-slate-700">
-              Análise de Retenção e Retorno de Pacientes
-            </h3>
-            <p className="mx-auto mt-1.5 max-w-xl leading-relaxed">
-              Os dados de coorte de retenção (30, 60 e 90 dias) e tempo médio entre consultas estão
-              sendo processados para esta unidade.
-            </p>
-          </div>
         </TabsContent>
 
         {/* Qualidade */}
         <TabsContent value="qualidade" className="space-y-6">
           <HhpKpiRow>
-            <HhpKpiCard
-              label="No-show %"
-              value={pctFmt(q.noShowPct)}
-              icon={AlertTriangle}
-              tone="danger"
-              delta={delta(q.noShowPct, qa.noShowPct)}
-            />
-            <HhpKpiCard
-              label="Atraso médio"
-              value={`${q.atrasoMedioMin.toFixed(0)} min`}
-              icon={Clock}
-              tone="warn"
-              delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)}
-            />
+            {!semRegistroFalta && (
+              <HhpKpiCard
+                label="No-show %"
+                value={pctFmt(q.noShowPct)}
+                icon={AlertTriangle}
+                tone="danger"
+                delta={delta(q.noShowPct, qa.noShowPct)}
+              />
+            )}
+            {!semRegistroExecucao && (
+              <HhpKpiCard
+                label="Atraso médio"
+                value={`${q.atrasoMedioMin.toFixed(0)} min`}
+                icon={Clock}
+                tone="warn"
+                delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)}
+              />
+            )}
             <HhpKpiCard
               label="Confirmação"
               value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
               icon={CheckCircle2}
               tone="ok"
+              hint="Agendamentos que passaram da recepção, sobre o total de marcações"
+            />
+            <HhpKpiCard
+              label="Tempo médio"
+              value={`${p.tempoMedioMin.toFixed(0)} min`}
+              icon={Timer}
+              tone="default"
+              hint="Duração média reservada na agenda dos atendimentos realizados"
             />
           </HhpKpiRow>
-          <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-6 text-center text-sm text-slate-500">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70">
-              <Timer className="h-5 w-5 text-slate-400" />
+
+          {/* Aviso no lugar dos indicadores escondidos. Antes havia aqui um
+              texto fixo dizendo que os tempos de espera eram "atualizados
+              automaticamente" — nada disso era calculado, e a gestão ficava
+              esperando um número que não viria. */}
+          {(semRegistroFalta || semRegistroExecucao) && (
+            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+              <span>
+                {semRegistroFalta && semRegistroExecucao
+                  ? `No-show e atraso médio estão fora do painel neste período: houve ${int(q.marcacoesFalta)} marcação de falta e ${int(q.marcacoesExecucao)} horário de execução registrado, pouco para sustentar um indicador.`
+                  : semRegistroFalta
+                    ? `O no-show está fora do painel neste período: só ${int(q.marcacoesFalta)} agendamento(s) foram marcados como falta.`
+                    : `O atraso médio está fora do painel neste período: só ${int(q.marcacoesExecucao)} atendimento(s) tiveram o horário de execução registrado.`}{" "}
+                Os indicadores voltam sozinhos assim que a recepção passar a registrar — não é
+                preciso mexer no sistema.
+              </span>
             </div>
-            <h3 className="text-base font-semibold text-slate-700">
-              Métricas de Tempo de Espera e Permanência
-            </h3>
-            <p className="mx-auto mt-1.5 max-w-xl leading-relaxed">
-              O acompanhamento detalhado dos tempos de espera e permanência dos pacientes é
-              atualizado automaticamente conforme os horários de atendimento registrados pela
-              recepção.
-            </p>
-          </div>
+          )}
         </TabsContent>
       </Tabs>
 
