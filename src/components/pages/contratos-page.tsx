@@ -3843,9 +3843,11 @@ function DetalheContrato({
       return;
     }
     toast.success(
-      resultado.aviso === "lancado_em_sessao_atual"
-        ? "Pagamento estornado. A saída foi lançada no caixa aberto atual, porque o caixa do pagamento original já estava fechado."
-        : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
+      resultado.aviso === "lancado_no_caixa_de_quem_recebeu"
+        ? "Pagamento estornado. O caixa do pagamento original já estava fechado, então a saída foi lançada no caixa aberto de quem recebeu o valor."
+        : resultado.aviso === "lancado_em_sessao_atual"
+          ? "Pagamento estornado. A saída foi lançada no SEU caixa aberto, porque o caixa do pagamento original já estava fechado e quem recebeu o valor não tem caixa aberto."
+          : "Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.",
     );
     load();
   };

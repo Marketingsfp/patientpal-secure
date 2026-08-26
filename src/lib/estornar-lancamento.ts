@@ -1,8 +1,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logAction } from "@/hooks/use-crud";
 
+/**
+ * Para onde a saída de caixa foi, quando o caixa do pagamento original já
+ * estava fechado. A devolução é dinheiro saindo de uma gaveta física, então
+ * quem a recebe importa para a conferência do dia:
+ *
+ *   'lancado_no_caixa_de_quem_recebeu' — caso normal. Foi para o caixa aberto
+ *       de quem recebeu o pagamento, que é a gaveta de onde o dinheiro sai.
+ *   'lancado_em_sessao_atual' — exceção. Essa pessoa não tinha caixa aberto, e
+ *       a saída foi para o caixa de quem executou o estorno (em geral o admin
+ *       que aprovou a solicitação). Precisa ser dito na tela, senão ele fecha
+ *       o dia com uma falta que não é dele.
+ *
+ * Sem nenhum dos dois, a saída caiu na própria sessão do recebimento, que
+ * ainda estava aberta, e não há nada a avisar.
+ */
+export type EstornoAviso = "lancado_no_caixa_de_quem_recebeu" | "lancado_em_sessao_atual";
+
 export type EstornoLancamentoResultado =
-  | { ok: true; aviso?: string | null }
+  | { ok: true; aviso?: EstornoAviso | string | null }
   /**
    * Recusa prevista pela regra de negócio — a mensagem já vem pronta do banco e
    * deve ser mostrada como aviso, não como erro técnico. Hoje: repasse já pago

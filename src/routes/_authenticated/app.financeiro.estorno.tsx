@@ -252,9 +252,11 @@ function Page() {
       return {
         executado: true,
         resposta:
-          r.aviso === "lancado_em_sessao_atual"
-            ? "Sangria estornada — compensação lançada no caixa aberto atual (sessão original já fechada)."
-            : "Sangria estornada — compensação lançada na mesma sessão de caixa.",
+          r.aviso === "lancado_no_caixa_de_quem_recebeu"
+            ? "Sangria estornada — compensação lançada no caixa aberto de quem fez a sangria (sessão original já fechada)."
+            : r.aviso === "lancado_em_sessao_atual"
+              ? "Sangria estornada — compensação lançada no SEU caixa aberto (sessão original fechada e quem fez a sangria não tem caixa aberto)."
+              : "Sangria estornada — compensação lançada na mesma sessão de caixa.",
       };
     }
     if (!s.lancamento_id) {
@@ -270,14 +272,21 @@ function Page() {
       return null;
     }
     // Quando o caixa do pagamento original já estava fechado, a saída foi para
-    // o caixa aberto atual — registra isso na resposta para quem consultar a
+    // outro caixa — registra QUAL na resposta, para quem consultar a
     // solicitação depois entender por que o valor não está no dia original.
+    //
+    // A distinção importa na conferência da gaveta: o normal é a devolução cair
+    // no caixa de quem recebeu o dinheiro. Cair no caixa de quem aprovou é a
+    // exceção (aquela pessoa não tinha caixa aberto) e precisa ficar explícita,
+    // senão o aprovador fecha o dia com uma falta que não é dele.
     return {
       executado: true,
       resposta:
-        resultado.aviso === "lancado_em_sessao_atual"
-          ? "Estorno executado — saída lançada no caixa aberto atual (o caixa do pagamento original já estava fechado)."
-          : "Estorno executado",
+        resultado.aviso === "lancado_no_caixa_de_quem_recebeu"
+          ? "Estorno executado — saída lançada no caixa aberto de quem recebeu o valor (o caixa do pagamento original já estava fechado)."
+          : resultado.aviso === "lancado_em_sessao_atual"
+            ? "Estorno executado — saída lançada no SEU caixa aberto, porque o caixa do pagamento original já estava fechado e quem recebeu o valor não tem caixa aberto."
+            : "Estorno executado",
     };
   };
 
