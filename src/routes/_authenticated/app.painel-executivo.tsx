@@ -67,7 +67,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDatePura, hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
+import {
+  formatDatePura,
+  hojeBR,
+  janelaDiaClinica,
+  TZ_CLINICA,
+  zonedDateStringToUtcISO,
+} from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
@@ -178,12 +184,31 @@ const emptyBloco = (): Bloco => ({
 });
 
 // ---------- Utils ----------
-const hojeISO = () => new Date().toISOString().slice(0, 10);
+/**
+ * Hoje no fuso da clínica.
+ *
+ * Antes era `new Date().toISOString().slice(0, 10)`, que devolve o dia em UTC:
+ * das 21:00 em diante, em São Paulo, já respondia o dia seguinte. Com o painel
+ * abrindo num intervalo de 30 dias isso passava despercebido; agora que ele
+ * abre em "Hoje", um erro de um dia deixaria a tela inteira no dia errado
+ * durante o fim do expediente.
+ */
+const hojeISO = () => hojeBR();
+
+/**
+ * Soma dias a uma data pura (YYYY-MM-DD), em calendário — sem passar pelo fuso
+ * do navegador. A versão anterior montava a data no fuso do runtime e voltava
+ * para ISO/UTC, o que desloca o dia em qualquer fuso à frente de Greenwich (e o
+ * mesmo código roda no Worker SSR, que é UTC).
+ */
 const addDays = (iso: string, d: number) => {
-  const dt = new Date(`${iso}T00:00:00`);
-  dt.setDate(dt.getDate() + d);
-  return dt.toISOString().slice(0, 10);
+  const [y, m, dd] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, dd + d)).toISOString().slice(0, 10);
 };
+
+/** Primeiro dia do mês / do ano de uma data pura, sem tocar em fuso. */
+const primeiroDiaDoMes = (iso: string) => `${iso.slice(0, 7)}-01`;
+const primeiroDiaDoAno = (iso: string) => `${iso.slice(0, 4)}-01-01`;
 const money = (n: number) =>
   `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const int = (n: number) => n.toLocaleString("pt-BR");
@@ -191,41 +216,48 @@ const pctFmt = (v: number) => `${v.toFixed(1)}%`;
 
 // ---------- Presets de período ----------
 type Periodo = { de: string; ate: string };
+/**
+ * Atalhos de período, na ordem em que a gestão pediu: primeiro o dia corrente,
+ * depois o dia anterior e as janelas mais longas. Os rótulos em português
+ * substituíram as siglas MTD e YTD, que ninguém na clínica lia como "mês
+ * corrente" e "ano corrente".
+ */
 const presets: { label: string; hint: string; make: () => Periodo }[] = [
   { label: "Hoje", hint: "Somente o dia de hoje", make: () => ({ de: hojeISO(), ate: hojeISO() }) },
   {
+    label: "Ontem",
+    hint: "Somente o dia de ontem",
+    make: () => ({ de: addDays(hojeISO(), -1), ate: addDays(hojeISO(), -1) }),
+  },
+  {
     label: "7d",
-    hint: "Últimos 7 dias",
+    hint: "Últimos 7 dias, incluindo hoje",
     make: () => ({ de: addDays(hojeISO(), -6), ate: hojeISO() }),
   },
   {
     label: "30d",
-    hint: "Últimos 30 dias",
+    hint: "Últimos 30 dias, incluindo hoje",
     make: () => ({ de: addDays(hojeISO(), -29), ate: hojeISO() }),
   },
   {
-    label: "MTD",
-    hint: "Mês atual (do dia 1 até hoje)",
-    make: () => {
-      const d = new Date();
-      const de = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-      return { de, ate: hojeISO() };
-    },
-  },
-  {
-    label: "YTD",
-    hint: "Ano atual (de 1º de janeiro até hoje)",
-    make: () => {
-      const d = new Date();
-      return { de: `${d.getFullYear()}-01-01`, ate: hojeISO() };
-    },
+    label: "Este mês",
+    hint: "Do dia 1º do mês até hoje",
+    make: () => ({ de: primeiroDiaDoMes(hojeISO()), ate: hojeISO() }),
   },
   {
     label: "90d",
-    hint: "Últimos 90 dias",
+    hint: "Últimos 90 dias, incluindo hoje",
     make: () => ({ de: addDays(hojeISO(), -89), ate: hojeISO() }),
   },
+  {
+    label: "Este ano",
+    hint: "De 1º de janeiro até hoje",
+    make: () => ({ de: primeiroDiaDoAno(hojeISO()), ate: hojeISO() }),
+  },
 ];
+
+/** Atalho que a tela abre selecionado: o dia corrente. */
+const PRESET_PADRAO = presets[0];
 
 // ---------- Carrega bloco ----------
 /**
@@ -257,8 +289,13 @@ const num = (v: unknown): number => {
 };
 
 async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco> {
-  const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
-  const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
+  // Fronteiras do período no fuso da clínica. Montar a data com
+  // `new Date(\`${periodo.de}T00:00:00\`)` resolve no fuso de quem executa —
+  // o navegador da recepção (BRT) e o Worker do SSR (UTC) chegavam a janelas
+  // diferentes, com até 3 horas de diferença. Num período de 30 dias isso
+  // mudava pouco; agora que o padrão é um único dia, deslocaria o dia inteiro.
+  const ini = zonedDateStringToUtcISO(periodo.de, "00:00:00");
+  const fim = zonedDateStringToUtcISO(periodo.ate, "23:59:59");
 
   const [blocoR, grsR, atendR, medicosR] = await Promise.all([
     supabase.rpc(
@@ -409,7 +446,9 @@ function PainelExecutivoPage() {
   const podeFin = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const podeEscrever = usePodeEscrever("painel-executivo");
 
-  const [periodo, setPeriodo] = useState<Periodo>(presets[2].make()); // 30d
+  // A tela abre no dia corrente. Antes abria nos últimos 30 dias, e a gestão
+  // via um acumulado quando queria saber como está o dia.
+  const [periodo, setPeriodo] = useState<Periodo>(PRESET_PADRAO.make());
   const [carregando, setCarregando] = useState(false);
   const [atual, setAtual] = useState<Bloco>(emptyBloco());
   const [anterior, setAnterior] = useState<Bloco>(emptyBloco());
@@ -513,7 +552,9 @@ function PainelExecutivoPage() {
                 className="h-9 w-40 focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
-            <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/60 p-1">
+            {/* flex-wrap: são sete atalhos, e em tela de celular eles não cabem
+                numa linha só — sem isso a faixa empurrava o layout para o lado. */}
+            <div className="flex flex-wrap items-center gap-0.5 rounded-2xl border border-border bg-muted/60 p-1">
               {presets.map((pr) => {
                 const alvo = pr.make();
                 const ativo = alvo.de === periodo.de && alvo.ate === periodo.ate;
