@@ -45,6 +45,8 @@ import {
   obterWhatsappConfig,
   salvarWhatsappConfig,
   testarConexaoWhatsapp,
+  statusNumeroWhatsapp,
+  registrarNumeroWhatsapp,
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
