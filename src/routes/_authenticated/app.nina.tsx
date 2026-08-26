@@ -1183,6 +1183,27 @@ function ConfiguracaoWhatsApp() {
                 </Button>
               </div>
             </div>
+            {(cfg.phone_number_id || cfg.has_access_token) && (
+              <div className="rounded-md border p-3 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium">Status na Cloud API</span>
+                  {statusDetalhe}
+                </div>
+                <div className="flex items-center gap-2">
+                  {metaStatusBadge}
+                  {botaoRegistrar}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void atualizarStatusMeta()}
+                    disabled={statusLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${statusLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
@@ -1197,6 +1218,49 @@ function ConfiguracaoWhatsApp() {
             </Button>
             <Button onClick={onSalvar} disabled={saving || testing}>
               {saving ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pinOpen}
+        onOpenChange={(o) => {
+          setPinOpen(o);
+          if (!o) setPin("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar na Cloud API</DialogTitle>
+            <DialogDescription>
+              Informe um PIN de 6 dígitos. Esse PIN se torna a verificação em duas etapas do número
+              na Meta — guarde-o, será exigido em registros futuros.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>PIN (6 dígitos)</Label>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="font-mono tracking-[0.4em] text-center text-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPinOpen(false)} disabled={registrando}>
+              Cancelar
+            </Button>
+            <Button onClick={onRegistrar} disabled={registrando || pin.length !== 6}>
+              {registrando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Registrando…
+                </>
+              ) : (
+                "Registrar"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
