@@ -24,6 +24,8 @@ import {
   RefreshCw,
   Undo2,
   BarChart3,
+  Users,
+  Printer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -57,8 +59,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDatePura } from "@/lib/date-utils";
+import { formatDatePura, hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
@@ -103,6 +112,13 @@ type Bloco = {
    * `painel_grs_periodo`), porque a contagem no navegador é limitada a 1.000
    * linhas por consulta e a clínica emite muito mais que isso.
    * `pacientes` = pacientes distintos que geraram essas guias.
+   *
+   * A conta é a MESMA da aba "GRs" (ver SecaoGrsDoDia): uma GR por atendimento
+   * lançado em `fin_lancamentos`. Até 26/08/2026 a função contava impressões de
+   * guia (`gr_impressoes`), que deixou de ser alimentada em 22/07 — o card
+   * mostrava 9 guias numa semana em que a clínica lançou mais de 1.500.
+   * A correção está em
+   * supabase/migrations/20260826120000_painel_grs_periodo_por_lancamento.sql.
    */
   grs: {
     total: number;
@@ -597,6 +613,7 @@ function PainelExecutivoPage() {
       <Tabs defaultValue="producao" className="space-y-4">
         <TabsList>
           <TabsTrigger value="producao">Produção</TabsTrigger>
+          <TabsTrigger value="grs">GRs</TabsTrigger>
           {podeFin && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
           <TabsTrigger value="comercial">Comercial</TabsTrigger>
           <TabsTrigger value="qualidade">Qualidade</TabsTrigger>
@@ -683,6 +700,11 @@ function PainelExecutivoPage() {
               rows={p.porEspecialidade.map((e) => ({ nome: e.nome, valor: e.total }))}
             />
           </div>
+        </TabsContent>
+
+        {/* GRs do dia — resumo e lista detalhada (ver SecaoGrsDoDia) */}
+        <TabsContent value="grs" className="space-y-6">
+          <SecaoGrsDoDia clinicaId={clinicaAtual.clinica_id} podeFin={podeFin} />
         </TabsContent>
 
         {/* Financeiro */}
@@ -1030,6 +1052,640 @@ function RankCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================================
+// GRs do dia — resumo + lista detalhada
+// ----------------------------------------------------------------------------
+// A gestão pediu para enxergar, guia por guia, o que foi lançado no dia:
+// horário, número da GR, paciente, médico/especialidade/procedimento, quem
+// executou o lançamento, situação e valor.
+//
+// Por que esta seção tem um filtro de DATA próprio, separado do período do topo
+// da tela: os cards do topo respondem "quanto deu no período" e podem varrer 90
+// dias; esta lista é linha a linha, e um dia da clínica já passa de 350 guias.
+//
+// ---------------------------- DE ONDE SAI A LISTA --------------------------
+// A base é o LANÇAMENTO de receita (`fin_lancamentos`), não o registro de
+// impressão da guia (`gr_impressoes`). Dois motivos:
+//
+//   1. É o que a gestão pediu: "horário do lançamento" e "usuário que executou
+//      o lançamento" são exatamente `created_at` e `criado_por` do lançamento.
+//   2. `gr_impressoes` deixou de ser alimentada de forma confiável: em
+//      25/08/2026 a clínica faturou 326 atendimentos e a tabela de impressões
+//      registrou 1 linha. Uma lista montada sobre ela viria praticamente
+//      vazia. A tabela ainda é lida aqui, mas só para acrescentar o número da
+//      guia impressa e contar as 2ªs vias.
+//
+// Uma GR = um atendimento. Pagamento dividido gera vários lançamentos para o
+// mesmo agendamento e continua sendo UMA guia, por isso o agrupamento por
+// agendamento.
+// ============================================================================
+
+/** Tamanho da página de leitura — é o teto de linhas que o PostgREST devolve. */
+const GR_PAGINA = 1000;
+/** Teto de páginas: 5.000 lançamentos num único dia já seria muito acima do normal. */
+const GR_MAX_PAGINAS = 5;
+
+type GrLancRow = {
+  id: string;
+  agendamento_id: string | null;
+  paciente_id: string | null;
+  medico_id: string | null;
+  descricao: string | null;
+  valor: number | string | null;
+  status: string;
+  criado_por: string | null;
+  created_at: string;
+};
+
+type GrLinha = {
+  id: string;
+  hora: string;
+  /** Posição da GR na ordem do dia (1, 2, 3…) — sempre existe. */
+  numero: string;
+  /** Nº da guia impressa, quando a impressão ficou registrada. */
+  numeroGuia: string | null;
+  paciente: string;
+  medico: string;
+  especialidade: string;
+  procedimento: string;
+  atendente: string;
+  /** Situação do atendimento na agenda (Aguardando, Atendido, Falta…). */
+  situacao: string;
+  /** Situação financeira da guia (Faturado, A receber, Estornado…). */
+  financeiro: string | null;
+  /** Valor cobrado na guia (lançamentos não cancelados). */
+  valor: number;
+  /** Parte já confirmada no caixa. */
+  valorConfirmado: number;
+};
+
+type GrsDoDia = { linhas: GrLinha[]; segundasVias: number; truncado: boolean };
+
+const grVazio = (): GrsDoDia => ({ linhas: [], segundasVias: 0, truncado: false });
+
+/**
+ * Hora HH:mm no fuso da clínica — nunca no fuso do navegador de quem abre o
+ * painel. Um lançamento das 21:30 em São Paulo, aberto de outro fuso,
+ * apareceria com outro horário e, na virada do dia, fora da lista.
+ */
+const horaClinica = (iso: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    timeZone: TZ_CLINICA,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+
+/**
+ * Separa o procedimento na especialidade do SERVIÇO e no nome limpo.
+ *
+ * O nome do procedimento carrega a especialidade entre parênteses no fim
+ * ("CONSULTA (CARDIOLOGIA)"), e é ela que vale para a guia — a mesma leitura
+ * que a GR impressa faz em `formatServicoLinha` (src/lib/print-gr.ts). Sem
+ * isso, a lista mostraria a especialidade principal do médico: um cardiologista
+ * cadastrado como geriatra apareceria atendendo "GERIATRIA · CONSULTA
+ * (CARDIOLOGIA)". Na base da clínica isso não é exceção — `especialidade_id` do
+ * agendamento vem sempre vazio, então a especialidade do médico seria a única
+ * fonte, e um quinto dos procedimentos do dia traz a sua própria.
+ */
+function separarProcedimento(nome: string): { procedimento: string; especialidade: string | null } {
+  const base = nome.trim();
+  const m = base.match(/^(.*)\(([^()]+)\)\s*$/);
+  if (!m) return { procedimento: base, especialidade: null };
+  const limpo = m[1].trim();
+  const esp = m[2].trim();
+  return { procedimento: limpo || base, especialidade: esp || null };
+}
+
+/** Os mesmos rótulos que a recepção vê na agenda, para a lista falar a mesma língua. */
+const SITUACAO_LABEL: Record<string, string> = {
+  agendado: "Aguardando",
+  confirmado: "Confirmado",
+  realizado: "Atendido",
+  faltou: "Falta",
+  cancelado: "Cancelado",
+};
+
+/**
+ * Roda a mesma consulta em lotes de ids.
+ *
+ * O filtro `.in(...)` viaja na URL da requisição, e algumas centenas de UUIDs
+ * de uma vez estouram o limite de tamanho da URL — nesse caso a consulta volta
+ * com erro, não com menos linhas. Em lotes, o tamanho da lista deixa de
+ * depender do movimento do dia.
+ */
+async function emLotes<T>(
+  ids: string[],
+  tamanho: number,
+  consulta: (lote: string[]) => PromiseLike<{ data: unknown }>,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += tamanho) lotes.push(ids.slice(i, i + tamanho));
+  const res = await Promise.all(lotes.map((l) => consulta(l)));
+  return res.flatMap((r) => (r.data ?? []) as T[]);
+}
+
+const soIds = (v: (string | null | undefined)[]) => [...new Set(v.filter((x): x is string => !!x))];
+
+async function carregarGrsDoDia(cid: string, dia: string): Promise<GrsDoDia> {
+  // Fronteira do dia calculada no fuso da clínica (ver janelaDiaClinica): o
+  // caminho `new Date(dia + "T00:00:00")` erra em até 3 horas dependendo de
+  // onde o código roda.
+  const { inicio, fimExclusivo } = janelaDiaClinica(dia);
+
+  // Leitura paginada: o PostgREST devolve no máximo GR_PAGINA linhas por
+  // consulta e um dia cheio já passa de 350 lançamentos. Sem paginar, um dia
+  // mais movimentado sairia cortado sem avisar.
+  const lancs: GrLancRow[] = [];
+  let truncado = false;
+  for (let pagina = 0; ; pagina++) {
+    if (pagina >= GR_MAX_PAGINAS) {
+      truncado = true;
+      break;
+    }
+    const { data, error } = await supabase
+      .from("fin_lancamentos")
+      .select(
+        "id,agendamento_id,paciente_id,medico_id,descricao,valor,status,criado_por,created_at",
+      )
+      .eq("clinica_id", cid)
+      .eq("tipo", "receita")
+      .gte("created_at", inicio)
+      .lt("created_at", fimExclusivo)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(pagina * GR_PAGINA, pagina * GR_PAGINA + GR_PAGINA - 1);
+    if (error) {
+      mostrarErro(error, "falha ao ler as GRs do dia");
+      return grVazio();
+    }
+    const pag = (data ?? []) as GrLancRow[];
+    lancs.push(...pag);
+    if (pag.length < GR_PAGINA) break;
+  }
+
+  // Uma GR = um atendimento. Pagamento dividido gera vários lançamentos para o
+  // mesmo agendamento e continua sendo a MESMA guia. Lançamento sem agendamento
+  // (mensalidade do cartão, cobrança avulsa) é uma GR sozinho.
+  const ordem: string[] = [];
+  const grupos = new Map<string, GrLancRow[]>();
+  for (const l of lancs) {
+    const chave = l.agendamento_id ?? `lanc:${l.id}`;
+    const atual = grupos.get(chave);
+    if (atual) atual.push(l);
+    else {
+      grupos.set(chave, [l]);
+      ordem.push(chave);
+    }
+  }
+
+  const agIds = soIds(lancs.map((l) => l.agendamento_id));
+
+  const [ags, impressoes] = await Promise.all([
+    emLotes<{
+      id: string;
+      paciente_nome: string | null;
+      medico_id: string | null;
+      especialidade_id: string | null;
+      procedimento: string | null;
+      status: string;
+    }>(agIds, 100, (lote) =>
+      supabase
+        .from("agendamentos")
+        .select("id,paciente_nome,medico_id,especialidade_id,procedimento,status")
+        .in("id", lote),
+    ),
+    // Só para enfeitar a lista com o número da guia impressa e contar as 2ªs
+    // vias — a existência da GR não depende disto (ver o bloco de comentário
+    // no topo da seção).
+    supabase
+      .from("gr_impressoes")
+      .select("agendamento_id,ficha_numero,via_numero")
+      .eq("clinica_id", cid)
+      .gte("created_at", inicio)
+      .lt("created_at", fimExclusivo)
+      .limit(GR_PAGINA)
+      .then(
+        (r) =>
+          (r.data ?? []) as {
+            agendamento_id: string | null;
+            ficha_numero: number | null;
+            via_numero: number;
+          }[],
+      ),
+  ]);
+
+  const agMap = new Map(ags.map((a) => [a.id, a] as const));
+  const fichaImpressa = new Map<string, number>();
+  let segundasVias = 0;
+  for (const i of impressoes) {
+    if (i.via_numero > 1) segundasVias++;
+    else if (i.agendamento_id && i.ficha_numero != null)
+      fichaImpressa.set(i.agendamento_id, i.ficha_numero);
+  }
+
+  const [meds, profs, pacs] = await Promise.all([
+    // Sem filtro de `ativo`: médico desligado depois do atendimento continua
+    // sendo o médico daquela guia.
+    emLotes<{ id: string; nome: string; especialidade_id: string | null }>(
+      soIds([...ags.map((a) => a.medico_id), ...lancs.map((l) => l.medico_id)]),
+      100,
+      (lote) => supabase.from("medicos").select("id,nome,especialidade_id").in("id", lote),
+    ),
+    emLotes<{ id: string; nome: string | null }>(
+      soIds(lancs.map((l) => l.criado_por)),
+      100,
+      (lote) => supabase.from("profiles").select("id,nome").in("id", lote),
+    ),
+    // Paciente só precisa ser buscado nas GRs sem agendamento; nas outras o
+    // nome já vem do próprio agendamento.
+    emLotes<{ id: string; nome: string }>(
+      soIds(lancs.filter((l) => !l.agendamento_id).map((l) => l.paciente_id)),
+      100,
+      (lote) => supabase.from("pacientes").select("id,nome").in("id", lote),
+    ),
+  ]);
+
+  const medMap = new Map(meds.map((m) => [m.id, m] as const));
+  const profMap = new Map(profs.map((p) => [p.id, (p.nome ?? "").trim()] as const));
+  const pacMap = new Map(pacs.map((p) => [p.id, p.nome] as const));
+
+  // A especialidade da guia sai do agendamento; quando ele não tem, cai na
+  // especialidade principal do médico — a mesma ordem que a GR impressa usa.
+  const esps = await emLotes<{ id: string; nome: string }>(
+    soIds([...ags.map((a) => a.especialidade_id), ...meds.map((m) => m.especialidade_id)]),
+    100,
+    (lote) => supabase.from("especialidades").select("id,nome").in("id", lote),
+  );
+  const espMap = new Map(esps.map((e) => [e.id, e.nome] as const));
+
+  const linhas: GrLinha[] = ordem.map((chave, i) => {
+    const doGrupo = grupos.get(chave) ?? [];
+    const primeiro = doGrupo[0];
+    const agId = primeiro.agendamento_id;
+    const a = agId ? agMap.get(agId) : undefined;
+
+    const naoCancelados = doGrupo.filter((l) => l.status !== "cancelado");
+    const confirmados = doGrupo.filter((l) => l.status === "confirmado");
+    const financeiro = confirmados.length
+      ? "Faturado"
+      : naoCancelados.length
+        ? "A receber"
+        : "Estornado";
+
+    const medId = a?.medico_id ?? primeiro.medico_id ?? null;
+    const med = medId ? medMap.get(medId) : undefined;
+    const espId = a?.especialidade_id ?? med?.especialidade_id ?? null;
+    // "Usuário que executou o lançamento" = quem criou a receita.
+    const autor = doGrupo.map((l) => l.criado_por).find((v): v is string => !!v) ?? null;
+    // A descrição do lançamento é "PACIENTE — PROCEDIMENTO"; sem agendamento,
+    // o que sobra depois do travessão é a melhor descrição do serviço.
+    const depoisDoTravessao = (primeiro.descricao ?? "").split("—").slice(1).join("—").trim();
+    const servico = separarProcedimento(
+      (a?.procedimento ?? "").trim() || depoisDoTravessao || (primeiro.descricao ?? "").trim(),
+    );
+
+    return {
+      id: chave,
+      hora: horaClinica(primeiro.created_at),
+      numero: String(i + 1),
+      numeroGuia: agId && fichaImpressa.has(agId) ? String(fichaImpressa.get(agId)) : null,
+      paciente:
+        (a?.paciente_nome ?? "").trim() ||
+        (primeiro.paciente_id ? (pacMap.get(primeiro.paciente_id) ?? "") : "") ||
+        "—",
+      medico: med?.nome ?? "—",
+      // Especialidade do serviço na frente da do médico — ver separarProcedimento.
+      especialidade: servico.especialidade ?? (espId ? (espMap.get(espId) ?? "—") : "—"),
+      procedimento: servico.procedimento || "—",
+      atendente: (autor ? (profMap.get(autor) ?? "") : "") || "—",
+      // Sem agendamento não há situação de agenda — é uma cobrança avulsa
+      // (mensalidade do cartão, taxa, acerto). Dizer "Avulso" é mais honesto
+      // que herdar um status que aquele lançamento não tem.
+      situacao: a ? (SITUACAO_LABEL[a.status] ?? "—") : "Avulso",
+      financeiro,
+      valor: naoCancelados.reduce((s, l) => s + num(l.valor), 0),
+      valorConfirmado: confirmados.reduce((s, l) => s + num(l.valor), 0),
+    };
+  });
+
+  return { linhas, segundasVias, truncado };
+}
+
+const TODOS = "todos";
+
+function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boolean }) {
+  const [dia, setDia] = useState<string>(hojeBR());
+  const [dados, setDados] = useState<GrsDoDia>(grVazio());
+  const [carregando, setCarregando] = useState(false);
+  const [fAtendente, setFAtendente] = useState(TODOS);
+  const [fMedico, setFMedico] = useState(TODOS);
+  const [fStatus, setFStatus] = useState(TODOS);
+  const [busca, setBusca] = useState("");
+
+  const carregar = async () => {
+    setCarregando(true);
+    try {
+      setDados(await carregarGrsDoDia(clinicaId, dia));
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    // Trocar de dia zera os filtros: o atendente escolhido ontem pode não ter
+    // trabalhado hoje, e a lista abriria vazia sem explicar o porquê.
+    setFAtendente(TODOS);
+    setFMedico(TODOS);
+    setFStatus(TODOS);
+    void carregar(); /* eslint-disable-next-line */
+  }, [clinicaId, dia]);
+
+  const ordenar = (v: string[]) => [...new Set(v)].filter((x) => x !== "—").sort();
+  const atendentes = useMemo(() => ordenar(dados.linhas.map((l) => l.atendente)), [dados]);
+  const medicos = useMemo(() => ordenar(dados.linhas.map((l) => l.medico)), [dados]);
+  // As opções de status saem das próprias linhas do dia — assim a lista nunca
+  // oferece um filtro que não existe naquele dia.
+  const statuses = useMemo(
+    () => ordenar(dados.linhas.flatMap((l) => [l.situacao, l.financeiro ?? "—"])),
+    [dados],
+  );
+
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return dados.linhas.filter((l) => {
+      if (fAtendente !== TODOS && l.atendente !== fAtendente) return false;
+      if (fMedico !== TODOS && l.medico !== fMedico) return false;
+      // Um status casa tanto pela situação do atendimento quanto pela situação
+      // financeira: "Atendido" e "Faturado" são respostas para a mesma guia.
+      if (fStatus !== TODOS && l.situacao !== fStatus && l.financeiro !== fStatus) return false;
+      if (
+        termo &&
+        !`${l.numero} ${l.numeroGuia ?? ""} ${l.paciente} ${l.medico} ${l.especialidade} ${l.procedimento} ${l.atendente}`
+          .toLowerCase()
+          .includes(termo)
+      )
+        return false;
+      return true;
+    });
+  }, [dados, fAtendente, fMedico, fStatus, busca]);
+
+  const valorTotal = filtradas.reduce((s, l) => s + l.valor, 0);
+  const valorConfirmado = filtradas.reduce((s, l) => s + l.valorConfirmado, 0);
+  const pacientes = new Set(filtradas.map((l) => l.paciente).filter((p) => p !== "—")).size;
+  const filtrando = filtradas.length !== dados.linhas.length;
+  const limpar = () => {
+    setFAtendente(TODOS);
+    setFMedico(TODOS);
+    setFStatus(TODOS);
+    setBusca("");
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtro de data próprio desta seção */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            Dia do lançamento
+          </Label>
+          <DateInputBR
+            value={dia}
+            onChange={(e) => setDia(e.target.value)}
+            className="h-9 w-40 focus-visible:ring-2 focus-visible:ring-primary/30"
+          />
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setDia(hojeBR())} className="h-9">
+          Hoje
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-9"
+          onClick={() => void carregar()}
+          disabled={carregando}
+        >
+          <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
+        </Button>
+        <span className="pb-1 text-xs text-muted-foreground">
+          Guias emitidas em {formatDatePura(dia)}
+        </span>
+      </div>
+
+      {/* 1) Cards de resumo — total de GRs do dia */}
+      <HhpKpiRow>
+        <HhpKpiCard
+          label="GRs geradas"
+          value={int(filtradas.length)}
+          icon={FileText}
+          tone="info"
+          hint={
+            filtrando
+              ? `${int(filtradas.length)} de ${int(dados.linhas.length)} guias do dia (filtro aplicado)`
+              : `${int(dados.linhas.length)} guias emitidas no dia`
+          }
+        />
+        {podeFin && (
+          <>
+            <HhpKpiCard
+              label="Valor lançado"
+              value={money(valorTotal)}
+              icon={Wallet}
+              tone="info"
+              hint="Soma das guias listadas, sem contar as estornadas"
+            />
+            <HhpKpiCard
+              label="Confirmado no caixa"
+              value={money(valorConfirmado)}
+              icon={Receipt}
+              tone="ok"
+              hint="Parte das guias listadas que já entrou no caixa"
+            />
+          </>
+        )}
+        <HhpKpiCard
+          label="Pacientes"
+          value={int(pacientes)}
+          icon={Users}
+          tone="default"
+          hint="Pacientes distintos nas guias listadas"
+        />
+        <HhpKpiCard
+          label="2ªs vias impressas"
+          value={int(dados.segundasVias)}
+          icon={Printer}
+          tone="default"
+          hint="Reimpressões registradas no dia — não contam como GR nova"
+        />
+      </HhpKpiRow>
+
+      {dados.truncado && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Este dia tem mais de {int(GR_PAGINA * GR_MAX_PAGINAS)} lançamentos e a lista mostra
+            apenas os primeiros. Os números acima também estão incompletos — trate como amostra, não
+            como total do dia.
+          </span>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>GRs geradas em {formatDatePura(dia)}</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {int(filtradas.length)} {filtradas.length === 1 ? "guia" : "guias"}
+            </span>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Uma linha por atendimento lançado. O Nº é a ordem da GR no dia; quando a impressão da
+            guia ficou registrada, o número dela aparece ao lado.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* 3) Filtros rápidos */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={fAtendente} onValueChange={setFAtendente}>
+              <SelectTrigger className="h-9 w-[200px] text-xs">
+                <SelectValue placeholder="Todos os atendentes" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={TODOS}>Todos os atendentes</SelectItem>
+                {atendentes.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={fMedico} onValueChange={setFMedico}>
+              <SelectTrigger className="h-9 w-[200px] text-xs">
+                <SelectValue placeholder="Todos os médicos" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={TODOS}>Todos os médicos</SelectItem>
+                {medicos.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={fStatus} onValueChange={setFStatus}>
+              <SelectTrigger className="h-9 w-[180px] text-xs">
+                <SelectValue placeholder="Todos os status" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={TODOS}>Todos os status</SelectItem>
+                {statuses.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar paciente, procedimento, nº da GR…"
+              className="h-9 w-[280px] text-xs"
+            />
+
+            {(filtrando || busca) && (
+              <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={limpar}>
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+
+          {/* 2) Lista detalhada */}
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[70px]">Horário</TableHead>
+                  <TableHead className="w-[110px]">Nº GR</TableHead>
+                  <TableHead>Paciente</TableHead>
+                  <TableHead>Médico / Especialidade / Procedimento</TableHead>
+                  <TableHead>Atendente</TableHead>
+                  <TableHead>Status</TableHead>
+                  {podeFin && <TableHead className="text-right">Valor</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {carregando && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={podeFin ? 7 : 6}
+                      className="py-6 text-center text-sm text-muted-foreground"
+                    >
+                      Carregando…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!carregando && filtradas.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={podeFin ? 7 : 6}
+                      className="py-6 text-center text-sm text-muted-foreground"
+                    >
+                      {dados.linhas.length === 0
+                        ? "Nenhuma GR gerada neste dia."
+                        : "Nenhuma GR corresponde aos filtros."}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!carregando &&
+                  filtradas.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="whitespace-nowrap text-xs tabular-nums">
+                        {l.hora}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs tabular-nums">
+                        <span className="font-semibold">{l.numero}</span>
+                        {l.numeroGuia && (
+                          <span className="ml-1 text-muted-foreground">· guia {l.numeroGuia}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium uppercase">{l.paciente}</TableCell>
+                      <TableCell className="text-sm">
+                        <div>{l.medico}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {l.especialidade !== "—" ? `${l.especialidade} · ` : ""}
+                          {l.procedimento}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{l.atendente}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant="outline" className="text-[11px]">
+                            {l.situacao}
+                          </Badge>
+                          {l.financeiro && (
+                            <Badge variant="secondary" className="text-[11px]">
+                              {l.financeiro}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      {podeFin && (
+                        <TableCell className="text-right tabular-nums">{money(l.valor)}</TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
