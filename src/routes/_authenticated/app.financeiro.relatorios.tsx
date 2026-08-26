@@ -61,12 +61,13 @@ import {
 import {
   diffDias,
   periodoComparacao,
-  presetAtivo,
-  PRESETS_PERIODO,
   variacao,
   type ModoComparacao,
 } from "@/lib/financeiro/periodos";
-import { hojeBR } from "@/lib/date-utils";
+// Mesmo seletor de período do Dashboard/Estatísticas: as abas Dia, Semana,
+// Quinzena e Mês aplicam o intervalo sozinhas e só "Período" abre os campos de
+// data. Reusar o componente é o que mantém as duas telas idênticas.
+import { computeRange, DateRangeFilter, type DatePreset } from "@/components/date-range-filter";
 // Mesma normalização de nome usada no cálculo de repasse ("ultrassom" acha
 // "ULTRASSONOGRAFIA"), para a busca do combobox casar com o cadastro.
 import { normRepasse } from "@/lib/repasse-calc";
@@ -101,7 +102,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios")({
@@ -331,8 +331,12 @@ function CardResumo({
 function Page() {
   const { clinicaAtual } = useClinica();
   const [tipo, setTipo] = useState<Tipo>("lancamentos");
-  const [from, setFrom] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  // A tela abre no mês corrente, que é a aba "Mês" do seletor. O intervalo e a
+  // aba precisam nascer combinando: um intervalo solto deixaria uma aba acesa
+  // mostrando outras datas.
+  const [preset, setPreset] = useState<DatePreset>("mes");
+  const [from, setFrom] = useState(() => computeRange("mes").from);
+  const [to, setTo] = useState(() => computeRange("mes").to);
   const [loading, setLoading] = useState(false);
   const [pagina, setPagina] = useState(1);
 
@@ -355,7 +359,6 @@ function Page() {
   const [ctxCarregando, setCtxCarregando] = useState(false);
   const ctxPedido = useRef(false);
 
-  const hoje = hojeBR();
   const periodoAtual = { de: from, ate: to };
   const periodoComp = periodoComparacao(periodoAtual, modoComparacao, {
     de: compDe || from,
@@ -882,7 +885,6 @@ function Page() {
     return out;
   }, [ctxRateio, rGrupo, buscaServico]);
 
-  const atalhoAtivo = presetAtivo({ de: from, ate: to }, hoje);
   const deltaDe = (atual: number, anterior: number) =>
     comparacaoVisivel ? variacao(atual, anterior).percentual : undefined;
 
@@ -902,11 +904,12 @@ function Page() {
           <CardTitle>Gerar relatório</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Bloco 1 — o que buscar e em que período. Os atalhos ocupam a
-              quarta coluna nas telas largas e a linha inteira nas estreitas,
-              onde oito pílulas não caberiam ao lado dos campos. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
+          {/* Bloco 1 — o que buscar e em que período. O seletor de período é o
+              mesmo componente do Dashboard/Estatísticas (Dia, Semana, Quinzena,
+              Mês, Período): as abas aplicam o intervalo sozinhas e os campos de
+              data só aparecem em "Período". */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-1.5 lg:w-72">
               <Label className={ROTULO}>Tipo de relatório</Label>
               <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
                 <SelectTrigger className={CAMPO}>
@@ -921,50 +924,16 @@ function Page() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className={ROTULO}>De</Label>
-              <DateInputBR
-                className={CAMPO}
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
+              <Label className={ROTULO}>Período</Label>
+              <DateRangeFilter
+                value={{ from, to }}
+                preset={preset}
+                onChange={(range, p) => {
+                  setFrom(range.from);
+                  setTo(range.to);
+                  setPreset(p);
+                }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className={ROTULO}>Até</Label>
-              <DateInputBR className={CAMPO} value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div className="space-y-1.5 md:col-span-2 xl:col-span-1">
-              <Label className={ROTULO}>Atalhos de período</Label>
-              <TooltipProvider delayDuration={200}>
-                <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  {PRESETS_PERIODO.map((pr) => {
-                    const ativo = atalhoAtivo === pr.label;
-                    return (
-                      <Tooltip key={pr.label}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const alvo = pr.make(hoje);
-                              setFrom(alvo.de);
-                              setTo(alvo.ate);
-                            }}
-                            aria-pressed={ativo}
-                            className={cn(
-                              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                              ativo
-                                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
-                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-                            )}
-                          >
-                            {pr.label}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>{pr.hint}</TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              </TooltipProvider>
             </div>
           </div>
 

@@ -4,50 +4,9 @@ import {
   diasDoPeriodo,
   mesmoDiaAnoAnterior,
   periodoComparacao,
-  presetAtivo,
-  PRESETS_PERIODO,
   ultimoDiaDoMes,
   variacao,
 } from "./periodos";
-
-const preset = (label: string) => PRESETS_PERIODO.find((p) => p.label === label)!;
-
-describe("atalhos de periodo", () => {
-  const hoje = "2026-08-26";
-
-  it("Hoje e Ontem cobrem um unico dia", () => {
-    expect(preset("Hoje").make(hoje)).toEqual({ de: "2026-08-26", ate: "2026-08-26" });
-    expect(preset("Ontem").make(hoje)).toEqual({ de: "2026-08-25", ate: "2026-08-25" });
-  });
-
-  it("as janelas de dias incluem o dia de hoje", () => {
-    expect(preset("7d").make(hoje)).toEqual({ de: "2026-08-20", ate: "2026-08-26" });
-    expect(preset("15d").make(hoje)).toEqual({ de: "2026-08-12", ate: "2026-08-26" });
-    expect(preset("30d").make(hoje)).toEqual({ de: "2026-07-28", ate: "2026-08-26" });
-    expect(diasDoPeriodo(preset("30d").make(hoje))).toBe(30);
-  });
-
-  it("Este mes vai do dia 1o ate hoje e Mes anterior fecha o mes inteiro", () => {
-    expect(preset("Este mês").make(hoje)).toEqual({ de: "2026-08-01", ate: "2026-08-26" });
-    expect(preset("Mês anterior").make(hoje)).toEqual({ de: "2026-07-01", ate: "2026-07-31" });
-  });
-
-  it("Mes anterior atravessa a virada do ano", () => {
-    expect(preset("Mês anterior").make("2026-01-10")).toEqual({
-      de: "2025-12-01",
-      ate: "2025-12-31",
-    });
-  });
-
-  it("Este ano comeca em 1o de janeiro", () => {
-    expect(preset("Este ano").make(hoje)).toEqual({ de: "2026-01-01", ate: "2026-08-26" });
-  });
-
-  it("reconhece qual atalho corresponde ao periodo escolhido", () => {
-    expect(presetAtivo({ de: "2026-08-01", ate: "2026-08-26" }, hoje)).toBe("Este mês");
-    expect(presetAtivo({ de: "2026-03-02", ate: "2026-04-09" }, hoje)).toBeNull();
-  });
-});
 
 describe("periodoComparacao", () => {
   it("periodo anterior tem o mesmo tamanho e encosta na vespera", () => {
@@ -60,6 +19,13 @@ describe("periodoComparacao", () => {
     expect(periodoComparacao({ de: "2026-08-26", ate: "2026-08-26" }, "anterior")).toEqual({
       de: "2026-08-25",
       ate: "2026-08-25",
+    });
+  });
+
+  it("mes inteiro compara com o mes anterior inteiro", () => {
+    expect(periodoComparacao({ de: "2026-08-01", ate: "2026-08-31" }, "anterior")).toEqual({
+      de: "2026-07-01",
+      ate: "2026-07-31",
     });
   });
 
