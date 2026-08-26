@@ -1,5 +1,10 @@
 -- Painel Executivo — card "GRs / Guias" passa a contar LANCAMENTOS, nao impressoes.
 --
+-- SITUACAO EM PRODUCAO: a funcao (passo 2) foi aplicada em 26/08/2026, com
+-- autorizacao do dono, e conferida logo depois. O indice (passo 1) ficou
+-- pendente de propriedade, para ser criado em um horario de movimento baixo —
+-- ele nao muda nenhum numero, so acelera a consulta.
+--
 -- ================================ O PROBLEMA ===============================
 -- A versao anterior desta funcao (20260819180000_painel_grs_periodo.sql) contava
 -- linhas de `gr_impressoes`, a tabela que registra a impressao da guia. Essa
