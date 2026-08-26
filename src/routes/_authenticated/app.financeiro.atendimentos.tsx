@@ -2176,11 +2176,17 @@ function AtendimentosPage() {
     return Array.from(m.values());
   }, [selectedItems, medMap]);
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
-  const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
+  // 2ª via: basta haver ao menos um selecionado já pago. Reimprimir não grava
+  // nada, então seleção misturada não precisa bloquear — o comprovante sai
+  // apenas com os itens efetivamente pagos.
+  const podeReimprimir = selectedPagos.length > 0;
   const misturado =
     selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
   const reimprimirSelecionados = () => {
-    if (!podeReimprimir) return;
+    if (!podeReimprimir) {
+      toast.info("Selecione atendimentos com repasse já pago para emitir a 2ª via.");
+      return;
+    }
     abrirSegundaViaLote(selectedPagos);
   };
 
@@ -2513,6 +2519,19 @@ function AtendimentosPage() {
                     : ""}
                 </Button>
               )}
+              {/* 2ª via do comprovante: aparece assim que há repasse pago marcado.
+                  Não exige permissão de escrita porque só reimprime. */}
+              {!isMedicoOnly && podeReimprimir && (
+                <Button
+                  variant="outline"
+                  onClick={reimprimirSelecionados}
+                  title="Reimprimir o comprovante (2ª via) dos repasses já pagos que estão selecionados"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  2ª via do comprovante
+                  {` (${selectedPagos.length} • ${fmt(selectedPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})`}
+                </Button>
+              )}
               {!isMedicoOnly && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -2562,6 +2581,18 @@ function AtendimentosPage() {
                       <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
                       Vincular vários laudos
                       {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={!podeReimprimir}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        reimprimirSelecionados();
+                      }}
+                    >
+                      <Printer className="h-4 w-4 mr-2 text-primary" />
+                      Reimprimir comprovante (2ª via)
+                      {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -3404,7 +3435,7 @@ function AtendimentosPage() {
                 <span className="ml-2 text-muted-foreground">— total {fmt(selectedTotal)}</span>
                 {misturado && (
                   <span className="ml-2 text-xs text-rose-700">
-                    Separe pagos e não pagos para agir.
+                    Para pagar repasse, selecione apenas os não pagos.
                   </span>
                 )}
               </div>
@@ -3418,6 +3449,17 @@ function AtendimentosPage() {
                   >
                     <Wallet className="h-4 w-4 mr-2" />
                     Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+                  </Button>
+                )}
+                {podeReimprimir && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={reimprimirSelecionados}
+                    title="Reimprimir o comprovante (2ª via) dos repasses já pagos que estão selecionados"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    2ª via ({selectedPagos.length})
                   </Button>
                 )}
                 <DropdownMenu>
