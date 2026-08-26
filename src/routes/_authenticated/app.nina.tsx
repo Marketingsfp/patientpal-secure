@@ -667,6 +667,9 @@ function ConfiguracaoWhatsApp() {
   const obter = useServerFn(obterWhatsappConfig);
   const salvar = useServerFn(salvarWhatsappConfig);
   const testar = useServerFn(testarConexaoWhatsapp);
+  const buscarStatus = useServerFn(statusNumeroWhatsapp);
+  const registrarNumero = useServerFn(registrarNumeroWhatsapp);
+
 
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
