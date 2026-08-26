@@ -199,3 +199,35 @@ vira sobra fantasma.
 
 **Não é defeito do programa — é a resposta dada na tela.** O único defeito real
 encontrado no dia é o do item 6 (estorno indo para o caixa de outra pessoa).
+
+---
+
+## 11. Correção aplicada em 26/08/2026
+
+**Movimentação do estorno da Odaiza: FEITA e conferida no banco.**
+
+A linha do estorno de R$ 110,00 saiu da sessão do João Pedro e está agora na
+sessão nº 2 da Suellen, com o dono do movimento corrigido para ela.
+
+| Caixa | Antes | Depois |
+|-------|-------|--------|
+| JOÃO PEDRO NEVES CANTARELA | −110,00 | **0,00** |
+| SUELLEN (caixa nº 2) | 887,00 | **777,00** |
+
+Os R$ 777,00 são os R$ 887,00 das guias retroativas menos os R$ 110,00 do
+estorno. No caixa da Suellen a Odaiza fecha em +R$ 10,00 (R$ 120,00 do risco
+cirúrgico − R$ 110,00 da consulta já paga no dia 20), que é exatamente a
+diferença que a paciente pagou.
+
+**Correção do código: no repositório, mas AINDA NÃO APLICADA no banco.**
+
+O commit `a62f5c0c` está na `main`, mas a migração
+`20260826120000_estorno_receita_vai_para_o_caixa_de_quem_recebeu.sql` ainda não
+rodou em produção. Verificado em 26/08/2026 direto no `pg_proc`: as funções
+`estornar_lancamento_receita` e `estornar_sangria` ainda são as versões
+antigas — a primeira ainda contém a variável `v_precisa_fallback` e a busca
+`user_id = v_uid` (o caixa de quem clicou), e nenhuma das duas conhece o aviso
+`lancado_no_caixa_de_quem_recebeu`.
+
+**Enquanto essa migração não rodar, o defeito se repete no próximo estorno
+aprovado de um recebimento cujo caixa já esteja fechado.**

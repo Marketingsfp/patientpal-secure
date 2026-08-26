@@ -61,6 +61,124 @@
 -- valor, reabertura do agendamento e baixa da mensalidade seguem idênticos.
 -- ---------------------------------------------------------------------------
 
+
+-- ---------------------------------------------------------------------------
+-- Auxiliar: para cada recebimento ainda pendente de estorno, onde a devolução
+-- deve ser lançada.
+--
+-- Existe como função separada porque o mesmo conjunto é lido duas vezes na
+-- rotina principal — uma para decidir se dá para estornar e montar o aviso,
+-- outra para inserir os movimentos. A alternativa seria uma tabela temporária
+-- dentro do PL/pgSQL, que é justamente onde mora a armadilha: o plano fica
+-- cacheado por conexão e a temp table é recriada com outro OID a cada chamada,
+-- então a segunda chamada na mesma conexão do pool falha com "relation ... does
+-- not exist". Uma função SQL não tem esse problema.
+--
+-- Não recebe GRANT para `authenticated`: é chamada de dentro de uma função
+-- SECURITY DEFINER e não deve ser exposta sozinha.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.estorno_receita_destinos(
+  _lancamento_id uuid,
+  _uid uuid
+)
+RETURNS TABLE (
+  clinica_id uuid,
+  valor numeric,
+  descricao text,
+  forma_pagamento text,
+  lancamento_id uuid,
+  sessao_destino uuid,
+  dono_destino uuid,
+  origem text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  with recebimentos as (
+    select r.id, r.sessao_id, r.clinica_id, r.user_id, r.valor, r.descricao,
+           r.forma_pagamento, r.lancamento_id, r.created_at,
+           s.status as sessao_status,
+           row_number() over (
+             partition by r.forma_pagamento, r.valor order by r.created_at, r.id
+           ) as rn
+      from caixa_movimentos r
+      join caixa_sessoes    s on s.id = r.sessao_id
+     where r.lancamento_id = _lancamento_id
+       and r.tipo = 'recebimento'
+  ),
+  ja_estornados as (
+    select e.forma_pagamento, e.valor, count(*) as n
+      from caixa_movimentos e
+     where e.lancamento_id = _lancamento_id
+       and (
+         e.tipo = 'estorno'
+         or (e.tipo = 'sangria' and lower(coalesce(e.descricao, '')) like 'estorno%')
+       )
+     group by e.forma_pagamento, e.valor
+  ),
+  pendentes as (
+    select r.*
+      from recebimentos r
+      left join ja_estornados j
+        on j.forma_pagamento is not distinct from r.forma_pagamento
+       and j.valor = r.valor
+     where r.rn > coalesce(j.n, 0)
+  )
+  select p.clinica_id, p.valor, p.descricao, p.forma_pagamento, p.lancamento_id,
+         d.sessao_destino, d.dono_destino, d.origem
+    from pendentes p
+    cross join lateral (
+      select
+        case when p.sessao_status = 'aberto' then p.sessao_id
+             else coalesce(s_receb.id, s_exec.id) end                as sessao_destino,
+        case when p.sessao_status = 'aberto' then p.user_id
+             else coalesce(s_receb.user_id, s_exec.user_id) end      as dono_destino,
+        case when p.sessao_status = 'aberto' then 'sessao_original'
+             when s_receb.id is not null     then 'caixa_de_quem_recebeu'
+             when s_exec.id  is not null     then 'caixa_do_executor'
+             else 'sem_destino' end                                  as origem
+        -- A base de uma linha é obrigatória: os dois LEFT JOIN LATERAL abaixo
+        -- podem não achar nada, e sem ela o recebimento sumiria do resultado
+        -- em vez de aparecer como 'sem_destino' — que é justamente o caso que
+        -- precisa bloquear o estorno.
+        from (select 1) base
+        -- Caixa aberto de quem RECEBEU o dinheiro: a gaveta de onde ele sai.
+        left join lateral (
+          select s2.id, s2.user_id
+            from caixa_sessoes s2
+           where s2.clinica_id = p.clinica_id
+             and s2.user_id    = p.user_id
+             and s2.status     = 'aberto'
+           order by s2.aberto_em desc
+           limit 1
+        ) s_receb on true
+        -- Só se essa pessoa não tiver caixa aberto: o de quem está executando.
+        left join lateral (
+          select s3.id, s3.user_id
+            from caixa_sessoes s3
+           where s3.clinica_id = p.clinica_id
+             and s3.user_id    = _uid
+             and s3.status     = 'aberto'
+           order by s3.aberto_em desc
+           limit 1
+        ) s_exec on true
+    ) d;
+$function$;
+
+-- O Postgres concede EXECUTE a PUBLIC em toda função nova. Aqui isso seria um
+-- vazamento: a função é SECURITY DEFINER, lê caixa_movimentos sem checar
+-- permissão nenhuma, e a descrição do movimento carrega nome de paciente e
+-- procedimento. Sem este REVOKE, qualquer usuário autenticado poderia varrer
+-- lançamentos de qualquer clínica passando ids no lugar do parâmetro.
+-- A função principal continua chamando normalmente: ela é SECURITY DEFINER e
+-- roda como owner.
+REVOKE ALL ON FUNCTION public.estorno_receita_destinos(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.estorno_receita_destinos(uuid, uuid) FROM authenticated;
+REVOKE ALL ON FUNCTION public.estorno_receita_destinos(uuid, uuid) FROM anon;
+
+
 CREATE OR REPLACE FUNCTION public.estornar_lancamento_receita(_lancamento_id uuid, _clinica_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -111,95 +229,22 @@ begin
       'mensagem', 'Repasse já pago — estorne o pagamento do repasse primeiro.');
   end if;
 
-  -- Sessão de destino de cada recebimento ainda pendente de estorno.
-  -- Materializada numa tabela temporária porque é consultada três vezes: para
-  -- checar se algum recebimento ficou sem destino, para montar os avisos e
-  -- para inserir os movimentos.
-  create temp table if not exists _estorno_destinos (
-    sessao_id uuid, clinica_id uuid, valor numeric, descricao text,
-    forma_pagamento text, lancamento_id uuid, sessao_destino uuid,
-    dono_destino uuid, origem text
-  ) on commit drop;
-  delete from _estorno_destinos;
-
-  insert into _estorno_destinos
-  with recebimentos as (
-    select r.id, r.sessao_id, r.clinica_id, r.user_id, r.valor, r.descricao,
-           r.forma_pagamento, r.lancamento_id, s.status as sessao_status,
-           row_number() over (
-             partition by r.forma_pagamento, r.valor order by r.created_at, r.id
-           ) as rn
-    from caixa_movimentos r
-    join caixa_sessoes s on s.id = r.sessao_id
-    where r.lancamento_id = v_lanc.id and r.tipo = 'recebimento'
-  ),
-  ja_estornados as (
-    select e.forma_pagamento, e.valor, count(*) as n
-    from caixa_movimentos e
-    where e.lancamento_id = v_lanc.id
-      and (
-        e.tipo = 'estorno'
-        or (e.tipo = 'sangria' and lower(coalesce(e.descricao, '')) like 'estorno%')
-      )
-    group by e.forma_pagamento, e.valor
-  ),
-  pendentes as (
-    select r.*
-    from recebimentos r
-    left join ja_estornados j
-      on j.forma_pagamento is not distinct from r.forma_pagamento and j.valor = r.valor
-    where r.rn > coalesce(j.n, 0)
-  )
-  select p.sessao_id, p.clinica_id, p.valor, p.descricao, p.forma_pagamento,
-         p.lancamento_id,
-         d.sessao_destino,
-         d.dono_destino,
-         d.origem
-  from pendentes p
-  cross join lateral (
-    select
-      case
-        when p.sessao_status = 'aberto' then p.sessao_id
-        else coalesce(s_receb.id, s_exec.id)
-      end as sessao_destino,
-      case
-        when p.sessao_status = 'aberto' then p.user_id
-        else coalesce(s_receb.user_id, s_exec.user_id)
-      end as dono_destino,
-      case
-        when p.sessao_status = 'aberto' then 'sessao_original'
-        when s_receb.id is not null      then 'caixa_de_quem_recebeu'
-        when s_exec.id is not null       then 'caixa_do_executor'
-        else 'sem_destino'
-      end as origem
-    from (select 1) _
-    -- Caixa aberto de quem RECEBEU o dinheiro: a gaveta de onde ele sai.
-    left join lateral (
-      select s2.id, s2.user_id from caixa_sessoes s2
-      where s2.clinica_id = p.clinica_id and s2.user_id = p.user_id and s2.status = 'aberto'
-      order by s2.aberto_em desc limit 1
-    ) s_receb on true
-    -- Só se essa pessoa não tiver caixa aberto: o caixa de quem está executando.
-    left join lateral (
-      select s3.id, s3.user_id from caixa_sessoes s3
-      where s3.clinica_id = p.clinica_id and s3.user_id = v_uid and s3.status = 'aberto'
-      order by s3.aberto_em desc limit 1
-    ) s_exec on true
-  ) d;
+  -- Onde cada devolução vai cair, e se alguma ficou sem destino possível.
+  select coalesce(bool_or(d.sessao_destino is null), false),
+         coalesce(bool_or(d.origem = 'caixa_de_quem_recebeu'), false),
+         coalesce(bool_or(d.origem = 'caixa_do_executor'), false)
+    into v_sem_destino, v_usou_caixa_de_quem_recebeu, v_usou_caixa_do_executor
+    from public.estorno_receita_destinos(v_lanc.id, v_uid) d;
 
   -- Nenhum caixa aberto para receber a devolução: não reescreve fechamento
   -- antigo nem empurra a saída para a gaveta de um terceiro.
-  select exists (select 1 from _estorno_destinos where sessao_destino is null)
-    into v_sem_destino;
   if v_sem_destino then
     return jsonb_build_object('ok', false, 'motivo', 'sem_sessao_aberta',
       'mensagem', 'O caixa do pagamento original já foi fechado e quem recebeu o valor não tem caixa aberto. Peça para essa pessoa abrir o caixa dela e tente novamente.');
   end if;
 
-  select exists (select 1 from _estorno_destinos where origem = 'caixa_de_quem_recebeu'),
-         exists (select 1 from _estorno_destinos where origem = 'caixa_do_executor')
-    into v_usou_caixa_de_quem_recebeu, v_usou_caixa_do_executor;
-
+  -- O caso mais grave manda na mensagem: se ALGUMA linha caiu no caixa de quem
+  -- está executando, é isso que ele precisa saber para conferir a própria gaveta.
   if v_usou_caixa_do_executor then
     v_aviso := 'lancado_em_sessao_atual';
   elsif v_usou_caixa_de_quem_recebeu then
@@ -215,7 +260,7 @@ begin
   insert into caixa_movimentos (sessao_id, clinica_id, user_id, tipo, valor, descricao, forma_pagamento, lancamento_id)
   select d.sessao_destino, d.clinica_id, d.dono_destino, 'estorno', d.valor,
          trim('Estorno — ' || coalesce(d.descricao, '')), d.forma_pagamento, d.lancamento_id
-  from _estorno_destinos d;
+    from public.estorno_receita_destinos(v_lanc.id, v_uid) d;
 
   v_ag_id := v_lanc.agendamento_id;
   if v_ag_id is not null then
@@ -234,6 +279,7 @@ begin
 end; $function$;
 
 GRANT EXECUTE ON FUNCTION public.estornar_lancamento_receita(uuid, uuid) TO authenticated;
+
 
 -- ---------------------------------------------------------------------------
 -- Mesma regra para o estorno de sangria: remove o fallback que pegava
