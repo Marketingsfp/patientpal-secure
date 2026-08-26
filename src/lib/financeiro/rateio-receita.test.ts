@@ -24,6 +24,7 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   repasse: 60,
   terceiro: 0,
   liquido: 40,
+  margem: 40,
   ...over,
 });
 

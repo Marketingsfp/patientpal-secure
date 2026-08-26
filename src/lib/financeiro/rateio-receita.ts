@@ -70,6 +70,12 @@ export interface RateioLinha {
   /** Parte do médico terceiro (dono do equipamento), quando houver. */
   terceiro: number;
   liquido: number;
+  /**
+   * Percentual da receita que ficou com a clínica NESTE atendimento. Vive na
+   * linha, e não só na tela, porque a coluna "% clínica" do analítico é lida
+   * por esta chave na tabela, no papel, no CSV e no Excel.
+   */
+  margem: number;
 }
 
 /** Uma linha do relatório sintético (um agrupador). */
@@ -363,6 +369,7 @@ function reparte(
       ? params.override
       : repasseCalculado;
   const terceiro = calc.terceiro?.valor ?? 0;
+  const liquido = round2(receita - repasse - terceiro);
   return {
     id: params.id,
     data: params.data,
@@ -377,7 +384,8 @@ function reparte(
     receita: round2(receita),
     repasse: round2(repasse),
     terceiro: round2(terceiro),
-    liquido: round2(receita - repasse - terceiro),
+    liquido,
+    margem: margemClinica(receita, liquido),
   };
 }
 

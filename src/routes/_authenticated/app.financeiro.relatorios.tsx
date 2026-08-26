@@ -54,6 +54,11 @@ import {
   type RateioTotais,
 } from "@/lib/financeiro/rateio-receita";
 import {
+  colunasRateio,
+  ROTULO_AGRUPADOR,
+  type ColunaRateio as Coluna,
+} from "@/lib/financeiro/rateio-colunas";
+import {
   diffDias,
   periodoComparacao,
   presetAtivo,
@@ -113,23 +118,6 @@ const POR_PAGINA = 50;
 /** Quantos serviços o combobox desenha por vez — o cadastro tem milhares. */
 const SERVICOS_VISIVEIS = 60;
 
-type FormatoColuna =
-  | "texto"
-  | "data"
-  | "moeda"
-  | "numero"
-  | "percentual"
-  | "variacao-moeda"
-  | "variacao-percentual";
-
-type Coluna = {
-  chave: string;
-  rotulo: string;
-  formato: FormatoColuna;
-  /** Colunas de dinheiro somadas no rodapé da tabela e do papel. */
-  somar?: boolean;
-};
-
 /**
  * Colunas de cada relatório. A ordem vale para a tela e para o papel — a lista
  * abaixo é a única fonte da verdade dos dois.
@@ -168,65 +156,11 @@ const TITULOS: Record<Tipo, string> = {
   rateio: "Rateio da Receita",
 };
 
-const ROTULO_AGRUPADOR: Record<RateioAgruparPor, string> = {
-  data: "Data",
-  profissional: "Profissional",
-  especialidade: "Especialidade",
-};
-
 const ROTULO_COMPARACAO: Record<ModoComparacao, string> = {
   anterior: "Período imediatamente anterior",
   "ano-anterior": "Mesmo período do ano anterior",
   personalizado: "Intervalo personalizado",
 };
-
-/**
- * Colunas do Rateio: no sintético uma linha por agrupador, no analítico uma
- * por atendimento. Com a comparação ligada entram as três colunas de confronto
- * — só no sintético, porque atendimento individual não tem par no outro
- * período.
- */
-function colunasRateio(
-  tipoRateio: RateioTipo,
-  agruparPor: RateioAgruparPor,
-  comparando: boolean,
-): Coluna[] {
-  const comparacao: Coluna[] = comparando
-    ? [
-        { chave: "receitaAnterior", rotulo: "Receita anterior", formato: "moeda", somar: true },
-        { chave: "variacaoValor", rotulo: "Variação (R$)", formato: "variacao-moeda" },
-        { chave: "variacaoPercentual", rotulo: "Variação (%)", formato: "variacao-percentual" },
-      ]
-    : [];
-  const dinheiro: Coluna[] = [
-    { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
-    ...comparacao,
-    { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
-    { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
-    { chave: "margem", rotulo: "% clínica", formato: "percentual" },
-  ];
-  if (tipoRateio === "sintetico") {
-    return [
-      {
-        chave: "agrupador",
-        rotulo: ROTULO_AGRUPADOR[agruparPor],
-        formato: agruparPor === "data" ? "data" : "texto",
-      },
-      { chave: "qtd", rotulo: "Qtd. atend.", formato: "numero" },
-      ...dinheiro,
-    ];
-  }
-  return [
-    { chave: "data", rotulo: "Data", formato: "data" },
-    { chave: "medico_nome", rotulo: "Profissional", formato: "texto" },
-    { chave: "especialidade_nome", rotulo: "Especialidade", formato: "texto" },
-    { chave: "procedimento", rotulo: "Serviço", formato: "texto" },
-    { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
-    { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
-    { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
-    { chave: "margem", rotulo: "% clínica", formato: "percentual" },
-  ];
-}
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
