@@ -101,6 +101,74 @@ export async function metaFetchPhoneInfo(phoneNumberId: string, accessToken: str
   return json as { display_phone_number?: string; verified_name?: string; quality_rating?: string };
 }
 
+/* =========================================================================
+ * Status real do número na Cloud API + registro (v26.0)
+ * ========================================================================= */
+const META_VERSION_STATUS = "v26.0";
+
+export interface MetaPhoneStatus {
+  id: string | null;
+  display_phone_number: string | null;
+  verified_name: string | null;
+  status: string | null;
+  name_status: string | null;
+  quality_rating: string | null;
+}
+
+/** Traduz o erro bruto da Meta em mensagem amigável, preservando código/mensagem originais. */
+export function traduzErroMeta(err: any): string {
+  const code = Number(err?.code ?? err?.error_subcode ?? NaN);
+  const msg = String(err?.error_user_msg ?? err?.message ?? "Erro desconhecido");
+  if (code === 133005 || /pin/i.test(msg)) {
+    return "PIN incorreto. Se o número já teve verificação em duas etapas ativada, use o PIN antigo ou redefina no Gerenciador do WhatsApp.";
+  }
+  if (code === 133010) return "Número ainda não registrado na Cloud API.";
+  if (code === 133006) return "O número precisa ser verificado na Meta antes de registrar.";
+  if (code === 190) return "Token inválido ou expirado.";
+  return `Meta${Number.isFinite(code) ? ` (#${code})` : ""}: ${msg}`;
+}
+
+export async function metaFetchPhoneStatus(
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<MetaPhoneStatus> {
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_STATUS}/${phoneNumberId}?fields=id,display_phone_number,verified_name,status,name_status,quality_rating`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(traduzErroMeta(json?.error ?? {}));
+  return {
+    id: json?.id ?? null,
+    display_phone_number: json?.display_phone_number ?? null,
+    verified_name: json?.verified_name ?? null,
+    status: json?.status ?? null,
+    name_status: json?.name_status ?? null,
+    quality_rating: json?.quality_rating ?? null,
+  };
+}
+
+export async function metaRegisterPhone(
+  phoneNumberId: string,
+  accessToken: string,
+  pin: string,
+): Promise<{ success: boolean }> {
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_STATUS}/${phoneNumberId}/register`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+    },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(traduzErroMeta(json?.error ?? {}));
+  return { success: json?.success !== false };
+}
+
 export async function metaSendText(
   phoneNumberId: string,
   accessToken: string,
