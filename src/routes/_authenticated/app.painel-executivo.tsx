@@ -40,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -449,6 +450,25 @@ function PainelExecutivoPage() {
   // A tela abre no dia corrente. Antes abria nos últimos 30 dias, e a gestão
   // via um acumulado quando queria saber como está o dia.
   const [periodo, setPeriodo] = useState<Periodo>(PRESET_PADRAO.make());
+
+  // Preferência do usuário: mostrar ou não a variação contra o período
+  // anterior. Padrão desligado, e persistida por navegador — mesmo padrão do
+  // Financeiro (`financeiro:decomporMisto`).
+  //
+  // Por que desligada por padrão: a tela abre em "Hoje", que é um dia em
+  // andamento, e o período anterior é um dia inteiro. Às 9h da manhã a
+  // comparação mostra quedas de 90% e poucos que não são queda nenhuma — é só
+  // o dia ainda não ter acontecido. Quem quiser a comparação liga a chave, e
+  // ela continua ligada nas próximas visitas.
+  const [comparar, setComparar] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("painel-executivo:comparar") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("painel-executivo:comparar", comparar ? "1" : "0");
+    }
+  }, [comparar]);
   const [carregando, setCarregando] = useState(false);
   const [atual, setAtual] = useState<Bloco>(emptyBloco());
   const [anterior, setAnterior] = useState<Bloco>(emptyBloco());
@@ -498,6 +518,15 @@ function PainelExecutivoPage() {
   const g = atual.grs,
     gaAnt = anterior.grs;
 
+  /**
+   * Variação usada pelos cards. Com a chave desligada devolve `undefined`, e
+   * tanto o `BigCard` quanto o `HhpKpiCard` já omitem o número nesse caso —
+   * por isso desligar a comparação não precisou de nenhuma condição espalhada
+   * pela tela.
+   */
+  const cmp = (valorAtual: number, valorAnterior: number): number | undefined =>
+    comparar ? delta(valorAtual, valorAnterior) : undefined;
+
   // Indicadores sem base de medição no período — ver o comentário do bloco
   // `qualidade` em `Bloco`. Enquanto não houver registro, eles saem do painel
   // em vez de mostrar zero: um "No-show 0,0%" ao lado dos números de produção
@@ -525,11 +554,16 @@ function PainelExecutivoPage() {
             <p className="text-sm text-muted-foreground">
               Indicadores estratégicos de produção, financeiro, comercial e qualidade
             </p>
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-800">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Comparando com o período anterior ({formatDatePura(periodoAnterior.de)} a{" "}
-              {formatDatePura(periodoAnterior.ate)})
-            </span>
+            {/* A faixa só aparece quando a comparação está ligada: ela existe
+                para dizer CONTRA O QUE os percentuais estão sendo medidos, e
+                sem percentual na tela ela não informa nada. */}
+            {comparar && (
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-800">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Comparando com o período anterior ({formatDatePura(periodoAnterior.de)} a{" "}
+                {formatDatePura(periodoAnterior.ate)})
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
@@ -583,6 +617,27 @@ function PainelExecutivoPage() {
             <Button size="sm" variant="ghost" onClick={load} disabled={carregando}>
               <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
             </Button>
+
+            {/* Chave da comparação. Fica ao lado dos atalhos de período porque
+                é sobre eles que ela age. A escolha é lembrada no navegador. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <label
+                  htmlFor="painel-comparar"
+                  className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-muted/60 px-3"
+                >
+                  <Switch id="painel-comparar" checked={comparar} onCheckedChange={setComparar} />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Comparar com período anterior
+                  </span>
+                </label>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                {comparar
+                  ? `Os cards mostram a variação contra ${formatDatePura(periodoAnterior.de)} a ${formatDatePura(periodoAnterior.ate)}.`
+                  : "Ligue para ver quanto cada número subiu ou caiu em relação ao período anterior. Com o filtro em Hoje, lembre que o dia ainda está em andamento e a queda aparente pode ser só isso."}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </TooltipProvider>
@@ -590,20 +645,22 @@ function PainelExecutivoPage() {
       {/* Visão geral — cards resumo (número grande + 2 métricas de apoio + variação) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <BigCard
+          mostrarComparacao={comparar}
           title="Agendamentos"
           icon={CalendarDays}
           value={int(p.agendados)}
-          delta={delta(p.agendados, pa.agendados)}
+          delta={cmp(p.agendados, pa.agendados)}
           subs={[
             { label: "Confirmados", value: int(p.confirmados) },
             { label: "Cancelados", value: int(p.cancelaram) },
           ]}
         />
         <BigCard
+          mostrarComparacao={comparar}
           title="Clientes atendidos"
           icon={UserCheck}
           value={int(p.compareceram)}
-          delta={delta(p.compareceram, pa.compareceram)}
+          delta={cmp(p.compareceram, pa.compareceram)}
           subs={[
             semRegistroFalta
               ? { label: "Confirmados", value: int(p.confirmados) }
@@ -612,10 +669,11 @@ function PainelExecutivoPage() {
           ]}
         />
         <BigCard
+          mostrarComparacao={comparar}
           title="GRs / Guias"
           icon={FileText}
           value={int(g.total)}
-          delta={delta(g.total, gaAnt.total)}
+          delta={cmp(g.total, gaAnt.total)}
           subs={[
             { label: "Pacientes", value: int(g.pacientes) },
             {
@@ -626,10 +684,11 @@ function PainelExecutivoPage() {
         />
         {podeFin ? (
           <BigCard
+            mostrarComparacao={comparar}
             title="Recebimentos"
             icon={Wallet}
             value={money(f.receitaRealizada)}
-            delta={delta(f.receitaRealizada, fa.receitaRealizada)}
+            delta={cmp(f.receitaRealizada, fa.receitaRealizada)}
             subs={[
               temPrevistoReceita
                 ? { label: "A receber", value: money(f.receitaPrevista) }
@@ -642,10 +701,11 @@ function PainelExecutivoPage() {
           // não tem registro por trás, o card passa a responder pela taxa de
           // confirmação, que sai de dado que a agenda realmente preenche.
           <BigCard
+            mostrarComparacao={comparar}
             title="Confirmação"
             icon={CheckCircle2}
             value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
-            delta={delta(p.confirmados, pa.confirmados)}
+            delta={cmp(p.confirmados, pa.confirmados)}
             subs={[
               { label: "Agendados", value: int(p.agendados) },
               { label: "Cancelados", value: int(p.cancelaram) },
@@ -655,10 +715,11 @@ function PainelExecutivoPage() {
         {podeFin && (
           <>
             <BigCard
+              mostrarComparacao={comparar}
               title="Pagamentos"
               icon={Receipt}
               value={money(f.despesaRealizada)}
-              delta={delta(f.despesaRealizada, fa.despesaRealizada)}
+              delta={cmp(f.despesaRealizada, fa.despesaRealizada)}
               subs={[
                 ...(temPrevistoDespesa
                   ? [{ label: "A pagar", value: money(f.despesaPrevista) }]
@@ -667,10 +728,11 @@ function PainelExecutivoPage() {
               ]}
             />
             <BigCard
+              mostrarComparacao={comparar}
               title="Convênios e particular"
               icon={Handshake}
               value={money(f.receitaConvenio)}
-              delta={delta(f.receitaConvenio, fa.receitaConvenio)}
+              delta={cmp(f.receitaConvenio, fa.receitaConvenio)}
               subs={[
                 { label: "Particular", value: money(f.receitaParticular) },
                 { label: "Convênio", value: money(f.receitaConvenio) },
@@ -679,22 +741,24 @@ function PainelExecutivoPage() {
           </>
         )}
         <BigCard
+          mostrarComparacao={comparar}
           title="Orçamentos"
           icon={BadgeDollarSign}
           value={int(c.orcamentosNoPeriodo)}
-          delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
+          delta={cmp(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
           subs={[
             { label: "Conversão", value: pctFmt(c.conversaoOrcamento) },
             { label: "Novos pacientes", value: int(c.novos) },
           ]}
         />
         <BigCard
+          mostrarComparacao={comparar}
           title="Qualidade"
           icon={Percent}
           value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
           // A variação vinha do no-show; sem registro de falta ela seria sempre
           // "0,0% vs. período anterior", uma estabilidade falsa.
-          delta={semRegistroFalta ? undefined : delta(q.noShowPct, qa.noShowPct)}
+          delta={semRegistroFalta ? undefined : cmp(q.noShowPct, qa.noShowPct)}
           deltaInvertido
           subs={[
             semRegistroFalta
@@ -724,21 +788,21 @@ function PainelExecutivoPage() {
               value={int(p.agendados)}
               icon={CalendarDays}
               tone="info"
-              delta={delta(p.agendados, pa.agendados)}
+              delta={cmp(p.agendados, pa.agendados)}
             />
             <HhpKpiCard
               label="Confirmados"
               value={int(p.confirmados)}
               icon={CheckCircle2}
               tone="ok"
-              delta={delta(p.confirmados, pa.confirmados)}
+              delta={cmp(p.confirmados, pa.confirmados)}
             />
             <HhpKpiCard
               label="Compareceram"
               value={int(p.compareceram)}
               icon={UserCheck}
               tone="ok"
-              delta={delta(p.compareceram, pa.compareceram)}
+              delta={cmp(p.compareceram, pa.compareceram)}
             />
             {!semRegistroFalta && (
               <HhpKpiCard
@@ -746,7 +810,7 @@ function PainelExecutivoPage() {
                 value={int(p.faltaram)}
                 icon={UserX}
                 tone="danger"
-                delta={delta(p.faltaram, pa.faltaram)}
+                delta={cmp(p.faltaram, pa.faltaram)}
               />
             )}
             <HhpKpiCard
@@ -754,7 +818,7 @@ function PainelExecutivoPage() {
               value={int(p.cancelaram)}
               icon={Ban}
               tone="warn"
-              delta={delta(p.cancelaram, pa.cancelaram)}
+              delta={cmp(p.cancelaram, pa.cancelaram)}
             />
             <HhpKpiCard
               label="Ocupação"
@@ -815,7 +879,7 @@ function PainelExecutivoPage() {
                 value={money(f.receitaRealizada)}
                 icon={Wallet}
                 tone="ok"
-                delta={delta(f.receitaRealizada, fa.receitaRealizada)}
+                delta={cmp(f.receitaRealizada, fa.receitaRealizada)}
               />
               {/* "A receber" só existe se houver lançamento pendente. Nesta
                   clínica a recepção lança e confirma no mesmo ato, então o card
@@ -826,7 +890,7 @@ function PainelExecutivoPage() {
                   value={money(f.receitaPrevista)}
                   icon={TrendingUp}
                   tone="info"
-                  delta={delta(f.receitaPrevista, fa.receitaPrevista)}
+                  delta={cmp(f.receitaPrevista, fa.receitaPrevista)}
                 />
               )}
               <HhpKpiCard
@@ -834,21 +898,21 @@ function PainelExecutivoPage() {
                 value={money(f.ticketMedio)}
                 icon={BadgeDollarSign}
                 tone="info"
-                delta={delta(f.ticketMedio, fa.ticketMedio)}
+                delta={cmp(f.ticketMedio, fa.ticketMedio)}
               />
               <HhpKpiCard
                 label="Despesa realizada"
                 value={money(f.despesaRealizada)}
                 icon={Receipt}
                 tone="warn"
-                delta={delta(f.despesaRealizada, fa.despesaRealizada)}
+                delta={cmp(f.despesaRealizada, fa.despesaRealizada)}
               />
               <HhpKpiCard
                 label="Resultado"
                 value={money(f.resultado)}
                 icon={TrendingUp}
                 tone={f.resultado >= 0 ? "ok" : "danger"}
-                delta={delta(f.resultado, fa.resultado)}
+                delta={cmp(f.resultado, fa.resultado)}
               />
             </HhpKpiRow>
             <HhpKpiRow>
@@ -953,21 +1017,21 @@ function PainelExecutivoPage() {
               value={int(c.novos)}
               icon={UserPlus}
               tone="ok"
-              delta={delta(c.novos, ca.novos)}
+              delta={cmp(c.novos, ca.novos)}
             />
             <HhpKpiCard
               label="Recorrentes"
               value={int(c.recorrentes)}
               icon={Repeat}
               tone="info"
-              delta={delta(c.recorrentes, ca.recorrentes)}
+              delta={cmp(c.recorrentes, ca.recorrentes)}
             />
             <HhpKpiCard
               label="Orçamentos"
               value={int(c.orcamentosNoPeriodo)}
               icon={Receipt}
               tone="default"
-              delta={delta(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
+              delta={cmp(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
             />
             <HhpKpiCard
               label="Conversão orçam."
@@ -987,7 +1051,7 @@ function PainelExecutivoPage() {
                 value={pctFmt(q.noShowPct)}
                 icon={AlertTriangle}
                 tone="danger"
-                delta={delta(q.noShowPct, qa.noShowPct)}
+                delta={cmp(q.noShowPct, qa.noShowPct)}
               />
             )}
             {!semRegistroExecucao && (
@@ -996,7 +1060,7 @@ function PainelExecutivoPage() {
                 value={`${q.atrasoMedioMin.toFixed(0)} min`}
                 icon={Clock}
                 tone="warn"
-                delta={delta(q.atrasoMedioMin, qa.atrasoMedioMin)}
+                delta={cmp(q.atrasoMedioMin, qa.atrasoMedioMin)}
               />
             )}
             <HhpKpiCard
@@ -1060,6 +1124,7 @@ function BigCard({
   delta: d,
   deltaInvertido,
   subs,
+  mostrarComparacao = true,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -1067,6 +1132,13 @@ function BigCard({
   delta?: number;
   deltaInvertido?: boolean;
   subs: { label: string; value: string }[];
+  /**
+   * Chave "Comparar com período anterior". Desligada, o card não mostra nem o
+   * percentual nem o aviso de falta de base — quem desligou não quer nenhuma
+   * linha de comparação ali, e "Sem base de comparação" em todos os cards seria
+   * pior que o percentual que ele acabou de esconder.
+   */
+  mostrarComparacao?: boolean;
 }) {
   const positivo = deltaInvertido ? (d ?? 0) <= 0 : (d ?? 0) >= 0;
   return (
@@ -1089,7 +1161,7 @@ function BigCard({
             </div>
           ))}
         </div>
-        {typeof d === "number" ? (
+        {!mostrarComparacao ? null : typeof d === "number" ? (
           <p
             className={`mt-2.5 text-xs font-medium ${positivo ? "text-emerald-600" : "text-rose-600"}`}
           >
