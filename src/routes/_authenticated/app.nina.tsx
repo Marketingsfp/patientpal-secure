@@ -688,6 +688,15 @@ function ConfiguracaoWhatsApp() {
   });
   const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
   const [savingHorario, setSavingHorario] = useState(false);
+  const [metaStatus, setMetaStatus] = useState<{
+    status: string | null;
+    name_status: string | null;
+    quality_rating?: string | null;
+  } | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [registrando, setRegistrando] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
