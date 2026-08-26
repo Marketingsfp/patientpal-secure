@@ -719,6 +719,55 @@ function ConfiguracaoWhatsApp() {
     void carregar();
   }, [carregar]);
 
+  const atualizarStatusMeta = useCallback(async () => {
+    if (!clinicaAtual) return;
+    setStatusLoading(true);
+    try {
+      const r: any = await buscarStatus({ data: { clinicaId: clinicaAtual.clinica_id } });
+      if (r?.ok) {
+        setMetaStatus({
+          status: r.status ?? null,
+          name_status: r.name_status ?? null,
+          quality_rating: r.quality_rating ?? null,
+        });
+      } else {
+        setMetaStatus(null);
+      }
+    } catch {
+      setMetaStatus(null);
+    } finally {
+      setStatusLoading(false);
+    }
+  }, [clinicaAtual, buscarStatus]);
+
+  useEffect(() => {
+    if (cfg?.phone_number_id && cfg?.has_access_token) void atualizarStatusMeta();
+  }, [cfg?.phone_number_id, cfg?.has_access_token, atualizarStatusMeta]);
+
+  const onRegistrar = async () => {
+    if (!cfg) return;
+    if (!/^\d{6}$/.test(pin)) {
+      toast.error("Informe um PIN de exatamente 6 dígitos.");
+      return;
+    }
+    setRegistrando(true);
+    try {
+      const r: any = await registrarNumero({ data: { clinicaId: cfg.clinica_id, pin } });
+      if (r?.ok) {
+        toast.success("Número registrado na Cloud API.");
+        setPinOpen(false);
+        setPin("");
+      } else {
+        toast.error(r?.error ?? "Falha ao registrar o número.");
+      }
+      await atualizarStatusMeta();
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
   const abrirDialog = () => {
     if (!cfg) return;
     setCanal("oficial");
