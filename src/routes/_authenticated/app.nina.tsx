@@ -889,18 +889,50 @@ function ConfiguracaoWhatsApp() {
     }
   };
 
-  const statusBadge = cfg.ultimo_teste_ok ? (
-    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-      <CheckCircle2 className="h-3 w-3 mr-1" /> Conectado
-      {cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}
+  const metaStatusBadge = statusLoading ? (
+    <Badge variant="outline">
+      <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Verificando na Meta…
     </Badge>
+  ) : metaStatus?.status ? (
+    metaStatus.status === "CONNECTED" ? (
+      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+        <CheckCircle2 className="h-3 w-3 mr-1" /> CONNECTED
+        {cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}
+      </Badge>
+    ) : metaStatus.status === "PENDING" ? (
+      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+        <AlertCircle className="h-3 w-3 mr-1" /> {metaStatus.status}
+      </Badge>
+    ) : (
+      <Badge variant="destructive">
+        <AlertCircle className="h-3 w-3 mr-1" /> {metaStatus.status}
+      </Badge>
+    )
   ) : cfg.ultimo_teste_ok === false ? (
     <Badge variant="destructive">
       <AlertCircle className="h-3 w-3 mr-1" /> Falha no último teste
     </Badge>
   ) : (
-    <Badge variant="outline">Não testado</Badge>
+    <Badge variant="outline">Status desconhecido</Badge>
   );
+
+  const statusDetalhe = metaStatus ? (
+    <span className="text-[11px] text-muted-foreground">
+      Nome: {metaStatus.name_status ?? "—"}
+      {metaStatus.quality_rating ? ` · Qualidade: ${metaStatus.quality_rating}` : ""}
+    </span>
+  ) : null;
+
+  const precisaRegistrar = Boolean(
+    cfg.phone_number_id && cfg.has_access_token && metaStatus?.status && metaStatus.status !== "CONNECTED",
+  );
+
+  const botaoRegistrar =
+    podeEscrever && precisaRegistrar ? (
+      <Button size="sm" variant="outline" onClick={() => setPinOpen(true)}>
+        Registrar na Cloud API
+      </Button>
+    ) : null;
 
   const canaisDisponiveis = [
     {
