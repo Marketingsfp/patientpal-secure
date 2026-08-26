@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   loadWhatsAppConfig,
   metaSendText,
@@ -32,6 +31,7 @@ function textoLimpo(value: unknown): string | null {
 }
 
 async function registrarStatusWhatsapp(clinicaId: string, ok: boolean, erro?: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   await supabaseAdmin
     .from("whatsapp_configs")
     .update({
@@ -63,6 +63,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
       // Meta envia POST para cada evento
       POST: async ({ request, params }) => {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const rawBody = await request.text();
         const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
         if (!cfg) return new Response("Not found", { status: 404 });
