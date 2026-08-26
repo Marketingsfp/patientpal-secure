@@ -119,6 +119,16 @@ const POR_PAGINA = 50;
 const SERVICOS_VISIVEIS = 60;
 
 /**
+ * Altura e borda comuns de todo campo do card de filtros. São oito campos em
+ * três blocos diferentes; sem uma classe única eles vinham com alturas
+ * ligeiramente diferentes e as linhas do grid não fechavam.
+ */
+const CAMPO = "h-10 text-sm border-slate-200 focus:ring-2 focus:ring-primary/20";
+
+/** Rótulo acima de cada campo: discreto, para o valor escolhido ter destaque. */
+const ROTULO = "text-xs font-medium text-slate-600";
+
+/**
  * Colunas de cada relatório. A ordem vale para a tela e para o papel — a lista
  * abaixo é a única fonte da verdade dos dois.
  */
@@ -892,11 +902,14 @@ function Page() {
           <CardTitle>Gerar relatório</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-2">
-              <Label>Tipo</Label>
+          {/* Bloco 1 — o que buscar e em que período. Os atalhos ocupam a
+              quarta coluna nas telas largas e a linha inteira nas estreitas,
+              onde oito pílulas não caberiam ao lado dos campos. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className={ROTULO}>Tipo de relatório</Label>
               <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
-                <SelectTrigger>
+                <SelectTrigger className={CAMPO}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -907,57 +920,62 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>De</Label>
-              <DateInputBR value={from} onChange={(e) => setFrom(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className={ROTULO}>De</Label>
+              <DateInputBR
+                className={CAMPO}
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Até</Label>
-              <DateInputBR value={to} onChange={(e) => setTo(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className={ROTULO}>Até</Label>
+              <DateInputBR className={CAMPO} value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <div className="space-y-1.5 md:col-span-2 xl:col-span-1">
+              <Label className={ROTULO}>Atalhos de período</Label>
+              <TooltipProvider delayDuration={200}>
+                <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  {PRESETS_PERIODO.map((pr) => {
+                    const ativo = atalhoAtivo === pr.label;
+                    return (
+                      <Tooltip key={pr.label}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const alvo = pr.make(hoje);
+                              setFrom(alvo.de);
+                              setTo(alvo.ate);
+                            }}
+                            aria-pressed={ativo}
+                            className={cn(
+                              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                              ativo
+                                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                            )}
+                          >
+                            {pr.label}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{pr.hint}</TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
             </div>
           </div>
 
-          {/* flex-wrap: são oito atalhos e, em tela pequena, eles não cabem numa
-              linha só — sem isso a faixa empurraria o layout para o lado. */}
-          <TooltipProvider delayDuration={200}>
-            <div className="flex flex-wrap items-center gap-0.5 rounded-2xl border border-border bg-muted/60 p-1">
-              {PRESETS_PERIODO.map((pr) => {
-                const ativo = atalhoAtivo === pr.label;
-                return (
-                  <Tooltip key={pr.label}>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const alvo = pr.make(hoje);
-                          setFrom(alvo.de);
-                          setTo(alvo.ate);
-                        }}
-                        aria-pressed={ativo}
-                        className={cn(
-                          "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                          ativo
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:bg-background hover:text-foreground",
-                        )}
-                      >
-                        {pr.label}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>{pr.hint}</TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </TooltipProvider>
-
           {tipo === "rateio" && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <Label>Profissional</Label>
+              {/* Bloco 2 — recorte da base: quem atendeu e o que foi feito. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Profissional</Label>
                   <Select value={rMedico} onValueChange={setRMedico} disabled={!ctxRateio}>
-                    <SelectTrigger>
+                    <SelectTrigger className={CAMPO}>
                       <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -970,14 +988,14 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Especialidade</Label>
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Especialidade</Label>
                   <Select
                     value={rEspecialidade}
                     onValueChange={setREspecialidade}
                     disabled={!ctxRateio}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={CAMPO}>
                       <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODAS"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -990,8 +1008,8 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Grupo de serviço</Label>
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Grupo de serviço</Label>
                   <Select
                     value={rGrupo}
                     onValueChange={(v) => {
@@ -1001,7 +1019,7 @@ function Page() {
                     }}
                     disabled={!ctxRateio}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={CAMPO}>
                       <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1014,14 +1032,14 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Serviço</Label>
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Serviço</Label>
                   <Popover open={servicoAberto} onOpenChange={setServicoAberto}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         role="combobox"
-                        className="w-full justify-between font-normal"
+                        className={cn("w-full justify-between font-normal", CAMPO)}
                         disabled={!ctxRateio}
                       >
                         <span className="truncate">
@@ -1084,108 +1102,144 @@ function Page() {
                     </PopoverContent>
                   </Popover>
                 </div>
-                <div className="space-y-2">
-                  <Label>Tipo do relatório</Label>
-                  <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sintetico">SINTÉTICO</SelectItem>
-                      <SelectItem value="analitico">ANALÍTICO</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Agrupar por</Label>
-                  <Select
-                    value={rAgrupar}
-                    onValueChange={(v) => setRAgrupar(v as RateioAgruparPor)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="data">DATA</SelectItem>
-                      <SelectItem value="profissional">PROFISSIONAL</SelectItem>
-                      <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <Label
-                    htmlFor="rateio-comparar"
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <Switch id="rateio-comparar" checked={comparar} onCheckedChange={setComparar} />
-                    <span className="text-sm font-medium">Comparar com</span>
-                  </Label>
-                  <div className="w-full sm:w-72">
-                    <Select
-                      value={modoComparacao}
-                      onValueChange={(v) => setModoComparacao(v as ModoComparacao)}
-                      disabled={!comparar}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="anterior">{ROTULO_COMPARACAO.anterior}</SelectItem>
-                        <SelectItem value="ano-anterior">
-                          {ROTULO_COMPARACAO["ano-anterior"]}
-                        </SelectItem>
-                        <SelectItem value="personalizado">
-                          {ROTULO_COMPARACAO.personalizado}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {comparar && modoComparacao === "personalizado" && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">De</span>
-                      <DateInputBR
-                        className="w-40"
-                        value={compDe || from}
-                        onChange={(e) => setCompDe(e.target.value)}
-                      />
-                      <span className="text-sm text-muted-foreground">até</span>
-                      <DateInputBR
-                        className="w-40"
-                        value={compAte || to}
-                        onChange={(e) => setCompAte(e.target.value)}
-                      />
+              {/* Bloco 3 — como o resultado é montado: o formato à esquerda, a
+                  comparação à direita, separados por uma régua nas telas
+                  largas. */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-100 lg:shrink-0">
+                    <div className="space-y-1.5">
+                      <Label className={ROTULO}>Tipo</Label>
+                      <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
+                        <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sintetico">SINTÉTICO</SelectItem>
+                          <SelectItem value="analitico">ANALÍTICO</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                    <div className="space-y-1.5">
+                      <Label className={ROTULO}>Agrupar por</Label>
+                      <Select
+                        value={rAgrupar}
+                        onValueChange={(v) => setRAgrupar(v as RateioAgruparPor)}
+                      >
+                        <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="data">DATA</SelectItem>
+                          <SelectItem value="profissional">PROFISSIONAL</SelectItem>
+                          <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 lg:flex-1 lg:border-l lg:border-slate-200 lg:pl-4">
+                    <Label className={ROTULO}>Comparação</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Label
+                        htmlFor="rateio-comparar"
+                        className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3"
+                      >
+                        <Switch
+                          id="rateio-comparar"
+                          checked={comparar}
+                          onCheckedChange={setComparar}
+                        />
+                        <span className="text-sm font-medium">Comparar com</span>
+                      </Label>
+                      <Select
+                        value={modoComparacao}
+                        onValueChange={(v) => setModoComparacao(v as ModoComparacao)}
+                        disabled={!comparar}
+                      >
+                        <SelectTrigger className={cn(CAMPO, "w-full bg-white sm:w-72")}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="anterior">{ROTULO_COMPARACAO.anterior}</SelectItem>
+                          <SelectItem value="ano-anterior">
+                            {ROTULO_COMPARACAO["ano-anterior"]}
+                          </SelectItem>
+                          <SelectItem value="personalizado">
+                            {ROTULO_COMPARACAO.personalizado}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {comparar && modoComparacao === "personalizado" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-muted-foreground">De</span>
+                          <DateInputBR
+                            className={cn(CAMPO, "w-40 bg-white")}
+                            value={compDe || from}
+                            onChange={(e) => setCompDe(e.target.value)}
+                          />
+                          <span className="text-sm text-muted-foreground">até</span>
+                          <DateInputBR
+                            className={cn(CAMPO, "w-40 bg-white")}
+                            value={compAte || to}
+                            onChange={(e) => setCompAte(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {comparar
+                        ? `${textoPeriodoComparado}. A comparação aparece nas colunas do relatório sintético e nos cards de fechamento.`
+                        : "Ligue para ver quanto a receita subiu ou caiu contra outro período."}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {comparar
-                    ? `${textoPeriodoComparado}. A comparação aparece nas colunas do relatório sintético e nos cards de fechamento.`
-                    : "Ligue para ver quanto a receita subiu ou caiu contra outro período."}
-                </p>
               </div>
             </>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={buscar} disabled={loading || !clinicaAtual}>
+          {/* Bloco 4 — ação principal à esquerda, saídas do relatório à direita. */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+            <Button
+              onClick={buscar}
+              disabled={loading || !clinicaAtual}
+              className="bg-primary font-medium text-primary-foreground shadow-sm hover:opacity-90"
+            >
               <Search className="h-4 w-4 mr-2" />
               {loading ? "Buscando..." : "Buscar"}
             </Button>
-            <Button variant="outline" onClick={imprimir} disabled={loading || !clinicaAtual}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir
-            </Button>
-            <Button variant="outline" onClick={baixarExcel} disabled={loading || !clinicaAtual}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Baixar Excel
-            </Button>
-            <Button variant="outline" onClick={baixarCsv} disabled={loading || !clinicaAtual}>
-              <Download className="h-4 w-4 mr-2" />
-              Baixar CSV
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <span aria-hidden className="hidden h-6 w-px bg-slate-200 sm:block" />
+              <Button
+                variant="outline"
+                className="border-slate-200"
+                onClick={baixarExcel}
+                disabled={loading || !clinicaAtual}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-600" />
+                Baixar Excel
+              </Button>
+              <Button
+                variant="outline"
+                className="border-slate-200"
+                onClick={imprimir}
+                disabled={loading || !clinicaAtual}
+              >
+                <Printer className="h-4 w-4 mr-2 text-slate-500" />
+                Imprimir
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-slate-600 hover:text-slate-900"
+                onClick={baixarCsv}
+                disabled={loading || !clinicaAtual}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Baixar CSV
+              </Button>
+            </div>
           </div>
           {tipo === "rateio" && (
             <p className="text-xs text-muted-foreground">
