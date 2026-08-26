@@ -9743,6 +9743,19 @@ export type Database = {
         Args: { _clinica_id?: string; _movimento_id: string }
         Returns: Json
       }
+      estorno_receita_destinos: {
+        Args: { _lancamento_id: string; _uid: string }
+        Returns: {
+          clinica_id: string
+          descricao: string
+          dono_destino: string
+          forma_pagamento: string
+          lancamento_id: string
+          origem: string
+          sessao_destino: string
+          valor: number
+        }[]
+      }
       feature_flag_ativa: {
         Args: { _clinica_id: string; _flag_key: string }
         Returns: boolean

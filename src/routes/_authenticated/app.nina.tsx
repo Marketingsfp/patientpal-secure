@@ -36,6 +36,7 @@ import {
   User,
   Tag,
   ArrowLeft,
+  RefreshCw,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
@@ -45,6 +46,8 @@ import {
   obterWhatsappConfig,
   salvarWhatsappConfig,
   testarConexaoWhatsapp,
+  statusNumeroWhatsapp,
+  registrarNumeroWhatsapp,
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
@@ -665,6 +668,8 @@ function ConfiguracaoWhatsApp() {
   const obter = useServerFn(obterWhatsappConfig);
   const salvar = useServerFn(salvarWhatsappConfig);
   const testar = useServerFn(testarConexaoWhatsapp);
+  const buscarStatus = useServerFn(statusNumeroWhatsapp);
+  const registrarNumero = useServerFn(registrarNumeroWhatsapp);
 
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
@@ -683,6 +688,15 @@ function ConfiguracaoWhatsApp() {
   });
   const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
   const [savingHorario, setSavingHorario] = useState(false);
+  const [metaStatus, setMetaStatus] = useState<{
+    status: string | null;
+    name_status: string | null;
+    quality_rating?: string | null;
+  } | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [registrando, setRegistrando] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -704,6 +718,55 @@ function ConfiguracaoWhatsApp() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  const atualizarStatusMeta = useCallback(async () => {
+    if (!clinicaAtual) return;
+    setStatusLoading(true);
+    try {
+      const r: any = await buscarStatus({ data: { clinicaId: clinicaAtual.clinica_id } });
+      if (r?.ok) {
+        setMetaStatus({
+          status: r.status ?? null,
+          name_status: r.name_status ?? null,
+          quality_rating: r.quality_rating ?? null,
+        });
+      } else {
+        setMetaStatus(null);
+      }
+    } catch {
+      setMetaStatus(null);
+    } finally {
+      setStatusLoading(false);
+    }
+  }, [clinicaAtual, buscarStatus]);
+
+  useEffect(() => {
+    if (cfg?.phone_number_id && cfg?.has_access_token) void atualizarStatusMeta();
+  }, [cfg?.phone_number_id, cfg?.has_access_token, atualizarStatusMeta]);
+
+  const onRegistrar = async () => {
+    if (!cfg) return;
+    if (!/^\d{6}$/.test(pin)) {
+      toast.error("Informe um PIN de exatamente 6 dígitos.");
+      return;
+    }
+    setRegistrando(true);
+    try {
+      const r: any = await registrarNumero({ data: { clinicaId: cfg.clinica_id, pin } });
+      if (r?.ok) {
+        toast.success("Número registrado na Cloud API.");
+        setPinOpen(false);
+        setPin("");
+      } else {
+        toast.error(r?.error ?? "Falha ao registrar o número.");
+      }
+      await atualizarStatusMeta();
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setRegistrando(false);
+    }
+  };
 
   const abrirDialog = () => {
     if (!cfg) return;
@@ -826,18 +889,53 @@ function ConfiguracaoWhatsApp() {
     }
   };
 
-  const statusBadge = cfg.ultimo_teste_ok ? (
-    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-      <CheckCircle2 className="h-3 w-3 mr-1" /> Conectado
-      {cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}
+  const metaStatusBadge = statusLoading ? (
+    <Badge variant="outline">
+      <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Verificando na Meta…
     </Badge>
+  ) : metaStatus?.status ? (
+    metaStatus.status === "CONNECTED" ? (
+      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+        <CheckCircle2 className="h-3 w-3 mr-1" /> CONNECTED
+        {cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}
+      </Badge>
+    ) : metaStatus.status === "PENDING" ? (
+      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+        <AlertCircle className="h-3 w-3 mr-1" /> {metaStatus.status}
+      </Badge>
+    ) : (
+      <Badge variant="destructive">
+        <AlertCircle className="h-3 w-3 mr-1" /> {metaStatus.status}
+      </Badge>
+    )
   ) : cfg.ultimo_teste_ok === false ? (
     <Badge variant="destructive">
       <AlertCircle className="h-3 w-3 mr-1" /> Falha no último teste
     </Badge>
   ) : (
-    <Badge variant="outline">Não testado</Badge>
+    <Badge variant="outline">Status desconhecido</Badge>
   );
+
+  const statusDetalhe = metaStatus ? (
+    <span className="text-[11px] text-muted-foreground">
+      Nome: {metaStatus.name_status ?? "—"}
+      {metaStatus.quality_rating ? ` · Qualidade: ${metaStatus.quality_rating}` : ""}
+    </span>
+  ) : null;
+
+  const precisaRegistrar = Boolean(
+    cfg.phone_number_id &&
+    cfg.has_access_token &&
+    metaStatus?.status &&
+    metaStatus.status !== "CONNECTED",
+  );
+
+  const botaoRegistrar =
+    podeEscrever && precisaRegistrar ? (
+      <Button size="sm" variant="outline" onClick={() => setPinOpen(true)}>
+        Registrar na Cloud API
+      </Button>
+    ) : null;
 
   const canaisDisponiveis = [
     {
@@ -881,8 +979,21 @@ function ConfiguracaoWhatsApp() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {statusBadge}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex flex-col items-end gap-0.5">
+                  {metaStatusBadge}
+                  {statusDetalhe}
+                </div>
+                {botaoRegistrar}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void atualizarStatusMeta()}
+                  disabled={statusLoading}
+                  title="Atualizar status na Meta"
+                >
+                  <RefreshCw className={`h-4 w-4 ${statusLoading ? "animate-spin" : ""}`} />
+                </Button>
                 {podeEscrever && (
                   <Button variant="ghost" size="icon" onClick={abrirDialog}>
                     <Pencil className="h-4 w-4" />
@@ -1074,6 +1185,27 @@ function ConfiguracaoWhatsApp() {
                 </Button>
               </div>
             </div>
+            {(cfg.phone_number_id || cfg.has_access_token) && (
+              <div className="rounded-md border p-3 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium">Status na Cloud API</span>
+                  {statusDetalhe}
+                </div>
+                <div className="flex items-center gap-2">
+                  {metaStatusBadge}
+                  {botaoRegistrar}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void atualizarStatusMeta()}
+                    disabled={statusLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${statusLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
@@ -1088,6 +1220,49 @@ function ConfiguracaoWhatsApp() {
             </Button>
             <Button onClick={onSalvar} disabled={saving || testing}>
               {saving ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pinOpen}
+        onOpenChange={(o) => {
+          setPinOpen(o);
+          if (!o) setPin("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar na Cloud API</DialogTitle>
+            <DialogDescription>
+              Informe um PIN de 6 dígitos. Esse PIN se torna a verificação em duas etapas do número
+              na Meta — guarde-o, será exigido em registros futuros.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>PIN (6 dígitos)</Label>
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="font-mono tracking-[0.4em] text-center text-lg"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPinOpen(false)} disabled={registrando}>
+              Cancelar
+            </Button>
+            <Button onClick={onRegistrar} disabled={registrando || pin.length !== 6}>
+              {registrando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Registrando…
+                </>
+              ) : (
+                "Registrar"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
