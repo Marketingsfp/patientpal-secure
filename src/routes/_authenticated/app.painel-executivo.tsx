@@ -1513,13 +1513,19 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
           tone="default"
           hint="Pacientes distintos nas guias listadas"
         />
-        <HhpKpiCard
-          label="2ªs vias impressas"
-          value={int(dados.segundasVias)}
-          icon={Printer}
-          tone="default"
-          hint="Reimpressões registradas no dia — não contam como GR nova"
-        />
+        {/* Só aparece quando houve reimpressão. O registro de impressão de guia
+            está descontinuado, então este número é quase sempre zero — e um
+            card sozinho com "0" no fim da grade do celular vira ruído sem
+            informação nenhuma. */}
+        {dados.segundasVias > 0 && (
+          <HhpKpiCard
+            label="2ªs vias impressas"
+            value={int(dados.segundasVias)}
+            icon={Printer}
+            tone="default"
+            hint="Reimpressões registradas no dia — não contam como GR nova"
+          />
+        )}
       </HhpKpiRow>
 
       {dados.truncado && (
@@ -1550,7 +1556,7 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
           {/* 3) Filtros rápidos */}
           <div className="flex flex-wrap items-center gap-2">
             <Select value={fAtendente} onValueChange={setFAtendente}>
-              <SelectTrigger className="h-9 w-[200px] text-xs">
+              <SelectTrigger className="h-9 w-full text-xs sm:w-[200px]">
                 <SelectValue placeholder="Todos os atendentes" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -1564,7 +1570,7 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
             </Select>
 
             <Select value={fMedico} onValueChange={setFMedico}>
-              <SelectTrigger className="h-9 w-[200px] text-xs">
+              <SelectTrigger className="h-9 w-full text-xs sm:w-[200px]">
                 <SelectValue placeholder="Todos os médicos" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -1578,7 +1584,7 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
             </Select>
 
             <Select value={fStatus} onValueChange={setFStatus}>
-              <SelectTrigger className="h-9 w-[180px] text-xs">
+              <SelectTrigger className="h-9 w-full text-xs sm:w-[180px]">
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -1595,7 +1601,7 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar paciente, procedimento, nº da GR…"
-              className="h-9 w-[280px] text-xs"
+              className="h-9 w-full text-xs sm:w-[280px]"
             />
 
             {(filtrando || busca) && (
@@ -1605,84 +1611,122 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
             )}
           </div>
 
-          {/* 2) Lista detalhada */}
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[70px]">Horário</TableHead>
-                  <TableHead className="w-[110px]">Nº GR</TableHead>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Médico / Especialidade / Procedimento</TableHead>
-                  <TableHead>Atendente</TableHead>
-                  <TableHead>Status</TableHead>
-                  {podeFin && <TableHead className="text-right">Valor</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {carregando && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={podeFin ? 7 : 6}
-                      className="py-6 text-center text-sm text-muted-foreground"
-                    >
-                      Carregando…
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!carregando && filtradas.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={podeFin ? 7 : 6}
-                      className="py-6 text-center text-sm text-muted-foreground"
-                    >
-                      {dados.linhas.length === 0
-                        ? "Nenhuma GR gerada neste dia."
-                        : "Nenhuma GR corresponde aos filtros."}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!carregando &&
-                  filtradas.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="whitespace-nowrap text-xs tabular-nums">
-                        {l.hora}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs tabular-nums">
-                        <span className="font-semibold">{l.numero}</span>
-                        {l.numeroGuia && (
-                          <span className="ml-1 text-muted-foreground">· guia {l.numeroGuia}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium uppercase">{l.paciente}</TableCell>
-                      <TableCell className="text-sm">
-                        <div>{l.medico}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {l.especialidade !== "—" ? `${l.especialidade} · ` : ""}
-                          {l.procedimento}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{l.atendente}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1">
-                          <Badge variant="outline" className="text-[11px]">
-                            {l.situacao}
-                          </Badge>
-                          {l.financeiro && (
-                            <Badge variant="secondary" className="text-[11px]">
-                              {l.financeiro}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
+          {/* 2) Lista detalhada.
+              As sete colunas não cabem na largura de um celular: a tabela
+              cortava justamente o fim da linha, que é onde ficam atendente,
+              status e valor. Por isso o celular recebe um card por GR, com os
+              mesmos campos empilhados, e a tabela fica a partir de `md`. */}
+          {carregando ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
+          ) : filtradas.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {dados.linhas.length === 0
+                ? "Nenhuma GR gerada neste dia."
+                : "Nenhuma GR corresponde aos filtros."}
+            </p>
+          ) : (
+            <>
+              {/* Celular */}
+              <ul className="space-y-2 md:hidden">
+                {filtradas.map((l) => (
+                  <li key={l.id} className="rounded-lg border p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {l.hora} · GR {l.numero}
+                        {l.numeroGuia ? ` · guia ${l.numeroGuia}` : ""}
+                      </span>
                       {podeFin && (
-                        <TableCell className="text-right tabular-nums">{money(l.valor)}</TableCell>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">
+                          {money(l.valor)}
+                        </span>
                       )}
+                    </div>
+                    <p className="mt-1 text-sm font-medium uppercase leading-tight">{l.paciente}</p>
+                    <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                      {l.medico}
+                      {l.especialidade !== "—" ? ` · ${l.especialidade}` : ""}
+                      {l.procedimento !== "—" ? ` · ${l.procedimento}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Atendente: <span className="text-foreground">{l.atendente}</span>
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      <Badge variant="outline" className="text-[11px]">
+                        {l.situacao}
+                      </Badge>
+                      {l.financeiro && (
+                        <Badge variant="secondary" className="text-[11px]">
+                          {l.financeiro}
+                        </Badge>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Tablet e desktop */}
+              <div className="hidden overflow-x-auto rounded-md border md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[70px]">Horário</TableHead>
+                      <TableHead className="w-[110px]">Nº GR</TableHead>
+                      <TableHead>Paciente</TableHead>
+                      <TableHead>Médico / Especialidade / Procedimento</TableHead>
+                      <TableHead>Atendente</TableHead>
+                      <TableHead>Status</TableHead>
+                      {podeFin && <TableHead className="text-right">Valor</TableHead>}
                     </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filtradas.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="whitespace-nowrap text-xs tabular-nums">
+                          {l.hora}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs tabular-nums">
+                          <span className="font-semibold">{l.numero}</span>
+                          {l.numeroGuia && (
+                            <span className="ml-1 text-muted-foreground">
+                              · guia {l.numeroGuia}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium uppercase">
+                          {l.paciente}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div>{l.medico}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {l.especialidade !== "—" ? `${l.especialidade} · ` : ""}
+                            {l.procedimento}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{l.atendente}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className="text-[11px]">
+                              {l.situacao}
+                            </Badge>
+                            {l.financeiro && (
+                              <Badge variant="secondary" className="text-[11px]">
+                                {l.financeiro}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        {podeFin && (
+                          <TableCell className="text-right tabular-nums">
+                            {money(l.valor)}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
