@@ -68,13 +68,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  formatDatePura,
-  hojeBR,
-  janelaDiaClinica,
-  TZ_CLINICA,
-  zonedDateStringToUtcISO,
-} from "@/lib/date-utils";
+import { formatDatePura, hojeBR, TZ_CLINICA, zonedDateStringToUtcISO } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
@@ -865,9 +859,9 @@ function PainelExecutivoPage() {
           </div>
         </TabsContent>
 
-        {/* GRs do dia — resumo e lista detalhada (ver SecaoGrsDoDia) */}
+        {/* GRs do período escolhido no topo — resumo e lista (ver SecaoGrsDoDia) */}
         <TabsContent value="grs" className="space-y-6">
-          <SecaoGrsDoDia clinicaId={clinicaAtual.clinica_id} podeFin={podeFin} />
+          <SecaoGrsDoDia clinicaId={clinicaAtual.clinica_id} periodo={periodo} podeFin={podeFin} />
         </TabsContent>
 
         {/* Financeiro */}
@@ -1238,15 +1232,16 @@ function RankCard({
 }
 
 // ============================================================================
-// GRs do dia — resumo + lista detalhada
+// GRs — resumo + lista detalhada do período
 // ----------------------------------------------------------------------------
-// A gestão pediu para enxergar, guia por guia, o que foi lançado no dia:
-// horário, número da GR, paciente, médico/especialidade/procedimento, quem
-// executou o lançamento, situação e valor.
+// A gestão pediu para enxergar, guia por guia, o que foi lançado: horário,
+// número da GR, paciente, médico/especialidade/procedimento, quem executou o
+// lançamento, situação e valor.
 //
-// Por que esta seção tem um filtro de DATA próprio, separado do período do topo
-// da tela: os cards do topo respondem "quanto deu no período" e podem varrer 90
-// dias; esta lista é linha a linha, e um dia da clínica já passa de 350 guias.
+// A seção segue o filtro de data do TOPO da tela. Ela já teve um seletor de dia
+// próprio, e o resultado era que clicar em "Ontem" lá em cima não mexia na
+// lista — a pessoa tinha que escolher a data duas vezes, e as duas metades da
+// tela podiam ficar mostrando dias diferentes sem avisar.
 //
 // ---------------------------- DE ONDE SAI A LISTA --------------------------
 // A base é o LANÇAMENTO de receita (`fin_lancamentos`), não o registro de
@@ -1267,8 +1262,29 @@ function RankCard({
 
 /** Tamanho da página de leitura — é o teto de linhas que o PostgREST devolve. */
 const GR_PAGINA = 1000;
-/** Teto de páginas: 5.000 lançamentos num único dia já seria muito acima do normal. */
-const GR_MAX_PAGINAS = 5;
+/** Rede de segurança da paginação; na prática GR_MAX_LANCAMENTOS trava antes. */
+const GR_MAX_PAGINAS = 25;
+/**
+ * Acima disto a seção nem tenta montar a lista.
+ *
+ * A conta de um período normal é pequena — 30 dias dão 2.952 lançamentos. Mas a
+ * migração do sistema antigo gravou o histórico inteiro de uma vez, e todas
+ * aquelas linhas ficaram com `created_at` no dia da importação: 609.793 em
+ * 01/06/2026 e 215.751 em 12/06/2026. Qualquer período que alcance esses dias
+ * (os atalhos de 90 dias e "Este ano") passa de 840 mil lançamentos.
+ *
+ * Sem esta trava, clicar em "90d" com a aba de GRs aberta gastaria uns dez
+ * segundos baixando página após página para no fim mostrar um pedaço inútil.
+ * A contagem prévia custa 66 ms mesmo nesse caso, então é ela que decide.
+ */
+const GR_MAX_LANCAMENTOS = 20000;
+/**
+ * Quantas guias a lista chega a desenhar. Ler 30 mil linhas o navegador
+ * aguenta; desenhar 30 mil linhas de tabela (e 30 mil cards no celular) trava
+ * a tela por vários segundos. Os cards de resumo continuam contando TODAS as
+ * guias do período — o corte é só do que aparece na lista, e a tela diz isso.
+ */
+const GR_MAX_LINHAS = 1000;
 
 type GrLancRow = {
   id: string;
@@ -1284,8 +1300,10 @@ type GrLancRow = {
 
 type GrLinha = {
   id: string;
+  /** Dia do lançamento (dd/MM), mostrado só quando o período passa de um dia. */
+  data: string;
   hora: string;
-  /** Posição da GR na ordem do dia (1, 2, 3…) — sempre existe. */
+  /** Posição da GR na ordem do período (1, 2, 3…) — sempre existe. */
   numero: string;
   /** Nº da guia impressa, quando a impressão ficou registrada. */
   numeroGuia: string | null;
@@ -1304,9 +1322,28 @@ type GrLinha = {
   valorConfirmado: number;
 };
 
-type GrsDoDia = { linhas: GrLinha[]; segundasVias: number; truncado: boolean };
+type GrsDoDia = {
+  linhas: GrLinha[];
+  segundasVias: number;
+  truncado: boolean;
+  /** Nº de lançamentos quando o período é grande demais para listar (ver GR_MAX_LANCAMENTOS). */
+  excedeu: number | null;
+};
 
-const grVazio = (): GrsDoDia => ({ linhas: [], segundasVias: 0, truncado: false });
+const grVazio = (): GrsDoDia => ({
+  linhas: [],
+  segundasVias: 0,
+  truncado: false,
+  excedeu: null,
+});
+
+/** Dia dd/MM no fuso da clínica — usado quando o período cobre mais de um dia. */
+const diaClinica = (iso: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    timeZone: TZ_CLINICA,
+    day: "2-digit",
+    month: "2-digit",
+  }).format(new Date(iso));
 
 /**
  * Hora HH:mm no fuso da clínica — nunca no fuso do navegador de quem abre o
@@ -1372,15 +1409,33 @@ async function emLotes<T>(
 
 const soIds = (v: (string | null | undefined)[]) => [...new Set(v.filter((x): x is string => !!x))];
 
-async function carregarGrsDoDia(cid: string, dia: string): Promise<GrsDoDia> {
-  // Fronteira do dia calculada no fuso da clínica (ver janelaDiaClinica): o
-  // caminho `new Date(dia + "T00:00:00")` erra em até 3 horas dependendo de
-  // onde o código roda.
-  const { inicio, fimExclusivo } = janelaDiaClinica(dia);
+async function carregarGrsDoPeriodo(cid: string, periodo: Periodo): Promise<GrsDoDia> {
+  // Fronteiras no fuso da clínica: `new Date(dia + "T00:00:00")` resolve no
+  // fuso de quem executa o código e erra em até 3 horas entre o navegador da
+  // recepção e o Worker do SSR.
+  const inicio = zonedDateStringToUtcISO(periodo.de, "00:00:00");
+  const fimExclusivo = zonedDateStringToUtcISO(addDays(periodo.ate, 1), "00:00:00");
+
+  // Contagem antes de qualquer leitura: descobre em uma consulta barata se o
+  // período cabe numa lista guia a guia. Ver GR_MAX_LANCAMENTOS.
+  const { count, error: erroContagem } = await supabase
+    .from("fin_lancamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("clinica_id", cid)
+    .eq("tipo", "receita")
+    .gte("created_at", inicio)
+    .lt("created_at", fimExclusivo);
+  if (erroContagem) {
+    mostrarErro(erroContagem, "falha ao contar as GRs do período");
+    return grVazio();
+  }
+  if ((count ?? 0) > GR_MAX_LANCAMENTOS) {
+    return { ...grVazio(), excedeu: count ?? 0 };
+  }
 
   // Leitura paginada: o PostgREST devolve no máximo GR_PAGINA linhas por
-  // consulta e um dia cheio já passa de 350 lançamentos. Sem paginar, um dia
-  // mais movimentado sairia cortado sem avisar.
+  // consulta e um dia cheio já passa de 350 lançamentos. Sem paginar, qualquer
+  // período maior que um dia sairia cortado sem avisar.
   const lancs: GrLancRow[] = [];
   let truncado = false;
   for (let pagina = 0; ; pagina++) {
@@ -1532,6 +1587,7 @@ async function carregarGrsDoDia(cid: string, dia: string): Promise<GrsDoDia> {
 
     return {
       id: chave,
+      data: diaClinica(primeiro.created_at),
       hora: horaClinica(primeiro.created_at),
       numero: String(i + 1),
       numeroGuia: agId && fichaImpressa.has(agId) ? String(fichaImpressa.get(agId)) : null,
@@ -1554,13 +1610,21 @@ async function carregarGrsDoDia(cid: string, dia: string): Promise<GrsDoDia> {
     };
   });
 
-  return { linhas, segundasVias, truncado };
+  return { linhas, segundasVias, truncado, excedeu: null };
 }
 
 const TODOS = "todos";
 
-function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boolean }) {
-  const [dia, setDia] = useState<string>(hojeBR());
+function SecaoGrsDoDia({
+  clinicaId,
+  periodo,
+  podeFin,
+}: {
+  clinicaId: string;
+  /** Período escolhido no topo da tela — esta seção não tem filtro próprio. */
+  periodo: Periodo;
+  podeFin: boolean;
+}) {
   const [dados, setDados] = useState<GrsDoDia>(grVazio());
   const [carregando, setCarregando] = useState(false);
   const [fAtendente, setFAtendente] = useState(TODOS);
@@ -1568,29 +1632,31 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
   const [fStatus, setFStatus] = useState(TODOS);
   const [busca, setBusca] = useState("");
 
+  const umDiaSo = periodo.de === periodo.ate;
+
   const carregar = async () => {
     setCarregando(true);
     try {
-      setDados(await carregarGrsDoDia(clinicaId, dia));
+      setDados(await carregarGrsDoPeriodo(clinicaId, periodo));
     } finally {
       setCarregando(false);
     }
   };
 
   useEffect(() => {
-    // Trocar de dia zera os filtros: o atendente escolhido ontem pode não ter
-    // trabalhado hoje, e a lista abriria vazia sem explicar o porquê.
+    // Trocar o período zera os filtros: o atendente escolhido ontem pode não
+    // ter trabalhado hoje, e a lista abriria vazia sem explicar o porquê.
     setFAtendente(TODOS);
     setFMedico(TODOS);
     setFStatus(TODOS);
     void carregar(); /* eslint-disable-next-line */
-  }, [clinicaId, dia]);
+  }, [clinicaId, periodo.de, periodo.ate]);
 
   const ordenar = (v: string[]) => [...new Set(v)].filter((x) => x !== "—").sort();
   const atendentes = useMemo(() => ordenar(dados.linhas.map((l) => l.atendente)), [dados]);
   const medicos = useMemo(() => ordenar(dados.linhas.map((l) => l.medico)), [dados]);
-  // As opções de status saem das próprias linhas do dia — assim a lista nunca
-  // oferece um filtro que não existe naquele dia.
+  // As opções de status saem das próprias linhas do período — assim a lista
+  // nunca oferece um filtro que não existe ali.
   const statuses = useMemo(
     () => ordenar(dados.linhas.flatMap((l) => [l.situacao, l.financeiro ?? "—"])),
     [dados],
@@ -1619,6 +1685,10 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
   const valorConfirmado = filtradas.reduce((s, l) => s + l.valorConfirmado, 0);
   const pacientes = new Set(filtradas.map((l) => l.paciente).filter((p) => p !== "—")).size;
   const filtrando = filtradas.length !== dados.linhas.length;
+  // Os cards acima contam tudo; a lista abaixo desenha só o começo quando o
+  // período é grande. Ver GR_MAX_LINHAS.
+  const visiveis = filtradas.slice(0, GR_MAX_LINHAS);
+  const cortouLista = filtradas.length > visiveis.length;
   const limpar = () => {
     setFAtendente(TODOS);
     setFMedico(TODOS);
@@ -1628,36 +1698,26 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
 
   return (
     <div className="space-y-4">
-      {/* Filtro de data próprio desta seção */}
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <Label className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Dia do lançamento
-          </Label>
-          <DateInputBR
-            value={dia}
-            onChange={(e) => setDia(e.target.value)}
-            className="h-9 w-40 focus-visible:ring-2 focus-visible:ring-primary/30"
-          />
-        </div>
-        <Button size="sm" variant="outline" onClick={() => setDia(hojeBR())} className="h-9">
-          Hoje
-        </Button>
+      {/* Esta seção não tem filtro de data: ela segue o período do topo. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">
+          {umDiaSo
+            ? `Guias emitidas em ${formatDatePura(periodo.de)}`
+            : `Guias emitidas de ${formatDatePura(periodo.de)} a ${formatDatePura(periodo.ate)}`}{" "}
+          — para trocar, use o filtro de data no topo da tela.
+        </span>
         <Button
           size="sm"
           variant="ghost"
-          className="h-9"
+          className="h-8"
           onClick={() => void carregar()}
           disabled={carregando}
         >
           <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
         </Button>
-        <span className="pb-1 text-xs text-muted-foreground">
-          Guias emitidas em {formatDatePura(dia)}
-        </span>
       </div>
 
-      {/* 1) Cards de resumo — total de GRs do dia */}
+      {/* 1) Cards de resumo — total de GRs do período */}
       <HhpKpiRow>
         <HhpKpiCard
           label="GRs geradas"
@@ -1666,8 +1726,8 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
           tone="info"
           hint={
             filtrando
-              ? `${int(filtradas.length)} de ${int(dados.linhas.length)} guias do dia (filtro aplicado)`
-              : `${int(dados.linhas.length)} guias emitidas no dia`
+              ? `${int(filtradas.length)} de ${int(dados.linhas.length)} guias do período (filtro aplicado)`
+              : `${int(dados.linhas.length)} guias emitidas no período`
           }
         />
         {podeFin && (
@@ -1710,13 +1770,25 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
         )}
       </HhpKpiRow>
 
+      {dados.excedeu !== null && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Este período tem {int(dados.excedeu)} lançamentos — demais para uma lista guia a guia.
+            Escolha um período menor no topo da tela (Hoje, Ontem, 7d ou 30d). Períodos que alcançam
+            junho de 2026 entram nessa conta porque a migração do sistema antigo gravou todo o
+            histórico de uma vez, com a data da importação.
+          </span>
+        </div>
+      )}
+
       {dados.truncado && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            Este dia tem mais de {int(GR_PAGINA * GR_MAX_PAGINAS)} lançamentos e a lista mostra
-            apenas os primeiros. Os números acima também estão incompletos — trate como amostra, não
-            como total do dia.
+            Este período tem mais de {int(GR_PAGINA * GR_MAX_PAGINAS)} lançamentos e só os primeiros
+            foram lidos. Os números acima estão incompletos — trate como amostra, não como total.
+            Escolha um período menor no topo da tela para ver o número certo.
           </span>
         </div>
       )}
@@ -1724,14 +1796,20 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span>GRs geradas em {formatDatePura(dia)}</span>
+            <span>
+              {umDiaSo
+                ? `GRs geradas em ${formatDatePura(periodo.de)}`
+                : `GRs geradas de ${formatDatePura(periodo.de)} a ${formatDatePura(periodo.ate)}`}
+            </span>
             <span className="text-xs font-normal text-muted-foreground">
               {int(filtradas.length)} {filtradas.length === 1 ? "guia" : "guias"}
             </span>
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Uma linha por atendimento lançado. O Nº é a ordem da GR no dia; quando a impressão da
-            guia ficou registrada, o número dela aparece ao lado.
+            Uma linha por atendimento lançado. O Nº é a ordem da GR no período; quando a impressão
+            da guia ficou registrada, o número dela aparece ao lado.
+            {cortouLista &&
+              ` A lista desenha as ${int(GR_MAX_LINHAS)} primeiras — os cards acima continuam contando todas as ${int(filtradas.length)}.`}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -1802,18 +1880,21 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
             <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>
           ) : filtradas.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              {dados.linhas.length === 0
-                ? "Nenhuma GR gerada neste dia."
-                : "Nenhuma GR corresponde aos filtros."}
+              {dados.excedeu !== null
+                ? "Escolha um período menor no topo da tela para ver a lista."
+                : dados.linhas.length === 0
+                  ? "Nenhuma GR gerada neste período."
+                  : "Nenhuma GR corresponde aos filtros."}
             </p>
           ) : (
             <>
               {/* Celular */}
               <ul className="space-y-2 md:hidden">
-                {filtradas.map((l) => (
+                {visiveis.map((l) => (
                   <li key={l.id} className="rounded-lg border p-3">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-xs tabular-nums text-muted-foreground">
+                        {umDiaSo ? "" : `${l.data} · `}
                         {l.hora} · GR {l.numero}
                         {l.numeroGuia ? ` · guia ${l.numeroGuia}` : ""}
                       </span>
@@ -1851,6 +1932,9 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {/* A data só faz sentido quando o período passa de um
+                          dia; num dia só ela repetiria a mesma linha 350 vezes. */}
+                      {!umDiaSo && <TableHead className="w-[70px]">Data</TableHead>}
                       <TableHead className="w-[70px]">Horário</TableHead>
                       <TableHead className="w-[110px]">Nº GR</TableHead>
                       <TableHead>Paciente</TableHead>
@@ -1861,8 +1945,13 @@ function SecaoGrsDoDia({ clinicaId, podeFin }: { clinicaId: string; podeFin: boo
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtradas.map((l) => (
+                    {visiveis.map((l) => (
                       <TableRow key={l.id}>
+                        {!umDiaSo && (
+                          <TableCell className="whitespace-nowrap text-xs tabular-nums">
+                            {l.data}
+                          </TableCell>
+                        )}
                         <TableCell className="whitespace-nowrap text-xs tabular-nums">
                           {l.hora}
                         </TableCell>
