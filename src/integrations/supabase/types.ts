@@ -9626,6 +9626,7 @@ export type Database = {
         }[]
       }
       consulta_publica: { Args: { _token: string }; Returns: Json }
+      contar_vinculos_paciente: { Args: { _id: string }; Returns: Json }
       contrato_dias_tolerancia: { Args: never; Returns: number }
       contrato_historico: { Args: { _contrato_id: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
@@ -9789,6 +9790,7 @@ export type Database = {
           valor: number
         }[]
       }
+      excluir_paciente_duplicado: { Args: { _id: string }; Returns: Json }
       feature_flag_ativa: {
         Args: { _clinica_id: string; _flag_key: string }
         Returns: boolean
