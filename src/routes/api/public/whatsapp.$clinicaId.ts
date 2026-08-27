@@ -174,8 +174,43 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 processou = true;
                 const from = String(msg.from ?? "");
                 const wa_message_id = String(msg.id ?? "");
-                const tipo = String(msg.type ?? "text");
-                const body = tipo === "text" ? String(msg.text?.body ?? "") : `[${tipo}]`;
+                const tipoBruto = String(msg.type ?? "text");
+                const tipo = tipoBruto === "voice" ? "audio" : tipoBruto;
+                const ehAudio = tipo === "audio";
+
+                // Texto do paciente que a Nina vai processar (áudio vira transcrição).
+                let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
+                let transcricao: string | null = null;
+                let audioFalhou = false;
+                let mediaMime: string | null = null;
+
+                if (ehAudio && cfg.access_token) {
+                  const mediaId = String(msg.audio?.id ?? msg.voice?.id ?? "");
+                  if (mediaId) {
+                    const { transcreverAudioWhatsapp } = await import(
+                      "@/lib/whatsapp-midia.server"
+                    );
+                    const r = await transcreverAudioWhatsapp(mediaId, cfg.access_token);
+                    mediaMime = r.mime;
+                    if (r.texto) {
+                      transcricao = r.texto;
+                      textoPaciente = r.texto;
+                    } else {
+                      audioFalhou = true;
+                      if (r.erro) console.error("transcrição de áudio falhou", r.erro);
+                    }
+                  } else {
+                    audioFalhou = true;
+                  }
+                }
+
+                const body = ehAudio
+                  ? transcricao
+                    ? `🎤 ${transcricao}`
+                    : "🎤 [áudio não transcrito]"
+                  : tipo === "text"
+                    ? String(msg.text?.body ?? "")
+                    : `[${tipo}]`;
 
                 await supabaseAdmin.from("whatsapp_mensagens").insert({
                   clinica_id: params.clinicaId,
@@ -185,23 +220,51 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   to_number: displayPhoneNumber,
                   body,
                   tipo,
+                  transcricao,
+                  media_mime: mediaMime,
                   status: "received",
                   enviada_por: "paciente",
                   raw: msg,
                 });
 
-                // Modo híbrido: Nina responde fora do horário humano (apenas texto).
+                // Mensagem nova do paciente reabre conversa fechada.
+                if (from) {
+                  await supabaseAdmin
+                    .from("atend_conversas")
+                    .update({ status: "aberta", ultima_msg_em: new Date().toISOString() })
+                    .eq("clinica_id", params.clinicaId)
+                    .eq("contato_telefone", from)
+                    .neq("status", "aberta");
+                }
+
+                // Modo híbrido: Nina responde fora do horário humano.
                 // Se a clínica desligou a Nina (flag `nina_desativada`), não responde nada.
                 const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
                 const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
-                if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
+                const foraDoHorario = !dentroHorarioAtendimento(cfg);
+                const deveResponder =
+                  !ninaOff &&
+                  foraDoHorario &&
+                  (Boolean(textoPaciente) || audioFalhou || ["image", "document", "sticker"].includes(tipo));
+
+                if (deveResponder) {
                   try {
                     if (!phoneNumberId) {
                       throw new Error(
                         "WhatsApp não configurado: Phone Number ID ausente na configuração e no webhook da Meta.",
                       );
                     }
-                    const reply = await gerarRespostaNina(params.clinicaId, body, from);
+                    const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } = await import(
+                      "@/lib/whatsapp-midia.server"
+                    );
+                    let reply = "";
+                    if (textoPaciente) {
+                      reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from);
+                    } else if (audioFalhou) {
+                      reply = RESPOSTA_AUDIO_FALHOU;
+                    } else {
+                      reply = respostaMidiaNaoSuportada(tipo);
+                    }
                     if (reply) {
                       const { wa_message_id: outId } = await metaSendText(
                         phoneNumberId,
