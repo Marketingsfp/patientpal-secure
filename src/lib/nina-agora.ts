@@ -38,7 +38,9 @@ export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date(
     month: "long",
     year: "numeric",
   }).format(now);
-  const nomeDia = new Intl.DateTimeFormat("en-US", { timeZone: fuso, weekday: "short" }).format(now);
+  const nomeDia = new Intl.DateTimeFormat("en-US", { timeZone: fuso, weekday: "short" }).format(
+    now,
+  );
   const mapa: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return {
     iso: partes,

@@ -7,7 +7,6 @@ import {
   pareceCitarEspecialidade,
 } from "@/lib/nina-especialidade";
 
-
 const META_VERSION = "v22.0";
 
 /* =========================================================================
@@ -482,7 +481,11 @@ export async function gerarRespostaNina(
 
   const [medR, dispR, procR, cliR, pacienteInfo, medEspR, espR, estadoId, histR] =
     await Promise.all([
-      supabaseAdmin.from("medicos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true),
+      supabaseAdmin
+        .from("medicos")
+        .select("id, nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true),
       supabaseAdmin
         .from("medico_disponibilidades")
         .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
@@ -540,58 +543,57 @@ export async function gerarRespostaNina(
     medEspNomes.set(r.medico_id, arr);
   }
 
-
   const medicosLista = (medR.data ?? []).map((m: any) => {
     const disps = (dispR.data ?? []).filter((d: any) => d.medico_id === m.id);
     const temMultiplas = (agendasPorMedico.get(m.id) ?? 0) > 1;
     const dias = new Set<number>(disps.map((d: any) => Number(d.dia_semana)));
 
-      // Agrupa por agenda → dia, mescla turnos sobrepostos/contíguos
-      const porAgenda = new Map<string, Map<number, Array<[string, string]>>>();
-      for (const d of disps) {
-        const ini = String(d.hora_inicio ?? "").slice(0, 5);
-        const fim = String(d.hora_fim ?? "").slice(0, 5);
-        if (!ini || !fim) continue;
-        const ag = d.agenda_id ?? "_";
-        if (!porAgenda.has(ag)) porAgenda.set(ag, new Map());
-        const porDia = porAgenda.get(ag)!;
-        const arr = porDia.get(d.dia_semana) ?? [];
-        arr.push([ini, fim]);
-        porDia.set(d.dia_semana, arr);
-      }
+    // Agrupa por agenda → dia, mescla turnos sobrepostos/contíguos
+    const porAgenda = new Map<string, Map<number, Array<[string, string]>>>();
+    for (const d of disps) {
+      const ini = String(d.hora_inicio ?? "").slice(0, 5);
+      const fim = String(d.hora_fim ?? "").slice(0, 5);
+      if (!ini || !fim) continue;
+      const ag = d.agenda_id ?? "_";
+      if (!porAgenda.has(ag)) porAgenda.set(ag, new Map());
+      const porDia = porAgenda.get(ag)!;
+      const arr = porDia.get(d.dia_semana) ?? [];
+      arr.push([ini, fim]);
+      porDia.set(d.dia_semana, arr);
+    }
 
-      const formatPorDia = (porDia: Map<number, Array<[string, string]>>) => {
-        const partes: string[] = [];
-        for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
-          turnos.sort((a, b) => a[0].localeCompare(b[0]));
-          const merged: Array<[string, string]> = [];
-          for (const [ini, fim] of turnos) {
-            const last = merged[merged.length - 1];
-            if (last && ini <= last[1]) {
-              if (fim > last[1]) last[1] = fim;
-            } else {
-              merged.push([ini, fim]);
-            }
+    const formatPorDia = (porDia: Map<number, Array<[string, string]>>) => {
+      const partes: string[] = [];
+      for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
+        turnos.sort((a, b) => a[0].localeCompare(b[0]));
+        const merged: Array<[string, string]> = [];
+        for (const [ini, fim] of turnos) {
+          const last = merged[merged.length - 1];
+          if (last && ini <= last[1]) {
+            if (fim > last[1]) last[1] = fim;
+          } else {
+            merged.push([ini, fim]);
           }
-          partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
         }
-        return partes.join(", ");
-      };
+        partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
+      }
+      return partes.join(", ");
+    };
 
     const esps = medEspNomes.get(m.id) ?? [];
     const sufixoEsp = esps.length ? ` (${esps.join(", ")})` : "";
 
-      if (!temMultiplas) {
-        // Junta tudo num único conjunto
-        const unico = new Map<number, Array<[string, string]>>();
-        for (const porDia of porAgenda.values()) {
-          for (const [dia, turnos] of porDia.entries()) {
-            const arr = unico.get(dia) ?? [];
-            arr.push(...turnos);
-            unico.set(dia, arr);
-          }
+    if (!temMultiplas) {
+      // Junta tudo num único conjunto
+      const unico = new Map<number, Array<[string, string]>>();
+      for (const porDia of porAgenda.values()) {
+        for (const [dia, turnos] of porDia.entries()) {
+          const arr = unico.get(dia) ?? [];
+          arr.push(...turnos);
+          unico.set(dia, arr);
         }
-        const horarios = formatPorDia(unico);
+      }
+      const horarios = formatPorDia(unico);
       return {
         id: m.id,
         nome: m.nome,
@@ -599,15 +601,15 @@ export async function gerarRespostaNina(
         dias,
         texto: `- ${m.nome}${sufixoEsp}${horarios ? ` | ${horarios}` : ""}`,
       };
-      }
+    }
 
-      // Mostra separado por agenda
-      const blocos: string[] = [];
-      for (const [ag, porDia] of porAgenda.entries()) {
-        const nome = agendaNome.get(ag) ?? "Agenda";
-        const horarios = formatPorDia(porDia);
-        if (horarios) blocos.push(`    • ${nome}: ${horarios}`);
-      }
+    // Mostra separado por agenda
+    const blocos: string[] = [];
+    for (const [ag, porDia] of porAgenda.entries()) {
+      const nome = agendaNome.get(ag) ?? "Agenda";
+      const horarios = formatPorDia(porDia);
+      if (horarios) blocos.push(`    • ${nome}: ${horarios}`);
+    }
     return {
       id: m.id,
       nome: m.nome,
@@ -618,7 +620,6 @@ export async function gerarRespostaNina(
   });
 
   const medicos = medicosLista.map((m) => m.texto).join("\n");
-
 
   const procs = (procR.data ?? [])
     .map(
@@ -828,4 +829,3 @@ ${procs || "(nenhum)"}`;
   }
   return resposta;
 }
-
