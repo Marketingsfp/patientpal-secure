@@ -691,6 +691,8 @@ function ConfiguracaoWhatsApp() {
     phone_number_id: "",
     waba_id: "",
     access_token: "",
+    app_secret: "",
+
   });
   const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
   const [savingHorario, setSavingHorario] = useState(false);
