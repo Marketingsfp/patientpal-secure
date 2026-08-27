@@ -778,7 +778,9 @@ ${dadosPublicos}
       ? `IDENTIFICAÇÃO: Não localizei este contato/CPF/nome na base de ${nomeUnidade}. Trate como paciente novo. NÃO peça dados completos agora — pergunte primeiro se a pessoa deseja agendar/se cadastrar. Só peça dados (nome completo, CPF, nascimento, telefone) quando houver intenção CLARA de agendamento, cadastro ou atualização.`
       : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
 
-  const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+  const systemPrompt = `Você é a Nina, assistente virtual da ${nomeUnidade}, respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+
+${blocoClinica}
 
 ${blocoDataHoraAgora()}
 
