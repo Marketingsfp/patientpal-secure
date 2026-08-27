@@ -635,6 +635,9 @@ export type Database = {
           departamento_id: string | null
           fila_posicao: number | null
           id: string
+          identidade_confirmada: boolean
+          identidade_perguntada_em: string | null
+          identidade_tentativas: number
           janela_24h_em: string | null
           primeiro_resp_em: string | null
           protocol_number: string | null
@@ -660,6 +663,9 @@ export type Database = {
           departamento_id?: string | null
           fila_posicao?: number | null
           id?: string
+          identidade_confirmada?: boolean
+          identidade_perguntada_em?: string | null
+          identidade_tentativas?: number
           janela_24h_em?: string | null
           primeiro_resp_em?: string | null
           protocol_number?: string | null
@@ -685,6 +691,9 @@ export type Database = {
           departamento_id?: string | null
           fila_posicao?: number | null
           id?: string
+          identidade_confirmada?: boolean
+          identidade_perguntada_em?: string | null
+          identidade_tentativas?: number
           janela_24h_em?: string | null
           primeiro_resp_em?: string | null
           protocol_number?: string | null

@@ -7,8 +7,6 @@
  * cada pergunta atrasava o início da fala da Nina.
  */
 
-import { blocoDataHoraAgora } from "@/lib/nina-agora";
-
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /** Validade do contexto em cache (ms). */
@@ -214,11 +212,8 @@ export async function contextoClinicaTexto(
 }
 
 /** Instruções da Nina + base de dados da clínica. */
-export function systemPromptNina(contextoTexto: string, modoVoz?: boolean, timeZone?: string) {
+export function systemPromptNina(contextoTexto: string, modoVoz?: boolean) {
   const base = `Você é a Nina, assistente virtual interna da clínica, falando com a EQUIPE autenticada (gestão/recepção/médicos). Responda SEMPRE em português do Brasil, de forma curta, direta e amigável.
-
-${blocoDataHoraAgora(timeZone)}
-
 
 CONTEXTO DE USO:
 - Este canal é o painel interno do sistema. Quem pergunta é um colaborador autenticado da clínica.
