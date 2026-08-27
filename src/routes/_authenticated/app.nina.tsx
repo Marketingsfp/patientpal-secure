@@ -48,6 +48,9 @@ import {
   testarConexaoWhatsapp,
   statusNumeroWhatsapp,
   registrarNumeroWhatsapp,
+  statusInscricaoWaba,
+  inscreverAppWaba,
+
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
