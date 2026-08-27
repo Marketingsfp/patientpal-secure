@@ -9247,6 +9247,39 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_webhook_logs: {
+        Row: {
+          assinatura: string | null
+          clinica_id: string
+          corpo: string | null
+          headers: Json
+          id: string
+          metodo: string
+          recebido_em: string
+          resultado: string | null
+        }
+        Insert: {
+          assinatura?: string | null
+          clinica_id: string
+          corpo?: string | null
+          headers?: Json
+          id?: string
+          metodo: string
+          recebido_em?: string
+          resultado?: string | null
+        }
+        Update: {
+          assinatura?: string | null
+          clinica_id?: string
+          corpo?: string | null
+          headers?: Json
+          id?: string
+          metodo?: string
+          recebido_em?: string
+          resultado?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       nfse_emitentes_publico: {

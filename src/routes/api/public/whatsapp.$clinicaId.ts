@@ -30,6 +30,64 @@ function textoLimpo(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+const HEADERS_RELEVANTES = [
+  "x-hub-signature-256",
+  "x-hub-signature",
+  "content-type",
+  "user-agent",
+  "x-forwarded-for",
+];
+
+/** Registra a requisição crua antes de qualquer validação. Nunca lança. */
+async function registrarLogWebhook(
+  clinicaId: string,
+  metodo: string,
+  request: Request,
+  corpo: string,
+): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const headers: Record<string, string> = {};
+    for (const nome of HEADERS_RELEVANTES) {
+      const v = request.headers.get(nome);
+      if (v) headers[nome] = v;
+    }
+    const { data, error } = await supabaseAdmin
+      .from("whatsapp_webhook_logs")
+      .insert({
+        clinica_id: clinicaId,
+        metodo,
+        headers,
+        assinatura: request.headers.get("x-hub-signature-256"),
+        corpo: corpo.slice(0, 8192),
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      console.error("whatsapp webhook log insert error", error.message);
+      return null;
+    }
+    return (data as { id: string } | null)?.id ?? null;
+  } catch (e) {
+    console.error("whatsapp webhook log error", e);
+    return null;
+  }
+}
+
+/** Preenche o campo `resultado` do log. Nunca lança. */
+async function marcarResultado(logId: string | null, resultado: string) {
+  if (!logId) return;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("whatsapp_webhook_logs")
+      .update({ resultado: resultado.slice(0, 500) })
+      .eq("id", logId);
+  } catch (e) {
+    console.error("whatsapp webhook log update error", e);
+  }
+}
+
 async function registrarStatusWhatsapp(clinicaId: string, ok: boolean, erro?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   await supabaseAdmin
@@ -52,12 +110,19 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
         const token = url.searchParams.get("hub.verify_token");
         const challenge = url.searchParams.get("hub.challenge");
 
+        const logId = await registrarLogWebhook(params.clinicaId, "GET", request, url.search);
+
         const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
-        if (!cfg) return new Response("Not found", { status: 404 });
+        if (!cfg) {
+          await marcarResultado(logId, "erro:clínica sem configuração de WhatsApp");
+          return new Response("Not found", { status: 404 });
+        }
 
         if (mode === "subscribe" && token && token === cfg.verify_token) {
+          await marcarResultado(logId, "processado_ok");
           return new Response(challenge ?? "", { status: 200 });
         }
+        await marcarResultado(logId, "erro:verify_token inválido");
         return new Response("Forbidden", { status: 403 });
       },
 
@@ -65,110 +130,131 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
       POST: async ({ request, params }) => {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const rawBody = await request.text();
-        const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
-        if (!cfg) return new Response("Not found", { status: 404 });
-        if (!cfg.app_secret || !cfg.access_token) {
-          return new Response("Not configured", { status: 412 });
-        }
-
-        const sigHeader = request.headers.get("x-hub-signature-256");
-        if (!verifySignature(cfg.app_secret, rawBody, sigHeader)) {
-          return new Response("Invalid signature", { status: 401 });
-        }
-
-        let payload: any;
+        const logId = await registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
+        let resultado = "evento_ignorado";
         try {
-          payload = JSON.parse(rawBody);
-        } catch {
-          return new Response("Bad request", { status: 400 });
-        }
+          const cfg = await loadWhatsAppConfig(params.clinicaId).catch(() => null);
+          if (!cfg) {
+            resultado = "erro:clínica sem configuração de WhatsApp";
+            return new Response("Not found", { status: 404 });
+          }
+          if (!cfg.access_token) {
+            resultado = "erro:access token ausente";
+            return new Response("Not configured", { status: 412 });
+          }
 
-        const entries: any[] = payload?.entry ?? [];
-        for (const entry of entries) {
-          const changes: any[] = entry?.changes ?? [];
-          for (const change of changes) {
-            const value = change?.value ?? {};
-            const webhookPhoneNumberId = textoLimpo(value?.metadata?.phone_number_id);
-            const displayPhoneNumber =
-              textoLimpo(value?.metadata?.display_phone_number) ?? cfg.display_phone_number;
-            const phoneNumberId = webhookPhoneNumberId ?? textoLimpo(cfg.phone_number_id);
-            const messages: any[] = value?.messages ?? [];
-            for (const msg of messages) {
-              const from = String(msg.from ?? "");
-              const wa_message_id = String(msg.id ?? "");
-              const tipo = String(msg.type ?? "text");
-              const body = tipo === "text" ? String(msg.text?.body ?? "") : `[${tipo}]`;
+          const sigHeader = request.headers.get("x-hub-signature-256");
+          // Assinatura não confere (ou App Secret vazio/errado): registramos, mas
+          // NUNCA descartamos a mensagem do paciente.
+          const assinaturaOk = Boolean(
+            cfg.app_secret && verifySignature(cfg.app_secret, rawBody, sigHeader),
+          );
+          if (!assinaturaOk) resultado = "assinatura_invalida";
 
-              await supabaseAdmin.from("whatsapp_mensagens").insert({
-                clinica_id: params.clinicaId,
-                wa_message_id,
-                direction: "in",
-                from_number: from,
-                to_number: displayPhoneNumber,
-                body,
-                tipo,
-                status: "received",
-                enviada_por: "paciente",
-                raw: msg,
-              });
+          let payload: any;
+          try {
+            payload = JSON.parse(rawBody);
+          } catch {
+            resultado = "erro:corpo não é JSON válido";
+            return new Response("Bad request", { status: 400 });
+          }
 
-              // Modo híbrido: Nina responde fora do horário humano (apenas texto).
-              // Se a clínica desligou a Nina (flag `nina_desativada`), não responde nada.
-              const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
-              const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
-              if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
-                try {
-                  if (!phoneNumberId) {
-                    throw new Error(
-                      "WhatsApp não configurado: Phone Number ID ausente na configuração e no webhook da Meta.",
-                    );
-                  }
-                  const reply = await gerarRespostaNina(params.clinicaId, body, from);
-                  if (reply) {
-                    const { wa_message_id: outId } = await metaSendText(
-                      phoneNumberId,
-                      cfg.access_token,
-                      from,
-                      reply,
-                    );
-                    await supabaseAdmin.from("whatsapp_mensagens").insert({
-                      clinica_id: params.clinicaId,
-                      wa_message_id: outId,
-                      direction: "out",
-                      from_number: displayPhoneNumber,
-                      to_number: from,
-                      body: reply,
-                      tipo: "text",
-                      status: "sent",
-                      enviada_por: "nina",
-                    });
-                    if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
-                      await supabaseAdmin
-                        .from("whatsapp_configs")
-                        .update({
-                          phone_number_id: webhookPhoneNumberId,
-                          display_phone_number: displayPhoneNumber,
-                          ultimo_teste_em: new Date().toISOString(),
-                          ultimo_teste_ok: true,
-                          ultimo_teste_erro: null,
-                        })
-                        .eq("clinica_id", params.clinicaId);
+          let processou = false;
+          const entries: any[] = payload?.entry ?? [];
+          for (const entry of entries) {
+            const changes: any[] = entry?.changes ?? [];
+            for (const change of changes) {
+              const value = change?.value ?? {};
+              const webhookPhoneNumberId = textoLimpo(value?.metadata?.phone_number_id);
+              const displayPhoneNumber =
+                textoLimpo(value?.metadata?.display_phone_number) ?? cfg.display_phone_number;
+              const phoneNumberId = webhookPhoneNumberId ?? textoLimpo(cfg.phone_number_id);
+              const messages: any[] = value?.messages ?? [];
+              for (const msg of messages) {
+                processou = true;
+                const from = String(msg.from ?? "");
+                const wa_message_id = String(msg.id ?? "");
+                const tipo = String(msg.type ?? "text");
+                const body = tipo === "text" ? String(msg.text?.body ?? "") : `[${tipo}]`;
+
+                await supabaseAdmin.from("whatsapp_mensagens").insert({
+                  clinica_id: params.clinicaId,
+                  wa_message_id,
+                  direction: "in",
+                  from_number: from,
+                  to_number: displayPhoneNumber,
+                  body,
+                  tipo,
+                  status: "received",
+                  enviada_por: "paciente",
+                  raw: msg,
+                });
+
+                // Modo híbrido: Nina responde fora do horário humano (apenas texto).
+                // Se a clínica desligou a Nina (flag `nina_desativada`), não responde nada.
+                const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
+                const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
+                if (!ninaOff && tipo === "text" && body && !dentroHorarioAtendimento(cfg)) {
+                  try {
+                    if (!phoneNumberId) {
+                      throw new Error(
+                        "WhatsApp não configurado: Phone Number ID ausente na configuração e no webhook da Meta.",
+                      );
                     }
+                    const reply = await gerarRespostaNina(params.clinicaId, body, from);
+                    if (reply) {
+                      const { wa_message_id: outId } = await metaSendText(
+                        phoneNumberId,
+                        cfg.access_token,
+                        from,
+                        reply,
+                      );
+                      await supabaseAdmin.from("whatsapp_mensagens").insert({
+                        clinica_id: params.clinicaId,
+                        wa_message_id: outId,
+                        direction: "out",
+                        from_number: displayPhoneNumber,
+                        to_number: from,
+                        body: reply,
+                        tipo: "text",
+                        status: "sent",
+                        enviada_por: "nina",
+                      });
+                      if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
+                        await supabaseAdmin
+                          .from("whatsapp_configs")
+                          .update({
+                            phone_number_id: webhookPhoneNumberId,
+                            display_phone_number: displayPhoneNumber,
+                            ultimo_teste_em: new Date().toISOString(),
+                            ultimo_teste_ok: true,
+                            ultimo_teste_erro: null,
+                          })
+                          .eq("clinica_id", params.clinicaId);
+                      }
+                    }
+                  } catch (e) {
+                    console.error("Nina autoreply error", e);
+                    await registrarStatusWhatsapp(
+                      params.clinicaId,
+                      false,
+                      String((e as Error)?.message ?? e),
+                    );
                   }
-                } catch (e) {
-                  console.error("Nina autoreply error", e);
-                  await registrarStatusWhatsapp(
-                    params.clinicaId,
-                    false,
-                    String((e as Error)?.message ?? e),
-                  );
                 }
               }
             }
           }
-        }
 
-        return new Response("ok", { status: 200 });
+          if (processou && resultado !== "assinatura_invalida") resultado = "processado_ok";
+          return new Response("ok", { status: 200 });
+        } catch (e) {
+          resultado = `erro:${String((e as Error)?.message ?? e)}`;
+          console.error("whatsapp webhook error", e);
+          return new Response("ok", { status: 200 });
+        } finally {
+          await marcarResultado(logId, resultado);
+        }
       },
     },
   },
