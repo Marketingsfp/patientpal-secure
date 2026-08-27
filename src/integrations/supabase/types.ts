@@ -10407,6 +10407,10 @@ export type Database = {
         }[]
       }
       pendencias_paciente: { Args: { _paciente_id: string }; Returns: Json }
+      pode_escrever_modulo: {
+        Args: { _clinica_id: string; _modulos: string[]; _user_id: string }
+        Returns: boolean
+      }
       procedimentos_popularidade: {
         Args: { p_clinica_id: string }
         Returns: {
