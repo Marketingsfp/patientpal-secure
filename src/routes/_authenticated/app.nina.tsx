@@ -48,6 +48,8 @@ import {
   testarConexaoWhatsapp,
   statusNumeroWhatsapp,
   registrarNumeroWhatsapp,
+  statusInscricaoWaba,
+  inscreverAppWaba,
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
@@ -670,6 +672,8 @@ function ConfiguracaoWhatsApp() {
   const testar = useServerFn(testarConexaoWhatsapp);
   const buscarStatus = useServerFn(statusNumeroWhatsapp);
   const registrarNumero = useServerFn(registrarNumeroWhatsapp);
+  const buscarInscricao = useServerFn(statusInscricaoWaba);
+  const inscreverApp = useServerFn(inscreverAppWaba);
 
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
@@ -697,6 +701,12 @@ function ConfiguracaoWhatsApp() {
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [registrando, setRegistrando] = useState(false);
+  const [inscricao, setInscricao] = useState<{
+    estado: "desconhecido" | "sem-waba" | "inscrito" | "sem-inscricao";
+    erro?: string;
+  }>({ estado: "desconhecido" });
+  const [inscricaoLoading, setInscricaoLoading] = useState(false);
+  const [inscrevendo, setInscrevendo] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -740,9 +750,47 @@ function ConfiguracaoWhatsApp() {
     }
   }, [clinicaAtual, buscarStatus]);
 
+  const atualizarInscricao = useCallback(async () => {
+    if (!clinicaAtual) return;
+    setInscricaoLoading(true);
+    try {
+      const r: any = await buscarInscricao({ data: { clinicaId: clinicaAtual.clinica_id } });
+      if (r?.semWaba) setInscricao({ estado: "sem-waba" });
+      else if (r?.ok)
+        setInscricao({ estado: (r.apps?.length ?? 0) > 0 ? "inscrito" : "sem-inscricao" });
+      else setInscricao({ estado: "desconhecido", erro: r?.error });
+    } catch (e: any) {
+      setInscricao({ estado: "desconhecido", erro: String(e?.message ?? e) });
+    } finally {
+      setInscricaoLoading(false);
+    }
+  }, [clinicaAtual, buscarInscricao]);
+
+  const onInscreverApp = async () => {
+    if (!cfg) return;
+    setInscrevendo(true);
+    try {
+      const r: any = await inscreverApp({ data: { clinicaId: cfg.clinica_id } });
+      if (r?.ok) {
+        toast.success("App inscrito na conta do WhatsApp. As mensagens já devem chegar.");
+      } else {
+        toast.error(r?.error ?? "Falha ao inscrever o app na conta.");
+      }
+      await Promise.all([atualizarStatusMeta(), atualizarInscricao()]);
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setInscrevendo(false);
+    }
+  };
+
   useEffect(() => {
     if (cfg?.phone_number_id && cfg?.has_access_token) void atualizarStatusMeta();
   }, [cfg?.phone_number_id, cfg?.has_access_token, atualizarStatusMeta]);
+
+  useEffect(() => {
+    if (cfg?.has_access_token) void atualizarInscricao();
+  }, [cfg?.has_access_token, cfg?.waba_id, atualizarInscricao]);
 
   const onRegistrar = async () => {
     if (!cfg) return;
@@ -937,6 +985,36 @@ function ConfiguracaoWhatsApp() {
       </Button>
     ) : null;
 
+  const linhaInscricao = (
+    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+      <span className="text-muted-foreground">Webhook da conta:</span>
+      {inscricaoLoading ? (
+        <span className="text-muted-foreground inline-flex items-center gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" /> verificando…
+        </span>
+      ) : inscricao.estado === "sem-waba" ? (
+        <span className="text-muted-foreground">WABA ID não informado</span>
+      ) : inscricao.estado === "inscrito" ? (
+        <span className="font-medium text-emerald-600">Inscrito</span>
+      ) : inscricao.estado === "sem-inscricao" ? (
+        <span className="font-medium text-destructive">Sem inscrição</span>
+      ) : (
+        <span className="text-muted-foreground">{inscricao.erro ?? "não verificado"}</span>
+      )}
+      {podeEscrever && inscricao.estado === "sem-inscricao" && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void onInscreverApp()}
+          disabled={inscrevendo}
+        >
+          {inscrevendo ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+          Inscrever app na conta
+        </Button>
+      )}
+    </div>
+  );
+
   const canaisDisponiveis = [
     {
       id: "oficial",
@@ -983,6 +1061,7 @@ function ConfiguracaoWhatsApp() {
                 <div className="flex flex-col items-end gap-0.5">
                   {metaStatusBadge}
                   {statusDetalhe}
+                  {linhaInscricao}
                 </div>
                 {botaoRegistrar}
                 <Button
@@ -1190,6 +1269,7 @@ function ConfiguracaoWhatsApp() {
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs font-medium">Status na Cloud API</span>
                   {statusDetalhe}
+                  {linhaInscricao}
                 </div>
                 <div className="flex items-center gap-2">
                   {metaStatusBadge}

@@ -193,6 +193,52 @@ export const registrarNumeroWhatsapp = createServerFn({ method: "POST" })
     }
   });
 
+/** Lista os apps inscritos no webhook da WABA (diagnóstico da inscrição). */
+export const statusInscricaoWaba = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    if (!cfg?.waba_id) return { ok: false as const, semWaba: true as const, apps: [] };
+    if (!cfg?.access_token) {
+      return { ok: false as const, error: "Access Token não configurado.", apps: [] };
+    }
+    const { metaListSubscribedApps } = await import("./whatsapp.server");
+    try {
+      const apps = await metaListSubscribedApps(cfg.waba_id, cfg.access_token);
+      return { ok: true as const, apps };
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message ?? e), apps: [] };
+    }
+  });
+
+/** Inscreve o app na WABA para que a Meta volte a entregar eventos no webhook. */
+export const inscreverAppWaba = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const cfg = await loadWhatsAppConfig(data.clinicaId);
+    if (!cfg?.waba_id || !cfg?.access_token) {
+      return { ok: false as const, error: "Preencha WABA ID e Access Token.", apps: [] };
+    }
+    const { metaSubscribeApp, metaListSubscribedApps } = await import("./whatsapp.server");
+    try {
+      await metaSubscribeApp(cfg.waba_id, cfg.access_token);
+    } catch (e: any) {
+      return { ok: false as const, error: String(e?.message ?? e), apps: [] };
+    }
+    try {
+      return {
+        ok: true as const,
+        apps: await metaListSubscribedApps(cfg.waba_id, cfg.access_token),
+      };
+    } catch {
+      return { ok: true as const, apps: [] };
+    }
+  });
+
 export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

@@ -125,7 +125,47 @@ export function traduzErroMeta(err: any): string {
   if (code === 133010) return "Número ainda não registrado na Cloud API.";
   if (code === 133006) return "O número precisa ser verificado na Meta antes de registrar.";
   if (code === 190) return "Token inválido ou expirado.";
+  if (code === 200 || /permission/i.test(msg)) {
+    return "O token não tem permissão para inscrever o app nesta conta. Confirme que o usuário do sistema tem acesso total à conta do WhatsApp e ao app na Meta.";
+  }
   return `Meta${Number.isFinite(code) ? ` (#${code})` : ""}: ${msg}`;
+}
+
+export interface MetaSubscribedApp {
+  id: string | null;
+  name: string | null;
+}
+
+/** Lista os apps inscritos no webhook da WABA. */
+export async function metaListSubscribedApps(
+  wabaId: string,
+  accessToken: string,
+): Promise<MetaSubscribedApp[]> {
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_STATUS}/${wabaId}/subscribed_apps`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(traduzErroMeta(json?.error ?? {}));
+  const list: any[] = Array.isArray(json?.data) ? json.data : [];
+  return list.map((item) => ({
+    id: item?.whatsapp_business_api_data?.id ?? item?.id ?? null,
+    name: item?.whatsapp_business_api_data?.name ?? item?.name ?? null,
+  }));
+}
+
+/** Inscreve o app (dono do token) no webhook da WABA. */
+export async function metaSubscribeApp(
+  wabaId: string,
+  accessToken: string,
+): Promise<{ success: boolean }> {
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_STATUS}/${wabaId}/subscribed_apps`,
+    { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(traduzErroMeta(json?.error ?? {}));
+  return { success: json?.success !== false };
 }
 
 export async function metaFetchPhoneStatus(
