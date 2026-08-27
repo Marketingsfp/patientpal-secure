@@ -873,6 +873,8 @@ function ConfiguracaoWhatsApp() {
           waba_id: form.waba_id,
           display_name: form.display_name,
           access_token: form.access_token || undefined,
+          app_secret: form.app_secret || undefined,
+
         },
       });
       toast.success("Configuração salva");
