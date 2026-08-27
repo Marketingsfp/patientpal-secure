@@ -103,6 +103,23 @@ export const salvarWhatsappConfig = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Últimos eventos crus recebidos da Meta no webhook desta clínica. */
+export const listarEventosWebhook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertManager(context.userId, data.clinicaId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("whatsapp_webhook_logs")
+      .select("id, metodo, recebido_em, assinatura, corpo, resultado")
+      .eq("clinica_id", data.clinicaId)
+      .order("recebido_em", { ascending: false })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    return { eventos: (rows ?? []) as Array<Record<string, any>> };
+  });
+
+
 export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
