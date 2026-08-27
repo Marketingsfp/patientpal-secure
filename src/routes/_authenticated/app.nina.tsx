@@ -1493,11 +1493,30 @@ function InboxWhatsapp({
     return conversas;
   }, [conversas, filtro]);
 
+  const [noFim, setNoFim] = useState(true);
+  const [novasMsgs, setNovasMsgs] = useState(false);
+
+  const irParaOFim = useCallback((suave = true) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: suave ? "smooth" : "auto" });
+    setNovasMsgs(false);
+    setNoFim(true);
+  }, []);
+
+  // Só puxa a rolagem se a atendente já estiver no fim da lista.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [sel?.id, sel?.msgs.length]);
+    if (noFim) irParaOFim(false);
+    else setNovasMsgs(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel?.msgs.length]);
+
+  // Troca de conversa: sempre começa no fim.
+  useEffect(() => {
+    setNovasMsgs(false);
+    setNoFim(true);
+    irParaOFim(false);
+  }, [sel?.id, irParaOFim]);
 
   const initials = (nome: string) =>
     nome
