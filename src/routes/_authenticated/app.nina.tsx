@@ -50,6 +50,8 @@ import {
   registrarNumeroWhatsapp,
   statusInscricaoWaba,
   inscreverAppWaba,
+  listarEventosWebhook,
+
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
