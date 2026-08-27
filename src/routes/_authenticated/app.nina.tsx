@@ -1666,8 +1666,27 @@ function InboxWhatsapp({
               </div>
             </header>
 
-            <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-1">
-              {renderMensagensAgrupadas(sel.msgs)}
+            <div className="relative flex-1 min-h-0">
+              <div
+                ref={scrollRef}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const fim = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+                  setNoFim(fim);
+                  if (fim) setNovasMsgs(false);
+                }}
+                className="absolute inset-0 overflow-auto p-4 space-y-1"
+              >
+                {renderMensagensAgrupadas(sel.msgs)}
+              </div>
+              {novasMsgs && (
+                <button
+                  onClick={() => irParaOFim(true)}
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1.5 rounded-full bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition-colors"
+                >
+                  novas mensagens ↓
+                </button>
+              )}
             </div>
 
             <div className="border-t border-border bg-card p-2.5 flex items-end gap-2">
