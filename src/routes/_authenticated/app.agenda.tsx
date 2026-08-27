@@ -8022,7 +8022,7 @@ function AgendaPage() {
                     </div>
                   </fieldset>
                 </div>
-                <DialogFooter className="shrink-0 z-20 bg-background px-4 sm:px-6 py-3 border-t border-slate-200 rounded-b-2xl flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                <DialogFooter className="shrink-0 z-20 bg-background px-4 sm:px-6 py-3 border-t border-slate-200 rounded-b-2xl flex sm:flex-row flex-col gap-2 sm:flex-wrap sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
                     <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
@@ -8054,7 +8054,7 @@ function AgendaPage() {
                           ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                           : "Desconto"}
                       </Button>
-                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:flex-nowrap sm:justify-end">
+                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:flex-wrap sm:justify-end">
                         <Button
                           type="button"
                           variant="outline"
