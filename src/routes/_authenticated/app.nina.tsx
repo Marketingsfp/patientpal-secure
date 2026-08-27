@@ -51,7 +51,6 @@ import {
   statusInscricaoWaba,
   inscreverAppWaba,
   listarEventosWebhook,
-
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
@@ -692,7 +691,6 @@ function ConfiguracaoWhatsApp() {
     waba_id: "",
     access_token: "",
     app_secret: "",
-
   });
   const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
   const [savingHorario, setSavingHorario] = useState(false);
@@ -829,7 +827,6 @@ function ConfiguracaoWhatsApp() {
       waba_id: cfg.waba_id ?? "",
       access_token: "",
       app_secret: "",
-
     });
     setShowToken(false);
     setDialogOpen(true);
@@ -874,7 +871,6 @@ function ConfiguracaoWhatsApp() {
           display_name: form.display_name,
           access_token: form.access_token || undefined,
           app_secret: form.app_secret || undefined,
-
         },
       });
       toast.success("Configuração salva");
@@ -1154,7 +1150,6 @@ function ConfiguracaoWhatsApp() {
       </Card>
 
       <EventosWebhookCard clinicaId={cfg.clinica_id} />
-
 
       <Card>
         <CardHeader>
@@ -2159,5 +2154,99 @@ function TemplatesWhatsapp() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/* ====================== EVENTOS RECEBIDOS DA META ====================== */
+
+interface EventoWebhook {
+  id: string;
+  metodo: string;
+  recebido_em: string;
+  assinatura: string | null;
+  corpo: string | null;
+  resultado: string | null;
+}
+
+function corResultado(resultado: string | null): string {
+  if (!resultado) return "text-muted-foreground";
+  if (resultado === "processado_ok") return "text-emerald-600";
+  if (resultado.startsWith("erro") || resultado === "assinatura_invalida")
+    return "text-destructive";
+  return "text-amber-600";
+}
+
+function EventosWebhookCard({ clinicaId }: { clinicaId: string }) {
+  const listar = useServerFn(listarEventosWebhook);
+  const [eventos, setEventos] = useState<EventoWebhook[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [aberto, setAberto] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const r: any = await listar({ data: { clinicaId } });
+      setEventos((r?.eventos ?? []) as EventoWebhook[]);
+    } catch (e: any) {
+      toast.error(String(e?.message ?? e));
+    } finally {
+      setCarregando(false);
+    }
+  }, [clinicaId, listar]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle>Eventos recebidos da Meta</CardTitle>
+            <CardDescription>Últimas 20 requisições feitas ao nosso webhook</CardDescription>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => void carregar()} disabled={carregando}>
+            <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {eventos.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            Nenhuma requisição recebida da Meta até agora.
+          </p>
+        ) : (
+          <div className="divide-y">
+            {eventos.map((ev) => (
+              <div key={ev.id} className="py-2 text-xs">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 text-left"
+                  onClick={() => setAberto(aberto === ev.id ? null : ev.id)}
+                >
+                  <span className="font-mono text-muted-foreground">
+                    {new Date(ev.recebido_em).toLocaleString("pt-BR")}
+                  </span>
+                  <span className="font-medium">{ev.metodo}</span>
+                  <span className={`font-medium ${corResultado(ev.resultado)}`}>
+                    {ev.resultado ?? "sem resultado"}
+                  </span>
+                  <span className="ml-auto text-muted-foreground">
+                    {aberto === ev.id ? "ocultar" : "ver corpo"}
+                  </span>
+                </button>
+                {aberto === ev.id && (
+                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap break-all">
+                    {ev.assinatura ? `x-hub-signature-256: ${ev.assinatura}\n\n` : ""}
+                    {ev.corpo || "(corpo vazio)"}
+                  </pre>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

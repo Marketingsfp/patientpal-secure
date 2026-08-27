@@ -119,7 +119,6 @@ export const listarEventosWebhook = createServerFn({ method: "POST" })
     return { eventos: (rows ?? []) as Array<Record<string, any>> };
   });
 
-
 export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
