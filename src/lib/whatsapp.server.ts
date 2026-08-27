@@ -740,6 +740,8 @@ export async function gerarRespostaNina(
 
   const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
 
+${blocoDataHoraAgora()}
+
 NUNCA mencione, cite ou inclua o CRM dos médicos nas respostas. Use apenas o nome do médico.
 
 SUA FUNÇÃO COM PACIENTES é EXCLUSIVAMENTE:
@@ -749,6 +751,22 @@ SUA FUNÇÃO COM PACIENTES é EXCLUSIVAMENTE:
 - Ser cordial, simpática e prestativa em qualquer interação.
 
 ${contextoRemetente}
+
+${blocoIdentidade}
+
+REGRAS DE CONFIRMAÇÃO DE IDENTIDADE:
+- A confirmação de identidade acontece NO MÁXIMO UMA VEZ por conversa. Se já perguntou, não repita.
+- Se a pessoa já confirmou (disse "sim", "sou eu" ou o próprio nome), trate-a pelo primeiro nome e nunca mais pergunte.
+- NUNCA abra uma resposta com a confirmação quando a pergunta for objetiva: responda primeiro o que foi perguntado; a confirmação, se ainda for necessária, vem depois, em uma linha.
+
+REGRAS DE ESPECIALIDADE / EXAME:
+- Quando o paciente citar uma especialidade ou procedimento, responda SOMENTE sobre ela — nunca devolva a lista geral de profissionais.
+- Compare nomes sem diferenciar acento, maiúsculas ou singular/plural ("cardio", "cardiologia", "cardiologista" são a mesma coisa).
+- Se não houver ninguém dessa especialidade no dia pedido, diga exatamente isso e ofereça o próximo dia com disponibilidade nela.
+- Se a especialidade não existir no cadastro, diga que a clínica não atende e ofereça listar as que atende.
+- No máximo 5 profissionais por resposta, com horários; se houver mais, diga quantos faltam e ofereça mostrar o restante.
+
+${blocoFoco}
 
 REGRA DE OURO — PEDIDO DE DADOS:
 - Só solicite dados pessoais (nome completo, CPF, nascimento, telefone, endereço) quando a pessoa demonstrar intenção clara de agendar, se cadastrar ou atualizar cadastro.
@@ -763,6 +781,8 @@ REGRAS DE PRIVACIDADE — NÃO PODEM SER QUEBRADAS:
 6. Você é SOMENTE LEITURA — não agenda, não cancela, não confirma nada diretamente. Oriente a pessoa a aguardar a recepção para concluir o agendamento.
 
 Se a pergunta fugir do escopo (horários, preços, especialidades, agendamento) ou violar as regras acima, peça gentilmente para a pessoa aguardar um atendente. Não invente dados.
+
+ESPECIALIDADES ATENDIDAS: ${espsCadastradas.join(", ") || "(nenhuma cadastrada)"}
 
 MÉDICOS:
 ${medicos || "(nenhum)"}
@@ -780,6 +800,7 @@ ${procs || "(nenhum)"}`;
       model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemPrompt },
+        ...historico,
         { role: "user", content: mensagemPaciente },
       ],
     }),
@@ -791,5 +812,20 @@ ${procs || "(nenhum)"}`;
     throw new Error(`Falha IA (${res.status})`);
   }
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content?.trim() ?? "";
+  const resposta = json.choices?.[0]?.message?.content?.trim() ?? "";
+
+  // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.
+  if (
+    !identidadeConfirmada &&
+    /confirmar\s+se\s+voc[eê]|voc[eê]\s+[eé]\s+o?\(?a?\)?\s|falo\s+com\s+o?\(?a?\)?\s|confirma\s+seu\s+nome/i.test(
+      resposta,
+    )
+  ) {
+    await salvarEstadoIdentidade(estadoId, {
+      identidade_perguntada_em: new Date().toISOString(),
+      identidade_tentativas: estadoId.tentativas + 1,
+    });
+  }
+  return resposta;
 }
+
