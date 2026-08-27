@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { blocoDataHoraAgora } from "@/lib/nina-agora";
 
 const META_VERSION = "v22.0";
 
@@ -519,6 +520,8 @@ export async function gerarRespostaNina(
       : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
 
   const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+
+${blocoDataHoraAgora()}
 
 NUNCA mencione, cite ou inclua o CRM dos médicos nas respostas. Use apenas o nome do médico.
 
