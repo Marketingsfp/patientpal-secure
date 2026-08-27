@@ -1,6 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
+import {
+  escolherContratoAtivo,
+  LIMITE_CONTRATOS_CANDIDATOS,
+} from "@/lib/convenio/escolher-contrato-ativo";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -1086,36 +1090,42 @@ function AgendaPage() {
     const clinicaId = clinicaAtual.clinica_id;
     (async () => {
       // 1) Contrato ativo (titular ou dependente)
-      // Mesma preferência de `obterInfoConvenioPaciente`: entre contratos
-      // ativos, vale o que TEM convênio vinculado (há contratos legados sem
-      // convênio que, vindo primeiro, faziam o paciente perder o desconto).
+      // Mesma preferência de `obterInfoConvenioPaciente`, centralizada em
+      // `escolherContratoAtivo`: entre contratos ativos vale o que TEM
+      // convênio vinculado e, no empate, o mais recente. Antes o desempate
+      // não existia — o paciente dependente em dois cartões ativos ficava
+      // com o que o banco devolvesse primeiro, e podia aparecer bloqueado
+      // por dívida de um cartão antigo de outro titular.
       const { data: titular } = await supabase
         .from("contratos_assinatura")
-        .select("id, convenio_id, cb_convenios(nome)")
+        .select("id, convenio_id, data_inicio, created_at, cb_convenios(nome)")
         .eq("clinica_id", clinicaId)
         .eq("status", "ativo")
         .eq("paciente_id", pacId)
-        .limit(5);
+        .order("data_inicio", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(LIMITE_CONTRATOS_CANDIDATOS);
       const daLinha = (c: any) => ({
         id: c.id as string,
         convenioNome: c.cb_convenios?.nome ?? "Convênio",
         semConvenio: !c.convenio_id,
       });
-      const titulares = ((titular ?? []) as any[]).filter(Boolean);
-      const titularEscolhido = titulares.find((c) => c.convenio_id) ?? titulares[0] ?? null;
+      const titularEscolhido = escolherContratoAtivo((titular ?? []) as any[]);
       let contrato: { id: string; convenioNome: string; semConvenio: boolean } | null =
         titularEscolhido ? daLinha(titularEscolhido) : null;
       if (!contrato || contrato.semConvenio) {
         const { data: deps } = await supabase
           .from("contrato_dependentes")
-          .select("contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
+          .select(
+            "contratos_assinatura!inner(id,clinica_id,status,convenio_id,data_inicio,created_at,cb_convenios(nome))",
+          )
           .eq("paciente_id", pacId)
           .eq("ativo", true)
-          .limit(5);
+          .limit(LIMITE_CONTRATOS_CANDIDATOS);
         const ativos = ((deps ?? []) as any[])
           .map((d) => d.contratos_assinatura)
           .filter((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
-        const cand = ativos.find((c: any) => c.convenio_id) ?? ativos[0] ?? null;
+        const cand = escolherContratoAtivo(ativos);
         if (cand) contrato = daLinha(cand);
       }
       if (reqId !== contratoPacienteReqId.current) return;

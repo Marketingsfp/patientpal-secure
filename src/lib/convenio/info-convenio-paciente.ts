@@ -14,6 +14,10 @@ import {
   calcularAvisoLimitePendentes,
   deveBloquearPorLimitePendente,
 } from "@/lib/agenda/aviso-limite-pendentes";
+import {
+  escolherContratoAtivo,
+  LIMITE_CONTRATOS_CANDIDATOS,
+} from "@/lib/convenio/escolher-contrato-ativo";
 
 /**
  * Data de hoje no fuso LOCAL, formato "YYYY-MM-DD". `new Date().toISOString()`
@@ -82,12 +86,14 @@ export async function obterInfoConvenioPaciente(params: {
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
     .select(
-      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,cb_convenios(nome)",
+      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,cb_convenios(nome)",
     )
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
-    .limit(5);
+    .order("data_inicio", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(LIMITE_CONTRATOS_CANDIDATOS);
   type ContratoAtivo = {
     id: string;
     convenio_id: string | null;
@@ -96,16 +102,17 @@ export async function obterInfoConvenioPaciente(params: {
     sem_carencia?: boolean | null;
     data_inicio?: string | null;
     renovado_em?: string | null;
+    created_at?: string | null;
     cb_convenios: { nome: string } | null;
   };
-  // Prefere sempre o contrato que TEM convênio vinculado. Existem contratos
-  // ativos legados sem `convenio_id` (criados pelo vínculo automático
+  // Prefere sempre o contrato que TEM convênio vinculado e, no empate, o mais
+  // recente (regra única em `escolherContratoAtivo`). Existem contratos ativos
+  // legados sem `convenio_id` (criados pelo vínculo automático
   // titular-dependente da importação): quando um deles vinha primeiro na
   // lista, o paciente perdia o desconto do cartão que de fato possui, porque
   // a função desistia no `!contrato.convenio_id` e a cobrança saía cheia.
   const titulares = ((titularContratos ?? []) as any[]).filter(Boolean) as ContratoAtivo[];
-  let contrato: ContratoAtivo | null =
-    titulares.find((c) => c?.convenio_id) ?? titulares[0] ?? null;
+  let contrato: ContratoAtivo | null = escolherContratoAtivo(titulares);
 
   // Segue para o vínculo como DEPENDENTE também quando o contrato de titular
   // encontrado está sem convênio — o benefício pode vir do contrato da família.
@@ -113,17 +120,17 @@ export async function obterInfoConvenioPaciente(params: {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
       .select(
-        "contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,cb_convenios(nome))",
+        "contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,cb_convenios(nome))",
       )
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
-      .limit(5);
+      .limit(LIMITE_CONTRATOS_CANDIDATOS);
     const ativos = ((deps ?? []) as any[])
       .map((d) => d.contratos_assinatura)
       .filter(
         (c: any) => c && c.clinica_id === clinicaId && c.status === "ativo",
       ) as ContratoAtivo[];
-    const cand = ativos.find((c) => c.convenio_id) ?? ativos[0] ?? null;
+    const cand = escolherContratoAtivo(ativos);
     if (cand) contrato = cand;
   }
   if (!contrato || !contrato.convenio_id) return null;

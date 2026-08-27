@@ -25,6 +25,10 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { hojeLocalISODate } from "@/lib/convenio/info-convenio-paciente";
+import {
+  escolherContratoAtivo,
+  LIMITE_CONTRATOS_CANDIDATOS,
+} from "@/lib/convenio/escolher-contrato-ativo";
 
 /**
  * Dias corridos de tolerância depois do vencimento da mensalidade. Dentro da
@@ -61,6 +65,9 @@ const PARTICULAR: TipoAtendimentoPadrao = {
 type LinhaContrato = {
   id?: unknown;
   convenio_id?: unknown;
+  // Usados só pelo desempate de `escolherContratoAtivo`.
+  data_inicio?: unknown;
+  created_at?: unknown;
   cb_convenios?: { nome?: string } | null;
 };
 
@@ -84,25 +91,30 @@ const daLinha = (c: LinhaContrato) => ({
 async function buscarContratoAtivo(clinicaId: string, pacienteId: string) {
   const { data: titulares } = await supabase
     .from("contratos_assinatura")
-    .select("id, convenio_id, cb_convenios(nome)")
+    .select("id, convenio_id, data_inicio, created_at, cb_convenios(nome)")
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
-    .limit(5);
+    .order("data_inicio", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(LIMITE_CONTRATOS_CANDIDATOS);
 
   const listaTitular = ((titulares ?? []) as LinhaContrato[]).filter(Boolean);
-  // Preferência por um contrato com convênio vinculado: se o paciente tiver
-  // mais de um, o que está com o cadastro completo dá o nome correto na tela.
-  const escolhido = listaTitular.find((c) => c.convenio_id) ?? listaTitular[0] ?? null;
+  // Preferência por um contrato com convênio vinculado e, no empate, o mais
+  // recente — mesma regra de `escolherContratoAtivo` usada na Agenda e no
+  // motor de preço, para que as três telas nunca escolham cartões diferentes.
+  const escolhido = escolherContratoAtivo(listaTitular);
   let contrato = escolhido ? daLinha(escolhido) : null;
   if (contrato && !contrato.semConvenio) return contrato;
 
   const { data: deps } = await supabase
     .from("contrato_dependentes")
-    .select("contratos_assinatura!inner(id, clinica_id, status, convenio_id, cb_convenios(nome))")
+    .select(
+      "contratos_assinatura!inner(id, clinica_id, status, convenio_id, data_inicio, created_at, cb_convenios(nome))",
+    )
     .eq("paciente_id", pacienteId)
     .eq("ativo", true)
-    .limit(5);
+    .limit(LIMITE_CONTRATOS_CANDIDATOS);
 
   const ativos = (
     (deps ?? []) as Array<{
@@ -114,7 +126,7 @@ async function buscarContratoAtivo(clinicaId: string, pacienteId: string) {
       (c): c is LinhaContrato & { clinica_id: unknown; status: unknown } =>
         !!c && c.clinica_id === clinicaId && c.status === "ativo",
     );
-  const candidato = ativos.find((c) => c.convenio_id) ?? ativos[0] ?? null;
+  const candidato = escolherContratoAtivo(ativos);
   if (candidato) contrato = daLinha(candidato);
   return contrato;
 }
