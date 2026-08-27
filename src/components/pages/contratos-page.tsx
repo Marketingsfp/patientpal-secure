@@ -2831,8 +2831,9 @@ function DetalheContrato({
   }, [contrato.id]);
 
   // ---- Edição avançada ----
-  // Liberado para todos os perfis: qualquer usuário com acesso ao contrato pode editar seus dados.
-  const isAdmin = true;
+  // Quem libera esta seção é a matriz de Perfis de Acesso (`podeEscrever` no
+  // módulo desta rota), nunca o cargo do usuário. Havia aqui uma constante
+  // de administrador fixa em true, resto de quando a tela era só do admin.
   const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
   const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
   const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
@@ -2852,14 +2853,16 @@ function DetalheContrato({
     !!(contrato as any).titular_apenas_financeiro,
   );
   const [savingApenasFin, setSavingApenasFin] = useState(false);
-  // Isenção manual de carência (Admin/Gestor).
+  // Isenção manual de carência (perfis com Edição no módulo).
   const [semCarencia, setSemCarencia] = useState<boolean>(!!(contrato as any).sem_carencia);
   const [semCarenciaMotivo, setSemCarenciaMotivo] = useState<string>(
     (contrato as any).sem_carencia_motivo ?? "",
   );
   const [savingSemCarencia, setSavingSemCarencia] = useState(false);
-  const roleAtual = (clinicaAtual?.role ?? "").toLowerCase();
-  const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
+  // Isenção de carência segue a mesma matriz de Perfis de Acesso do resto da
+  // tela. Era fixa em admin/gestor, então um perfil marcado como "Edição"
+  // enxergava o campo e não conseguia alterá-lo.
+  const podeEditarCarencia = podeEscrever;
   const [retroDialog, setRetroDialog] = useState<{
     open: boolean;
     parcelasPagas: string;
@@ -2880,7 +2883,7 @@ function DetalheContrato({
 
   // Carrega lista de convênios ativos (ADM)
   useEffect(() => {
-    if (!isAdmin || !clinicaAtual?.clinica_id) return;
+    if (!clinicaAtual?.clinica_id) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -2895,10 +2898,9 @@ function DetalheContrato({
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id]);
   // Preenche paciente titular no combobox (ADM)
   useEffect(() => {
-    if (!isAdmin) return;
     const pid = (contrato as any).paciente_id as string | null | undefined;
     if (!pid) {
       setAdmPaciente(null);
@@ -2916,7 +2918,7 @@ function DetalheContrato({
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, contrato.id]);
+  }, [contrato.id]);
 
   const salvarContratoAdmin = async () => {
     if (!podeEscrever) {
@@ -3012,10 +3014,10 @@ function DetalheContrato({
     }
   };
 
-  // Salva a isenção manual de carência (Admin/Gestor).
+  // Salva a isenção manual de carência (perfis com Edição no módulo).
   const salvarSemCarencia = async (novoValor: boolean, motivo: string) => {
     if (!podeEditarCarencia) {
-      toast.error("Apenas Admin ou Gestor podem alterar a carência.");
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     if (novoValor && !motivo.trim()) {
@@ -3428,8 +3430,8 @@ function DetalheContrato({
 
   const [revertendoCancelamento, setRevertendoCancelamento] = useState(false);
   const reverterCancelamento = async () => {
-    if (roleAtual !== "admin") {
-      toast.error("Apenas Admin pode reverter cancelamento.");
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     if (!cancelado) return;
@@ -4893,14 +4895,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
             </div>
-          ) : cancelado && roleAtual === "admin" ? (
+          ) : cancelado && podeEscrever ? (
             <Button
               size="sm"
               variant="outline"
               onClick={reverterCancelamento}
               disabled={revertendoCancelamento}
               className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
-              title="Reverter o cancelamento e reativar o contrato (somente Admin)."
+              title="Reverter o cancelamento e reativar o contrato."
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               {revertendoCancelamento ? "Revertendo..." : "Reverter cancelamento"}
@@ -5154,7 +5156,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-sm">Mensalidades</h3>
-                  {isAdmin && podeEscrever ? (
+                  {podeEscrever ? (
                     <div className="flex items-center gap-2">
                       {totalRascunhos > 0 ? (
                         <>
@@ -5185,7 +5187,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </div>
                   ) : null}
                 </div>
-                {podeEscrever && !(cancelado && !isAdmin)
+                {podeEscrever
                   ? (() => {
                       const selecionaveis = mens.filter((m) => !(isAdesao(m) && adesaoEmbutida));
                       const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
@@ -5266,7 +5268,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {podeEscrever && !(cancelado && !isAdmin) ? (
+                        {podeEscrever ? (
                           <TableHead className="w-8">
                             {(() => {
                               const selecionaveis = mens.filter((m) => {
@@ -5313,7 +5315,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       {loading ? (
                         <TableRow>
                           <TableCell
-                            colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                            colSpan={podeEscrever ? 8 : 7}
                             className="text-center py-4 text-muted-foreground"
                           >
                             Carregando…
@@ -5331,7 +5333,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
                                 <TableCell
-                                  colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                                  colSpan={podeEscrever ? 8 : 7}
                                   className="text-xs font-semibold py-2"
                                 >
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a{" "}
@@ -5343,7 +5345,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
                                 <TableCell
-                                  colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7}
+                                  colSpan={podeEscrever ? 8 : 7}
                                   className="text-xs font-semibold py-2"
                                 >
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a{" "}
@@ -5357,7 +5359,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <Fragment key={m.id}>
                             {cicloHeader}
                             <TableRow>
-                              {podeEscrever && !(cancelado && !isAdmin) ? (
+                              {podeEscrever ? (
                                 <TableCell className="w-8">
                                   {(() => {
                                     if (isAdesao(m) && adesaoEmbutida) return null;
@@ -5397,7 +5399,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 )}
                               </TableCell>
                               <TableCell>
-                                {isAdmin && podeEscrever ? (
+                                {podeEscrever ? (
                                   <DateInputBR
                                     className="h-8 w-40"
                                     value={rascunhos[m.id]?.vencimento ?? m.vencimento}
@@ -5414,7 +5416,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 {competenciaDe(rascunhos[m.id]?.vencimento ?? m.vencimento)}
                               </TableCell>
                               <TableCell>
-                                {isAdmin && podeEscrever ? (
+                                {podeEscrever ? (
                                   <Input
                                     type="number"
                                     step="0.01"
@@ -5451,7 +5453,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                {isAdmin && podeEscrever ? (
+                                {podeEscrever ? (
                                   <DateInputBR
                                     className="h-8 w-40"
                                     value={
@@ -5531,7 +5533,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                         <>
                                           <Button
                                             size="sm"
-                                            disabled={cancelado && !isAdmin}
+                                            disabled={!podeEscrever}
                                             onClick={() => abrirFormaPag(m)}
                                           >
                                             <Check className="h-3 w-3 mr-1" />
@@ -5541,7 +5543,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                             size="sm"
                                             variant="outline"
                                             title="Marcar como paga historicamente (sem lançar no caixa)"
-                                            disabled={cancelado && !isAdmin}
+                                            disabled={!podeEscrever}
                                             onClick={() => marcarPagaHistorica(m)}
                                           >
                                             Paga (histórica)
@@ -5565,7 +5567,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                       )}
                                     </Button>
                                   ) : null}
-                                  {isAdmin && podeEscrever ? (
+                                  {podeEscrever ? (
                                     <Button
                                       size="sm"
                                       variant="ghost"
@@ -5587,14 +5589,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </TabsContent>
             <TabsContent value="dados" className="mt-4 space-y-4">
-              {isAdmin && podeEscrever ? (
+              {podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
                   Modo administrador — você pode alterar todos os campos deste contrato. Alterações
                   não regeram parcelas automaticamente; use o botão “Regerar 12 parcelas” abaixo
                   quando quiser propagar o novo valor/dia.
                 </div>
               ) : null}
-              {isAdmin && podeEscrever ? (
+              {podeEscrever ? (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Label>Paciente titular</Label>
@@ -5615,7 +5617,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         contratoId={contrato.id}
                         checked={apenasFinanceiro}
                         saving={savingApenasFin}
-                        disabled={cancelado && !isAdmin}
+                        disabled={!podeEscrever}
                         onChange={async (v) => {
                           setSavingApenasFin(true);
                           const { error } = await supabase
@@ -5666,7 +5668,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {isAdmin && podeEscrever ? (
+                {podeEscrever ? (
                   <div className="space-y-1">
                     <Label>Convênio</Label>
                     <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
@@ -5685,7 +5687,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 ) : (
                   <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
                 )}
-                {isAdmin && podeEscrever && faixas.length > 0 ? (
+                {podeEscrever && faixas.length > 0 ? (
                   <div className="space-y-1">
                     <Label>Nº de pessoas no contrato</Label>
                     <Select
@@ -5741,10 +5743,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     min={0}
                     value={editValor}
                     onChange={(e) => setEditValor(e.target.value)}
-                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                    disabled={savingDados || !podeEscrever}
                   />
                 </div>
-                {isAdmin && podeEscrever ? (
+                {podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
                     <Input
@@ -5763,7 +5765,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {isAdmin && podeEscrever ? (
+                {podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Data início</div>
                     <DateInputBR
@@ -5788,7 +5790,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     max={31}
                     value={editDia}
                     onChange={(e) => setEditDia(e.target.value)}
-                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                    disabled={savingDados || !podeEscrever}
                   />
                 </div>
               </div>
@@ -5801,13 +5803,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <Button
                     size="sm"
                     onClick={salvarDadosFinanceiros}
-                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                    disabled={savingDados || !podeEscrever}
                   >
                     {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
                   </Button>
                 </div>
               </div>
-              {isAdmin && podeEscrever ? (
+              {podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Forma de pagamento</Label>
                   <Select
@@ -5923,7 +5925,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   )}
                 </div>
               </div>
-              {isAdmin && podeEscrever ? (
+              {podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Observações</Label>
                   <Textarea
@@ -5998,7 +6000,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   value={`Isento — ${(contrato as any).sem_carencia_motivo ?? "sem motivo registrado"}`}
                 />
               ) : null}
-              {isAdmin && podeEscrever ? (
+              {podeEscrever ? (
                 <div className="flex justify-end pt-2">
                   <Button onClick={salvarContratoAdmin} disabled={savingAdm}>
                     {savingAdm ? (
