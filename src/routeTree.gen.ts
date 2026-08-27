@@ -137,6 +137,7 @@ import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './route
 import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
 import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
 import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
+import { Route as AuthenticatedAppFinanceiroEstacionamentoRouteImport } from './routes/_authenticated/app.financeiro.estacionamento'
 import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
@@ -875,6 +876,12 @@ const AuthenticatedAppFinanceiroEstatisticasRoute =
     path: '/estatisticas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroEstacionamentoRoute =
+  AuthenticatedAppFinanceiroEstacionamentoRouteImport.update({
+    id: '/estacionamento',
+    path: '/estacionamento',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroEmpresasRoute =
   AuthenticatedAppFinanceiroEmpresasRouteImport.update({
     id: '/empresas',
@@ -1149,6 +1156,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/app/financeiro/estacionamento': typeof AuthenticatedAppFinanceiroEstacionamentoRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
@@ -1299,6 +1307,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/app/financeiro/estacionamento': typeof AuthenticatedAppFinanceiroEstacionamentoRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
@@ -1455,6 +1464,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
+  '/_authenticated/app/financeiro/estacionamento': typeof AuthenticatedAppFinanceiroEstacionamentoRoute
   '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/_authenticated/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/_authenticated/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
@@ -1611,6 +1621,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
+    | '/app/financeiro/estacionamento'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
@@ -1761,6 +1772,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
+    | '/app/financeiro/estacionamento'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
@@ -1916,6 +1928,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
     | '/_authenticated/app/financeiro/empresas'
+    | '/_authenticated/app/financeiro/estacionamento'
     | '/_authenticated/app/financeiro/estatisticas'
     | '/_authenticated/app/financeiro/estorno'
     | '/_authenticated/app/financeiro/lembretes'
@@ -2888,6 +2901,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroEstatisticasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/estacionamento': {
+      id: '/_authenticated/app/financeiro/estacionamento'
+      path: '/estacionamento'
+      fullPath: '/app/financeiro/estacionamento'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstacionamentoRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/empresas': {
       id: '/_authenticated/app/financeiro/empresas'
       path: '/empresas'
@@ -3146,6 +3166,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
   AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
+  AuthenticatedAppFinanceiroEstacionamentoRoute: typeof AuthenticatedAppFinanceiroEstacionamentoRoute
   AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
   AuthenticatedAppFinanceiroEstornoRoute: typeof AuthenticatedAppFinanceiroEstornoRoute
   AuthenticatedAppFinanceiroLembretesRoute: typeof AuthenticatedAppFinanceiroLembretesRoute
@@ -3174,6 +3195,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroContasRoute,
     AuthenticatedAppFinanceiroEmpresasRoute:
       AuthenticatedAppFinanceiroEmpresasRoute,
+    AuthenticatedAppFinanceiroEstacionamentoRoute:
+      AuthenticatedAppFinanceiroEstacionamentoRoute,
     AuthenticatedAppFinanceiroEstatisticasRoute:
       AuthenticatedAppFinanceiroEstatisticasRoute,
     AuthenticatedAppFinanceiroEstornoRoute:

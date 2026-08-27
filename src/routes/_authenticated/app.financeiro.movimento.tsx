@@ -91,6 +91,7 @@ import {
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Pilulas } from "@/components/financeiro/pilulas";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import {
   AlertDialog,
@@ -338,47 +339,6 @@ function CardGrupo({
         {comLegenda ? ` · ${LEGENDA_GRUPO[grupo]}` : ""}
       </p>
     </button>
-  );
-}
-
-/**
- * Grupo de botões em pílula, no lugar de um `select`, para as escolhas que a
- * recepção troca o tempo todo: com as opções à vista o modo atual se lê sem
- * abrir nada.
- */
-function Pilulas<T extends string>({
-  valor,
-  opcoes,
-  onChange,
-  ariaLabel,
-}: {
-  valor: T;
-  opcoes: Array<{ valor: T; label: string }>;
-  onChange: (v: T) => void;
-  ariaLabel: string;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={ariaLabel}
-      className="inline-flex rounded-md border bg-muted/40 p-0.5"
-    >
-      {opcoes.map((o) => (
-        <button
-          key={o.valor}
-          type="button"
-          aria-pressed={valor === o.valor}
-          onClick={() => onChange(o.valor)}
-          className={`px-3 py-1.5 text-xs rounded transition ${
-            valor === o.valor
-              ? "bg-background shadow-sm font-medium"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
