@@ -55,7 +55,7 @@ type PacienteDup = {
 
 type Grupo = {
   clinica_id: string;
-  tipo: "cpf" | "telefone" | "nome_dn" | "nome";
+  tipo: "cpf" | "telefone" | "nome_dn" | "nome" | "nome_truncado";
   chave: string;
   qtd: number;
   ids: string[];
@@ -74,6 +74,11 @@ const TIPO_LABEL: Record<Grupo["tipo"], string> = {
   telefone: "Mesmo telefone",
   nome_dn: "Mesmo nome + nascimento",
   nome: "Mesmo nome (um cadastro incompleto)",
+  // Resíduo da importação: o sistema antigo cortava o nome em 25 letras, e
+  // quem já tinha cadastro ganhou um segundo, com o nome pela metade e sem
+  // CPF. Nenhuma das outras regras achava esses casos, porque todas exigem
+  // ou o mesmo CPF ou o mesmo nome.
+  nome_truncado: "Nome cortado na importação",
 };
 
 /** Nome legível das tabelas que impedem a exclusão. */
@@ -135,6 +140,9 @@ function formatChave(g: Grupo): string {
   if (g.tipo === "cpf") return formatCPF(g.chave);
   if (g.tipo === "telefone") return formatPhone(g.chave);
   if (g.tipo === "nome") return g.chave;
+  // A chave é o nome como ficou cortado na importação; as reticências deixam
+  // claro que o cadastro de baixo é o mesmo nome, porém completo.
+  if (g.tipo === "nome_truncado") return g.chave + "…";
   const [nome, dn] = g.chave.split("|");
   return `${nome}${dn ? ` · ${formatData(dn)}` : ""}`;
 }
@@ -349,6 +357,7 @@ function DuplicadosPage() {
             <option value="telefone">Mesmo telefone</option>
             <option value="nome_dn">Mesmo nome + nascimento</option>
             <option value="nome">Mesmo nome (cadastro incompleto)</option>
+            <option value="nome_truncado">Nome cortado na importação</option>
           </select>
         </div>
       </div>
