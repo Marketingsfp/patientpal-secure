@@ -828,6 +828,8 @@ function ConfiguracaoWhatsApp() {
       phone_number_id: cfg.phone_number_id ?? "",
       waba_id: cfg.waba_id ?? "",
       access_token: "",
+      app_secret: "",
+
     });
     setShowToken(false);
     setDialogOpen(true);
