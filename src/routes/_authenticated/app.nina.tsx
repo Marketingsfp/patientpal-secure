@@ -673,6 +673,9 @@ function ConfiguracaoWhatsApp() {
   const testar = useServerFn(testarConexaoWhatsapp);
   const buscarStatus = useServerFn(statusNumeroWhatsapp);
   const registrarNumero = useServerFn(registrarNumeroWhatsapp);
+  const buscarInscricao = useServerFn(statusInscricaoWaba);
+  const inscreverApp = useServerFn(inscreverAppWaba);
+
 
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
@@ -700,6 +703,13 @@ function ConfiguracaoWhatsApp() {
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [registrando, setRegistrando] = useState(false);
+  const [inscricao, setInscricao] = useState<{
+    estado: "desconhecido" | "sem-waba" | "inscrito" | "sem-inscricao";
+    erro?: string;
+  }>({ estado: "desconhecido" });
+  const [inscricaoLoading, setInscricaoLoading] = useState(false);
+  const [inscrevendo, setInscrevendo] = useState(false);
+
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
