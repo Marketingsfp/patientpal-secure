@@ -187,7 +187,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
-import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
+import { incluirDependenteConfirmando } from "@/lib/contrato-dependentes";
+import { perguntarVinculoDuplicado } from "@/lib/perguntar-vinculo-dependente";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
@@ -4675,15 +4676,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
       }
     }
     setIncSaving(true);
-    const resultado = await incluirDependenteContrato({
-      contratoId: contrato.id,
-      pacienteId: incPaciente.id,
-      pacienteNome: incPaciente.nome,
-      parentesco: incParentesco || null,
-      tipo: incTipo,
-      taxa: incCobrarTaxa ? { valor: taxaValor, vencimento: incTaxaVenc } : null,
-    });
+    const resultado = await incluirDependenteConfirmando(
+      {
+        contratoId: contrato.id,
+        pacienteId: incPaciente.id,
+        pacienteNome: incPaciente.nome,
+        parentesco: incParentesco || null,
+        tipo: incTipo,
+        taxa: incCobrarTaxa ? { valor: taxaValor, vencimento: incTaxaVenc } : null,
+      },
+      perguntarVinculoDuplicado,
+    );
     setIncSaving(false);
+    // null = o operador viu o aviso de outro cartão ativo e desistiu.
+    if (!resultado) return;
     if (!resultado.ok) {
       toast.error(resultado.mensagem);
       return;

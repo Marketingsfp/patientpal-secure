@@ -18,9 +18,143 @@ export interface TaxaInclusaoLancada {
   vencimento: string;
 }
 
+/** Um cartão ativo em que o paciente já aparece, como titular ou dependente. */
+export interface VinculoAtivoDoPaciente {
+  contratoId: string;
+  numero: number | null;
+  titularNome: string;
+  convenioNome: string | null;
+  vinculo: "titular" | "dependente";
+}
+
 export type IncluirDependenteResultado =
-  | { ok: true; dependente: DependenteIncluido; taxa?: TaxaInclusaoLancada; taxaAviso?: string }
-  | { ok: false; mensagem: string; error?: unknown };
+  | {
+      ok: true;
+      dependente: DependenteIncluido;
+      taxa?: TaxaInclusaoLancada;
+      taxaAviso?: string;
+      /**
+       * Preenchido quando a inclusão foi feita mesmo com o paciente já ligado
+       * a outro cartão ativo (operador confirmou, ou o chamador é a
+       * importação em lote). Serve para a tela registrar o aviso.
+       */
+      avisoVinculoDuplicado?: string;
+    }
+  | {
+      ok: false;
+      mensagem: string;
+      /**
+       * "vinculo_duplicado" NÃO é erro: é a pergunta que falta ao operador.
+       * Quem chama deve confirmar com ele e repetir a chamada com
+       * `confirmarVinculoDuplicado: true`.
+       */
+      motivo?: "vinculo_duplicado";
+      vinculos?: VinculoAtivoDoPaciente[];
+      error?: unknown;
+    };
+
+/**
+ * Lista os cartões ATIVOS em que o paciente já aparece — como titular ou como
+ * dependente ativo —, ignorando o contrato informado em `ignorarContratoId`.
+ *
+ * Existe porque nada impedia a recepção de cadastrar o mesmo paciente como
+ * dependente em dois cartões ativos ao mesmo tempo. Quando isso acontece, o
+ * sistema tem que escolher um dos dois para decidir convênio, preço e bloqueio
+ * por mensalidade vencida — e o paciente podia acabar sendo cobrado pela
+ * tabela de um cartão e bloqueado pela dívida do outro.
+ */
+export async function buscarVinculosAtivosDoPaciente(params: {
+  pacienteId: string;
+  clinicaId: string;
+  ignorarContratoId?: string | null;
+}): Promise<VinculoAtivoDoPaciente[]> {
+  const { pacienteId, clinicaId, ignorarContratoId } = params;
+  if (!pacienteId || !clinicaId) return [];
+
+  const encontrados: VinculoAtivoDoPaciente[] = [];
+
+  const { data: comoTitular } = await supabase
+    .from("contratos_assinatura")
+    .select("id, numero, paciente_nome, cb_convenios(nome)")
+    .eq("clinica_id", clinicaId)
+    .eq("status", "ativo")
+    .eq("paciente_id", pacienteId)
+    .limit(50);
+  for (const c of ((comoTitular ?? []) as any[]).filter(Boolean)) {
+    if (ignorarContratoId && c.id === ignorarContratoId) continue;
+    encontrados.push({
+      contratoId: String(c.id),
+      numero: c.numero ?? null,
+      titularNome: c.paciente_nome ?? "—",
+      convenioNome: c.cb_convenios?.nome ?? null,
+      vinculo: "titular",
+    });
+  }
+
+  const { data: comoDependente } = await supabase
+    .from("contrato_dependentes")
+    .select(
+      "contrato_id, contratos_assinatura!inner(id, numero, status, clinica_id, paciente_nome, cb_convenios(nome))",
+    )
+    .eq("paciente_id", pacienteId)
+    .eq("ativo", true)
+    .limit(50);
+  for (const linha of ((comoDependente ?? []) as any[]).filter(Boolean)) {
+    const c = linha.contratos_assinatura;
+    if (!c || c.clinica_id !== clinicaId || c.status !== "ativo") continue;
+    if (ignorarContratoId && c.id === ignorarContratoId) continue;
+    if (encontrados.some((v) => v.contratoId === String(c.id))) continue;
+    encontrados.push({
+      contratoId: String(c.id),
+      numero: c.numero ?? null,
+      titularNome: c.paciente_nome ?? "—",
+      convenioNome: c.cb_convenios?.nome ?? null,
+      vinculo: "dependente",
+    });
+  }
+
+  return encontrados;
+}
+
+/** Frase pronta para a tela, listando os cartões em que o paciente já está. */
+export function descreverVinculosAtivos(
+  pacienteNome: string,
+  vinculos: ReadonlyArray<VinculoAtivoDoPaciente>,
+): string {
+  const linhas = vinculos.map((v) => {
+    const cartao = v.numero != null ? `cartão ${v.numero}` : "um cartão";
+    const convenio = v.convenioNome ? ` — ${v.convenioNome}` : "";
+    const papel =
+      v.vinculo === "titular"
+        ? "onde é o TITULAR"
+        : `onde é dependente de ${v.titularNome.toUpperCase()}`;
+    return `• ${cartao}${convenio}, ${papel}`;
+  });
+  const abertura =
+    vinculos.length === 1
+      ? `${pacienteNome} já está em outro cartão ativo:`
+      : `${pacienteNome} já está em ${vinculos.length} outros cartões ativos:`;
+  return `${abertura}\n\n${linhas.join("\n")}`;
+}
+
+/**
+ * `incluirDependenteContrato` com a pergunta ao operador já embutida.
+ *
+ * Devolve `null` quando o operador desistiu no aviso de vínculo duplicado —
+ * nesse caso a tela deve simplesmente parar, sem mostrar erro.
+ *
+ * A pergunta chega por parâmetro (e não com `confirmDialog` importado aqui)
+ * para este módulo continuar sem depender de componente de tela.
+ */
+export async function incluirDependenteConfirmando(
+  params: Parameters<typeof incluirDependenteContrato>[0],
+  perguntar: (mensagem: string) => Promise<boolean>,
+): Promise<IncluirDependenteResultado | null> {
+  const primeira = await incluirDependenteContrato(params);
+  if (primeira.ok || primeira.motivo !== "vinculo_duplicado") return primeira;
+  if (!(await perguntar(primeira.mensagem))) return null;
+  return incluirDependenteContrato({ ...params, confirmarVinculoDuplicado: true });
+}
 
 /**
  * Rotina única para incluir dependente num contrato de assinatura.
@@ -46,8 +180,28 @@ export async function incluirDependenteContrato(params: {
     valor: number;
     vencimento: string; // ISO YYYY-MM-DD
   } | null;
+  /**
+   * Deixa passar quando o paciente já está em OUTRO cartão ativo. Sem isto, a
+   * função devolve `motivo: "vinculo_duplicado"` com a lista dos cartões, para
+   * a tela perguntar ao operador antes de duplicar o vínculo.
+   *
+   * Não é bloqueio: mudar de cartão é legítimo (foi o que a recepção fez ao
+   * vender um plano novo para a família). O que não pode é acontecer sem que
+   * ninguém perceba — quando o paciente fica ativo nos dois, o sistema precisa
+   * escolher um deles para decidir preço e inadimplência, e o paciente podia
+   * ser bloqueado pela dívida de um titular que não é mais o dele.
+   */
+  confirmarVinculoDuplicado?: boolean;
 }): Promise<IncluirDependenteResultado> {
-  const { contratoId, pacienteId, pacienteNome, parentesco, tipo, taxa } = params;
+  const {
+    contratoId,
+    pacienteId,
+    pacienteNome,
+    parentesco,
+    tipo,
+    taxa,
+    confirmarVinculoDuplicado,
+  } = params;
 
   const { data: contrato, error: eContrato } = await supabase
     .from("contratos_assinatura")
@@ -95,6 +249,28 @@ export async function incluirDependenteContrato(params: {
           ? "Este convênio não permite dependentes."
           : `Limite de ${maxDep} dependentes atingido.`,
     };
+  }
+
+  // Último check antes de gravar: o paciente já está em outro cartão ativo?
+  // Fica por último de propósito — não adianta avisar sobre duplicidade se a
+  // inclusão fosse falhar por limite ou contrato cancelado de qualquer jeito.
+  let avisoVinculoDuplicado: string | undefined;
+  const vinculos = await buscarVinculosAtivosDoPaciente({
+    pacienteId,
+    clinicaId: (contrato as { clinica_id: string }).clinica_id,
+    ignorarContratoId: contratoId,
+  });
+  if (vinculos.length > 0) {
+    const descricao = descreverVinculosAtivos(pacienteNome, vinculos);
+    if (!confirmarVinculoDuplicado) {
+      return {
+        ok: false,
+        motivo: "vinculo_duplicado",
+        vinculos,
+        mensagem: `${descricao}\n\nSe ele mudou de cartão, remova o vínculo antigo depois de incluir aqui — ficar ativo nos dois faz o sistema escolher um deles para decidir preço e mensalidade vencida.`,
+      };
+    }
+    avisoVinculoDuplicado = descricao;
   }
 
   const hoje = new Date().toISOString().slice(0, 10);
@@ -154,14 +330,16 @@ export async function incluirDependenteContrato(params: {
         ok: true,
         dependente,
         taxaAviso: `Dependente incluído, mas a Taxa de inclusão não foi lançada. Detalhe: ${eTaxa.message ?? String(eTaxa)}`,
+        avisoVinculoDuplicado,
       };
     }
     return {
       ok: true,
       dependente,
       taxa: taxaRow as unknown as TaxaInclusaoLancada,
+      avisoVinculoDuplicado,
     };
   }
 
-  return { ok: true, dependente };
+  return { ok: true, dependente, avisoVinculoDuplicado };
 }

@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { AvisoVinculoDuplicado } from "@/components/cartao-beneficios/aviso-vinculo-duplicado";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { printGuiaMensalidade } from "@/lib/print-gr";
@@ -482,45 +483,54 @@ export function PagamentoAvulsoMensalidadeDialog({
                     </Button>
                   </div>
                   {dependentes.map((d) => (
-                    <div key={d.key} className="grid grid-cols-[1fr_120px_32px] items-center gap-2">
-                      <PatientSearchInput
-                        value={d.paciente}
-                        onSelect={(p) =>
-                          setDependentes((arr) =>
-                            arr.map((x) => (x.key === d.key ? { ...x, paciente: p } : x)),
-                          )
-                        }
-                        clinicaIdsOverride={[clinicaId]}
-                        placeholder="Nome ou CPF do dependente"
-                        onRequestCreate={(q) => setQuickOpen({ alvo: d.key, nome: q })}
+                    <div key={d.key} className="space-y-1">
+                      <div className="grid grid-cols-[1fr_120px_32px] items-center gap-2">
+                        <PatientSearchInput
+                          value={d.paciente}
+                          onSelect={(p) =>
+                            setDependentes((arr) =>
+                              arr.map((x) => (x.key === d.key ? { ...x, paciente: p } : x)),
+                            )
+                          }
+                          clinicaIdsOverride={[clinicaId]}
+                          placeholder="Nome ou CPF do dependente"
+                          onRequestCreate={(q) => setQuickOpen({ alvo: d.key, nome: q })}
+                        />
+                        <Select
+                          value={d.parentesco}
+                          onValueChange={(v) =>
+                            setDependentes((arr) =>
+                              arr.map((x) => (x.key === d.key ? { ...x, parentesco: v } : x)),
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Parentesco" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PARENTESCOS.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() =>
+                            setDependentes((arr) => arr.filter((x) => x.key !== d.key))
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <AvisoVinculoDuplicado
+                        pacienteId={d.paciente?.id}
+                        pacienteNome={d.paciente?.nome}
+                        clinicaId={clinicaId}
                       />
-                      <Select
-                        value={d.parentesco}
-                        onValueChange={(v) =>
-                          setDependentes((arr) =>
-                            arr.map((x) => (x.key === d.key ? { ...x, parentesco: v } : x)),
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Parentesco" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PARENTESCOS.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setDependentes((arr) => arr.filter((x) => x.key !== d.key))}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
                     </div>
                   ))}
                   {dependentes.length === 0 && (

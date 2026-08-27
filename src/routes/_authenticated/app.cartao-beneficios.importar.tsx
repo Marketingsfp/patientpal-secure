@@ -521,14 +521,28 @@ function ImportarBeneficiariosPage() {
           );
           continue;
         }
+        // `confirmarVinculoDuplicado: true`: aqui não há operador para
+        // responder a pergunta, e travar a planilha no meio seria pior. O
+        // vínculo é criado e a duplicidade sai no relatório de pendências,
+        // para alguém resolver depois — foi assim que os cadastros duplicados
+        // entraram sem ninguém ver.
         const resultado = await incluirDependenteContrato({
           contratoId,
           pacienteId,
           pacienteNome: dep.nome,
           tipo: "dependente",
+          confirmarVinculoDuplicado: true,
         });
-        if (resultado.ok) vinculadosOk++;
-        else problemas.push(`"${dep.nome}": ${resultado.mensagem}`);
+        if (resultado.ok) {
+          vinculadosOk++;
+          if (resultado.avisoVinculoDuplicado) {
+            problemas.push(
+              `"${dep.nome}" foi vinculado, MAS já estava em outro cartão ativo. ` +
+                `${resultado.avisoVinculoDuplicado.replace(/\n+/g, " ")} ` +
+                `Confira e remova o vínculo que não valer mais.`,
+            );
+          }
+        } else problemas.push(`"${dep.nome}": ${resultado.mensagem}`);
       }
 
       setEtapa(null);

@@ -5,7 +5,8 @@ import { Users, Search, Plus, Trash2, AlertCircle, CheckCircle2, X } from "lucid
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
-import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
+import { incluirDependenteConfirmando } from "@/lib/contrato-dependentes";
+import { perguntarVinculoDuplicado } from "@/lib/perguntar-vinculo-dependente";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,13 +156,18 @@ function DependentesPage() {
       return;
     }
     setSaving(true);
-    const resultado = await incluirDependenteContrato({
-      contratoId: openTitular.id,
-      pacienteId: novoDep.id,
-      pacienteNome: novoDep.nome,
-      parentesco: parentesco.trim() || null,
-    });
+    const resultado = await incluirDependenteConfirmando(
+      {
+        contratoId: openTitular.id,
+        pacienteId: novoDep.id,
+        pacienteNome: novoDep.nome,
+        parentesco: parentesco.trim() || null,
+      },
+      perguntarVinculoDuplicado,
+    );
     setSaving(false);
+    // null = o operador viu o aviso de outro cartão ativo e desistiu.
+    if (!resultado) return;
     if (!resultado.ok) {
       toast.error(resultado.mensagem);
       return;

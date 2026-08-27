@@ -18,7 +18,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { exportToExcel } from "@/lib/export-csv";
-import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
+import { incluirDependenteConfirmando } from "@/lib/contrato-dependentes";
+import { perguntarVinculoDuplicado } from "@/lib/perguntar-vinculo-dependente";
 import {
   diagnosticarVidas,
   indexarFaixas,
@@ -442,13 +443,18 @@ function ConferenciaPage() {
       return;
     }
     setSalvando(true);
-    const r = await incluirDependenteContrato({
-      contratoId: aberto.id,
-      pacienteId: paciente.id,
-      pacienteNome: paciente.nome,
-      parentesco: parentesco.trim() || null,
-    });
+    const r = await incluirDependenteConfirmando(
+      {
+        contratoId: aberto.id,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome,
+        parentesco: parentesco.trim() || null,
+      },
+      perguntarVinculoDuplicado,
+    );
     setSalvando(false);
+    // null = o operador viu o aviso de outro cartão ativo e desistiu.
+    if (!r) return;
     if (!r.ok) {
       toast.error(r.mensagem);
       return;

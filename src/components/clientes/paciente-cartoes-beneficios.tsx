@@ -14,7 +14,8 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
-import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
+import { incluirDependenteConfirmando } from "@/lib/contrato-dependentes";
+import { perguntarVinculoDuplicado } from "@/lib/perguntar-vinculo-dependente";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -212,13 +213,18 @@ export function PacienteCartoesBeneficios({
   const adicionar = async () => {
     if (!openAdd || !novoDep) return;
     setSaving(true);
-    const resultado = await incluirDependenteContrato({
-      contratoId: openAdd,
-      pacienteId: novoDep.id,
-      pacienteNome: novoDep.nome,
-      parentesco: parentesco.trim() || null,
-    });
+    const resultado = await incluirDependenteConfirmando(
+      {
+        contratoId: openAdd,
+        pacienteId: novoDep.id,
+        pacienteNome: novoDep.nome,
+        parentesco: parentesco.trim() || null,
+      },
+      perguntarVinculoDuplicado,
+    );
     setSaving(false);
+    // null = o operador viu o aviso de outro cartão ativo e desistiu.
+    if (!resultado) return;
     if (!resultado.ok) {
       toast.error(resultado.mensagem);
       return;
