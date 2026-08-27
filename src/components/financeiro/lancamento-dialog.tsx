@@ -38,6 +38,7 @@ import {
 } from "@/lib/financeiro/formas-pagamento";
 import { planoDeMovimento } from "@/lib/financeiro/registro-no-caixa";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
+import { contaPadrao, dedupContas, type ContaOpcao } from "@/lib/financeiro/contas";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
@@ -183,7 +184,7 @@ export function LancamentoDialog({
   const [emitirNfse, setEmitirNfse] = useState<boolean>(false);
   const [observacoes, setObservacoes] = useState("");
   const [categorias, setCategorias] = useState<{ id: string; nome: string }[]>([]);
-  const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
+  const [contas, setContas] = useState<ContaOpcao[]>([]);
   const [saving, setSaving] = useState(false);
   // Segunda etapa do "Salvar e imprimir": o lançamento já está gravado e a
   // guia está sendo montada/enviada para a impressora.
@@ -319,7 +320,7 @@ export function LancamentoDialog({
           .order("nome"),
         supabase
           .from("fin_contas")
-          .select("id, nome")
+          .select("id, nome, tipo, created_at")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("ativo", true)
           .order("nome"),
@@ -334,7 +335,7 @@ export function LancamentoDialog({
           .trim();
       const listaContas = cs ?? [];
       setContas(listaContas);
-      const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
+      const caixa = contaPadrao(listaContas);
       if (caixa) setContaId((cur) => cur || caixa.id);
       // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
       if (categoriaFixaNome) {
@@ -1991,7 +1992,7 @@ export function LancamentoDialog({
                     <SelectValue placeholder="Conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {contas.map((c) => (
+                    {dedupContas(contas).map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.nome}
                       </SelectItem>
