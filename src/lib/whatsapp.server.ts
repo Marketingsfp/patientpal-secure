@@ -517,7 +517,23 @@ export async function gerarRespostaNina(
     ]);
 
   const baseImportada = (cliR.data as any)?.base_importada === true;
-  const nomeUnidade = (cliR.data as any)?.nome ?? "esta unidade";
+  const clinicaRow = (cliR.data ?? null) as {
+    nome?: string | null;
+    endereco?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+    telefone?: string | null;
+    email?: string | null;
+  } | null;
+  const nomeUnidade = clinicaRow?.nome ?? "esta unidade";
+  const enderecoUnidade = [
+    clinicaRow?.endereco,
+    [clinicaRow?.cidade, clinicaRow?.estado].filter(Boolean).join("/"),
+    clinicaRow?.cep,
+  ]
+    .filter((p) => p && String(p).trim())
+    .join(" - ");
 
   const { data: agendasData } = await supabaseAdmin
     .from("medico_agendas")
