@@ -395,6 +395,72 @@ async function identificarPaciente(
   return rows[0] ?? null;
 }
 
+/**
+ * Estado de identidade da conversa (por telefone), para a Nina não repetir a
+ * confirmação de identidade a cada resposta.
+ */
+export interface EstadoIdentidade {
+  conversaId: string | null;
+  confirmada: boolean;
+  perguntadaEm: string | null;
+  tentativas: number;
+}
+
+async function carregarEstadoIdentidade(
+  clinicaId: string,
+  telefone: string | null,
+): Promise<EstadoIdentidade> {
+  const vazio: EstadoIdentidade = {
+    conversaId: null,
+    confirmada: false,
+    perguntadaEm: null,
+    tentativas: 0,
+  };
+  if (!telefone) return vazio;
+  const { data } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas")
+    .eq("clinica_id", clinicaId)
+    .eq("contato_telefone", telefone)
+    .order("ultima_msg_em", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (data) {
+    return {
+      conversaId: (data as any).id,
+      confirmada: (data as any).identidade_confirmada === true,
+      perguntadaEm: (data as any).identidade_perguntada_em ?? null,
+      tentativas: Number((data as any).identidade_tentativas ?? 0),
+    };
+  }
+  const { data: nova } = await supabaseAdmin
+    .from("atend_conversas")
+    .insert({
+      clinica_id: clinicaId,
+      canal: "whatsapp",
+      contato_telefone: telefone,
+      status: "aberta",
+      ultima_msg_em: new Date().toISOString(),
+    })
+    .select("id")
+    .maybeSingle();
+  return { ...vazio, conversaId: (nova as any)?.id ?? null };
+}
+
+const CONFIRMACOES = /\b(sim|sou eu|isso|isso mesmo|correto|exato|positivo|eu mesmo|eu mesma)\b/i;
+
+async function salvarEstadoIdentidade(
+  estado: EstadoIdentidade,
+  patch: {
+    identidade_confirmada?: boolean;
+    identidade_perguntada_em?: string | null;
+    identidade_tentativas?: number;
+  },
+): Promise<void> {
+  if (!estado.conversaId) return;
+  await supabaseAdmin.from("atend_conversas").update(patch).eq("id", estado.conversaId);
+}
+
 export async function gerarRespostaNina(
   clinicaId: string,
   mensagemPaciente: string,
@@ -404,26 +470,40 @@ export async function gerarRespostaNina(
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
   const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const telefoneNorm = normalizarTelefoneRemetente(telefoneRemetente ?? null);
 
-  const [medR, dispR, procR, cliR, pacienteInfo] = await Promise.all([
-    supabaseAdmin.from("medicos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true),
-    supabaseAdmin
-      .from("medico_disponibilidades")
-      .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true),
-    supabaseAdmin
-      .from("procedimentos")
-      .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true),
-    supabaseAdmin.from("clinicas").select("nome, base_importada").eq("id", clinicaId).maybeSingle(),
-    identificarPaciente(
-      clinicaId,
-      mensagemPaciente,
-      normalizarTelefoneRemetente(telefoneRemetente ?? null),
-    ),
-  ]);
+  const [medR, dispR, procR, cliR, pacienteInfo, medEspR, espR, estadoId, histR] =
+    await Promise.all([
+      supabaseAdmin.from("medicos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true),
+      supabaseAdmin
+        .from("medico_disponibilidades")
+        .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true),
+      supabaseAdmin
+        .from("procedimentos")
+        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true),
+      supabaseAdmin
+        .from("clinicas")
+        .select("nome, base_importada")
+        .eq("id", clinicaId)
+        .maybeSingle(),
+      identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
+      supabaseAdmin.from("medico_especialidades").select("medico_id, especialidade_id"),
+      supabaseAdmin.from("especialidades").select("id, nome").eq("ativo", true),
+      carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null),
+      telefoneRemetente
+        ? supabaseAdmin
+            .from("whatsapp_mensagens")
+            .select("direction, body, created_at")
+            .eq("clinica_id", clinicaId)
+            .or(`from_number.eq.${telefoneRemetente},to_number.eq.${telefoneRemetente}`)
+            .order("created_at", { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
 
   const baseImportada = (cliR.data as any)?.base_importada === true;
   const nomeUnidade = (cliR.data as any)?.nome ?? "esta unidade";
@@ -440,10 +520,23 @@ export async function gerarRespostaNina(
     agendasPorMedico.set(a.medico_id, (agendasPorMedico.get(a.medico_id) ?? 0) + 1);
   }
 
-  const medicos = (medR.data ?? [])
-    .map((m: any) => {
-      const disps = (dispR.data ?? []).filter((d: any) => d.medico_id === m.id);
-      const temMultiplas = (agendasPorMedico.get(m.id) ?? 0) > 1;
+  // Especialidades por médico
+  const espNomePorId = new Map<string, string>();
+  for (const e of (espR.data ?? []) as any[]) espNomePorId.set(e.id, e.nome);
+  const medEspNomes = new Map<string, string[]>();
+  for (const r of (medEspR.data ?? []) as any[]) {
+    const nome = espNomePorId.get(r.especialidade_id);
+    if (!nome) continue;
+    const arr = medEspNomes.get(r.medico_id) ?? [];
+    arr.push(nome);
+    medEspNomes.set(r.medico_id, arr);
+  }
+
+
+  const medicosLista = (medR.data ?? []).map((m: any) => {
+    const disps = (dispR.data ?? []).filter((d: any) => d.medico_id === m.id);
+    const temMultiplas = (agendasPorMedico.get(m.id) ?? 0) > 1;
+    const dias = new Set<number>(disps.map((d: any) => Number(d.dia_semana)));
 
       // Agrupa por agenda → dia, mescla turnos sobrepostos/contíguos
       const porAgenda = new Map<string, Map<number, Array<[string, string]>>>();
@@ -477,6 +570,9 @@ export async function gerarRespostaNina(
         return partes.join(", ");
       };
 
+    const esps = medEspNomes.get(m.id) ?? [];
+    const sufixoEsp = esps.length ? ` (${esps.join(", ")})` : "";
+
       if (!temMultiplas) {
         // Junta tudo num único conjunto
         const unico = new Map<number, Array<[string, string]>>();
@@ -488,7 +584,13 @@ export async function gerarRespostaNina(
           }
         }
         const horarios = formatPorDia(unico);
-        return `- ${m.nome}${horarios ? ` | ${horarios}` : ""}`;
+      return {
+        id: m.id,
+        nome: m.nome,
+        esps,
+        dias,
+        texto: `- ${m.nome}${sufixoEsp}${horarios ? ` | ${horarios}` : ""}`,
+      };
       }
 
       // Mostra separado por agenda
@@ -498,9 +600,17 @@ export async function gerarRespostaNina(
         const horarios = formatPorDia(porDia);
         if (horarios) blocos.push(`    • ${nome}: ${horarios}`);
       }
-      return `- ${m.nome}${blocos.length ? `\n${blocos.join("\n")}` : ""}`;
-    })
-    .join("\n");
+    return {
+      id: m.id,
+      nome: m.nome,
+      esps,
+      dias,
+      texto: `- ${m.nome}${sufixoEsp}${blocos.length ? `\n${blocos.join("\n")}` : ""}`,
+    };
+  });
+
+  const medicos = medicosLista.map((m) => m.texto).join("\n");
+
 
   const procs = (procR.data ?? [])
     .map(
@@ -508,6 +618,108 @@ export async function gerarRespostaNina(
         `- ${p.nome}${p.grupo ? ` [${p.grupo}]` : ""}: PIX R$ ${Number(p.valor_dinheiro_pix).toFixed(2)} / cartão R$ ${Number(p.valor_cartao).toFixed(2)}${p.preparo ? ` | PREPARO: ${String(p.preparo).replace(/\s+/g, " ").trim()}` : ""}`,
     )
     .join("\n");
+
+  /* ---------- Foco da pergunta: especialidade / procedimento / dia ---------- */
+  const espsCadastradas = [...new Set((espR.data ?? []).map((e: any) => String(e.nome)))];
+  const espsPedidas = detectarEspecialidades(mensagemPaciente, espsCadastradas);
+  const espCitadaSemCadastro =
+    espsPedidas.length === 0 ? pareceCitarEspecialidade(mensagemPaciente) : null;
+  const procsPedidos = detectarProcedimentos(
+    mensagemPaciente,
+    (procR.data ?? []).map((p: any) => String(p.nome)),
+  );
+
+  const agora = agoraNaClinica();
+  const textoNorm = normalizar(mensagemPaciente);
+  let diaAlvo: number | null = null;
+  let rotuloDia = "";
+  if (/\bhoje\b/.test(textoNorm)) {
+    diaAlvo = agora.diaSemana;
+    rotuloDia = "hoje";
+  } else if (/\bamanha\b/.test(textoNorm)) {
+    diaAlvo = (agora.diaSemana + 1) % 7;
+    rotuloDia = "amanhã";
+  }
+
+  const temEsp = (m: (typeof medicosLista)[number], esp: string) =>
+    m.esps.some((e) => normalizar(e) === normalizar(esp));
+
+  let blocoFoco = "";
+  if (espCitadaSemCadastro) {
+    blocoFoco = `FOCO DA PERGUNTA: o paciente pediu "${espCitadaSemCadastro}", que NÃO existe no cadastro de especialidades desta clínica (${espsCadastradas.join(", ") || "nenhuma"}). Responda que a clínica não atende essa especialidade e ofereça listar as que atende. NÃO liste a agenda geral.`;
+  } else if (espsPedidas.length > 0) {
+    const partes: string[] = [];
+    for (const esp of espsPedidas) {
+      const daEsp = medicosLista.filter((m) => temEsp(m, esp));
+      const noDia = diaAlvo === null ? daEsp : daEsp.filter((m) => m.dias.has(diaAlvo!));
+      if (noDia.length > 0) {
+        const mostra = noDia.slice(0, 5);
+        const restantes = noDia.length - mostra.length;
+        partes.push(
+          `${esp}${rotuloDia ? ` — ${rotuloDia}` : ""}:\n${mostra.map((m) => m.texto).join("\n")}${
+            restantes > 0
+              ? `\n(mais ${restantes} profissional(is) de ${esp} — diga ao paciente quantos faltam e ofereça mostrar o restante)`
+              : ""
+          }`,
+        );
+      } else if (daEsp.length === 0) {
+        partes.push(
+          `${esp}: a clínica não tem profissional ativo cadastrado nesta especialidade. Informe isso e ofereça as especialidades atendidas.`,
+        );
+      } else {
+        // Procura o próximo dia com atendimento nessa especialidade
+        let proximo: { rotulo: string; lista: typeof daEsp } | null = null;
+        for (let i = 1; i <= 14 && !proximo; i++) {
+          const dia = (agora.diaSemana + i) % 7;
+          const lista = daEsp.filter((m) => m.dias.has(dia));
+          if (lista.length > 0) {
+            const iso = somarDiasIso(agora.iso, i);
+            const [aa, mm, dd] = iso.split("-");
+            proximo = { rotulo: `${DIAS[dia]} ${dd}/${mm}/${aa}`, lista };
+          }
+        }
+        partes.push(
+          proximo
+            ? `${esp}: NÃO há atendimento ${rotuloDia || "no dia pedido"}. Diga isso claramente e ofereça o próximo dia com ${esp}: ${proximo.rotulo} —\n${proximo.lista
+                .slice(0, 5)
+                .map((m) => m.texto)
+                .join("\n")}`
+            : `${esp}: sem dias de atendimento cadastrados. Informe isso e oriente a falar com a recepção.`,
+        );
+      }
+    }
+    blocoFoco = `FOCO DA PERGUNTA — RESPONDA SOMENTE SOBRE ISTO:\n${partes.join("\n\n")}\n\nNÃO liste profissionais de outras especialidades. Máximo 5 profissionais por resposta, com horários.`;
+  } else if (procsPedidos.length > 0) {
+    blocoFoco = `FOCO DA PERGUNTA: o paciente citou o(s) procedimento(s): ${procsPedidos.join(", ")}. Responda apenas sobre eles (valor e preparo), sem listar a tabela inteira.`;
+  }
+
+  /* ---------- Confirmação de identidade (uma vez por conversa) ---------- */
+  const respondeuConfirmando =
+    CONFIRMACOES.test(mensagemPaciente) ||
+    (pacienteInfo?.nome
+      ? textoNorm.includes(normalizar(String(pacienteInfo.nome).split(" ")[0] ?? ""))
+      : false);
+  let identidadeConfirmada = estadoId.confirmada;
+  if (!identidadeConfirmada && estadoId.perguntadaEm && respondeuConfirmando) {
+    identidadeConfirmada = true;
+    await salvarEstadoIdentidade(estadoId, { identidade_confirmada: true });
+  }
+
+  const primeiroNome = pacienteInfo?.nome ? String(pacienteInfo.nome).split(" ")[0] : null;
+  const blocoIdentidade = identidadeConfirmada
+    ? `IDENTIDADE: já confirmada nesta conversa${primeiroNome ? ` (${primeiroNome})` : ""}. NUNCA volte a perguntar quem é a pessoa; trate-a pelo primeiro nome.`
+    : estadoId.perguntadaEm
+      ? `IDENTIDADE: você JÁ perguntou a identidade nesta conversa e não houve confirmação clara. NÃO pergunte de novo — siga o atendimento normalmente. Só pergunte mais uma vez (a última) se for indispensável para a ação pedida (ex.: confirmar um agendamento existente dessa pessoa).`
+      : `IDENTIDADE: ainda não perguntada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
+
+  const historico = ((histR as any)?.data ?? [])
+    .slice()
+    .reverse()
+    .map((m: any) => ({
+      role: m.direction === "out" ? "assistant" : "user",
+      content: String(m.body ?? "").slice(0, 1500),
+    }))
+    .filter((m: any) => m.content);
 
   // Bloco de contexto do remetente + regras condicionais
   const contextoRemetente = pacienteInfo
