@@ -281,8 +281,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                             LIMITE_FALA_CURTA,
                           } = await import("@/lib/nina-audio.server");
                           if (!(await respostaAudioDesativada(params.clinicaId))) {
-                            const longa =
-                              reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
+                            const longa = reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
                             const falado = longa ? resumoFalado(reply) : prepararParaFala(reply);
                             const audio = await sintetizarFala(falado);
                             if (audio) {

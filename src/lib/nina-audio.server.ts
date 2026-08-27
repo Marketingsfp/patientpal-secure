@@ -101,7 +101,12 @@ export async function sintetizarFala(
         }),
       });
       if (!res.ok) {
-        console.error("nina audio tts erro", t.format, res.status, await res.text().catch(() => ""));
+        console.error(
+          "nina audio tts erro",
+          t.format,
+          res.status,
+          await res.text().catch(() => ""),
+        );
         continue;
       }
       const bytes = new Uint8Array(await res.arrayBuffer());

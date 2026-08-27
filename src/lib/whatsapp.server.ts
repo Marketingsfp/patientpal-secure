@@ -892,11 +892,14 @@ export async function metaUploadMedia(
   form.append("messaging_product", "whatsapp");
   form.append("type", mime);
   form.append("file", new Blob([bytes as unknown as BlobPart], { type: mime }), filename);
-  const res = await fetch(`https://graph.facebook.com/${META_VERSION_AUDIO}/${phoneNumberId}/media`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: form,
-  });
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_AUDIO}/${phoneNumberId}/media`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    },
+  );
   const json: any = await res.json().catch(() => ({}));
   if (!res.ok || !json?.id) {
     throw new Error(json?.error?.message ?? `Falha no upload de áudio (${res.status})`);
