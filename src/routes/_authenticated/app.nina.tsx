@@ -753,9 +753,48 @@ function ConfiguracaoWhatsApp() {
     }
   }, [clinicaAtual, buscarStatus]);
 
+  const atualizarInscricao = useCallback(async () => {
+    if (!clinicaAtual) return;
+    setInscricaoLoading(true);
+    try {
+      const r: any = await buscarInscricao({ data: { clinicaId: clinicaAtual.clinica_id } });
+      if (r?.semWaba) setInscricao({ estado: "sem-waba" });
+      else if (r?.ok)
+        setInscricao({ estado: (r.apps?.length ?? 0) > 0 ? "inscrito" : "sem-inscricao" });
+      else setInscricao({ estado: "desconhecido", erro: r?.error });
+    } catch (e: any) {
+      setInscricao({ estado: "desconhecido", erro: String(e?.message ?? e) });
+    } finally {
+      setInscricaoLoading(false);
+    }
+  }, [clinicaAtual, buscarInscricao]);
+
+  const onInscreverApp = async () => {
+    if (!cfg) return;
+    setInscrevendo(true);
+    try {
+      const r: any = await inscreverApp({ data: { clinicaId: cfg.clinica_id } });
+      if (r?.ok) {
+        toast.success("App inscrito na conta do WhatsApp. As mensagens já devem chegar.");
+      } else {
+        toast.error(r?.error ?? "Falha ao inscrever o app na conta.");
+      }
+      await Promise.all([atualizarStatusMeta(), atualizarInscricao()]);
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setInscrevendo(false);
+    }
+  };
+
   useEffect(() => {
     if (cfg?.phone_number_id && cfg?.has_access_token) void atualizarStatusMeta();
   }, [cfg?.phone_number_id, cfg?.has_access_token, atualizarStatusMeta]);
+
+  useEffect(() => {
+    if (cfg?.has_access_token) void atualizarInscricao();
+  }, [cfg?.has_access_token, cfg?.waba_id, atualizarInscricao]);
+
 
   const onRegistrar = async () => {
     if (!cfg) return;
