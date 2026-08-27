@@ -498,7 +498,7 @@ export async function gerarRespostaNina(
         .eq("ativo", true),
       supabaseAdmin
         .from("clinicas")
-        .select("nome, base_importada")
+        .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
         .eq("id", clinicaId)
         .maybeSingle(),
       identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
