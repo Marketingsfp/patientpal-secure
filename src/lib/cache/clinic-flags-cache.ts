@@ -30,4 +30,23 @@ export function peekClinicFlags(clinicaId: string): Record<string, boolean> | nu
 
 export function invalidateClinicFlags(clinicaId?: string): void {
   cache.invalidate(clinicaId);
+  notifyClinicFlagsChanged(clinicaId);
+}
+
+/* --------------------------------------------------------------------------
+ * Assinantes: sem isso, ligar/desligar uma flag limpava o cache mas nenhum
+ * componente relia — o Switch parecia "travado" até recarregar a página.
+ * ------------------------------------------------------------------------ */
+type Listener = (clinicaId: string | undefined) => void;
+const listeners = new Set<Listener>();
+
+export function subscribeClinicFlags(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+export function notifyClinicFlagsChanged(clinicaId?: string): void {
+  for (const fn of listeners) fn(clinicaId);
 }
