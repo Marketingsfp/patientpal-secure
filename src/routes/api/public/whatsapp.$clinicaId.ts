@@ -187,9 +187,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 if (ehAudio && cfg.access_token) {
                   const mediaId = String(msg.audio?.id ?? msg.voice?.id ?? "");
                   if (mediaId) {
-                    const { transcreverAudioWhatsapp } = await import(
-                      "@/lib/whatsapp-midia.server"
-                    );
+                    const { transcreverAudioWhatsapp } =
+                      await import("@/lib/whatsapp-midia.server");
                     const r = await transcreverAudioWhatsapp(mediaId, cfg.access_token);
                     mediaMime = r.mime;
                     if (r.texto) {
@@ -245,7 +244,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const deveResponder =
                   !ninaOff &&
                   foraDoHorario &&
-                  (Boolean(textoPaciente) || audioFalhou || ["image", "document", "sticker"].includes(tipo));
+                  (Boolean(textoPaciente) ||
+                    audioFalhou ||
+                    ["image", "document", "sticker"].includes(tipo));
 
                 if (deveResponder) {
                   try {
@@ -254,9 +255,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         "WhatsApp não configurado: Phone Number ID ausente na configuração e no webhook da Meta.",
                       );
                     }
-                    const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } = await import(
-                      "@/lib/whatsapp-midia.server"
-                    );
+                    const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } =
+                      await import("@/lib/whatsapp-midia.server");
                     let reply = "";
                     if (textoPaciente) {
                       reply = await gerarRespostaNina(params.clinicaId, textoPaciente, from);
