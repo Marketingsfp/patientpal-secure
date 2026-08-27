@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
-import { setClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { setClinicFeatureFlag, useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { FLAG_NINA_DESATIVADA, useNinaDesativada } from "@/hooks/use-nina-desativada";
 import {
   DEFAULT_TTS_RATE,
@@ -263,8 +263,6 @@ function VozConfigPage() {
       </div>
 
       <NinaLigaDesliga />
-
-
 
       <Card>
         <CardHeader>
@@ -605,7 +603,7 @@ function NinaLigaDesliga() {
           <Bot className="h-4 w-4" /> Assistente Nina
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-medium">Nina ativa</div>
@@ -619,7 +617,57 @@ function NinaLigaDesliga() {
             onCheckedChange={(v) => void alternar(v)}
           />
         </div>
+        <NinaRespostaAudio />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Interruptor "Responder em áudio quando o paciente mandar áudio" (por clínica).
+ * Ligado por padrão: a flag gravada é a NEGATIVA
+ * (`nina_resposta_audio_desativada`), pois flags sem registro nascem OFF.
+ */
+const FLAG_NINA_AUDIO_DESATIVADO = "nina_resposta_audio_desativada";
+
+function NinaRespostaAudio() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
+  const { enabled: desativado, loading } = useClinicFeatureFlag(FLAG_NINA_AUDIO_DESATIVADO);
+  const [salvando, setSalvando] = useState(false);
+
+  async function alternar(ligar: boolean) {
+    if (!clinicaId) return;
+    setSalvando(true);
+    try {
+      await setClinicFeatureFlag(
+        clinicaId,
+        FLAG_NINA_AUDIO_DESATIVADO,
+        !ligar,
+        "Desliga a resposta em áudio da Nina no WhatsApp",
+      );
+      toast.success(ligar ? "Nina vai responder em áudio" : "Nina vai responder só por texto");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-t pt-4">
+      <div>
+        <div className="text-sm font-medium">Responder em áudio quando o paciente mandar áudio</div>
+        <p className="text-xs text-muted-foreground">
+          Nota de voz no WhatsApp. Respostas longas ou com lista vão como áudio curto + texto
+          completo. Se a voz falhar, responde por texto.
+        </p>
+      </div>
+      <Switch
+        checked={!desativado}
+        disabled={loading || salvando || !clinicaId}
+        onCheckedChange={(v) => void alternar(v)}
+      />
+    </div>
   );
 }

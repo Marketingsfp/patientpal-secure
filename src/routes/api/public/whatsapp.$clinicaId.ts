@@ -266,23 +266,82 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       reply = respostaMidiaNaoSuportada(tipo);
                     }
                     if (reply) {
-                      const { wa_message_id: outId } = await metaSendText(
-                        phoneNumberId,
-                        cfg.access_token,
-                        from,
-                        reply,
-                      );
-                      await supabaseAdmin.from("whatsapp_mensagens").insert({
-                        clinica_id: params.clinicaId,
-                        wa_message_id: outId,
-                        direction: "out",
-                        from_number: displayPhoneNumber,
-                        to_number: from,
-                        body: reply,
-                        tipo: "text",
-                        status: "sent",
-                        enviada_por: "nina",
-                      });
+                      // Paciente mandou áudio → Nina responde falando (se a
+                      // clínica não desligou). Qualquer falha cai para texto.
+                      let audioEnviado = false;
+                      let precisaTextoCompleto = true;
+                      if (ehAudio && cfg.access_token) {
+                        try {
+                          const {
+                            respostaAudioDesativada,
+                            prepararParaFala,
+                            pareceLista,
+                            resumoFalado,
+                            sintetizarFala,
+                            LIMITE_FALA_CURTA,
+                          } = await import("@/lib/nina-audio.server");
+                          if (!(await respostaAudioDesativada(params.clinicaId))) {
+                            const longa = reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
+                            const falado = longa ? resumoFalado(reply) : prepararParaFala(reply);
+                            const audio = await sintetizarFala(falado);
+                            if (audio) {
+                              const { metaUploadMedia, metaSendAudio } =
+                                await import("@/lib/whatsapp.server");
+                              const mediaId = await metaUploadMedia(
+                                phoneNumberId,
+                                cfg.access_token,
+                                audio.bytes,
+                                audio.mime,
+                                `nina.${audio.ext}`,
+                              );
+                              const { wa_message_id: audioId } = await metaSendAudio(
+                                phoneNumberId,
+                                cfg.access_token,
+                                from,
+                                mediaId,
+                              );
+                              await supabaseAdmin.from("whatsapp_mensagens").insert({
+                                clinica_id: params.clinicaId,
+                                wa_message_id: audioId,
+                                direction: "out",
+                                from_number: displayPhoneNumber,
+                                to_number: from,
+                                body: `🎤 ${falado}`,
+                                tipo: "audio",
+                                transcricao: falado,
+                                media_mime: audio.mime,
+                                status: "sent",
+                                enviada_por: "nina",
+                              });
+                              audioEnviado = true;
+                              precisaTextoCompleto = longa;
+                            }
+                          }
+                        } catch (e) {
+                          console.error("Nina resposta em áudio falhou (caindo para texto)", e);
+                        }
+                      }
+
+                      if (!audioEnviado || precisaTextoCompleto) {
+                        const { wa_message_id: outId } = await metaSendText(
+                          phoneNumberId,
+                          cfg.access_token,
+                          from,
+                          reply,
+                        );
+                        await supabaseAdmin.from("whatsapp_mensagens").insert({
+                          clinica_id: params.clinicaId,
+                          wa_message_id: outId,
+                          direction: "out",
+                          from_number: displayPhoneNumber,
+                          to_number: from,
+                          body: reply,
+                          tipo: "text",
+                          status: "sent",
+                          enviada_por: "nina",
+                        });
+                      }
+
                       if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
                         await supabaseAdmin
                           .from("whatsapp_configs")

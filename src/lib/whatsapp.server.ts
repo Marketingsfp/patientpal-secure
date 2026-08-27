@@ -8,6 +8,8 @@ import {
 } from "@/lib/nina-especialidade";
 
 const META_VERSION = "v22.0";
+/** Mídia (upload/envio de áudio) usa a versão atual da Graph API. */
+const META_VERSION_AUDIO = "v26.0";
 
 /* =========================================================================
  * Templates (HSM) — Meta Cloud API
@@ -872,4 +874,61 @@ ${procs || "(nenhum)"}`;
     });
   }
   return resposta;
+}
+
+/* =========================================================================
+ * Áudio (nota de voz) — upload de mídia + envio
+ * ========================================================================= */
+
+/** Sobe um arquivo de áudio para a Meta e devolve o `media_id`. */
+export async function metaUploadMedia(
+  phoneNumberId: string,
+  accessToken: string,
+  bytes: Uint8Array,
+  mime: string,
+  filename: string,
+): Promise<string> {
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", mime);
+  form.append("file", new Blob([bytes as unknown as BlobPart], { type: mime }), filename);
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_AUDIO}/${phoneNumberId}/media`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.id) {
+    throw new Error(json?.error?.message ?? `Falha no upload de áudio (${res.status})`);
+  }
+  return String(json.id);
+}
+
+/** Envia uma nota de voz já enviada para a Meta (`media_id`). */
+export async function metaSendAudio(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  mediaId: string,
+): Promise<{ wa_message_id: string | null }> {
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION_AUDIO}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "audio",
+        audio: { id: mediaId },
+      }),
+    },
+  );
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error?.message ?? `Falha ao enviar áudio (${res.status})`);
+  return { wa_message_id: json?.messages?.[0]?.id ?? null };
 }
