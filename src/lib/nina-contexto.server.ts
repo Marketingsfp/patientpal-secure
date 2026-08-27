@@ -7,6 +7,8 @@
  * cada pergunta atrasava o início da fala da Nina.
  */
 
+import { blocoDataHoraAgora } from "@/lib/nina-agora";
+
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /** Validade do contexto em cache (ms). */
