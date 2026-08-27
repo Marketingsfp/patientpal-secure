@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -11,6 +11,7 @@ import {
   Undo2,
   Printer,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -23,6 +24,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { hojeBR } from "@/lib/date-utils";
+import { contaPadrao, dedupContas } from "@/lib/financeiro/contas";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import {
   classificarForma,
@@ -43,6 +45,16 @@ import {
   diaBR,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "@/lib/financeiro/retroativos";
+import {
+  classificarReceita,
+  totaisPorGrupo,
+  totaisPorForma,
+  GRUPOS_RECEITA,
+  LABEL_GRUPO,
+  AJUDA_GRUPO,
+  FILTRO_DA_FORMA,
+  type GrupoReceita,
+} from "@/lib/financeiro/composicao-receita";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -75,6 +87,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import {
   AlertDialog,
@@ -138,6 +151,15 @@ interface Lanc {
    *  gaveta daquele dia: é ajuste gerencial, não caixa físico da recepção.
    *  Ver `@/lib/financeiro/retroativos`. */
   _retroativo?: boolean;
+  /** Nome do procedimento do atendimento vinculado, como está gravado em
+   *  `agendamentos.procedimento` (com a especialidade colada no fim). Separa
+   *  Consultas de Exames/Procedimentos na composição da receita. */
+  procedimento?: string | null;
+  /** Vencimento da mensalidade do Cartão Benefícios que este lançamento
+   *  quitou. É o que diz se ela é do período, atrasada ou antecipada. */
+  mensalidadeVencimento?: string | null;
+  /** Nº da parcela da mensalidade; 0 ou negativo é taxa de adesão. */
+  mensalidadeParcela?: number | null;
 }
 /** Rótulos amigáveis das formas de pagamento (usados no recibo impresso). */
 const FORMA_LABEL: Record<string, string> = {
@@ -154,6 +176,7 @@ interface Opt {
   id: string;
   nome: string;
   tipo?: string;
+  created_at?: string;
 }
 
 /** Formulário zerado. É uma função, e não uma constante de módulo, porque a
@@ -234,6 +257,43 @@ function linhasVisiveis(items: Lanc[], filtro: FiltroForma, decompor: boolean): 
   const expandido = decompor ? expandMistoItems(items) : items;
   if (filtro === "todos") return expandido;
   return expandido.filter((l) => baldeCasaComFiltro(baldeDaLinha(l), filtro));
+}
+
+/**
+ * Um card da composição da receita. É um `button` de verdade, e não uma div
+ * clicável, para funcionar no teclado e ser anunciado como controle — a
+ * recepção usa esta tela o dia inteiro.
+ */
+function CardGrupo({
+  grupo,
+  total,
+  qtd,
+  ativo,
+  onClick,
+}: {
+  grupo: GrupoReceita;
+  total: number;
+  qtd: number;
+  ativo: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={AJUDA_GRUPO[grupo]}
+      aria-pressed={ativo}
+      className={`text-left rounded-md border px-3 py-2 transition hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        ativo ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"
+      }`}
+    >
+      <p className="text-[11px] text-muted-foreground truncate">{LABEL_GRUPO[grupo]}</p>
+      <p className="text-base font-semibold tabular-nums">{fmt(total)}</p>
+      <p className="text-[10px] text-muted-foreground">
+        {qtd} {qtd === 1 ? "lançamento" : "lançamentos"}
+      </p>
+    </button>
+  );
 }
 
 function Page() {
@@ -321,6 +381,10 @@ function Page() {
       window.localStorage.setItem("financeiro:ocultarRetroativos", ocultarRetroativos ? "1" : "0");
     }
   }, [ocultarRetroativos]);
+  /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
+  const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
+  /** Card da composição em que o usuário clicou; null = mostrando tudo. */
+  const [filtroGrupo, setFiltroGrupo] = useState<GrupoReceita | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
@@ -433,13 +497,22 @@ function Page() {
         }
       }
       const fichaMap = new Map<string, number | null>();
+      // `procedimento` vem junto da ficha: é ele que separa Consultas de
+      // Exames/Procedimentos na composição da receita, e a consulta ao
+      // agendamento já estava sendo feita de qualquer forma.
+      const procMap = new Map<string, string | null>();
       if (agIds.length) {
         const { data: ags } = await supabase
           .from("agendamentos")
-          .select("id, ficha_numero")
+          .select("id, ficha_numero, procedimento")
           .in("id", agIds);
-        for (const a of (ags ?? []) as Array<{ id: string; ficha_numero: number | null }>) {
+        for (const a of (ags ?? []) as Array<{
+          id: string;
+          ficha_numero: number | null;
+          procedimento: string | null;
+        }>) {
           fichaMap.set(a.id, a.ficha_numero);
+          procMap.set(a.id, a.procedimento);
         }
       }
       finList = finList.map((l) => {
@@ -448,6 +521,46 @@ function Page() {
           ...l,
           medico_nome: raw.medico_id ? (medMap.get(raw.medico_id) ?? null) : null,
           ficha_numero: raw.agendamento_id ? (fichaMap.get(raw.agendamento_id) ?? null) : null,
+          procedimento: raw.agendamento_id ? (procMap.get(raw.agendamento_id) ?? null) : null,
+        };
+      });
+      // 1c) Mensalidades do Cartão Benefícios quitadas neste período
+      //
+      // `fin_lancamentos` NÃO guarda o vínculo: quem aponta para o lançamento é
+      // `contrato_mensalidades.lancamento_id` (o campo `contrato_id` do
+      // lançamento vem nulo nas mensalidades — conferido nas 121 de agosto/2026).
+      // Sem o `vencimento` daqui não há como dizer se o pagamento é do mês,
+      // atrasado ou adiantado.
+      //
+      // O recorte é por `pago_em`, que coincide com a data do lançamento em 338
+      // das 340 mensalidades existentes; a folga de três dias cobre as demais.
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("lancamento_id, vencimento, numero_parcela")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .not("lancamento_id", "is", null)
+        .gte("pago_em", `${diaDeslocado(fromDate, -3)}T00:00:00`)
+        .lte("pago_em", `${diaDeslocado(toDate, 3)}T23:59:59`)
+        .limit(5000);
+      const mensMap = new Map<string, { vencimento: string; numero_parcela: number }>();
+      for (const m of (mens ?? []) as Array<{
+        lancamento_id: string | null;
+        vencimento: string;
+        numero_parcela: number;
+      }>) {
+        if (m.lancamento_id) {
+          mensMap.set(m.lancamento_id, {
+            vencimento: m.vencimento,
+            numero_parcela: Number(m.numero_parcela),
+          });
+        }
+      }
+      finList = finList.map((l) => {
+        const m = mensMap.get(l.id);
+        return {
+          ...l,
+          mensalidadeVencimento: m?.vencimento ?? null,
+          mensalidadeParcela: m?.numero_parcela ?? null,
         };
       });
     }
@@ -762,6 +875,23 @@ function Page() {
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
+    // Cadastro de procedimentos: só nome e tipo, uma vez por clínica. É a
+    // tabela que diz se um atendimento é consulta, exame ou procedimento —
+    // `agendamentos.tipo_atendimento` responde outra pergunta (particular ×
+    // convênio) e não serve para isto.
+    void (async () => {
+      const { data: procs } = await supabase
+        .from("procedimentos")
+        .select("nome, tipo")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .limit(20000);
+      const mapa = new Map<string, string>();
+      for (const p of (procs ?? []) as Array<{ nome: string | null; tipo: string | null }>) {
+        if (p.nome && p.tipo) mapa.set(p.nome.trim().toUpperCase(), p.tipo);
+      }
+      setProcTipos(mapa);
+    })();
     const [c, b, m, meds] = await Promise.all([
       supabase
         .from("fin_categorias")
@@ -771,7 +901,7 @@ function Page() {
         .order("nome"),
       supabase
         .from("fin_contas")
-        .select("id, nome")
+        .select("id, nome, tipo, created_at")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome"),
@@ -844,6 +974,10 @@ function Page() {
   // Reseta a página sempre que qualquer filtro mudar
   useEffect(() => {
     setPage(1);
+    // O card escolhido pertence ao recorte antigo: mantê-lo depois de trocar
+    // o período mostraria uma lista filtrada por um card que não está mais
+    // destacado, e o usuário não teria como saber por que a lista encolheu.
+    setFiltroGrupo(null);
   }, [
     clinicaAtual?.clinica_id,
     filterTipo,
@@ -859,15 +993,33 @@ function Page() {
     // podia ficar numa página que deixou de existir.
     ocultarRetroativos,
   ]);
+  // Escolher um card muda o tamanho da lista; a paginação volta ao começo.
+  // Efeito separado de propósito: se `filtroGrupo` entrasse no efeito acima,
+  // ele se apagaria sozinho no clique.
+  useEffect(() => {
+    setPage(1);
+  }, [filtroGrupo]);
   useEffect(() => {
     void loadOpts();
   }, [clinicaAtual?.clinica_id]);
 
+  // O select de conta mostra a lista sem repetições; `contas` continua inteira
+  // porque o mapa id → nome (export do Excel, recibo) precisa saber o nome de
+  // lançamentos antigos gravados numa das duplicatas.
+  const contasSelect = useMemo(() => dedupContas(contas), [contas]);
+  const contaPadraoId = useMemo(() => contaPadrao(contas)?.id ?? "", [contas]);
+
   const openNew = () => {
     setEditing(null);
-    setForm(emptyForm());
+    setForm({ ...emptyForm(), conta_id: contaPadraoId });
     setOpen(true);
   };
+  // As contas chegam por uma consulta assíncrona: se o lançamento for aberto
+  // antes dela responder, o campo ficaria vazio mesmo existindo conta padrão.
+  useEffect(() => {
+    if (!open || editing || !contaPadraoId) return;
+    setForm((f) => (f.conta_id ? f : { ...f, conta_id: contaPadraoId }));
+  }, [open, editing, contaPadraoId]);
   const openEdit = (l: Lanc) => {
     if (l.origem === "caixa" || l.tipo === "transferencia") return; // transferências de caixa são somente-leitura aqui
     const desc = (l.descricao ?? "").trim().toLowerCase();
@@ -1284,9 +1436,47 @@ function Page() {
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
   // isso a conta fecha igual com a decomposição ligada ou desligada.
   const retro = totaisRetroativos(linhasDoPeriodo.filter((l) => l._retroativo));
-  const displayItems = ocultarRetroativos
+  const itensVisiveis = ocultarRetroativos
     ? linhasDoPeriodo.filter((l) => !l._retroativo)
     : linhasDoPeriodo;
+
+  // Composição da receita: de onde veio cada real do período.
+  //
+  // Calculada ANTES do filtro por card, senão clicar em "Consultas" zeraria
+  // todos os outros cards e a tela deixaria de ser comparável. Os cards
+  // mostram sempre o período inteiro; quem se estreita é a lista de baixo.
+  const periodo = { de: fromDate, ate: toDate };
+  const grupoDaLinha = (l: Lanc): GrupoReceita =>
+    classificarReceita(
+      {
+        tipo: l.tipo,
+        procedimento: l.procedimento,
+        mensalidadeVencimento: l.mensalidadeVencimento,
+        mensalidadeParcela: l.mensalidadeParcela,
+      },
+      periodo,
+      procTipos,
+    );
+  const receitasVisiveis = itensVisiveis.filter((l) => l.tipo === "receita");
+  const composicao = totaisPorGrupo(
+    receitasVisiveis.map((l) => ({ grupo: grupoDaLinha(l), valor: l.valor })),
+  );
+  const formasRecebidas = totaisPorForma(
+    receitasVisiveis.map((l) => ({ balde: baldeDaLinha(l), valor: l.valor })),
+  );
+  const totalParticular = Number(
+    (composicao.consulta.total + composicao.exame_procedimento.total).toFixed(2),
+  );
+  const totalMensalidades = Number(
+    (
+      composicao.mensalidade_periodo.total +
+      composicao.mensalidade_atrasada.total +
+      composicao.mensalidade_antecipada.total
+    ).toFixed(2),
+  );
+  const displayItems = filtroGrupo
+    ? itensVisiveis.filter((l) => l.tipo === "receita" && grupoDaLinha(l) === filtroGrupo)
+    : itensVisiveis;
 
   // Cards de Receita/Despesa/Saldo.
   //
@@ -1729,11 +1919,19 @@ function Page() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">—</SelectItem>
-                        {contas.map((c) => (
+                        {contasSelect.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
                           </SelectItem>
                         ))}
+                        {/* Lançamento antigo gravado numa conta que saiu da
+                            lista (duplicata ou conta desativada) continua
+                            mostrando a conta dele em vez de aparecer vazio. */}
+                        {form.conta_id && !contasSelect.some((c) => c.id === form.conta_id) && (
+                          <SelectItem value={form.conta_id}>
+                            {contas.find((c) => c.id === form.conta_id)?.nome ?? "Conta anterior"}
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1802,16 +2000,78 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card
-          className="cursor-pointer hover:bg-muted/40 transition"
-          onClick={() => setDetalhe("receita")}
-        >
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Receitas</p>
-            <p className="text-2xl font-semibold text-green-600">{fmt(totais.r)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
-          </CardContent>
-        </Card>
+        {/* Passar o mouse abre a quebra por forma de pagamento; clicar continua
+            abrindo o detalhamento lançamento a lançamento, como antes. */}
+        <HoverCard openDelay={120} closeDelay={80}>
+          <HoverCardTrigger asChild>
+            <Card
+              className="cursor-pointer hover:bg-muted/40 transition"
+              onClick={() => setDetalhe("receita")}
+            >
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Receitas</p>
+                <p className="text-2xl font-semibold text-green-600">{fmt(totais.r)}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Passe o mouse para as formas · clique para os detalhes
+                </p>
+              </CardContent>
+            </Card>
+          </HoverCardTrigger>
+          <HoverCardContent align="start" className="w-80">
+            <p className="text-xs font-medium mb-2">Recebido por forma de pagamento</p>
+            {formasRecebidas.formas.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sem recebimentos no período.</p>
+            ) : (
+              <>
+                <div className="space-y-0.5">
+                  {formasRecebidas.formas.map((f) => {
+                    const alvo = FILTRO_DA_FORMA[f.forma];
+                    const conteudo = (
+                      <>
+                        <span className="truncate">{f.label}</span>
+                        <span className="ml-auto tabular-nums text-muted-foreground shrink-0">
+                          {f.qtd}
+                        </span>
+                        <span className="tabular-nums font-medium shrink-0 w-24 text-right">
+                          {fmt(f.total)}
+                        </span>
+                      </>
+                    );
+                    // Só vira botão a forma que existe no seletor "Forma".
+                    // Convênio, misto e transferência não têm opção lá, e
+                    // mandar o usuário para um recorte parecido seria pior do
+                    // que não deixar clicar.
+                    return alvo ? (
+                      <button
+                        key={f.forma}
+                        type="button"
+                        onClick={() => setFilterForma(alvo)}
+                        className="w-full flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
+                      >
+                        {conteudo}
+                      </button>
+                    ) : (
+                      <div
+                        key={f.forma}
+                        className="w-full flex items-center gap-2 px-1.5 py-1 text-xs"
+                      >
+                        {conteudo}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs font-semibold">
+                  <span>Total conferido</span>
+                  <span className="tabular-nums">{fmt(formasRecebidas.total)}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {formasRecebidas.qtd} {formasRecebidas.qtd === 1 ? "transação" : "transações"} ·
+                  clique numa forma para filtrar a lista
+                </p>
+              </>
+            )}
+          </HoverCardContent>
+        </HoverCard>
         <Card
           className="cursor-pointer hover:bg-muted/40 transition"
           onClick={() => setDetalhe("despesa")}
@@ -1837,6 +2097,106 @@ function Page() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Composição da receita: Particular × Mensalidades do Cartão
+          Benefícios. Só aparece quando há receita no recorte — num período só
+          de despesas o bloco seria uma fileira de zeros — e depois que o
+          cadastro de procedimentos chegou: sem ele toda linha cairia em
+          "Outros" por um instante, e os cards piscariam errado. */}
+      {receitasVisiveis.length > 0 && procTipos.size > 0 && (
+        <Card>
+          <CardContent className="pt-5 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-sm font-medium">Composição das receitas</p>
+                <p className="text-xs text-muted-foreground">
+                  Clique num card para filtrar a lista abaixo.
+                </p>
+              </div>
+              {filtroGrupo && (
+                <Button variant="outline" size="sm" onClick={() => setFiltroGrupo(null)}>
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Limpar filtro · {LABEL_GRUPO[filtroGrupo]}
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Particular
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(totalParticular)}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["consulta", "exame_procedimento"] as GrupoReceita[]).map((g) => (
+                    <CardGrupo
+                      key={g}
+                      grupo={g}
+                      total={composicao[g].total}
+                      qtd={composicao[g].qtd}
+                      ativo={filtroGrupo === g}
+                      onClick={() => setFiltroGrupo(filtroGrupo === g ? null : g)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Mensalidades (Cartão Benefícios)
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(totalMensalidades)}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      "mensalidade_periodo",
+                      "mensalidade_atrasada",
+                      "mensalidade_antecipada",
+                    ] as GrupoReceita[]
+                  ).map((g) => (
+                    <CardGrupo
+                      key={g}
+                      grupo={g}
+                      total={composicao[g].total}
+                      qtd={composicao[g].qtd}
+                      ativo={filtroGrupo === g}
+                      onClick={() => setFiltroGrupo(filtroGrupo === g ? null : g)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* "Outros" existe para os cards fecharem com o total de Receitas.
+                Sem ele o que não é atendimento nem mensalidade — taxa de
+                adesão, lançamento manual, acerto — sumiria da conta e os
+                números pareceriam errados. */}
+            {composicao.outros.qtd > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <CardGrupo
+                  grupo="outros"
+                  total={composicao.outros.total}
+                  qtd={composicao.outros.qtd}
+                  ativo={filtroGrupo === "outros"}
+                  onClick={() => setFiltroGrupo(filtroGrupo === "outros" ? null : "outros")}
+                />
+              </div>
+            )}
+
+            <p className="text-[11px] text-muted-foreground">
+              Soma dos cards:{" "}
+              <span className="tabular-nums font-medium">
+                {fmt(GRUPOS_RECEITA.reduce((acc, g) => acc + composicao[g].total, 0))}
+              </span>{" "}
+              — o mesmo total de receitas do período.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* O que não é dinheiro da gaveta deste dia. O aviso é obrigatório
           quando a lista esconde linhas: some sem explicação, vira "sumiu
@@ -2103,7 +2463,8 @@ function Page() {
                   <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
                     Página {currentPage} de {totalPages} —{" "}
                     {displayItems.length.toLocaleString("pt-BR")} linha(s)
-                    {decomporMisto ? " (mistos decompostos)" : ""} no período.
+                    {decomporMisto ? " (mistos decompostos)" : ""} no período
+                    {filtroGrupo ? ` · filtrado por "${LABEL_GRUPO[filtroGrupo]}"` : ""}.
                   </div>
                 );
               })()}
