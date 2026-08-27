@@ -989,6 +989,31 @@ function ConfiguracaoWhatsApp() {
       </Button>
     ) : null;
 
+  const linhaInscricao = (
+    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+      <span className="text-muted-foreground">Webhook da conta:</span>
+      {inscricaoLoading ? (
+        <span className="text-muted-foreground inline-flex items-center gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" /> verificando…
+        </span>
+      ) : inscricao.estado === "sem-waba" ? (
+        <span className="text-muted-foreground">WABA ID não informado</span>
+      ) : inscricao.estado === "inscrito" ? (
+        <span className="font-medium text-emerald-600">Inscrito</span>
+      ) : inscricao.estado === "sem-inscricao" ? (
+        <span className="font-medium text-destructive">Sem inscrição</span>
+      ) : (
+        <span className="text-muted-foreground">{inscricao.erro ?? "não verificado"}</span>
+      )}
+      {podeEscrever && inscricao.estado === "sem-inscricao" && (
+        <Button size="sm" variant="outline" onClick={() => void onInscreverApp()} disabled={inscrevendo}>
+          {inscrevendo ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+          Inscrever app na conta
+        </Button>
+      )}
+    </div>
+  );
+
   const canaisDisponiveis = [
     {
       id: "oficial",
