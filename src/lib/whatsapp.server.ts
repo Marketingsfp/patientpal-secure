@@ -498,7 +498,7 @@ export async function gerarRespostaNina(
         .eq("ativo", true),
       supabaseAdmin
         .from("clinicas")
-        .select("nome, base_importada")
+        .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
         .eq("id", clinicaId)
         .maybeSingle(),
       identificarPaciente(clinicaId, mensagemPaciente, telefoneNorm),
@@ -517,7 +517,23 @@ export async function gerarRespostaNina(
     ]);
 
   const baseImportada = (cliR.data as any)?.base_importada === true;
-  const nomeUnidade = (cliR.data as any)?.nome ?? "esta unidade";
+  const clinicaRow = (cliR.data ?? null) as {
+    nome?: string | null;
+    endereco?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+    telefone?: string | null;
+    email?: string | null;
+  } | null;
+  const nomeUnidade = clinicaRow?.nome ?? "esta unidade";
+  const enderecoUnidade = [
+    clinicaRow?.endereco,
+    [clinicaRow?.cidade, clinicaRow?.estado].filter(Boolean).join("/"),
+    clinicaRow?.cep,
+  ]
+    .filter((p) => p && String(p).trim())
+    .join(" - ");
 
   const { data: agendasData } = await supabaseAdmin
     .from("medico_agendas")
@@ -730,6 +746,32 @@ export async function gerarRespostaNina(
     }))
     .filter((m: any) => m.content);
 
+  // Nome curto para a apresentação (o cadastro costuma trazer a unidade após um travessão).
+  const nomeCurtoUnidade =
+    String(nomeUnidade)
+      .split(/\s+[—–-]\s+/)[0]
+      ?.trim() || nomeUnidade;
+  const jaSeApresentou = ((histR as any)?.data ?? []).some((m: any) => m.direction === "out");
+  const dadosPublicos = [
+    `Nome oficial: ${nomeUnidade}`,
+    enderecoUnidade ? `Endereço: ${enderecoUnidade}` : null,
+    clinicaRow?.telefone ? `Telefone: ${clinicaRow.telefone}` : null,
+    clinicaRow?.email ? `E-mail: ${clinicaRow.email}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const blocoClinica = `IDENTIDADE DA CLÍNICA — USE SEMPRE O NOME REAL:
+${dadosPublicos}
+
+- Você é a assistente virtual de "${nomeUnidade}". NUNCA fale como "a clínica" de forma genérica quando o nome está aqui, e NUNCA diga representar outra unidade.
+- ${
+    jaSeApresentou
+      ? "Você JÁ se apresentou nesta conversa. NÃO repita a apresentação — vá direto ao ponto."
+      : `Esta é a PRIMEIRA mensagem da conversa: comece se apresentando exatamente assim: "Oi! Aqui é a Nina, assistente virtual da ${nomeCurtoUnidade} 😊" e só depois responda o que foi perguntado.`
+  }
+- Se perguntarem "que clínica é essa?", "onde vocês ficam?", "é a ${nomeCurtoUnidade}?" ou pedirem contato/endereço, responda com o nome oficial e com o endereço/telefone acima (apenas os que existirem). Se algum desses dados não estiver acima, diga que confirma com a recepção — não invente.`;
+
   // Bloco de contexto do remetente + regras condicionais
   const contextoRemetente = pacienteInfo
     ? pacienteInfo.associado
@@ -739,7 +781,9 @@ export async function gerarRespostaNina(
       ? `IDENTIFICAÇÃO: Não localizei este contato/CPF/nome na base de ${nomeUnidade}. Trate como paciente novo. NÃO peça dados completos agora — pergunte primeiro se a pessoa deseja agendar/se cadastrar. Só peça dados (nome completo, CPF, nascimento, telefone) quando houver intenção CLARA de agendamento, cadastro ou atualização.`
       : `IDENTIFICAÇÃO: A base de pacientes da unidade "${nomeUnidade}" AINDA NÃO FOI IMPORTADA no sistema. Se a pessoa quiser confirmar cadastro, agendamento ou histórico, responda com educação: "Os dados desta unidade ainda não estão disponíveis no meu sistema — vou te encaminhar para uma atendente humana." NÃO peça CPF, nome completo ou dados cadastrais. Você pode responder normalmente sobre horários de médicos, preços de tabela e informações públicas.`;
 
-  const systemPrompt = `Você é a Nina, assistente virtual da clínica respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+  const systemPrompt = `Você é a Nina, assistente virtual da ${nomeUnidade}, respondendo a PACIENTES via WhatsApp. Responda em português do Brasil, de forma curta (no máximo 4 frases), direta, cordial e acolhedora com TODOS.
+
+${blocoClinica}
 
 ${blocoDataHoraAgora()}
 
