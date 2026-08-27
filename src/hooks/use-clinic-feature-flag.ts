@@ -5,6 +5,7 @@ import {
   getClinicFlags,
   invalidateClinicFlags,
   peekClinicFlags,
+  subscribeClinicFlags,
 } from "@/lib/cache/clinic-flags-cache";
 
 /**
@@ -60,6 +61,14 @@ export function useClinicFeatureFlag(flagKey: string) {
   const cachePrevio = clinicaId ? peekClinicFlags(clinicaId) : null;
   const [enabled, setEnabled] = useState(Boolean(cachePrevio?.[flagKey]));
   const [loading, setLoading] = useState(cachePrevio == null);
+  // Reconsulta quando alguém grava uma flag (o cache é invalidado e avisa).
+  const [versao, setVersao] = useState(0);
+
+  useEffect(() => {
+    return subscribeClinicFlags((alterada) => {
+      if (!alterada || alterada === clinicaId) setVersao((v) => v + 1);
+    });
+  }, [clinicaId]);
 
   useEffect(() => {
     let alive = true;
@@ -86,7 +95,7 @@ export function useClinicFeatureFlag(flagKey: string) {
     return () => {
       alive = false;
     };
-  }, [clinicaId, flagKey]);
+  }, [clinicaId, flagKey, versao]);
 
   // Override por código: a Menino Jesus herda as flags ativas da São Francisco
   // (não depende do banco; resolve o "loading" na hora pra evitar flash do
