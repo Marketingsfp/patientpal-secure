@@ -280,81 +280,131 @@ function NinaPage() {
     }
   };
 
-  const carregar = useCallback(async () => {
-    if (!clinicaId) return;
-    setLoadingConv(true);
-    const { data, error } = await supabase
-      .from("whatsapp_mensagens")
-      .select(
-        "id, wa_message_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em",
-      )
-      .eq("clinica_id", clinicaId)
-      .order("recebida_em", { ascending: true })
-      .limit(1000);
-    setLoadingConv(false);
-    if (error) {
-      mostrarErro(error, "erro ao carregar conversas");
-      return;
-    }
-    const map = new Map<string, Conv>();
-    for (const row of data || []) {
-      const telefone = row.direction === "in" ? row.from_number || "" : row.to_number || "";
-      if (!telefone) continue;
-      const key = telefone.replace(/\D/g, "");
-      let conv = map.get(key);
-      if (!conv) {
-        conv = {
-          id: key,
-          nome: formatTelefone(telefone),
-          telefone: formatTelefone(telefone),
-          ultima: "",
-          quando: "",
-          naoLidas: 0,
-          msgs: [],
-        };
-        map.set(key, conv);
+  const carregar = useCallback(
+    async (silencioso = false) => {
+      if (!clinicaId) return;
+      if (!silencioso) setLoadingConv(true);
+      const { data, error } = await supabase
+        .from("whatsapp_mensagens")
+        .select(
+          "id, wa_message_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, recebida_em",
+        )
+        .eq("clinica_id", clinicaId)
+        .order("recebida_em", { ascending: true })
+        .limit(1000);
+      if (!silencioso) setLoadingConv(false);
+      if (error) {
+        if (!silencioso) mostrarErro(error, "erro ao carregar conversas");
+        return;
       }
-      const isIn = row.direction === "in";
-      conv.msgs.push({
-        from: isIn ? "paciente" : "nina",
-        text: row.body || `[${row.tipo}]`,
-        at: formatHora(row.recebida_em),
-        tipo: row.tipo === "audio" ? "audio" : "texto",
-      });
-      conv.ultima = row.body || `[${row.tipo}]`;
-      conv.quando = formatRelativo(row.recebida_em);
-    }
-    const lista = Array.from(map.values()).sort((a, b) => (a.quando === "agora" ? -1 : 1));
-    setConversas(lista);
-    setSel((prev) =>
-      prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null,
-    );
-  }, [clinicaId]);
+      const map = new Map<string, Conv>();
+      const ultimoIso = new Map<string, string>();
+      for (const row of data || []) {
+        const telefone = row.direction === "in" ? row.from_number || "" : row.to_number || "";
+        if (!telefone) continue;
+        const key = telefone.replace(/\D/g, "");
+        let conv = map.get(key);
+        if (!conv) {
+          conv = {
+            id: key,
+            nome: formatTelefone(telefone),
+            telefone: formatTelefone(telefone),
+            ultima: "",
+            quando: "",
+            naoLidas: 0,
+            msgs: [],
+          };
+          map.set(key, conv);
+        }
+        const isIn = row.direction === "in";
+        const transcrito = (row as any).transcricao as string | null;
+        const texto =
+          row.tipo === "audio"
+            ? transcrito
+              ? `🎤 ${transcrito}`
+              : row.body || "🎤 [áudio]"
+            : row.body || `[${row.tipo}]`;
+        conv.msgs.push({
+          from: isIn ? "paciente" : "nina",
+          text: texto,
+          at: formatHora(row.recebida_em),
+          tipo: row.tipo === "audio" ? "audio" : "texto",
+        });
+        conv.ultima = texto;
+        conv.quando = formatRelativo(row.recebida_em);
+        ultimoIso.set(key, row.recebida_em);
+      }
+      const lista = Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(ultimoIso.get(b.id) ?? 0).getTime() -
+          new Date(ultimoIso.get(a.id) ?? 0).getTime(),
+      );
+      setConversas(lista);
+      setSel((prev) =>
+        prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null,
+      );
+    },
+    [clinicaId],
+  );
 
   useEffect(() => {
     carregar();
   }, [carregar]);
 
-  // Realtime: novas mensagens chegam automaticamente
+  // Realtime: novas mensagens e conversas chegam sozinhas, com reconexão e
+  // polling leve de reserva para a recepção nunca ficar muda.
   useEffect(() => {
     if (!clinicaId) return;
-    const channel = supabase
-      .channel(`wa-msgs-${clinicaId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "whatsapp_mensagens",
-          filter: `clinica_id=eq.${clinicaId}`,
-        },
-        () => {
-          carregar();
-        },
-      )
-      .subscribe();
+    let ativo = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconectar: ReturnType<typeof setTimeout> | null = null;
+
+    const conectar = () => {
+      if (!ativo) return;
+      channel = supabase
+        .channel(`nina-inbox-${clinicaId}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "whatsapp_mensagens",
+            filter: `clinica_id=eq.${clinicaId}`,
+          },
+          () => carregar(true),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "atend_conversas",
+            filter: `clinica_id=eq.${clinicaId}`,
+          },
+          () => carregar(true),
+        )
+        .subscribe((status) => {
+          if (
+            ativo &&
+            (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED")
+          ) {
+            if (reconectar) clearTimeout(reconectar);
+            reconectar = setTimeout(() => {
+              if (!ativo) return;
+              if (channel) supabase.removeChannel(channel);
+              conectar();
+            }, 3000);
+          }
+        });
+    };
+    conectar();
+
+    const poll = setInterval(() => carregar(true), 20000);
     return () => {
-      supabase.removeChannel(channel);
+      ativo = false;
+      if (reconectar) clearTimeout(reconectar);
+      clearInterval(poll);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [clinicaId, carregar]);
 
