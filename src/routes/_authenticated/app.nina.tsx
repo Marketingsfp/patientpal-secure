@@ -1135,9 +1135,26 @@ function ConfiguracaoWhatsApp() {
               <strong>Meta for Developers → Seu App → WhatsApp → Configuration → Webhooks</strong>,
               cole a URL e o Verify Token, depois assine o campo <code>messages</code>.
             </p>
+            <p className="text-xs">
+              App Secret:{" "}
+              {cfg.has_app_secret ? (
+                <span className="font-medium text-emerald-600">preenchido</span>
+              ) : (
+                <span className="font-medium text-destructive">vazio</span>
+              )}
+            </p>
+            {!cfg.has_app_secret && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+                Assinatura não verificada — confirme o App Secret do app usado no webhook. As
+                mensagens continuam sendo recebidas normalmente.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      <EventosWebhookCard clinicaId={cfg.clinica_id} />
+
 
       <Card>
         <CardHeader>
