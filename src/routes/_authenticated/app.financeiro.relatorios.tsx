@@ -58,6 +58,13 @@ import {
   ROTULO_AGRUPADOR,
   type ColunaRateio as Coluna,
 } from "@/lib/financeiro/rateio-colunas";
+// Quebra da receita bruta em Dinheiro / PIX / Débito / Crédito, mostrada
+// debaixo do total do card e repetida na planilha e no papel.
+import {
+  COR_FORMA,
+  receitaPorForma,
+  type FatiaDaReceita,
+} from "@/lib/financeiro/receita-por-forma";
 import {
   diffDias,
   periodoComparacao,
@@ -273,6 +280,35 @@ async function fetchAll(builder: () => any): Promise<Record<string, unknown>[]> 
   return all;
 }
 
+/** Título do bloco de composição, igual na tela, na planilha e no papel. */
+const TITULO_COMPOSICAO = "Composição da receita bruta";
+
+/**
+ * Mini-detalhamento por forma de pagamento, logo abaixo do valor do card.
+ *
+ * Tipografia compacta e cinza de propósito: o número grande do card continua
+ * sendo o que se lê primeiro, e isto aqui é a conferência de quem quer saber
+ * quanto passou na maquininha sem abrir outra tela. O pontinho colorido é
+ * reforço — quem identifica a linha é o rótulo escrito ao lado, para o bloco
+ * continuar legível impresso em preto e branco.
+ */
+function ComposicaoPorForma({ fatias }: { fatias: FatiaDaReceita[] }) {
+  if (fatias.length === 0) return null;
+  return (
+    <ul className="mt-3 space-y-1 border-t border-slate-100 pt-2.5">
+      {fatias.map((f) => (
+        <li key={f.forma} className="flex items-center justify-between gap-2 text-xs">
+          <span className="flex min-w-0 items-center gap-1.5 text-slate-500">
+            <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", COR_FORMA[f.forma])} />
+            <span className="truncate">{f.rotulo}</span>
+          </span>
+          <span className="shrink-0 font-medium tabular-nums text-slate-600">{brl(f.valor)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Card de fechamento do rateio, com a variação contra o período comparado. */
 function CardResumo({
   titulo,
@@ -280,6 +316,7 @@ function CardResumo({
   detalhe,
   delta,
   invertido = false,
+  composicao,
 }: {
   titulo: string;
   valor: string;
@@ -288,6 +325,8 @@ function CardResumo({
   delta?: number | null;
   /** Para repasse: subir não é boa notícia para a clínica. */
   invertido?: boolean;
+  /** Quebra por forma de pagamento, listada abaixo do valor. */
+  composicao?: FatiaDaReceita[];
 }) {
   const bom = delta == null ? true : invertido ? delta <= 0 : delta >= 0;
   const Icone = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
@@ -323,6 +362,7 @@ function CardResumo({
             )}
           </div>
         )}
+        {composicao && <ComposicaoPorForma fatias={composicao} />}
       </CardContent>
     </Card>
   );
@@ -439,6 +479,13 @@ function Page() {
   );
   const totaisR = useMemo(() => totaisRateio(linhasRateio), [linhasRateio]);
   const totaisComp = useMemo(() => totaisRateio(linhasRateioComp), [linhasRateioComp]);
+  /**
+   * Quebra da receita bruta por forma de pagamento. Sai das linhas cruas (uma
+   * por atendimento), e não do agrupamento da tabela: "Agrupar por" e
+   * "Sintético/Analítico" mudam a apresentação, nunca quanto entrou em cada
+   * forma. A soma destas fatias é sempre `totaisR.receita`.
+   */
+  const fatiasReceita = useMemo(() => receitaPorForma(linhasRateio), [linhasRateio]);
   const comparacaoVisivel = comparandoAgora && atualizado;
 
   const linhas = useMemo<Linha[]>(() => {
@@ -766,6 +813,20 @@ function Page() {
                     ? `${data.length.toLocaleString("pt-BR")} registro(s)`
                     : "",
               ),
+        // O mesmo bloco que a tela mostra no card, abaixo da tabela: quem abre
+        // a planilha enxerga a quebra por forma de pagamento sem precisar
+        // montar tabela dinâmica. Os valores vão como número, para somarem.
+        resumo:
+          tipo === "rateio"
+            ? {
+                titulo: TITULO_COMPOSICAO,
+                itens: receitaPorForma(res.cruas).map((f) => ({
+                  rotulo: f.rotulo,
+                  valor: f.valor,
+                  tipo: "moeda" as const,
+                })),
+              }
+            : undefined,
       });
       toast.success(`Planilha gerada (${data.length} linhas)`);
     } catch (e) {
@@ -829,6 +890,13 @@ function Page() {
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeRateio(colunas, t, tComp),
         resumo,
+        composicao: {
+          titulo: TITULO_COMPOSICAO,
+          itens: receitaPorForma(res.cruas).map((f) => ({
+            rotulo: f.rotulo,
+            valor: brl(f.valor),
+          })),
+        },
       });
       return;
     }
@@ -1235,6 +1303,7 @@ function Page() {
             valor={brl(totaisR.receita)}
             detalhe={comparacaoVisivel ? `${brl(totaisComp.receita)} antes` : undefined}
             delta={deltaDe(totaisR.receita, totaisComp.receita)}
+            composicao={fatiasReceita}
           />
           <CardResumo
             titulo="Repasse ao prestador"

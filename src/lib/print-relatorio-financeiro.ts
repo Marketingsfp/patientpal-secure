@@ -34,6 +34,15 @@ export type RelatorioImpresso = {
   totais: string[];
   /** Linhas de resumo mostradas abaixo da tabela (ex.: receitas x despesas). */
   resumo?: { rotulo: string; valor: string }[];
+  /**
+   * Quebra da receita por forma de pagamento, impressa ao lado do resumo.
+   *
+   * Fica num bloco próprio, e não misturada às linhas do resumo, porque o
+   * resumo destaca a última linha como o total do documento — a composição
+   * emendada ali faria "Dinheiro" terminar a folha em negrito, como se fosse
+   * o fechamento.
+   */
+  composicao?: { titulo: string; itens: { rotulo: string; valor: string }[] };
 };
 
 const CSS_RELATORIO = `
@@ -69,12 +78,23 @@ const CSS_RELATORIO = `
     font-weight: 800; font-size: 9pt; padding-top: 7px; }
   tr { break-inside: avoid; page-break-inside: avoid; }
 
-  .resumo { margin-top: 14px; margin-left: auto; width: 90mm; }
+  .blocos { display: flex; justify-content: flex-end; align-items: flex-start;
+    gap: 12mm; margin-top: 14px; flex-wrap: wrap; }
+  .resumo { width: 90mm; }
   .resumo .linha { display: flex; justify-content: space-between; align-items: baseline;
     gap: 14px; font-size: 10.5pt; padding: 5px 0; border-bottom: 1px dotted #a1a1aa; }
   .resumo .linha:last-child { border-bottom: none; border-top: 1.5px solid #18181b;
     font-weight: 800; }
   .resumo .v { font-weight: 600; white-space: nowrap; }
+
+  .composicao { width: 80mm; }
+  .composicao .tit { font-size: 8.5pt; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .6px; color: #3f3f46; border-bottom: 1.5px solid #18181b;
+    padding-bottom: 4px; }
+  .composicao .linha { display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; font-size: 9.5pt; padding: 4px 0; border-bottom: 1px dotted #d4d4d8; }
+  .composicao .linha:last-child { border-bottom: none; }
+  .composicao .v { font-weight: 600; white-space: nowrap; }
 
   .vazio { text-align: center; font-size: 11pt; color: #52525b; padding: 20px 0; }
 
@@ -87,7 +107,7 @@ const CSS_RELATORIO = `
     html { background: #fff; }
     .folha { max-width: none; margin: 0; padding: 0; }
     .doc { border: none; border-radius: 0; padding: 0; }
-    .resumo { break-inside: avoid; page-break-inside: avoid; }
+    .blocos { break-inside: avoid; page-break-inside: avoid; }
   }`;
 
 const agora = () => {
@@ -126,6 +146,17 @@ export function montarRelatorioHtml(r: RelatorioImpresso): string {
         .join("")}</div>`
     : "";
 
+  const composicao = r.composicao?.itens.length
+    ? `<div class="composicao"><div class="tit">${esc(r.composicao.titulo)}</div>${r.composicao.itens
+        .map(
+          (l) =>
+            `<div class="linha"><span class="k">${esc(l.rotulo)}</span><span class="v">${esc(l.valor)}</span></div>`,
+        )
+        .join("")}</div>`
+    : "";
+
+  const blocos = resumo || composicao ? `<div class="blocos">${composicao}${resumo}</div>` : "";
+
   const corpoDoc = `
   <div class="folha">
     <div class="doc">
@@ -136,7 +167,7 @@ ${headerA4(r.clinicaNome, `Relatório do período ${r.periodo}`, { texto: "Relat
         <tbody>${corpo}</tbody>
         <tfoot>${rodapeTabela}</tfoot>
       </table>
-      ${resumo}
+      ${blocos}
       <div class="rodape">Emitido em ${esc(agora())} — ${esc(r.linhas.length.toLocaleString("pt-BR"))} registro(s)</div>
     </div>
   </div>`;

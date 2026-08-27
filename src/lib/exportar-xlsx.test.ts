@@ -71,3 +71,42 @@ describe("nomeDeAbaValido", () => {
     expect(nomeDeAbaValido("   ")).toBe("Relatório");
   });
 });
+
+describe("resumo abaixo da tabela", () => {
+  const comResumo: PlanilhaRelatorio = {
+    ...planilha,
+    resumo: {
+      titulo: "Composição por forma de pagamento",
+      itens: [
+        { rotulo: "Dinheiro", valor: 1500.5, tipo: "moeda" },
+        { rotulo: "PIX", valor: 900, tipo: "moeda" },
+      ],
+    },
+  };
+
+  it("separa da tabela com uma linha em branco e escreve o título", () => {
+    const { matriz, ultimaLinhaDaTabela } = montarMatrizRelatorio(comResumo);
+    expect(matriz[ultimaLinhaDaTabela]).toEqual(["TOTAL GERAL", 2400.5]);
+    expect(matriz[ultimaLinhaDaTabela + 1]).toEqual([]);
+    expect(matriz[ultimaLinhaDaTabela + 2]).toEqual(["Composição por forma de pagamento"]);
+  });
+
+  it("grava rótulo e valor em duas colunas, com o valor ainda numérico", () => {
+    const { matriz, linhasDoResumo } = montarMatrizRelatorio(comResumo);
+    expect(linhasDoResumo).toHaveLength(2);
+    expect(matriz[linhasDoResumo[0].linha]).toEqual(["Dinheiro", 1500.5]);
+    expect(typeof matriz[linhasDoResumo[1].linha][1]).toBe("number");
+    expect(linhasDoResumo[0].tipo).toBe("moeda");
+  });
+
+  it("a última linha da TABELA continua sendo os totais — o resumo fica fora dela", () => {
+    const { ultimaLinhaDaTabela, matriz } = montarMatrizRelatorio(comResumo);
+    expect(ultimaLinhaDaTabela).toBeLessThan(matriz.length - 1);
+  });
+
+  it("sem resumo nada muda: a matriz termina nos totais", () => {
+    const { matriz, ultimaLinhaDaTabela, linhasDoResumo } = montarMatrizRelatorio(planilha);
+    expect(linhasDoResumo).toEqual([]);
+    expect(ultimaLinhaDaTabela).toBe(matriz.length - 1);
+  });
+});

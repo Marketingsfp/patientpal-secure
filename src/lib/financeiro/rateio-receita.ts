@@ -43,6 +43,11 @@ import {
   resolverModalidade,
   type MapaConvenioPaciente,
 } from "@/lib/convenio/modalidade";
+import {
+  classificarForma,
+  partesDoPagamentoMisto,
+  type ParteMisto,
+} from "@/lib/financeiro/formas-pagamento";
 import { addDias, variacao } from "@/lib/financeiro/periodos";
 
 /** O PostgREST devolve no máximo 1.000 linhas por requisição. */
@@ -76,6 +81,15 @@ export interface RateioLinha {
    * por esta chave na tabela, no papel, no CSV e no Excel.
    */
   margem: number;
+  /**
+   * Como a receita desta linha se reparte entre as formas de pagamento.
+   *
+   * A soma das partes é SEMPRE igual a `receita`: é o que garante que o
+   * mini-detalhamento do card de Receita bruta feche com o total impresso logo
+   * acima dele. Pagamento misto entra decomposto (ver `repartirPorForma`); nos
+   * demais casos é uma parte só.
+   */
+  formas: ParteMisto[];
 }
 
 /** Uma linha do relatório sintético (um agrupador). */
@@ -327,6 +341,58 @@ function linhaDoServico(
   return undefined;
 }
 
+/**
+ * Reparte a receita de UM atendimento entre as formas de pagamento.
+ *
+ * Quase sempre é uma parte só — o paciente pagou tudo em dinheiro, em PIX, num
+ * cartão. O caso interessante é o pagamento misto, que no banco fica gravado
+ * como `forma_pagamento = "misto"` mais uma composição à parte; sem
+ * decompor, metade do movimento em cartão da clínica ficaria escondida numa
+ * linha "Misto" e a conferência com a maquininha não fecharia.
+ *
+ * Duas cautelas, ambas herdadas do Movimento de Caixa:
+ *
+ *  - se as partes não somam o valor pago (composição truncada, observação
+ *    escrita à mão pela metade), a decomposição é descartada e o atendimento
+ *    volta a contar como "Misto" inteiro. Espalhar um valor que não fecha é
+ *    pior do que admitir que não dá para separar;
+ *
+ *  - as partes são gravadas sobre o VALOR PAGO, e a receita do rateio pode ser
+ *    outra (valor de tabela do cartão consulta, por exemplo). Por isso as
+ *    partes entram como PROPORÇÃO da receita, e a última absorve o centavo do
+ *    arredondamento — assim a soma bate com `receita` até o último centavo.
+ */
+export function repartirPorForma(
+  receita: number,
+  valorPago: number,
+  forma: string | null | undefined,
+  observacoes?: string | null,
+  composicao?: unknown,
+): ParteMisto[] {
+  const total = round2(receita);
+  const partes = partesDoPagamentoMisto(forma, observacoes, composicao);
+  const soma = partes.reduce((s, p) => s + p.valor, 0);
+  if (partes.length === 0 || soma <= 0 || Math.abs(soma - valorPago) > 0.05) {
+    return [{ forma: classificarForma(forma), valor: total }];
+  }
+
+  // Partes da mesma forma são fundidas antes de ratear: "DINHEIRO R$ 20,00;
+  // DINHEIRO R$ 30,00" é uma linha de R$ 50,00, não duas.
+  const porForma = new Map<ParteMisto["forma"], number>();
+  for (const p of partes) porForma.set(p.forma, (porForma.get(p.forma) ?? 0) + p.valor);
+
+  const saida: ParteMisto[] = [];
+  let acumulado = 0;
+  const entradas = Array.from(porForma);
+  entradas.forEach(([f, valor], i) => {
+    const ultima = i === entradas.length - 1;
+    const fatia = ultima ? round2(total - acumulado) : round2((total * valor) / soma);
+    acumulado = round2(acumulado + fatia);
+    saida.push({ forma: f, valor: fatia });
+  });
+  return saida;
+}
+
 function reparte(
   ctx: RateioContexto,
   params: {
@@ -338,6 +404,12 @@ function reparte(
     valorPago: number;
     descricao?: string | null;
     modalidadeLancamento?: string | null;
+    /** Texto gravado em `forma_pagamento` (livre; ver `classificarForma`). */
+    formaPagamento?: string | null;
+    /** Retaguarda da decomposição de "misto" em lançamentos antigos. */
+    observacoes?: string | null;
+    /** `fin_lancamentos.composicao_pagamento` — fonte confiável do misto. */
+    composicaoPagamento?: unknown;
     /** Repasse digitado à mão na tela de Atendimentos, se houver. */
     override?: number | null;
     /** Repasse já gravado na linha (atendimentos manuais antigos). */
@@ -386,6 +458,13 @@ function reparte(
     terceiro: round2(terceiro),
     liquido,
     margem: margemClinica(receita, liquido),
+    formas: repartirPorForma(
+      receita,
+      params.valorPago,
+      params.formaPagamento ?? null,
+      params.observacoes ?? null,
+      params.composicaoPagamento,
+    ),
   };
 }
 
@@ -401,7 +480,7 @@ export async function carregarRateio(
       supabase
         .from("fin_atendimentos")
         .select(
-          "id, data, procedimento, valor_total, valor_medico, medico_id, paciente_id, lancamento_id",
+          "id, data, procedimento, valor_total, valor_medico, medico_id, paciente_id, lancamento_id, forma_pagamento, observacoes",
         )
         .eq("clinica_id", clinicaId)
         .gte("data", de)
@@ -412,7 +491,7 @@ export async function carregarRateio(
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, convenio_modalidade, medico_id, paciente_id, agendamento_id, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)",
+          "id, data, descricao, valor, valor_medico_override, convenio_modalidade, medico_id, paciente_id, agendamento_id, forma_pagamento, observacoes, composicao_pagamento, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)",
         )
         .eq("clinica_id", clinicaId)
         .eq("tipo", "receita")
@@ -452,6 +531,8 @@ export async function carregarRateio(
         pacienteId: (r.paciente_id as string) ?? null,
         procedimento: (r.procedimento as string) ?? null,
         valorPago: num(r.valor_total),
+        formaPagamento: (r.forma_pagamento as string) ?? null,
+        observacoes: (r.observacoes as string) ?? null,
         repasseGravado: num(r.valor_medico),
       }),
     );
@@ -479,6 +560,9 @@ export async function carregarRateio(
         valorPago: num(r.valor),
         descricao: (r.descricao as string) ?? null,
         modalidadeLancamento: (r.convenio_modalidade as string) ?? null,
+        formaPagamento: (r.forma_pagamento as string) ?? null,
+        observacoes: (r.observacoes as string) ?? null,
+        composicaoPagamento: r.composicao_pagamento,
         override,
       }),
     );

@@ -25,6 +25,7 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   terceiro: 0,
   liquido: 40,
   margem: 40,
+  formas: [{ forma: "dinheiro", valor: over.receita ?? 100 }],
   ...over,
 });
 

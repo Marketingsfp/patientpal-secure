@@ -65,3 +65,38 @@ describe("montarRelatorioHtml", () => {
     expect(montarRelatorioHtml(base)).toContain("size: A4 landscape");
   });
 });
+
+describe("composição por forma de pagamento", () => {
+  const comComposicao = {
+    ...base,
+    resumo: [{ rotulo: "Saldo do período", valor: "R$ 1.050,00" }],
+    composicao: {
+      titulo: "Composição da receita bruta",
+      itens: [
+        { rotulo: "Dinheiro", valor: "R$ 600,00" },
+        { rotulo: "PIX", valor: "R$ 450,00" },
+        { rotulo: "Cartão de Crédito", valor: "R$ 0,00" },
+      ],
+    },
+  };
+
+  it("imprime o título e uma linha por forma", () => {
+    const html = montarRelatorioHtml(comComposicao);
+    expect(html).toContain("Composição da receita bruta");
+    expect(html).toContain("Cartão de Crédito");
+    expect(html).toContain("R$ 450,00");
+  });
+
+  it("fica num bloco próprio, sem se misturar ao resumo", () => {
+    const html = montarRelatorioHtml(comComposicao);
+    const bloco = html.match(/<div class="composicao">(.*?)<\/div><div class="resumo">/s)?.[1];
+    expect(bloco).toBeTruthy();
+    expect(bloco).not.toContain("Saldo do período");
+  });
+
+  it("sem composição a folha continua saindo com o resumo sozinho", () => {
+    const html = montarRelatorioHtml({ ...base, resumo: comComposicao.resumo });
+    expect(html).toContain('<div class="resumo">');
+    expect(html).not.toContain('class="composicao"');
+  });
+});
