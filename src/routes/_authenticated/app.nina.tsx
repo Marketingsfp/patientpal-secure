@@ -280,81 +280,131 @@ function NinaPage() {
     }
   };
 
-  const carregar = useCallback(async () => {
-    if (!clinicaId) return;
-    setLoadingConv(true);
-    const { data, error } = await supabase
-      .from("whatsapp_mensagens")
-      .select(
-        "id, wa_message_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em",
-      )
-      .eq("clinica_id", clinicaId)
-      .order("recebida_em", { ascending: true })
-      .limit(1000);
-    setLoadingConv(false);
-    if (error) {
-      mostrarErro(error, "erro ao carregar conversas");
-      return;
-    }
-    const map = new Map<string, Conv>();
-    for (const row of data || []) {
-      const telefone = row.direction === "in" ? row.from_number || "" : row.to_number || "";
-      if (!telefone) continue;
-      const key = telefone.replace(/\D/g, "");
-      let conv = map.get(key);
-      if (!conv) {
-        conv = {
-          id: key,
-          nome: formatTelefone(telefone),
-          telefone: formatTelefone(telefone),
-          ultima: "",
-          quando: "",
-          naoLidas: 0,
-          msgs: [],
-        };
-        map.set(key, conv);
+  const carregar = useCallback(
+    async (silencioso = false) => {
+      if (!clinicaId) return;
+      if (!silencioso) setLoadingConv(true);
+      const { data, error } = await supabase
+        .from("whatsapp_mensagens")
+        .select(
+          "id, wa_message_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, recebida_em",
+        )
+        .eq("clinica_id", clinicaId)
+        .order("recebida_em", { ascending: true })
+        .limit(1000);
+      if (!silencioso) setLoadingConv(false);
+      if (error) {
+        if (!silencioso) mostrarErro(error, "erro ao carregar conversas");
+        return;
       }
-      const isIn = row.direction === "in";
-      conv.msgs.push({
-        from: isIn ? "paciente" : "nina",
-        text: row.body || `[${row.tipo}]`,
-        at: formatHora(row.recebida_em),
-        tipo: row.tipo === "audio" ? "audio" : "texto",
-      });
-      conv.ultima = row.body || `[${row.tipo}]`;
-      conv.quando = formatRelativo(row.recebida_em);
-    }
-    const lista = Array.from(map.values()).sort((a, b) => (a.quando === "agora" ? -1 : 1));
-    setConversas(lista);
-    setSel((prev) =>
-      prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null,
-    );
-  }, [clinicaId]);
+      const map = new Map<string, Conv>();
+      const ultimoIso = new Map<string, string>();
+      for (const row of data || []) {
+        const telefone = row.direction === "in" ? row.from_number || "" : row.to_number || "";
+        if (!telefone) continue;
+        const key = telefone.replace(/\D/g, "");
+        let conv = map.get(key);
+        if (!conv) {
+          conv = {
+            id: key,
+            nome: formatTelefone(telefone),
+            telefone: formatTelefone(telefone),
+            ultima: "",
+            quando: "",
+            naoLidas: 0,
+            msgs: [],
+          };
+          map.set(key, conv);
+        }
+        const isIn = row.direction === "in";
+        const transcrito = (row as any).transcricao as string | null;
+        const texto =
+          row.tipo === "audio"
+            ? transcrito
+              ? `🎤 ${transcrito}`
+              : row.body || "🎤 [áudio]"
+            : row.body || `[${row.tipo}]`;
+        conv.msgs.push({
+          from: isIn ? "paciente" : "nina",
+          text: texto,
+          at: formatHora(row.recebida_em),
+          tipo: row.tipo === "audio" ? "audio" : "texto",
+        });
+        conv.ultima = texto;
+        conv.quando = formatRelativo(row.recebida_em);
+        ultimoIso.set(key, row.recebida_em);
+      }
+      const lista = Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(ultimoIso.get(b.id) ?? 0).getTime() -
+          new Date(ultimoIso.get(a.id) ?? 0).getTime(),
+      );
+      setConversas(lista);
+      setSel((prev) =>
+        prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null,
+      );
+    },
+    [clinicaId],
+  );
 
   useEffect(() => {
     carregar();
   }, [carregar]);
 
-  // Realtime: novas mensagens chegam automaticamente
+  // Realtime: novas mensagens e conversas chegam sozinhas, com reconexão e
+  // polling leve de reserva para a recepção nunca ficar muda.
   useEffect(() => {
     if (!clinicaId) return;
-    const channel = supabase
-      .channel(`wa-msgs-${clinicaId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "whatsapp_mensagens",
-          filter: `clinica_id=eq.${clinicaId}`,
-        },
-        () => {
-          carregar();
-        },
-      )
-      .subscribe();
+    let ativo = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconectar: ReturnType<typeof setTimeout> | null = null;
+
+    const conectar = () => {
+      if (!ativo) return;
+      channel = supabase
+        .channel(`nina-inbox-${clinicaId}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "whatsapp_mensagens",
+            filter: `clinica_id=eq.${clinicaId}`,
+          },
+          () => carregar(true),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "atend_conversas",
+            filter: `clinica_id=eq.${clinicaId}`,
+          },
+          () => carregar(true),
+        )
+        .subscribe((status) => {
+          if (
+            ativo &&
+            (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED")
+          ) {
+            if (reconectar) clearTimeout(reconectar);
+            reconectar = setTimeout(() => {
+              if (!ativo) return;
+              if (channel) supabase.removeChannel(channel);
+              conectar();
+            }, 3000);
+          }
+        });
+    };
+    conectar();
+
+    const poll = setInterval(() => carregar(true), 20000);
     return () => {
-      supabase.removeChannel(channel);
+      ativo = false;
+      if (reconectar) clearTimeout(reconectar);
+      clearInterval(poll);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [clinicaId, carregar]);
 
@@ -1443,11 +1493,30 @@ function InboxWhatsapp({
     return conversas;
   }, [conversas, filtro]);
 
+  const [noFim, setNoFim] = useState(true);
+  const [novasMsgs, setNovasMsgs] = useState(false);
+
+  const irParaOFim = useCallback((suave = true) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: suave ? "smooth" : "auto" });
+    setNovasMsgs(false);
+    setNoFim(true);
+  }, []);
+
+  // Só puxa a rolagem se a atendente já estiver no fim da lista.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [sel?.id, sel?.msgs.length]);
+    if (noFim) irParaOFim(false);
+    else setNovasMsgs(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel?.msgs.length]);
+
+  // Troca de conversa: sempre começa no fim.
+  useEffect(() => {
+    setNovasMsgs(false);
+    setNoFim(true);
+    irParaOFim(false);
+  }, [sel?.id, irParaOFim]);
 
   const initials = (nome: string) =>
     nome
@@ -1597,8 +1666,27 @@ function InboxWhatsapp({
               </div>
             </header>
 
-            <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-1">
-              {renderMensagensAgrupadas(sel.msgs)}
+            <div className="relative flex-1 min-h-0">
+              <div
+                ref={scrollRef}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const fim = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+                  setNoFim(fim);
+                  if (fim) setNovasMsgs(false);
+                }}
+                className="absolute inset-0 overflow-auto p-4 space-y-1"
+              >
+                {renderMensagensAgrupadas(sel.msgs)}
+              </div>
+              {novasMsgs && (
+                <button
+                  onClick={() => irParaOFim(true)}
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1.5 rounded-full bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition-colors"
+                >
+                  novas mensagens ↓
+                </button>
+              )}
             </div>
 
             <div className="border-t border-border bg-card p-2.5 flex items-end gap-2">

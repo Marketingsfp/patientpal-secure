@@ -9162,6 +9162,7 @@ export type Database = {
           status: string | null
           tipo: string
           to_number: string | null
+          transcricao: string | null
           wa_message_id: string | null
         }
         Insert: {
@@ -9183,6 +9184,7 @@ export type Database = {
           status?: string | null
           tipo?: string
           to_number?: string | null
+          transcricao?: string | null
           wa_message_id?: string | null
         }
         Update: {
@@ -9204,6 +9206,7 @@ export type Database = {
           status?: string | null
           tipo?: string
           to_number?: string | null
+          transcricao?: string | null
           wa_message_id?: string | null
         }
         Relationships: [
