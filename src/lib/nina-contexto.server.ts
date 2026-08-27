@@ -212,8 +212,11 @@ export async function contextoClinicaTexto(
 }
 
 /** Instruções da Nina + base de dados da clínica. */
-export function systemPromptNina(contextoTexto: string, modoVoz?: boolean) {
+export function systemPromptNina(contextoTexto: string, modoVoz?: boolean, timeZone?: string) {
   const base = `Você é a Nina, assistente virtual interna da clínica, falando com a EQUIPE autenticada (gestão/recepção/médicos). Responda SEMPRE em português do Brasil, de forma curta, direta e amigável.
+
+${blocoDataHoraAgora(timeZone)}
+
 
 CONTEXTO DE USO:
 - Este canal é o painel interno do sistema. Quem pergunta é um colaborador autenticado da clínica.
