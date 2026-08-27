@@ -605,7 +605,7 @@ function NinaLigaDesliga() {
           <Bot className="h-4 w-4" /> Assistente Nina
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-medium">Nina ativa</div>
@@ -619,7 +619,9 @@ function NinaLigaDesliga() {
             onCheckedChange={(v) => void alternar(v)}
           />
         </div>
+        <NinaRespostaAudio />
       </CardContent>
+
     </Card>
   );
 }
