@@ -1272,6 +1272,27 @@ function ConfiguracaoWhatsApp() {
                 </Button>
               </div>
             </div>
+
+            <div className="space-y-1">
+              <Label>App Secret (opcional)</Label>
+              <Input
+                type="password"
+                value={form.app_secret}
+                onChange={(e) => setForm({ ...form, app_secret: e.target.value })}
+                placeholder={
+                  cfg.has_app_secret
+                    ? "•••••••• (preenchido — deixe em branco para manter)"
+                    : "App Secret do app da Meta usado no webhook"
+                }
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use o App Secret do <strong>mesmo app</strong> que está configurado no webhook. Se
+                for de outro app, a assinatura não confere — as mensagens continuam sendo salvas,
+                mas ficam marcadas como “assinatura não verificada”.
+              </p>
+            </div>
+
             {(cfg.phone_number_id || cfg.has_access_token) && (
               <div className="rounded-md border p-3 flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex flex-col gap-0.5">
