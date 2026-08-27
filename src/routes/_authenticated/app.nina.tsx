@@ -1060,6 +1060,7 @@ function ConfiguracaoWhatsApp() {
                 <div className="flex flex-col items-end gap-0.5">
                   {metaStatusBadge}
                   {statusDetalhe}
+                  {linhaInscricao}
                 </div>
                 {botaoRegistrar}
                 <Button
@@ -1267,6 +1268,7 @@ function ConfiguracaoWhatsApp() {
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs font-medium">Status na Cloud API</span>
                   {statusDetalhe}
+                  {linhaInscricao}
                 </div>
                 <div className="flex items-center gap-2">
                   {metaStatusBadge}
