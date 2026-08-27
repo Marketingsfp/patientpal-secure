@@ -747,7 +747,10 @@ export async function gerarRespostaNina(
     .filter((m: any) => m.content);
 
   // Nome curto para a apresentação (o cadastro costuma trazer a unidade após um travessão).
-  const nomeCurtoUnidade = String(nomeUnidade).split(/\s+[—–-]\s+/)[0]?.trim() || nomeUnidade;
+  const nomeCurtoUnidade =
+    String(nomeUnidade)
+      .split(/\s+[—–-]\s+/)[0]
+      ?.trim() || nomeUnidade;
   const jaSeApresentou = ((histR as any)?.data ?? []).some((m: any) => m.direction === "out");
   const dadosPublicos = [
     `Nome oficial: ${nomeUnidade}`,
