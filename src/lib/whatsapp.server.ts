@@ -1,4 +1,12 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { agoraNaClinica, blocoDataHoraAgora, somarDiasIso } from "@/lib/nina-agora";
+import {
+  detectarEspecialidades,
+  detectarProcedimentos,
+  normalizar,
+  pareceCitarEspecialidade,
+} from "@/lib/nina-especialidade";
+
 
 const META_VERSION = "v22.0";
 
