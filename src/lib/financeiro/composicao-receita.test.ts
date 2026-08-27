@@ -4,6 +4,8 @@ import {
   tipoDoProcedimento,
   totaisPorForma,
   totaisPorGrupo,
+  barraDeFormas,
+  resumoSintetico,
   GRUPOS_RECEITA,
   type GrupoReceita,
 } from "./composicao-receita";
@@ -188,5 +190,103 @@ describe("totaisPorForma", () => {
 
   it("lista vazia devolve zeros", () => {
     expect(totaisPorForma([])).toEqual({ formas: [], qtd: 0, total: 0 });
+  });
+});
+
+describe("barraDeFormas", () => {
+  it("devolve sempre as três colunas, na ordem Dinheiro, PIX, Cartão", () => {
+    const b = barraDeFormas([]);
+    expect(b.map((c) => c.chave)).toEqual(["dinheiro", "pix", "cartao"]);
+    expect(b.every((c) => c.total === 0 && c.qtd === 0)).toBe(true);
+  });
+
+  it("soma débito, crédito e cartão legado numa coluna só", () => {
+    const b = barraDeFormas([
+      { forma: "debito", label: "Cartão de Débito", qtd: 2, total: 100 },
+      { forma: "credito", label: "Cartão de Crédito", qtd: 3, total: 250.5 },
+      { forma: "legado_cartao", label: "Parcelas do sistema antigo", qtd: 1, total: 49.5 },
+      { forma: "dinheiro", label: "Dinheiro", qtd: 4, total: 80 },
+    ]);
+    const cartao = b.find((c) => c.chave === "cartao")!;
+    expect(cartao.qtd).toBe(6);
+    expect(cartao.total).toBe(400);
+    expect(b.find((c) => c.chave === "dinheiro")!.total).toBe(80);
+    expect(b.find((c) => c.chave === "pix")!.total).toBe(0);
+  });
+
+  it("cada coluna aponta para a opção certa do filtro de forma", () => {
+    expect(barraDeFormas([]).map((c) => c.filtro)).toEqual(["dinheiro", "pix", "cartao"]);
+  });
+
+  it("convênio e transferência não entram em nenhuma das três colunas", () => {
+    const b = barraDeFormas([
+      { forma: "convenio", label: "Convênio / Gratuidade", qtd: 5, total: 500 },
+      { forma: "transferencia", label: "Transferência / Depósito", qtd: 1, total: 90 },
+    ]);
+    expect(b.reduce((s, c) => s + c.total, 0)).toBe(0);
+  });
+});
+
+describe("resumoSintetico", () => {
+  it("agrupa por categoria com entradas, saídas e saldo", () => {
+    const r = resumoSintetico([
+      { categoria: "PARTICULAR", tipo: "receita", valor: 130 },
+      { categoria: "PARTICULAR", tipo: "receita", valor: "70.50" },
+      { categoria: "SALARIOS", tipo: "despesa", valor: 500 },
+    ]);
+    expect(r.linhas[0]).toEqual({
+      label: "SALARIOS",
+      qtd: 1,
+      entradas: 0,
+      saidas: 500,
+      saldo: -500,
+    });
+    expect(r.linhas[1]).toEqual({
+      label: "PARTICULAR",
+      qtd: 2,
+      entradas: 200.5,
+      saidas: 0,
+      saldo: 200.5,
+    });
+    expect(r.total).toEqual({ qtd: 3, entradas: 200.5, saidas: 500, saldo: -299.5 });
+  });
+
+  it("transferência entra pelo sentido: suprimento soma, sangria subtrai", () => {
+    const r = resumoSintetico([
+      { categoria: "Transferências", tipo: "transferencia", sentido: "entrada", valor: 300 },
+      { categoria: "Transferências", tipo: "transferencia", sentido: "saida", valor: 100 },
+    ]);
+    expect(r.linhas[0]).toEqual({
+      label: "Transferências",
+      qtd: 2,
+      entradas: 300,
+      saidas: 100,
+      saldo: 200,
+    });
+  });
+
+  it("linha sem categoria recebe rótulo próprio em vez de sumir", () => {
+    const r = resumoSintetico([{ categoria: "", tipo: "receita", valor: 10 }]);
+    expect(r.linhas[0].label).toBe("(sem categoria)");
+  });
+
+  it("o total sintético fecha com a soma das linhas", () => {
+    const r = resumoSintetico([
+      { categoria: "A", tipo: "receita", valor: 10.1 },
+      { categoria: "B", tipo: "receita", valor: 20.2 },
+      { categoria: "C", tipo: "despesa", valor: 5.05 },
+    ]);
+    const somaEnt = r.linhas.reduce((s, l) => s + l.entradas, 0);
+    const somaSai = r.linhas.reduce((s, l) => s + l.saidas, 0);
+    expect(Number(somaEnt.toFixed(2))).toBe(r.total.entradas);
+    expect(Number(somaSai.toFixed(2))).toBe(r.total.saidas);
+    expect(r.total.saldo).toBe(25.25);
+  });
+
+  it("lista vazia devolve zeros", () => {
+    expect(resumoSintetico([])).toEqual({
+      linhas: [],
+      total: { qtd: 0, entradas: 0, saidas: 0, saldo: 0 },
+    });
   });
 });

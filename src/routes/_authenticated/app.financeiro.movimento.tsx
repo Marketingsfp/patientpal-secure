@@ -52,7 +52,10 @@ import {
   GRUPOS_RECEITA,
   LABEL_GRUPO,
   AJUDA_GRUPO,
+  LEGENDA_GRUPO,
   FILTRO_DA_FORMA,
+  barraDeFormas,
+  resumoSintetico,
   type GrupoReceita,
 } from "@/lib/financeiro/composicao-receita";
 import { Button } from "@/components/ui/button";
@@ -264,35 +267,118 @@ function linhasVisiveis(items: Lanc[], filtro: FiltroForma, decompor: boolean): 
  * clicável, para funcionar no teclado e ser anunciado como controle — a
  * recepção usa esta tela o dia inteiro.
  */
+/**
+ * Cores dos cards de mensalidade, na convenção que a diretoria já lê nos
+ * relatórios: verde é o que está em dia, âmbar é atraso, azul é adiantamento.
+ * A cor nunca é a única informação — o rótulo e a legenda dizem o mesmo, para
+ * quem não distingue as cores.
+ */
+const TOM_CARD = {
+  neutro: {
+    base: "border-border",
+    ativo: "border-primary bg-primary/5 ring-1 ring-primary",
+    valor: "",
+  },
+  verde: {
+    base: "border-emerald-300 bg-emerald-50/60",
+    ativo: "border-emerald-500 bg-emerald-100 ring-1 ring-emerald-500",
+    valor: "text-emerald-700",
+  },
+  ambar: {
+    base: "border-amber-300 bg-amber-50/60",
+    ativo: "border-amber-500 bg-amber-100 ring-1 ring-amber-500",
+    valor: "text-amber-700",
+  },
+  azul: {
+    base: "border-sky-300 bg-sky-50/60",
+    ativo: "border-sky-500 bg-sky-100 ring-1 ring-sky-500",
+    valor: "text-sky-700",
+  },
+} as const;
+
+/**
+ * Um card da composição da receita. É um `button` de verdade, e não uma div
+ * clicável, para funcionar no teclado e ser anunciado como controle — a
+ * recepção usa esta tela o dia inteiro.
+ */
 function CardGrupo({
   grupo,
   total,
   qtd,
   ativo,
   onClick,
+  tom = "neutro",
+  comLegenda = false,
 }: {
   grupo: GrupoReceita;
   total: number;
   qtd: number;
   ativo: boolean;
   onClick: () => void;
+  tom?: keyof typeof TOM_CARD;
+  comLegenda?: boolean;
 }) {
+  const cores = TOM_CARD[tom];
   return (
     <button
       type="button"
       onClick={onClick}
       title={AJUDA_GRUPO[grupo]}
       aria-pressed={ativo}
-      className={`text-left rounded-md border px-3 py-2 transition hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        ativo ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"
+      className={`text-left rounded-md border px-3 py-2 transition hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        ativo ? cores.ativo : cores.base
       }`}
     >
-      <p className="text-[11px] text-muted-foreground truncate">{LABEL_GRUPO[grupo]}</p>
-      <p className="text-base font-semibold tabular-nums">{fmt(total)}</p>
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+        {LABEL_GRUPO[grupo]}
+      </p>
+      <p className={`text-lg font-semibold tabular-nums ${cores.valor}`}>{fmt(total)}</p>
       <p className="text-[10px] text-muted-foreground">
-        {qtd} {qtd === 1 ? "lançamento" : "lançamentos"}
+        {qtd} {qtd === 1 ? "pagamento" : "pagamentos"}
+        {comLegenda ? ` · ${LEGENDA_GRUPO[grupo]}` : ""}
       </p>
     </button>
+  );
+}
+
+/**
+ * Grupo de botões em pílula, no lugar de um `select`, para as escolhas que a
+ * recepção troca o tempo todo: com as opções à vista o modo atual se lê sem
+ * abrir nada.
+ */
+function Pilulas<T extends string>({
+  valor,
+  opcoes,
+  onChange,
+  ariaLabel,
+}: {
+  valor: T;
+  opcoes: Array<{ valor: T; label: string }>;
+  onChange: (v: T) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex rounded-md border bg-muted/40 p-0.5"
+    >
+      {opcoes.map((o) => (
+        <button
+          key={o.valor}
+          type="button"
+          aria-pressed={valor === o.valor}
+          onClick={() => onChange(o.valor)}
+          className={`px-3 py-1.5 text-xs rounded transition ${
+            valor === o.valor
+              ? "bg-background shadow-sm font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -385,6 +471,10 @@ function Page() {
   const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
   /** Card da composição em que o usuário clicou; null = mostrando tudo. */
   const [filtroGrupo, setFiltroGrupo] = useState<GrupoReceita | null>(null);
+  /** "analitico" = uma linha por lançamento; "sintetico" = uma por categoria. */
+  const [modoLista, setModoLista] = useState<"analitico" | "sintetico">("analitico");
+  /** Os filtros finos ficam recolhidos: a barra do dia a dia é data + tipo. */
+  const [maisFiltros, setMaisFiltros] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
@@ -1474,6 +1564,10 @@ function Page() {
       composicao.mensalidade_antecipada.total
     ).toFixed(2),
   );
+  const qtdMensalidades =
+    composicao.mensalidade_periodo.qtd +
+    composicao.mensalidade_atrasada.qtd +
+    composicao.mensalidade_antecipada.qtd;
   const displayItems = filtroGrupo
     ? itensVisiveis.filter((l) => l.tipo === "receita" && grupoDaLinha(l) === filtroGrupo)
     : itensVisiveis;
@@ -1676,6 +1770,58 @@ function Page() {
     w.document.close();
   };
 
+  /**
+   * Exportação da planilha. Vive como função nomeada porque o botão saiu do
+   * cabeçalho e foi para a barra de controles, junto de Imprimir: a diretoria
+   * pediu as duas ações ao lado dos filtros, e não soltas no topo.
+   */
+  const exportarExcel = () => {
+    if (!displayItems.length) {
+      toast.info("Sem dados para exportar.");
+      return;
+    }
+    const catMap = new Map(cats.map((c) => [c.id, c.nome]));
+    const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
+    const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
+    exportToExcel(
+      displayItems.map((l) => ({
+        data: l.data
+          ? l.data.slice(8, 10) + "/" + l.data.slice(5, 7) + "/" + l.data.slice(0, 4)
+          : "",
+        hora: l.hora ?? "",
+        tipo: l.tipo,
+        descricao: l.descricao,
+        medico: l.medico_nome ?? "",
+        ficha: typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "",
+        categoria: l.categoria_id ? (catMap.get(l.categoria_id) ?? "") : "",
+        conta: l.conta_id ? (contaMap.get(l.conta_id) ?? "") : "",
+        forma_pagamento: LABEL_FORMA[baldeDaLinha(l)],
+        forma_registrada: l.forma_pagamento ?? "",
+        status: l.status,
+        usuario: l.criado_por ? (userMap.get(l.criado_por) ?? "") : "",
+        valor: Number(l.valor).toFixed(2),
+        retroativo: l._retroativo ? "Sim" : "",
+      })),
+      `movimento-${fromDate}_a_${toDate}`,
+      [
+        { key: "data", label: "Data" },
+        { key: "hora", label: "Hora" },
+        { key: "tipo", label: "Tipo" },
+        { key: "descricao", label: "Descrição" },
+        { key: "medico", label: "Médico" },
+        { key: "ficha", label: "Ficha" },
+        { key: "categoria", label: "Categoria" },
+        { key: "conta", label: "Conta" },
+        { key: "forma_pagamento", label: "Forma pagamento" },
+        { key: "forma_registrada", label: "Registrado como" },
+        { key: "status", label: "Status" },
+        { key: "usuario", label: "Usuário" },
+        { key: "valor", label: "Valor (R$)" },
+        { key: "retroativo", label: "Retroativo" },
+      ],
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1684,65 +1830,6 @@ function Page() {
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={imprimirRelatorio} disabled={!displayItems.length}>
-            <Printer className="h-4 w-4 mr-2" />
-            Relatório
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!displayItems.length) {
-                toast.info("Sem dados para exportar.");
-                return;
-              }
-              const catMap = new Map(cats.map((c) => [c.id, c.nome]));
-              const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
-              const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
-              exportToExcel(
-                displayItems.map((l) => ({
-                  data: l.data
-                    ? l.data.slice(8, 10) + "/" + l.data.slice(5, 7) + "/" + l.data.slice(0, 4)
-                    : "",
-                  hora: l.hora ?? "",
-                  tipo: l.tipo,
-                  descricao: l.descricao,
-                  medico: l.medico_nome ?? "",
-                  ficha:
-                    typeof l.ficha_numero === "number"
-                      ? String(l.ficha_numero).padStart(3, "0")
-                      : "",
-                  categoria: l.categoria_id ? (catMap.get(l.categoria_id) ?? "") : "",
-                  conta: l.conta_id ? (contaMap.get(l.conta_id) ?? "") : "",
-                  forma_pagamento: LABEL_FORMA[baldeDaLinha(l)],
-                  forma_registrada: l.forma_pagamento ?? "",
-                  status: l.status,
-                  usuario: l.criado_por ? (userMap.get(l.criado_por) ?? "") : "",
-                  valor: Number(l.valor).toFixed(2),
-                  retroativo: l._retroativo ? "Sim" : "",
-                })),
-                `movimento-${fromDate}_a_${toDate}`,
-                [
-                  { key: "data", label: "Data" },
-                  { key: "hora", label: "Hora" },
-                  { key: "tipo", label: "Tipo" },
-                  { key: "descricao", label: "Descrição" },
-                  { key: "medico", label: "Médico" },
-                  { key: "ficha", label: "Ficha" },
-                  { key: "categoria", label: "Categoria" },
-                  { key: "conta", label: "Conta" },
-                  { key: "forma_pagamento", label: "Forma pagamento" },
-                  { key: "forma_registrada", label: "Registrado como" },
-                  { key: "status", label: "Status" },
-                  { key: "usuario", label: "Usuário" },
-                  { key: "valor", label: "Valor (R$)" },
-                  { key: "retroativo", label: "Retroativo" },
-                ],
-              );
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar Excel
-          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             {podeEscrever && (
               <DialogTrigger asChild>
@@ -2098,31 +2185,52 @@ function Page() {
         </Card>
       </div>
 
-      {/* Composição da receita: Particular × Mensalidades do Cartão
-          Benefícios. Só aparece quando há receita no recorte — num período só
-          de despesas o bloco seria uma fileira de zeros — e depois que o
-          cadastro de procedimentos chegou: sem ele toda linha cairia em
-          "Outros" por um instante, e os cards piscariam errado. */}
+      {/* Composição da receita, na hierarquia pedida pela diretoria: formas de
+          pagamento e Particular na primeira faixa, mensalidades logo abaixo.
+          Só aparece quando há receita no recorte — num período só de despesas
+          seria uma fileira de zeros — e depois que o cadastro de procedimentos
+          chegou: sem ele toda linha cairia em "Outros" por um instante, e os
+          cards piscariam errado. */}
       {receitasVisiveis.length > 0 && procTipos.size > 0 && (
-        <Card>
-          <CardContent className="pt-5 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="text-sm font-medium">Composição das receitas</p>
-                <p className="text-xs text-muted-foreground">
-                  Clique num card para filtrar a lista abaixo.
+        <div className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Card>
+              <CardContent className="pt-5 space-y-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Total recebido por forma de pagamento
                 </p>
-              </div>
-              {filtroGrupo && (
-                <Button variant="outline" size="sm" onClick={() => setFiltroGrupo(null)}>
-                  <X className="h-3.5 w-3.5 mr-1" />
-                  Limpar filtro · {LABEL_GRUPO[filtroGrupo]}
-                </Button>
-              )}
-            </div>
+                {/* Três colunas fixas. Débito e crédito aparecem somados em
+                    "Cartão"; a separação exata continua no popover do card de
+                    Receitas, que é onde ela serve para conferir. */}
+                <div className="grid grid-cols-3 gap-2">
+                  {barraDeFormas(formasRecebidas.formas).map((c) => (
+                    <button
+                      key={c.chave}
+                      type="button"
+                      onClick={() => setFilterForma(filterForma === c.filtro ? "todos" : c.filtro)}
+                      aria-pressed={filterForma === c.filtro}
+                      title={`Filtrar a lista por ${c.label}`}
+                      className={`text-left rounded-md border px-3 py-2 transition hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        filterForma === c.filtro
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border"
+                      }`}
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {c.label}
+                      </p>
+                      <p className="text-lg font-semibold tabular-nums">{fmt(c.total)}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {c.qtd} {c.qtd === 1 ? "transação" : "transações"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="rounded-lg border p-3 space-y-2">
+            <Card>
+              <CardContent className="pt-5 space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     Particular
@@ -2141,42 +2249,80 @@ function Page() {
                     />
                   ))}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              <div className="rounded-lg border p-3 space-y-2">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Mensalidades (Cartão Benefícios)
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
+                  <p className="text-xs text-muted-foreground">
+                    Quanto entrou no caixa × a qual mês cada pagamento se refere
                   </p>
-                  <p className="text-sm font-semibold tabular-nums">{fmt(totalMensalidades)}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      "mensalidade_periodo",
-                      "mensalidade_atrasada",
-                      "mensalidade_antecipada",
-                    ] as GrupoReceita[]
-                  ).map((g) => (
-                    <CardGrupo
-                      key={g}
-                      grupo={g}
-                      total={composicao[g].total}
-                      qtd={composicao[g].qtd}
-                      ativo={filtroGrupo === g}
-                      onClick={() => setFiltroGrupo(filtroGrupo === g ? null : g)}
-                    />
-                  ))}
+                <div className="text-right">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Total recebido
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">{fmt(totalMensalidades)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {qtdMensalidades} {qtdMensalidades === 1 ? "pagamento" : "pagamentos"}
+                  </p>
                 </div>
               </div>
-            </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <CardGrupo
+                  grupo="mensalidade_periodo"
+                  tom="verde"
+                  comLegenda
+                  total={composicao.mensalidade_periodo.total}
+                  qtd={composicao.mensalidade_periodo.qtd}
+                  ativo={filtroGrupo === "mensalidade_periodo"}
+                  onClick={() =>
+                    setFiltroGrupo(
+                      filtroGrupo === "mensalidade_periodo" ? null : "mensalidade_periodo",
+                    )
+                  }
+                />
+                <CardGrupo
+                  grupo="mensalidade_atrasada"
+                  tom="ambar"
+                  comLegenda
+                  total={composicao.mensalidade_atrasada.total}
+                  qtd={composicao.mensalidade_atrasada.qtd}
+                  ativo={filtroGrupo === "mensalidade_atrasada"}
+                  onClick={() =>
+                    setFiltroGrupo(
+                      filtroGrupo === "mensalidade_atrasada" ? null : "mensalidade_atrasada",
+                    )
+                  }
+                />
+                <CardGrupo
+                  grupo="mensalidade_antecipada"
+                  tom="azul"
+                  comLegenda
+                  total={composicao.mensalidade_antecipada.total}
+                  qtd={composicao.mensalidade_antecipada.qtd}
+                  ativo={filtroGrupo === "mensalidade_antecipada"}
+                  onClick={() =>
+                    setFiltroGrupo(
+                      filtroGrupo === "mensalidade_antecipada" ? null : "mensalidade_antecipada",
+                    )
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* "Outros" existe para os cards fecharem com o total de Receitas.
-                Sem ele o que não é atendimento nem mensalidade — taxa de
-                adesão, lançamento manual, acerto — sumiria da conta e os
-                números pareceriam errados. */}
-            {composicao.outros.qtd > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* "Outros" existe para os cards fecharem com o total de Receitas.
+              Sem ele o que não é atendimento nem mensalidade — taxa de adesão,
+              lançamento manual, acerto — sumiria da conta e os números
+              pareceriam errados. */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {composicao.outros.qtd > 0 && (
                 <CardGrupo
                   grupo="outros"
                   total={composicao.outros.total}
@@ -2184,9 +2330,14 @@ function Page() {
                   ativo={filtroGrupo === "outros"}
                   onClick={() => setFiltroGrupo(filtroGrupo === "outros" ? null : "outros")}
                 />
-              </div>
-            )}
-
+              )}
+              {filtroGrupo && (
+                <Button variant="outline" size="sm" onClick={() => setFiltroGrupo(null)}>
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Limpar filtro · {LABEL_GRUPO[filtroGrupo]}
+                </Button>
+              )}
+            </div>
             <p className="text-[11px] text-muted-foreground">
               Soma dos cards:{" "}
               <span className="tabular-nums font-medium">
@@ -2194,8 +2345,8 @@ function Page() {
               </span>{" "}
               — o mesmo total de receitas do período.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* O que não é dinheiro da gaveta deste dia. O aviso é obrigatório
@@ -2299,149 +2450,202 @@ function Page() {
       </Dialog>
 
       <Card>
-        <CardContent className="pt-6 flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">De</Label>
-            <DateInputBR
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-40"
-            />
+        <CardContent className="pt-6 space-y-3">
+          {/* Barra do dia a dia: período, visão, tipo e as duas saídas em
+              papel. Tudo o mais fica atrás de "Mais filtros" — a recepção usa
+              data e tipo o tempo todo, e o resto é exceção. Nenhum filtro foi
+              removido, só recolhido. */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">De</Label>
+              <DateInputBR
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Até</Label>
+              <DateInputBR
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Visão</Label>
+              <div>
+                <Pilulas
+                  ariaLabel="Visão da listagem"
+                  valor={modoLista}
+                  onChange={setModoLista}
+                  opcoes={[
+                    { valor: "analitico", label: "Analítico" },
+                    { valor: "sintetico", label: "Sintético" },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tipo</Label>
+              <div>
+                {/* "Transferências" continua aqui: a diretoria pediu três
+                    pílulas, mas tirar a quarta apagaria a única forma de ver
+                    sangrias e suprimentos nesta tela. */}
+                <Pilulas
+                  ariaLabel="Tipo de lançamento"
+                  valor={filterTipo}
+                  onChange={setFilterTipo}
+                  opcoes={[
+                    { valor: "todos", label: "Todos" },
+                    { valor: "receita", label: "Entradas" },
+                    { valor: "despesa", label: "Saídas" },
+                    { valor: "transferencia", label: "Transferências" },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="ml-auto flex items-center gap-2 pb-0.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={imprimirRelatorio}
+                disabled={!displayItems.length}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportarExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-expanded={maisFiltros}
+                onClick={() => setMaisFiltros((v) => !v)}
+              >
+                {maisFiltros ? "Menos filtros" : "Mais filtros"}
+              </Button>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Até</Label>
-            <DateInputBR
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-40"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Tipo</Label>
-            <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v as typeof filterTipo)}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="receita">Receitas</SelectItem>
-                <SelectItem value="despesa">Despesas</SelectItem>
-                <SelectItem value="transferencia">Transferências entre caixas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Status</Label>
-            <Select
-              value={filterStatus}
-              onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="confirmado">Apenas confirmados</SelectItem>
-                <SelectItem value="pendente">Apenas pendentes</SelectItem>
-                <SelectItem value="todos">Confirmados + pendentes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Usuário</Label>
-            <Select value={filterUsuario} onValueChange={setFilterUsuario}>
-              <SelectTrigger className="w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os usuários</SelectItem>
-                <SelectItem value="sem">Sem usuário</SelectItem>
-                {usuarios.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Forma de pagamento</Label>
-            <Select value={filterForma} onValueChange={setFilterForma}>
-              <SelectTrigger className="w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas as formas</SelectItem>
-                <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                <SelectItem value="pix">Pix</SelectItem>
-                <SelectItem value="debito">Cartão débito</SelectItem>
-                <SelectItem value="credito">Cartão crédito</SelectItem>
-                <SelectItem value="cartao">Cartão (qualquer)</SelectItem>
-                <SelectItem value="legado">Parcelas do sistema antigo</SelectItem>
-                <SelectItem value="pago_anterior">Pago no sistema anterior</SelectItem>
-                <SelectItem value="boleto">Boleto / Transferência</SelectItem>
-                <SelectItem value="sem">Sem informação</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1 flex-1 min-w-[220px]">
-            <Label className="text-xs">Paciente / descrição</Label>
-            <Input
-              type="search"
-              value={filterPaciente}
-              onChange={(e) => setFilterPaciente(e.target.value)}
-              placeholder="Buscar por nome do paciente..."
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Valor (R$)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              className="w-32"
-              value={filterValor}
-              onChange={(e) => setFilterValor(e.target.value)}
-              placeholder="Ex.: 36,00"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Ficha (referência)</Label>
-            <Input
-              type="number"
-              min={0}
-              className="w-32"
-              value={filterFicha}
-              onChange={(e) => setFilterFicha(e.target.value)}
-              placeholder="Nº da ficha"
-            />
-          </div>
-          <div className="flex items-center gap-2 pb-1 ml-auto">
-            <Switch
-              id="decompor-misto"
-              checked={decomporMisto}
-              onCheckedChange={setDecomporMisto}
-            />
-            <Label
-              htmlFor="decompor-misto"
-              className="text-xs cursor-pointer"
-              title="Quando ligado, cada pagamento 'misto' aparece como várias linhas (uma por forma real: dinheiro, cartão, pix…). A soma dos valores é preservada."
-            >
-              Decompor pagamentos mistos
-            </Label>
-          </div>
-          <div className="flex items-center gap-2 pb-1">
-            <Switch
-              id="ocultar-retroativos"
-              checked={ocultarRetroativos}
-              onCheckedChange={setOcultarRetroativos}
-            />
-            <Label
-              htmlFor="ocultar-retroativos"
-              className="text-xs cursor-pointer"
-              title="Ligado (padrão): o Movimento mostra só o que passou pela gaveta da recepção na data, para bater com o cupom impresso. Desligado: entram também os lançamentos com competência de outro dia (guia antiga faturada depois, parcela recebida em outra data), marcados como retroativos."
-            >
-              Ocultar lançamentos retroativos
-            </Label>
+
+          <div
+            className={`flex-wrap items-end gap-3 border-t pt-3 ${maisFiltros ? "flex" : "hidden"}`}
+          >
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
+              <Select
+                value={filterStatus}
+                onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="confirmado">Apenas confirmados</SelectItem>
+                  <SelectItem value="pendente">Apenas pendentes</SelectItem>
+                  <SelectItem value="todos">Confirmados + pendentes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Usuário</Label>
+              <Select value={filterUsuario} onValueChange={setFilterUsuario}>
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os usuários</SelectItem>
+                  <SelectItem value="sem">Sem usuário</SelectItem>
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Forma de pagamento</Label>
+              <Select value={filterForma} onValueChange={setFilterForma}>
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas as formas</SelectItem>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="pix">Pix</SelectItem>
+                  <SelectItem value="debito">Cartão débito</SelectItem>
+                  <SelectItem value="credito">Cartão crédito</SelectItem>
+                  <SelectItem value="cartao">Cartão (qualquer)</SelectItem>
+                  <SelectItem value="legado">Parcelas do sistema antigo</SelectItem>
+                  <SelectItem value="pago_anterior">Pago no sistema anterior</SelectItem>
+                  <SelectItem value="boleto">Boleto / Transferência</SelectItem>
+                  <SelectItem value="sem">Sem informação</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 flex-1 min-w-[220px]">
+              <Label className="text-xs">Paciente / descrição</Label>
+              <Input
+                type="search"
+                value={filterPaciente}
+                onChange={(e) => setFilterPaciente(e.target.value)}
+                placeholder="Buscar por nome do paciente..."
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                className="w-32"
+                value={filterValor}
+                onChange={(e) => setFilterValor(e.target.value)}
+                placeholder="Ex.: 36,00"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Ficha (referência)</Label>
+              <Input
+                type="number"
+                min={0}
+                className="w-32"
+                value={filterFicha}
+                onChange={(e) => setFilterFicha(e.target.value)}
+                placeholder="Nº da ficha"
+              />
+            </div>
+            <div className="flex items-center gap-2 pb-1 ml-auto">
+              <Switch
+                id="decompor-misto"
+                checked={decomporMisto}
+                onCheckedChange={setDecomporMisto}
+              />
+              <Label
+                htmlFor="decompor-misto"
+                className="text-xs cursor-pointer"
+                title="Quando ligado, cada pagamento 'misto' aparece como várias linhas (uma por forma real: dinheiro, cartão, pix…). A soma dos valores é preservada."
+              >
+                Decompor pagamentos mistos
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 pb-1">
+              <Switch
+                id="ocultar-retroativos"
+                checked={ocultarRetroativos}
+                onCheckedChange={setOcultarRetroativos}
+              />
+              <Label
+                htmlFor="ocultar-retroativos"
+                className="text-xs cursor-pointer"
+                title="Ligado (padrão): o Movimento mostra só o que passou pela gaveta da recepção na data, para bater com o cupom impresso. Desligado: entram também os lançamentos com competência de outro dia (guia antiga faturada depois, parcela recebida em outra data), marcados como retroativos."
+              >
+                Ocultar lançamentos retroativos
+              </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -2454,6 +2658,90 @@ function Page() {
             <div className="py-12 text-center text-muted-foreground">
               Nenhum lançamento no período.
             </div>
+          ) : modoLista === "sintetico" ? (
+            /* Uma linha por categoria, a mesma quebra do relatório impresso.
+               Lê as MESMAS linhas da visão analítica, então os dois totais não
+               têm como divergir. */
+            (() => {
+              const catMap = new Map(cats.map((c) => [c.id, c.nome]));
+              const resumo2 = resumoSintetico(
+                displayItems.map((l) => ({
+                  categoria:
+                    l.tipo === "transferencia"
+                      ? "Transferências entre caixas"
+                      : l.categoria_id
+                        ? (catMap.get(l.categoria_id) ?? "(sem categoria)")
+                        : "(sem categoria)",
+                  tipo: l.tipo,
+                  sentido: l.transferSentido ?? null,
+                  valor: l.valor,
+                })),
+              );
+              return (
+                <>
+                  <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
+                    Visão sintética — {resumo2.linhas.length} categoria(s),{" "}
+                    {resumo2.total.qtd.toLocaleString("pt-BR")} lançamento(s) no período
+                    {filtroGrupo ? ` · filtrado por "${LABEL_GRUPO[filtroGrupo]}"` : ""}.
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="text-right">Lançamentos</TableHead>
+                          <TableHead className="text-right">Entradas</TableHead>
+                          <TableHead className="text-right">Saídas</TableHead>
+                          <TableHead className="text-right">Saldo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {resumo2.linhas.map((l) => (
+                          <TableRow key={l.label}>
+                            <TableCell className="font-medium">{l.label}</TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                              {l.qtd}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-green-600">
+                              {l.entradas ? fmt(l.entradas) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-red-600">
+                              {l.saidas ? fmt(l.saidas) : "—"}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right tabular-nums font-medium ${
+                                l.saldo >= 0 ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {fmt(l.saldo)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/40 font-semibold">
+                          <TableCell>TOTAL</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {resumo2.total.qtd}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-green-600">
+                            {fmt(resumo2.total.entradas)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-red-600">
+                            {fmt(resumo2.total.saidas)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums ${
+                              resumo2.total.saldo >= 0 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {fmt(resumo2.total.saldo)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            })()
           ) : (
             <>
               {(() => {

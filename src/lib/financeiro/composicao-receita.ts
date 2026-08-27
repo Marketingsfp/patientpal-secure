@@ -213,3 +213,132 @@ export const FILTRO_DA_FORMA: Partial<Record<FormaCanonica, FiltroForma>> = {
   boleto: "boleto",
   sem_informacao: "sem",
 };
+
+/** Legenda curta de cada card, no padrão pedido pela diretoria. */
+export const LEGENDA_GRUPO: Record<GrupoReceita, string> = {
+  consulta: "atendimento de consulta",
+  exame_procedimento: "exames e procedimentos",
+  mensalidade_periodo: "mensalidade do mês atual",
+  mensalidade_atrasada: "quitou mês passado agora",
+  mensalidade_antecipada: "pagou adiantado",
+  outros: "sem atendimento nem mensalidade",
+};
+
+/** Uma das três colunas da barra "Total recebido por forma de pagamento". */
+export interface ColunaDaBarra {
+  chave: "dinheiro" | "pix" | "cartao";
+  label: string;
+  qtd: number;
+  total: number;
+  /** Opção do seletor "Forma" aplicada ao clicar. */
+  filtro: FiltroForma;
+}
+
+/** Baldes que cada coluna da barra soma. */
+const BALDES_DA_BARRA: Record<ColunaDaBarra["chave"], FormaCanonica[]> = {
+  dinheiro: ["dinheiro"],
+  pix: ["pix"],
+  // A barra mostra CARTÃO como um número só, como no sistema de referência. A
+  // separação débito × crédito continua existindo no popover do card de
+  // Receitas, que é onde ela é útil para conferência.
+  cartao: ["debito", "credito", "legado_cartao"],
+};
+
+/**
+ * As três colunas fixas da barra do topo: Dinheiro, PIX e Cartão.
+ *
+ * São FIXAS de propósito, aparecendo com R$ 0,00 quando não houve nada. A
+ * barra é lida de relance todos os dias, sempre no mesmo lugar; coluna que
+ * some conforme o movimento obriga a reler a tela inteira para achar o número.
+ */
+export function barraDeFormas(formas: TotalForma[]): ColunaDaBarra[] {
+  const porBalde = new Map(formas.map((f) => [f.forma, f]));
+  const soma = (chave: ColunaDaBarra["chave"]) => {
+    let qtd = 0;
+    let total = 0;
+    for (const b of BALDES_DA_BARRA[chave]) {
+      const t = porBalde.get(b);
+      if (t) {
+        qtd += t.qtd;
+        total += t.total;
+      }
+    }
+    return { qtd, total: Number(total.toFixed(2)) };
+  };
+  return [
+    {
+      chave: "dinheiro",
+      label: "Dinheiro",
+      filtro: "dinheiro" as FiltroForma,
+      ...soma("dinheiro"),
+    },
+    { chave: "pix", label: "PIX", filtro: "pix" as FiltroForma, ...soma("pix") },
+    { chave: "cartao", label: "Cartão", filtro: "cartao" as FiltroForma, ...soma("cartao") },
+  ];
+}
+
+export interface LinhaSintetica {
+  label: string;
+  qtd: number;
+  entradas: number;
+  saidas: number;
+  saldo: number;
+}
+
+/**
+ * Visão sintética: uma linha por categoria, em vez de uma por lançamento.
+ *
+ * É a mesma quebra do relatório impresso, agora também na tela — quem confere
+ * o fechamento lia o resumo no papel e a lista no monitor, e as duas coisas
+ * precisavam ser abertas em lugares diferentes para bater.
+ *
+ * Transferência entre caixas entra pelo SENTIDO, não pelo tipo: suprimento é
+ * dinheiro entrando na gaveta e sangria é dinheiro saindo. Ignorá-las faria o
+ * saldo sintético divergir do analítico exibido logo acima.
+ *
+ * A ordem é por movimento total (entradas + saídas), do maior para o menor:
+ * quem confere quer ver primeiro onde está o dinheiro.
+ */
+export function resumoSintetico(
+  linhas: Array<{
+    categoria: string;
+    tipo: string;
+    sentido?: "entrada" | "saida" | null;
+    valor: number | string | null | undefined;
+  }>,
+): { linhas: LinhaSintetica[]; total: Omit<LinhaSintetica, "label"> } {
+  const acc = new Map<string, LinhaSintetica>();
+  for (const l of linhas) {
+    const v = Number(l.valor) || 0;
+    const label = l.categoria || "(sem categoria)";
+    const atual = acc.get(label) ?? { label, qtd: 0, entradas: 0, saidas: 0, saldo: 0 };
+    atual.qtd += 1;
+    const ehEntrada =
+      l.tipo === "receita" || (l.tipo === "transferencia" && l.sentido === "entrada");
+    if (ehEntrada) atual.entradas += v;
+    else atual.saidas += v;
+    acc.set(label, atual);
+  }
+  const arr = Array.from(acc.values()).map((l) => ({
+    ...l,
+    entradas: Number(l.entradas.toFixed(2)),
+    saidas: Number(l.saidas.toFixed(2)),
+    saldo: Number((l.entradas - l.saidas).toFixed(2)),
+  }));
+  arr.sort(
+    (a, b) => b.entradas + b.saidas - (a.entradas + a.saidas) || a.label.localeCompare(b.label),
+  );
+  const total = arr.reduce(
+    (t, l) => ({
+      qtd: t.qtd + l.qtd,
+      entradas: t.entradas + l.entradas,
+      saidas: t.saidas + l.saidas,
+      saldo: 0,
+    }),
+    { qtd: 0, entradas: 0, saidas: 0, saldo: 0 },
+  );
+  total.entradas = Number(total.entradas.toFixed(2));
+  total.saidas = Number(total.saidas.toFixed(2));
+  total.saldo = Number((total.entradas - total.saidas).toFixed(2));
+  return { linhas: arr, total };
+}
