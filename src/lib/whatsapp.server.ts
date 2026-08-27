@@ -168,7 +168,6 @@ export async function metaSubscribeApp(
   return { success: json?.success !== false };
 }
 
-
 export async function metaFetchPhoneStatus(
   phoneNumberId: string,
   accessToken: string,

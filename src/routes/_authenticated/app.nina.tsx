@@ -50,7 +50,6 @@ import {
   registrarNumeroWhatsapp,
   statusInscricaoWaba,
   inscreverAppWaba,
-
 } from "@/lib/whatsapp.functions";
 import {
   enviarMensagemWhatsapp,
@@ -676,7 +675,6 @@ function ConfiguracaoWhatsApp() {
   const buscarInscricao = useServerFn(statusInscricaoWaba);
   const inscreverApp = useServerFn(inscreverAppWaba);
 
-
   const [cfg, setCfg] = useState<WppCfg | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -709,7 +707,6 @@ function ConfiguracaoWhatsApp() {
   }>({ estado: "desconhecido" });
   const [inscricaoLoading, setInscricaoLoading] = useState(false);
   const [inscrevendo, setInscrevendo] = useState(false);
-
 
   const carregar = useCallback(async () => {
     if (!clinicaAtual) return;
@@ -794,7 +791,6 @@ function ConfiguracaoWhatsApp() {
   useEffect(() => {
     if (cfg?.has_access_token) void atualizarInscricao();
   }, [cfg?.has_access_token, cfg?.waba_id, atualizarInscricao]);
-
 
   const onRegistrar = async () => {
     if (!cfg) return;
@@ -1006,7 +1002,12 @@ function ConfiguracaoWhatsApp() {
         <span className="text-muted-foreground">{inscricao.erro ?? "não verificado"}</span>
       )}
       {podeEscrever && inscricao.estado === "sem-inscricao" && (
-        <Button size="sm" variant="outline" onClick={() => void onInscreverApp()} disabled={inscrevendo}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void onInscreverApp()}
+          disabled={inscrevendo}
+        >
           {inscrevendo ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
           Inscrever app na conta
         </Button>

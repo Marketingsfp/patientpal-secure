@@ -230,12 +230,14 @@ export const inscreverAppWaba = createServerFn({ method: "POST" })
       return { ok: false as const, error: String(e?.message ?? e), apps: [] };
     }
     try {
-      return { ok: true as const, apps: await metaListSubscribedApps(cfg.waba_id, cfg.access_token) };
+      return {
+        ok: true as const,
+        apps: await metaListSubscribedApps(cfg.waba_id, cfg.access_token),
+      };
     } catch {
       return { ok: true as const, apps: [] };
     }
   });
-
 
 export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
