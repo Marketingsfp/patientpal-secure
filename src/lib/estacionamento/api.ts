@@ -89,10 +89,21 @@ const cliente = () => supabase as unknown as ClienteSemTipos;
 const COLUNAS =
   "id, clinica_id, tipo, sentido, placa, nome, valor, forma_pagamento, data, competencia, observacoes, criado_por, created_at";
 
-/** A tabela ainda não existe no banco? Serve para a tela explicar em vez de só falhar. */
+/**
+ * A tabela ainda não existe no banco? Serve para a tela explicar o que falta
+ * em vez de despejar um erro vermelho de banco na cara de quem abriu a aba.
+ *
+ * O texto do erro muda conforme quem responde. O PostgREST, que é quem atende
+ * o app, devolve "Could not find the table 'public.estacionamento_movimentos'
+ * in the schema cache" — sem as palavras "does not exist" nem "relation", que
+ * é o que o Postgres cru diria. A primeira versão desta função só conhecia a
+ * forma do Postgres e deixou passar justamente a mensagem que aparece na
+ * prática. Por isso a lista cobre as duas, e o teste guarda as duas.
+ */
 export function ehTabelaAusente(erro: { message?: string } | null | undefined): boolean {
   const m = erro?.message ?? "";
-  return /estacionamento_movimentos/i.test(m) && /(does not exist|não existe|relation)/i.test(m);
+  if (!/estacionamento_movimentos/i.test(m)) return false;
+  return /(does not exist|não existe|nao existe|relation|schema cache|could not find)/i.test(m);
 }
 
 /** Movimentos da clínica dentro do intervalo, do mais recente para o mais antigo. */

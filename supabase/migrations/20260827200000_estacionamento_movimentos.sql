@@ -117,3 +117,9 @@ DROP TRIGGER IF EXISTS trg_estacionamento_normaliza ON public.estacionamento_mov
 CREATE TRIGGER trg_estacionamento_normaliza
   BEFORE INSERT OR UPDATE ON public.estacionamento_movimentos
   FOR EACH ROW EXECUTE FUNCTION public.fn_estacionamento_normaliza_placa();
+
+-- O PostgREST (que é quem o app consulta) mantém um cache do schema. Sem este
+-- aviso ele pode continuar respondendo "Could not find the table ... in the
+-- schema cache" por alguns instantes depois de a tabela já existir, e quem
+-- acabou de rodar o SQL acha que não funcionou.
+NOTIFY pgrst, 'reload schema';
