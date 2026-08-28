@@ -103,6 +103,10 @@ interface TotaisClinica {
  */
 const PAGINA_TOTAIS = 1000;
 const MAX_PAGINAS_TOTAIS = 50;
+// Quantos cards a relação desenha por vez (o filtro dos indicadores continua
+// olhando a lista inteira; isto é só o recorte de exibição).
+const POR_PAGINA_CARDS = 50;
+
 
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
