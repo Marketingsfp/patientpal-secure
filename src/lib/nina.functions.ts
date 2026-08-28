@@ -179,7 +179,7 @@ export const chatNina = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
-          model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
+          model: "google/gemini-3.7-flash",
           ...(data.modoVoz ? { max_tokens: 220 } : {}),
           tools: FERRAMENTAS_NINA,
           messages: historico,
