@@ -10,7 +10,7 @@ antes de qualquer script.
 |---|---|
 | `CARTAO-LOTE-A-RATEIO-MJ-213.csv` | Lista completa do lote A (abre no Excel) |
 | `CARTAO-LOTE-C-IMPORTACAO-18-08-164.csv` | Lista completa do lote C (abre no Excel) |
-| `CARTAO-LOTES-CONSULTAS-2026-08-28.sql` | Consultas de leitura que regeram os três lotes a qualquer momento |
+| `docs/CARTAO-LOTES-CONSULTAS-2026-08-28.sql` | Consultas de leitura que regeram os três lotes a qualquer momento |
 | `AUDITORIA-CARTAO-BENEFICIOS-2026-08-28.md` | A auditoria completa do módulo |
 
 O lote B não tem CSV próprio porque a aba **"Sem convênio"** do próprio sistema
