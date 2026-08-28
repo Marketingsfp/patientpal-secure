@@ -435,6 +435,13 @@ export function ContratosPage({
     .toLowerCase()
     .includes("menino jesus");
   const [modoCards, setModoCards] = useState(false);
+  /** Filtro de período por data de início do contrato (só apresentação). */
+  const [periodo, setPeriodo] = useState<
+    "todos" | "7d" | "15d" | "30d" | "mes" | "mes_passado" | "90d" | "ano" | "personalizado"
+  >("todos");
+  const [periodoDe, setPeriodoDe] = useState("");
+  const [periodoAte, setPeriodoAte] = useState("");
+
   const [isencaoLoteOpen, setIsencaoLoteOpen] = useState(false);
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
