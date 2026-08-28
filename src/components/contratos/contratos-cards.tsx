@@ -624,42 +624,12 @@ export function ContratosCards({
     };
   }, [clinicaId]);
 
-  // Clicar num indicador filtra a relação de cards logo abaixo. É só um
-  // recorte visual da página atual — não altera nenhuma regra de cobrança.
-  const visiveis = useMemo(() => {
-    if (!filtro) return itens;
-    const { ini, fim, hojeIso } = limitesDoMes();
-    return itens.filter((c) => {
-      const status = (c.status ?? "").toLowerCase();
-      const cob = cobrancas[c.id];
-      switch (filtro) {
-        case "ativos":
-          return status === "ativo";
-        case "inativos":
-          return ["cancelado", "inativo", "encerrado"].includes(status);
-        case "novos":
-          return (c.data_inicio ?? "").slice(0, 10) >= ini;
-        case "pagos":
-          return Boolean(
-            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
-          );
-        case "avencer":
-          // Mesma régua do indicador: ainda não venceu OU está dentro da
-          // tolerância — nos dois casos o cartão continua valendo.
-          return Boolean(
-            cob?.proximoVencimento &&
-            cob.proximoVencimento <= fim &&
-            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
-          );
-        case "inadimplentes":
-          // Só a partir do 6º dia, igual ao bloqueio do balcão. Antes disso o
-          // card contava a partir do 1º dia e discordava do próprio número.
-          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
-        default:
-          return true;
-      }
-    });
-  }, [itens, filtro, cobrancas]);
+  // Trocar de filtro sempre volta para a primeira página da relação.
+  useEffect(() => {
+    setPagina(1);
+  }, [filtro, ids]);
+
+
 
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
