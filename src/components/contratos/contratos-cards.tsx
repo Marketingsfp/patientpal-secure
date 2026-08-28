@@ -192,7 +192,6 @@ const ROTULO_FILTRO: Record<FiltroKpi, string> = {
   inativos: "Cancelados / inativos",
 };
 
-
 function KpiCard({
   titulo,
   valor,
@@ -241,7 +240,6 @@ function KpiCard({
     </Card>
   );
 }
-
 
 /** Um dos quatro números do quadro cinza do card. */
 function CampoFinanceiro({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) {
@@ -537,8 +535,8 @@ export function ContratosCards({
         case "avencer":
           return Boolean(
             cob?.proximoVencimento &&
-              cob.proximoVencimento >= hojeIso &&
-              cob.proximoVencimento <= fim,
+            cob.proximoVencimento >= hojeIso &&
+            cob.proximoVencimento <= fim,
           );
         case "inadimplentes":
           return (cob?.diasEmAberto ?? 0) > 0 || Boolean(c.parcelas?.temAtrasada);
@@ -631,7 +629,6 @@ export function ContratosCards({
             : "Nenhum contrato para mostrar."}
         </div>
       ) : (
-
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {visiveis.map((c) => {
             const lista = deps[c.id] ?? [];
