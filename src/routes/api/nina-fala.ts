@@ -24,7 +24,7 @@ import { z } from "zod";
 
 const MODELO_TEXTO = "google/gemini-3.7-flash";
 /** TTS mais leve do catálogo = primeiro pedaço de áudio mais rápido. */
-const MODELO_VOZ = "google/gemini-2.5-flash-lite-preview-tts";
+const MODELO_VOZ = "google/gemini-3.1-flash-tts-preview";
 const VOZ = "Leda";
 
 const Body = z.object({
