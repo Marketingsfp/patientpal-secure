@@ -21,6 +21,19 @@ export type TipoMovimento = "rotativo" | "mensalista";
 /** "entrada" = dinheiro recebido; "saida" = despesa do próprio estacionamento. */
 export type Sentido = "entrada" | "saida";
 
+/**
+ * Como cada tipo aparece na tela.
+ *
+ * O banco continua gravando "rotativo" e "mensalista" — o CHECK da tabela e os
+ * registros já existentes dependem disso, e renomear no banco seria uma
+ * migração de dados para trocar uma palavra de tela. A diretoria pediu os
+ * nomes "Particular" e "Mensalidade", e é só o rótulo que muda.
+ */
+export const LABEL_TIPO: Record<TipoMovimento, string> = {
+  rotativo: "Particular",
+  mensalista: "Mensalidade",
+};
+
 export interface MovimentoEstacionamento {
   id: string;
   clinica_id: string;

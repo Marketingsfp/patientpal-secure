@@ -24,12 +24,15 @@ import {
   barraDeFormas,
   totaisPorForma,
   resumoSintetico,
+  baldeCasaComColuna,
+  type ColunaDaBarra,
 } from "@/lib/financeiro/composicao-receita";
 import {
   listarMovimentos,
   criarMovimento,
   excluirMovimento,
   ehTabelaAusente,
+  LABEL_TIPO,
   type MovimentoEstacionamento,
   type TipoMovimento,
   type Sentido,
@@ -190,6 +193,8 @@ function Page() {
   /** Card clicado na barra do topo; null = mostrando tudo. */
   const [filtroTipo, setFiltroTipo] = useState<TipoMovimento | null>(null);
   const [filtroSituacao, setFiltroSituacao] = useState<SituacaoMensalista | null>(null);
+  /** Coluna da barra de formas clicada; null = todas. */
+  const [filtroForma, setFiltroForma] = useState<ColunaDaBarra["chave"] | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(formVazio);
@@ -266,17 +271,19 @@ function Page() {
   const visiveis = movimentos.filter((m) => {
     if (filtroSentido !== "todos" && m.sentido !== filtroSentido) return false;
     if (filtroTipo && m.tipo !== filtroTipo) return false;
+    if (filtroForma && !baldeCasaComColuna(balde(m), filtroForma)) return false;
     if (filtroSituacao) {
       if (m.tipo !== "mensalista") return false;
       if (situacaoMensalista(m.competencia, periodo) !== filtroSituacao) return false;
     }
     return true;
   });
-  const temFiltroDeCard = filtroTipo !== null || filtroSituacao !== null;
+  const temFiltroDeCard = filtroTipo !== null || filtroSituacao !== null || filtroForma !== null;
 
   const limparFiltros = () => {
     setFiltroTipo(null);
     setFiltroSituacao(null);
+    setFiltroForma(null);
   };
 
   const salvar = async (e: FormEvent) => {
@@ -288,7 +295,7 @@ function Page() {
       return;
     }
     if (form.tipo === "mensalista" && !form.competencia) {
-      toast.error("Mensalista precisa do mês de competência.");
+      toast.error(`${LABEL_TIPO.mensalista} precisa do mês de competência.`);
       return;
     }
     setSaving(true);
@@ -330,8 +337,9 @@ function Page() {
   };
 
   const tituloDaLinha = (m: MovimentoEstacionamento) => {
-    const quem = m.tipo === "mensalista" ? (m.nome ?? m.placa ?? "Mensalista") : (m.placa ?? "—");
-    return `${m.tipo === "mensalista" ? "Mensalista" : "Rotativo"} · ${quem}`;
+    const quem =
+      m.tipo === "mensalista" ? (m.nome ?? m.placa ?? LABEL_TIPO.mensalista) : (m.placa ?? "—");
+    return `${LABEL_TIPO[m.tipo]} · ${quem}`;
   };
 
   const exportar = () => {
@@ -342,7 +350,7 @@ function Page() {
     exportToExcel(
       visiveis.map((m) => ({
         data: m.data ? `${m.data.slice(8, 10)}/${m.data.slice(5, 7)}/${m.data.slice(0, 4)}` : "",
-        tipo: m.tipo === "mensalista" ? "Mensalista" : "Rotativo",
+        tipo: LABEL_TIPO[m.tipo],
         sentido: m.sentido === "entrada" ? "Entrada" : "Saída",
         placa: m.placa ?? "",
         nome: m.nome ?? "",
@@ -421,7 +429,7 @@ function Page() {
             Estacionamento
           </h1>
           <p className="text-sm text-muted-foreground">
-            Rotativo e mensalistas — entradas e saídas do período.
+            Particular e mensalidades — entradas e saídas do período.
           </p>
         </div>
         {podeEscrever && (
@@ -448,8 +456,8 @@ function Page() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="rotativo">Rotativo</SelectItem>
-                        <SelectItem value="mensalista">Mensalista</SelectItem>
+                        <SelectItem value="rotativo">{LABEL_TIPO.rotativo}</SelectItem>
+                        <SelectItem value="mensalista">{LABEL_TIPO.mensalista}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -483,7 +491,7 @@ function Page() {
                     <Input
                       value={form.nome}
                       onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-                      placeholder="Nome do mensalista"
+                      placeholder="Nome do cliente"
                     />
                   </div>
                   <div className="space-y-1">
@@ -580,6 +588,8 @@ function Page() {
                     titulo={c.label}
                     valor={c.total}
                     legenda={`${c.qtd} ${c.qtd === 1 ? "transação" : "transações"}`}
+                    ativo={filtroForma === c.chave}
+                    onClick={() => setFiltroForma(filtroForma === c.chave ? null : c.chave)}
                   />
                 ))}
               </div>
@@ -609,13 +619,13 @@ function Page() {
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <CardTotal
-                  titulo="Rotativo"
+                  titulo={LABEL_TIPO.rotativo}
                   valor={recebidoRotativo}
                   onClick={() => setFiltroTipo(filtroTipo === "rotativo" ? null : "rotativo")}
                   ativo={filtroTipo === "rotativo"}
                 />
                 <CardTotal
-                  titulo="Mensalista"
+                  titulo={LABEL_TIPO.mensalista}
                   valor={recebidoMensalista}
                   onClick={() => setFiltroTipo(filtroTipo === "mensalista" ? null : "mensalista")}
                   ativo={filtroTipo === "mensalista"}
@@ -633,7 +643,7 @@ function Page() {
             <div className="flex items-start gap-2">
               <Car className="h-4 w-4 mt-0.5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Detalhamento de mensalistas no período</p>
+                <p className="text-sm font-medium">Detalhamento de mensalidades no período</p>
                 <p className="text-xs text-muted-foreground">
                   Quanto entrou no caixa × a qual mês cada pagamento se refere
                 </p>
@@ -747,13 +757,13 @@ function Page() {
               <span>
                 Filtrado por{" "}
                 <strong>
-                  {filtroTipo === "rotativo"
-                    ? "Rotativo"
-                    : filtroTipo === "mensalista"
-                      ? "Mensalista"
-                      : ""}
-                  {filtroTipo && filtroSituacao ? " · " : ""}
-                  {filtroSituacao ? LABEL_SITUACAO[filtroSituacao] : ""}
+                  {[
+                    filtroForma ? colunas.find((c) => c.chave === filtroForma)?.label : null,
+                    filtroTipo ? LABEL_TIPO[filtroTipo] : null,
+                    filtroSituacao ? LABEL_SITUACAO[filtroSituacao] : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </strong>
               </span>
               <Button variant="outline" size="sm" onClick={limparFiltros}>
@@ -779,7 +789,7 @@ function Page() {
             {(() => {
               const r = resumoSintetico(
                 visiveis.map((m) => ({
-                  categoria: m.tipo === "mensalista" ? "Mensalista" : "Rotativo",
+                  categoria: LABEL_TIPO[m.tipo],
                   // `resumoSintetico` fala a língua do financeiro: aqui a
                   // entrada do estacionamento é uma receita e a saída, uma
                   // despesa. A conta é a mesma.
@@ -868,7 +878,7 @@ function Page() {
                         {tituloDaLinha(m)}
                       </p>
                       <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
-                        {m.tipo === "mensalista" ? "Mensalista" : "Rotativo"}
+                        {LABEL_TIPO[m.tipo]}
                       </Badge>
                       <Badge variant="outline" className="text-[11px] px-1.5 py-0">
                         estacionamento
