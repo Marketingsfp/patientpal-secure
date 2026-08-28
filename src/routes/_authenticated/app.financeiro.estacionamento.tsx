@@ -33,6 +33,7 @@ import {
   excluirMovimento,
   ehTabelaAusente,
   LABEL_TIPO,
+  quemEhNoMovimento,
   type MovimentoEstacionamento,
   type TipoMovimento,
   type Sentido,
@@ -336,11 +337,8 @@ function Page() {
     void carregar();
   };
 
-  const tituloDaLinha = (m: MovimentoEstacionamento) => {
-    const quem =
-      m.tipo === "mensalista" ? (m.nome ?? m.placa ?? LABEL_TIPO.mensalista) : (m.placa ?? "—");
-    return `${LABEL_TIPO[m.tipo]} · ${quem}`;
-  };
+  const tituloDaLinha = (m: MovimentoEstacionamento) =>
+    `${LABEL_TIPO[m.tipo]} · ${quemEhNoMovimento(m)}`;
 
   const exportar = () => {
     if (!visiveis.length) {

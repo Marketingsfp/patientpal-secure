@@ -34,6 +34,24 @@ export const LABEL_TIPO: Record<TipoMovimento, string> = {
   mensalista: "Mensalidade",
 };
 
+/**
+ * Quem é a linha: o cliente e o carro, na mesma frase.
+ *
+ * Quando existem os dois, mostra "JOÃO DA SILVA (ABC1D23)". A recepção procura
+ * ora por um, ora por outro — o mensalista se apresenta pelo nome, e o carro na
+ * cancela se identifica pela placa. A primeira versão mostrava só o nome quando
+ * havia nome, e quem tinha a placa na mão não achava o lançamento na lista.
+ *
+ * Com só um dos dois, mostra o que existe. Sem nenhum, devolve "—": a linha
+ * precisa continuar visível e apagável mesmo tendo sido lançada incompleta.
+ */
+export function quemEhNoMovimento(m: { nome?: string | null; placa?: string | null }): string {
+  const nome = m.nome?.trim() || null;
+  const placa = m.placa?.trim() || null;
+  if (nome && placa) return `${nome} (${placa})`;
+  return nome ?? placa ?? "—";
+}
+
 export interface MovimentoEstacionamento {
   id: string;
   clinica_id: string;
