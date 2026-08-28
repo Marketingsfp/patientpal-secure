@@ -314,6 +314,8 @@ export function ContratosCards({
   const [cobrancas, setCobrancas] = useState<Record<string, Cobranca>>({});
   const [imprimindo, setImprimindo] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
+  const [pagina, setPagina] = useState(1);
+
   const [totais, setTotais] = useState<TotaisClinica | null>(null);
   const [mes, setMes] = useState<{
     pagos: number;
