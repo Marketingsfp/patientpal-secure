@@ -250,37 +250,37 @@ export function ContratosCards({ itens, todos, clinicaId, onAbrir }: Props) {
           titulo="Contratos ativos"
           valor={String(kpis.ativos)}
           detalhe={`Receita prevista ${BRL(kpis.receita)}`}
-          cor="text-foreground"
+          tom="azul"
         />
         <KpiCard
           titulo="Pagos no mês"
           valor={mes ? String(mes.pagos) : "—"}
           detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
-          cor="text-emerald-600"
+          tom="verde"
         />
         <KpiCard
           titulo="A vencer"
           valor={mes ? String(mes.aVencer) : "—"}
           detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
-          cor="text-amber-600"
+          tom="ambar"
         />
         <KpiCard
           titulo="Inadimplentes"
           valor={mes ? String(mes.atrasados) : "—"}
           detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
-          cor="text-red-600"
+          tom="vermelho"
         />
         <KpiCard
           titulo="Novos contratos"
           valor={String(kpis.novos)}
           detalhe={`Neste mês · ${BRL(kpis.novosValor)}`}
-          cor="text-blue-600"
+          tom="azul"
         />
         <KpiCard
           titulo="Cancelados / inativos"
           valor={String(kpis.inativos)}
           detalhe="Fora de uso"
-          cor="text-muted-foreground"
+          tom="neutro"
         />
       </div>
 
