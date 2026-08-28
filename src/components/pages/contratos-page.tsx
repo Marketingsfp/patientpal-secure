@@ -418,7 +418,9 @@ export function ContratosPage({
   );
   // Visão em cards do Cartão Benefício — hoje só na Policlínica Menino Jesus.
   // As demais clínicas seguem com a tabela de sempre.
-  const visaoCardsDisponivel = (clinicaAtual?.nome ?? "").toLowerCase().includes("menino jesus");
+  const visaoCardsDisponivel = (clinicaAtual?.clinica?.nome ?? "")
+    .toLowerCase()
+    .includes("menino jesus");
   const [modoCards, setModoCards] = useState(false);
   const [isencaoLoteOpen, setIsencaoLoteOpen] = useState(false);
   const [list, setList] = useState<Contrato[]>([]);
