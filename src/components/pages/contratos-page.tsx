@@ -199,6 +199,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
+import { PixCobrancaDialog } from "@/components/financeiro/pix-cobranca-dialog";
+import { competenciaDeVencimento, txidMensalidade } from "@/lib/pix/br-code";
 import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteConfirmando } from "@/lib/contrato-dependentes";
 import { perguntarVinculoDuplicado } from "@/lib/perguntar-vinculo-dependente";
@@ -3689,6 +3691,8 @@ function DetalheContrato({
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
+  /** Etapa do QR Code, entre escolher "Pix" e dar a baixa de fato. */
+  const [pixOpen, setPixOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
   // Isenção de juros + multa para a mensalidade atualmente em pagamento.
@@ -4565,10 +4569,21 @@ function DetalheContrato({
   const normalizarForma = (f: string) =>
     f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
 
+  /**
+   * PIX passa por uma parada a mais: em vez de ir direto para o lançamento,
+   * mostra o QR Code para o paciente ler no aplicativo do banco. A baixa só
+   * acontece depois, quando o operador confirma o recebimento — e aí segue
+   * exatamente o mesmo caminho das outras formas de pagamento.
+   */
   const escolherForma = (forma: string) => {
     if (!pagMens) return;
-    setPagInitialForma(normalizarForma(forma));
+    const normalizada = normalizarForma(forma);
+    setPagInitialForma(normalizada);
     setFormaPagOpen(false);
+    if (normalizada === "pix") {
+      setPixOpen(true);
+      return;
+    }
     setLancOpen(true);
   };
   const escolherMisto = () => {
@@ -6657,6 +6672,45 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Etapa do QR Code do PIX. Só desenha o código — a baixa continua
+          sendo o mesmo LancamentoDialog das outras formas de pagamento. */}
+      <PixCobrancaDialog
+        open={pixOpen}
+        onOpenChange={(v) => {
+          setPixOpen(v);
+          // Fechar sem confirmar cancela o pagamento inteiro, senão a parcela
+          // ficaria "presa" num pagamento que ninguém terminou.
+          if (!v) {
+            setPagMens(null);
+            setPagInitialForma("");
+          }
+        }}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        valor={pagTotalCobrar}
+        descricao={
+          pagMens
+            ? isAdesao(pagMens)
+              ? `Taxa de adesao Contrato #${contrato.numero}`
+              : isTaxaInclusao(pagMens)
+                ? `Taxa de inclusao Contrato #${contrato.numero}`
+                : `Mensalidade Contrato #${contrato.numero} - ${competenciaDeVencimento(pagMens.vencimento)}`
+            : ""
+        }
+        txid={pagMens ? txidMensalidade(contrato.numero, pagMens.numero_parcela) : ""}
+        subtitulo={
+          pagMens
+            ? `${contrato.paciente_nome} · ${cobrancaLabel(pagMens)}${
+                isAdesao(pagMens) ? "" : `/${mensalidades.length}`
+              }`
+            : contrato.paciente_nome
+        }
+        podeConfirmar={podeEscrever}
+        onConfirmar={() => {
+          setPixOpen(false);
+          setLancOpen(true);
+        }}
+      />
 
       <LancamentoDialog
         open={lancOpen}

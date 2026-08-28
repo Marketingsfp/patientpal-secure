@@ -17,9 +17,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Plus, Pencil, Building2, CheckCircle2 } from "lucide-react";
+import { MapPin, Plus, Pencil, Building2, CheckCircle2, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { colunaNaoExiste } from "@/lib/pix/chave-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/unidades")({
   component: UnidadesPage,
@@ -53,6 +54,13 @@ function ClinicasTab() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  /**
+   * Os campos de PIX só aparecem depois que a atualização do banco que os
+   * cria for aplicada. Enquanto isso a tela continua salvando o resto
+   * normalmente — incluir uma coluna inexistente no update derrubaria o
+   * cadastro inteiro da clínica.
+   */
+  const [pixDisponivel, setPixDisponivel] = useState(true);
   const [form, setForm] = useState({
     nome: "",
     cnpj: "",
@@ -65,6 +73,8 @@ function ClinicasTab() {
     longitude: "",
     raio_metros: "200",
     ativo: true,
+    pix_chave: "",
+    pix_beneficiario: "",
   });
 
   const resetForm = () => {
@@ -81,6 +91,8 @@ function ClinicasTab() {
       longitude: "",
       raio_metros: "200",
       ativo: true,
+      pix_chave: "",
+      pix_beneficiario: "",
     });
   };
   const openNew = () => {
@@ -95,31 +107,54 @@ function ClinicasTab() {
 
   const openEdit = async (id: string) => {
     setLoading(true);
-    const { data, error } = await supabase
+    const COLUNAS_BASE =
+      "nome, cnpj, endereco, cidade, estado, cep, telefone, latitude, longitude, raio_metros, ativo";
+    // Tenta com os campos de PIX; se o banco ainda não tem essas colunas,
+    // repete sem elas e esconde a seção em vez de quebrar a tela.
+    let { data, error } = (await supabase
       .from("clinicas")
-      .select(
-        "nome, cnpj, endereco, cidade, estado, cep, telefone, latitude, longitude, raio_metros, ativo",
-      )
+      .select(`${COLUNAS_BASE}, pix_chave, pix_beneficiario` as never)
       .eq("id", id)
-      .single();
+      .single()) as unknown as {
+      data: Record<string, unknown> | null;
+      error: { code?: string; message?: string } | null;
+    };
+    let temPix = true;
+    if (error && colunaNaoExiste(error)) {
+      temPix = false;
+      const repetida = (await supabase
+        .from("clinicas")
+        .select(COLUNAS_BASE)
+        .eq("id", id)
+        .single()) as unknown as {
+        data: Record<string, unknown> | null;
+        error: { code?: string; message?: string } | null;
+      };
+      data = repetida.data;
+      error = repetida.error;
+    }
+    setPixDisponivel(temPix);
     setLoading(false);
     if (error || !data) {
       mostrarErro(error);
       return;
     }
     setEditingId(id);
+    const txt = (v: unknown) => (typeof v === "string" ? v : "");
     setForm({
-      nome: data.nome ?? "",
-      cnpj: data.cnpj ?? "",
-      endereco: (data as any).endereco ?? "",
-      cidade: data.cidade ?? "",
-      estado: data.estado ?? "",
-      cep: (data as any).cep ?? "",
-      telefone: data.telefone ?? "",
-      latitude: (data as any).latitude?.toString() ?? "",
-      longitude: (data as any).longitude?.toString() ?? "",
-      raio_metros: (data as any).raio_metros?.toString() ?? "200",
-      ativo: (data as any).ativo ?? true,
+      nome: txt(data.nome),
+      cnpj: txt(data.cnpj),
+      endereco: txt(data.endereco),
+      cidade: txt(data.cidade),
+      estado: txt(data.estado),
+      cep: txt(data.cep),
+      telefone: txt(data.telefone),
+      latitude: data.latitude != null ? String(data.latitude) : "",
+      longitude: data.longitude != null ? String(data.longitude) : "",
+      raio_metros: data.raio_metros != null ? String(data.raio_metros) : "200",
+      ativo: data.ativo == null ? true : Boolean(data.ativo),
+      pix_chave: txt(data.pix_chave),
+      pix_beneficiario: txt(data.pix_beneficiario),
     });
     setOpen(true);
   };
@@ -149,6 +184,28 @@ function ClinicasTab() {
     ativo: form.ativo,
   });
 
+  /**
+   * Grava a chave PIX num update separado, e só quando as colunas existem.
+   *
+   * Vai à parte do update principal por dois motivos: mandar uma coluna
+   * inexistente faria o Postgres recusar o cadastro inteiro da clínica, e os
+   * tipos gerados do Supabase ainda não conhecem essas colunas — o `as never`
+   * fica confinado aqui em vez de desligar a checagem de todos os campos.
+   * Some quando os tipos forem regerados depois da migration.
+   */
+  const salvarPix = async (clinicaId: string) => {
+    if (!pixDisponivel) return;
+    const { error } = await supabase
+      .from("clinicas")
+      .update({
+        pix_chave: form.pix_chave.trim() || null,
+        pix_beneficiario: form.pix_beneficiario.trim() || null,
+      } as never)
+      .eq("id", clinicaId);
+    // O resto da clínica já foi salvo; avisa sem derrubar o que deu certo.
+    if (error) toast.error("Clínica salva, mas a chave PIX não foi gravada.");
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!podeEscrever) {
@@ -169,11 +226,13 @@ function ClinicasTab() {
           ...extras(),
         })
         .eq("id", editingId);
-      setLoading(false);
       if (error) {
+        setLoading(false);
         mostrarErro(error);
         return;
       }
+      await salvarPix(editingId);
+      setLoading(false);
       toast.success("Clínica atualizada!");
       setOpen(false);
       resetForm();
@@ -196,11 +255,13 @@ function ClinicasTab() {
       .from("clinicas")
       .update(extras())
       .eq("id", clinicaId as unknown as string);
-    setLoading(false);
     if (updErr) {
+      setLoading(false);
       mostrarErro(updErr);
       return;
     }
+    await salvarPix(clinicaId as unknown as string);
+    setLoading(false);
     toast.success("Clínica criada!");
     setOpen(false);
     resetForm();
@@ -284,6 +345,41 @@ function ClinicasTab() {
                     />
                   </div>
                 </div>
+                {pixDisponivel ? (
+                  <div className="border-t pt-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <QrCode className="h-4 w-4 text-primary" />
+                      <Label>Recebimento por PIX</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      Usada para gerar o QR Code de cobrança das mensalidades do Cartão Benefícios.
+                      O dinheiro cai direto na conta desta chave — confira antes de salvar.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Chave PIX</Label>
+                        <Input
+                          placeholder="CNPJ, e-mail, telefone ou chave aleatória"
+                          value={form.pix_chave}
+                          onChange={(e) => setForm({ ...form, pix_chave: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Nome de quem recebe (opcional)</Label>
+                        <Input
+                          maxLength={25}
+                          placeholder={form.nome.slice(0, 25) || "Nome da clínica"}
+                          value={form.pix_beneficiario}
+                          onChange={(e) => setForm({ ...form, pix_beneficiario: e.target.value })}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Até 25 letras, como aparece no aplicativo de quem paga. Em branco, usa o
+                          nome da clínica.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="border-t pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <Label>Geolocalização (para bater ponto)</Label>
