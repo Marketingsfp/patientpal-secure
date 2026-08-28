@@ -155,20 +155,56 @@ const TONS = {
 
 type TomNome = keyof typeof TONS;
 
+/** Indicador do topo escolhido como filtro da relação de cards. */
+type FiltroKpi = "ativos" | "pagos" | "avencer" | "inadimplentes" | "novos" | "inativos";
+
+const ROTULO_FILTRO: Record<FiltroKpi, string> = {
+  ativos: "Contratos ativos",
+  pagos: "Pagos no mês",
+  avencer: "A vencer",
+  inadimplentes: "Inadimplentes",
+  novos: "Novos contratos",
+  inativos: "Cancelados / inativos",
+};
+
+
 function KpiCard({
   titulo,
   valor,
   detalhe,
   tom,
+  ativo = false,
+  onClick,
 }: {
   titulo: string;
   valor: string;
   detalhe: string;
   tom: TomNome;
+  ativo?: boolean;
+  onClick?: () => void;
 }) {
   const t = TONS[tom];
+  const clicavel = Boolean(onClick);
   return (
-    <Card className={`relative overflow-hidden p-4 ${t.fundo} ${t.borda}`}>
+    <Card
+      role={clicavel ? "button" : undefined}
+      tabIndex={clicavel ? 0 : undefined}
+      aria-pressed={clicavel ? ativo : undefined}
+      onClick={onClick}
+      onKeyDown={
+        clicavel
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`relative overflow-hidden p-4 transition ${t.fundo} ${t.borda} ${
+        clicavel ? "cursor-pointer hover:shadow-md" : ""
+      } ${ativo ? "ring-2 ring-primary ring-offset-1" : ""}`}
+    >
       <span className={`absolute inset-y-0 left-0 w-1 ${t.faixa}`} aria-hidden />
       <div className="pl-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -180,6 +216,7 @@ function KpiCard({
     </Card>
   );
 }
+
 
 /** Um dos quatro números do quadro cinza do card. */
 function CampoFinanceiro({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) {
@@ -209,6 +246,8 @@ export function ContratosCards({
   const [cpfs, setCpfs] = useState<Record<string, string | null>>({});
   const [cobrancas, setCobrancas] = useState<Record<string, Cobranca>>({});
   const [imprimindo, setImprimindo] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
+
   const [mes, setMes] = useState<{
     pagos: number;
     pagosValor: number;
@@ -408,6 +447,39 @@ export function ContratosCards({
     };
   }, [todos]);
 
+  // Clicar num indicador filtra a relação de cards logo abaixo. É só um
+  // recorte visual da página atual — não altera nenhuma regra de cobrança.
+  const visiveis = useMemo(() => {
+    if (!filtro) return itens;
+    const { ini, fim, hojeIso } = limitesDoMes();
+    return itens.filter((c) => {
+      const status = (c.status ?? "").toLowerCase();
+      const cob = cobrancas[c.id];
+      switch (filtro) {
+        case "ativos":
+          return status === "ativo";
+        case "inativos":
+          return ["cancelado", "inativo", "encerrado"].includes(status);
+        case "novos":
+          return (c.data_inicio ?? "").slice(0, 10) >= ini;
+        case "pagos":
+          return Boolean(
+            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
+          );
+        case "avencer":
+          return Boolean(
+            cob?.proximoVencimento &&
+              cob.proximoVencimento >= hojeIso &&
+              cob.proximoVencimento <= fim,
+          );
+        case "inadimplentes":
+          return (cob?.diasEmAberto ?? 0) > 0 || Boolean(c.parcelas?.temAtrasada);
+        default:
+          return true;
+      }
+    });
+  }, [itens, filtro, cobrancas]);
+
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
     setImprimindo(id);
@@ -418,6 +490,8 @@ export function ContratosCards({
     }
   };
 
+  const alternar = (f: FiltroKpi) => setFiltro((atual) => (atual === f ? null : f));
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -426,46 +500,72 @@ export function ContratosCards({
           valor={String(kpis.ativos)}
           detalhe={`Receita prevista ${BRL(kpis.receita)}`}
           tom="azul"
+          ativo={filtro === "ativos"}
+          onClick={() => alternar("ativos")}
         />
         <KpiCard
           titulo="Pagos no mês"
           valor={mes ? String(mes.pagos) : "—"}
           detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
           tom="verde"
+          ativo={filtro === "pagos"}
+          onClick={() => alternar("pagos")}
         />
         <KpiCard
           titulo="A vencer"
           valor={mes ? String(mes.aVencer) : "—"}
           detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
           tom="ambar"
+          ativo={filtro === "avencer"}
+          onClick={() => alternar("avencer")}
         />
         <KpiCard
           titulo="Inadimplentes"
           valor={mes ? String(mes.atrasados) : "—"}
           detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
           tom="vermelho"
+          ativo={filtro === "inadimplentes"}
+          onClick={() => alternar("inadimplentes")}
         />
         <KpiCard
           titulo="Novos contratos"
           valor={String(kpis.novos)}
           detalhe={`Neste mês · ${BRL(kpis.novosValor)}`}
           tom="azul"
+          ativo={filtro === "novos"}
+          onClick={() => alternar("novos")}
         />
         <KpiCard
           titulo="Cancelados / inativos"
           valor={String(kpis.inativos)}
           detalhe="Fora de uso"
           tom="neutro"
+          ativo={filtro === "inativos"}
+          onClick={() => alternar("inativos")}
         />
       </div>
 
-      {itens.length === 0 ? (
+      {filtro && (
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant="secondary">
+            Filtro: {ROTULO_FILTRO[filtro]} · {visiveis.length} contrato(s)
+          </Badge>
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => setFiltro(null)}>
+            Limpar filtro
+          </Button>
+        </div>
+      )}
+
+      {visiveis.length === 0 ? (
         <div className="rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-          Nenhum contrato para mostrar.
+          {filtro
+            ? "Nenhum contrato desta página se encaixa no indicador escolhido."
+            : "Nenhum contrato para mostrar."}
         </div>
       ) : (
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {itens.map((c) => {
+          {visiveis.map((c) => {
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
