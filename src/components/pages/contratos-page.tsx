@@ -67,6 +67,12 @@ import {
  */
 const LIMITE_BUSCA = 50;
 const LIMITE_LISTA = 500;
+/**
+ * Teto de páginas da listagem: 20 × 500 = 10.000 contratos. Trava de segurança
+ * contra laço infinito, bem acima do tamanho real de qualquer clínica aqui
+ * (a maior tem cerca de 2.000).
+ */
+const MAX_PAGINAS_LISTA = 20;
 
 /** Uma linha devolvida pela função `buscar_contratos` do banco. */
 type LinhaBuscaContrato = {
@@ -552,6 +558,50 @@ export function ContratosPage({
   };
 
   /**
+   * Traz a listagem inteira da clínica, em páginas de 500.
+   *
+   * Antes vinha só a primeira página, e os filtros da tela (período, convênio,
+   * vendedor, situação…) rodavam em cima desse recorte — por isso o filtro
+   * "Últimos 30 dias" dizia "1–22 de 22 contratos" quando havia 29: os outros
+   * 7 não estavam entre os 500 mais recentes e nunca chegaram ao navegador.
+   *
+   * A primeira página vem sempre; as demais só quando a primeira encheu, então
+   * numa clínica pequena continua sendo uma ida só ao banco. Se a função do
+   * banco ainda não aceitar `_offset` (migration não aplicada), devolve o que
+   * veio na primeira página e a tela segue como antes.
+   */
+  const carregarListaPaginada = async (
+    clinicaId: string,
+  ): Promise<{ data: unknown; error: { code?: string; message?: string } | null }> => {
+    const primeira = await supabase.rpc("buscar_contratos", {
+      _clinica_id: clinicaId,
+      _termo: "",
+      _limit: LIMITE_LISTA,
+    });
+    if (primeira.error) return primeira;
+    const acumulado = [...((primeira.data ?? []) as LinhaBuscaContrato[])];
+    if (acumulado.length < LIMITE_LISTA) return { data: acumulado, error: null };
+
+    for (let pagina = 1; pagina < MAX_PAGINAS_LISTA; pagina += 1) {
+      const proxima = await supabase.rpc("buscar_contratos", {
+        _clinica_id: clinicaId,
+        _termo: "",
+        _limit: LIMITE_LISTA,
+        _offset: pagina * LIMITE_LISTA,
+      } as never);
+      if (proxima.error) {
+        // Migration do `_offset` ainda não aplicada: fica com o que já veio,
+        // que é exatamente o comportamento anterior — nada quebra.
+        return { data: acumulado, error: null };
+      }
+      const lote = (proxima.data ?? []) as LinhaBuscaContrato[];
+      acumulado.push(...lote);
+      if (lote.length < LIMITE_LISTA) break;
+    }
+    return { data: acumulado, error: null };
+  };
+
+  /**
    * Caminho novo: uma única chamada à função `buscar_contratos`, que já volta
    * com prontuário, contagem de parcelas e nome do vendedor. Devolve `false`
    * quando a função ainda não foi criada no banco, para o chamador cair no
@@ -562,11 +612,15 @@ export function ContratosPage({
     const s = termo.trim();
     const buscando = s.length >= 2;
     const [res, cv] = await Promise.all([
-      supabase.rpc("buscar_contratos", {
-        _clinica_id: clinicaAtual!.clinica_id,
-        _termo: buscando ? s : "",
-        _limit: buscando ? LIMITE_BUSCA : LIMITE_LISTA,
-      }),
+      buscando
+        ? // Busca por texto continua num lote só: o corte de 50 é proposital,
+          // serve para achar um paciente e a tela avisa quando corta.
+          supabase.rpc("buscar_contratos", {
+            _clinica_id: clinicaAtual!.clinica_id,
+            _termo: s,
+            _limit: LIMITE_BUSCA,
+          })
+        : carregarListaPaginada(clinicaAtual!.clinica_id),
       supabase
         .from("cb_convenios")
         .select("*")

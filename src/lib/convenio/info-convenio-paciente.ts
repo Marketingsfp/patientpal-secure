@@ -18,6 +18,7 @@ import {
   escolherContratoAtivo,
   LIMITE_CONTRATOS_CANDIDATOS,
 } from "@/lib/convenio/escolher-contrato-ativo";
+import { DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
 
 /**
  * Data de hoje no fuso LOCAL, formato "YYYY-MM-DD". `new Date().toISOString()`
@@ -152,7 +153,9 @@ export async function obterInfoConvenioPaciente(params: {
     .eq("contrato_id", contrato.id)
     .in("status", ["pendente", "aberto", "atrasado"])
     .lte("vencimento", hojeStr);
-  const DIAS_TOLERANCIA = 5;
+  // A régua vem de `cb-regras` para não haver dois "5" soltos no sistema: o
+  // indicador de inadimplentes da tela de Vendas usa a mesma constante.
+  const DIAS_TOLERANCIA = DIAS_TOLERANCIA_MENSALIDADE;
   const hojeMs = new Date(hojeStr + "T00:00:00").getTime();
   const diasAtrasoLista = (mens ?? []).map((m: any) => {
     const v = new Date(String(m.vencimento) + "T00:00:00").getTime();

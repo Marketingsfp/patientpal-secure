@@ -8,11 +8,14 @@ import {
   ChevronRight,
   CreditCard,
   DollarSign,
+  Info,
   Loader2,
   Pencil,
   Power,
   Users,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { classificarParcelaDoMes, DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
 
 /**
  * Visão em CARDS da lista de contratos do Cartão Benefício.
@@ -192,6 +195,26 @@ const ROTULO_FILTRO: Record<FiltroKpi, string> = {
   inativos: "Cancelados / inativos",
 };
 
+/**
+ * O que cada indicador conta, em uma frase.
+ *
+ * Existe porque três destes números medem coisa diferente do que o título
+ * sugere, e isso já gerou leitura errada: "Pagos no mês" não é dinheiro que
+ * entrou no mês, e "Novos contratos" não é venda do mês. Deixar a régua à
+ * mostra é mais honesto do que renomear o card e continuar ambíguo.
+ */
+const AJUDA: Record<FiltroKpi, string> = {
+  ativos:
+    "Todos os contratos com situação 'ativo' na clínica, e a soma das mensalidades deles. Não depende dos filtros da tela.",
+  pagos:
+    "Parcelas com vencimento neste mês que já foram quitadas. Não é o dinheiro recebido no mês: quem pagou em atraso uma parcela de outro mês entra no mês do vencimento dela, não neste.",
+  avencer: `Parcelas deste mês ainda em aberto que não bloqueiam o cartão: as que ainda não venceram e as vencidas há até ${DIAS_TOLERANCIA_MENSALIDADE} dias, que ainda estão na tolerância.`,
+  inadimplentes: `Parcelas com vencimento neste mês, não pagas, atrasadas há mais de ${DIAS_TOLERANCIA_MENSALIDADE} dias — a mesma régua que bloqueia o cartão no balcão. Só olha o mês corrente: quem deve de meses anteriores não entra aqui.`,
+  novos:
+    "Contratos cujo INÍCIO de vigência cai neste mês. Não é o mesmo que vendidos no mês: contrato cadastrado agora com início retroativo não entra.",
+  inativos: "Contratos cancelados, inativos ou encerrados. Não entram na receita prevista.",
+};
+
 function KpiCard({
   titulo,
   valor,
@@ -199,6 +222,7 @@ function KpiCard({
   tom,
   ativo = false,
   onClick,
+  ajuda,
 }: {
   titulo: string;
   valor: string;
@@ -206,6 +230,8 @@ function KpiCard({
   tom: TomNome;
   ativo?: boolean;
   onClick?: () => void;
+  /** Explica em uma frase o que exatamente este número conta. */
+  ajuda?: string;
 }) {
   const t = TONS[tom];
   const clicavel = Boolean(onClick);
@@ -231,8 +257,27 @@ function KpiCard({
     >
       <span className={`absolute inset-y-0 left-0 w-1 ${t.faixa}`} aria-hidden />
       <div className="pl-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {titulo}
+        <div className="flex items-start gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="min-w-0">{titulo}</span>
+          {ajuda ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* `span` e não `button`: o card inteiro já é um botão de
+                    filtro, e botão dentro de botão quebra o HTML. */}
+                <span
+                  tabIndex={0}
+                  aria-label={`O que entra em ${titulo}`}
+                  className="mt-px shrink-0 cursor-help text-muted-foreground/70 hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[260px] text-xs leading-snug">
+                {ajuda}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
         <div className={`mt-1 text-3xl font-semibold tabular-nums ${t.texto}`}>{valor}</div>
         <div className="mt-1 text-xs text-muted-foreground">{detalhe}</div>
@@ -409,19 +454,6 @@ export function ContratosCards({
     let cancelado = false;
     void (async () => {
       const { ini, fim, hojeIso } = limitesDoMes();
-      const { data } = await supabase
-        .from("contrato_mensalidades")
-        .select("status, valor, valor_pago, vencimento")
-        .eq("clinica_id", clinicaId)
-        .gte("vencimento", ini)
-        .lte("vencimento", fim);
-      if (cancelado) return;
-      const linhas = (data ?? []) as Array<{
-        status: string | null;
-        valor: number | null;
-        valor_pago: number | null;
-        vencimento: string;
-      }>;
       const resumo = {
         pagos: 0,
         pagosValor: 0,
@@ -430,22 +462,49 @@ export function ContratosCards({
         atrasados: 0,
         atrasadosValor: 0,
       };
-      linhas.forEach((l) => {
-        const pago = (l.status ?? "").toLowerCase() === "pago";
-        if (pago) {
-          resumo.pagos += 1;
-          resumo.pagosValor += Number(l.valor_pago ?? l.valor ?? 0);
+      for (let pagina = 0; pagina < MAX_PAGINAS_TOTAIS; pagina += 1) {
+        const de = pagina * PAGINA_TOTAIS;
+        const { data, error } = await supabase
+          .from("contrato_mensalidades")
+          .select("status, valor, valor_pago, vencimento")
+          .eq("clinica_id", clinicaId)
+          .gte("vencimento", ini)
+          .lte("vencimento", fim)
+          .range(de, de + PAGINA_TOTAIS - 1);
+        if (cancelado) return;
+        // Meio da paginação quebrado devolveria um total menor que o real —
+        // e um número menor que parece certo é pior que número nenhum.
+        if (error) {
+          setMes(null);
           return;
         }
-        if ((l.status ?? "").toLowerCase() === "cancelado") return;
-        if (l.vencimento < hojeIso) {
-          resumo.atrasados += 1;
-          resumo.atrasadosValor += Number(l.valor ?? 0);
-        } else {
-          resumo.aVencer += 1;
-          resumo.aVencerValor += Number(l.valor ?? 0);
-        }
-      });
+        const linhas = (data ?? []) as Array<{
+          status: string | null;
+          valor: number | null;
+          valor_pago: number | null;
+          vencimento: string;
+        }>;
+        linhas.forEach((l) => {
+          switch (classificarParcelaDoMes(l.status, l.vencimento, hojeIso)) {
+            case "paga":
+              resumo.pagos += 1;
+              resumo.pagosValor += Number(l.valor_pago ?? l.valor ?? 0);
+              break;
+            case "inadimplente":
+              resumo.atrasados += 1;
+              resumo.atrasadosValor += Number(l.valor ?? 0);
+              break;
+            case "a_vencer":
+              resumo.aVencer += 1;
+              resumo.aVencerValor += Number(l.valor ?? 0);
+              break;
+            case "cancelada":
+              break;
+          }
+        });
+        if (linhas.length < PAGINA_TOTAIS) break;
+      }
+      if (cancelado) return;
       setMes(resumo);
     })();
     return () => {
@@ -533,13 +592,17 @@ export function ContratosCards({
             cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
           );
         case "avencer":
+          // Mesma régua do indicador: ainda não venceu OU está dentro da
+          // tolerância — nos dois casos o cartão continua valendo.
           return Boolean(
             cob?.proximoVencimento &&
-            cob.proximoVencimento >= hojeIso &&
-            cob.proximoVencimento <= fim,
+            cob.proximoVencimento <= fim &&
+            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
           );
         case "inadimplentes":
-          return (cob?.diasEmAberto ?? 0) > 0 || Boolean(c.parcelas?.temAtrasada);
+          // Só a partir do 6º dia, igual ao bloqueio do balcão. Antes disso o
+          // card contava a partir do 1º dia e discordava do próprio número.
+          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
         default:
           return true;
       }
@@ -560,56 +623,64 @@ export function ContratosCards({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard
-          titulo="Contratos ativos"
-          valor={totais ? String(totais.ativos) : "—"}
-          detalhe={totais ? `Receita prevista ${BRL(totais.receita)}` : "Carregando…"}
-          tom="azul"
-          ativo={filtro === "ativos"}
-          onClick={() => alternar("ativos")}
-        />
-        <KpiCard
-          titulo="Pagos no mês"
-          valor={mes ? String(mes.pagos) : "—"}
-          detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
-          tom="verde"
-          ativo={filtro === "pagos"}
-          onClick={() => alternar("pagos")}
-        />
-        <KpiCard
-          titulo="A vencer"
-          valor={mes ? String(mes.aVencer) : "—"}
-          detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
-          tom="ambar"
-          ativo={filtro === "avencer"}
-          onClick={() => alternar("avencer")}
-        />
-        <KpiCard
-          titulo="Inadimplentes"
-          valor={mes ? String(mes.atrasados) : "—"}
-          detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
-          tom="vermelho"
-          ativo={filtro === "inadimplentes"}
-          onClick={() => alternar("inadimplentes")}
-        />
-        <KpiCard
-          titulo="Novos contratos"
-          valor={totais ? String(totais.novos) : "—"}
-          detalhe={totais ? `Neste mês · ${BRL(totais.novosValor)}` : "Carregando…"}
-          tom="azul"
-          ativo={filtro === "novos"}
-          onClick={() => alternar("novos")}
-        />
-        <KpiCard
-          titulo="Cancelados / inativos"
-          valor={totais ? String(totais.inativos) : "—"}
-          detalhe={totais ? "Fora de uso" : "Carregando…"}
-          tom="neutro"
-          ativo={filtro === "inativos"}
-          onClick={() => alternar("inativos")}
-        />
-      </div>
+      <TooltipProvider delayDuration={200}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <KpiCard
+            titulo="Contratos ativos"
+            valor={totais ? String(totais.ativos) : "—"}
+            detalhe={totais ? `Receita prevista ${BRL(totais.receita)}` : "Carregando…"}
+            tom="azul"
+            ativo={filtro === "ativos"}
+            onClick={() => alternar("ativos")}
+            ajuda={AJUDA.ativos}
+          />
+          <KpiCard
+            titulo="Pagos no mês"
+            valor={mes ? String(mes.pagos) : "—"}
+            detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
+            tom="verde"
+            ativo={filtro === "pagos"}
+            onClick={() => alternar("pagos")}
+            ajuda={AJUDA.pagos}
+          />
+          <KpiCard
+            titulo="A vencer"
+            valor={mes ? String(mes.aVencer) : "—"}
+            detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
+            tom="ambar"
+            ativo={filtro === "avencer"}
+            onClick={() => alternar("avencer")}
+            ajuda={AJUDA.avencer}
+          />
+          <KpiCard
+            titulo="Inadimplentes"
+            valor={mes ? String(mes.atrasados) : "—"}
+            detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
+            tom="vermelho"
+            ativo={filtro === "inadimplentes"}
+            onClick={() => alternar("inadimplentes")}
+            ajuda={AJUDA.inadimplentes}
+          />
+          <KpiCard
+            titulo="Novos contratos"
+            valor={totais ? String(totais.novos) : "—"}
+            detalhe={totais ? `Neste mês · ${BRL(totais.novosValor)}` : "Carregando…"}
+            tom="azul"
+            ativo={filtro === "novos"}
+            onClick={() => alternar("novos")}
+            ajuda={AJUDA.novos}
+          />
+          <KpiCard
+            titulo="Cancelados / inativos"
+            valor={totais ? String(totais.inativos) : "—"}
+            detalhe={totais ? "Fora de uso" : "Carregando…"}
+            tom="neutro"
+            ativo={filtro === "inativos"}
+            onClick={() => alternar("inativos")}
+            ajuda={AJUDA.inativos}
+          />
+        </div>
+      </TooltipProvider>
 
       {filtro && (
         <div className="flex items-center gap-2 text-sm">

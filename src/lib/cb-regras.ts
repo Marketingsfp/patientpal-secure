@@ -1,5 +1,57 @@
 /** Helpers para regras de preço de convênios do Cartão Benefícios. */
 
+/**
+ * Dias corridos de tolerância depois do vencimento da mensalidade.
+ *
+ * Regra de negócio: dentro da tolerância o cartão funciona NORMALMENTE — os
+ * mesmos benefícios, limites e descontos de sempre. Só a partir do 6º dia a
+ * parcela conta como atrasada e o convênio é bloqueado no balcão.
+ *
+ * Fica aqui, e não solto em cada tela, porque a mesma régua precisa valer em
+ * dois lugares que antes não conversavam: o bloqueio do atendimento
+ * (`info-convenio-paciente`) e o indicador de inadimplentes da tela de Vendas.
+ * Com o número repetido, um gestor olhando o card e a recepção olhando a ficha
+ * do paciente chegavam a conclusões opostas sobre a mesma pessoa.
+ */
+export const DIAS_TOLERANCIA_MENSALIDADE = 5;
+
+/** Em qual indicador do topo da tela de Vendas a parcela do mês entra. */
+export type SituacaoParcelaMes = "paga" | "cancelada" | "a_vencer" | "inadimplente";
+
+/**
+ * Classifica uma parcela com vencimento no mês corrente para os indicadores.
+ *
+ * Cada parcela cai em exatamente um balde, então os números do topo somam o
+ * total do mês sem sobra nem repetição.
+ *
+ * "A vencer" junta duas situações porque, para quem atende no balcão, elas são
+ * a mesma coisa: a parcela que ainda não venceu e a que venceu há poucos dias
+ * mas continua dentro da tolerância — nas duas o cartão funciona. Só depois da
+ * tolerância a parcela vira inadimplência, exatamente como no bloqueio do
+ * atendimento.
+ *
+ * As datas entram como texto ISO (AAAA-MM-DD) e são comparadas como texto de
+ * propósito: `new Date("2026-08-10")` é lido como UTC e, no Brasil, volta como
+ * dia 9 — erro que já custou um dia inteiro de diferença em outras telas.
+ */
+export function classificarParcelaDoMes(
+  status: string | null | undefined,
+  vencimentoIso: string,
+  hojeIso: string,
+  diasTolerancia: number = DIAS_TOLERANCIA_MENSALIDADE,
+): SituacaoParcelaMes {
+  const s = (status ?? "").toLowerCase();
+  if (s === "pago") return "paga";
+  if (s === "cancelado") return "cancelada";
+
+  const corte = new Date(hojeIso + "T00:00:00");
+  corte.setDate(corte.getDate() - diasTolerancia);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const corteIso = `${corte.getFullYear()}-${pad(corte.getMonth() + 1)}-${pad(corte.getDate())}`;
+
+  return vencimentoIso.slice(0, 10) < corteIso ? "inadimplente" : "a_vencer";
+}
+
 export interface CbRegra {
   id: string;
   convenio_id: string;
