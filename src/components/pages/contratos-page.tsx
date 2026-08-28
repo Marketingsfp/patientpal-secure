@@ -1135,7 +1135,83 @@ export function ContratosPage({
         </div>
       ) : null}
       {visaoCardsDisponivel ? (
-        <div className="flex items-center justify-end gap-1 pb-2">
+        <div className="flex flex-wrap items-center justify-end gap-1 pb-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant={periodo === "todos" ? "outline" : "default"}>
+                <CalendarRange className="h-4 w-4 mr-1" />
+                {periodo === "todos"
+                  ? "Período"
+                  : periodo === "7d"
+                    ? "Últimos 7 dias"
+                    : periodo === "15d"
+                      ? "Quinzenal"
+                      : periodo === "30d"
+                        ? "Últimos 30 dias"
+                        : periodo === "mes"
+                          ? "Este mês"
+                          : periodo === "mes_passado"
+                            ? "Mês passado"
+                            : periodo === "90d"
+                              ? "Últimos 90 dias"
+                              : periodo === "ano"
+                                ? "Este ano"
+                                : "Personalizado"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-3 space-y-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                Início do contrato
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {(
+                  [
+                    ["todos", "Todos"],
+                    ["7d", "Semanal (7d)"],
+                    ["15d", "Quinzenal (15d)"],
+                    ["30d", "30 dias"],
+                    ["mes", "Este mês"],
+                    ["mes_passado", "Mês passado"],
+                    ["90d", "90 dias"],
+                    ["ano", "Este ano"],
+                  ] as const
+                ).map(([valor, rotulo]) => (
+                  <Button
+                    key={valor}
+                    size="sm"
+                    variant={periodo === valor ? "default" : "outline"}
+                    className="justify-start text-xs"
+                    onClick={() => setPeriodo(valor)}
+                  >
+                    {rotulo}
+                  </Button>
+                ))}
+              </div>
+              <div className="pt-1 space-y-1">
+                <div className="text-xs font-medium text-muted-foreground">Personalizado</div>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="date"
+                    value={periodoDe}
+                    onChange={(e) => {
+                      setPeriodoDe(e.target.value);
+                      setPeriodo("personalizado");
+                    }}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    type="date"
+                    value={periodoAte}
+                    onChange={(e) => {
+                      setPeriodoAte(e.target.value);
+                      setPeriodo("personalizado");
+                    }}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             size="sm"
             variant={modoCards ? "default" : "outline"}
@@ -1152,6 +1228,7 @@ export function ContratosPage({
           </Button>
         </div>
       ) : null}
+
       <div className="rounded-md border bg-card overflow-hidden">
         {modoCards ? (
           <div className="p-3">
