@@ -565,7 +565,7 @@ export function ContratosCards({
       ) : (
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {itens.map((c) => {
+          {visiveis.map((c) => {
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
