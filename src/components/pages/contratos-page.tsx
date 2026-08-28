@@ -1625,7 +1625,7 @@ export function ContratosPage({
           </TableBody>
         </Table>
         )}
-        {!carregando && filtered.length > 0 ? (
+        {!carregando && !modoCards && filtered.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
               {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
