@@ -1044,7 +1044,38 @@ export function ContratosPage({
           </span>
         </div>
       ) : null}
+      {visaoCardsDisponivel ? (
+        <div className="flex items-center justify-end gap-1 pb-2">
+          <Button
+            size="sm"
+            variant={modoCards ? "default" : "outline"}
+            onClick={() => setModoCards(true)}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" /> Cards
+          </Button>
+          <Button
+            size="sm"
+            variant={modoCards ? "outline" : "default"}
+            onClick={() => setModoCards(false)}
+          >
+            <Rows3 className="h-4 w-4 mr-1" /> Tabela
+          </Button>
+        </div>
+      ) : null}
       <div className="rounded-md border bg-card overflow-hidden">
+        {modoCards ? (
+          <div className="p-3">
+            <ContratosCards
+              clinicaId={clinicaAtual?.clinica_id ?? ""}
+              itens={paginados.map((c) => paraCardItem(c))}
+              todos={filtered.map((c) => paraCardItem(c))}
+              onAbrir={(id) => {
+                const alvo = list.find((x) => x.id === id);
+                if (alvo) setDetail(alvo);
+              }}
+            />
+          </div>
+        ) : (
         <Table className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
             <TableRow className="bg-muted">
