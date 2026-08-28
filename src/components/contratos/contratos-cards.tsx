@@ -383,7 +383,7 @@ export function ContratosCards({
 
 
   useEffect(() => {
-    const lista = ids ? ids.split(",") : [];
+    const lista = idsPagina ? idsPagina.split(",") : [];
     if (lista.length === 0) {
       setDeps({});
       return;
@@ -406,7 +406,8 @@ export function ContratosCards({
     return () => {
       cancelado = true;
     };
-  }, [ids]);
+  }, [idsPagina]);
+
 
   // CPF do titular: o contrato guarda só o nome, o documento vem do paciente.
   useEffect(() => {
