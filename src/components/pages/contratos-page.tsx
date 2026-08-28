@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { LayoutGrid, Rows3 } from "lucide-react";
+import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import {
   ContratosCards,
   type ContratoCardItem,
@@ -435,6 +435,13 @@ export function ContratosPage({
     .toLowerCase()
     .includes("menino jesus");
   const [modoCards, setModoCards] = useState(false);
+  /** Filtro de período por data de início do contrato (só apresentação). */
+  const [periodo, setPeriodo] = useState<
+    "todos" | "7d" | "15d" | "30d" | "mes" | "mes_passado" | "90d" | "ano" | "personalizado"
+  >("todos");
+  const [periodoDe, setPeriodoDe] = useState("");
+  const [periodoAte, setPeriodoAte] = useState("");
+
   const [isencaoLoteOpen, setIsencaoLoteOpen] = useState(false);
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
@@ -766,9 +773,51 @@ export function ContratosPage({
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
     const dHoje = new Date(hojeStr + "T00:00:00").getTime();
     const anoAtual = new Date().getFullYear();
+    // Janela do filtro de período (por data de início do contrato).
+    const janela = (() => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const hoje = new Date(hojeStr + "T00:00:00");
+      const dias = (n: number) => ({
+        de: iso(new Date(dHoje - n * 86400000)),
+        ate: hojeStr,
+      });
+      switch (periodo) {
+        case "7d":
+          return dias(7);
+        case "15d":
+          return dias(15);
+        case "30d":
+          return dias(30);
+        case "90d":
+          return dias(90);
+        case "mes":
+          return {
+            de: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)),
+            ate: iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)),
+          };
+        case "mes_passado":
+          return {
+            de: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)),
+            ate: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+          };
+        case "ano":
+          return { de: `${anoAtual}-01-01`, ate: `${anoAtual}-12-31` };
+        case "personalizado":
+          return { de: periodoDe || "0000-01-01", ate: periodoAte || "9999-12-31" };
+        default:
+          return null;
+      }
+    })();
     const withFilters = base.filter((c) => {
       const a = parcAgg[c.id];
+      // Período (data de início)
+      if (janela) {
+        const ini = c.data_inicio?.slice(0, 10) ?? null;
+        if (!ini || ini < janela.de || ini > janela.ate) return false;
+      }
       // Início
+
       if (filtroInicio !== "todos") {
         const ini = c.data_inicio?.slice(0, 10) ?? null;
         if (!ini) return false;
@@ -847,7 +896,11 @@ export function ContratosPage({
     filtroVendedor,
     filtroStatus,
     filtroConvenio,
+    periodo,
+    periodoDe,
+    periodoAte,
   ]);
+
 
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
@@ -1082,7 +1135,83 @@ export function ContratosPage({
         </div>
       ) : null}
       {visaoCardsDisponivel ? (
-        <div className="flex items-center justify-end gap-1 pb-2">
+        <div className="flex flex-wrap items-center justify-end gap-1 pb-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant={periodo === "todos" ? "outline" : "default"}>
+                <CalendarRange className="h-4 w-4 mr-1" />
+                {periodo === "todos"
+                  ? "Período"
+                  : periodo === "7d"
+                    ? "Últimos 7 dias"
+                    : periodo === "15d"
+                      ? "Quinzenal"
+                      : periodo === "30d"
+                        ? "Últimos 30 dias"
+                        : periodo === "mes"
+                          ? "Este mês"
+                          : periodo === "mes_passado"
+                            ? "Mês passado"
+                            : periodo === "90d"
+                              ? "Últimos 90 dias"
+                              : periodo === "ano"
+                                ? "Este ano"
+                                : "Personalizado"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-3 space-y-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                Início do contrato
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {(
+                  [
+                    ["todos", "Todos"],
+                    ["7d", "Semanal (7d)"],
+                    ["15d", "Quinzenal (15d)"],
+                    ["30d", "30 dias"],
+                    ["mes", "Este mês"],
+                    ["mes_passado", "Mês passado"],
+                    ["90d", "90 dias"],
+                    ["ano", "Este ano"],
+                  ] as const
+                ).map(([valor, rotulo]) => (
+                  <Button
+                    key={valor}
+                    size="sm"
+                    variant={periodo === valor ? "default" : "outline"}
+                    className="justify-start text-xs"
+                    onClick={() => setPeriodo(valor)}
+                  >
+                    {rotulo}
+                  </Button>
+                ))}
+              </div>
+              <div className="pt-1 space-y-1">
+                <div className="text-xs font-medium text-muted-foreground">Personalizado</div>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="date"
+                    value={periodoDe}
+                    onChange={(e) => {
+                      setPeriodoDe(e.target.value);
+                      setPeriodo("personalizado");
+                    }}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    type="date"
+                    value={periodoAte}
+                    onChange={(e) => {
+                      setPeriodoAte(e.target.value);
+                      setPeriodo("personalizado");
+                    }}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             size="sm"
             variant={modoCards ? "default" : "outline"}
@@ -1099,6 +1228,7 @@ export function ContratosPage({
           </Button>
         </div>
       ) : null}
+
       <div className="rounded-md border bg-card overflow-hidden">
         {modoCards ? (
           <div className="p-3">
