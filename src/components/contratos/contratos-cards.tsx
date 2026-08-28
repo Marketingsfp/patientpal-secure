@@ -246,6 +246,8 @@ export function ContratosCards({
   const [cpfs, setCpfs] = useState<Record<string, string | null>>({});
   const [cobrancas, setCobrancas] = useState<Record<string, Cobranca>>({});
   const [imprimindo, setImprimindo] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
+
   const [mes, setMes] = useState<{
     pagos: number;
     pagosValor: number;
