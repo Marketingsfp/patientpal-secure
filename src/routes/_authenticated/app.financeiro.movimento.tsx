@@ -1496,10 +1496,12 @@ function Page() {
   // todos os outros cards e a tela deixaria de ser comparável. Os cards
   // mostram sempre o período inteiro; quem se estreita é a lista de baixo.
   const periodo = { de: fromDate, ate: toDate };
+  const nomeDaCategoria = new Map(cats.map((c) => [c.id, c.nome]));
   const grupoDaLinha = (l: Lanc): GrupoReceita =>
     classificarReceita(
       {
         tipo: l.tipo,
+        categoria: l.categoria_id ? (nomeDaCategoria.get(l.categoria_id) ?? null) : null,
         procedimento: l.procedimento,
         mensalidadeVencimento: l.mensalidadeVencimento,
         mensalidadeParcela: l.mensalidadeParcela,
@@ -1517,17 +1519,23 @@ function Page() {
   const totalParticular = Number(
     (composicao.consulta.total + composicao.exame_procedimento.total).toFixed(2),
   );
-  const totalMensalidades = Number(
+  // Recorrentes são as parcelas mensais — é exatamente o que os três cards de
+  // situação detalham, então este total sempre fecha com a soma deles.
+  const totalRecorrentes = Number(
     (
       composicao.mensalidade_periodo.total +
       composicao.mensalidade_atrasada.total +
       composicao.mensalidade_antecipada.total
     ).toFixed(2),
   );
-  const qtdMensalidades =
+  const qtdRecorrentes =
     composicao.mensalidade_periodo.qtd +
     composicao.mensalidade_atrasada.qtd +
     composicao.mensalidade_antecipada.qtd;
+  // O bloco inteiro é adesão + recorrentes: quem entrou agora no cartão mais
+  // quem já era cliente e pagou a parcela do mês.
+  const totalMensalidades = Number((totalRecorrentes + composicao.adesao.total).toFixed(2));
+  const qtdMensalidades = qtdRecorrentes + composicao.adesao.qtd;
   const displayItems = filtroGrupo
     ? itensVisiveis.filter((l) => l.tipo === "receita" && grupoDaLinha(l) === filtroGrupo)
     : itensVisiveis;
@@ -2229,6 +2237,30 @@ function Page() {
                   <p className="text-lg font-semibold tabular-nums">{fmt(totalMensalidades)}</p>
                   <p className="text-[10px] text-muted-foreground">
                     {qtdMensalidades} {qtdMensalidades === 1 ? "pagamento" : "pagamentos"}
+                  </p>
+                </div>
+              </div>
+              {/* Quem entrou agora × quem já era cliente. A diretoria pediu os
+                  dois separados: um mês com muita adesão e pouca mensalidade
+                  conta uma história diferente do contrário, e somados os dois
+                  pareciam o mesmo número. */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <CardGrupo
+                  grupo="adesao"
+                  comLegenda
+                  total={composicao.adesao.total}
+                  qtd={composicao.adesao.qtd}
+                  ativo={filtroGrupo === "adesao"}
+                  onClick={() => setFiltroGrupo(filtroGrupo === "adesao" ? null : "adesao")}
+                />
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+                    Mensalidades (recorrentes)
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">{fmt(totalRecorrentes)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {qtdRecorrentes} {qtdRecorrentes === 1 ? "pagamento" : "pagamentos"} · detalhado
+                    abaixo por mês de competência
                   </p>
                 </div>
               </div>

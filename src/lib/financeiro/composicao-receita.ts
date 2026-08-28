@@ -25,6 +25,7 @@ import {
 export type GrupoReceita =
   | "consulta"
   | "exame_procedimento"
+  | "adesao"
   | "mensalidade_periodo"
   | "mensalidade_atrasada"
   | "mensalidade_antecipada"
@@ -33,6 +34,7 @@ export type GrupoReceita =
 export const GRUPOS_RECEITA: GrupoReceita[] = [
   "consulta",
   "exame_procedimento",
+  "adesao",
   "mensalidade_periodo",
   "mensalidade_atrasada",
   "mensalidade_antecipada",
@@ -41,7 +43,8 @@ export const GRUPOS_RECEITA: GrupoReceita[] = [
 
 export const LABEL_GRUPO: Record<GrupoReceita, string> = {
   consulta: "Consultas",
-  exame_procedimento: "Exames / Procedimentos",
+  exame_procedimento: "Exames",
+  adesao: "Adesão (novos)",
   mensalidade_periodo: "Referente ao período",
   mensalidade_atrasada: "Atrasados",
   mensalidade_antecipada: "Antecipados",
@@ -51,7 +54,10 @@ export const LABEL_GRUPO: Record<GrupoReceita, string> = {
 /** Explicação curta de cada card, para a gestão saber o que está somando. */
 export const AJUDA_GRUPO: Record<GrupoReceita, string> = {
   consulta: "Atendimentos cujo procedimento é cadastrado como consulta.",
-  exame_procedimento: "Exames e procedimentos, incluindo laboratório e imagem.",
+  exame_procedimento:
+    "Exames e procedimentos, incluindo laboratório, imagem e procedimentos em consultório.",
+  adesao:
+    "Taxa de adesão do Cartão Benefícios e inclusão de dependente: cobrada uma vez, na entrada do cliente. Não é mensalidade.",
   mensalidade_periodo: "Mensalidade cujo vencimento cai dentro do período exibido.",
   mensalidade_atrasada: "Quitou agora uma mensalidade vencida antes do período.",
   mensalidade_antecipada: "Pagou adiantado uma mensalidade que vence depois do período.",
@@ -87,6 +93,8 @@ export function tipoDoProcedimento(
 export interface LinhaReceita {
   /** "receita" | "despesa" | "transferencia". Só receita é classificada. */
   tipo: string;
+  /** Nome da categoria financeira do lançamento. */
+  categoria?: string | null;
   /** Nome do procedimento do atendimento vinculado, se houver. */
   procedimento?: string | null;
   /** Vencimento (YYYY-MM-DD) da mensalidade do Cartão Benefícios quitada. */
@@ -108,6 +116,11 @@ export interface LinhaReceita {
  * cartão. Não é mensalidade e cai em "Outros", para não inflar o controle de
  * quem está em dia.
  */
+/** A categoria financeira é de adesão ao cartão? Aceita com e sem acento. */
+function ehCategoriaDeAdesao(categoria: string | null | undefined): boolean {
+  return /ADES[ÃA]O/i.test(categoria ?? "");
+}
+
 export function classificarReceita(
   l: LinhaReceita,
   periodo: { de: string; ate: string },
@@ -115,8 +128,18 @@ export function classificarReceita(
 ): GrupoReceita {
   if (l.tipo !== "receita") return "outros";
 
+  // Adesão vem ANTES da mensalidade porque é o caso mais específico: é a
+  // cobrança única da entrada no Cartão Benefícios (taxa de adesão e inclusão
+  // de dependente), e não uma parcela mensal. Ela aparece de duas formas nos
+  // dados de produção — vinculada a `contrato_mensalidades` com parcela 0 ou
+  // negativa, ou solta, com a categoria financeira de adesão —, e as duas
+  // precisam cair aqui. Antes disto tudo isso ficava escondido em "Outros".
+  const parcela = l.mensalidadeParcela;
+  if (l.mensalidadeVencimento && (parcela ?? 1) <= 0) return "adesao";
+  if (ehCategoriaDeAdesao(l.categoria)) return "adesao";
+
   const venc = l.mensalidadeVencimento;
-  if (venc && (l.mensalidadeParcela ?? 1) > 0) {
+  if (venc && (parcela ?? 1) > 0) {
     if (venc < periodo.de) return "mensalidade_atrasada";
     if (venc > periodo.ate) return "mensalidade_antecipada";
     return "mensalidade_periodo";
@@ -218,6 +241,7 @@ export const FILTRO_DA_FORMA: Partial<Record<FormaCanonica, FiltroForma>> = {
 export const LEGENDA_GRUPO: Record<GrupoReceita, string> = {
   consulta: "atendimento de consulta",
   exame_procedimento: "exames e procedimentos",
+  adesao: "entrou agora no cartão",
   mensalidade_periodo: "mensalidade do mês atual",
   mensalidade_atrasada: "quitou mês passado agora",
   mensalidade_antecipada: "pagou adiantado",

@@ -104,14 +104,16 @@ describe("classificarReceita", () => {
     ).toBe("mensalidade_periodo");
   });
 
-  it("taxa de adesão (parcela 0) não é mensalidade", () => {
+  it("taxa de adesão (parcela 0) não é mensalidade — tem grupo próprio", () => {
+    // Até 27/08/2026 caía em "outros"; a diretoria pediu o valor separado, e
+    // agora ele tem card próprio dentro do bloco de mensalidades.
     expect(
       classificarReceita(
         { tipo: "receita", mensalidadeVencimento: "2026-08-10", mensalidadeParcela: 0 },
         AGOSTO,
         TIPOS,
       ),
-    ).toBe("outros");
+    ).toBe("adesao");
   });
 
   it("mensalidade vence o procedimento quando os dois existem", () => {
@@ -288,5 +290,92 @@ describe("resumoSintetico", () => {
       linhas: [],
       total: { qtd: 0, entradas: 0, saidas: 0, saldo: 0 },
     });
+  });
+});
+
+describe("classificarReceita — adesão do Cartão Benefícios", () => {
+  it("mensalidade vinculada com parcela 0 é adesão, não mensalidade", () => {
+    expect(
+      classificarReceita(
+        { tipo: "receita", mensalidadeVencimento: "2026-08-10", mensalidadeParcela: 0 },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("adesao");
+  });
+
+  it("parcela negativa (dependente) também é adesão", () => {
+    expect(
+      classificarReceita(
+        { tipo: "receita", mensalidadeVencimento: "2026-08-10", mensalidadeParcela: -1 },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("adesao");
+  });
+
+  it("adesão solta, sem vínculo, é reconhecida pela categoria", () => {
+    // Em agosto/2026 são 11 lançamentos assim: categoria de adesão e nenhuma
+    // linha em contrato_mensalidades apontando para eles.
+    expect(
+      classificarReceita(
+        { tipo: "receita", categoria: "DEPENDENTE / ADESAO CARTAO" },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("adesao");
+    expect(
+      classificarReceita({ tipo: "receita", categoria: "TAXA DE ADESAO CARTAO" }, AGOSTO, TIPOS),
+    ).toBe("adesao");
+  });
+
+  it("categoria com acento também conta", () => {
+    expect(
+      classificarReceita({ tipo: "receita", categoria: "Taxa de Adesão" }, AGOSTO, TIPOS),
+    ).toBe("adesao");
+  });
+
+  it("mensalidade recorrente continua sendo mensalidade", () => {
+    expect(
+      classificarReceita(
+        {
+          tipo: "receita",
+          categoria: "MENSALIDADE CARTAO CONSULTA",
+          mensalidadeVencimento: "2026-08-10",
+          mensalidadeParcela: 2,
+        },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("mensalidade_periodo");
+  });
+
+  it("adesão vence o procedimento quando os dois existem", () => {
+    expect(
+      classificarReceita(
+        { tipo: "receita", categoria: "TAXA DE ADESAO CARTAO", procedimento: "CONSULTA" },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("adesao");
+  });
+
+  it("categoria comum não vira adesão por acidente", () => {
+    expect(
+      classificarReceita(
+        { tipo: "receita", categoria: "PARTICULAR", procedimento: "CONSULTA" },
+        AGOSTO,
+        TIPOS,
+      ),
+    ).toBe("consulta");
+  });
+
+  it("adesão entra na lista de grupos e no fechamento", () => {
+    const t = totaisPorGrupo([
+      { grupo: "adesao", valor: 30 },
+      { grupo: "mensalidade_periodo", valor: 150 },
+    ]);
+    expect(t.adesao).toEqual({ qtd: 1, total: 30 });
+    expect(GRUPOS_RECEITA).toContain("adesao");
   });
 });
