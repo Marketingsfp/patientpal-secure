@@ -15,14 +15,19 @@
  */
 export const DIAS_TOLERANCIA_MENSALIDADE = 5;
 
-/** Em qual indicador do topo da tela de Vendas a parcela do mês entra. */
-export type SituacaoParcelaMes = "paga" | "cancelada" | "a_vencer" | "inadimplente";
+/** Em qual balde a parcela entra nos indicadores e relatórios do Cartão. */
+export type SituacaoParcela = "paga" | "cancelada" | "a_vencer" | "inadimplente";
 
 /**
- * Classifica uma parcela com vencimento no mês corrente para os indicadores.
+ * Classifica uma parcela de mensalidade.
  *
- * Cada parcela cai em exatamente um balde, então os números do topo somam o
- * total do mês sem sobra nem repetição.
+ * Vale para qualquer parcela, de qualquer vencimento — é usada tanto pelos
+ * indicadores do topo da tela de Vendas (que já filtram o mês antes de
+ * chamar) quanto pelo relatório do módulo, que olha todas as parcelas dos
+ * contratos do período.
+ *
+ * Cada parcela cai em exatamente um balde, então os números somam o total sem
+ * sobra nem repetição.
  *
  * "A vencer" junta duas situações porque, para quem atende no balcão, elas são
  * a mesma coisa: a parcela que ainda não venceu e a que venceu há poucos dias
@@ -34,12 +39,12 @@ export type SituacaoParcelaMes = "paga" | "cancelada" | "a_vencer" | "inadimplen
  * propósito: `new Date("2026-08-10")` é lido como UTC e, no Brasil, volta como
  * dia 9 — erro que já custou um dia inteiro de diferença em outras telas.
  */
-export function classificarParcelaDoMes(
+export function classificarParcela(
   status: string | null | undefined,
   vencimentoIso: string,
   hojeIso: string,
   diasTolerancia: number = DIAS_TOLERANCIA_MENSALIDADE,
-): SituacaoParcelaMes {
+): SituacaoParcela {
   const s = (status ?? "").toLowerCase();
   if (s === "pago") return "paga";
   if (s === "cancelado") return "cancelada";

@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
+import { classificarParcela } from "@/lib/cb-regras";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/relatorios")({
@@ -69,7 +70,6 @@ type Dep = {
 };
 type Pac = { id: string; data_nascimento: string | null };
 type Atend = { id: string; paciente_id: string | null; data: string };
-type Lanc = { id: string; tipo: string; valor: number; data: string; descricao?: string | null };
 
 function idade(dn: string | null): number | null {
   if (!dn) return null;
@@ -109,7 +109,6 @@ function RelatoriosPage() {
   const [deps, setDeps] = useState<Dep[]>([]);
   const [pacs, setPacs] = useState<Map<string, Pac>>(new Map());
   const [atends, setAtends] = useState<Atend[]>([]);
-  const [despesas, setDespesas] = useState<Lanc[]>([]);
   const [allContratos, setAllContratos] = useState<Contrato[]>([]);
   const [allDeps, setAllDeps] = useState<Dep[]>([]);
   const [allMens, setAllMens] = useState<Mens[]>([]);
@@ -119,7 +118,7 @@ function RelatoriosPage() {
     setLoading(true);
     const cid = clinicaAtual.clinica_id;
 
-    const [cs, ps, ds, ls] = await Promise.all([
+    const [cs, ps, ds] = await Promise.all([
       supabase
         .from("contratos_assinatura")
         .select(
@@ -138,14 +137,6 @@ function RelatoriosPage() {
         .from("contrato_dependentes")
         .select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo")
         .eq("ativo", true)
-        .limit(5000),
-      supabase
-        .from("fin_lancamentos")
-        .select("id, tipo, valor, data, descricao")
-        .eq("clinica_id", cid)
-        .eq("tipo", "despesa")
-        .gte("data", from)
-        .lte("data", to)
         .limit(5000),
     ]);
     const cList = (cs.data ?? []) as Contrato[];
@@ -220,7 +211,6 @@ function RelatoriosPage() {
     setDeps(depsFiltered);
     setPacs(pacMap);
     setAtends((atendsRes.data ?? []) as Atend[]);
-    setDespesas((ls.data ?? []) as Lanc[]);
     setAllContratos(allCList);
     setAllDeps((allDepsRes.data ?? []) as Dep[]);
     setAllMens((allMensRes.data ?? []) as Mens[]);
@@ -232,6 +222,12 @@ function RelatoriosPage() {
   }, [clinicaAtual?.clinica_id, from, to]);
 
   const stats = useMemo(() => {
+    // Data local. `new Date().toISOString()` devolveria a data em UTC, que no
+    // Brasil vira o dia seguinte depois das 21h — e uma parcela que vence hoje
+    // apareceria como vencida.
+    const agora = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const hojeIso = `${agora.getFullYear()}-${pad2(agora.getMonth() + 1)}-${pad2(agora.getDate())}`;
     const totalContratos = contratos.length;
     const ativos = contratos.filter((c) => c.status === "ativo").length;
     const titulares = new Set(contratos.map((c) => c.paciente_id)).size;
@@ -253,19 +249,25 @@ function RelatoriosPage() {
     const receitaMens = pagasPeriodo
       .filter((m) => !isAdesao(m))
       .reduce((s, m) => s + Number(m.valor), 0);
-    const contratosComAdesaoLancada = new Set(mens.filter(isAdesao).map((m) => m.contrato_id));
-    const receitaAdesaoLancada = pagasPeriodo
-      .filter(isAdesao)
-      .reduce((s, m) => s + Number(m.valor), 0);
-    const receitaAdesaoLegada = contratos
-      .filter((c) => !contratosComAdesaoLancada.has(c.id))
-      .reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
-    const receitaAdesao = receitaAdesaoLancada + receitaAdesaoLegada;
+    // Receita de adesão: SÓ o que foi efetivamente pago e lançado no período.
+    // Antes somava também a `taxa_adesao` cadastrada nos contratos que não
+    // tinham linha de adesão — dinheiro que talvez nunca tenha entrado. Isso
+    // inflava a receita e, junto com ela, o ticket médio e a margem.
+    const receitaAdesao = pagasPeriodo.filter(isAdesao).reduce((s, m) => s + Number(m.valor), 0);
     const receita = receitaMens + receitaAdesao;
-    const aReceber = mens
-      .filter((m) => m.status !== "pago")
-      .reduce((s, m) => s + Number(m.valor), 0);
-    const despesa = despesas.reduce((s, l) => s + Number(l.valor), 0);
+
+    // "A receber" separado em duas colunas, porque são coisas diferentes:
+    // parcela futura é previsão, parcela vencida é dívida. Juntas, davam a
+    // impressão de que um contrato novo já nascia devendo o ano inteiro.
+    const emAberto = mens.filter((m) => m.status !== "pago" && m.status !== "cancelado");
+    const aVencer = emAberto.filter(
+      (m) => classificarParcela(m.status, m.vencimento, hojeIso) === "a_vencer",
+    );
+    const vencido = emAberto.filter(
+      (m) => classificarParcela(m.status, m.vencimento, hojeIso) === "inadimplente",
+    );
+    const aReceberFuturo = aVencer.reduce((s, m) => s + Number(m.valor), 0);
+    const aReceberVencido = vencido.reduce((s, m) => s + Number(m.valor), 0);
 
     // Utilização: atendimentos por paciente vinculado
     const usoTotal = atends.length;
@@ -380,14 +382,19 @@ function RelatoriosPage() {
     const usosSemVinculo = Math.max(0, usoTotal - usosTitulares - usosDependentes);
 
     // Financeiro derivado
-    const resultado = receita - despesa;
-    const margemPct = receita > 0 ? (resultado / receita) * 100 : 0;
     const ticketMedio = pagantes > 0 ? receita / pagantes : 0;
     const mensalidades = mens.filter((m) => !isAdesao(m));
-    const totalMens = mensalidades.length;
     const mensPagas = mensalidades.filter((m) => m.status === "pago").length;
-    const mensAbertas = totalMens - mensPagas;
-    const inadimplenciaPct = totalMens > 0 ? (mensAbertas / totalMens) * 100 : 0;
+    // Inadimplência conta só parcela VENCIDA além da tolerância. Antes dividia
+    // as em aberto pelo total, e como todo contrato nasce com 12 parcelas
+    // futuras, um contrato vendido hoje aparecia com 92% de inadimplência.
+    const mensVencidas = mensalidades.filter(
+      (m) => classificarParcela(m.status, m.vencimento, hojeIso) === "inadimplente",
+    ).length;
+    // A base da conta é o que já era exigível: vencidas + pagas. Parcela que
+    // ainda não venceu não entra nem no numerador nem no denominador.
+    const baseCobravel = mensVencidas + mensPagas;
+    const inadimplenciaPct = baseCobravel > 0 ? (mensVencidas / baseCobravel) * 100 : 0;
     const utilizacaoPct =
       titulares + dependentesCount > 0
         ? (usoPorPac.size / (titulares + dependentesCount)) * 100
@@ -407,8 +414,10 @@ function RelatoriosPage() {
       receita,
       receitaMens,
       receitaAdesao,
-      aReceber,
-      despesa,
+      aReceberFuturo,
+      aReceberVencido,
+      aVencer,
+      vencido,
       usoTotal,
       porPlano,
       porPlanoAll,
@@ -420,29 +429,14 @@ function RelatoriosPage() {
       usosTitulares,
       usosDependentes,
       usosSemVinculo,
-      resultado,
-      margemPct,
       ticketMedio,
       inadimplenciaPct,
       mensPagas,
-      mensAbertas,
+      mensVencidas,
       utilizacaoPct,
       mediaConsultasPessoa,
     };
-  }, [
-    contratos,
-    planos,
-    mens,
-    deps,
-    pacs,
-    atends,
-    despesas,
-    allContratos,
-    allDeps,
-    allMens,
-    from,
-    to,
-  ]);
+  }, [contratos, planos, mens, deps, pacs, atends, allContratos, allDeps, allMens, from, to]);
 
   const exportarPlanos = () => {
     exportToExcel(stats.porPlanoAll, `cartao_beneficios_planos_${from}_${to}`, [
@@ -559,23 +553,14 @@ function RelatoriosPage() {
       const pagas = mens.filter(
         (m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to,
       );
-      const contratosComAdesaoLancada = new Set(
-        mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id),
-      );
-      const rows = [
-        ...pagas.map((m) => ({
-          data: fmtDate(m.pago_em ?? ""),
-          descricao: `${Number(m.numero_parcela) === 0 ? "Adesão" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "—"}`,
-          valor: BRL(m.valor),
-        })),
-        ...contratos
-          .filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id))
-          .map((c) => ({
-            data: fmtDate(c.data_inicio),
-            descricao: `Adesão - ${c.paciente_nome}`,
-            valor: BRL(c.taxa_adesao),
-          })),
-      ];
+      // Só o que foi recebido de fato. A lista antiga acrescentava a taxa de
+      // adesão cadastrada nos contratos sem linha de adesão, mesmo sem
+      // pagamento — o detalhe não fechava com o card.
+      const rows = pagas.map((m) => ({
+        data: fmtDate(m.pago_em ?? ""),
+        descricao: `${Number(m.numero_parcela) === 0 ? "Adesão" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "—"}`,
+        valor: BRL(m.valor),
+      }));
       setDrill({
         title: `Receita do período (${rows.length})`,
         columns: [
@@ -585,11 +570,15 @@ function RelatoriosPage() {
         ],
         rows,
       });
-    } else if (which === "aReceber") {
+    } else if (which === "aVencer" || which === "vencido") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
-      const lista = mens.filter((m) => m.status !== "pago");
+      const futuro = which === "aVencer";
+      const lista = futuro ? stats.aVencer : stats.vencido;
+      const total = futuro ? stats.aReceberFuturo : stats.aReceberVencido;
       setDrill({
-        title: `A receber (${lista.length})`,
+        title: futuro
+          ? `A vencer — ${lista.length} parcela(s), ${BRL(total)}`
+          : `Vencido / em atraso — ${lista.length} parcela(s), ${BRL(total)}`,
         columns: [
           { key: "venc", label: "Vencimento" },
           { key: "titular", label: "Titular" },
@@ -603,20 +592,6 @@ function RelatoriosPage() {
           valor: BRL(m.valor),
         })),
       });
-    } else if (which === "despesas") {
-      setDrill({
-        title: `Despesas do período (${despesas.length})`,
-        columns: [
-          { key: "data", label: "Data" },
-          { key: "descricao", label: "Descrição" },
-          { key: "valor", label: "Valor", align: "right" },
-        ],
-        rows: despesas.map((l) => ({
-          data: fmtDate(l.data),
-          descricao: l.descricao ?? "—",
-          valor: BRL(l.valor),
-        })),
-      });
     } else if (which === "atendimentos") {
       setDrill({
         title: `Atendimentos usados (${atends.length})`,
@@ -628,46 +603,6 @@ function RelatoriosPage() {
           data: fmtDate(a.data),
           paciente: a.paciente_id ? (pessoaNomeAll.get(a.paciente_id) ?? "—") : "—",
         })),
-      });
-    } else if (which === "resultado") {
-      const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
-      const pagas = mens.filter(
-        (m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to,
-      );
-      const contratosComAdesaoLancada = new Set(
-        mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id),
-      );
-      const rows = [
-        ...pagas.map((m) => ({
-          data: fmtDate(m.pago_em ?? ""),
-          tipo: "Receita",
-          descricao: `${Number(m.numero_parcela) === 0 ? "Adesão" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "—"}`,
-          valor: BRL(m.valor),
-        })),
-        ...contratos
-          .filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id))
-          .map((c) => ({
-            data: fmtDate(c.data_inicio),
-            tipo: "Receita",
-            descricao: `Adesão - ${c.paciente_nome}`,
-            valor: BRL(c.taxa_adesao),
-          })),
-        ...despesas.map((l) => ({
-          data: fmtDate(l.data),
-          tipo: "Despesa",
-          descricao: l.descricao ?? "—",
-          valor: `- ${BRL(l.valor)}`,
-        })),
-      ];
-      setDrill({
-        title: `${stats.resultado >= 0 ? "Lucro" : "Prejuízo"} do período (${BRL(Math.abs(stats.resultado))})`,
-        columns: [
-          { key: "data", label: "Data" },
-          { key: "tipo", label: "Tipo" },
-          { key: "descricao", label: "Descrição" },
-          { key: "valor", label: "Valor", align: "right" },
-        ],
-        rows,
       });
     } else if (which === "ticket") {
       const contratosComPag = new Set(
@@ -704,9 +639,11 @@ function RelatoriosPage() {
       });
     } else if (which === "inadimplencia") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
-      const lista = mens.filter((m) => m.status !== "pago");
+      // Só as vencidas além da tolerância — a lista tem que mostrar as mesmas
+      // parcelas que o card conta, senão o detalhe desmente o número.
+      const lista = stats.vencido;
       setDrill({
-        title: `Inadimplência — ${stats.mensAbertas} aberta(s) de ${stats.mensPagas + stats.mensAbertas}`,
+        title: `Inadimplência — ${stats.mensVencidas} vencida(s) de ${stats.mensVencidas + stats.mensPagas} já exigíveis`,
         columns: [
           { key: "venc", label: "Vencimento" },
           { key: "titular", label: "Titular" },
@@ -948,16 +885,16 @@ function RelatoriosPage() {
           value={BRL(stats.receita)}
         />
         <KPI
-          onClick={() => openDrill("aReceber")}
-          icon={<TrendingUp className="h-4 w-4 text-orange-600" />}
-          label="A receber"
-          value={BRL(stats.aReceber)}
+          onClick={() => openDrill("aVencer")}
+          icon={<TrendingUp className="h-4 w-4 text-blue-600" />}
+          label="A vencer (futuro)"
+          value={BRL(stats.aReceberFuturo)}
         />
         <KPI
-          onClick={() => openDrill("despesas")}
+          onClick={() => openDrill("vencido")}
           icon={<TrendingDown className="h-4 w-4 text-red-600" />}
-          label="Despesas (período)"
-          value={BRL(stats.despesa)}
+          label="Vencido / em atraso"
+          value={BRL(stats.aReceberVencido)}
         />
         <KPI
           onClick={() => openDrill("atendimentos")}
@@ -969,18 +906,6 @@ function RelatoriosPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPI
-          onClick={() => openDrill("resultado")}
-          icon={
-            stats.resultado >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            )
-          }
-          label={stats.resultado >= 0 ? "Lucro (período)" : "Prejuízo (período)"}
-          value={`${BRL(Math.abs(stats.resultado))} (${stats.margemPct.toFixed(1)}%)`}
-        />
-        <KPI
           onClick={() => openDrill("ticket")}
           icon={<Activity className="h-4 w-4" />}
           label="Ticket médio / pagante"
@@ -990,7 +915,7 @@ function RelatoriosPage() {
           onClick={() => openDrill("inadimplencia")}
           icon={<Activity className="h-4 w-4" />}
           label="Inadimplência"
-          value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensAbertas}/${stats.mensPagas + stats.mensAbertas})`}
+          value={`${stats.inadimplenciaPct.toFixed(1)}% (${stats.mensVencidas}/${stats.mensVencidas + stats.mensPagas})`}
         />
         <KPI
           onClick={() => openDrill("utilizacao")}

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
-  classificarParcelaDoMes,
+  classificarParcela,
   DIAS_TOLERANCIA_MENSALIDADE,
-  type SituacaoParcelaMes,
+  type SituacaoParcela,
 } from "./cb-regras";
 
 /**
@@ -21,10 +21,10 @@ function diasAtras(n: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const classificar = (status: string | null, vencimento: string): SituacaoParcelaMes =>
-  classificarParcelaDoMes(status, vencimento, HOJE);
+const classificar = (status: string | null, vencimento: string): SituacaoParcela =>
+  classificarParcela(status, vencimento, HOJE);
 
-describe("classificarParcelaDoMes — status", () => {
+describe("classificarParcela — status", () => {
   it("parcela paga é paga, mesmo vencida há muito tempo", () => {
     expect(classificar("pago", diasAtras(90))).toBe("paga");
   });
@@ -48,7 +48,7 @@ describe("classificarParcelaDoMes — status", () => {
   });
 });
 
-describe("classificarParcelaDoMes — a régua da tolerância", () => {
+describe("classificarParcela — a régua da tolerância", () => {
   it("parcela que ainda não venceu é a vencer", () => {
     expect(classificar("pendente", diasAtras(-3))).toBe("a_vencer");
   });
@@ -76,18 +76,18 @@ describe("classificarParcelaDoMes — a régua da tolerância", () => {
   });
 
   it("aceita uma tolerância diferente quando informada", () => {
-    expect(classificarParcelaDoMes("pendente", diasAtras(3), HOJE, 0)).toBe("inadimplente");
-    expect(classificarParcelaDoMes("pendente", diasAtras(3), HOJE, 10)).toBe("a_vencer");
+    expect(classificarParcela("pendente", diasAtras(3), HOJE, 0)).toBe("inadimplente");
+    expect(classificarParcela("pendente", diasAtras(3), HOJE, 10)).toBe("a_vencer");
   });
 });
 
-describe("classificarParcelaDoMes — datas", () => {
+describe("classificarParcela — datas", () => {
   it("não escorrega um dia por causa de fuso horário", () => {
     // `new Date("2026-08-01")` é lido como UTC e no Brasil volta como 31/07.
     // Se a função caísse nessa, a parcela do dia 1º seria classificada com a
     // data do dia anterior. Vale a virada de mês, que é onde isso apareceria.
-    expect(classificarParcelaDoMes("pendente", "2026-08-01", "2026-08-06")).toBe("a_vencer");
-    expect(classificarParcelaDoMes("pendente", "2026-08-01", "2026-08-07")).toBe("inadimplente");
+    expect(classificarParcela("pendente", "2026-08-01", "2026-08-06")).toBe("a_vencer");
+    expect(classificarParcela("pendente", "2026-08-01", "2026-08-07")).toBe("inadimplente");
   });
 
   it("aceita vencimento com hora junto", () => {
@@ -96,13 +96,13 @@ describe("classificarParcelaDoMes — datas", () => {
 
   it("atravessa a virada de mês sem erro", () => {
     // Hoje 03/09, parcela vencida em 30/08: 4 dias, ainda na tolerância.
-    expect(classificarParcelaDoMes("pendente", "2026-08-30", "2026-09-03")).toBe("a_vencer");
+    expect(classificarParcela("pendente", "2026-08-30", "2026-09-03")).toBe("a_vencer");
     // Mesma parcela dois dias depois: 6 dias, já é inadimplência.
-    expect(classificarParcelaDoMes("pendente", "2026-08-30", "2026-09-05")).toBe("inadimplente");
+    expect(classificarParcela("pendente", "2026-08-30", "2026-09-05")).toBe("inadimplente");
   });
 });
 
-describe("classificarParcelaDoMes — os baldes não se sobrepõem", () => {
+describe("classificarParcela — os baldes não se sobrepõem", () => {
   it("cada parcela cai em exatamente um indicador", () => {
     const casos: Array<[string | null, string]> = [
       ["pago", diasAtras(10)],

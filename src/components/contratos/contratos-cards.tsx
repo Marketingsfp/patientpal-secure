@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { classificarParcelaDoMes, DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
+import { classificarParcela, DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
 
 /**
  * Visão em CARDS da lista de contratos do Cartão Benefício.
@@ -485,7 +485,7 @@ export function ContratosCards({
           vencimento: string;
         }>;
         linhas.forEach((l) => {
-          switch (classificarParcelaDoMes(l.status, l.vencimento, hojeIso)) {
+          switch (classificarParcela(l.status, l.vencimento, hojeIso)) {
             case "paga":
               resumo.pagos += 1;
               resumo.pagosValor += Number(l.valor_pago ?? l.valor ?? 0);
