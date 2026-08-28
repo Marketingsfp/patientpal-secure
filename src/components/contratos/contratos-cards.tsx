@@ -295,9 +295,15 @@ export function ContratosCards({ itens, todos, clinicaId, onAbrir }: Props) {
             const expandido = Boolean(aberto[c.id]);
             const emDia = !c.parcelas || !c.parcelas.temAtrasada;
             const cancelado = (c.status ?? "").toLowerCase() !== "ativo";
+            const tom = cancelado ? TONS.neutro : emDia ? TONS.verde : TONS.ambar;
             return (
-              <Card key={c.id} className="flex flex-col gap-3 p-4">
+              <Card
+                key={c.id}
+                className={`relative flex flex-col gap-3 overflow-hidden p-4 pl-5 ${tom.borda}`}
+              >
+                <span className={`absolute inset-y-0 left-0 w-1 ${tom.faixa}`} aria-hidden />
                 <div className="flex items-start gap-3">
+
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">
                     {iniciais(c.paciente_nome)}
                   </div>
