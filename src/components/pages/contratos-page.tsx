@@ -896,7 +896,11 @@ export function ContratosPage({
     filtroVendedor,
     filtroStatus,
     filtroConvenio,
+    periodo,
+    periodoDe,
+    periodoAte,
   ]);
+
 
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
