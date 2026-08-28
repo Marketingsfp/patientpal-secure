@@ -1319,7 +1319,7 @@ export function ContratosPage({
           <div className="p-3">
             <ContratosCards
               clinicaId={clinicaAtual?.clinica_id ?? ""}
-              itens={paginados.map((c) => paraCardItem(c))}
+              itens={filtered.map((c) => paraCardItem(c))}
               podeEscrever={podeEscrever}
               onAbrir={(id) => abrirContratoCom(id, "dados", null)}
               onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
