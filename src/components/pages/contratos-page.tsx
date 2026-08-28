@@ -852,6 +852,24 @@ export function ContratosPage({
     for (const cv of convenios) m.set(cv.id, cv.nome);
     return m;
   }, [convenios]);
+  // Converte a linha do contrato no formato usado pela visão em cards.
+  const paraCardItem = useCallback(
+    (c: Contrato): ContratoCardItem => ({
+      id: c.id,
+      numero: c.numero ?? null,
+      paciente_nome: c.paciente_nome,
+      codigo_prontuario: (c as Contrato & { codigo_prontuario?: string | null })
+        .codigo_prontuario as string | null,
+      convenio_nome: (c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? null,
+      status: c.status,
+      data_inicio: c.data_inicio,
+      data_fim: c.data_fim ?? null,
+      valor_mensal: Number(c.valor_mensal || 0),
+      vendedor: c.criado_por ? (vendedores[c.criado_por] ?? null) : null,
+      parcelas: parcAgg[c.id],
+    }),
+    [convenioNomePorId, vendedores, parcAgg],
+  );
   const statusOpcoes = useMemo(() => {
     const s = new Set<string>();
     for (const c of list) if (c.status) s.add(c.status);
