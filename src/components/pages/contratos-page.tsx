@@ -773,9 +773,51 @@ export function ContratosPage({
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
     const dHoje = new Date(hojeStr + "T00:00:00").getTime();
     const anoAtual = new Date().getFullYear();
+    // Janela do filtro de período (por data de início do contrato).
+    const janela = (() => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const hoje = new Date(hojeStr + "T00:00:00");
+      const dias = (n: number) => ({
+        de: iso(new Date(dHoje - n * 86400000)),
+        ate: hojeStr,
+      });
+      switch (periodo) {
+        case "7d":
+          return dias(7);
+        case "15d":
+          return dias(15);
+        case "30d":
+          return dias(30);
+        case "90d":
+          return dias(90);
+        case "mes":
+          return {
+            de: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)),
+            ate: iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)),
+          };
+        case "mes_passado":
+          return {
+            de: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)),
+            ate: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+          };
+        case "ano":
+          return { de: `${anoAtual}-01-01`, ate: `${anoAtual}-12-31` };
+        case "personalizado":
+          return { de: periodoDe || "0000-01-01", ate: periodoAte || "9999-12-31" };
+        default:
+          return null;
+      }
+    })();
     const withFilters = base.filter((c) => {
       const a = parcAgg[c.id];
+      // Período (data de início)
+      if (janela) {
+        const ini = c.data_inicio?.slice(0, 10) ?? null;
+        if (!ini || ini < janela.de || ini > janela.ate) return false;
+      }
       // Início
+
       if (filtroInicio !== "todos") {
         const ini = c.data_inicio?.slice(0, 10) ?? null;
         if (!ini) return false;
