@@ -1,4 +1,17 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { LayoutGrid, Rows3 } from "lucide-react";
+import {
+  ContratosCards,
+  type ContratoCardItem,
+} from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
 import {
   FileSignature,
@@ -416,6 +429,12 @@ export function ContratosPage({
   const podeIsentarCarencia = ["admin", "gestor"].includes(
     (clinicaAtual?.role ?? "").toLowerCase(),
   );
+  // Visão em cards do Cartão Benefício — hoje só na Policlínica Menino Jesus.
+  // As demais clínicas seguem com a tabela de sempre.
+  const visaoCardsDisponivel = (clinicaAtual?.clinica?.nome ?? "")
+    .toLowerCase()
+    .includes("menino jesus");
+  const [modoCards, setModoCards] = useState(false);
   const [isencaoLoteOpen, setIsencaoLoteOpen] = useState(false);
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
@@ -846,6 +865,24 @@ export function ContratosPage({
     for (const cv of convenios) m.set(cv.id, cv.nome);
     return m;
   }, [convenios]);
+  // Converte a linha do contrato no formato usado pela visão em cards.
+  const paraCardItem = useCallback(
+    (c: Contrato): ContratoCardItem => ({
+      id: c.id,
+      numero: c.numero ?? null,
+      paciente_nome: c.paciente_nome,
+      codigo_prontuario: (c as Contrato & { codigo_prontuario?: string | null })
+        .codigo_prontuario as string | null,
+      convenio_nome: (c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? null,
+      status: c.status,
+      data_inicio: c.data_inicio,
+      data_fim: c.data_fim ?? null,
+      valor_mensal: Number(c.valor_mensal || 0),
+      vendedor: c.criado_por ? (vendedores[c.criado_por] ?? null) : null,
+      parcelas: parcAgg[c.id],
+    }),
+    [convenioNomePorId, vendedores, parcAgg],
+  );
   const statusOpcoes = useMemo(() => {
     const s = new Set<string>();
     for (const c of list) if (c.status) s.add(c.status);
@@ -1044,7 +1081,38 @@ export function ContratosPage({
           </span>
         </div>
       ) : null}
+      {visaoCardsDisponivel ? (
+        <div className="flex items-center justify-end gap-1 pb-2">
+          <Button
+            size="sm"
+            variant={modoCards ? "default" : "outline"}
+            onClick={() => setModoCards(true)}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" /> Cards
+          </Button>
+          <Button
+            size="sm"
+            variant={modoCards ? "outline" : "default"}
+            onClick={() => setModoCards(false)}
+          >
+            <Rows3 className="h-4 w-4 mr-1" /> Tabela
+          </Button>
+        </div>
+      ) : null}
       <div className="rounded-md border bg-card overflow-hidden">
+        {modoCards ? (
+          <div className="p-3">
+            <ContratosCards
+              clinicaId={clinicaAtual?.clinica_id ?? ""}
+              itens={paginados.map((c) => paraCardItem(c))}
+              todos={filtered.map((c) => paraCardItem(c))}
+              onAbrir={(id) => {
+                const alvo = list.find((x) => x.id === id);
+                if (alvo) setDetail(alvo);
+              }}
+            />
+          </div>
+        ) : (
         <Table className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
             <TableRow className="bg-muted">
@@ -1340,6 +1408,7 @@ export function ContratosPage({
                 })}
           </TableBody>
         </Table>
+        )}
         {!carregando && filtered.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
