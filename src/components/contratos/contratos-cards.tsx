@@ -324,14 +324,63 @@ export function ContratosCards({
     atrasadosValor: number;
   } | null>(null);
 
+  // Todos os contratos recebidos (a relação inteira, não só uma página). O
+  // filtro dos indicadores precisa enxergar tudo, senão clicar em
+  // "Inadimplentes" mostraria só os que calhassem de estar na página aberta.
   const ids = useMemo(() => itens.map((i) => i.id).join(","), [itens]);
+
+  // Clicar num indicador filtra a relação inteira; a paginação abaixo é só
+  // para não desenhar centenas de cards de uma vez.
+  const visiveis = useMemo(() => {
+    if (!filtro) return itens;
+    const { ini, fim, hojeIso } = limitesDoMes();
+    return itens.filter((c) => {
+      const status = (c.status ?? "").toLowerCase();
+      const cob = cobrancas[c.id];
+      switch (filtro) {
+        case "ativos":
+          return status === "ativo";
+        case "inativos":
+          return ["cancelado", "inativo", "encerrado"].includes(status);
+        case "novos":
+          return (c.data_inicio ?? "").slice(0, 10) >= ini;
+        case "pagos":
+          return Boolean(
+            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
+          );
+        case "avencer":
+          // Mesma régua do indicador: ainda não venceu OU está dentro da
+          // tolerância — nos dois casos o cartão continua valendo.
+          return Boolean(
+            cob?.proximoVencimento &&
+            cob.proximoVencimento <= fim &&
+            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
+          );
+        case "inadimplentes":
+          // Só a partir do 6º dia, igual ao bloqueio do balcão.
+          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
+        default:
+          return true;
+      }
+    });
+  }, [itens, filtro, cobrancas]);
+
+  const totalPaginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA_CARDS));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const visiveisPagina = useMemo(
+    () => visiveis.slice((paginaSegura - 1) * POR_PAGINA_CARDS, paginaSegura * POR_PAGINA_CARDS),
+    [visiveis, paginaSegura],
+  );
+
+  const idsPagina = useMemo(() => visiveisPagina.map((i) => i.id).join(","), [visiveisPagina]);
   const pacIds = useMemo(
     () =>
-      Array.from(new Set(itens.map((i) => i.paciente_id).filter((v): v is string => !!v))).join(
-        ",",
-      ),
-    [itens],
+      Array.from(
+        new Set(visiveisPagina.map((i) => i.paciente_id).filter((v): v is string => !!v)),
+      ).join(","),
+    [visiveisPagina],
   );
+
 
   useEffect(() => {
     const lista = ids ? ids.split(",") : [];
