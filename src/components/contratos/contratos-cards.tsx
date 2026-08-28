@@ -432,6 +432,39 @@ export function ContratosCards({
     };
   }, [todos]);
 
+  // Clicar num indicador filtra a relação de cards logo abaixo. É só um
+  // recorte visual da página atual — não altera nenhuma regra de cobrança.
+  const visiveis = useMemo(() => {
+    if (!filtro) return itens;
+    const { ini, fim, hojeIso } = limitesDoMes();
+    return itens.filter((c) => {
+      const status = (c.status ?? "").toLowerCase();
+      const cob = cobrancas[c.id];
+      switch (filtro) {
+        case "ativos":
+          return status === "ativo";
+        case "inativos":
+          return ["cancelado", "inativo", "encerrado"].includes(status);
+        case "novos":
+          return (c.data_inicio ?? "").slice(0, 10) >= ini;
+        case "pagos":
+          return Boolean(
+            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
+          );
+        case "avencer":
+          return Boolean(
+            cob?.proximoVencimento &&
+              cob.proximoVencimento >= hojeIso &&
+              cob.proximoVencimento <= fim,
+          );
+        case "inadimplentes":
+          return (cob?.diasEmAberto ?? 0) > 0 || Boolean(c.parcelas?.temAtrasada);
+        default:
+          return true;
+      }
+    });
+  }, [itens, filtro, cobrancas]);
+
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
     setImprimindo(id);
@@ -442,6 +475,8 @@ export function ContratosCards({
     }
   };
 
+  const alternar = (f: FiltroKpi) => setFiltro((atual) => (atual === f ? null : f));
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -450,44 +485,70 @@ export function ContratosCards({
           valor={String(kpis.ativos)}
           detalhe={`Receita prevista ${BRL(kpis.receita)}`}
           tom="azul"
+          ativo={filtro === "ativos"}
+          onClick={() => alternar("ativos")}
         />
         <KpiCard
           titulo="Pagos no mês"
           valor={mes ? String(mes.pagos) : "—"}
           detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
           tom="verde"
+          ativo={filtro === "pagos"}
+          onClick={() => alternar("pagos")}
         />
         <KpiCard
           titulo="A vencer"
           valor={mes ? String(mes.aVencer) : "—"}
           detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
           tom="ambar"
+          ativo={filtro === "avencer"}
+          onClick={() => alternar("avencer")}
         />
         <KpiCard
           titulo="Inadimplentes"
           valor={mes ? String(mes.atrasados) : "—"}
           detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
           tom="vermelho"
+          ativo={filtro === "inadimplentes"}
+          onClick={() => alternar("inadimplentes")}
         />
         <KpiCard
           titulo="Novos contratos"
           valor={String(kpis.novos)}
           detalhe={`Neste mês · ${BRL(kpis.novosValor)}`}
           tom="azul"
+          ativo={filtro === "novos"}
+          onClick={() => alternar("novos")}
         />
         <KpiCard
           titulo="Cancelados / inativos"
           valor={String(kpis.inativos)}
           detalhe="Fora de uso"
           tom="neutro"
+          ativo={filtro === "inativos"}
+          onClick={() => alternar("inativos")}
         />
       </div>
 
-      {itens.length === 0 ? (
+      {filtro && (
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant="secondary">
+            Filtro: {ROTULO_FILTRO[filtro]} · {visiveis.length} contrato(s)
+          </Badge>
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => setFiltro(null)}>
+            Limpar filtro
+          </Button>
+        </div>
+      )}
+
+      {visiveis.length === 0 ? (
         <div className="rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-          Nenhum contrato para mostrar.
+          {filtro
+            ? "Nenhum contrato desta página se encaixa no indicador escolhido."
+            : "Nenhum contrato para mostrar."}
         </div>
       ) : (
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {itens.map((c) => {
             const lista = deps[c.id] ?? [];
