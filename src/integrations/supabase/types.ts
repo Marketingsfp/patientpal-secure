@@ -3190,62 +3190,6 @@ export type Database = {
         }
         Relationships: []
       }
-      estacionamento_movimentos: {
-        Row: {
-          clinica_id: string
-          competencia: string | null
-          created_at: string
-          criado_por: string | null
-          data: string
-          forma_pagamento: string | null
-          id: string
-          nome: string | null
-          observacoes: string | null
-          placa: string | null
-          sentido: string
-          tipo: string
-          valor: number
-        }
-        Insert: {
-          clinica_id: string
-          competencia?: string | null
-          created_at?: string
-          criado_por?: string | null
-          data?: string
-          forma_pagamento?: string | null
-          id?: string
-          nome?: string | null
-          observacoes?: string | null
-          placa?: string | null
-          sentido?: string
-          tipo: string
-          valor?: number
-        }
-        Update: {
-          clinica_id?: string
-          competencia?: string | null
-          created_at?: string
-          criado_por?: string | null
-          data?: string
-          forma_pagamento?: string | null
-          id?: string
-          nome?: string | null
-          observacoes?: string | null
-          placa?: string | null
-          sentido?: string
-          tipo?: string
-          valor?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "estacionamento_movimentos_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       estoque_lotes: {
         Row: {
           clinica_id: string
