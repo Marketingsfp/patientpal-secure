@@ -359,6 +359,7 @@ type Contrato = {
   sem_carencia_motivo?: string | null;
   sem_carencia_por?: string | null;
   sem_carencia_em?: string | null;
+  created_at?: string | null;
 };
 type Mens = {
   id: string;
@@ -461,6 +462,24 @@ export function ContratosPage({
   const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">(
     "dados",
   );
+  /**
+   * Ação pedida pelo card ao abrir o contrato. Os botões "Pagar" e o de
+   * desativar não repetem a regra aqui: eles abrem o contrato e mandam a tela
+   * de detalhe abrir o mesmo diálogo que o operador já usava (recebimento da
+   * parcela / cancelamento). Assim nada de financeiro é duplicado.
+   */
+  const [detailAcao, setDetailAcao] = useState<"pagar" | "cancelar" | null>(null);
+  const abrirContratoCom = (
+    id: string,
+    aba: "resumo" | "dados" | "contrato",
+    acao: "pagar" | "cancelar" | null,
+  ) => {
+    const alvo = list.find((x) => x.id === id);
+    if (!alvo) return;
+    setDetailInitialTab(aba);
+    setDetailAcao(acao);
+    setDetail(alvo);
+  };
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
   // Filtros
   const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
@@ -924,12 +943,14 @@ export function ContratosPage({
       id: c.id,
       numero: c.numero ?? null,
       paciente_nome: c.paciente_nome,
+      paciente_id: c.paciente_id ?? null,
       codigo_prontuario: (c as Contrato & { codigo_prontuario?: string | null })
         .codigo_prontuario as string | null,
       convenio_nome: (c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? null,
       status: c.status,
       data_inicio: c.data_inicio,
       data_fim: c.data_fim ?? null,
+      created_at: c.created_at ?? null,
       valor_mensal: Number(c.valor_mensal || 0),
       vendedor: c.criado_por ? (vendedores[c.criado_por] ?? null) : null,
       parcelas: parcAgg[c.id],
@@ -1032,10 +1053,12 @@ export function ContratosPage({
       <DetalheContrato
         contrato={detail}
         initialTab={detailInitialTab}
+        acaoInicial={detailAcao}
         modulo={modulo}
         onBack={() => {
           setDetail(null);
           setDetailInitialTab("dados");
+          setDetailAcao(null);
           load();
         }}
       />
@@ -1236,10 +1259,12 @@ export function ContratosPage({
               clinicaId={clinicaAtual?.clinica_id ?? ""}
               itens={paginados.map((c) => paraCardItem(c))}
               todos={filtered.map((c) => paraCardItem(c))}
-              onAbrir={(id) => {
-                const alvo = list.find((x) => x.id === id);
-                if (alvo) setDetail(alvo);
-              }}
+              podeEscrever={podeEscrever}
+              onAbrir={(id) => abrirContratoCom(id, "dados", null)}
+              onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
+              onCartao={(id) => printCartoes(id)}
+              onEditar={(id) => abrirContratoCom(id, "dados", null)}
+              onInativar={(id) => abrirContratoCom(id, "dados", "cancelar")}
             />
           </div>
         ) : (
@@ -2808,11 +2833,14 @@ function DetalheContrato({
   contrato,
   onBack,
   initialTab = "dados",
+  acaoInicial = null,
   modulo = "contratos",
 }: {
   contrato: Contrato;
   onBack: () => void;
   initialTab?: "resumo" | "dados" | "contrato";
+  /** Diálogo a abrir sozinho quando o contrato foi aberto por um botão do card. */
+  acaoInicial?: "pagar" | "cancelar" | null;
   modulo?: string;
 }) {
   const { clinicaAtual } = useClinica();
@@ -4587,6 +4615,43 @@ function DetalheContrato({
     primeiraParcela.status !== "pago" &&
     Number(primeiraParcela.taxa_adesao ?? 0) > 0,
   );
+  // Ação pedida pelo card da listagem ("Pagar" / desativar). Abre uma única
+  // vez, depois que as parcelas chegaram, o mesmo diálogo que o operador já
+  // usava aqui dentro — nenhuma regra de cobrança ou de cancelamento é
+  // reimplementada no card.
+  const acaoInicialFeitaRef = useRef(false);
+  useEffect(() => {
+    if (!acaoInicial || acaoInicialFeitaRef.current || loading) return;
+    acaoInicialFeitaRef.current = true;
+    if (acaoInicial === "cancelar") {
+      if (!podeEscrever) {
+        toast.error("Você não tem permissão para cancelar contratos.");
+        return;
+      }
+      if (cancelado) {
+        toast.info("Este contrato já está cancelado.");
+        return;
+      }
+      setCancelOpen(true);
+      return;
+    }
+    // "Pagar": a próxima parcela mensal em aberto, na ordem das parcelas.
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão para receber mensalidades.");
+      return;
+    }
+    if (cancelado) {
+      toast.info("Contrato cancelado — não há parcela a receber.");
+      return;
+    }
+    const proxima = mensalidades.find((m) => m.status !== "pago" && m.status !== "cancelado");
+    if (!proxima) {
+      toast.info("Não há mensalidade em aberto neste contrato.");
+      return;
+    }
+    abrirFormaPag(proxima);
+  }, [acaoInicial, loading, cancelado, podeEscrever, mensalidades]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens
     .filter((m) => m.status === "pago")
