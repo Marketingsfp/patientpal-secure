@@ -46,8 +46,6 @@ export interface ContratoCardItem {
 interface Props {
   /** Contratos da página atual (os que aparecem em card). */
   itens: ContratoCardItem[];
-  /** Todos os contratos filtrados — base dos indicadores do topo. */
-  todos: ContratoCardItem[];
   clinicaId: string;
   onAbrir: (id: string) => void;
   /** Botão verde: abre o recebimento da próxima parcela em aberto. */
@@ -75,6 +73,33 @@ interface Cobranca {
   ultimoPagamento: string | null;
   diasEmAberto: number;
 }
+
+/**
+ * Indicadores de contratos da clínica INTEIRA.
+ *
+ * Não saem da lista da tela de propósito: a listagem carrega no máximo 500
+ * contratos (corte de performance da busca), e contar em cima dela mostrava
+ * "483 contratos ativos · R$ 34.485,00" numa clínica que tem 1.882 ativos e
+ * R$ 202.730,70 previstos. Pior, os indicadores vizinhos (pagos no mês, a
+ * vencer, inadimplentes) sempre vieram do banco inteiro — a mesma faixa
+ * misturava duas bases diferentes.
+ */
+interface TotaisClinica {
+  ativos: number;
+  receita: number;
+  inativos: number;
+  novos: number;
+  novosValor: number;
+}
+
+/**
+ * Quantos contratos pedir por ida ao banco na soma dos indicadores. O
+ * PostgREST devolve no máximo 1000 linhas por requisição, então a contagem é
+ * paginada — sem isso, uma clínica com mais de mil contratos voltaria a somar
+ * só uma parte. O teto de páginas é uma trava de segurança contra laço infinito.
+ */
+const PAGINA_TOTAIS = 1000;
+const MAX_PAGINAS_TOTAIS = 50;
 
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -232,7 +257,6 @@ function CampoFinanceiro({ rotulo, valor, cor }: { rotulo: string; valor: string
 
 export function ContratosCards({
   itens,
-  todos,
   clinicaId,
   onAbrir,
   onPagar,
@@ -247,7 +271,7 @@ export function ContratosCards({
   const [cobrancas, setCobrancas] = useState<Record<string, Cobranca>>({});
   const [imprimindo, setImprimindo] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
-
+  const [totais, setTotais] = useState<TotaisClinica | null>(null);
   const [mes, setMes] = useState<{
     pagos: number;
     pagosValor: number;
@@ -431,21 +455,65 @@ export function ContratosCards({
     };
   }, [clinicaId]);
 
-  const kpis = useMemo(() => {
-    const { ini } = limitesDoMes();
-    const ativos = todos.filter((c) => (c.status ?? "").toLowerCase() === "ativo");
-    const inativos = todos.filter((c) =>
-      ["cancelado", "inativo", "encerrado"].includes((c.status ?? "").toLowerCase()),
-    );
-    const novos = todos.filter((c) => (c.data_inicio ?? "").slice(0, 10) >= ini);
-    return {
-      ativos: ativos.length,
-      receita: ativos.reduce((s, c) => s + Number(c.valor_mensal || 0), 0),
-      inativos: inativos.length,
-      novos: novos.length,
-      novosValor: novos.reduce((s, c) => s + Number(c.valor_mensal || 0), 0),
+  // Indicadores de contratos: sempre a clínica inteira, nunca a página. Ver o
+  // comentário de `TotaisClinica`.
+  useEffect(() => {
+    if (!clinicaId) {
+      setTotais(null);
+      return;
+    }
+    let cancelado = false;
+    void (async () => {
+      const { ini } = limitesDoMes();
+      const acumulado: TotaisClinica = {
+        ativos: 0,
+        receita: 0,
+        inativos: 0,
+        novos: 0,
+        novosValor: 0,
+      };
+      for (let pagina = 0; pagina < MAX_PAGINAS_TOTAIS; pagina += 1) {
+        const de = pagina * PAGINA_TOTAIS;
+        const { data, error } = await supabase
+          .from("contratos_assinatura")
+          .select("status, valor_mensal, data_inicio")
+          .eq("clinica_id", clinicaId)
+          .range(de, de + PAGINA_TOTAIS - 1);
+        if (cancelado) return;
+        // Erro no meio da paginação deixaria um total menor que o real — pior
+        // que não mostrar número nenhum, porque parece certo.
+        if (error) {
+          setTotais(null);
+          return;
+        }
+        const lote = (data ?? []) as Array<{
+          status: string | null;
+          valor_mensal: number | null;
+          data_inicio: string | null;
+        }>;
+        lote.forEach((c) => {
+          const status = (c.status ?? "").toLowerCase();
+          const valor = Number(c.valor_mensal || 0);
+          if (status === "ativo") {
+            acumulado.ativos += 1;
+            acumulado.receita += valor;
+          } else if (["cancelado", "inativo", "encerrado"].includes(status)) {
+            acumulado.inativos += 1;
+          }
+          if ((c.data_inicio ?? "").slice(0, 10) >= ini) {
+            acumulado.novos += 1;
+            acumulado.novosValor += valor;
+          }
+        });
+        if (lote.length < PAGINA_TOTAIS) break;
+      }
+      if (cancelado) return;
+      setTotais(acumulado);
+    })();
+    return () => {
+      cancelado = true;
     };
-  }, [todos]);
+  }, [clinicaId]);
 
   // Clicar num indicador filtra a relação de cards logo abaixo. É só um
   // recorte visual da página atual — não altera nenhuma regra de cobrança.
@@ -497,8 +565,8 @@ export function ContratosCards({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           titulo="Contratos ativos"
-          valor={String(kpis.ativos)}
-          detalhe={`Receita prevista ${BRL(kpis.receita)}`}
+          valor={totais ? String(totais.ativos) : "—"}
+          detalhe={totais ? `Receita prevista ${BRL(totais.receita)}` : "Carregando…"}
           tom="azul"
           ativo={filtro === "ativos"}
           onClick={() => alternar("ativos")}
@@ -529,16 +597,16 @@ export function ContratosCards({
         />
         <KpiCard
           titulo="Novos contratos"
-          valor={String(kpis.novos)}
-          detalhe={`Neste mês · ${BRL(kpis.novosValor)}`}
+          valor={totais ? String(totais.novos) : "—"}
+          detalhe={totais ? `Neste mês · ${BRL(totais.novosValor)}` : "Carregando…"}
           tom="azul"
           ativo={filtro === "novos"}
           onClick={() => alternar("novos")}
         />
         <KpiCard
           titulo="Cancelados / inativos"
-          valor={String(kpis.inativos)}
-          detalhe="Fora de uso"
+          valor={totais ? String(totais.inativos) : "—"}
+          detalhe={totais ? "Fora de uso" : "Carregando…"}
           tom="neutro"
           ativo={filtro === "inativos"}
           onClick={() => alternar("inativos")}

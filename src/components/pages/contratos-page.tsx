@@ -1258,7 +1258,6 @@ export function ContratosPage({
             <ContratosCards
               clinicaId={clinicaAtual?.clinica_id ?? ""}
               itens={paginados.map((c) => paraCardItem(c))}
-              todos={filtered.map((c) => paraCardItem(c))}
               podeEscrever={podeEscrever}
               onAbrir={(id) => abrirContratoCom(id, "dados", null)}
               onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
