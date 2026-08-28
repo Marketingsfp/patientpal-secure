@@ -1243,7 +1243,10 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       const [agR, ctR] = await Promise.all([
         supabaseAdmin
           .from("agendamentos")
-          .select("id, inicio, procedimento, status, medico_nome")
+          // O nome do médico não fica em `agendamentos`; vem do vínculo com
+          // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
+          .select("id, inicio, procedimento, status, medicos(nome)")
+
           .eq("paciente_id", paciente.id)
           .order("inicio", { ascending: false })
           .limit(5),
