@@ -160,15 +160,38 @@ function KpiCard({
   valor,
   detalhe,
   tom,
+  ativo = false,
+  onClick,
 }: {
   titulo: string;
   valor: string;
   detalhe: string;
   tom: TomNome;
+  ativo?: boolean;
+  onClick?: () => void;
 }) {
   const t = TONS[tom];
+  const clicavel = Boolean(onClick);
   return (
-    <Card className={`relative overflow-hidden p-4 ${t.fundo} ${t.borda}`}>
+    <Card
+      role={clicavel ? "button" : undefined}
+      tabIndex={clicavel ? 0 : undefined}
+      aria-pressed={clicavel ? ativo : undefined}
+      onClick={onClick}
+      onKeyDown={
+        clicavel
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`relative overflow-hidden p-4 transition ${t.fundo} ${t.borda} ${
+        clicavel ? "cursor-pointer hover:shadow-md" : ""
+      } ${ativo ? "ring-2 ring-primary ring-offset-1" : ""}`}
+    >
       <span className={`absolute inset-y-0 left-0 w-1 ${t.faixa}`} aria-hidden />
       <div className="pl-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -180,6 +203,7 @@ function KpiCard({
     </Card>
   );
 }
+
 
 /** Um dos quatro números do quadro cinza do card. */
 function CampoFinanceiro({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) {
