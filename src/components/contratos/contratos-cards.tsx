@@ -155,6 +155,19 @@ const TONS = {
 
 type TomNome = keyof typeof TONS;
 
+/** Indicador do topo escolhido como filtro da relação de cards. */
+type FiltroKpi = "ativos" | "pagos" | "avencer" | "inadimplentes" | "novos" | "inativos";
+
+const ROTULO_FILTRO: Record<FiltroKpi, string> = {
+  ativos: "Contratos ativos",
+  pagos: "Pagos no mês",
+  avencer: "A vencer",
+  inadimplentes: "Inadimplentes",
+  novos: "Novos contratos",
+  inativos: "Cancelados / inativos",
+};
+
+
 function KpiCard({
   titulo,
   valor,
