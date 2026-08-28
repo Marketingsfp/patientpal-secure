@@ -1,4 +1,17 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { LayoutGrid, Rows3 } from "lucide-react";
+import {
+  ContratosCards,
+  type ContratoCardItem,
+} from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
 import {
   FileSignature,
