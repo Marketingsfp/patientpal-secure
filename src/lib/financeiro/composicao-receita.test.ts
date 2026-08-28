@@ -6,7 +6,6 @@ import {
   totaisPorGrupo,
   barraDeFormas,
   resumoSintetico,
-  baldeCasaComColuna,
   GRUPOS_RECEITA,
   type GrupoReceita,
 } from "./composicao-receita";
@@ -378,30 +377,5 @@ describe("classificarReceita — adesão do Cartão Benefícios", () => {
     ]);
     expect(t.adesao).toEqual({ qtd: 1, total: 30 });
     expect(GRUPOS_RECEITA).toContain("adesao");
-  });
-});
-
-describe("baldeCasaComColuna", () => {
-  it("cartão junta débito, crédito e as parcelas antigas", () => {
-    expect(baldeCasaComColuna("debito", "cartao")).toBe(true);
-    expect(baldeCasaComColuna("credito", "cartao")).toBe(true);
-    expect(baldeCasaComColuna("legado_cartao", "cartao")).toBe(true);
-  });
-
-  it("dinheiro e PIX só casam com a própria coluna", () => {
-    expect(baldeCasaComColuna("dinheiro", "dinheiro")).toBe(true);
-    expect(baldeCasaComColuna("dinheiro", "pix")).toBe(false);
-    expect(baldeCasaComColuna("pix", "pix")).toBe(true);
-    expect(baldeCasaComColuna("pix", "cartao")).toBe(false);
-  });
-
-  it("o que não é somado na coluna também não é filtrado por ela", () => {
-    // Convênio e transferência ficam fora das três colunas na soma; o filtro
-    // precisa concordar, senão clicar num card mostraria linha que não entrou
-    // naquele total.
-    for (const chave of ["dinheiro", "pix", "cartao"] as const) {
-      expect(baldeCasaComColuna("convenio", chave)).toBe(false);
-      expect(baldeCasaComColuna("transferencia", chave)).toBe(false);
-    }
   });
 });

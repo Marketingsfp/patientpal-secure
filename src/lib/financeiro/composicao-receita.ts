@@ -269,15 +269,6 @@ const BALDES_DA_BARRA: Record<ColunaDaBarra["chave"], FormaCanonica[]> = {
 };
 
 /**
- * Este balde pertence a qual coluna da barra? Serve para a barra poder
- * FILTRAR a lista, e não só somar: quem clica em "Cartão" espera ver débito,
- * crédito e as parcelas antigas juntos, exatamente como foram somados ali.
- */
-export function baldeCasaComColuna(balde: FormaCanonica, chave: ColunaDaBarra["chave"]): boolean {
-  return BALDES_DA_BARRA[chave].includes(balde);
-}
-
-/**
  * As três colunas fixas da barra do topo: Dinheiro, PIX e Cartão.
  *
  * São FIXAS de propósito, aparecendo com R$ 0,00 quando não houve nada. A

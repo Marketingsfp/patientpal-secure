@@ -3,9 +3,11 @@
  * recepção troca o tempo todo: com as opções à vista o modo atual se lê sem
  * abrir nada.
  *
- * Vive em componente próprio porque o Movimento de Caixa e o Estacionamento
- * usam a mesma barra de controles — se os dois tivessem cópias, a primeira
- * diferença de estilo entre elas passaria despercebida.
+ * Vive em componente próprio, e não dentro da tela que o usa, porque a barra
+ * de controles do financeiro tende a se repetir: assim a próxima tela que
+ * precisar dela herda o mesmo comportamento de teclado e o mesmo destaque do
+ * item ativo, em vez de nascer com uma cópia que vai divergir na primeira
+ * mudança de estilo.
  */
 export function Pilulas<T extends string>({
   valor,
