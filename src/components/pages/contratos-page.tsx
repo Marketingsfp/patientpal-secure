@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { LayoutGrid, Rows3 } from "lucide-react";
+import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import {
   ContratosCards,
   type ContratoCardItem,
