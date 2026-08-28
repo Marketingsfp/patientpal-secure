@@ -928,6 +928,37 @@ export function ContratosCards({
           })}
         </div>
       )}
+
+      {visiveis.length > POR_PAGINA_CARDS && (
+        <div className="flex items-center justify-between gap-2 pt-1 text-sm text-muted-foreground">
+          <span className="tabular-nums">
+            {(paginaSegura - 1) * POR_PAGINA_CARDS + 1}–
+            {Math.min(paginaSegura * POR_PAGINA_CARDS, visiveis.length)} de {visiveis.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={paginaSegura <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </Button>
+            <span className="tabular-nums">
+              {paginaSegura}/{totalPaginas}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={paginaSegura >= totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
