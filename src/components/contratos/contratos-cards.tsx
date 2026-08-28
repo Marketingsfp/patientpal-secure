@@ -75,25 +75,68 @@ function limitesDoMes() {
   return { ini, fim, hojeIso };
 }
 
+/** Tons usados no modelo enviado: faixa colorida à esquerda + fundo suave. */
+const TONS = {
+  neutro: {
+    faixa: "bg-slate-400",
+    fundo: "bg-slate-50 dark:bg-slate-900/40",
+    borda: "border-slate-200 dark:border-slate-800",
+    texto: "text-slate-700 dark:text-slate-200",
+  },
+  verde: {
+    faixa: "bg-emerald-500",
+    fundo: "bg-emerald-50 dark:bg-emerald-950/30",
+    borda: "border-emerald-200 dark:border-emerald-900",
+    texto: "text-emerald-700 dark:text-emerald-300",
+  },
+  ambar: {
+    faixa: "bg-amber-500",
+    fundo: "bg-amber-50 dark:bg-amber-950/30",
+    borda: "border-amber-200 dark:border-amber-900",
+    texto: "text-amber-700 dark:text-amber-300",
+  },
+  vermelho: {
+    faixa: "bg-red-500",
+    fundo: "bg-red-50 dark:bg-red-950/30",
+    borda: "border-red-200 dark:border-red-900",
+    texto: "text-red-700 dark:text-red-300",
+  },
+  azul: {
+    faixa: "bg-blue-500",
+    fundo: "bg-blue-50 dark:bg-blue-950/30",
+    borda: "border-blue-200 dark:border-blue-900",
+    texto: "text-blue-700 dark:text-blue-300",
+  },
+} as const;
+
+type TomNome = keyof typeof TONS;
+
 function KpiCard({
   titulo,
   valor,
   detalhe,
-  cor,
+  tom,
 }: {
   titulo: string;
   valor: string;
   detalhe: string;
-  cor: string;
+  tom: TomNome;
 }) {
+  const t = TONS[tom];
   return (
-    <Card className="p-4">
-      <div className="text-sm text-muted-foreground">{titulo}</div>
-      <div className={`mt-1 text-3xl font-semibold tabular-nums ${cor}`}>{valor}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{detalhe}</div>
+    <Card className={`relative overflow-hidden p-4 ${t.fundo} ${t.borda}`}>
+      <span className={`absolute inset-y-0 left-0 w-1 ${t.faixa}`} aria-hidden />
+      <div className="pl-2">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {titulo}
+        </div>
+        <div className={`mt-1 text-3xl font-semibold tabular-nums ${t.texto}`}>{valor}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{detalhe}</div>
+      </div>
     </Card>
   );
 }
+
 
 export function ContratosCards({ itens, todos, clinicaId, onAbrir }: Props) {
   const [deps, setDeps] = useState<Record<string, Dependente[]>>({});
