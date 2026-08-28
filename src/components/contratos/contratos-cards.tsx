@@ -722,12 +722,13 @@ export function ContratosCards({
       {visiveis.length === 0 ? (
         <div className="rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
           {filtro
-            ? "Nenhum contrato desta página se encaixa no indicador escolhido."
+            ? "Nenhum contrato se encaixa no indicador escolhido."
             : "Nenhum contrato para mostrar."}
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {visiveis.map((c) => {
+          {visiveisPagina.map((c) => {
+
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
