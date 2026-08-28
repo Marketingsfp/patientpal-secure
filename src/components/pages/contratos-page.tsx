@@ -1187,6 +1187,11 @@ export function ContratosPage({
               {" — filtros ativos: "}
               <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
             </span>
+          ) : modoCards ? (
+            <span>
+              <strong className="text-foreground">{filtered.length}</strong> contrato
+              {filtered.length === 1 ? "" : "s"} na relação
+            </span>
           ) : (
             <span>
               Mostrando{" "}
@@ -1196,6 +1201,7 @@ export function ContratosPage({
               de <strong className="text-foreground">{filtered.length}</strong> contratos
             </span>
           )}
+
         </div>
         {temFiltroAtivo ? (
           <Button variant="ghost" size="sm" onClick={limparFiltros}>
