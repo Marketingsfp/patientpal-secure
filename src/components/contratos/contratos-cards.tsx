@@ -103,6 +103,10 @@ interface TotaisClinica {
  */
 const PAGINA_TOTAIS = 1000;
 const MAX_PAGINAS_TOTAIS = 50;
+// Quantos cards a relação desenha por vez (o filtro dos indicadores continua
+// olhando a lista inteira; isto é só o recorte de exibição).
+const POR_PAGINA_CARDS = 50;
+
 
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -314,6 +318,8 @@ export function ContratosCards({
   const [cobrancas, setCobrancas] = useState<Record<string, Cobranca>>({});
   const [imprimindo, setImprimindo] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
+  const [pagina, setPagina] = useState(1);
+
   const [totais, setTotais] = useState<TotaisClinica | null>(null);
   const [mes, setMes] = useState<{
     pagos: number;
@@ -324,17 +330,66 @@ export function ContratosCards({
     atrasadosValor: number;
   } | null>(null);
 
+  // Todos os contratos recebidos (a relação inteira, não só uma página). O
+  // filtro dos indicadores precisa enxergar tudo, senão clicar em
+  // "Inadimplentes" mostraria só os que calhassem de estar na página aberta.
   const ids = useMemo(() => itens.map((i) => i.id).join(","), [itens]);
-  const pacIds = useMemo(
-    () =>
-      Array.from(new Set(itens.map((i) => i.paciente_id).filter((v): v is string => !!v))).join(
-        ",",
-      ),
-    [itens],
+
+  // Clicar num indicador filtra a relação inteira; a paginação abaixo é só
+  // para não desenhar centenas de cards de uma vez.
+  const visiveis = useMemo(() => {
+    if (!filtro) return itens;
+    const { ini, fim, hojeIso } = limitesDoMes();
+    return itens.filter((c) => {
+      const status = (c.status ?? "").toLowerCase();
+      const cob = cobrancas[c.id];
+      switch (filtro) {
+        case "ativos":
+          return status === "ativo";
+        case "inativos":
+          return ["cancelado", "inativo", "encerrado"].includes(status);
+        case "novos":
+          return (c.data_inicio ?? "").slice(0, 10) >= ini;
+        case "pagos":
+          return Boolean(
+            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
+          );
+        case "avencer":
+          // Mesma régua do indicador: ainda não venceu OU está dentro da
+          // tolerância — nos dois casos o cartão continua valendo.
+          return Boolean(
+            cob?.proximoVencimento &&
+            cob.proximoVencimento <= fim &&
+            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
+          );
+        case "inadimplentes":
+          // Só a partir do 6º dia, igual ao bloqueio do balcão.
+          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
+        default:
+          return true;
+      }
+    });
+  }, [itens, filtro, cobrancas]);
+
+  const totalPaginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA_CARDS));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const visiveisPagina = useMemo(
+    () => visiveis.slice((paginaSegura - 1) * POR_PAGINA_CARDS, paginaSegura * POR_PAGINA_CARDS),
+    [visiveis, paginaSegura],
   );
 
+  const idsPagina = useMemo(() => visiveisPagina.map((i) => i.id).join(","), [visiveisPagina]);
+  const pacIds = useMemo(
+    () =>
+      Array.from(
+        new Set(visiveisPagina.map((i) => i.paciente_id).filter((v): v is string => !!v)),
+      ).join(","),
+    [visiveisPagina],
+  );
+
+
   useEffect(() => {
-    const lista = ids ? ids.split(",") : [];
+    const lista = idsPagina ? idsPagina.split(",") : [];
     if (lista.length === 0) {
       setDeps({});
       return;
@@ -357,7 +412,8 @@ export function ContratosCards({
     return () => {
       cancelado = true;
     };
-  }, [ids]);
+  }, [idsPagina]);
+
 
   // CPF do titular: o contrato guarda só o nome, o documento vem do paciente.
   useEffect(() => {
@@ -572,42 +628,12 @@ export function ContratosCards({
     };
   }, [clinicaId]);
 
-  // Clicar num indicador filtra a relação de cards logo abaixo. É só um
-  // recorte visual da página atual — não altera nenhuma regra de cobrança.
-  const visiveis = useMemo(() => {
-    if (!filtro) return itens;
-    const { ini, fim, hojeIso } = limitesDoMes();
-    return itens.filter((c) => {
-      const status = (c.status ?? "").toLowerCase();
-      const cob = cobrancas[c.id];
-      switch (filtro) {
-        case "ativos":
-          return status === "ativo";
-        case "inativos":
-          return ["cancelado", "inativo", "encerrado"].includes(status);
-        case "novos":
-          return (c.data_inicio ?? "").slice(0, 10) >= ini;
-        case "pagos":
-          return Boolean(
-            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
-          );
-        case "avencer":
-          // Mesma régua do indicador: ainda não venceu OU está dentro da
-          // tolerância — nos dois casos o cartão continua valendo.
-          return Boolean(
-            cob?.proximoVencimento &&
-            cob.proximoVencimento <= fim &&
-            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
-          );
-        case "inadimplentes":
-          // Só a partir do 6º dia, igual ao bloqueio do balcão. Antes disso o
-          // card contava a partir do 1º dia e discordava do próprio número.
-          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
-        default:
-          return true;
-      }
-    });
-  }, [itens, filtro, cobrancas]);
+  // Trocar de filtro sempre volta para a primeira página da relação.
+  useEffect(() => {
+    setPagina(1);
+  }, [filtro, ids]);
+
+
 
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
@@ -696,12 +722,13 @@ export function ContratosCards({
       {visiveis.length === 0 ? (
         <div className="rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
           {filtro
-            ? "Nenhum contrato desta página se encaixa no indicador escolhido."
+            ? "Nenhum contrato se encaixa no indicador escolhido."
             : "Nenhum contrato para mostrar."}
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {visiveis.map((c) => {
+          {visiveisPagina.map((c) => {
+
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
@@ -901,6 +928,37 @@ export function ContratosCards({
           })}
         </div>
       )}
+
+      {visiveis.length > POR_PAGINA_CARDS && (
+        <div className="flex items-center justify-between gap-2 pt-1 text-sm text-muted-foreground">
+          <span className="tabular-nums">
+            {(paginaSegura - 1) * POR_PAGINA_CARDS + 1}–
+            {Math.min(paginaSegura * POR_PAGINA_CARDS, visiveis.length)} de {visiveis.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={paginaSegura <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </Button>
+            <span className="tabular-nums">
+              {paginaSegura}/{totalPaginas}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={paginaSegura >= totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }

@@ -1243,7 +1243,10 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       const [agR, ctR] = await Promise.all([
         supabaseAdmin
           .from("agendamentos")
-          .select("id, inicio, procedimento, status, medico_nome")
+          // O nome do médico não fica em `agendamentos`; vem do vínculo com
+          // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
+          .select("id, inicio, procedimento, status, medicos(nome)")
+
           .eq("paciente_id", paciente.id)
           .order("inicio", { ascending: false })
           .limit(5),
@@ -1254,9 +1257,16 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .order("created_at", { ascending: false })
           .limit(5),
       ]);
-      agendamentos = agR.data ?? [];
+      // Mantém o formato antigo (`medico_nome`) para quem consome no front.
+      agendamentos = ((agR.data ?? []) as Array<Record<string, unknown>>).map((a) => {
+        const m = a.medicos as { nome?: string } | Array<{ nome?: string }> | null;
+        const nome = Array.isArray(m) ? (m[0]?.nome ?? null) : (m?.nome ?? null);
+        const { medicos: _m, ...resto } = a;
+        return { ...resto, medico_nome: nome };
+      });
       contratos = ctR.data ?? [];
     }
+
 
     const { data: atribuidoProfile } = conv.atribuida_user_id
       ? await supabaseAdmin

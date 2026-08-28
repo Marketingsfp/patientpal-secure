@@ -1187,6 +1187,11 @@ export function ContratosPage({
               {" — filtros ativos: "}
               <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
             </span>
+          ) : modoCards ? (
+            <span>
+              <strong className="text-foreground">{filtered.length}</strong> contrato
+              {filtered.length === 1 ? "" : "s"} na relação
+            </span>
           ) : (
             <span>
               Mostrando{" "}
@@ -1196,6 +1201,7 @@ export function ContratosPage({
               de <strong className="text-foreground">{filtered.length}</strong> contratos
             </span>
           )}
+
         </div>
         {temFiltroAtivo ? (
           <Button variant="ghost" size="sm" onClick={limparFiltros}>
@@ -1313,7 +1319,7 @@ export function ContratosPage({
           <div className="p-3">
             <ContratosCards
               clinicaId={clinicaAtual?.clinica_id ?? ""}
-              itens={paginados.map((c) => paraCardItem(c))}
+              itens={filtered.map((c) => paraCardItem(c))}
               podeEscrever={podeEscrever}
               onAbrir={(id) => abrirContratoCom(id, "dados", null)}
               onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
@@ -1619,7 +1625,7 @@ export function ContratosPage({
           </TableBody>
         </Table>
         )}
-        {!carregando && filtered.length > 0 ? (
+        {!carregando && !modoCards && filtered.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
               {filtered.length} contrato{filtered.length === 1 ? "" : "s"}

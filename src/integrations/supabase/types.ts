@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -2358,6 +2358,8 @@ export type Database = {
           nfse_modo_emissao: string
           nome: string
           paytime_recipient_id: string | null
+          pix_beneficiario: string | null
+          pix_chave: string | null
           raio_metros: number
           telefone: string | null
           token_publico: string | null
@@ -2380,6 +2382,8 @@ export type Database = {
           nfse_modo_emissao?: string
           nome: string
           paytime_recipient_id?: string | null
+          pix_beneficiario?: string | null
+          pix_chave?: string | null
           raio_metros?: number
           telefone?: string | null
           token_publico?: string | null
@@ -2402,6 +2406,8 @@ export type Database = {
           nfse_modo_emissao?: string
           nome?: string
           paytime_recipient_id?: string | null
+          pix_beneficiario?: string | null
+          pix_chave?: string | null
           raio_metros?: number
           telefone?: string | null
           token_publico?: string | null
@@ -9424,7 +9430,12 @@ export type Database = {
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       buscar_contratos: {
-        Args: { _clinica_id: string; _limit?: number; _termo?: string }
+        Args: {
+          _clinica_id: string
+          _limit?: number
+          _offset?: number
+          _termo?: string
+        }
         Returns: {
           codigo_prontuario: string
           contrato: Json
