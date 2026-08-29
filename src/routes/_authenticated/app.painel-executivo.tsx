@@ -70,6 +70,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDatePura, hojeBR, TZ_CLINICA, zonedDateStringToUtcISO } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
+import { useDashboardBlocos } from "@/hooks/use-dashboard-blocos";
+import { BlocosDashboard } from "@/components/painel-executivo/blocos";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
   head: () => ({ meta: [{ title: "Painel Executivo — ClinicaOS" }] }),
@@ -445,6 +447,13 @@ function PainelExecutivoPage() {
   // via um acumulado quando queria saber como está o dia.
   const [periodo, setPeriodo] = useState<Periodo>(PRESET_PADRAO.make());
 
+  /**
+   * Dados dos três blocos temáticos do topo. Ficam fora do `carregarBloco`
+   * porque não seguem o filtro de período: eles são sempre o mês (e o ano)
+   * corrente, e recarregar tudo a cada clique em "Ontem" só gastaria consulta.
+   */
+  const blocos = useDashboardBlocos(clinicaAtual?.clinica_id);
+
   // Preferência do usuário: mostrar ou não a variação contra o período
   // anterior. Padrão desligado, e persistida por navegador — mesmo padrão do
   // Financeiro (`financeiro:decomporMisto`).
@@ -540,13 +549,33 @@ function PainelExecutivoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Cabeçalho */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Painel Executivo</h1>
+        <p className="text-sm text-muted-foreground">
+          A leitura do mês em três blocos, e o detalhamento por período logo abaixo
+        </p>
+      </div>
+
+      {/*
+        Blocos 1, 2 e 3. Olham sempre o MÊS e o ANO corrente — não seguem o
+        filtro de datas do detalhamento, e cada bloco escreve o período no
+        próprio cabeçalho para que ninguém leia um número com a régua errada.
+      */}
+      <BlocosDashboard
+        dados={blocos.data}
+        carregando={blocos.isLoading}
+        clinicaId={clinicaAtual.clinica_id}
+        podeFin={podeFin}
+      />
+
+      {/* Detalhamento por período — as abas e o filtro de datas que as governa */}
       <TooltipProvider delayDuration={200}>
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-t border-border pt-6">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Painel Executivo</h1>
+            <h2 className="text-base font-semibold tracking-tight">Detalhamento por período</h2>
             <p className="text-sm text-muted-foreground">
-              Indicadores estratégicos de produção, financeiro, comercial e qualidade
+              Produção, GRs, financeiro, comercial e qualidade nas datas escolhidas ao lado
             </p>
             {/* A faixa só aparece quando a comparação está ligada: ela existe
                 para dizer CONTRA O QUE os percentuais estão sendo medidos, e
@@ -635,135 +664,6 @@ function PainelExecutivoPage() {
           </div>
         </div>
       </TooltipProvider>
-
-      {/* Visão geral — cards resumo (número grande + 2 métricas de apoio + variação) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <BigCard
-          mostrarComparacao={comparar}
-          title="Agendamentos"
-          icon={CalendarDays}
-          value={int(p.agendados)}
-          delta={cmp(p.agendados, pa.agendados)}
-          subs={[
-            { label: "Confirmados", value: int(p.confirmados) },
-            { label: "Cancelados", value: int(p.cancelaram) },
-          ]}
-        />
-        <BigCard
-          mostrarComparacao={comparar}
-          title="Clientes atendidos"
-          icon={UserCheck}
-          value={int(p.compareceram)}
-          delta={cmp(p.compareceram, pa.compareceram)}
-          subs={[
-            semRegistroFalta
-              ? { label: "Confirmados", value: int(p.confirmados) }
-              : { label: "Faltas", value: int(p.faltaram) },
-            { label: "Ocupação", value: pctFmt(p.ocupacaoPct) },
-          ]}
-        />
-        <BigCard
-          mostrarComparacao={comparar}
-          title="GRs / Guias"
-          icon={FileText}
-          value={int(g.total)}
-          delta={cmp(g.total, gaAnt.total)}
-          subs={[
-            { label: "Pacientes", value: int(g.pacientes) },
-            {
-              label: "Novos / Recorrentes",
-              value: `${int(g.novos)} / ${int(g.recorrentes)}`,
-            },
-          ]}
-        />
-        {podeFin ? (
-          <BigCard
-            mostrarComparacao={comparar}
-            title="Recebimentos"
-            icon={Wallet}
-            value={money(f.receitaRealizada)}
-            delta={cmp(f.receitaRealizada, fa.receitaRealizada)}
-            subs={[
-              temPrevistoReceita
-                ? { label: "A receber", value: money(f.receitaPrevista) }
-                : { label: "Particular", value: money(f.receitaParticular) },
-              { label: "Ticket médio", value: money(f.ticketMedio) },
-            ]}
-          />
-        ) : (
-          // Sem acesso ao financeiro, este espaço mostrava o no-show. Como ele
-          // não tem registro por trás, o card passa a responder pela taxa de
-          // confirmação, que sai de dado que a agenda realmente preenche.
-          <BigCard
-            mostrarComparacao={comparar}
-            title="Confirmação"
-            icon={CheckCircle2}
-            value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
-            delta={cmp(p.confirmados, pa.confirmados)}
-            subs={[
-              { label: "Agendados", value: int(p.agendados) },
-              { label: "Cancelados", value: int(p.cancelaram) },
-            ]}
-          />
-        )}
-        {podeFin && (
-          <>
-            <BigCard
-              mostrarComparacao={comparar}
-              title="Pagamentos"
-              icon={Receipt}
-              value={money(f.despesaRealizada)}
-              delta={cmp(f.despesaRealizada, fa.despesaRealizada)}
-              subs={[
-                ...(temPrevistoDespesa
-                  ? [{ label: "A pagar", value: money(f.despesaPrevista) }]
-                  : []),
-                { label: "Resultado", value: money(f.resultado) },
-              ]}
-            />
-            <BigCard
-              mostrarComparacao={comparar}
-              title="Convênios e particular"
-              icon={Handshake}
-              value={money(f.receitaConvenio)}
-              delta={cmp(f.receitaConvenio, fa.receitaConvenio)}
-              subs={[
-                { label: "Particular", value: money(f.receitaParticular) },
-                { label: "Convênio", value: money(f.receitaConvenio) },
-              ]}
-            />
-          </>
-        )}
-        <BigCard
-          mostrarComparacao={comparar}
-          title="Orçamentos"
-          icon={BadgeDollarSign}
-          value={int(c.orcamentosNoPeriodo)}
-          delta={cmp(c.orcamentosNoPeriodo, ca.orcamentosNoPeriodo)}
-          subs={[
-            { label: "Conversão", value: pctFmt(c.conversaoOrcamento) },
-            { label: "Novos pacientes", value: int(c.novos) },
-          ]}
-        />
-        <BigCard
-          mostrarComparacao={comparar}
-          title="Qualidade"
-          icon={Percent}
-          value={pctFmt(p.agendados > 0 ? (p.confirmados / p.agendados) * 100 : 0)}
-          // A variação vinha do no-show; sem registro de falta ela seria sempre
-          // "0,0% vs. período anterior", uma estabilidade falsa.
-          delta={semRegistroFalta ? undefined : cmp(q.noShowPct, qa.noShowPct)}
-          deltaInvertido
-          subs={[
-            semRegistroFalta
-              ? { label: "Cancelados", value: int(p.cancelaram) }
-              : { label: "No-show", value: pctFmt(q.noShowPct) },
-            semRegistroExecucao
-              ? { label: "Tempo médio", value: `${p.tempoMedioMin.toFixed(0)} min` }
-              : { label: "Atraso médio", value: `${q.atrasoMedioMin.toFixed(0)} min` },
-          ]}
-        />
-      </div>
 
       <Tabs defaultValue="producao" className="space-y-4">
         <TabsList>
@@ -1107,68 +1007,6 @@ function PainelExecutivoPage() {
         />
       )}
     </div>
-  );
-}
-
-// ---------- Ranking card ----------
-function BigCard({
-  title,
-  icon: Icon,
-  value,
-  delta: d,
-  deltaInvertido,
-  subs,
-  mostrarComparacao = true,
-}: {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  value: string;
-  delta?: number;
-  deltaInvertido?: boolean;
-  subs: { label: string; value: string }[];
-  /**
-   * Chave "Comparar com período anterior". Desligada, o card não mostra nem o
-   * percentual nem o aviso de falta de base — quem desligou não quer nenhuma
-   * linha de comparação ali, e "Sem base de comparação" em todos os cards seria
-   * pior que o percentual que ele acabou de esconder.
-   */
-  mostrarComparacao?: boolean;
-}) {
-  const positivo = deltaInvertido ? (d ?? 0) <= 0 : (d ?? 0) >= 0;
-  return (
-    <Card className="overflow-hidden border-slate-200/70 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-        <CardTitle className="text-[12px] font-semibold uppercase tracking-wider text-slate-600">
-          {title}
-        </CardTitle>
-        <Icon className="h-4 w-4 text-slate-400" />
-      </CardHeader>
-      <CardContent className="px-4 py-3">
-        <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-slate-900">
-          {value}
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {subs.map((s) => (
-            <div key={s.label} className="rounded-lg bg-slate-50 px-2.5 py-1.5">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">{s.label}</p>
-              <p className="text-sm font-medium tabular-nums text-slate-800">{s.value}</p>
-            </div>
-          ))}
-        </div>
-        {!mostrarComparacao ? null : typeof d === "number" ? (
-          <p
-            className={`mt-2.5 text-xs font-medium ${positivo ? "text-emerald-600" : "text-rose-600"}`}
-          >
-            {d > 0 ? "+" : ""}
-            {d.toFixed(1)}% <span className="text-slate-400 font-normal">vs. período anterior</span>
-          </p>
-        ) : (
-          // Período anterior zerado: não existe base de comparação. Antes isso
-          // aparecia como "0,0%", que se lê como estabilidade e engana.
-          <p className="mt-2.5 text-xs font-normal text-slate-400">Sem base de comparação</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
