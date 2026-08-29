@@ -48,10 +48,20 @@ const MAX_PAGINAS = 50;
 
 export interface AtendimentosPorCategoria {
   consultas: number;
+  /** Imagem (1 por linha) + laboratório (1 por paciente/dia). */
   exames: number;
   procedimentos: number;
-  outros: number;
-  /** Consultas + exames — é o que a gestão chama de "atendimentos realizados". */
+  /**
+   * Atendimentos cujo serviço está cadastrado SEM o campo "tipo de
+   * procedimento". Não é sobra de conta nem erro: em agosto de 2026 são 623 de
+   * 2.147, porque 2.512 dos 4.520 serviços ativos da clínica estão sem tipo
+   * (ECOCARDIOGRAMA, PREVENTIVO, ELETROCARDIOGRAMA e outros). Fica visível na
+   * tela em vez de ser jogado dentro de "consultas" ou "exames" — chutar o
+   * tipo seria inventar regra de negócio. Some sozinho conforme o cadastro
+   * for preenchido.
+   */
+  semTipo: number;
+  /** Todos os realizados: consultas + exames + procedimentos + semTipo. */
   total: number;
 }
 
@@ -198,7 +208,7 @@ async function carregar(clinicaId: string): Promise<DashboardBlocos> {
           consultas: num(at.consultas),
           exames: num(at.exames),
           procedimentos: num(at.procedimentos),
-          outros: num(at.outros),
+          semTipo: num(at.semTipo),
           total: num(at.total),
         }
       : null,

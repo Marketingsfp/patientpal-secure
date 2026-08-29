@@ -194,7 +194,13 @@ export function BlocoTopoExecutivo({
               ? `${int(at.consultas)} consulta(s) · ${int(at.exames)} exame(s)`
               : "Falta aplicar APLICAR-DASHBOARD-BLOCOS.sql"
           }
-          ajuda="Consultas mais exames realizados no mês. Exames de laboratório do mesmo paciente no mesmo dia contam como um atendimento só, pela regra aprovada em 07/07/2026."
+          /*
+            O número grande é o TOTAL de atendimentos realizados, não a soma de
+            consultas + exames. Os dois separados deixariam de fora os 623
+            atendimentos de agosto cujo serviço está sem tipo no cadastro — o
+            card publicaria 1.524 numa clínica que atendeu 2.147.
+          */
+          ajuda="Todos os atendimentos realizados no mês. A linha de baixo mostra quanto disso é consulta e quanto é exame; o que falta para o total são serviços ainda sem 'tipo de procedimento' no cadastro, e aparecem na pizza ao lado. Exames de laboratório do mesmo paciente no mesmo dia contam como um atendimento só, pela regra aprovada em 07/07/2026."
         />
       </div>
     </Bloco>
@@ -277,12 +283,24 @@ export function BlocoVisaoClinica({
   const hojeIso = dados?.mes.hojeIso ?? "";
   const listaAniver = useAniversariantesDeHoje(clinicaId);
 
+  /**
+   * Fatias da pizza. A soma delas é sempre o total de atendimentos realizados.
+   *
+   * "Sem tipo cadastrado" é uma fatia de verdade, não um resto escondido: em
+   * agosto de 2026 são 623 de 2.147 atendimentos, de serviços como
+   * ECOCARDIOGRAMA e PREVENTIVO que estão no cadastro sem o campo "tipo de
+   * procedimento". Empurrá-los para dentro de Consultas ou de Exames seria
+   * inventar regra de negócio; deixá-los de fora faria a pizza mentir sobre o
+   * tamanho do mês.
+   */
   const fatias = useMemo(
     () =>
       at
         ? [
             { name: "Consultas", value: at.consultas },
             { name: "Exames", value: at.exames },
+            { name: "Procedimentos", value: at.procedimentos },
+            { name: "Sem tipo cadastrado", value: at.semTipo },
           ].filter((f) => f.value > 0)
         : [],
     [at],
@@ -338,12 +356,22 @@ export function BlocoVisaoClinica({
               Nenhum atendimento realizado no mês até agora.
             </p>
           ) : (
-            <MiniPieChart
-              data={fatias}
-              height={280}
-              colors={["#3b82f6", "#13b5a3"]}
-              formatValue={(n) => int(n)}
-            />
+            <>
+              <MiniPieChart
+                data={fatias}
+                height={280}
+                colors={["#3b82f6", "#13b5a3", "#a855f7", "#94a3b8"]}
+                formatValue={(n) => int(n)}
+              />
+              {at.semTipo > 0 && (
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                  <strong>{int(at.semTipo)}</strong> atendimento(s) aparecem como “sem tipo
+                  cadastrado” porque o serviço deles está no cadastro sem o campo{" "}
+                  <em>tipo de procedimento</em>. Preencher esse campo em Serviços move cada um para
+                  Consultas ou Exames automaticamente.
+                </p>
+              )}
+            </>
           )}
         </PainelGrafico>
 
@@ -420,6 +448,17 @@ export function BlocoVisaoClinica({
               ) : (
                 <p className="py-4 text-center text-sm text-muted-foreground">
                   Nenhum paciente faz aniversário hoje.
+                </p>
+              )}
+              {/*
+                A clínica tem centenas de aniversariantes por dia (681 em
+                29/08/2026), então a lista é um recorte. Dizer o tamanho do
+                recorte evita que alguém a leia como "são só estes".
+              */}
+              {listaAniver.data && aniver.hoje > listaAniver.data.length && (
+                <p className="text-xs text-muted-foreground">
+                  Mostrando os {int(listaAniver.data.length)} primeiros de {int(aniver.hoje)}, em
+                  ordem alfabética.
                 </p>
               )}
             </div>

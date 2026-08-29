@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.dashboard_blocos_periodo(
   p_clinica uuid,
   p_ini timestamptz,
@@ -18,10 +17,9 @@ BEGIN
   END IF;
 
   WITH
-  -- nome do procedimento -> categoria operacional.
-  -- Copia fiel do mesmo bloco de `painel_executivo_periodo`, para que os dois
-  -- paineis classifiquem o mesmo agendamento da mesma forma. Se um dia a regra
-  -- mudar, tem que mudar nos dois.
+  -- nome do servico -> categoria operacional. Mesmo bloco de
+  -- `painel_executivo_periodo`, para que os dois paineis classifiquem o mesmo
+  -- agendamento da mesma forma.
   proc AS (
     SELECT DISTINCT ON (chave) chave, cat
     FROM (
@@ -40,6 +38,8 @@ BEGIN
         AND pr.ativo
         AND coalesce(btrim(pr.nome), '') <> ''
     ) t
+    -- O mesmo nome existe cadastrado varias vezes, umas com tipo e outras sem.
+    -- Vence a linha que TEM tipo.
     ORDER BY chave, (cat = 'outro'), cat
   ),
   lab_med AS (
@@ -60,13 +60,18 @@ BEGIN
       AND NOT (a.paciente_id IS NULL
                AND upper(btrim(coalesce(a.paciente_nome, ''))) = 'DISPONIVEL')
   ),
-  -- categoria resolvida por agendamento: menor prioridade numerica vence.
-  -- Uma ficha "HEMOGRAMA + RX TORAX" conta como imagem, nao como laboratorio.
+  -- Categoria de cada agendamento: menor prioridade numerica vence. Uma ficha
+  -- "HEMOGRAMA + RX TORAX" conta como imagem, nao como laboratorio.
+  --
+  -- Duas tentativas de encontrar o servico, nesta ordem:
+  --   p1 = nome INTEIRO como esta na agenda;
+  --   p2 = nome sem o ultimo parenteses (a especialidade que a agenda anexa).
+  -- A primeira tem prioridade — ver "O QUE MUDOU" no cabecalho.
   cat_ag AS (
     SELECT s.id, min(s.pri) AS pri
     FROM (
       SELECT a.id,
-             CASE coalesce(p.cat, 'outro')
+             CASE coalesce(nullif(p1.cat, 'outro'), nullif(p2.cat, 'outro'), 'outro')
                WHEN 'cirurgia'     THEN 1
                WHEN 'imagem'       THEN 2
                WHEN 'procedimento' THEN 3
@@ -76,7 +81,10 @@ BEGIN
              END AS pri
       FROM ags a
       CROSS JOIN LATERAL regexp_split_to_table(a.procedimento, '\s+\+\s+') AS x(parte)
-      LEFT JOIN proc p ON p.chave = lower(btrim(unaccent(x.parte)))
+      LEFT JOIN proc p1
+        ON p1.chave = lower(btrim(unaccent(x.parte)))
+      LEFT JOIN proc p2
+        ON p2.chave = lower(btrim(unaccent(regexp_replace(x.parte, '\s*\([^()]*\)\s*$', ''))))
       WHERE a.procedimento IS NOT NULL
         AND a.procedimento <> ''
         AND btrim(x.parte) <> ''
@@ -93,31 +101,39 @@ BEGIN
              WHEN 5 THEN 'laboratorio'
              ELSE NULL
            END AS cat,
-           -- Sem procedimento cadastrado na ficha, cai na heuristica antiga:
+           -- Sem servico preenchido na ficha, cai na heuristica antiga:
            -- medico de laboratorio => laboratorio.
            CASE
              WHEN a.procedimento IS NOT NULL AND a.procedimento <> ''
                THEN coalesce(c.pri, 6) = 5
              ELSE a.medico_id IN (SELECT medico_id FROM lab_med)
            END AS is_lab,
-           -- chave de agrupamento do laboratorio: paciente + dia. Regra
-           -- aprovada em 07/07/2026 — N exames de sangue do mesmo paciente no
-           -- mesmo dia sao 1 atendimento.
+           -- Agrupamento do laboratorio: paciente + dia. Regra aprovada em
+           -- 07/07/2026 — N exames de sangue do mesmo paciente no mesmo dia
+           -- sao 1 atendimento.
            coalesce(a.paciente_id::text, a.id::text) || '|'
              || (a.inicio AT TIME ZONE 'America/Sao_Paulo')::date::text AS chave_lab,
            (a.status::text = 'realizado' OR a.executado_em IS NOT NULL) AS realizado
     FROM ags a
     LEFT JOIN cat_ag c ON c.id = a.id
   ),
-  -- Consultas x Exames, contando so o que foi REALIZADO.
-  -- "Exames" = imagem (1 por linha) + laboratorio (1 por paciente/dia).
   atend AS (
     SELECT
       count(*) FILTER (WHERE realizado AND NOT is_lab AND cat = 'consulta') AS consultas,
+      -- Exames = imagem (1 por linha) + laboratorio (1 por paciente/dia).
       count(*) FILTER (WHERE realizado AND NOT is_lab AND cat = 'imagem')
         + count(DISTINCT chave_lab) FILTER (WHERE realizado AND is_lab) AS exames,
       count(*) FILTER (WHERE realizado AND NOT is_lab AND cat IN ('procedimento', 'cirurgia')) AS procedimentos,
-      count(*) FILTER (WHERE realizado AND NOT is_lab AND (cat IS NULL OR cat NOT IN ('consulta','imagem','procedimento','cirurgia'))) AS outros
+      -- Servico sem "tipo de procedimento" no cadastro. Fica visivel de
+      -- proposito: some sozinho conforme o cadastro for preenchido.
+      count(*) FILTER (
+        WHERE realizado AND NOT is_lab
+          AND (cat IS NULL OR cat NOT IN ('consulta', 'imagem', 'procedimento', 'cirurgia'))
+      ) AS sem_tipo,
+      -- Total de atendimentos realizados, com a mesma regra de laboratorio.
+      -- E a soma exata das quatro fatias acima.
+      count(*) FILTER (WHERE realizado AND NOT is_lab)
+        + count(DISTINCT chave_lab) FILTER (WHERE realizado AND is_lab) AS total
     FROM base
   ),
   -- Aniversariantes. Mesma regra da funcao ja existente
@@ -143,8 +159,8 @@ BEGIN
       'consultas',     a.consultas,
       'exames',        a.exames,
       'procedimentos', a.procedimentos,
-      'outros',        a.outros,
-      'total',         a.consultas + a.exames
+      'semTipo',       a.sem_tipo,
+      'total',         a.total
     ),
     'aniversariantes', jsonb_build_object(
       'hoje', n.hoje,
@@ -162,14 +178,15 @@ GRANT EXECUTE ON FUNCTION public.dashboard_blocos_periodo(uuid, timestamptz, tim
   TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- CONFERENCIA RAPIDA (opcional). Troque o UUID pelo da clinica e rode:
+-- CONFERENCIA (opcional). Rode logo depois, dentro do sistema nao e preciso:
 --
 --   SELECT public.dashboard_blocos_periodo(
---     'COLE-AQUI-O-ID-DA-CLINICA'::uuid,
+--     '7570ddde-8c1c-4b55-ba72-cf12b2a6c940'::uuid,
 --     date_trunc('month', now()),
 --     now()
 --   );
 --
--- Esperado: um JSON com "atendimentos" (consultas, exames, total) e
--- "aniversariantes" (hoje, mes).
+-- Observacao: rodando pelo SQL editor sem usuario logado a funcao devolve
+-- NULO de proposito — ela so responde para quem e membro da clinica. Isso e a
+-- protecao funcionando, nao erro. O numero de verdade aparece na tela.
 -- ---------------------------------------------------------------------------
