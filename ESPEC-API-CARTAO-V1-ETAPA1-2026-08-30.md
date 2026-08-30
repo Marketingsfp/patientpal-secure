@@ -456,9 +456,9 @@ dependentes, e há 14 CPFs duplicados na base.
 - [x] Contratos com `teste = true` excluídos de todas as respostas
 - [x] Campos da seção 5 ausentes de toda resposta
 - [x] Conferência dos números contra os dados de produção (seção 8)
-- [ ] **Chave `policardmed` criada com 60/min e 5.000/dia** — pendente, é a
-      única escrita da etapa e precisa da confirmação do dono
-- [ ] Publicar e conferir no site publicado
+- [x] **Chave `policardmed` criada com 60/min e 5.000/dia**
+- [x] Publicado e conferido no site publicado (seção 9)
+
 
 Nada nesta etapa escreve no banco. A primeira escrita é a Etapa 3, e só depois
 de a leitura estar estável.
@@ -505,3 +505,80 @@ outro lado dependem.
 normalização do status `aberto`, a virada da tolerância no 5º/6º dia, carência
 que não vira dívida, e a soma dos quatro baldes. Suíte completa do projeto:
 422 testes, 0 falhas. `tsc --noEmit`: 0 erros.
+
+---
+
+## 9. Teste de ponta a ponta em produção — 30/08/2026
+
+Rodado contra `https://patientpal-secure.lovable.app`, com a chave
+`policardmed`, depois do Publish do commit `56803863`.
+
+### Segurança
+
+| Cenário | Resultado |
+|---|---|
+| Sem chave | 401 `missing_api_key` ✓ |
+| Chave inventada | 401 `invalid_api_key` ✓ |
+| Rota de outro escopo (`/appointments`) | 403 `insufficient_scope` ✓ |
+| Tentativa de escrita (`POST /appointments`) | 403 `insufficient_scope` ✓ |
+| Rota inexistente | 404 `route_not_found` ✓ |
+| Campos proibidos da seção 5 no corpo | todos ausentes ✓ |
+
+A chave só lê o cartão: não alcança agenda nem nenhuma escrita.
+
+### Números — API contra a linha de base do banco
+
+| Consulta | Esperado | API |
+|---|---:|---:|
+| Contratos ativos | 1.882 | **1.882** ✓ |
+| … inadimplentes | 1.169 | **1.169** ✓ |
+| … em carência | 19 | **19** ✓ |
+| … em dia | 694 | **694** ✓ |
+| Contratos (todos os status) | 1.991 | **1.991** ✓ |
+| Parcelas — paga | 1.294 | **1.294** ✓ |
+| Parcelas — a vencer | 14.325 | **14.325** ✓ |
+| Parcelas — inadimplente | 2.102 | **2.102** ✓ |
+| Parcelas — cancelada | 1.490 | **1.490** ✓ |
+| **Total de parcelas** | 19.211 | **19.211** ✓ |
+
+Valores: R$ 204.323,50 pagas · R$ 1.753.843,45 a vencer ·
+R$ 237.073,45 inadimplentes · R$ 220.585,00 canceladas.
+
+### Casos concretos conferidos
+
+**Carência funcionando** — contrato 20260132 (CARTÃO CONSULTA + SEGUROS),
+parcela vencida em 28/08: `situacao_financeira = em_carencia`,
+`dias_carencia_restantes = 3`, `total_em_aberto_vencido = 0` e
+`total_em_carencia = 120`. É exatamente o comportamento do balcão: parcela
+vencida há 2 dias, cartão funcionando.
+
+**Status legado normalizado** — contrato com 11 parcelas gravadas como
+`aberto`: a vencida em 10/08 saiu `inadimplente` (20 dias de atraso) e as 10
+futuras saíram `a_vencer`. Sem a normalização, o satélite receberia um status
+que não sabe interpretar.
+
+### Desempenho
+
+| Chamada | Tempo |
+|---|---:|
+| `/billing/installments` sem filtro (19.211 parcelas) | 8,6 s |
+| `/billing/installments` filtrado por mês | 1,7 s |
+| `/contracts` com filtro de situação | ~1,8 s |
+| `/contracts/{id}` e sub-recursos | 0,6–0,9 s |
+
+> **Orientação ao satélite:** varrer a base inteira leva ~8,6 s e só deve
+> acontecer na carga inicial. O uso normal é filtrar por período ou usar
+> `atualizado_desde`, que fica abaixo de 2 s.
+
+Auditoria: as 16 chamadas ficaram registradas em `integracao_requisicoes`,
+com rota, status, duração e IP.
+
+### Um achado dos dados, para a Etapa 2
+
+Existem **58 parcelas com `numero_parcela` menor ou igual a zero** (−5 a 0),
+todas de R$ 20 a R$ 30: é a **taxa de adesão lançada como parcela**, não no
+campo `taxa_adesao`. Duas consequências para quem consumir a API:
+
+1. não assumir que a numeração das parcelas começa em 1;
+2. não contar essas linhas como mensalidade recorrente — a adesão é cobrada
+   uma única vez, na emissão do cartão.
