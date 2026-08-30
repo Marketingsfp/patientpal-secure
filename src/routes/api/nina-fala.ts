@@ -161,9 +161,8 @@ export const Route = createFileRoute("/api/nina-fala")({
                 headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
                   model: MODELO_TEXTO,
-                  reasoning_effort: "none",
                   stream: true,
-                  max_completion_tokens: 220,
+                  max_tokens: 220,
                   messages: [{ role: "system", content: systemPrompt }, ...body.messages],
                 }),
               });
