@@ -503,11 +503,18 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     ) {
       resultado = await handleReagendar(db, ctx, ator, decodeURIComponent(partes[1]!), bodyTexto);
     } else {
-      throw new ApiError({
-        status: 404,
-        code: "route_not_found",
-        message: `Rota ${request.method} ${rota} não existe na API v1.`,
-      });
+      // Recursos do Cartão Benefícios (leitura). Devolve null quando o caminho
+      // não é de lá, e aí cai no 404 abaixo.
+      const { rotearCartaoV1 } = await import("./cartao-v1.server");
+      const cartao = await rotearCartaoV1(db, ctx, request.method, partes, url);
+      if (!cartao) {
+        throw new ApiError({
+          status: 404,
+          code: "route_not_found",
+          message: `Rota ${request.method} ${rota} não existe na API v1.`,
+        });
+      }
+      resultado = cartao;
     }
 
     status = resultado.status;

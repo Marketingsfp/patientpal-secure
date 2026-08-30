@@ -38,6 +38,14 @@ export const ESCOPOS_CONHECIDOS = [
   // Permite alterar QUALQUER agendamento da clínica, não só os criados pela
   // própria chave. Concedido caso a caso.
   "appointments:write:all",
+  // Cartão Benefícios (somente leitura). `contracts:read` é separado de
+  // `members:read` de propósito: dá para entregar os números do contrato e a
+  // situação financeira SEM entregar CPF, nascimento e telefone de titular e
+  // dependentes.
+  "contracts:read",
+  "members:read",
+  "billing:read",
+  "plans:read",
 ] as const;
 
 export class ApiError extends Error {
