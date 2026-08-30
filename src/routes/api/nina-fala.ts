@@ -22,7 +22,7 @@ import { z } from "zod";
  * - `{ type: "erro", mensagem }`
  */
 
-const MODELO_TEXTO = "openai/gpt-5.6-terra";
+const MODELO_TEXTO = "google/gemini-3.1-flash-lite";
 /** TTS mais leve do catálogo = primeiro pedaço de áudio mais rápido. */
 const MODELO_VOZ = "google/gemini-3.1-flash-tts-preview";
 const VOZ = "Leda";
@@ -161,9 +161,8 @@ export const Route = createFileRoute("/api/nina-fala")({
                 headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
                   model: MODELO_TEXTO,
-                  reasoning_effort: "none",
                   stream: true,
-                  max_completion_tokens: 220,
+                  max_tokens: 220,
                   messages: [{ role: "system", content: systemPrompt }, ...body.messages],
                 }),
               });

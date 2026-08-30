@@ -844,8 +844,7 @@ ${procs || "(nenhum)"}`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/gpt-5.6-terra",
-      reasoning_effort: "none",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemPrompt },
         ...historico,

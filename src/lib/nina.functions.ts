@@ -179,9 +179,8 @@ export const chatNina = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
-          model: "openai/gpt-5.6-terra",
-          reasoning_effort: "none",
-          ...(data.modoVoz ? { max_completion_tokens: 220 } : {}),
+          model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
+          ...(data.modoVoz ? { max_tokens: 220 } : {}),
           tools: FERRAMENTAS_NINA,
           messages: historico,
         }),
