@@ -22,7 +22,7 @@ import { z } from "zod";
  * - `{ type: "erro", mensagem }`
  */
 
-const MODELO_TEXTO = "openai/gpt-5.6-terra";
+const MODELO_TEXTO = "google/gemini-3.1-flash-lite";
 /** TTS mais leve do catálogo = primeiro pedaço de áudio mais rápido. */
 const MODELO_VOZ = "google/gemini-3.1-flash-tts-preview";
 const VOZ = "Leda";
