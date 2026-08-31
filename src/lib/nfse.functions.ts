@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
 import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse-tomador";
+import { avancarContadorDps, reservarNumeroDps } from "@/lib/nfse-numeracao";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -403,11 +404,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
 
     // Reserva o próximo número de DPS/RPS antes do envio (evita duplicidade).
+    // A reserva é condicional no banco — ver `reservarNumeroDps`.
     if (emitente.usar_ambiente_nacional) {
-      await supabaseAdmin
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
-        .eq("id", emitente.id);
+      const numeroReservado = await reservarNumeroDps(
+        supabaseAdmin,
+        emitente.id,
+        Number(emitente.rps_proximo_numero ?? 1),
+      );
+      (payloadNacional as { numero_dps: number }).numero_dps = numeroReservado;
     }
 
     // Cria registro local antes do envio (para rastreio mesmo se Focus falhar)
@@ -502,13 +506,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
     }
 
     // Persiste o avanço do contador (mesmo em caso de falha final, para não
-    // tentar de novo os mesmos números na próxima emissão).
-    if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabaseAdmin
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: bumpedTo + 1 })
-        .eq("id", emitente.id);
-    }
+    // tentar de novo os mesmos números na próxima emissão). Só adianta, nunca
+    // volta atrás — ver `avancarContadorDps`.
+    if (isNacional) await avancarContadorDps(supabaseAdmin, emitente.id, bumpedTo + 1);
 
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
@@ -915,6 +915,19 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
     };
 
+    // Reenvio também reserva o número no banco antes de mandar. Sem isto, um
+    // reenvio disparado enquanto a recepção emite uma nota nova saía com o
+    // mesmo número dela e voltava recusado pelo mesmo E0014 que ele estava
+    // tentando resolver.
+    if (emitente.usar_ambiente_nacional) {
+      const numeroReservado = await reservarNumeroDps(
+        supabaseAdmin,
+        emitente.id,
+        Number(emitente.rps_proximo_numero ?? 1),
+      );
+      (payloadNacional as { numero_dps: number }).numero_dps = numeroReservado;
+    }
+
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
 
     await supabase
@@ -976,12 +989,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       currentRef = `${ref}-r${currentNumero}`;
     }
 
-    if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabaseAdmin
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: bumpedTo + 1 })
-        .eq("id", emitente.id);
-    }
+    if (isNacional) await avancarContadorDps(supabaseAdmin, emitente.id, bumpedTo + 1);
 
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
