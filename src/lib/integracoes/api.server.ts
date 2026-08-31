@@ -22,6 +22,9 @@ export type ApiKeyContexto = {
   escopos: string[];
   limite_por_minuto: number;
   limite_por_dia: number;
+  /** Limites próprios da criação de paciente (v1.1), separados do geral. */
+  limite_pacientes_por_minuto: number;
+  limite_pacientes_por_dia: number;
 };
 
 export type ApiErro = {
@@ -46,6 +49,9 @@ export const ESCOPOS_CONHECIDOS = [
   "members:read",
   "billing:read",
   "plans:read",
+  // v1.1: permite que o POST /appointments resolva/cadastre o paciente a
+  // partir de CPF+nome+nascimento+telefone. Nunca concedido por padrão.
+  "patients:write",
 ] as const;
 
 export class ApiError extends Error {
@@ -145,7 +151,7 @@ export async function autenticarApiKey(
   const { data, error } = await db
     .from("integracao_api_keys")
     .select(
-      "id,clinica_id,origem_integracao,key_hash,escopos,ativo,expira_em,limite_por_minuto,limite_por_dia",
+      "id,clinica_id,origem_integracao,key_hash,escopos,ativo,expira_em,limite_por_minuto,limite_por_dia,limite_pacientes_por_minuto,limite_pacientes_por_dia",
     )
     .eq("key_prefix", prefixo)
     .maybeSingle();
@@ -182,6 +188,7 @@ export async function autenticarApiKey(
     .update({ ultima_utilizacao_em: new Date().toISOString() } as never)
     .eq("id", data.id);
 
+  const bruto = data as unknown as Record<string, unknown>;
   return {
     api_key_id: data.id,
     clinica_id: data.clinica_id,
@@ -189,6 +196,8 @@ export async function autenticarApiKey(
     escopos: (data.escopos ?? []) as string[],
     limite_por_minuto: data.limite_por_minuto,
     limite_por_dia: data.limite_por_dia,
+    limite_pacientes_por_minuto: Number(bruto['limite_pacientes_por_minuto'] ?? 20),
+    limite_pacientes_por_dia: Number(bruto['limite_pacientes_por_dia'] ?? 200),
   };
 }
 
@@ -243,6 +252,55 @@ export async function consumirRateLimit(
     }
   }
 }
+
+/**
+ * Limite específico da CRIAÇÃO DE PACIENTE pela API (v1.1), separado do
+ * limite geral: cadastrar gente por rota pública é caminho clássico de abuso,
+ * então a torneira dele é mais estreita e independente.
+ */
+export async function consumirRateLimitPacientes(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+): Promise<void> {
+  const agora = new Date();
+  const minuto = new Date(
+    Date.UTC(
+      agora.getUTCFullYear(),
+      agora.getUTCMonth(),
+      agora.getUTCDate(),
+      agora.getUTCHours(),
+      agora.getUTCMinutes(),
+    ),
+  ).toISOString();
+  const dia = new Date(
+    Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+  ).toISOString();
+
+  const janelas: Array<[string, string, number]> = [
+    ["pacientes_minuto", minuto, ctx.limite_pacientes_por_minuto],
+    ["pacientes_dia", dia, ctx.limite_pacientes_por_dia],
+  ];
+  for (const [janela, inicio, limite] of janelas) {
+    const { data, error } = await db.rpc("integracao_rate_limit_consumir", {
+      _api_key_id: ctx.api_key_id,
+      _janela: janela,
+      _janela_inicio: inicio,
+      _limite: limite,
+    } as never);
+    if (error) continue;
+    const r = (data ?? {}) as { permitido?: boolean };
+    if (r.permitido === false) {
+      throw new ApiError({
+        status: 429,
+        code: "rate_limit_exceeded",
+        message: `Limite de ${limite} cadastros de paciente por ${janela.replace("pacientes_", "")} atingido para esta chave.`,
+        details: { limite: "patients" },
+      });
+    }
+  }
+}
+
+
 
 // ---------------------------------------------------------------- idempotência
 

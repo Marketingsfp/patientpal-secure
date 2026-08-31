@@ -31,6 +31,7 @@ import {
   registrarRequisicao,
   type ApiKeyContexto,
 } from "./api.server";
+import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -43,7 +44,10 @@ const uuid = z.string().uuid("Identificador inválido.");
 
 const criarSchema = z.object({
   id_externo: z.string().min(1).max(120),
-  paciente_id: uuid,
+  // v1: paciente já cadastrado. v1.1: alternativamente o objeto `paciente`.
+  // Um ou outro — nunca os dois (ver `patient_and_id_conflict`).
+  paciente_id: uuid.optional(),
+  paciente: pacienteSchema.optional(),
   medico_id: uuid.nullish(),
   especialidade_id: uuid.nullish(),
   inicio: isoDatetime,
@@ -162,7 +166,8 @@ async function handleCriar(
   ctx: ApiKeyContexto,
   ator: AtorAgenda,
   bodyTexto: string,
-): Promise<{ status: number; body: unknown; idExterno?: string }> {
+  idempotencyKey: string | null,
+): Promise<{ status: number; body: unknown; idExterno?: string; pacienteCriado?: boolean }> {
   exigirEscopo(ctx, "appointments:write");
 
   let bruto: unknown;
@@ -181,6 +186,34 @@ async function handleCriar(
     });
   }
   const body = parsed.data;
+
+  if (body.paciente && body.paciente_id) {
+    throw new ApiError({
+      status: 422,
+      code: "patient_and_id_conflict",
+      message: "Envie 'paciente_id' OU o objeto 'paciente', nunca os dois.",
+    });
+  }
+  if (!body.paciente && !body.paciente_id) {
+    throw new ApiError({
+      status: 422,
+      code: "invalid_body",
+      message: "Informe 'paciente_id' (paciente já cadastrado) ou o objeto 'paciente'.",
+    });
+  }
+  if (body.paciente) {
+    // Cadastro por rota pública exige escopo próprio e idempotência: sem isso,
+    // um duplo clique ou um retry vira paciente duplicado na base real.
+    exigirEscopo(ctx, "patients:write");
+    if (!idempotencyKey) {
+      throw new ApiError({
+        status: 422,
+        code: "idempotency_key_required",
+        message:
+          "Envie o cabeçalho 'Idempotency-Key' quando o corpo trouxer o objeto 'paciente'.",
+      });
+    }
+  }
 
   if (Date.parse(body.fim) <= Date.parse(body.inicio)) {
     throw new ApiError({
@@ -206,20 +239,43 @@ async function handleCriar(
     };
   }
 
-  // v1: paciente precisa existir. Nada de cadastro automático pela API.
-  const { data: paciente } = await db
-    .from("pacientes")
-    .select("id,nome,clinica_id")
-    .eq("id", body.paciente_id)
-    .eq("clinica_id", ctx.clinica_id)
-    .maybeSingle();
-  if (!paciente) {
-    throw new ApiError({
-      status: 422,
-      code: "patient_not_found",
-      message: "Paciente não encontrado nesta clínica. Cadastre o paciente antes de agendar.",
-    });
+  // Resolução do paciente.
+  //  • v1 (`paciente_id`): precisa existir; comportamento inalterado.
+  //  • v1.1 (`paciente`): encontra pelo CPF na clínica da chave ou cadastra.
+  let pacienteId: string;
+  let pacienteNome: string;
+  let pacienteCriado = false;
+  let obsExtra: string | null = null;
+
+  if (body.paciente) {
+    const resolvido = await resolverPaciente(db, ctx, body.paciente);
+    pacienteId = resolvido.paciente_id;
+    pacienteNome = resolvido.nome;
+    pacienteCriado = resolvido.criado;
+    if (resolvido.telefone_divergente) {
+      // Cadastro é da recepção: telefone novo só é anotado no agendamento.
+      obsExtra = `Telefone informado no agendamento online: ${resolvido.telefone_divergente}`;
+    }
+  } else {
+    const { data: paciente } = await db
+      .from("pacientes")
+      .select("id,nome,clinica_id")
+      .eq("id", body.paciente_id!)
+      .eq("clinica_id", ctx.clinica_id)
+      .maybeSingle();
+    if (!paciente) {
+      throw new ApiError({
+        status: 422,
+        code: "patient_not_found",
+        message: "Paciente não encontrado nesta clínica. Cadastre o paciente antes de agendar.",
+      });
+    }
+    pacienteId = paciente.id;
+    pacienteNome = paciente.nome;
   }
+  const paciente = { id: pacienteId, nome: pacienteNome };
+  const observacoesFinais =
+    [body.observacoes ?? null, obsExtra].filter(Boolean).join(" | ") || null;
 
   const ctxAgenda: CtxAgenda = { db, ator };
   const resultado = await criarAgendamentoCore(ctxAgenda, {
@@ -234,7 +290,7 @@ async function handleCriar(
       fim: new Date(body.fim).toISOString(),
       procedimento: body.procedimento ?? body.procedimentos?.[0] ?? null,
       status: "agendado",
-      observacoes: body.observacoes ?? null,
+      observacoes: observacoesFinais,
       // Agendamento vindo da API entra SEMPRE como não pago.
       data_pagamento: null,
       orcamento_id: null,
@@ -281,7 +337,95 @@ async function handleCriar(
       },
     },
     idExterno: body.id_externo,
+    // Só para o log interno: a resposta HTTP não revela se o CPF já existia.
+    pacienteCriado,
   };
+}
+
+/**
+ * Catálogo para os seletores do site institucional. Devolve apenas id e nome —
+ * nada de CRM, contato ou qualquer dado além do necessário para montar a tela.
+ */
+async function handleEspecialidades(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+): Promise<{ status: number; body: unknown }> {
+  exigirEscopo(ctx, "availability:read");
+  // Especialidades são globais; o recorte por clínica vem dos médicos dela.
+  const { data: vinculos } = await db
+    .from("medicos")
+    .select("id")
+    .eq("clinica_id", ctx.clinica_id)
+    .eq("ativo", true);
+  const medicoIds = (vinculos ?? []).map((m) => m.id);
+  if (medicoIds.length === 0) return { status: 200, body: { data: [] } };
+
+  const { data: rel } = await db
+    .from("medico_especialidades")
+    .select("especialidade_id")
+    .in("medico_id", medicoIds);
+  const espIds = [...new Set((rel ?? []).map((r) => r.especialidade_id).filter(Boolean))];
+  if (espIds.length === 0) return { status: 200, body: { data: [] } };
+
+  const { data, error } = await db
+    .from("especialidades")
+    .select("id,nome")
+    .in("id", espIds as string[])
+    .order("nome");
+  if (error) {
+    throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler especialidades." });
+  }
+  return { status: 200, body: { data: data ?? [] } };
+}
+
+async function handleMedicos(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+  url: URL,
+): Promise<{ status: number; body: unknown }> {
+  exigirEscopo(ctx, "availability:read");
+  const filtroEsp = url.searchParams.get("especialidade_id");
+  if (filtroEsp && !z.string().uuid().safeParse(filtroEsp).success) {
+    throw new ApiError({
+      status: 422,
+      code: "invalid_query",
+      message: "Parâmetro 'especialidade_id' inválido.",
+    });
+  }
+
+  const { data: medicos, error } = await db
+    .from("medicos")
+    .select("id,nome")
+    .eq("clinica_id", ctx.clinica_id)
+    .eq("ativo", true)
+    .order("nome");
+  if (error) {
+    throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler médicos." });
+  }
+  const lista = medicos ?? [];
+  if (lista.length === 0) return { status: 200, body: { data: [] } };
+
+  const { data: rel } = await db
+    .from("medico_especialidades")
+    .select("medico_id,especialidade_id")
+    .in(
+      "medico_id",
+      lista.map((m) => m.id),
+    );
+
+  const saida: Array<{ id: string; nome: string; especialidade_id: string | null }> = [];
+  for (const m of lista) {
+    const espsDoMedico = (rel ?? []).filter((r) => r.medico_id === m.id);
+    if (espsDoMedico.length === 0) {
+      if (!filtroEsp) saida.push({ id: m.id, nome: m.nome, especialidade_id: null });
+      continue;
+    }
+    for (const e of espsDoMedico) {
+      if (filtroEsp && e.especialidade_id !== filtroEsp) continue;
+      saida.push({ id: m.id, nome: m.nome, especialidade_id: e.especialidade_id ?? null });
+    }
+  }
+  return { status: 200, body: { data: saida } };
 }
 
 async function handleCancelar(
@@ -476,18 +620,27 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
         ? await iniciarIdempotencia(db, ctx.api_key_id, idempotencyKey, bodyTexto)
         : null;
 
-    let resultado: { status: number; body: unknown; idExterno?: string };
+    let resultado: {
+      status: number;
+      body: unknown;
+      idExterno?: string;
+      pacienteCriado?: boolean;
+    };
     if (replay) {
       resultado = { status: replay.status, body: replay.body };
     } else if (request.method === "GET" && partes[0] === "availability" && partes.length === 1) {
       resultado = await handleAvailability(db, ctx, url);
+    } else if (request.method === "GET" && partes[0] === "specialties" && partes.length === 1) {
+      resultado = await handleEspecialidades(db, ctx);
+    } else if (request.method === "GET" && partes[0] === "doctors" && partes.length === 1) {
+      resultado = await handleMedicos(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "appointments" && partes.length === 1) {
       resultado = await handleListar(db, ctx, url);
     } else if (request.method === "GET" && partes[0] === "appointments" && partes.length === 2) {
       exigirEscopo(ctx, "appointments:read");
       resultado = ok(200, await buscarAgendamento(db, ctx, decodeURIComponent(partes[1]!)));
     } else if (request.method === "POST" && partes[0] === "appointments" && partes.length === 1) {
-      resultado = await handleCriar(db, ctx, ator, bodyTexto);
+      resultado = await handleCriar(db, ctx, ator, bodyTexto, idempotencyKey);
     } else if (
       request.method === "POST" &&
       partes[0] === "appointments" &&

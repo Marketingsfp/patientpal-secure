@@ -5177,6 +5177,8 @@ export type Database = {
           id: string
           key_hash: string
           key_prefix: string
+          limite_pacientes_por_dia: number
+          limite_pacientes_por_minuto: number
           limite_por_dia: number
           limite_por_minuto: number
           nome: string
@@ -5194,6 +5196,8 @@ export type Database = {
           id?: string
           key_hash: string
           key_prefix: string
+          limite_pacientes_por_dia?: number
+          limite_pacientes_por_minuto?: number
           limite_por_dia?: number
           limite_por_minuto?: number
           nome: string
@@ -5211,6 +5215,8 @@ export type Database = {
           id?: string
           key_hash?: string
           key_prefix?: string
+          limite_pacientes_por_dia?: number
+          limite_pacientes_por_minuto?: number
           limite_por_dia?: number
           limite_por_minuto?: number
           nome?: string
@@ -10076,6 +10082,8 @@ export type Database = {
           _clinica_id: string
           _escopos?: string[]
           _expira_em?: string
+          _limite_pacientes_por_dia?: number
+          _limite_pacientes_por_minuto?: number
           _limite_por_dia?: number
           _limite_por_minuto?: number
           _nome: string
@@ -10089,6 +10097,18 @@ export type Database = {
           _janela: string
           _janela_inicio: string
           _limite: number
+        }
+        Returns: Json
+      }
+      integracao_resolver_paciente: {
+        Args: {
+          _clinica_id: string
+          _cpf_digits: string
+          _data_nascimento: string
+          _email?: string
+          _nome: string
+          _sexo?: string
+          _telefone: string
         }
         Returns: Json
       }
