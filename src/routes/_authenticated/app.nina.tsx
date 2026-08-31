@@ -703,6 +703,108 @@ function NinaTreinada() {
   );
 }
 
+/* ===================== FEEDBACK DA RESPOSTA (aprendizado) ===================== */
+
+/**
+ * 👍 / 👎 em cada resposta da Nina. O 👎 abre um campo de correção que, se
+ * preenchido, entra na fila "Nina → Aprendizado" para um gestor aprovar.
+ * Nada muda no comportamento da Nina até essa aprovação.
+ */
+function FeedbackResposta({ pergunta, resposta }: { pergunta: string; resposta: string }) {
+  const { clinicaAtual } = useClinica();
+  const enviar = useServerFn(registrarFeedbackNina);
+  const [enviado, setEnviado] = useState<null | "positivo" | "negativo">(null);
+  const [abrirCorrecao, setAbrirCorrecao] = useState(false);
+  const [correcao, setCorrecao] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const registrar = async (avaliacao: 1 | -1, texto?: string) => {
+    if (!clinicaAtual) return;
+    setSalvando(true);
+    try {
+      await enviar({
+        data: {
+          clinicaId: clinicaAtual.clinica_id,
+          canal: "interno" as const,
+          pergunta: pergunta.slice(0, 4000),
+          resposta: resposta.slice(0, 8000),
+          avaliacao,
+          ...(texto?.trim() ? { correcao: texto.trim(), virarAprendizado: true } : {}),
+        },
+      });
+      setEnviado(avaliacao === 1 ? "positivo" : "negativo");
+      setAbrirCorrecao(false);
+      toast.success(
+        texto?.trim()
+          ? "Correção enviada para aprovação em Nina → Aprendizado"
+          : "Obrigado! Avaliação registrada.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível registrar");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (enviado && !abrirCorrecao) {
+    return (
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {enviado === "positivo" ? "👍 avaliada como boa" : "👎 avaliação registrada"}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-1 space-y-2">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => registrar(1)}
+          title="Resposta boa"
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-emerald-600 disabled:opacity-50"
+        >
+          <ThumbsUp className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => setAbrirCorrecao(true)}
+          title="Resposta errada — ensinar a Nina"
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive disabled:opacity-50"
+        >
+          <ThumbsDown className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {abrirCorrecao && (
+        <div className="space-y-2">
+          <Textarea
+            rows={3}
+            value={correcao}
+            onChange={(e) => setCorrecao(e.target.value)}
+            placeholder="Como a Nina deveria ter respondido? (vai para aprovação, não muda nada sozinho)"
+            className="text-xs"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" disabled={salvando} onClick={() => registrar(-1, correcao)}>
+              Enviar correção
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={salvando}
+              onClick={() => registrar(-1)}
+            >
+              Só marcar como ruim
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* ============================ WHATSAPP CONFIG ============================ */
 
 interface WppCfg {
