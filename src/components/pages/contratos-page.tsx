@@ -3209,6 +3209,49 @@ function DetalheContrato({
     };
   }, [contrato.id]);
 
+  /**
+   * Espelha o valor mensal do contrato nas parcelas que ainda não foram pagas.
+   *
+   * Só mexe em parcelas com status "pendente" ou "aberto": parcela paga é
+   * histórico e parcela cancelada não pode voltar a valer. Encargos avulsos
+   * (numero_parcela <= 0 — taxa de adesão, taxa de inclusão de dependente,
+   * juros) também ficam de fora, porque não acompanham a mensalidade.
+   *
+   * Devolve quantas parcelas foram atualizadas, ou null se o banco recusou.
+   */
+  const sincronizarValorParcelasAbertas = async (novoValor: number): Promise<number | null> => {
+    const abertas = mens.filter(
+      (m) => !isEncargoAvulso(m) && (m.status === "pendente" || m.status === "aberto"),
+    );
+    if (abertas.length === 0) return 0;
+    // Agrupa por valor final (no boleto cada parcela carrega a taxa) para gravar
+    // um UPDATE por valor, em vez de um UPDATE por parcela.
+    const porValor = new Map<number, string[]>();
+    for (const m of abertas) {
+      const isBoleto = (m.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
+      const v = novoValor + (isBoleto ? TAXA_BOLETO : 0);
+      porValor.set(v, [...(porValor.get(v) ?? []), m.id]);
+    }
+    for (const [valor, ids] of porValor) {
+      const { error } = await supabase
+        .from("contrato_mensalidades")
+        .update({ valor } as any)
+        .in("id", ids);
+      if (error) {
+        mostrarErro(error, "não foi possível atualizar o valor das parcelas em aberto");
+        return null;
+      }
+    }
+    setMens((rows) =>
+      rows.map((r) => {
+        if (isEncargoAvulso(r) || (r.status !== "pendente" && r.status !== "aberto")) return r;
+        const isBoleto = (r.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
+        return { ...r, valor: novoValor + (isBoleto ? TAXA_BOLETO : 0) } as Mens;
+      }),
+    );
+    return abertas.length;
+  };
+
   const salvarContratoAdmin = async () => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -3274,16 +3317,7 @@ function DetalheContrato({
       (contrato as any).valor_mensal = novoValorMensal;
       setValorMensalAtual(novoValorMensal);
       // Recalcula parcelas em aberto para o novo valor
-      const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
-      if (abertas.length > 0) {
-        await Promise.all(
-          abertas.map((m) => {
-            const isBoleto = (m.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
-            const v = novoValorMensal + (isBoleto ? TAXA_BOLETO : 0);
-            return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
-          }),
-        );
-      }
+      await sincronizarValorParcelasAbertas(novoValorMensal);
     }
     toast.success("Contrato atualizado.");
     await load();
@@ -3636,6 +3670,11 @@ function DetalheContrato({
       toast.error("Dia de vencimento inválido");
       return;
     }
+    // Guardado ANTES do update: é o que diz se o valor mensal realmente mudou.
+    // Quando o operador mexe só no dia de vencimento, as parcelas não são
+    // reescritas — assim um valor ajustado à mão numa parcela não se perde.
+    const valorAnterior = Number(valorMensalAtual);
+    const valorMudou = v !== valorAnterior;
     setSavingDados(true);
     const { error } = await supabase
       .from("contratos_assinatura")
@@ -3650,8 +3689,23 @@ function DetalheContrato({
     (contrato as any).dia_vencimento = dia;
     setValorMensalAtual(v);
 
+    // Antes o valor parava no cabeçalho do contrato e as parcelas continuavam
+    // com o preço antigo, contrariando o aviso da tela ("as parcelas em aberto
+    // serão atualizadas"). Agora o novo valor desce para as parcelas.
+    let sincronizadas: number | null = 0;
+    if (valorMudou) sincronizadas = await sincronizarValorParcelasAbertas(v);
+
     setSavingDados(false);
-    toast.success("Dados salvos.");
+    if (sincronizadas === null) {
+      // O contrato gravou, as parcelas não: mostra isso em vez de "Dados salvos".
+      await load();
+      return;
+    }
+    toast.success(
+      valorMudou && sincronizadas > 0
+        ? `Dados salvos. ${sincronizadas} parcela(s) em aberto atualizada(s) para ${BRL(v)}.`
+        : "Dados salvos.",
+    );
     await load();
   };
 
@@ -4959,35 +5013,36 @@ h1, h2, h3 { margin: 0 0 6mm; }
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
-    if (!faixas.length) return;
     const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate),
     );
     const f = elegiveis.length
       ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
       : null;
-    if (!f) return;
-    const novoValor = Number(f.valor_mensal);
+    // Sem faixa correspondente (convênio sem tabela ou contrato na tabela antiga)
+    // o botão não pode sair sem fazer nada: sincroniza as parcelas com o valor
+    // que o contrato já tem hoje.
+    const novoValor = f ? Number(f.valor_mensal) : Number(valorMensalAtual);
+    if (!Number.isFinite(novoValor)) return;
     if (novoValor !== Number(valorMensalAtual)) {
-      await supabase
+      const { error } = await supabase
         .from("contratos_assinatura")
         .update({ valor_mensal: novoValor })
         .eq("id", contrato.id);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
       setValorMensalAtual(novoValor);
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
     }
-    const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
-    if (abertas.length === 0) return;
-    await Promise.all(
-      abertas.map((m) => {
-        const isBoleto = (m.forma_pagamento ?? contrato.forma_pagamento) === "boleto";
-        const v = novoValor + (isBoleto ? TAXA_BOLETO : 0);
-        return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
-      }),
-    );
+    const sincronizadas = await sincronizarValorParcelasAbertas(novoValor);
+    if (sincronizadas === null) return;
     toast.success(
-      `Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`,
+      sincronizadas > 0
+        ? `${sincronizadas} parcela(s) em aberto recalculada(s) para ${BRL(novoValor)}/mês (${totalVidas} vidas)`
+        : `Nenhuma parcela em aberto para recalcular — mensalidade do contrato: ${BRL(novoValor)}`,
     );
   };
 
@@ -5935,9 +5990,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <TabsContent value="dados" className="mt-4 space-y-4">
               {podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
-                  Modo administrador — você pode alterar todos os campos deste contrato. Alterações
-                  não regeram parcelas automaticamente; use o botão “Regerar 12 parcelas” abaixo
-                  quando quiser propagar o novo valor/dia.
+                  Modo administrador — você pode alterar todos os campos deste contrato. Ao mudar o
+                  valor mensal, as parcelas ainda em aberto passam a valer o novo preço; parcelas já
+                  pagas ou canceladas não são tocadas. O dia de vencimento só é aplicado às datas
+                  pelo botão “Recalcular vencimentos”, na aba Mensalidades.
                 </div>
               ) : null}
               {podeEscrever ? (
