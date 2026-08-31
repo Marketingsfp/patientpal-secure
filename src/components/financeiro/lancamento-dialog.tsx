@@ -37,6 +37,7 @@ import {
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
 import { planoDeMovimento } from "@/lib/financeiro/registro-no-caixa";
+import { aceitaNovoRecebimento } from "@/lib/agenda/saldo-atendimento";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 import { contaPadrao, dedupContas, type ContaOpcao } from "@/lib/financeiro/contas";
 
@@ -130,6 +131,23 @@ interface Props {
    */
   permiteParcelasEmOutrasDatas?: boolean;
   /**
+   * Libera um SEGUNDO recebimento no mesmo atendimento (padrão: bloqueado).
+   *
+   * A trava "este agendamento já possui um pagamento registrado" existe para
+   * impedir que o mesmo atendimento seja faturado duas vezes por engano. Ela
+   * é anterior ao pagamento parcial e, sozinha, também barrava a QUITAÇÃO de
+   * um saldo devedor: quem pagou R$ 200,00 de R$ 400,00 nunca conseguia
+   * registrar os outros R$ 200,00, e o selo "Falta R$ ..." ficava para
+   * sempre na agenda.
+   *
+   * Quem chama sabendo que ainda há saldo em aberto (agenda: saldo devedor de
+   * pagamento parcial, ou etapa de saldo de um orçamento com sinal) passa
+   * `true` aqui. Independentemente desta prop, a trava também é dispensada
+   * quando o próprio banco mostra saldo aberto — ver `valor_cobranca` na
+   * checagem de duplicidade abaixo.
+   */
+  permiteSegundoPagamento?: boolean;
+  /**
    * Pagamento com saldo: mostra Total / Já pago / Pagando agora / Falta pagar.
    * Usado tanto pelo orçamento com entrada (sinal) quanto pelo pagamento
    * parcial de um atendimento comum — daí o `titulo` ser variável.
@@ -164,6 +182,7 @@ export function LancamentoDialog({
   pacienteIdFixo,
   categoriaFixaNome,
   permiteParcelasEmOutrasDatas = true,
+  permiteSegundoPagamento = false,
   resumoSaldo,
 }: Props) {
   const { clinicaAtual } = useClinica();
@@ -844,26 +863,44 @@ export function LancamentoDialog({
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
         tipo === "receita"
-          ? supabase
+          ? // Traz o VALOR de cada recebimento já lançado, não só a existência
+            // de um. Com pagamento parcial, "já tem lançamento" deixou de
+            // significar "está quitado": o que decide é a SOMA recebida contra
+            // o total combinado (`valor_cobranca`).
+            supabase
               .from("fin_lancamentos")
-              .select("id")
+              .select("valor")
               .eq("agendamento_id", agendamentoId)
               .eq("tipo", "receita")
               .neq("status", "cancelado")
-              .limit(1)
-              .maybeSingle()
           : Promise.resolve({ data: null }),
         supabase
           .from("agendamentos")
-          .select("medico_id, paciente_id, procedimento, pacientes:paciente_id(nome)")
+          .select(
+            "medico_id, paciente_id, procedimento, valor_cobranca, pacientes:paciente_id(nome)",
+          )
           .eq("id", agendamentoId)
           .maybeSingle(),
       ]);
-      if (tipo === "receita" && jaPagoRes.data) {
-        toast.error("Este agendamento já possui um pagamento registrado.");
-        setSaving(false);
-        onOpenChange(false);
-        return;
+      if (tipo === "receita") {
+        const recebidos = (jaPagoRes.data ?? []) as Array<{ valor: number | string | null }>;
+        const somaRecebida =
+          Math.round(recebidos.reduce((s, l) => s + (Number(l.valor ?? 0) || 0), 0) * 100) / 100;
+        const totalCombinado =
+          (agRes.data as { valor_cobranca?: number | string | null } | null)?.valor_cobranca ??
+          null;
+        if (
+          !permiteSegundoPagamento &&
+          !aceitaNovoRecebimento(
+            totalCombinado === null ? null : Number(totalCombinado),
+            somaRecebida,
+          )
+        ) {
+          toast.error("Este agendamento já possui um pagamento registrado.");
+          setSaving(false);
+          onOpenChange(false);
+          return;
+        }
       }
       const raw = agRes.data as any;
       agPrefetch = raw

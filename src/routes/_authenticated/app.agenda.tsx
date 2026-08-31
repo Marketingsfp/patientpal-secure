@@ -1767,6 +1767,19 @@ function AgendaPage() {
    */
   const saldoAtualRef = useRef<SaldoAtendimento | null>(null);
   /**
+   * Libera a gravação de um SEGUNDO recebimento no atendimento que está sendo
+   * cobrado. Vale quando ainda existe saldo em aberto — seja o saldo devedor
+   * de um pagamento parcial, seja a etapa de saldo de um orçamento com sinal.
+   *
+   * Sem isso, o diálogo de lançamento recusa a quitação com "este agendamento
+   * já possui um pagamento registrado" e o selo "Falta R$ ..." nunca sai da
+   * linha, porque o segundo pagamento jamais chega a virar lançamento.
+   *
+   * É estado (e não ref) de propósito: precisa entrar no render que monta o
+   * diálogo.
+   */
+  const [segundoRecebimentoLiberado, setSegundoRecebimentoLiberado] = useState(false);
+  /**
    * Contexto do pagamento parcial em andamento, lido depois que o lançamento
    * é gravado. `total` é sempre o valor CHEIO combinado (nunca o saldo), para
    * que a quitação não regrave um total menor por engano.
@@ -3914,6 +3927,7 @@ function AgendaPage() {
       // Cobrança agrupada: nunca é quitação de saldo de um atendimento só.
       saldoAtualRef.current = null;
       setCobrarParcial(false);
+      setSegundoRecebimentoLiberado(false);
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
         agId: itens.map((i) => i.id).join(","),
@@ -5465,6 +5479,7 @@ function AgendaPage() {
       // Atendimento recém-criado: não há saldo anterior a quitar.
       saldoAtualRef.current = null;
       setCobrarParcial(false);
+      setSegundoRecebimentoLiberado(false);
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx(montarCtxNovo(descSuffix));
       // Só oferece a troca para valor cheio quando o desconto do cartão foi de
@@ -6001,6 +6016,9 @@ function AgendaPage() {
       const temSaldoAberto = !!saldoParcial && !saldoParcial.quitado;
       saldoAtualRef.current = temSaldoAberto ? saldoParcial : null;
       setCobrarParcial(false);
+      // Quitação de saldo (parcial ou etapa de sinal do orçamento): o
+      // atendimento JÁ tem um lançamento e mesmo assim precisa aceitar mais um.
+      setSegundoRecebimentoLiberado(temSaldoAberto || !!etapaSinal);
       if (pagosSet.has(a.id) && !etapaSinal && !temSaldoAberto) {
         toast.info("Este agendamento já foi pago.");
         return;
@@ -8308,6 +8326,7 @@ function AgendaPage() {
             setPagamentoPacienteNome("");
             setDescontoPendente(null);
             setSaldoOrcResumo(null);
+            setSegundoRecebimentoLiberado(false);
           }
         }}
         tipo="receita"
@@ -8322,6 +8341,12 @@ function AgendaPage() {
         // atendimentos do grupo, e mais de um lançamento na origem
         // atrapalharia o rateio.
         permiteParcelasEmOutrasDatas={pagamentoExtraIds.length === 0}
+        // Quitação de saldo devedor / etapa de saldo do orçamento: o
+        // atendimento já tem um recebimento lançado e precisa aceitar o
+        // próximo. Só vale para a cobrança de um atendimento só — na agrupada
+        // o valor é rateado depois e um segundo lançamento na origem
+        // atrapalharia o rateio.
+        permiteSegundoPagamento={segundoRecebimentoLiberado && pagamentoExtraIds.length === 0}
         aguardarImpressao
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;

@@ -63,6 +63,33 @@ export function calcularSaldoAtendimento(
   };
 }
 
+/**
+ * O atendimento ainda aceita mais um recebimento?
+ *
+ * Regra usada pela trava anti-cobrança-dupla do diálogo de lançamento. Antes
+ * do pagamento parcial bastava perguntar "já existe lançamento?"; hoje isso é
+ * insuficiente, porque a QUITAÇÃO de um saldo devedor é, por definição, um
+ * segundo lançamento no mesmo atendimento. Era esse o motivo de um atendimento
+ * de R$ 400,00 com R$ 200,00 pagos ficar preso em "Falta R$ 200,00" para
+ * sempre: o segundo recebimento era recusado e nunca virava lançamento.
+ *
+ * - Sem nenhum recebimento ainda → sempre aceita.
+ * - Com recebimento e SEM total combinado (`valorCobranca` NULL) → não aceita:
+ *   é o atendimento comum, em que existir lançamento significa estar pago.
+ * - Com recebimento e COM total combinado → aceita enquanto a soma recebida
+ *   não alcançar o total.
+ */
+export function aceitaNovoRecebimento(
+  valorCobranca: number | null | undefined,
+  somaJaRecebida: number,
+): boolean {
+  const recebido = Number(somaJaRecebida ?? 0) || 0;
+  if (recebido <= EPS) return true;
+  const total = Number(valorCobranca ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return false;
+  return total - recebido > EPS;
+}
+
 /** "Falta R$ 50,00" — rótulo curto para badge na agenda. */
 export function rotuloSaldo(saldo: SaldoAtendimento): string {
   return `Falta ${saldo.restante.toLocaleString("pt-BR", {

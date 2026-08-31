@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { calcularSaldoAtendimento, rotuloSaldo } from "./saldo-atendimento";
+import { aceitaNovoRecebimento, calcularSaldoAtendimento, rotuloSaldo } from "./saldo-atendimento";
 
 describe("calcularSaldoAtendimento", () => {
   it("é o cenário da coordenadora: R$ 100,00 com R$ 50,00 de entrada", () => {
@@ -59,5 +59,32 @@ describe("rotuloSaldo", () => {
     // olha as duas partes em vez de comparar a string inteira.
     expect(rotuloSaldo(s).startsWith("Falta R$")).toBe(true);
     expect(rotuloSaldo(s)).toContain("50,00");
+  });
+});
+
+describe("aceitaNovoRecebimento", () => {
+  it("aceita o primeiro recebimento de um atendimento comum", () => {
+    expect(aceitaNovoRecebimento(null, 0)).toBe(true);
+    expect(aceitaNovoRecebimento(400, 0)).toBe(true);
+  });
+
+  it("recusa o segundo recebimento quando não há total combinado", () => {
+    // Atendimento comum: existir lançamento significa estar pago.
+    expect(aceitaNovoRecebimento(null, 130)).toBe(false);
+  });
+
+  it("aceita a quitação do saldo de um pagamento parcial", () => {
+    // R$ 400,00 combinados, R$ 200,00 recebidos: os outros R$ 200,00 têm de
+    // conseguir entrar — era exatamente isso que a trava antiga barrava.
+    expect(aceitaNovoRecebimento(400, 200)).toBe(true);
+  });
+
+  it("recusa um terceiro recebimento depois de quitado", () => {
+    expect(aceitaNovoRecebimento(400, 400)).toBe(false);
+    expect(aceitaNovoRecebimento(400, 450)).toBe(false);
+  });
+
+  it("trata sobra de arredondamento como quitado", () => {
+    expect(aceitaNovoRecebimento(100, 99.999)).toBe(false);
   });
 });
