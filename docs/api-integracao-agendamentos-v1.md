@@ -363,3 +363,126 @@ partir do código atual, sem alterar nenhum endpoint.
 
 **Status: v1 congelada.** Próximas mudanças só quando houver necessidade real do
 futuro consumidor.
+
+---
+
+## 9. v1.1 — agendamento de paciente novo (site institucional)
+
+Motivação: o site público da Policlínica São Francisco de Paula precisa fechar
+agendamento sozinho, inclusive para quem nunca foi na clínica. A v1 travava
+porque exigia `paciente_id` já existente.
+
+### 9.1 Por que NÃO existe busca de paciente
+
+A solução óbvia seria um `GET /patients?cpf=...`. Ela é a errada: qualquer rota
+pública que confirme se um CPF existe transforma a API num **oráculo de
+enumeração de CPF** sobre a base real de pacientes — problema de LGPD, não de
+conveniência. Por isso a resolução do paciente acontece **dentro** do
+`POST /appointments` e nenhuma resposta da API revela se o cadastro já existia
+(nem por campo, nem por mensagem de erro, nem por código HTTP). Essa informação
+fica só no log interno (`integracao_requisicoes`).
+
+### 9.2 `POST /appointments` aceita `paciente`
+
+Continue mandando `paciente_id` para paciente já cadastrado (caminho v1,
+inalterado). Como alternativa — **um ou outro, nunca os dois** — mande o objeto
+`paciente`:
+
+```json
+{
+  "id_externo": "SITE-1731",
+  "paciente": {
+    "cpf": "12345678901",
+    "nome": "Maria da Silva",
+    "data_nascimento": "1985-03-12",
+    "telefone": "21999998888",
+    "email": "maria@exemplo.com",
+    "sexo": "feminino"
+  },
+  "medico_id": "uuid",
+  "inicio": "2026-09-01T13:00:00Z",
+  "fim": "2026-09-01T13:10:00Z"
+}
+```
+
+Obrigatórios: `cpf`, `nome`, `data_nascimento`, `telefone`. Opcionais: `email`,
+`sexo` (padrão `nao_informar`).
+
+**Como o paciente é resolvido**
+
+1. CPF é normalizado para dígitos e tem os verificadores validados →
+   `422 invalid_cpf` se inválido.
+2. Procura na **clínica da chave**, por CPF, apenas cadastro ativo.
+3. **Achou:** confere a data de nascimento. Batendo, usa esse paciente e **não
+   sobrescreve** nome, telefone nem e-mail — a recepção é a fonte de verdade.
+   Telefone diferente é anotado nas *observações do agendamento*. Não batendo →
+   `422 patient_data_mismatch`, com mensagem genérica que não confirma nem nega
+   a existência do CPF.
+4. **Não achou:** cadastra na clínica da chave, ativo, com
+   `consentimento_lgpd_em` preenchido.
+5. Contra corrida (dois cliques ao mesmo tempo), tudo isso roda sob
+   `pg_advisory_xact_lock(clinica + cpf)` numa única transação, então nasce um
+   único paciente. Não há índice único em `(clinica_id, cpf)`: a base legada
+   pode ter duplicidades e a migration falharia.
+
+### 9.3 Escopo novo `patients:write`
+
+Exigido **apenas** quando o corpo traz `paciente`. Chave sem o escopo mandando
+`paciente` → `403 insufficient_scope`. Chaves existentes **não** ganharam o
+escopo automaticamente.
+
+### 9.4 Catálogo para montar os seletores do site
+
+Ambos com escopo `availability:read`, escopados pela clínica da chave, e
+devolvendo **só id e nome** — nada de CRM, CPF, telefone ou contato:
+
+| Método | Rota | Resposta |
+| --- | --- | --- |
+| GET | `/specialties` | `[{ "id": "...", "nome": "..." }]` |
+| GET | `/doctors` | `[{ "id": "...", "nome": "...", "especialidade_id": "..." }]` |
+
+`/doctors` aceita o filtro opcional `especialidade_id`.
+
+### 9.5 Proteção contra abuso
+
+- `Idempotency-Key` é **obrigatório** no `POST /appointments` quando o corpo traz
+  `paciente`. Ausente → `422 idempotency_key_required`.
+- Limite próprio de cadastro de paciente por chave (padrão **20/min e
+  200/dia**, configuráveis em `integracao_api_keys` junto dos demais), separado
+  do limite geral. Excedido → `429 rate_limit_exceeded` com
+  `details.limite: "patients"`.
+- Tudo continua registrado em `integracao_requisicoes`.
+
+### 9.6 O que NÃO mudou
+
+Agendamento continua entrando **não pago** (`data_pagamento: null`, status
+`agendado`, sem forma de pagamento e sem orçamento); a API continua sem tocar
+caixa, pagamento, orçamento, repasse ou financeiro; continua sem marcar
+atendimento como "Realizado"; a escrita continua passando pelos núcleos
+`src/lib/agenda/*.core.server.ts`; e `clinica_id` continua vindo só da chave.
+
+### 9.7 Erros novos
+
+| HTTP | Código | Quando |
+| --- | --- | --- |
+| 422 | `invalid_cpf` | CPF com dígitos verificadores errados |
+| 422 | `patient_data_mismatch` | dados não conferem (mensagem genérica de propósito) |
+| 422 | `idempotency_key_required` | corpo com `paciente` e sem o cabeçalho |
+| 422 | `patient_and_id_conflict` | mandou `paciente` e `paciente_id` juntos |
+| 403 | `insufficient_scope` | chave sem `patients:write` |
+
+### 9.8 Onde está o código novo
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/lib/integracoes/pacientes-v1.server.ts` | validação de CPF e resolução do paciente |
+| `src/lib/integracoes/pacientes-v1.test.ts` | testes da resolução |
+| `public.integracao_resolver_paciente(...)` | trava por clínica+CPF, busca/cadastro na mesma transação |
+
+### 9.9 Changelog
+
+- **v1.1 (2026-09):** objeto `paciente` no `POST /appointments`; escopo
+  `patients:write`; `GET /specialties` e `GET /doctors`; limite próprio de
+  cadastro de paciente; `Idempotency-Key` obrigatório no cadastro.
+  **Deliberadamente ausente:** endpoint de busca/consulta de paciente (ver 9.1).
+- **v1 (2026-08):** versão inicial, congelada e ainda válida.
