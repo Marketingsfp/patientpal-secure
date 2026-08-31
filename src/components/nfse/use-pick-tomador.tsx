@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { documentoTomadorValido } from "@/lib/nfse-tomador";
 
 export interface TomadorPayload {
   nome: string;
@@ -90,11 +91,28 @@ function temEnderecoValido(t: TomadorPayload | null | undefined): boolean {
 }
 
 /**
+ * Por que este paciente não pode ser o tomador da nota — em texto que diz à
+ * recepção o que fazer. Devolve `null` quando não há impedimento.
+ *
+ * A falta de CPF entrou aqui depois de 31/08/2026, quando seis emissões
+ * falharam por isso em um único dia (o porquê está em `nfse-tomador.ts`).
+ */
+function impedimentoDoPaciente(t: TomadorPayload | null | undefined): string | null {
+  if (!t) return null;
+  if (!documentoTomadorValido(t.cpfCnpj))
+    return "Paciente sem CPF no cadastro — a prefeitura não aceita nota fiscal sem o CPF do tomador. Cadastre o CPF na ficha do paciente para liberar esta opção, ou emita em nome de um terceiro.";
+  if (!temEnderecoValido(t))
+    return "Paciente sem endereço cadastrado — não é possível emitir NFS-e no nome dele. Complete o cadastro do paciente para liberar esta opção.";
+  return null;
+}
+
+/**
  * Diálogo que pergunta se a NFS-e deve ser emitida em nome do
  * paciente (cliente do serviço) ou de um terceiro pagador. Bloqueia a
- * emissão quando o tomador não tem endereço (a prefeitura preenche com
- * o endereço da Receita do CPF/CNPJ nesse caso). Permite escolher um
- * percentual do valor para emitir nota parcial.
+ * emissão quando o tomador não tem CPF/CNPJ (a prefeitura recusa o XML) ou
+ * não tem endereço (a prefeitura preenche com o endereço da Receita do
+ * CPF/CNPJ nesse caso). Permite escolher um percentual do valor para emitir
+ * nota parcial.
  */
 export function usePickTomador() {
   const [open, setOpen] = useState(false);
@@ -130,8 +148,9 @@ export function usePickTomador() {
   const pick = useCallback(async (input: PickTomadorInput): Promise<TomadorPayload | null> => {
     setPaciente(input.paciente);
     setPacienteLabel(input.pacienteLabel ?? input.paciente?.nome ?? "Paciente");
-    // Se o paciente não tem endereço, já força o modo terceiro (com endereço).
-    setModo(input.paciente && temEnderecoValido(input.paciente) ? "paciente" : "terceiro");
+    // Se o paciente não serve como tomador (sem CPF ou sem endereço), já abre
+    // no modo terceiro, que pede os dois no próprio diálogo.
+    setModo(input.paciente && !impedimentoDoPaciente(input.paciente) ? "paciente" : "terceiro");
     const base = Number(input.valorBase) || 0;
     setValorBase(base);
     setValorTexto(base > 0 ? base.toFixed(2) : "");
@@ -163,6 +182,12 @@ export function usePickTomador() {
     }
 
     if (modo === "paciente" && paciente) {
+      if (!documentoTomadorValido(paciente.cpfCnpj)) {
+        setErro(
+          "O paciente não tem CPF no cadastro. A prefeitura recusa a nota fiscal sem o CPF do tomador: cadastre o CPF na ficha do paciente e emita de novo — ou emita em nome de um terceiro.",
+        );
+        return;
+      }
       if (!temEnderecoValido(paciente)) {
         setErro(
           "O paciente não tem endereço cadastrado. Complete o cadastro (logradouro, número, bairro, cidade/UF, CEP) antes de emitir a NFS-e — ou emita em nome de um terceiro informando o endereço.",
@@ -220,7 +245,7 @@ export function usePickTomador() {
     r?.(null);
   };
 
-  const pacienteSemEndereco = !!paciente && !temEnderecoValido(paciente);
+  const impedimentoPaciente = paciente ? impedimentoDoPaciente(paciente) : null;
   // Exatamente o que está no campo — sem arredondar para percentual.
   const valorFinal = +(Number(valorTexto) || 0).toFixed(2);
 
@@ -249,11 +274,11 @@ export function usePickTomador() {
           className="space-y-2"
         >
           <label
-            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || pacienteSemEndereco ? "opacity-60 cursor-not-allowed" : ""}`}
+            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || impedimentoPaciente ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <RadioGroupItem
               value="paciente"
-              disabled={!paciente || pacienteSemEndereco}
+              disabled={!paciente || !!impedimentoPaciente}
               className="mt-0.5"
             />
             <div className="text-sm">
@@ -262,11 +287,8 @@ export function usePickTomador() {
                 {paciente ? pacienteLabel : "Nenhum paciente vinculado ao atendimento."}
                 {paciente?.cpfCnpj ? ` • CPF/CNPJ ${paciente.cpfCnpj}` : ""}
               </div>
-              {pacienteSemEndereco && (
-                <div className="text-xs text-destructive mt-1">
-                  Paciente sem endereço cadastrado — não é possível emitir NFS-e no nome dele.
-                  Complete o cadastro do paciente para liberar esta opção.
-                </div>
+              {impedimentoPaciente && (
+                <div className="text-xs text-destructive mt-1">{impedimentoPaciente}</div>
               )}
             </div>
           </label>

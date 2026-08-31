@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
+import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse-tomador";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -189,6 +190,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
         );
       }
     }
+
+    // Trava contra emissão sem CPF/CNPJ do tomador (ver `nfse-tomador.ts`).
+    //
+    // O diálogo de tomador já barra antes, mas a barreira tem que existir aqui
+    // também: são cinco telas chamando esta função, e uma aba aberta desde
+    // antes da correção continuaria mandando nota sem documento.
+    const problemaDocumento = problemaNoDocumentoDoTomador(data.tomador.nome, data.tomador.cpfCnpj);
+    if (problemaDocumento) throw new Error(problemaDocumento);
 
     const sugestaoFiscal = conferirEscolhaDeEmitente(data.descricaoServicos, emitente.cnpj);
     const emitenteDivergente = sugestaoFiscal
@@ -769,7 +778,25 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       emitente.codigo_tributario_municipio,
     );
 
-    const cpfCnpj = only(nota.tomador_documento ?? "");
+    // Documento do tomador no reenvio.
+    //
+    // O reenvio repete os dados gravados na nota. Quando a nota foi recusada
+    // justamente por falta de CPF, repetir o mesmo vazio só produz a mesma
+    // recusa. Então, antes de reenviar, buscamos o CPF na ficha do paciente:
+    // é isso que faz o botão "Reenviar" funcionar logo depois de a recepção
+    // completar o cadastro, sem precisar refazer a nota pelo atendimento.
+    let cpfCnpj = only(nota.tomador_documento ?? "");
+    if (!documentoTomadorValido(cpfCnpj) && nota.paciente_id) {
+      const { data: pac } = await supabase
+        .from("pacientes")
+        .select("cpf")
+        .eq("id", nota.paciente_id)
+        .maybeSingle();
+      const doCadastro = only(pac?.cpf ?? "");
+      if (documentoTomadorValido(doCadastro)) cpfCnpj = doCadastro;
+    }
+    const problemaNoReenvio = problemaNoDocumentoDoTomador(nota.tomador_nome, cpfCnpj);
+    if (problemaNoReenvio) throw new Error(problemaNoReenvio);
     const imRaw2 = only(emitente.inscricao_municipal ?? "");
     const imLower2 = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal2 =
@@ -876,6 +903,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         status: "processando",
         erro_mensagem: null,
         payload_envio: payload,
+        // Grava o documento que foi realmente enviado — inclusive quando ele
+        // veio da ficha do paciente por estar faltando na nota.
+        tomador_documento: cpfCnpj,
       })
       .eq("id", nota.id);
 
