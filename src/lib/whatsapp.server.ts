@@ -841,7 +841,9 @@ ${procs || "(nenhum)"}`;
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
   // leitura: ela consulta a agenda REAL e marca, usando o mesmo núcleo de
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
-  const { ferramentasAgendaAtivas, blocoPromptAgenda } = await import("@/lib/nina/agenda-flag.server");
+  const { ferramentasAgendaAtivas, blocoPromptAgenda, blocoPromptDisponibilidade } = await import(
+    "@/lib/nina/agenda-flag.server"
+  );
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
 
   // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
@@ -856,6 +858,7 @@ ${procs || "(nenhum)"}`;
 
   const systemPromptFinal = [
     systemPrompt,
+    blocoPromptDisponibilidade(),
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
   ]
