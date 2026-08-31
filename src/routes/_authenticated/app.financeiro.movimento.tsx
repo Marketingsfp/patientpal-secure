@@ -11,6 +11,7 @@ import {
   Undo2,
   Printer,
   AlertTriangle,
+  Search,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +39,12 @@ import {
   type FiltroForma,
   type FormaCanonica,
 } from "@/lib/financeiro/formas-pagamento";
+import {
+  avisoDaBuscaGlobal,
+  buscaEmTodasAsDatas,
+  LIMITE_BUSCA_GLOBAL,
+  TERMO_MINIMO,
+} from "@/lib/financeiro/busca-movimento";
 import {
   ehLancamentoRetroativo,
   mapaDaGaveta,
@@ -392,6 +399,20 @@ function Page() {
   const [filterForma, setFilterForma] = useState<string>("todos");
   const [filterPaciente, setFilterPaciente] = useState<string>("");
   const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+  /**
+   * "Buscar em todas as datas": derruba o recorte De/Até só para a busca por
+   * texto. De propósito NÃO é gravado no navegador, ao contrário das outras
+   * chaves desta tela — o Movimento tem que abrir sempre na conferência do
+   * caixa do dia. Achar um pagamento antigo é uma ida pontual, não o estado
+   * normal da tela.
+   */
+  const [buscarTodasDatas, setBuscarTodasDatas] = useState<boolean>(false);
+  /**
+   * true → a busca em todas as datas encheu algum dos lotes e a lista está
+   * cortada nos mais recentes. Os dois lotes (lançamentos e transferências de
+   * caixa) têm teto próprio, então só a tela sabe dizer se houve corte.
+   */
+  const [buscaTruncada, setBuscaTruncada] = useState<boolean>(false);
   const [filterValor, setFilterValor] = useState<string>("");
   const [filterValorDebounced, setFilterValorDebounced] = useState<string>("");
   const [filterFicha, setFilterFicha] = useState<string>("");
@@ -437,9 +458,13 @@ function Page() {
   const [maisFiltros, setMaisFiltros] = useState(false);
 
   useEffect(() => {
+    // Limpar a caixa de busca devolve a tela ao caixa do dia: sem texto, a
+    // chave "todas as datas" não tem o que procurar e não pode ficar ligada em
+    // silêncio, esperando a próxima palavra digitada para derrubar o período.
+    if (!filterPaciente.trim() && buscarTodasDatas) setBuscarTodasDatas(false);
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
     return () => clearTimeout(t);
-  }, [filterPaciente]);
+  }, [filterPaciente, buscarTodasDatas]);
   useEffect(() => {
     const t = setTimeout(() => setFilterValorDebounced(filterValor.trim()), 300);
     return () => clearTimeout(t);
@@ -448,6 +473,17 @@ function Page() {
     const t = setTimeout(() => setFilterFichaDebounced(filterFicha.trim()), 300);
     return () => clearTimeout(t);
   }, [filterFicha]);
+
+  /**
+   * true → a busca por texto vale para o histórico inteiro da clínica, sem a
+   * trava De/Até. Só liga com a chave marcada E um termo de tamanho razoável
+   * (ver `@/lib/financeiro/busca-movimento`): marcar a chave com a caixa
+   * vazia não pode baixar 900 mil lançamentos.
+   */
+  const buscaGlobal = buscaEmTodasAsDatas({
+    termo: filterPacienteDebounced,
+    todasAsDatas: buscarTodasDatas,
+  });
 
   /**
    * Recorte do filtro de forma direto no banco. É de propósito mais largo que
@@ -475,7 +511,9 @@ function Page() {
     let finList: Lanc[] = [];
     if (carregarFin) {
       const CHUNK = 1000;
-      const MAX = 20000; // salvaguarda
+      // Busca em todas as datas para no primeiro lote: ela procura uma
+      // transação, não soma um caixa. Ver `LIMITE_BUSCA_GLOBAL`.
+      const MAX = buscaGlobal ? LIMITE_BUSCA_GLOBAL : 20000; // salvaguarda
       let offset = 0;
       for (;;) {
         let q = supabase
@@ -484,10 +522,9 @@ function Page() {
             "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("data", fromDate)
-          .lte("data", toDate)
           .order("data", { ascending: false })
           .range(offset, offset + CHUNK - 1);
+        if (!buscaGlobal) q = q.gte("data", fromDate).lte("data", toDate);
         if (filterTipo === "receita" || filterTipo === "despesa") q = q.eq("tipo", filterTipo);
         if (filterUsuario !== "todos") {
           if (filterUsuario === "sem") q = q.is("criado_por", null);
@@ -693,7 +730,7 @@ function Page() {
     let caixaList: Lanc[] = [];
     if (carregarCaixa) {
       const CHUNK = 1000;
-      const MAX = 20000;
+      const MAX = buscaGlobal ? LIMITE_BUSCA_GLOBAL : 20000;
       let offset = 0;
       const raw: Array<{
         id: string;
@@ -714,10 +751,11 @@ function Page() {
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .in("tipo", ["sangria", "suprimento"])
-          .gte("created_at", `${fromDate}T00:00:00`)
-          .lte("created_at", `${toDate}T23:59:59`)
           .order("created_at", { ascending: false })
           .range(offset, offset + CHUNK - 1);
+        if (!buscaGlobal) {
+          qc = qc.gte("created_at", `${fromDate}T00:00:00`).lte("created_at", `${toDate}T23:59:59`);
+        }
         if (filterUsuario !== "todos") {
           if (filterUsuario === "sem") qc = qc.is("user_id", null);
           else qc = qc.eq("user_id", filterUsuario);
@@ -777,6 +815,12 @@ function Page() {
       }));
     }
     // Merge ordenado por data + hora desc (mais recente primeiro)
+    // Cada lote tem teto próprio na busca global; basta um encher para a
+    // lista estar cortada, e o aviso na tela precisa dizer isso.
+    setBuscaTruncada(
+      buscaGlobal &&
+        (finList.length >= LIMITE_BUSCA_GLOBAL || caixaList.length >= LIMITE_BUSCA_GLOBAL),
+    );
     let merged = [...finList, ...caixaList].sort((a, b) => {
       if (a.data !== b.data) return a.data < b.data ? 1 : -1;
       const ha = a.hora ?? "";
@@ -814,7 +858,13 @@ function Page() {
     // Se qualquer filtro client-side estiver ativo, recomputa o resumo a partir da lista filtrada.
     // O filtro de forma entra aqui porque a separação exata entre débito e
     // crédito (e a decomposição do misto) só existe no cliente.
-    if (Number.isFinite(vNum) || Number.isFinite(fNum) || filterForma !== "todos") {
+    //
+    // A busca em todas as datas entra pelo mesmo motivo de sempre: os cards
+    // têm que cobrir exatamente as linhas listadas. Como a lista global para
+    // no teto de `LIMITE_BUSCA_GLOBAL`, somar no banco daria um total maior
+    // do que a soma do que está na tela — a mesma divergência que já fez um
+    // fechamento acusar diferença inexistente.
+    if (Number.isFinite(vNum) || Number.isFinite(fNum) || filterForma !== "todos" || buscaGlobal) {
       let r = 0,
         d = 0;
       const base = linhasVisiveis(merged, filterForma as FiltroForma, decomporMisto);
@@ -834,6 +884,9 @@ function Page() {
       setResumo({ r: 0, d: 0, saldo: 0, totalRows: 0 });
       return;
     }
+    // Busca em todas as datas: quem fecha os cards é `load()`, sobre as
+    // linhas que realmente vieram (limitadas ao teto da busca global).
+    if (buscaGlobal) return;
     // Filtro "só transferências" não afeta os cards de Receita/Despesa/Saldo — zera-os.
     if (filterTipo === "transferencia") {
       setResumo({ r: 0, d: 0, saldo: 0, totalRows: items.length });
@@ -1020,6 +1073,8 @@ function Page() {
     filterPacienteDebounced,
     filterValorDebounced,
     filterFichaDebounced,
+    // a chave "todas as datas" muda o recorte enviado ao banco
+    buscarTodasDatas,
   ]);
   // Reseta a página sempre que qualquer filtro mudar
   useEffect(() => {
@@ -1039,6 +1094,7 @@ function Page() {
     filterPacienteDebounced,
     filterValorDebounced,
     filterFichaDebounced,
+    buscarTodasDatas,
     // Mostrar/ocultar retroativos muda o tamanho da lista: sem isto a tela
     // podia ficar numa página que deixou de existir.
     ocultarRetroativos,
@@ -1486,7 +1542,20 @@ function Page() {
   // pagamento misto herdam a marca do pai e somam exatamente o valor dele, por
   // isso a conta fecha igual com a decomposição ligada ou desligada.
   const retro = totaisRetroativos(linhasDoPeriodo.filter((l) => l._retroativo));
-  const itensVisiveis = ocultarRetroativos
+  // Na busca em todas as datas os retroativos NÃO são escondidos, mesmo com a
+  // chave ligada. Esconder ali derrubaria justamente o caso que motivou a
+  // busca: o lançamento digitado num dia e com competência de outro, que é o
+  // que a recepção não consegue achar varrendo datas. Fora da busca global a
+  // regra segue igual — a tela é a conferência do cupom do dia.
+  const escondendoRetroativos = ocultarRetroativos && !buscaGlobal;
+  // Aviso obrigatório enquanto a busca ignora as datas: sem ele, os cards de
+  // Receita/Despesa/Saldo somando várias datas passariam por fechamento do dia.
+  const avisoBusca = avisoDaBuscaGlobal({
+    termo: filterPacienteDebounced,
+    todasAsDatas: buscarTodasDatas,
+    truncado: buscaTruncada,
+  });
+  const itensVisiveis = escondendoRetroativos
     ? linhasDoPeriodo.filter((l) => !l._retroativo)
     : linhasDoPeriodo;
 
@@ -1547,7 +1616,7 @@ function Page() {
   // Quando elas estão fora da tela, também precisam sair daqui: dois números
   // cobrindo conjuntos diferentes de movimentos é exatamente o descasamento
   // que faz um fechamento acusar diferença que não existe.
-  const totais = ocultarRetroativos
+  const totais = escondendoRetroativos
     ? {
         r: Number((resumo.r - retro.receitas).toFixed(2)),
         d: Number((resumo.d - retro.despesas).toFixed(2)),
@@ -1688,7 +1757,12 @@ function Page() {
       })
       .join("");
     const p = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4);
-    const periodo = p(fromDate) + " — " + p(toDate);
+    // Na busca em todas as datas o cabeçalho NÃO pode dizer um período: o
+    // papel sairia se apresentando como o movimento de dias que ele não
+    // cobre. Diz o que ele é de verdade — o resultado de uma procura.
+    const periodo = buscaGlobal
+      ? `BUSCA EM TODAS AS DATAS — "${filterPacienteDebounced}"`
+      : p(fromDate) + " — " + p(toDate);
     const clinicaNome = "";
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const style =
@@ -1706,7 +1780,7 @@ function Page() {
       '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' +
       esc(periodo) +
       "</span><span>Agrupar: CATEGORIA</span><span>" +
-      (ocultarRetroativos
+      (escondendoRetroativos
         ? "Retroativos: EXCLUÍDOS (caixa da recepção)"
         : "Retroativos: INCLUÍDOS (ajuste gerencial)") +
       "</span></div>" +
@@ -1770,7 +1844,12 @@ function Page() {
         valor: Number(l.valor).toFixed(2),
         retroativo: l._retroativo ? "Sim" : "",
       })),
-      `movimento-${fromDate}_a_${toDate}`,
+      // Mesmo motivo do relatório impresso: um arquivo chamado
+      // "movimento-31/08 a 31/08" com linhas de outros meses vira confusão na
+      // primeira vez que alguém o abrir sem lembrar de onde saiu.
+      buscaGlobal
+        ? `movimento-busca-${filterPacienteDebounced.replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase()}`
+        : `movimento-${fromDate}_a_${toDate}`,
       [
         { key: "data", label: "Data" },
         { key: "hora", label: "Hora" },
@@ -2341,6 +2420,24 @@ function Page() {
         </div>
       )}
 
+      {/* Enquanto a busca ignora o período, a tela não é mais a conferência
+          do caixa. Dizer isso na cara do usuário é o que impede alguém de
+          fechar o dia por um total que soma várias datas. */}
+      {avisoBusca && (
+        <div className="rounded-md border border-sky-300 bg-sky-50 px-4 py-3 flex flex-wrap items-start gap-x-3 gap-y-2">
+          <Search className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
+          <p className="flex-1 min-w-64 text-sm text-sky-900">{avisoBusca}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-sky-400 bg-white hover:bg-sky-100"
+            onClick={() => setBuscarTodasDatas(false)}
+          >
+            Voltar ao período
+          </Button>
+        </div>
+      )}
+
       {/* O que não é dinheiro da gaveta deste dia. O aviso é obrigatório
           quando a lista esconde linhas: some sem explicação, vira "sumiu
           lançamento" no balcão. */}
@@ -2353,7 +2450,7 @@ function Page() {
                 {retro.quantidade} lançamento{retro.quantidade === 1 ? "" : "s"} retroativo
                 {retro.quantidade === 1 ? "" : "s"}
               </strong>{" "}
-              {ocultarRetroativos ? "fora" : "dentro"} do caixa deste período
+              {escondendoRetroativos ? "fora" : "dentro"} do caixa deste período
               {retro.receitas > 0 ? ` — ${fmt(retro.receitas)} em receitas` : ""}
               {retro.despesas > 0 ? ` — ${fmt(retro.despesas)} em despesas` : ""}.
             </p>
@@ -2361,19 +2458,23 @@ function Page() {
               Competência de {retro.dias.slice(0, 4).map(diaBR).join(", ")}
               {retro.dias.length > 4 ? ` e mais ${retro.dias.length - 4} dia(s)` : ""}, digitados
               depois: esses valores não estão no cupom impresso desses dias.{" "}
-              {ocultarRetroativos
+              {escondendoRetroativos
                 ? "Eles continuam inteiros no Painel Executivo e nos relatórios por competência."
                 : "Incluídos aqui, o total acima deixa de bater com o cupom impresso da recepção."}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 border-amber-400 bg-white hover:bg-amber-100"
-            onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
-          >
-            {ocultarRetroativos ? "Incluir ajustes retroativos" : "Ocultar retroativos"}
-          </Button>
+          {/* Na busca em todas as datas o botão sai: ali os retroativos são
+              sempre mostrados, e um botão que não muda nada só confunde. */}
+          {!buscaGlobal && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-amber-400 bg-white hover:bg-amber-100"
+              onClick={() => setOcultarRetroativos(!ocultarRetroativos)}
+            >
+              {ocultarRetroativos ? "Incluir ajustes retroativos" : "Ocultar retroativos"}
+            </Button>
+          )}
         </div>
       )}
 
@@ -2497,6 +2598,47 @@ function Page() {
                 />
               </div>
             </div>
+            {/* Busca por texto na barra principal, e não mais atrás de "Mais
+                filtros". É com ela que a recepção acha o pagamento de um
+                paciente sem adivinhar o dia — filtro escondido não é usado. */}
+            <div className="space-y-1 flex-1 min-w-56">
+              <Label className="text-xs" htmlFor="busca-movimento">
+                Paciente / descrição
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="busca-movimento"
+                  type="search"
+                  value={filterPaciente}
+                  onChange={(e) => setFilterPaciente(e.target.value)}
+                  placeholder="Buscar por nome do paciente ou descrição..."
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1 pb-1">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="busca-todas-datas"
+                  checked={buscarTodasDatas}
+                  onCheckedChange={setBuscarTodasDatas}
+                  disabled={!filterPaciente.trim()}
+                />
+                <Label
+                  htmlFor="busca-todas-datas"
+                  className="text-xs cursor-pointer"
+                  title="Desligado (padrão): a busca estreita só o que está no período De/Até, e a tela continua batendo com o cupom impresso do dia. Ligado: procura o texto no histórico inteiro da clínica, ignorando as datas — útil para achar um pagamento antigo, mas aí os totais da tela cobrem várias datas e não servem para conferir caixa."
+                >
+                  Todas as datas
+                </Label>
+              </div>
+              {buscarTodasDatas && !buscaGlobal && (
+                <span className="text-[11px] text-muted-foreground">
+                  Digite ao menos {TERMO_MINIMO} letras
+                </span>
+              )}
+            </div>
             <div className="ml-auto flex items-center gap-2 pb-0.5">
               <Button
                 variant="outline"
@@ -2577,15 +2719,6 @@ function Page() {
                   <SelectItem value="sem">Sem informação</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1 flex-1 min-w-[220px]">
-              <Label className="text-xs">Paciente / descrição</Label>
-              <Input
-                type="search"
-                value={filterPaciente}
-                onChange={(e) => setFilterPaciente(e.target.value)}
-                placeholder="Buscar por nome do paciente..."
-              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Valor (R$)</Label>
