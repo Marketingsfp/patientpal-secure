@@ -30,8 +30,14 @@ export interface TomadorPayload {
    */
   dependenteAtendido?: string;
   /**
-   * Percentual do valor do serviço a emitir nesta NFS-e (1–100). Padrão 100.
+   * Valor em reais a emitir nesta NFS-e, exatamente como o usuário digitou no
+   * diálogo. É a fonte da verdade: quando presente, vence `percentualValor`.
    * Callers aplicam via `aplicarValorParcial` sobre o valor base.
+   */
+  valorEmitir?: number;
+  /**
+   * Percentual do valor do serviço a emitir nesta NFS-e (1–100). Padrão 100.
+   * Mantido por compatibilidade — só é usado quando `valorEmitir` não veio.
    */
   percentualValor?: number;
 }
@@ -49,16 +55,31 @@ const fmtBRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 /**
- * Aplica o percentual escolhido no picker sobre o valor base e devolve
- * o valor a enviar à NFS-e + o sufixo que deve compor a descrição
- * quando a nota é parcial (< 100%).
+ * Devolve o valor a enviar à NFS-e + o sufixo que deve compor a descrição
+ * quando a nota é parcial (menor que o valor do serviço).
+ *
+ * O valor digitado no diálogo (`valorEmitir`) manda. Antes o diálogo guardava
+ * só um percentual inteiro, então valores como R$ 45,50 sobre R$ 60,00 eram
+ * arredondados para o percentual mais próximo e o campo "corrigia" sozinho o
+ * que o usuário tinha acabado de digitar. `percentualValor` continua aceito
+ * para não quebrar quem ainda passe só o percentual.
  */
 export function aplicarValorParcial(
   valorBase: number,
   tomador: TomadorPayload,
 ): { valor: number; descricaoSufixo: string } {
-  const pct = Math.max(1, Math.min(100, Math.round(tomador.percentualValor ?? 100)));
   const base = Number(valorBase) || 0;
+  const digitado = Number(tomador.valorEmitir);
+  if (isFinite(digitado) && digitado > 0) {
+    const valor = +digitado.toFixed(2);
+    // Igual (ou maior) que o serviço: nota cheia, sem sufixo de parcial.
+    if (valor >= base - 0.005) return { valor, descricaoSufixo: "" };
+    return {
+      valor,
+      descricaoSufixo: ` — Nota parcial (${fmtBRL(valor)} de ${fmtBRL(base)})`,
+    };
+  }
+  const pct = Math.max(1, Math.min(100, Math.round(tomador.percentualValor ?? 100)));
   if (pct >= 100) return { valor: +base.toFixed(2), descricaoSufixo: "" };
   const valor = +((base * pct) / 100).toFixed(2);
   return { valor, descricaoSufixo: ` — Nota parcial (${pct}% de ${fmtBRL(base)})` };
@@ -81,7 +102,11 @@ export function usePickTomador() {
   const [paciente, setPaciente] = useState<TomadorPayload | null>(null);
   const [pacienteLabel, setPacienteLabel] = useState<string>("");
   const [valorBase, setValorBase] = useState<number>(0);
-  const [percentual, setPercentual] = useState<number>(100);
+  // Fonte da verdade do campo de valor: a string numérica que o CurrencyInput
+  // guarda ("60.00", "45.50", ""). Nada de percentual no meio do caminho — era
+  // o ida-e-volta valor → percentual → valor que reescrevia o que o usuário
+  // digitava e fazia o campo parecer travado.
+  const [valorTexto, setValorTexto] = useState<string>("");
   const [erro, setErro] = useState<string>("");
   const [terceiro, setTerceiro] = useState<TomadorPayload>({
     nome: "",
@@ -107,8 +132,9 @@ export function usePickTomador() {
     setPacienteLabel(input.pacienteLabel ?? input.paciente?.nome ?? "Paciente");
     // Se o paciente não tem endereço, já força o modo terceiro (com endereço).
     setModo(input.paciente && temEnderecoValido(input.paciente) ? "paciente" : "terceiro");
-    setValorBase(Number(input.valorBase) || 0);
-    setPercentual(100);
+    const base = Number(input.valorBase) || 0;
+    setValorBase(base);
+    setValorTexto(base > 0 ? base.toFixed(2) : "");
     setErro("");
     setTerceiro({
       nome: "",
@@ -130,9 +156,9 @@ export function usePickTomador() {
   }, []);
 
   const confirm = () => {
-    const pct = Math.max(1, Math.min(100, Math.round(Number(percentual) || 0)));
-    if (!pct) {
-      setErro("Informe um percentual entre 1 e 100.");
+    const valorEmitir = +(Number(valorTexto) || 0).toFixed(2);
+    if (valorEmitir <= 0) {
+      setErro("Informe o valor a emitir na NFS-e.");
       return;
     }
 
@@ -148,7 +174,7 @@ export function usePickTomador() {
       setOpen(false);
       r?.({
         ...paciente,
-        percentualValor: pct,
+        valorEmitir,
         dependenteAtendido:
           dependenteAtendido.trim() && dependenteAtendido.trim() !== (paciente.nome ?? "").trim()
             ? dependenteAtendido.trim()
@@ -183,7 +209,7 @@ export function usePickTomador() {
       municipio: terceiro.municipio?.trim() || undefined,
       uf: terceiro.uf?.trim() || undefined,
       dependenteAtendido: dependenteAtendido.trim() || undefined,
-      percentualValor: pct,
+      valorEmitir,
     });
   };
 
@@ -195,10 +221,8 @@ export function usePickTomador() {
   };
 
   const pacienteSemEndereco = !!paciente && !temEnderecoValido(paciente);
-  const valorFinal = aplicarValorParcial(valorBase, {
-    nome: "",
-    percentualValor: percentual,
-  }).valor;
+  // Exatamente o que está no campo — sem arredondar para percentual.
+  const valorFinal = +(Number(valorTexto) || 0).toFixed(2);
 
   const dialog = (
     <Dialog
@@ -349,6 +373,7 @@ export function usePickTomador() {
         <div className="space-y-2 border-t pt-3">
           <Label>Valor a emitir na NFS-e (R$)</Label>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Atalhos: só preenchem o mesmo campo, não travam a digitação. */}
             {[100, 75, 50, 25].map((p) => {
               const v = +(((Number(valorBase) || 0) * p) / 100).toFixed(2);
               const ativo = Math.abs(valorFinal - v) < 0.005;
@@ -360,7 +385,7 @@ export function usePickTomador() {
                   variant={ativo ? "default" : "outline"}
                   disabled={!valorBase}
                   onClick={() => {
-                    setPercentual(p);
+                    setValorTexto(v.toFixed(2));
                     setErro("");
                   }}
                 >
@@ -370,16 +395,9 @@ export function usePickTomador() {
             })}
             <div className="w-32">
               <CurrencyInput
-                value={valorFinal.toFixed(2)}
+                value={valorTexto}
                 onChange={(v) => {
-                  const n = Number(v) || 0;
-                  const base = Number(valorBase) || 0;
-                  if (base <= 0) {
-                    setPercentual(100);
-                    return;
-                  }
-                  const pct = Math.max(1, Math.min(100, (n / base) * 100));
-                  setPercentual(pct);
+                  setValorTexto(v);
                   setErro("");
                 }}
               />
@@ -389,7 +407,12 @@ export function usePickTomador() {
             <p className="text-xs text-muted-foreground">
               Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e:{" "}
               <b>{fmtBRL(valorFinal)}</b>
-              {valorFinal < valorBase ? " (nota parcial)" : ""}
+              {valorFinal > 0 && valorFinal < valorBase - 0.005 ? " (nota parcial)" : ""}
+            </p>
+          )}
+          {valorFinal > valorBase + 0.005 && valorBase > 0 && (
+            <p className="text-xs text-amber-600">
+              Atenção: o valor digitado é maior que o valor do serviço.
             </p>
           )}
         </div>
