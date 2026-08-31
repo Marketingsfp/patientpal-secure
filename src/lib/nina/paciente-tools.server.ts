@@ -771,6 +771,107 @@ export async function executarFerramentaPaciente(
         };
       }
 
+      case "verificar_horario": {
+        const p = zVerificarHorario.parse(args);
+        const hora = p.hora.padStart(5, "0");
+        const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
+        const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
+        const doDia = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId,
+          medicoId: p.medico_id,
+          dias: 30,
+          data: p.data,
+        });
+        const alvo = doDia.find((s) => s.hora === hora);
+        await auditar(
+          ctx,
+          "verificar_horario",
+          { ...p, atende_no_dia: atende, slots_encontrados: doDia.length },
+          { ok: true },
+        );
+        if (!atende)
+          return {
+            ok: true,
+            medico: nome,
+            data: p.data,
+            hora,
+            disponivel: false,
+            motivo: "NAO_ATENDE_NO_DIA",
+            alternativas: [],
+          };
+        return {
+          ok: true,
+          medico: nome,
+          data: p.data,
+          hora,
+          disponivel: Boolean(alvo),
+          motivo: alvo ? null : doDia.length === 0 ? "AGENDA_CHEIA" : "HORARIO_OCUPADO",
+          // Só horário — nunca quem ocupa a vaga.
+          ...(alvo ? { inicio: alvo.inicio, fim: alvo.fim } : {}),
+          alternativas: doDia
+            .filter((s) => s.hora !== hora)
+            .slice(0, 4)
+            .map((s) => ({ hora: s.hora, inicio: s.inicio, fim: s.fim })),
+        };
+      }
+
+      case "proxima_vaga": {
+        const p = zProximaVaga.parse(args);
+        let especialidadeId: string | null = null;
+        if (p.especialidade) {
+          const lista = await listarEspecialidades(ctx.clinicaId);
+          const esp = acharEspecialidade(p.especialidade, lista);
+          if (!esp)
+            return falha(
+              "NO_AVAILABILITY",
+              `A clínica não atende "${p.especialidade}". Atende: ${lista.map((e) => e.nome).join(", ")}`,
+            );
+          especialidadeId = esp.id;
+        }
+        const todos = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId,
+          especialidadeId,
+          medicoId: p.medico_id ?? null,
+          dias: 30,
+          periodo: p.periodo ?? null,
+        });
+        const desde = p.a_partir_de ?? null;
+        const slots = desde ? todos.filter((s) => dataISODoSlot(s.inicio) >= desde) : todos;
+        await auditar(
+          ctx,
+          "proxima_vaga",
+          { ...p, slots_encontrados: slots.length },
+          { ok: slots.length > 0 },
+        );
+        if (slots.length === 0)
+          return falha(
+            "NO_AVAILABILITY",
+            "Não há vaga disponível nos próximos 30 dias com esses critérios.",
+          );
+        const primeira = slots[0]!;
+        return {
+          ok: true,
+          proxima: {
+            medico_id: primeira.medico_id,
+            medico: primeira.medico_nome,
+            especialidade: primeira.especialidade,
+            data: primeira.data,
+            hora: primeira.hora,
+            inicio: primeira.inicio,
+            fim: primeira.fim,
+          },
+          seguintes: slots.slice(1, 4).map((s) => ({
+            medico: s.medico_nome,
+            data: s.data,
+            hora: s.hora,
+            inicio: s.inicio,
+            fim: s.fim,
+          })),
+        };
+      }
+
+
+
       case "identificar_paciente": {
         const p = zIdentificar.parse(args);
         const cpf = somenteDigitos(p.cpf);
