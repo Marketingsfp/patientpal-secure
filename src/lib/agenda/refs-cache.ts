@@ -161,6 +161,14 @@ export function getProcedimentosComValor(clinicaId: string): Promise<ProcComValo
         )
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
+        // O cadastro tem muitos serviços com o mesmo NOME (cópias antigas da
+        // importação). Quem consome esta lista casa por nome e fica com a
+        // PRIMEIRA cópia; ordenar pela última atualização faz a linha
+        // recém-editada na tela de Serviços ser a escolhida. O `id` desempata
+        // para a paginação por `range` não repetir nem pular linhas quando
+        // várias cópias têm o mesmo `updated_at`.
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) break;
       const page = (data ?? []) as ProcComValor[];

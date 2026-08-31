@@ -421,6 +421,15 @@ async function buscarProcedimentoPorNome(
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .ilike("nome", tentativa)
+        // O cadastro tem centenas de serviços com NOME REPETIDO (cópias
+        // antigas da importação). Sem ordenação explícita o Postgres devolve
+        // as cópias em ordem arbitrária, e o preço exibido na cobrança podia
+        // sair de uma cópia velha — dando a impressão de que a alteração
+        // feita na tela de Serviços "não pegou". Ordenar pela última
+        // atualização faz a linha recém-editada ganhar sempre; o `id` desempata
+        // para o resultado ser estável entre um clique e outro.
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
         .limit(5);
       const exatoComValor =
         (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvoT && temValor(p)) ??
@@ -461,6 +470,10 @@ async function buscarProcedimentoPorNome(
     )
     .eq("clinica_id", clinicaId)
     .ilike("nome", padrao)
+    // Mesma razão da consulta exata acima: com nomes repetidos no cadastro,
+    // a cópia editada por último é a que deve valer.
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: true })
     .limit(10);
   // Prefere match exato com valor; depois qualquer um com valor; depois o primeiro.
   const exatoComValor = (data ?? []).find((p) => norm(p.nome ?? "") === alvo && temValor(p));
