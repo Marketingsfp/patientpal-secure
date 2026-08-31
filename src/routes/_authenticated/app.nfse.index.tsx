@@ -14,6 +14,8 @@ import {
   Eye,
   Search,
   Ban,
+  Download,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -54,6 +56,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -73,10 +76,38 @@ interface Row {
   status: string;
   url_pdf: string | null;
   tomador_nome: string | null;
+  tomador_documento: string | null;
   emitente_id: string | null;
   emitente: { nome: string; cnpj: string } | null;
   erro_mensagem: string | null;
   payload_resposta: unknown;
+  /** Quem apertou "Emitir" — `nfse.emitida_por` sempre foi gravado, só nunca era exibido. */
+  emitida_por: string | null;
+  emitida_por_nome: string | null;
+}
+
+/** "YYYY-MM-DD" do primeiro dia do mês corrente e de hoje, no fuso local. */
+function periodoPadrao(): { inicio: string; fim: string } {
+  const hoje = new Date();
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), fim: iso(hoje) };
+}
+
+/** Data da nota em dd/mm/aaaa sem o recuo de 1 dia do fuso. */
+function dataBr(v: string): string {
+  // "YYYY-MM-DD" sem hora é parseado como UTC 00:00 e em BRT volta 1 dia.
+  return /^\d{4}-\d{2}-\d{2}$/.test(v)
+    ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR")
+    : new Date(v).toLocaleDateString("pt-BR");
+}
+
+/** CPF/CNPJ com máscara; devolve o original quando não tem 11 nem 14 dígitos. */
+function documentoBr(v: string | null): string {
+  const d = (v ?? "").replace(/\D/g, "");
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  return v ?? "";
 }
 
 function NfsePage() {
@@ -105,6 +136,8 @@ function NfsePage() {
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [busca, setBusca] = useState<string>("");
+  const [periodo, setPeriodo] = useState(periodoPadrao);
+  const [exportando, setExportando] = useState(false);
   const [cancelarAlvo, setCancelarAlvo] = useState<Row | null>(null);
   const [cancelarJustificativa, setCancelarJustificativa] = useState<string>("");
   const [cancelando, setCancelando] = useState(false);
@@ -132,36 +165,60 @@ function NfsePage() {
   const load = async () => {
     if (!clinicaAtual) return;
     setLoading(true);
+    // O período entra na consulta, não só na filtragem em memória: antes a tela
+    // trazia as últimas 500 notas e cortava o resto, então um mês antigo
+    // simplesmente não aparecia — e a exportação sairia pela metade.
     const { data, error } = await supabase
       .from("nfse")
       .select(
-        "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta",
+        "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
+      .gte("data_emissao", periodo.inicio)
+      .lte("data_emissao", periodo.fim)
       .order("data_emissao", { ascending: false })
-      .limit(500);
-    setLoading(false);
+      .limit(5000);
     if (error) {
+      setLoading(false);
       mostrarErro(error);
       return;
     }
+    const brutas = (data ?? []) as unknown as Row[];
+
+    // Nome de quem emitiu: `nfse` guarda só o UUID em `emitida_por`, e não há
+    // FK declarada para `profiles`, então o embed do PostgREST não funciona —
+    // resolvemos em uma segunda consulta, como o Caixa e o Movimento fazem.
+    const idsUsuarios = Array.from(
+      new Set(brutas.map((r) => r.emitida_por).filter((v): v is string => !!v)),
+    );
+    const nomes = new Map<string, string>();
+    if (idsUsuarios.length > 0) {
+      const { data: perfis } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", idsUsuarios);
+      for (const p of perfis ?? []) nomes.set(p.id, p.nome ?? "");
+    }
+
     // Enriquece cliente-side com nome/CNPJ do emitente a partir do state,
     // já que a view pública nfse_emitentes_publico não expõe FK para embed.
     const map = new Map(emitentes.map((e) => [e.id, e]));
+    setLoading(false);
     setRows(
-      ((data ?? []) as unknown as Row[]).map((r) => ({
+      brutas.map((r) => ({
         ...r,
         emitente: r.emitente_id
           ? map.get(r.emitente_id)
             ? { nome: map.get(r.emitente_id)!.nome, cnpj: map.get(r.emitente_id)!.cnpj }
             : null
           : null,
+        emitida_por_nome: r.emitida_por ? (nomes.get(r.emitida_por) ?? null) : null,
       })),
     );
   };
   useEffect(() => {
     void load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id, emitentes]);
+  }, [clinicaAtual?.clinica_id, emitentes, periodo.inicio, periodo.fim]);
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
@@ -217,7 +274,7 @@ function NfsePage() {
         const q = busca.trim().toLowerCase();
         if (q) {
           const alvo =
-            `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""}`.toLowerCase();
+            `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.tomador_documento ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""} ${r.emitida_por_nome ?? ""}`.toLowerCase();
           const qDigits = q.replace(/\D/g, "");
           if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits)))
             return false;
@@ -334,6 +391,75 @@ function NfsePage() {
     return Array.from(porEmitente.values());
   }, [filtrados]);
 
+  // Exporta exatamente o que está na tela: mesmo período, mesmo emitente,
+  // mesmo status e mesma busca. Se sair diferente da tela, a planilha não
+  // serve para conferência.
+  const onExportar = async () => {
+    if (filtrados.length === 0) {
+      toast.error("Nenhuma nota no período/filtro selecionado para exportar.");
+      return;
+    }
+    setExportando(true);
+    try {
+      const colunas: ColunaXlsx[] = [
+        { rotulo: "Número", tipo: "texto", largura: 12 },
+        { rotulo: "Emissão", tipo: "texto", largura: 12 },
+        { rotulo: "Emitente", tipo: "texto", largura: 34 },
+        { rotulo: "CNPJ do emitente", tipo: "texto", largura: 20 },
+        { rotulo: "Tomador", tipo: "texto", largura: 34 },
+        { rotulo: "CPF/CNPJ do tomador", tipo: "texto", largura: 20 },
+        { rotulo: "Valor", tipo: "moeda", largura: 14 },
+        { rotulo: "Status", tipo: "texto", largura: 14 },
+        { rotulo: "Emitido por", tipo: "texto", largura: 30 },
+      ];
+      const linhas = filtrados.map((r) => [
+        r.numero ?? "",
+        dataBr(r.data_emissao),
+        r.emitente?.nome?.trim() ?? "",
+        r.emitente?.cnpj ?? "",
+        r.tomador_nome ?? "",
+        documentoBr(r.tomador_documento),
+        Number(r.valor_servicos) || 0,
+        r.status,
+        r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—"),
+      ]);
+      const total = filtrados.reduce((s, r) => s + (Number(r.valor_servicos) || 0), 0);
+      const nomeEmitenteFiltro =
+        filtroEmitente === "todos"
+          ? "Todos os emitentes"
+          : (emitentes.find((e) => e.id === filtroEmitente)?.nome?.trim() ?? filtroEmitente);
+
+      await exportarRelatorioXlsx({
+        arquivo: `notas-fiscais-${periodo.inicio}-a-${periodo.fim}.xlsx`,
+        aba: "NFS-e",
+        cabecalho: [
+          `Notas Fiscais (NFS-e) — ${clinicaAtual?.clinica.nome ?? ""}`,
+          `Período: ${dataBr(periodo.inicio)} a ${dataBr(periodo.fim)}`,
+          `Emitente: ${nomeEmitenteFiltro} · Status: ${filtroStatus === "todos" ? "Todos" : filtroStatus}${
+            busca.trim() ? ` · Busca: "${busca.trim()}"` : ""
+          }`,
+          `Gerado em ${new Date().toLocaleString("pt-BR")}`,
+        ],
+        colunas,
+        linhas,
+        totais: ["", "", "", "", "", `${filtrados.length} nota(s)`, total, "", ""],
+        resumo: {
+          titulo: "Total por emitente",
+          itens: totais.map((t) => ({
+            rotulo: `${t.nome.trim()} (${t.qtd} nota${t.qtd !== 1 ? "s" : ""})`,
+            valor: t.valor,
+            tipo: "moeda" as const,
+          })),
+        },
+      });
+      toast.success(`Planilha gerada com ${filtrados.length} nota(s).`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -345,30 +471,63 @@ function NfsePage() {
             Emissão e controle de notas fiscais de serviço.
           </p>
         </div>
-        {!ehSaoFrancisco && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setConferirOpen(true);
-                setConferirExtraido(null);
-                setConferirPreview(null);
-              }}
-            >
-              <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
-            </Button>
-            {podeEscrever && (
-              <Button asChild>
-                <Link to="/app/nfse/testar">
-                  <FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e
-                </Link>
-              </Button>
+        <div className="flex gap-2">
+          {/* Exportar não depende de permissão de escrita nem da clínica: é
+              leitura do que já está na tela, e a São Francisco também precisa
+              fechar o mês. */}
+          <Button variant="outline" onClick={() => void onExportar()} disabled={exportando}>
+            {exportando ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
             )}
-          </div>
-        )}
+            Exportar Excel
+          </Button>
+          {!ehSaoFrancisco && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConferirOpen(true);
+                  setConferirExtraido(null);
+                  setConferirPreview(null);
+                }}
+              >
+                <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
+              </Button>
+              {podeEscrever && (
+                <Button asChild>
+                  <Link to="/app/nfse/testar">
+                    <FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e
+                  </Link>
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4 flex flex-wrap gap-3 items-end">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Data inicial</label>
+          <Input
+            type="date"
+            className="w-40"
+            value={periodo.inicio}
+            max={periodo.fim}
+            onChange={(e) => setPeriodo((p) => ({ ...p, inicio: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Data final</label>
+          <Input
+            type="date"
+            className="w-40"
+            value={periodo.fim}
+            min={periodo.inicio}
+            onChange={(e) => setPeriodo((p) => ({ ...p, fim: e.target.value }))}
+          />
+        </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Emitente</label>
           <Select value={filtroEmitente} onValueChange={setFiltroEmitente}>
@@ -438,19 +597,20 @@ function NfsePage() {
               <TableHead>Tomador</TableHead>
               <TableHead className="w-32 text-right">Valor</TableHead>
               <TableHead className="w-28">Status</TableHead>
+              <TableHead className="w-40">Emitido por</TableHead>
               <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Nenhuma nota.
                 </TableCell>
               </TableRow>
@@ -468,15 +628,7 @@ function NfsePage() {
                     )}
                   </TableCell>
                   <TableCell>{r.numero ?? "—"}</TableCell>
-                  <TableCell>
-                    {
-                      // `data_emissao` vem como "YYYY-MM-DD"; sem hora, o parse assume
-                      // UTC 00:00 e em BRT (UTC-3) o dia aparece 1 dia antes.
-                      /^\d{4}-\d{2}-\d{2}$/.test(r.data_emissao)
-                        ? new Date(`${r.data_emissao}T12:00:00`).toLocaleDateString("pt-BR")
-                        : new Date(r.data_emissao).toLocaleDateString("pt-BR")
-                    }
-                  </TableCell>
+                  <TableCell>{dataBr(r.data_emissao)}</TableCell>
                   <TableCell>{r.tomador_nome ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     {Number(r.valor_servicos).toLocaleString("pt-BR", {
@@ -498,6 +650,16 @@ function NfsePage() {
                     >
                       {r.status}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {r.emitida_por_nome ? (
+                      <span className="text-xs flex items-center gap-1" title={r.emitida_por_nome}>
+                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{r.emitida_por_nome}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

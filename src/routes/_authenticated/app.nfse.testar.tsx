@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { FileText, Loader2, ExternalLink, RefreshCw } from "lucide-react";
+import { FileText, Loader2, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +74,16 @@ function TestarNfse() {
   const [uf, setUf] = useState("");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [enderecoBuscando, setEnderecoBuscando] = useState(false);
+
+  // Roteamento fiscal: consulta sai pela CASA DE SAUDE, exame pela MA IMAGENS.
+  // O servidor aplica essa regra de qualquer jeito; aqui ela aparece na tela
+  // enquanto a descrição é digitada, para a nota não sair por uma empresa
+  // diferente da que a pessoa acabou de escolher sem ela saber.
+  const emitenteSelecionado = emitentes.find((e) => e.id === emitenteId) ?? null;
+  const desvioDeEmitente = useMemo(
+    () => conferirEscolhaDeEmitente(descricao, emitenteSelecionado?.cnpj),
+    [descricao, emitenteSelecionado?.cnpj],
+  );
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -167,6 +178,12 @@ function TestarNfse() {
       setNotaId(r.id);
       if (r.ok) {
         toast.success("Nota enviada ao Focus. Aguarde autorização da prefeitura.");
+        if (r.emitenteAjustado) {
+          toast.warning(
+            `Emitida por ${r.emitenteAjustado.para} (não por ${r.emitenteAjustado.de}): ${r.emitenteAjustado.motivo}.`,
+            { duration: 10000 },
+          );
+        }
         // Faz um polling de consulta após alguns segundos
         setTimeout(() => void onConsultar(r.id), 4000);
       } else {
@@ -239,6 +256,16 @@ function TestarNfse() {
                 ))}
               </SelectContent>
             </Select>
+            {desvioDeEmitente && (
+              <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-500/10 rounded-md px-2 py-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
+                <span>
+                  Pela descrição, esta nota é de <strong>{desvioDeEmitente.tipo}</strong> e será
+                  emitida por <strong>{desvioDeEmitente.nome}</strong>, e não pela empresa
+                  selecionada acima. Se a empresa correta for a selecionada, ajuste a descrição.
+                </span>
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-[2fr_1fr] gap-3">

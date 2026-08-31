@@ -1,17 +1,6 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
-import {
-  ContratosCards,
-  type ContratoCardItem,
-} from "@/components/contratos/contratos-cards";
+import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
 import {
   FileSignature,
@@ -232,6 +221,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { avisarEmitenteAjustado } from "@/lib/nfse-aviso-emitente";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
@@ -976,7 +966,6 @@ export function ContratosPage({
     periodoAte,
   ]);
 
-
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
     const seen = new Map<string, string>();
@@ -1201,7 +1190,6 @@ export function ContratosPage({
               de <strong className="text-foreground">{filtered.length}</strong> contratos
             </span>
           )}
-
         </div>
         {temFiltroAtivo ? (
           <Button variant="ghost" size="sm" onClick={limparFiltros}>
@@ -1245,9 +1233,7 @@ export function ContratosPage({
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64 p-3 space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">
-                Início do contrato
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">Início do contrato</div>
               <div className="grid grid-cols-2 gap-1">
                 {(
                   [
@@ -1329,301 +1315,303 @@ export function ContratosPage({
             />
           </div>
         ) : (
-        <Table className="max-lg:table max-lg:overflow-visible">
-          <TableHeader className="sticky top-0 z-20">
-            <TableRow className="bg-muted">
-              <TableHead>Nº</TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))
-                  }
-                  className="inline-flex items-center gap-1 font-bold uppercase tracking-wide hover:opacity-80"
-                  title="Ordenar por paciente"
-                >
-                  PACIENTE
-                  <span className="text-[11px] text-muted-foreground">
-                    {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
-                  </span>
-                </button>
-              </TableHead>
-              <TableHead className="font-bold uppercase tracking-wide text-xs text-primary">
-                PRONTUÁRIO
-              </TableHead>
-              <TableHead>
-                <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      TIPO DE CONVÊNIO
-                      {filtroConvenio !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
+          <Table className="max-lg:table max-lg:overflow-visible">
+            <TableHeader className="sticky top-0 z-20">
+              <TableRow className="bg-muted">
+                <TableHead>Nº</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))
+                    }
+                    className="inline-flex items-center gap-1 font-bold uppercase tracking-wide hover:opacity-80"
+                    title="Ordenar por paciente"
+                  >
+                    PACIENTE
+                    <span className="text-[11px] text-muted-foreground">
+                      {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
                     </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="sem">Sem convênio</SelectItem>
-                    {convenios.map((cv) => (
-                      <SelectItem key={cv.id} value={cv.id}>
-                        {cv.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select
-                  value={filtroInicio}
-                  onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}
-                >
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      INÍCIO
-                      {filtroInicio !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                    <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                    <SelectItem value="ano">Este ano</SelectItem>
-                    <SelectItem value="anterior">Anos anteriores</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select
-                  value={filtroTermino}
-                  onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}
-                >
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      TÉRMINO
-                      {filtroTermino !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="vencidos">Vencidos</SelectItem>
-                    <SelectItem value="30d">Vencem em 30 dias</SelectItem>
-                    <SelectItem value="90d">Vencem em 90 dias</SelectItem>
-                    <SelectItem value="sem_data">Sem data</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select
-                  value={filtroMensal}
-                  onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}
-                >
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      MENSAL
-                      {filtroMensal !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="zero">R$ 0,00</SelectItem>
-                    <SelectItem value="ate100">Até R$ 100</SelectItem>
-                    <SelectItem value="100a200">R$ 100 a R$ 200</SelectItem>
-                    <SelectItem value="acima200">Acima de R$ 200</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select
-                  value={filtroProgresso}
-                  onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}
-                >
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      PARCELAS
-                      {filtroProgresso !== "todas" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
-                    <SelectItem value="andamento">Em andamento</SelectItem>
-                    <SelectItem value="quitadas">Quitadas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select
-                  value={filtroSituacao}
-                  onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}
-                >
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      SITUAÇÃO
-                      {filtroSituacao !== "todas" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    <SelectItem value="em_dia">Em dia</SelectItem>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      VENDEDOR
-                      {filtroVendedor !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="sem">Sem vendedor</SelectItem>
-                    {vendedorOpcoes.map(([id, nome]) => (
-                      <SelectItem key={id} value={id}>
-                        {nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead>
-                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <span className="inline-flex items-center gap-1">
-                      STATUS
-                      {filtroStatus !== "todos" ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      ) : null}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {statusOpcoes.map((s) => (
-                      <SelectItem key={s} value={s} className="capitalize">
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          {/* `divide-y` no corpo desenha uma única linha separadora entre as
-              linhas (o `border-b` de cada `TableRow` é desligado aqui). */}
-          <TableBody className="divide-y divide-gray-200 dark:divide-gray-800 [&_tr]:border-b-0">
-            {carregando ? <LinhasSkeletonContratos /> : null}
-            {!carregando && filtered.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
-                  Nenhum contrato.
-                </TableCell>
+                  </button>
+                </TableHead>
+                <TableHead className="font-bold uppercase tracking-wide text-xs text-primary">
+                  PRONTUÁRIO
+                </TableHead>
+                <TableHead>
+                  <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        TIPO DE CONVÊNIO
+                        {filtroConvenio !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="sem">Sem convênio</SelectItem>
+                      {convenios.map((cv) => (
+                        <SelectItem key={cv.id} value={cv.id}>
+                          {cv.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select
+                    value={filtroInicio}
+                    onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}
+                  >
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        INÍCIO
+                        {filtroInicio !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                      <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                      <SelectItem value="ano">Este ano</SelectItem>
+                      <SelectItem value="anterior">Anos anteriores</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select
+                    value={filtroTermino}
+                    onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}
+                  >
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        TÉRMINO
+                        {filtroTermino !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="vencidos">Vencidos</SelectItem>
+                      <SelectItem value="30d">Vencem em 30 dias</SelectItem>
+                      <SelectItem value="90d">Vencem em 90 dias</SelectItem>
+                      <SelectItem value="sem_data">Sem data</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select
+                    value={filtroMensal}
+                    onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}
+                  >
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        MENSAL
+                        {filtroMensal !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="zero">R$ 0,00</SelectItem>
+                      <SelectItem value="ate100">Até R$ 100</SelectItem>
+                      <SelectItem value="100a200">R$ 100 a R$ 200</SelectItem>
+                      <SelectItem value="acima200">Acima de R$ 200</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select
+                    value={filtroProgresso}
+                    onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}
+                  >
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        PARCELAS
+                        {filtroProgresso !== "todas" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
+                      <SelectItem value="andamento">Em andamento</SelectItem>
+                      <SelectItem value="quitadas">Quitadas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select
+                    value={filtroSituacao}
+                    onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}
+                  >
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        SITUAÇÃO
+                        {filtroSituacao !== "todas" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="em_dia">Em dia</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        VENDEDOR
+                        {filtroVendedor !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="sem">Sem vendedor</SelectItem>
+                      {vendedorOpcoes.map(([id, nome]) => (
+                        <SelectItem key={id} value={id}>
+                          {nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                    <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                      <span className="inline-flex items-center gap-1">
+                        STATUS
+                        {filtroStatus !== "todos" ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {statusOpcoes.map((s) => (
+                        <SelectItem key={s} value={s} className="capitalize">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead></TableHead>
               </TableRow>
-            ) : null}
-            {carregando
-              ? null
-              : paginados.map((c) => {
-                  const agg = parcAgg[c.id];
-                  const emDia = !agg || !agg.temAtrasada;
-                  return (
-                    <TableRow
-                      key={c.id}
-                      className={
-                        c.tabela_legada
-                          ? "cursor-pointer bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
-                          : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                      }
-                      onClick={() => setDetail(c)}
-                    >
-                      <TableCell className="font-semibold">{c.numero}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 whitespace-normal break-words">
-                          <span>{c.paciente_nome}</span>
-                          {c.sem_carencia ? (
+            </TableHeader>
+            {/* `divide-y` no corpo desenha uma única linha separadora entre as
+              linhas (o `border-b` de cada `TableRow` é desligado aqui). */}
+            <TableBody className="divide-y divide-gray-200 dark:divide-gray-800 [&_tr]:border-b-0">
+              {carregando ? <LinhasSkeletonContratos /> : null}
+              {!carregando && filtered.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
+                    Nenhum contrato.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {carregando
+                ? null
+                : paginados.map((c) => {
+                    const agg = parcAgg[c.id];
+                    const emDia = !agg || !agg.temAtrasada;
+                    return (
+                      <TableRow
+                        key={c.id}
+                        className={
+                          c.tabela_legada
+                            ? "cursor-pointer bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+                            : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        }
+                        onClick={() => setDetail(c)}
+                      >
+                        <TableCell className="font-semibold">{c.numero}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 whitespace-normal break-words">
+                            <span>{c.paciente_nome}</span>
+                            {c.sem_carencia ? (
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                              >
+                                Sem carência
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="tabular-nums text-sm">
+                          {c.codigo_prontuario ?? (
+                            <span className="text-muted-foreground/60">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {(c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? "—"}
+                        </TableCell>
+                        <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
+                        <TableCell className="tabular-nums">
+                          {fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}
+                        </TableCell>
+                        <TableCell>{BRL(c.valor_mensal)}</TableCell>
+                        <TableCell className="tabular-nums">
+                          {agg ? `${agg.pagas} / ${agg.total}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {c.status === "cancelado" ? (
                             <Badge
                               variant="outline"
-                              className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                              className="rounded-full px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
                             >
-                              Sem carência
+                              —
                             </Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell className="tabular-nums text-sm">
-                        {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {(c.convenio_id ? convenioNomePorId.get(c.convenio_id) : null) ?? "—"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}
-                      </TableCell>
-                      <TableCell>{BRL(c.valor_mensal)}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {agg ? `${agg.pagas} / ${agg.total}` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {c.status === "cancelado" ? (
+                          ) : emDia ? (
+                            <Badge
+                              className={`${BADGE_BASE} bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300`}
+                            >
+                              Em dia
+                            </Badge>
+                          ) : (
+                            <Badge
+                              className={`${BADGE_BASE} bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300`}
+                            >
+                              Pendente
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {c.criado_por && vendedores[c.criado_por] ? (
+                            <span>
+                              {vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/60">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Badge
-                            variant="outline"
-                            className="rounded-full px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                            variant="secondary"
+                            className={`${BADGE_BASE} ${corStatus(c.status)}`}
                           >
-                            —
+                            {c.status}
                           </Badge>
-                        ) : emDia ? (
-                          <Badge
-                            className={`${BADGE_BASE} bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300`}
-                          >
-                            Em dia
-                          </Badge>
-                        ) : (
-                          <Badge
-                            className={`${BADGE_BASE} bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300`}
-                          >
-                            Pendente
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {c.criado_por && vendedores[c.criado_por] ? (
-                          <span>
-                            {vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/60">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={`${BADGE_BASE} ${corStatus(c.status)}`}
-                        >
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-          </TableBody>
-        </Table>
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+            </TableBody>
+          </Table>
         )}
         {!carregando && !modoCards && filtered.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
@@ -4459,6 +4447,7 @@ function DetalheContrato({
           tomador,
         },
       });
+      avisarEmitenteAjustado(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       if (nfseId) {
@@ -4602,6 +4591,7 @@ function DetalheContrato({
           tomador,
         },
       });
+      avisarEmitenteAjustado(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e agrupada enviada. Consultando status...");
       if (nfseId) {

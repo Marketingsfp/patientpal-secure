@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  conferirEscolhaDeEmitente,
+  somenteDigitos as apenasDigitos,
+} from "@/lib/nfse-roteamento-emitente";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -144,38 +148,37 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!membership) throw new Error("Sem permissão para emitir por este emitente");
 
-    // Regra de negócio: toda NFS-e de CONSULTA deve ser emitida no CNPJ
-    // 31.919.483/0003-18 (CASA DE SAUDE E MATERNIDADE), independente do
-    // emitente escolhido pelo usuário. Detecta "consulta" na descrição.
-    const CONSULTA_CNPJ = "31919483000318";
-    const ehConsulta = /consulta/i.test(data.descricaoServicos ?? "");
-    // Exames vão para MA IMAGENS (CNPJ 57.786.061/0001-43).
-    const EXAME_CNPJ = "57786061000143";
-    const desc = (data.descricaoServicos ?? "").toLowerCase();
-    const ehExame =
-      /\bexam|ultrassom|ultra-?som|raio.?x|raio x|radiograf|tomograf|ressonan|mamograf|densitometr|ecocardio|eletrocardio|\becg\b|\beeg\b|holter|endoscop|colonoscop|doppler|ecograf/i.test(
-        desc,
-      );
+    // Roteamento fiscal por tipo de serviço (consulta -> CASA DE SAUDE,
+    // exame -> MA IMAGENS). A regra mora em @/lib/nfse-roteamento-emitente
+    // para que a tela de emissão consiga avisar ANTES do envio em qual
+    // empresa a nota vai sair — até então o emitente escolhido no modal era
+    // trocado aqui em silêncio, e a recepção só descobria a troca depois, na
+    // listagem de notas ("escolhi CASA DE SAUDE e saiu MA").
+    const emitenteEscolhido = { nome: emitente.nome, cnpj: emitente.cnpj };
+    const destinoFiscal = conferirEscolhaDeEmitente(data.descricaoServicos, emitente.cnpj);
+    let emitenteAjustado: { de: string; para: string; motivo: string } | null = null;
 
-    const alvoCnpj = ehExame ? EXAME_CNPJ : ehConsulta ? CONSULTA_CNPJ : null;
-    const alvoCnpjFormatado = ehExame ? "57.786.061/0001-43" : "31.919.483/0003-18";
-    const alvoNome = ehExame ? "MA IMAGENS" : "CASA DE SAUDE E MATERNIDADE";
-
-    if (alvoCnpj && only(emitente.cnpj) !== alvoCnpj) {
-      const { data: emitConsulta } = await supabaseAdmin
+    if (destinoFiscal) {
+      // Busca pelos dígitos do CNPJ: o cadastro grava ora "57.786.061/0001-43",
+      // ora "57786061000143", e o filtro por texto exato fazia a emissão
+      // estourar "emitente não cadastrado" sempre que a máscara não batia.
+      const { data: candidatos } = await supabaseAdmin
         .from("nfse_emitentes")
         .select("*")
         .eq("clinica_id", emitente.clinica_id)
-        .eq("ativo", true)
-        .eq("cnpj", alvoCnpjFormatado)
-        .maybeSingle();
-      if (emitConsulta) {
-        emitente = emitConsulta;
-      } else {
+        .eq("ativo", true);
+      const alvo = (candidatos ?? []).find((e) => apenasDigitos(e.cnpj) === destinoFiscal.cnpj);
+      if (!alvo) {
         throw new Error(
-          `Emitente ${alvoNome} (CNPJ ${alvoCnpjFormatado}) não cadastrado/ativo — necessário para esta NFS-e.`,
+          `Esta nota é de ${destinoFiscal.tipo} e precisa sair pelo CNPJ ${destinoFiscal.cnpj} (${destinoFiscal.nome}), que não está cadastrado/ativo nesta clínica.`,
         );
       }
+      emitente = alvo;
+      emitenteAjustado = {
+        de: emitenteEscolhido.nome,
+        para: alvo.nome,
+        motivo: `a descrição caracteriza ${destinoFiscal.tipo}`,
+      };
     }
 
     const token =
@@ -387,6 +390,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
         status: "processando",
         payload_envio: payload,
         emitida_por: userId,
+        // Trilha de auditoria do roteamento fiscal: fica gravado na própria
+        // nota quando a empresa emissora não foi a escolhida no formulário.
+        observacoes: emitenteAjustado
+          ? `Emitente ajustado automaticamente: escolhido "${emitenteAjustado.de}", emitido por "${emitenteAjustado.para}" (${emitenteAjustado.motivo}).`
+          : null,
       })
       .select()
       .single();
@@ -474,6 +482,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
         error: body?.mensagem ?? `HTTP ${resp.status}`,
         body,
         tentativas: attempts,
+        emitenteAjustado,
       };
     }
 
@@ -506,7 +515,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
       );
     }
 
-    return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts };
+    return {
+      ok: true,
+      id: nota.id,
+      ref: currentRef,
+      focus: body,
+      tentativas: attempts,
+      emitenteAjustado,
+    };
   });
 
 /** Consulta o status atual da nota no Focus NFe e atualiza o registro local. */
