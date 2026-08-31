@@ -37,6 +37,8 @@ import {
   Tag,
   ArrowLeft,
   RefreshCw,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
