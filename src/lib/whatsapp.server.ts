@@ -837,29 +837,103 @@ ${medicos || "(nenhum)"}
 PROCEDIMENTOS:
 ${procs || "(nenhum)"}`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...historico,
-        { role: "user", content: mensagemPaciente },
-      ],
-    }),
-  });
+  // ---------------------------------------------------------------- agendar
+  // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
+  // leitura: ela consulta a agenda REAL e marca, usando o mesmo núcleo de
+  // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
+  const { ferramentasAgendaAtivas, blocoPromptAgenda } = await import("@/lib/nina/agenda-flag.server");
+  const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("Nina WhatsApp AI error", res.status, body);
-    throw new Error(`Falha IA (${res.status})`);
+  const systemPromptFinal = podeAgendar
+    ? `${systemPrompt}\n\n${blocoPromptAgenda()}`
+    : systemPrompt;
+
+  let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
+  let ferramentas: unknown[] | undefined;
+  let executar:
+    | typeof import("@/lib/nina/paciente-tools.server").executarFerramentaPaciente
+    | null = null;
+  if (podeAgendar) {
+    const mod = await import("@/lib/nina/paciente-tools.server");
+    ferramentas = [...mod.FERRAMENTAS_NINA_PACIENTE];
+    executar = mod.executarFerramentaPaciente;
+    ctxFerramentas = {
+      clinicaId,
+      telefone: telefoneNorm,
+      // Só entra identificado quem foi casado pelo telefone do próprio
+      // remetente — nome solto nunca identifica ninguém.
+      pacienteId: telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null,
+      pacienteNome: telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null,
+      conversaId: estadoId.conversaId,
+      origem: "whatsapp",
+    };
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const resposta = json.choices?.[0]?.message?.content?.trim() ?? "";
+
+  type MsgIA = {
+    role: string;
+    content: string | null;
+    tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
+    tool_call_id?: string;
+  };
+  const mensagens: MsgIA[] = [
+    { role: "system", content: systemPromptFinal },
+    ...(historico as MsgIA[]),
+    { role: "user", content: mensagemPaciente },
+  ];
+
+  let resposta = "";
+  const MAX_RODADAS = podeAgendar ? 5 : 1;
+  for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        ...(ferramentas ? { tools: ferramentas } : {}),
+        messages: mensagens,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("Nina WhatsApp AI error", res.status, body);
+      throw new Error(`Falha IA (${res.status})`);
+    }
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string; tool_calls?: MsgIA["tool_calls"] } }>;
+    };
+    const msg = json.choices?.[0]?.message;
+    const chamadas = msg?.tool_calls ?? [];
+
+    if (chamadas.length === 0 || !executar || !ctxFerramentas) {
+      resposta = (msg?.content ?? "").trim();
+      break;
+    }
+
+    mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
+    for (const c of chamadas) {
+      let resultado: unknown;
+      try {
+        resultado = await executar(ctxFerramentas, String(c.function?.name ?? ""), c.function?.arguments);
+      } catch (e) {
+        console.error("[Nina] ferramenta falhou", c.function?.name, e);
+        resultado = { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar o sistema." };
+      }
+      mensagens.push({
+        role: "tool",
+        tool_call_id: c.id,
+        content: JSON.stringify(resultado).slice(0, 8000),
+      });
+    }
+  }
+
+  if (!resposta) {
+    resposta =
+      "Consegui iniciar aqui, mas preciso de um instante — vou pedir para uma atendente concluir com você.";
+  }
 
   // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.
   if (
