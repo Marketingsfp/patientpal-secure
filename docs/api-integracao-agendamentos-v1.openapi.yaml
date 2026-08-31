@@ -1,10 +1,18 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.0.0"
+  version: "1.1.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
-    Congelada como v1: nenhum endpoint novo até haver necessidade real de um consumidor.
+    A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
+
+    Novidades da v1.1: `POST /appointments` aceita o objeto `paciente`
+    (resolve por CPF ou cadastra, com escopo `patients:write`) e existem os
+    catálogos `GET /specialties` e `GET /doctors`.
+
+    Não existe — e não existirá — endpoint de busca de paciente: uma rota
+    pública que responde "esse CPF existe?" seria um oráculo de enumeração
+    sobre a base real de pacientes.
 
     Toda escrita passa pelos mesmos núcleos de regra de negócio usados pela tela
     da Agenda. A API nunca grava direto em `agendamentos` (exceto anexar o motivo
