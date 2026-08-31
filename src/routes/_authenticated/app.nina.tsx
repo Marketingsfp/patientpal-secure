@@ -630,6 +630,12 @@ function NinaTreinada() {
                   content={m.content}
                   variant={m.role === "assistant" ? "assistant" : "user"}
                 />
+                {m.role === "assistant" && i > 0 && (
+                  <FeedbackResposta
+                    pergunta={messages[i - 1]?.content ?? ""}
+                    resposta={m.content}
+                  />
+                )}
               </div>
             </div>
           ))}
