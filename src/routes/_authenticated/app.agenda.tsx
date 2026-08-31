@@ -10583,9 +10583,17 @@ function AgendaPage() {
                                         onClick={() => verOuEmitirNota(a)}
                                         className={`h-7 w-7 shrink-0 rounded-md border-2 ${
                                           emitida
-                                            ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                            ? // Azul é exclusivo da nota emitida. O verde desta
+                                              // coluna já significa "pago" e "check-in feito" —
+                                              // reusá-lo aqui faria a recepção ler nota emitida
+                                              // onde só houve pagamento.
+                                              "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
                                             : selecionadaLote
-                                              ? "border-indigo-400 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                              ? // Seleção para nota agrupada é um estado passageiro,
+                                                // então marca com um anel em vez de outra cor de
+                                                // preenchimento: o botão continua cinza, porque a
+                                                // nota ainda não saiu.
+                                                "border-slate-200 text-slate-400 ring-2 ring-amber-400 ring-offset-1 hover:bg-slate-50"
                                               : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
                                         }`}
                                       >
