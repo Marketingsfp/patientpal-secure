@@ -60,6 +60,8 @@ export type CtxNinaPaciente = {
   conversaId: string | null;
   /** Origem do disparo — só para auditoria. */
   origem: "whatsapp" | "chat_interno";
+  /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
+  podeAgendar?: boolean;
 };
 
 /* ------------------------------------------------------------------ auditoria */
@@ -314,9 +316,57 @@ export async function consultarDisponibilidadeCore(params: {
 /** Sentinela para `in()` vazio — nunca casa com nada. */
 const SEM_RESULTADO = "00000000-0000-0000-0000-000000000000";
 
+/* ------------------------------------------------- escala × disponibilidade */
+
+/** AAAA-MM-DD -> dia da semana (0=Dom) no fuso da clínica. */
+function diaSemanaDe(dataISO: string): number {
+  return new Date(`${dataISO}T12:00:00-03:00`).getDay();
+}
+
+/**
+ * Escala teórica do médico (`medico_disponibilidades`). Serve APENAS para
+ * diferenciar "não atende nesse dia" de "atende, mas agenda cheia". Nunca é
+ * usada para oferecer horário — vaga só sai de `consultarDisponibilidadeCore`.
+ */
+async function escalaDoMedico(clinicaId: string, medicoId: string) {
+  const { data } = await supabaseAdmin
+    .from("medico_disponibilidades")
+    .select("dia_semana, hora_inicio, hora_fim")
+    .eq("clinica_id", clinicaId)
+    .eq("medico_id", medicoId)
+    .eq("ativo", true);
+  return (data ?? []) as Array<{ dia_semana: number; hora_inicio: string; hora_fim: string }>;
+}
+
+async function medicoAtendeNoDia(clinicaId: string, medicoId: string, dataISO: string) {
+  const escala = await escalaDoMedico(clinicaId, medicoId);
+  const dow = diaSemanaDe(dataISO);
+  return { atende: escala.some((e) => e.dia_semana === dow), escala };
+}
+
+async function nomeMedico(medicoId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("medicos")
+    .select("nome")
+    .eq("id", medicoId)
+    .maybeSingle();
+  return (data as { nome?: string } | null)?.nome ?? null;
+}
+
+/** "AAAA-MM-DD" do slot, no fuso da clínica (para comparar com a data pedida). */
+function dataISODoSlot(iso: string) {
+  const [dd, mm, yyyy] = formatarData(iso).split("/");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
 /* ------------------------------------------------------------ definições AI */
 
-export const FERRAMENTAS_NINA_PACIENTE = [
+/**
+ * Ferramentas de CONSULTA (catálogo + agenda real). Disponíveis em todas as
+ * clínicas — consultar disponibilidade não cria nada e não expõe paciente.
+ */
+export const FERRAMENTAS_NINA_CONSULTA = [
   {
     type: "function",
     function: {
@@ -385,6 +435,44 @@ export const FERRAMENTAS_NINA_PACIENTE = [
   {
     type: "function",
     function: {
+      name: "verificar_horario",
+      description:
+        "Verifica UM horário específico na agenda real ('tem 15h amanhã com o Dr. João?'). Devolve se está livre e, se ocupado, alternativas próximas no mesmo dia. Nunca informa quem ocupa o horário.",
+      parameters: {
+        type: "object",
+        properties: {
+          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
+          hora: { type: "string", description: "HH:MM, ex.: 15:00" },
+        },
+        required: ["medico_id", "data", "hora"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "proxima_vaga",
+      description:
+        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use em 'qual o próximo horário?' ou quando o dia pedido estiver cheio.",
+      parameters: {
+        type: "object",
+        properties: {
+          medico_id: { type: "string" },
+          especialidade: { type: "string" },
+          a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
+          periodo: { type: "string", description: "manha, tarde ou noite" },
+        },
+      },
+    },
+  },
+] as const;
+
+/** Ferramentas que alteram estado/expõem paciente — só com a flag de agenda. */
+export const FERRAMENTAS_NINA_AGENDAMENTO = [
+  {
+    type: "function",
+    function: {
       name: "identificar_paciente",
       description:
         "Identifica ou cadastra o paciente com CPF, nome completo e data de nascimento. Necessário antes de consultar agendamentos ou marcar. Só peça esses dados quando houver intenção clara de agendar.",
@@ -429,9 +517,31 @@ export const FERRAMENTAS_NINA_PACIENTE = [
   },
 ] as const;
 
+/** Conjunto completo (consulta + agendamento) usado quando a flag está ligada. */
+export const FERRAMENTAS_NINA_PACIENTE = [
+  ...FERRAMENTAS_NINA_CONSULTA,
+  ...FERRAMENTAS_NINA_AGENDAMENTO,
+] as const;
+
+
+
 /* -------------------------------------------------------------- schemas Zod */
 
 const zEspecialidade = z.object({ especialidade: z.string().max(120).optional() });
+const zVerificarHorario = z.object({
+  medico_id: z.string().uuid(),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  hora: z.string().regex(/^\d{1,2}:\d{2}$/),
+});
+const zProximaVaga = z.object({
+  medico_id: z.string().uuid().optional(),
+  especialidade: z.string().max(120).optional(),
+  a_partir_de: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  periodo: z.enum(["manha", "tarde", "noite"]).optional(),
+});
 const zBuscarMedicos = zEspecialidade.extend({ nome: z.string().max(120).optional() });
 const zProcedimentos = z.object({ termo: z.string().trim().min(2).max(120) });
 const zDisponibilidade = z.object({
@@ -474,6 +584,12 @@ export async function executarFerramentaPaciente(
   } else if (argsRaw && typeof argsRaw === "object") {
     args = argsRaw as Record<string, unknown>;
   }
+
+  // Defesa: mesmo que o modelo invente uma chamada, sem a flag da clínica
+  // nenhuma ferramenta que grava ou expõe paciente executa.
+  const SOMENTE_COM_FLAG = new Set(["identificar_paciente", "meus_agendamentos", "agendar"]);
+  if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
+    return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
   try {
     switch (nome) {
@@ -624,9 +740,30 @@ export async function executarFerramentaPaciente(
           periodo: p.periodo ?? null,
           data: p.data ?? null,
         });
-        await auditar(ctx, "consultar_disponibilidade", p, { ok: true });
-        if (slots.length === 0)
+        await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
+          ok: true,
+        });
+        if (slots.length === 0) {
+          // Diferencia "não atende nesse dia" de "atende, mas está cheio".
+          if (p.medico_id && p.data) {
+            const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
+            const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
+            const proximos = await consultarDisponibilidadeCore({
+              clinicaId: ctx.clinicaId,
+              medicoId: p.medico_id,
+              dias: 30,
+            });
+            const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora }));
+            return falha(
+              "NO_AVAILABILITY",
+              atende
+                ? `${nome} atende nesse dia, mas a agenda está sem horários disponíveis.`
+                : `${nome} não possui atendimento cadastrado nesse dia.`,
+              { motivo: atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA", proximos: sugestoes },
+            );
+          }
           return falha("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
+        }
         return {
           ok: true,
           horarios: slots.slice(0, 12).map((s) => ({
@@ -641,6 +778,107 @@ export async function executarFerramentaPaciente(
           total: slots.length,
         };
       }
+
+      case "verificar_horario": {
+        const p = zVerificarHorario.parse(args);
+        const hora = p.hora.padStart(5, "0");
+        const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
+        const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
+        const doDia = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId,
+          medicoId: p.medico_id,
+          dias: 30,
+          data: p.data,
+        });
+        const alvo = doDia.find((s) => s.hora === hora);
+        await auditar(
+          ctx,
+          "verificar_horario",
+          { ...p, atende_no_dia: atende, slots_encontrados: doDia.length },
+          { ok: true },
+        );
+        if (!atende)
+          return {
+            ok: true,
+            medico: nome,
+            data: p.data,
+            hora,
+            disponivel: false,
+            motivo: "NAO_ATENDE_NO_DIA",
+            alternativas: [],
+          };
+        return {
+          ok: true,
+          medico: nome,
+          data: p.data,
+          hora,
+          disponivel: Boolean(alvo),
+          motivo: alvo ? null : doDia.length === 0 ? "AGENDA_CHEIA" : "HORARIO_OCUPADO",
+          // Só horário — nunca quem ocupa a vaga.
+          ...(alvo ? { inicio: alvo.inicio, fim: alvo.fim } : {}),
+          alternativas: doDia
+            .filter((s) => s.hora !== hora)
+            .slice(0, 4)
+            .map((s) => ({ hora: s.hora, inicio: s.inicio, fim: s.fim })),
+        };
+      }
+
+      case "proxima_vaga": {
+        const p = zProximaVaga.parse(args);
+        let especialidadeId: string | null = null;
+        if (p.especialidade) {
+          const lista = await listarEspecialidades(ctx.clinicaId);
+          const esp = acharEspecialidade(p.especialidade, lista);
+          if (!esp)
+            return falha(
+              "NO_AVAILABILITY",
+              `A clínica não atende "${p.especialidade}". Atende: ${lista.map((e) => e.nome).join(", ")}`,
+            );
+          especialidadeId = esp.id;
+        }
+        const todos = await consultarDisponibilidadeCore({
+          clinicaId: ctx.clinicaId,
+          especialidadeId,
+          medicoId: p.medico_id ?? null,
+          dias: 30,
+          periodo: p.periodo ?? null,
+        });
+        const desde = p.a_partir_de ?? null;
+        const slots = desde ? todos.filter((s) => dataISODoSlot(s.inicio) >= desde) : todos;
+        await auditar(
+          ctx,
+          "proxima_vaga",
+          { ...p, slots_encontrados: slots.length },
+          { ok: slots.length > 0 },
+        );
+        if (slots.length === 0)
+          return falha(
+            "NO_AVAILABILITY",
+            "Não há vaga disponível nos próximos 30 dias com esses critérios.",
+          );
+        const primeira = slots[0]!;
+        return {
+          ok: true,
+          proxima: {
+            medico_id: primeira.medico_id,
+            medico: primeira.medico_nome,
+            especialidade: primeira.especialidade,
+            data: primeira.data,
+            hora: primeira.hora,
+            inicio: primeira.inicio,
+            fim: primeira.fim,
+          },
+          seguintes: slots.slice(1, 4).map((s) => ({
+            medico: s.medico_nome,
+            data: s.data,
+            hora: s.hora,
+            inicio: s.inicio,
+            fim: s.fim,
+          })),
+        };
+      }
+
+
 
       case "identificar_paciente": {
         const p = zIdentificar.parse(args);
