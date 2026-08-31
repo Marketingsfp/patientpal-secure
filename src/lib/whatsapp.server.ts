@@ -887,6 +887,7 @@ ${procs || "(nenhum)"}`;
       pacienteNome: telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null,
       conversaId: estadoId.conversaId,
       origem: "whatsapp",
+      podeAgendar,
     };
   }
 

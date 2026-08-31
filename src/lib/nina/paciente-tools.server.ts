@@ -60,6 +60,8 @@ export type CtxNinaPaciente = {
   conversaId: string | null;
   /** Origem do disparo — só para auditoria. */
   origem: "whatsapp" | "chat_interno";
+  /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
+  podeAgendar?: boolean;
 };
 
 /* ------------------------------------------------------------------ auditoria */
@@ -582,6 +584,12 @@ export async function executarFerramentaPaciente(
   } else if (argsRaw && typeof argsRaw === "object") {
     args = argsRaw as Record<string, unknown>;
   }
+
+  // Defesa: mesmo que o modelo invente uma chamada, sem a flag da clínica
+  // nenhuma ferramenta que grava ou expõe paciente executa.
+  const SOMENTE_COM_FLAG = new Set(["identificar_paciente", "meus_agendamentos", "agendar"]);
+  if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
+    return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
 
   try {
     switch (nome) {
