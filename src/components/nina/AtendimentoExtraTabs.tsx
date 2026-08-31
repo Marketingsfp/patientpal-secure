@@ -72,7 +72,10 @@ import {
   pausaAtual,
   listarPauseReasons,
   meuStatusAgente,
+  assumirConversa,
+  devolverParaNina,
 } from "@/lib/atendimento.functions";
+import { FilaHumana } from "@/components/nina/FilaHumana";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -107,6 +110,8 @@ export function AtendInbox() {
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
   const travarFilaFn = useServerFn(travarMinhaFila);
+  const assumirFn = useServerFn(assumirConversa);
+  const devolverFn = useServerFn(devolverParaNina);
   const iniciarPausaFn = useServerFn(iniciarPausa);
   const finalizarPausaFn = useServerFn(finalizarPausa);
   const pausaAtualFn = useServerFn(pausaAtual);
@@ -440,7 +445,15 @@ export function AtendInbox() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-12 gap-3 h-[calc(100vh-260px)] min-h-[520px]">
+      <FilaHumana
+        onAssumida={(id) => {
+          const c = convs.find((x: any) => x.id === id);
+          if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
+          void carregarConvs();
+        }}
+      />
+
+      <div className="grid grid-cols-12 gap-3 h-[calc(100vh-320px)] min-h-[520px]">
         {/* COLUNA 1 — LISTA */}
         <Card className="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col overflow-hidden">
           <CardHeader className="py-3 space-y-2">
@@ -495,6 +508,15 @@ export function AtendInbox() {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
                   {statusBadge(c.status)}
+                  {c.owner_type === "NONE" && (
+                    <Badge className="bg-amber-500/15 text-amber-600 text-[11px]">Na fila</Badge>
+                  )}
+                  {c.owner_type === "HUMAN" && (
+                    <Badge className="bg-sky-500/15 text-sky-600 text-[11px]">Humano</Badge>
+                  )}
+                  {c.owner_type === "AI" && (
+                    <Badge variant="secondary" className="text-[11px]">Nina</Badge>
+                  )}
                   {c.protocol_number && (
                     <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
                   )}
@@ -557,6 +579,50 @@ export function AtendInbox() {
                     >
                       <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
                     </Button>
+                    {!sel.atribuida_user_id && sel.status !== "closed" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          if (!clinicaId) return;
+                          try {
+                            const r: any = await assumirFn({
+                              data: { clinicaId, conversaId: sel.id },
+                            });
+                            if (r?.ok) {
+                              toast.success("Conversa assumida — a Nina parou de responder.");
+                              setSel({ ...sel, atribuida_user_id: "me", owner_type: "HUMAN", status: "active" });
+                            } else {
+                              toast.warning("Outro atendente assumiu primeiro.");
+                            }
+                            await carregarConvs();
+                          } catch (e: any) {
+                            mostrarErro(e);
+                          }
+                        }}
+                      >
+                        Assumir
+                      </Button>
+                    )}
+                    {sel.owner_type && sel.owner_type !== "AI" && sel.status !== "closed" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          if (!clinicaId) return;
+                          try {
+                            await devolverFn({ data: { clinicaId, conversaId: sel.id } });
+                            toast.success("Conversa devolvida para a Nina.");
+                            setSel({ ...sel, atribuida_user_id: null, owner_type: "AI", status: "bot_attending" });
+                            await carregarConvs();
+                          } catch (e: any) {
+                            mostrarErro(e);
+                          }
+                        }}
+                      >
+                        Devolver para Nina
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
                       <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
                     </Button>
