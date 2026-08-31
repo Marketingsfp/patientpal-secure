@@ -883,6 +883,22 @@ ${procs || "(nenhum)"}`;
     };
   }
 
+  // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
+  const {
+    FERRAMENTA_HANDOFF,
+    ehFerramentaHandoff,
+    executarHandoffTool,
+  } = await import("@/lib/nina/handoff-tool.server");
+  ferramentas = [...(ferramentas ?? []), FERRAMENTA_HANDOFF];
+  const ctxHandoff = { clinicaId, conversaId: estadoId.conversaId ?? null };
+  const systemPromptComHandoff = `${systemPromptFinal}
+
+ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
+- Você é o 1º nível. Resolva o que souber, com clareza e sem enrolar.
+- Chame a ferramenta "solicitar_atendente_humano" quando: o paciente pedir uma pessoa/atendente/humano; houver reclamação, urgência clínica, cobrança, erro nosso ou conflito; ou você já tiver tentado duas vezes sem resolver.
+- Ao chamar, mande um resumo útil do caso. Depois, avise em uma frase que a equipe assume daqui — não continue tentando resolver sozinha e não prometa prazo.`;
+
+
   type MsgIA = {
     role: string;
     content: string | null;
@@ -890,13 +906,14 @@ ${procs || "(nenhum)"}`;
     tool_call_id?: string;
   };
   const mensagens: MsgIA[] = [
-    { role: "system", content: systemPromptFinal },
+    { role: "system", content: systemPromptComHandoff },
     ...(historico as MsgIA[]),
     { role: "user", content: mensagemPaciente },
   ];
 
   let resposta = "";
-  const MAX_RODADAS = podeAgendar ? 5 : 1;
+  let houveHandoff = false;
+  const MAX_RODADAS = podeAgendar ? 5 : 3;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -922,18 +939,26 @@ ${procs || "(nenhum)"}`;
     const msg = json.choices?.[0]?.message;
     const chamadas = msg?.tool_calls ?? [];
 
-    if (chamadas.length === 0 || !executar || !ctxFerramentas) {
+    if (chamadas.length === 0) {
       resposta = (msg?.content ?? "").trim();
       break;
     }
 
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     for (const c of chamadas) {
+      const nome = String(c.function?.name ?? "");
       let resultado: unknown;
       try {
-        resultado = await executar(ctxFerramentas, String(c.function?.name ?? ""), c.function?.arguments);
+        if (ehFerramentaHandoff(nome)) {
+          resultado = await executarHandoffTool(ctxHandoff, c.function?.arguments);
+          houveHandoff = true;
+        } else if (executar && ctxFerramentas) {
+          resultado = await executar(ctxFerramentas, nome, c.function?.arguments);
+        } else {
+          resultado = { ok: false, erro: "FERRAMENTA_INDISPONIVEL" };
+        }
       } catch (e) {
-        console.error("[Nina] ferramenta falhou", c.function?.name, e);
+        console.error("[Nina] ferramenta falhou", nome, e);
         resultado = { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar o sistema." };
       }
       mensagens.push({
@@ -943,6 +968,12 @@ ${procs || "(nenhum)"}`;
       });
     }
   }
+
+  if (!resposta && houveHandoff) {
+    resposta =
+      "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
+  }
+
 
   if (!resposta) {
     resposta =

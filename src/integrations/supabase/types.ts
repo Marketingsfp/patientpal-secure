@@ -506,6 +506,39 @@ export type Database = {
           },
         ]
       }
+      atend_agente_presenca: {
+        Row: {
+          aceita_novas: boolean
+          clinica_id: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+          visto_em: string
+        }
+        Insert: {
+          aceita_novas?: boolean
+          clinica_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          visto_em?: string
+        }
+        Update: {
+          aceita_novas?: boolean
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          visto_em?: string
+        }
+        Relationships: []
+      }
       atend_avaliacoes: {
         Row: {
           clinica_id: string
@@ -621,9 +654,56 @@ export type Database = {
           },
         ]
       }
+      atend_conversa_eventos: {
+        Row: {
+          clinica_id: string
+          conversa_id: string
+          created_at: string
+          departamento_id: string | null
+          detalhes: Json | null
+          evento: string
+          id: string
+          motivo: string | null
+          user_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id: string
+          created_at?: string
+          departamento_id?: string | null
+          detalhes?: Json | null
+          evento: string
+          id?: string
+          motivo?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string
+          created_at?: string
+          departamento_id?: string | null
+          detalhes?: Json | null
+          evento?: string
+          id?: string
+          motivo?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_conversa_eventos_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_conversas: {
         Row: {
           aguardando_desde: string | null
+          ai_enabled: boolean
+          ai_tentativas: number
+          assigned_at: string | null
           atribuida_user_id: string | null
           canal: string
           clinica_id: string
@@ -634,13 +714,19 @@ export type Database = {
           created_at: string
           departamento_id: string | null
           fila_posicao: number | null
+          handoff_em: string | null
+          handoff_motivo: string | null
+          handoff_resumo: Json | null
           id: string
           identidade_confirmada: boolean
           identidade_perguntada_em: string | null
           identidade_tentativas: number
           janela_24h_em: string | null
+          owner_type: string
           primeiro_resp_em: string | null
+          prioridade: number
           protocol_number: string | null
+          resolved_at: string | null
           sentimento: string | null
           sentimento_score: number | null
           sla_first_response_seg: number | null
@@ -652,6 +738,9 @@ export type Database = {
         }
         Insert: {
           aguardando_desde?: string | null
+          ai_enabled?: boolean
+          ai_tentativas?: number
+          assigned_at?: string | null
           atribuida_user_id?: string | null
           canal?: string
           clinica_id: string
@@ -662,13 +751,19 @@ export type Database = {
           created_at?: string
           departamento_id?: string | null
           fila_posicao?: number | null
+          handoff_em?: string | null
+          handoff_motivo?: string | null
+          handoff_resumo?: Json | null
           id?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
           janela_24h_em?: string | null
+          owner_type?: string
           primeiro_resp_em?: string | null
+          prioridade?: number
           protocol_number?: string | null
+          resolved_at?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
@@ -680,6 +775,9 @@ export type Database = {
         }
         Update: {
           aguardando_desde?: string | null
+          ai_enabled?: boolean
+          ai_tentativas?: number
+          assigned_at?: string | null
           atribuida_user_id?: string | null
           canal?: string
           clinica_id?: string
@@ -690,13 +788,19 @@ export type Database = {
           created_at?: string
           departamento_id?: string | null
           fila_posicao?: number | null
+          handoff_em?: string | null
+          handoff_motivo?: string | null
+          handoff_resumo?: Json | null
           id?: string
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
           janela_24h_em?: string | null
+          owner_type?: string
           primeiro_resp_em?: string | null
+          prioridade?: number
           protocol_number?: string | null
+          resolved_at?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
@@ -9762,6 +9866,10 @@ export type Database = {
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
+      }
+      atend_claim_conversa: {
+        Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
+        Returns: boolean
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       buscar_contratos: {
