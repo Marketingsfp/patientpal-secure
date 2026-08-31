@@ -84,6 +84,8 @@ interface Row {
   /** Quem apertou "Emitir" — `nfse.emitida_por` sempre foi gravado, só nunca era exibido. */
   emitida_por: string | null;
   emitida_por_nome: string | null;
+  /** Momento real da emissão. É por ele que a lista é ordenada. */
+  created_at: string;
 }
 
 /** "YYYY-MM-DD" do primeiro dia do mês corrente e de hoje, no fuso local. */
@@ -100,6 +102,15 @@ function dataBr(v: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(v)
     ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR")
     : new Date(v).toLocaleDateString("pt-BR");
+}
+
+/** Hora da emissão (HH:MM), a partir do `created_at`. */
+function horaBr(v: string | null | undefined): string {
+  if (!v) return "";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** CPF/CNPJ com máscara; devolve o original quando não tem 11 nem 14 dígitos. */
@@ -178,12 +189,21 @@ function NfsePage() {
     const { data, error } = await supabase
       .from("nfse")
       .select(
-        "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por",
+        "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data_emissao", periodo.inicio)
       .lte("data_emissao", periodo.fim)
-      .order("data_emissao", { ascending: false })
+      // Ordena por `created_at` (momento real da emissão), não por
+      // `data_emissao`. `data_emissao` é uma DATA sem hora: todas as notas do
+      // mesmo dia empatam, e o banco devolve os empates em ordem arbitrária —
+      // que muda a cada consulta, ainda mais porque o auto-polling reconsulta a
+      // cada 15s. A lista embaralhava sozinha na frente da recepção, e quem
+      // estava lendo uma linha via os dados trocarem de lugar, o que passava a
+      // impressão de nota duplicada e de nome de emissor errado.
+      // O `id` no fim garante ordem estável mesmo em empate de milissegundo.
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(5000);
     if (error) {
       setLoading(false);
@@ -411,6 +431,7 @@ function NfsePage() {
       const colunas: ColunaXlsx[] = [
         { rotulo: "Número", tipo: "texto", largura: 12 },
         { rotulo: "Emissão", tipo: "texto", largura: 12 },
+        { rotulo: "Hora", tipo: "texto", largura: 8 },
         { rotulo: "Emitente", tipo: "texto", largura: 34 },
         { rotulo: "CNPJ do emitente", tipo: "texto", largura: 20 },
         { rotulo: "Tomador", tipo: "texto", largura: 34 },
@@ -425,6 +446,7 @@ function NfsePage() {
       const linhas = filtrados.map((r) => [
         r.numero ?? "",
         dataBr(r.data_emissao),
+        horaBr(r.created_at),
         r.emitente?.nome?.trim() ?? "",
         r.emitente?.cnpj ?? "",
         r.tomador_nome ?? "",
@@ -455,6 +477,7 @@ function NfsePage() {
         colunas,
         linhas,
         totais: [
+          "",
           "",
           "",
           "",
@@ -656,7 +679,12 @@ function NfsePage() {
                     )}
                   </TableCell>
                   <TableCell>{r.numero ?? "—"}</TableCell>
-                  <TableCell>{dataBr(r.data_emissao)}</TableCell>
+                  <TableCell>
+                    <div>{dataBr(r.data_emissao)}</div>
+                    {/* A hora deixa a ordem da lista visível: sem ela, duas
+                        notas do mesmo dia pareciam estar em ordem aleatória. */}
+                    <div className="text-xs text-muted-foreground">{horaBr(r.created_at)}</div>
+                  </TableCell>
                   <TableCell>{r.tomador_nome ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     {Number(r.valor_servicos).toLocaleString("pt-BR", {

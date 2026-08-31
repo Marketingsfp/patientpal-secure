@@ -157,6 +157,39 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // ORIENTAÇÃO: quando a descrição sugere a outra empresa, a tela avisa
     // antes de emitir, avisa de novo depois, e a divergência fica registrada
     // na nota. Só não decide mais nada sozinha.
+    // Trava contra emissão dupla do mesmo atendimento/pagamento.
+    //
+    // Em 31/08 o atendimento 4c06b86a saiu com DUAS NFS-e válidas (9831 e
+    // 9832), emitidas com 11,7 segundos de diferença pela mesma pessoa: o
+    // clique foi dado de novo enquanto o primeiro envio ainda estava em
+    // andamento. Nota fiscal em duplicidade só se desfaz cancelando na
+    // prefeitura, então a barreira tem que ser aqui no servidor — desabilitar
+    // o botão na tela não cobre dois cliques rápidos nem duas abas abertas.
+    //
+    // Só bloqueia contra nota que ainda vale: nota com erro ou cancelada não
+    // impede uma nova, que é justamente o caso de reemitir depois de recusa.
+    const vinculo = data.agendamentoId
+      ? { coluna: "agendamento_id" as const, valor: data.agendamentoId, rotulo: "atendimento" }
+      : data.pagamentoId
+        ? { coluna: "pagamento_id" as const, valor: data.pagamentoId, rotulo: "pagamento" }
+        : null;
+    if (vinculo) {
+      const { data: jaExiste } = await supabase
+        .from("nfse")
+        .select("id, numero, status")
+        .eq(vinculo.coluna, vinculo.valor)
+        .in("status", ["processando", "emitida"])
+        .limit(1)
+        .maybeSingle();
+      if (jaExiste) {
+        throw new Error(
+          jaExiste.numero
+            ? `Este ${vinculo.rotulo} já tem a NFS-e nº ${jaExiste.numero} emitida. Para emitir outra, cancele a atual primeiro.`
+            : `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+        );
+      }
+    }
+
     const sugestaoFiscal = conferirEscolhaDeEmitente(data.descricaoServicos, emitente.cnpj);
     const emitenteDivergente = sugestaoFiscal
       ? {
