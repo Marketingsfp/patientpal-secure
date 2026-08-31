@@ -1,12 +1,19 @@
-# API de Agendamentos — Health Hub Pro (v1)
+# API de Agendamentos — Health Hub Pro (v1.1)
 
 API REST genérica de agenda, autenticada por **chave de API**. Não é uma
 integração com nenhum sistema específico: é a agenda do Health Hub Pro exposta
-para que qualquer sistema externo possa consumir no futuro. Não há webhook nem
+para que qualquer sistema externo possa consumir. Não há webhook nem
 sincronização automática nesta versão.
+
+> **v1.1 — evolução compatível.** Tudo que existia na v1 continua funcionando
+> igual, na mesma base `/api/public/integrations/v1`. Não há v2 e nada foi
+> removido. O que entrou: o `POST /appointments` passa a aceitar o objeto
+> `paciente` (além do `paciente_id` de sempre) e existem os catálogos
+> `GET /specialties` e `GET /doctors`. Detalhes na seção 9.
 
 Toda escrita passa pelas **mesmas regras de negócio da tela da Agenda**
 (mesmos núcleos de código). A API não grava direto na tabela de agendamentos.
+
 
 ---
 
