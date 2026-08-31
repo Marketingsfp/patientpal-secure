@@ -6958,6 +6958,298 @@ export type Database = {
           },
         ]
       }
+      nina_aprendizado_versoes: {
+        Row: {
+          alterado_por: string | null
+          aprendizado_id: string
+          clinica_id: string
+          conteudo: string
+          created_at: string
+          id: string
+          status: string
+          versao: number
+        }
+        Insert: {
+          alterado_por?: string | null
+          aprendizado_id: string
+          clinica_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+          status: string
+          versao: number
+        }
+        Update: {
+          alterado_por?: string | null
+          aprendizado_id?: string
+          clinica_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+          status?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_aprendizado_versoes_aprendizado_id_fkey"
+            columns: ["aprendizado_id"]
+            isOneToOne: false
+            referencedRelation: "nina_aprendizados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_aprendizado_versoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_aprendizados: {
+        Row: {
+          acertos: number
+          aprovado_em: string | null
+          aprovado_por: string | null
+          canal: string
+          clinica_id: string
+          confianca: number
+          conteudo: string
+          created_at: string
+          criado_por: string | null
+          erros: number
+          id: string
+          origem: string
+          origem_ref: string | null
+          status: string
+          tags: string[]
+          tipo: string
+          titulo: string
+          updated_at: string
+          usos: number
+          valido_ate: string | null
+          versao: number
+        }
+        Insert: {
+          acertos?: number
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          canal?: string
+          clinica_id: string
+          confianca?: number
+          conteudo: string
+          created_at?: string
+          criado_por?: string | null
+          erros?: number
+          id?: string
+          origem?: string
+          origem_ref?: string | null
+          status?: string
+          tags?: string[]
+          tipo: string
+          titulo: string
+          updated_at?: string
+          usos?: number
+          valido_ate?: string | null
+          versao?: number
+        }
+        Update: {
+          acertos?: number
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          canal?: string
+          clinica_id?: string
+          confianca?: number
+          conteudo?: string
+          created_at?: string
+          criado_por?: string | null
+          erros?: number
+          id?: string
+          origem?: string
+          origem_ref?: string | null
+          status?: string
+          tags?: string[]
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          usos?: number
+          valido_ate?: string | null
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_aprendizados_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_avaliacoes_ia: {
+        Row: {
+          canal: string
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          id: string
+          modelo: string | null
+          nota: number | null
+          pergunta: string
+          problema: string | null
+          resposta: string
+          sugestao: string | null
+        }
+        Insert: {
+          canal?: string
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          modelo?: string | null
+          nota?: number | null
+          pergunta: string
+          problema?: string | null
+          resposta: string
+          sugestao?: string | null
+        }
+        Update: {
+          canal?: string
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          modelo?: string | null
+          nota?: number | null
+          pergunta?: string
+          problema?: string | null
+          resposta?: string
+          sugestao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_avaliacoes_ia_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_feedback: {
+        Row: {
+          aprendizado_id: string | null
+          avaliacao: number
+          canal: string
+          categoria: string | null
+          clinica_id: string
+          conversa_id: string | null
+          correcao: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          pergunta: string
+          resposta: string
+        }
+        Insert: {
+          aprendizado_id?: string | null
+          avaliacao: number
+          canal?: string
+          categoria?: string | null
+          clinica_id: string
+          conversa_id?: string | null
+          correcao?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          pergunta: string
+          resposta: string
+        }
+        Update: {
+          aprendizado_id?: string | null
+          avaliacao?: number
+          canal?: string
+          categoria?: string | null
+          clinica_id?: string
+          conversa_id?: string | null
+          correcao?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          pergunta?: string
+          resposta?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_feedback_aprendizado_id_fkey"
+            columns: ["aprendizado_id"]
+            isOneToOne: false
+            referencedRelation: "nina_aprendizados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_feedback_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_testes_regressao: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          id: string
+          origem_feedback_id: string | null
+          pergunta: string
+          resposta_esperada: string
+          ultima_execucao: string | null
+          ultimo_resultado: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          origem_feedback_id?: string | null
+          pergunta: string
+          resposta_esperada: string
+          ultima_execucao?: string | null
+          ultimo_resultado?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          origem_feedback_id?: string | null
+          pergunta?: string
+          resposta_esperada?: string
+          ultima_execucao?: string | null
+          ultimo_resultado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_testes_regressao_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_testes_regressao_origem_feedback_id_fkey"
+            columns: ["origem_feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       odonto_anamnese: {
         Row: {
           alergias: string | null

@@ -156,7 +156,21 @@ export const chatNina = createServerFn({ method: "POST" })
     // deslocada em 3 horas.
     const janela = janelaDiaClinica(hojeBR());
     const contextoTexto = await contextoClinicaTexto(supabase, data.clinicaId, janela);
-    const systemPrompt = systemPromptNina(contextoTexto, data.modoVoz);
+    let systemPrompt = systemPromptNina(contextoTexto, data.modoVoz);
+
+    // Aprendizados aprovados pela equipe (memória de longo prazo da clínica).
+    const ultimaPergunta = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const { recuperarAprendizados, blocoPromptAprendizados } = await import(
+      "@/lib/nina/aprendizado.server"
+    );
+    const aprendizados = await recuperarAprendizados(
+      data.clinicaId,
+      "interno",
+      ultimaPergunta,
+      data.modoVoz ? 3 : 6,
+    ).catch(() => []);
+    const blocoAprendizado = blocoPromptAprendizados(aprendizados);
+    if (blocoAprendizado) systemPrompt = `${systemPrompt}\n\n${blocoAprendizado}`;
 
     const { FERRAMENTAS_NINA, executarFerramentaNina } = await import(
       "@/lib/nina-ferramentas.server"

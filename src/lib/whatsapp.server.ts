@@ -844,9 +844,23 @@ ${procs || "(nenhum)"}`;
   const { ferramentasAgendaAtivas, blocoPromptAgenda } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
 
-  const systemPromptFinal = podeAgendar
-    ? `${systemPrompt}\n\n${blocoPromptAgenda()}`
-    : systemPrompt;
+  // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
+  // mensagem atual. Nunca substituem dado vivo (preço/horário/agenda).
+  const { recuperarAprendizados, blocoPromptAprendizados } = await import(
+    "@/lib/nina/aprendizado.server"
+  );
+  const aprendizados = await recuperarAprendizados(clinicaId, "whatsapp", mensagemPaciente).catch(
+    () => [],
+  );
+  const blocoAprendizado = blocoPromptAprendizados(aprendizados);
+
+  const systemPromptFinal = [
+    systemPrompt,
+    podeAgendar ? blocoPromptAgenda() : "",
+    blocoAprendizado,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
