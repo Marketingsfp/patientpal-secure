@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useClinica } from "@/hooks/useClinica";
+import { useClinica } from "@/hooks/use-clinica";
 import {
   definirStatusAprendizado,
   estatisticasAprendizado,
