@@ -62,7 +62,7 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
     return () => clearInterval(t);
   }, [carregar]);
 
-  useRealtimeRefresh({ table: "atend_conversas", onChange: carregar });
+  useRealtimeRefresh(["atend_conversas"], carregar);
 
   const assumir = async (c: ConversaFila) => {
     if (!clinicaId) return;
