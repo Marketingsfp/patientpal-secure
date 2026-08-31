@@ -515,6 +515,14 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
   },
 ] as const;
 
+/** Conjunto completo (consulta + agendamento) usado quando a flag está ligada. */
+export const FERRAMENTAS_NINA_PACIENTE = [
+  ...FERRAMENTAS_NINA_CONSULTA,
+  ...FERRAMENTAS_NINA_AGENDAMENTO,
+] as const;
+
+
+
 /* -------------------------------------------------------------- schemas Zod */
 
 const zEspecialidade = z.object({ especialidade: z.string().max(120).optional() });
