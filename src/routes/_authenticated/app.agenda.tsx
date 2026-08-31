@@ -10456,7 +10456,7 @@ function AgendaPage() {
                         })()}
                       </TableCell>
 
-                      <TableCell className="w-[140px] py-1.5 px-3 text-right">
+                      <TableCell className="w-[170px] py-1.5 px-3 text-right">
                         <TooltipProvider delayDuration={200}>
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Check-in (✅) - aparece apenas para pacientes presentes */}
@@ -10558,6 +10558,61 @@ function AgendaPage() {
                                 </TooltipContent>
                               </Tooltip>
                             )}
+
+                            {/* Nota Fiscal (📄) — mostra na própria linha se a
+                                NFS-e do atendimento já saiu. Verde = emitida
+                                (clique abre o PDF); cinza apagado = ainda não
+                                emitida. Some nos horários livres, onde não há
+                                paciente nem o que faturar. */}
+                            {!ehLivre &&
+                              (() => {
+                                const nf = nfseMap.get(a.id);
+                                const emitida = !!nf;
+                                const selecionadaLote = nfseSel.has(a.id);
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={
+                                          emitida
+                                            ? `Nota Fiscal emitida${nf?.numero ? ` — nº ${nf.numero}` : ""}`
+                                            : "Nota Fiscal não emitida"
+                                        }
+                                        onClick={() => verOuEmitirNota(a)}
+                                        className={`h-7 w-7 shrink-0 rounded-md border-2 ${
+                                          emitida
+                                            ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                            : selecionadaLote
+                                              ? "border-indigo-400 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                              : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
+                                        }`}
+                                      >
+                                        <FileText
+                                          className="h-3.5 w-3.5"
+                                          strokeWidth={emitida ? 3 : 2}
+                                        />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {(() => {
+                                        if (emitida) {
+                                          const num = nf?.numero ? ` nº ${nf.numero}` : "";
+                                          return nf?.url_pdf
+                                            ? `Nota Fiscal emitida${num} — clique para abrir o PDF`
+                                            : `Nota Fiscal emitida${num} — status: ${nf?.status ?? "—"}`;
+                                        }
+                                        if (selecionadaLote)
+                                          return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
+                                        if (!pagosSet.has(a.id))
+                                          return "Nota Fiscal não emitida — registre o pagamento antes";
+                                        return "Nota Fiscal não emitida — clique para emitir";
+                                      })()}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })()}
 
                             {/* Menu (⋮) */}
                             <DropdownMenu>
