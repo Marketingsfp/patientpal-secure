@@ -246,6 +246,24 @@ export const FERRAMENTAS_NINA = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_disponibilidade",
+      description:
+        "Horários REALMENTE livres na agenda (mesma fonte usada pela recepção). Use antes de propor qualquer horário — não deduza a partir da tabela de disponibilidades.",
+      parameters: {
+        type: "object",
+        properties: {
+          especialidade: { type: "string" },
+          medico_id: { type: "string" },
+          data: { type: "string", description: "AAAA-MM-DD" },
+          periodo: { type: "string", description: "manha, tarde ou noite" },
+          dias: { type: "number", description: "Janela de busca em dias (padrão 14)" },
+        },
+      },
+    },
+  },
 ] as const;
 
 function parseJson(txt: unknown, campo: string): Record<string, unknown> {
@@ -388,6 +406,43 @@ export async function executarFerramentaNina(
         { agendamento_ids: ids, novo_status: String(args.novo_status) as any },
       );
     }
+
+    case "consultar_disponibilidade": {
+      // Mesma função usada pela Nina do WhatsApp e pela API de integração:
+      // a disponibilidade tem uma única fonte no sistema.
+      const { consultarDisponibilidadeCore } = await import("@/lib/nina/paciente-tools.server");
+      let especialidadeId: string | null = args.especialidade_id
+        ? String(args.especialidade_id)
+        : null;
+      if (!especialidadeId && args.especialidade) {
+        const { data: esps } = await supabase
+          .from("especialidades")
+          .select("id, nome")
+          .eq("ativo", true);
+        const alvo = String(args.especialidade)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+        const achada = (esps ?? []).find((e: any) =>
+          String(e.nome)
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .includes(alvo.slice(0, 5)),
+        );
+        especialidadeId = achada?.id ?? null;
+      }
+      const slots = await consultarDisponibilidadeCore({
+        clinicaId,
+        especialidadeId,
+        medicoId: args.medico_id ? String(args.medico_id) : null,
+        dias: Number(args.dias) || (args.data ? 30 : 14),
+        periodo: (args.periodo as any) ?? null,
+        data: args.data ? String(args.data) : null,
+      });
+      return { horarios: slots.slice(0, 20), total: slots.length };
+    }
+
 
     default:
       throw new Error(`Ferramenta desconhecida: ${nome}`);
