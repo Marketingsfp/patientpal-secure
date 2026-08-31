@@ -433,6 +433,44 @@ export const FERRAMENTAS_NINA_CONSULTA = [
   {
     type: "function",
     function: {
+      name: "verificar_horario",
+      description:
+        "Verifica UM horário específico na agenda real ('tem 15h amanhã com o Dr. João?'). Devolve se está livre e, se ocupado, alternativas próximas no mesmo dia. Nunca informa quem ocupa o horário.",
+      parameters: {
+        type: "object",
+        properties: {
+          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
+          hora: { type: "string", description: "HH:MM, ex.: 15:00" },
+        },
+        required: ["medico_id", "data", "hora"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "proxima_vaga",
+      description:
+        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use em 'qual o próximo horário?' ou quando o dia pedido estiver cheio.",
+      parameters: {
+        type: "object",
+        properties: {
+          medico_id: { type: "string" },
+          especialidade: { type: "string" },
+          a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
+          periodo: { type: "string", description: "manha, tarde ou noite" },
+        },
+      },
+    },
+  },
+] as const;
+
+/** Ferramentas que alteram estado/expõem paciente — só com a flag de agenda. */
+export const FERRAMENTAS_NINA_AGENDAMENTO = [
+  {
+    type: "function",
+    function: {
       name: "identificar_paciente",
       description:
         "Identifica ou cadastra o paciente com CPF, nome completo e data de nascimento. Necessário antes de consultar agendamentos ou marcar. Só peça esses dados quando houver intenção clara de agendar.",
