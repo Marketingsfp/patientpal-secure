@@ -172,7 +172,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { avisarEmitenteAjustado } from "@/lib/nfse-aviso-emitente";
+import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import {
   obterEtapaSinal,
@@ -6651,7 +6651,7 @@ function AgendaPage() {
           tomador,
         },
       });
-      avisarEmitenteAjustado(res);
+      avisarEmitenteDivergente(res);
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e enviada. Consultando status...");
@@ -6785,7 +6785,7 @@ function AgendaPage() {
           tomador,
         },
       });
-      avisarEmitenteAjustado(res);
+      avisarEmitenteDivergente(res);
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e agrupada enviada. Consultando status...");
@@ -8690,7 +8690,7 @@ function AgendaPage() {
                             tomador,
                           },
                         });
-                        avisarEmitenteAjustado(res);
+                        avisarEmitenteDivergente(res);
                         const nfseId = (res as { id?: string })?.id;
                         if (nfseId) {
                           toast.success("NFS-e enviada. Consultando status...");

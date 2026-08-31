@@ -75,10 +75,10 @@ function TestarNfse() {
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [enderecoBuscando, setEnderecoBuscando] = useState(false);
 
-  // Roteamento fiscal: consulta sai pela CASA DE SAUDE, exame pela MA IMAGENS.
-  // O servidor aplica essa regra de qualquer jeito; aqui ela aparece na tela
-  // enquanto a descrição é digitada, para a nota não sair por uma empresa
-  // diferente da que a pessoa acabou de escolher sem ela saber.
+  // Orientação: consulta costuma sair pela CASA DE SAUDE, exame pela MA
+  // IMAGENS. A nota sai SEMPRE pela empresa selecionada aqui — isto é só um
+  // alerta enquanto a descrição é digitada, para a pessoa perceber um engano
+  // antes de emitir, quando ainda não custa cancelar na prefeitura.
   const emitenteSelecionado = emitentes.find((e) => e.id === emitenteId) ?? null;
   const desvioDeEmitente = useMemo(
     () => conferirEscolhaDeEmitente(descricao, emitenteSelecionado?.cnpj),
@@ -178,9 +178,9 @@ function TestarNfse() {
       setNotaId(r.id);
       if (r.ok) {
         toast.success("Nota enviada ao Focus. Aguarde autorização da prefeitura.");
-        if (r.emitenteAjustado) {
+        if (r.emitenteDivergente) {
           toast.warning(
-            `Emitida por ${r.emitenteAjustado.para} (não por ${r.emitenteAjustado.de}): ${r.emitenteAjustado.motivo}.`,
+            `Emitida por ${r.emitenteDivergente.usado}, como você escolheu — mas ${r.emitenteDivergente.motivo}, que normalmente sai por ${r.emitenteDivergente.sugerido}.`,
             { duration: 10000 },
           );
         }
@@ -260,9 +260,10 @@ function TestarNfse() {
               <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-500/10 rounded-md px-2 py-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
                 <span>
-                  Pela descrição, esta nota é de <strong>{desvioDeEmitente.tipo}</strong> e será
-                  emitida por <strong>{desvioDeEmitente.nome}</strong>, e não pela empresa
-                  selecionada acima. Se a empresa correta for a selecionada, ajuste a descrição.
+                  Confira a empresa: pela descrição isto parece{" "}
+                  <strong>{desvioDeEmitente.tipo}</strong>, que normalmente sai por{" "}
+                  <strong>{desvioDeEmitente.nome}</strong>. A nota vai sair pela empresa selecionada
+                  acima — se for essa mesma, pode seguir.
                 </span>
               </p>
             )}

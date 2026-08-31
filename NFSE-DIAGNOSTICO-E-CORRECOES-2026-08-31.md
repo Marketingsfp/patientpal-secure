@@ -187,40 +187,49 @@ dependendo de como o CNPJ foi digitado.
 
 ### O que foi feito
 
-A regra de enquadramento fiscal **continua valendo** — trocá-la sozinho seria
-mexer em imposto sem a sua autorização (veja a pergunta no fim). O que mudou é
-que ela **deixou de ser invisível**:
+Decisão do dono: **a escolha da funcionária passa a mandar sempre.** Escolheu
+MA, sai MA. Escolheu CASA DE SAUDE, sai CASA DE SAUDE. Sem exceção.
 
-1. **A regra saiu de dentro da emissão** e virou um módulo próprio,
-   `src/lib/nfse-roteamento-emitente.ts`, que o servidor **e as telas** usam. É
-   uma fonte única, com testes automatizados.
-2. **A tela de emissão avisa antes de enviar.** Enquanto a pessoa digita a
-   descrição, aparece um aviso amarelo embaixo do seletor de empresa:
-   > ⚠ Pela descrição, esta nota é de **exame** e será emitida por **MA
-   > IMAGENS**, e não pela empresa selecionada acima. Se a empresa correta for a
-   > selecionada, ajuste a descrição.
-
-   Ela decide antes, não descobre depois.
-3. **Aviso também depois de emitir**, em todos os pontos de emissão (tela de
-   NFS-e, Agenda e Contratos): "Emitida por MA IMAGENS, não por CASA DE SAUDE E
-   MATERNIDADE — a descrição caracteriza exame."
-4. **Trilha de auditoria na própria nota.** Quando há troca, fica gravado no
-   campo `observacoes` da nota: `Emitente ajustado automaticamente: escolhido
-   "X", emitido por "Y" (motivo)`. Assim dá para levantar depois quantas notas
-   tiveram a empresa trocada.
-5. **A comparação de CNPJ passou a ser por dígitos**, ignorando pontos e barra.
-   O segundo defeito acabou.
-6. Quando a empresa obrigatória não está cadastrada, a mensagem de erro agora
-   explica o motivo em vez de só dizer "não cadastrado".
+1. **A troca automática foi removida.** O servidor não reescreve mais o
+   emitente. A empresa que assina a nota é sempre a selecionada no formulário.
+2. **A relação tipo-de-serviço ↔ empresa virou orientação**, não decisão. Saiu
+   de dentro da emissão e virou um módulo próprio,
+   `src/lib/nfse-roteamento-emitente.ts`, com testes automatizados. Ele agora
+   só alimenta avisos.
+3. **Aviso na tela enquanto a descrição é digitada**, embaixo do seletor de
+   empresa:
+   > ⚠ Confira a empresa: pela descrição isto parece **exame**, que normalmente
+   > sai por **MA IMAGENS**. A nota vai sair pela empresa selecionada acima —
+   > se for essa mesma, pode seguir.
+4. **Aviso também depois de emitir**, em todos os pontos de emissão (tela de
+   NFS-e, Agenda e Contratos): "Emitida por CASA DE SAUDE E MATERNIDADE, como
+   escolhido — mas a descrição caracteriza exame, que normalmente sai por MA
+   IMAGENS." Serve para perceber o engano enquanto cancelar na prefeitura e
+   reemitir ainda é barato.
+5. **Trilha de auditoria na própria nota.** Quando a escolha contraria a
+   orientação, fica gravado no campo `observacoes`: `Emitida por "X" conforme
+   escolha do formulário; a orientação para este serviço seria "Y" (motivo)`.
+   Dá para levantar depois quantas notas saíram contra a orientação.
+6. **A comparação de CNPJ passou a ser por dígitos**, ignorando pontos e barra —
+   o segundo defeito acabou. Como a empresa não é mais trocada, ele deixou de
+   poder derrubar a emissão de qualquer forma, mas a comparação correta continua
+   valendo para o aviso não disparar à toa.
 
 ### Ponto que ficou registrado para o futuro
 
-Exame tem **precedência** sobre consulta. Uma nota agrupada que cite os dois
-(ex.: "CONSULTA + ELETROCARDIOGRAMA") vai **inteira** para a MA, inclusive a
-parte da consulta. Hoje isso não acontece na prática — procurei no banco e
-**não existe nenhuma nota com as duas palavras** —, mas fica anotado e travado
-em teste, porque no dia em que a clínica começar a agrupar consulta com exame na
-mesma nota, esse é o ponto que vai precisar de decisão.
+Exame tem **precedência** sobre consulta: uma descrição que cite os dois (ex.:
+"CONSULTA + ELETROCARDIOGRAMA") é tratada como exame. Hoje isso não acontece na
+prática — procurei no banco e **não existe nenhuma nota com as duas palavras**.
+E, como agora isso só alimenta um aviso, errar aqui produz no máximo uma
+sugestão inadequada, nunca uma nota no CNPJ errado.
+
+### Histórico da decisão
+
+Esta demanda foi decidida duas vezes. Na primeira, a orientação foi manter a
+troca automática. Ao ver os casos concretos lado a lado — "ela escolhe CASA DE
+SAUDE, digita ECOCARDIOGRAMA, sai MA" — ficou claro que não era isso que se
+queria, e a decisão mudou para a escolha da funcionária mandar sempre. Fica
+registrado para não ser revertido por engano.
 
 ---
 

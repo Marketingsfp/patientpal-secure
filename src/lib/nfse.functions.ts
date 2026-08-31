@@ -1,10 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  conferirEscolhaDeEmitente,
-  somenteDigitos as apenasDigitos,
-} from "@/lib/nfse-roteamento-emitente";
+import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -135,8 +132,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .eq("id", data.emitenteId)
       .single();
     const errEmit = emitRes.error;
-    // `emitente` é reatribuído mais abaixo (consulta de fallback), por isso `let`.
-    let emitente = emitRes.data;
+    const emitente = emitRes.data;
     if (errEmit || !emitente) throw new Error("Emitente não encontrado");
 
     // Autorização: o usuário precisa ter vínculo com a clínica do emitente.
@@ -148,38 +144,27 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!membership) throw new Error("Sem permissão para emitir por este emitente");
 
-    // Roteamento fiscal por tipo de serviço (consulta -> CASA DE SAUDE,
-    // exame -> MA IMAGENS). A regra mora em @/lib/nfse-roteamento-emitente
-    // para que a tela de emissão consiga avisar ANTES do envio em qual
-    // empresa a nota vai sair — até então o emitente escolhido no modal era
-    // trocado aqui em silêncio, e a recepção só descobria a troca depois, na
-    // listagem de notas ("escolhi CASA DE SAUDE e saiu MA").
-    const emitenteEscolhido = { nome: emitente.nome, cnpj: emitente.cnpj };
-    const destinoFiscal = conferirEscolhaDeEmitente(data.descricaoServicos, emitente.cnpj);
-    let emitenteAjustado: { de: string; para: string; motivo: string } | null = null;
-
-    if (destinoFiscal) {
-      // Busca pelos dígitos do CNPJ: o cadastro grava ora "57.786.061/0001-43",
-      // ora "57786061000143", e o filtro por texto exato fazia a emissão
-      // estourar "emitente não cadastrado" sempre que a máscara não batia.
-      const { data: candidatos } = await supabaseAdmin
-        .from("nfse_emitentes")
-        .select("*")
-        .eq("clinica_id", emitente.clinica_id)
-        .eq("ativo", true);
-      const alvo = (candidatos ?? []).find((e) => apenasDigitos(e.cnpj) === destinoFiscal.cnpj);
-      if (!alvo) {
-        throw new Error(
-          `Esta nota é de ${destinoFiscal.tipo} e precisa sair pelo CNPJ ${destinoFiscal.cnpj} (${destinoFiscal.nome}), que não está cadastrado/ativo nesta clínica.`,
-        );
-      }
-      emitente = alvo;
-      emitenteAjustado = {
-        de: emitenteEscolhido.nome,
-        para: alvo.nome,
-        motivo: `a descrição caracteriza ${destinoFiscal.tipo}`,
-      };
-    }
+    // A empresa emitente é SEMPRE a escolhida no formulário. Escolheu MA, sai
+    // MA; escolheu CASA DE SAUDE, sai CASA DE SAUDE.
+    //
+    // Existia aqui uma regra que reescrevia essa escolha em silêncio, pelo
+    // texto da descrição: "consulta" forçava a CASA DE SAUDE e palavra de
+    // exame forçava a MA. Era a causa do relato da recepção "escolhi CASA DE
+    // SAUDE e a nota saiu como MA". O dono determinou que a escolha da
+    // funcionária passasse a mandar sempre.
+    //
+    // A relação entre tipo de serviço e empresa continua valendo como
+    // ORIENTAÇÃO: quando a descrição sugere a outra empresa, a tela avisa
+    // antes de emitir, avisa de novo depois, e a divergência fica registrada
+    // na nota. Só não decide mais nada sozinha.
+    const sugestaoFiscal = conferirEscolhaDeEmitente(data.descricaoServicos, emitente.cnpj);
+    const emitenteDivergente = sugestaoFiscal
+      ? {
+          usado: emitente.nome,
+          sugerido: sugestaoFiscal.nome,
+          motivo: `a descrição caracteriza ${sugestaoFiscal.tipo}`,
+        }
+      : null;
 
     const token =
       emitente.focus_ambiente === "producao"
@@ -390,10 +375,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
         status: "processando",
         payload_envio: payload,
         emitida_por: userId,
-        // Trilha de auditoria do roteamento fiscal: fica gravado na própria
-        // nota quando a empresa emissora não foi a escolhida no formulário.
-        observacoes: emitenteAjustado
-          ? `Emitente ajustado automaticamente: escolhido "${emitenteAjustado.de}", emitido por "${emitenteAjustado.para}" (${emitenteAjustado.motivo}).`
+        // Trilha de auditoria: a empresa emitida é sempre a escolhida, mas
+        // quando ela contraria o tipo de serviço isso fica registrado na nota,
+        // para dar para levantar depois as emitidas contra a orientação.
+        observacoes: emitenteDivergente
+          ? `Emitida por "${emitenteDivergente.usado}" conforme escolha do formulário; a orientação para este serviço seria "${emitenteDivergente.sugerido}" (${emitenteDivergente.motivo}).`
           : null,
       })
       .select()
@@ -482,7 +468,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
         error: body?.mensagem ?? `HTTP ${resp.status}`,
         body,
         tentativas: attempts,
-        emitenteAjustado,
+        emitenteDivergente,
       };
     }
 
@@ -521,7 +507,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       ref: currentRef,
       focus: body,
       tentativas: attempts,
-      emitenteAjustado,
+      emitenteDivergente,
     };
   });
 

@@ -1,18 +1,20 @@
 /**
- * Regra de roteamento fiscal da NFS-e por tipo de serviço.
+ * Orientação de qual empresa costuma emitir cada tipo de serviço.
  *
- * A clínica emite por dois CNPJs e o enquadramento não é escolha da recepção:
- * consulta sai pela CASA DE SAUDE E MATERNIDADE e exame de imagem/gráfico sai
- * pela MA IMAGENS. Até então essa regra vivia escondida dentro de
- * `emitirNfse` e reescrevia o emitente DEPOIS que a funcionária já tinha
- * escolhido a empresa no modal — ela selecionava "CASA DE SAUDE", digitava
- * "ECOCARDIOGRAMA" e a nota saía em "MA" sem nenhum aviso. O relato de
- * "empresa trocada" é exatamente esse desvio silencioso.
+ * A clínica emite por dois CNPJs: consulta costuma sair pela CASA DE SAUDE E
+ * MATERNIDADE e exame de imagem/gráfico pela MA IMAGENS.
  *
- * A regra continua valendo (é o enquadramento correto), mas agora mora aqui,
- * num módulo que o servidor E a tela importam. Assim a tela consegue avisar
- * ANTES de enviar em qual empresa a nota vai realmente sair, e o servidor
- * consegue registrar na nota que houve desvio.
+ * Isto é ORIENTAÇÃO, não decisão. A empresa que assina a nota é sempre a
+ * escolhida no formulário: escolheu MA, sai MA; escolheu CASA DE SAUDE, sai
+ * CASA DE SAUDE. Este módulo só serve para a tela avisar antes de emitir e
+ * para o servidor registrar a divergência na nota.
+ *
+ * Antes era o contrário: esta relação vivia escondida dentro de `emitirNfse` e
+ * reescrevia o emitente DEPOIS que a funcionária já tinha escolhido a empresa
+ * no modal — ela selecionava "CASA DE SAUDE", digitava "ECOCARDIOGRAMA" e a
+ * nota saía em "MA" sem nenhum aviso. Era a causa do relato "empresa trocada".
+ * O dono determinou que a escolha da funcionária passasse a mandar sempre, com
+ * o aviso no lugar da troca automática. Não voltar a decidir por aqui.
  */
 
 /** Só dígitos — CNPJ é gravado ora com máscara, ora sem. */
@@ -22,7 +24,7 @@ export type TipoServicoNfse = "consulta" | "exame";
 
 export interface DestinoFiscal {
   tipo: TipoServicoNfse;
-  /** CNPJ do emitente obrigatório para esse tipo, apenas dígitos. */
+  /** CNPJ da empresa que costuma emitir esse tipo, apenas dígitos. */
   cnpj: string;
   /** Nome usado nas mensagens ao usuário. */
   nome: string;
@@ -47,14 +49,13 @@ const RE_EXAME =
 const RE_CONSULTA = /consulta/i;
 
 /**
- * Diz em qual empresa a descrição obriga a nota a sair, ou `null` quando o
- * texto não caracteriza nem consulta nem exame — aí vale a escolha do
- * formulário.
+ * Diz qual empresa a descrição sugere, ou `null` quando o texto não
+ * caracteriza nem consulta nem exame — aí não há o que comentar.
  *
- * Exame tem precedência sobre consulta: uma descrição que cite os dois
- * (nota agrupada, por exemplo) vai inteira para a MA. Isso é intencional,
- * mas é o ponto a revisar caso a clínica passe a agrupar consulta e exame
- * na mesma nota.
+ * Exame tem precedência sobre consulta: uma descrição que cite os dois (nota
+ * agrupada, por exemplo) é tratada como exame. Como isto hoje só alimenta um
+ * aviso, o efeito de errar é uma sugestão inadequada, não uma nota no CNPJ
+ * errado.
  */
 export function destinoFiscalPorDescricao(
   descricao: string | null | undefined,
@@ -66,9 +67,12 @@ export function destinoFiscalPorDescricao(
 }
 
 /**
- * Compara o destino obrigatório com o emitente escolhido no formulário.
- * Retorna `null` quando não há desvio (a escolha já está correta ou a
- * descrição não aciona a regra).
+ * Compara a orientação com o emitente escolhido no formulário. Retorna `null`
+ * quando não há nada a avisar — a escolha já bate com a orientação, ou a
+ * descrição não sugere empresa nenhuma.
+ *
+ * Quem chama usa isto SÓ para avisar e registrar. A empresa da nota continua
+ * sendo a escolhida no formulário.
  */
 export function conferirEscolhaDeEmitente(
   descricao: string | null | undefined,

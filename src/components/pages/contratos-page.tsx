@@ -221,7 +221,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { avisarEmitenteAjustado } from "@/lib/nfse-aviso-emitente";
+import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
@@ -4447,7 +4447,7 @@ function DetalheContrato({
           tomador,
         },
       });
-      avisarEmitenteAjustado(res);
+      avisarEmitenteDivergente(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       if (nfseId) {
@@ -4591,7 +4591,7 @@ function DetalheContrato({
           tomador,
         },
       });
-      avisarEmitenteAjustado(res);
+      avisarEmitenteDivergente(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e agrupada enviada. Consultando status...");
       if (nfseId) {
