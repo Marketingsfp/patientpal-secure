@@ -1684,3 +1684,181 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
 
     return { totais, agentes, departamentos };
   });
+
+/* =========================================================
+ *  ATENDIMENTO HÍBRIDO — fila, claim, devolução e presença
+ * ======================================================= */
+
+/** Fila de conversas aguardando um atendente humano (handoff da Nina). */
+export const listarFilaHumana = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        departamentoId: z.string().uuid().nullable().optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    let q = supabaseAdmin
+      .from("atend_conversas")
+      .select(
+        "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count",
+      )
+      .eq("clinica_id", data.clinicaId)
+      .eq("status", "waiting")
+      .is("atribuida_user_id", null)
+      .order("prioridade", { ascending: false })
+      .order("aguardando_desde", { ascending: true })
+      .limit(data.limit);
+    if (data.departamentoId) q = q.eq("departamento_id", data.departamentoId);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r, i) => ({ ...r, posicao: i + 1 }));
+  });
+
+/**
+ * Assumir conversa da fila. Usa RPC atômica: se dois atendentes clicarem ao
+ * mesmo tempo, apenas um recebe `ok: true`.
+ */
+export const assumirConversa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    const { data: ok, error } = await supabaseAdmin.rpc("atend_claim_conversa", {
+      _conversa_id: data.conversaId,
+      _clinica_id: data.clinicaId,
+      _user_id: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    if (!ok) return { ok: false, motivo: "JA_ASSUMIDA" as const };
+    const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
+    await registrarEvento({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "ASSUMIDA",
+      userId: context.userId,
+    });
+    return { ok: true, motivo: null };
+  });
+
+/** Devolve a conversa para a Nina (reativa a IA). */
+export const devolverParaNina = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        motivo: z.string().trim().max(500).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    const { devolverParaIA } = await import("@/lib/atendimento/handoff.server");
+    await devolverParaIA({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      userId: context.userId,
+      motivo: data.motivo ?? null,
+    });
+    return { ok: true };
+  });
+
+/** Encaminha manualmente uma conversa da Nina para a fila humana. */
+export const encaminharParaFilaHumana = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        motivo: z.string().trim().min(1).max(500),
+        departamentoNome: z.string().trim().max(120).nullable().optional(),
+        urgencia: z.enum(["baixa", "normal", "alta"]).default("normal"),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    const { encaminharParaHumano } = await import("@/lib/atendimento/handoff.server");
+    return encaminharParaHumano({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      motivo: data.motivo,
+      urgencia: data.urgencia,
+      departamentoNome: data.departamentoNome ?? null,
+      solicitadoPor: "SISTEMA",
+    });
+  });
+
+/** Linha do tempo do fluxo (handoff, fila, assumida, transferida, finalizada). */
+export const listarEventosConversa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("atend_conversa_eventos")
+      .select("id, evento, user_id, motivo, detalhes, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .eq("conversa_id", data.conversaId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+/** Presença do atendente (Disponível / Ocupado / Ausente / Offline). */
+export const definirPresenca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        status: z.enum(["ONLINE", "BUSY", "AWAY", "OFFLINE"]),
+        aceitaNovas: z.boolean().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    const { error } = await supabaseAdmin.from("atend_agente_presenca").upsert(
+      {
+        clinica_id: data.clinicaId,
+        user_id: context.userId,
+        status: data.status,
+        aceita_novas: data.aceitaNovas ?? data.status === "ONLINE",
+        visto_em: new Date().toISOString(),
+      },
+      { onConflict: "clinica_id,user_id" },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listarPresenca = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.userId, data.clinicaId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("atend_agente_presenca")
+      .select("user_id, status, aceita_novas, visto_em")
+      .eq("clinica_id", data.clinicaId);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
