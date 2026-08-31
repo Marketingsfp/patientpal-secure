@@ -314,6 +314,50 @@ export async function consultarDisponibilidadeCore(params: {
 /** Sentinela para `in()` vazio — nunca casa com nada. */
 const SEM_RESULTADO = "00000000-0000-0000-0000-000000000000";
 
+/* ------------------------------------------------- escala × disponibilidade */
+
+/** AAAA-MM-DD -> dia da semana (0=Dom) no fuso da clínica. */
+function diaSemanaDe(dataISO: string): number {
+  return new Date(`${dataISO}T12:00:00-03:00`).getDay();
+}
+
+/**
+ * Escala teórica do médico (`medico_disponibilidades`). Serve APENAS para
+ * diferenciar "não atende nesse dia" de "atende, mas agenda cheia". Nunca é
+ * usada para oferecer horário — vaga só sai de `consultarDisponibilidadeCore`.
+ */
+async function escalaDoMedico(clinicaId: string, medicoId: string) {
+  const { data } = await supabaseAdmin
+    .from("medico_disponibilidades")
+    .select("dia_semana, hora_inicio, hora_fim")
+    .eq("clinica_id", clinicaId)
+    .eq("medico_id", medicoId)
+    .eq("ativo", true);
+  return (data ?? []) as Array<{ dia_semana: number; hora_inicio: string; hora_fim: string }>;
+}
+
+async function medicoAtendeNoDia(clinicaId: string, medicoId: string, dataISO: string) {
+  const escala = await escalaDoMedico(clinicaId, medicoId);
+  const dow = diaSemanaDe(dataISO);
+  return { atende: escala.some((e) => e.dia_semana === dow), escala };
+}
+
+async function nomeMedico(medicoId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("medicos")
+    .select("nome")
+    .eq("id", medicoId)
+    .maybeSingle();
+  return (data as { nome?: string } | null)?.nome ?? null;
+}
+
+/** "AAAA-MM-DD" do slot, no fuso da clínica (para comparar com a data pedida). */
+function dataISODoSlot(iso: string) {
+  const [dd, mm, yyyy] = formatarData(iso).split("/");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
 /* ------------------------------------------------------------ definições AI */
 
 export const FERRAMENTAS_NINA_PACIENTE = [
