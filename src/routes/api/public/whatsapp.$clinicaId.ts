@@ -3,7 +3,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 import {
   loadWhatsAppConfig,
   metaSendText,
-  dentroHorarioAtendimento,
   gerarRespostaNina,
 } from "@/lib/whatsapp.server";
 

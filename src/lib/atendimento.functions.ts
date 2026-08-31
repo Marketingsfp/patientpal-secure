@@ -111,9 +111,16 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       atribuida_user_id: string | null;
       status: "active" | "waiting";
       departamento_id?: string | null;
+      owner_type: "HUMAN" | "NONE";
+      ai_enabled: boolean;
+      assigned_at?: string | null;
     } = {
       atribuida_user_id: data.userId,
       status: data.userId ? "active" : "waiting",
+      // Enquanto houver pessoa (ou fila aguardando pessoa), a Nina fica muda.
+      owner_type: data.userId ? "HUMAN" : "NONE",
+      ai_enabled: false,
+      assigned_at: data.userId ? new Date().toISOString() : null,
     };
     if (data.departamentoId !== undefined) patch.departamento_id = data.departamentoId;
     const { error } = await supabaseAdmin
@@ -163,6 +170,9 @@ export const transferirConversa = createServerFn({ method: "POST" })
         atribuida_user_id: data.paraUserId ?? null,
         departamento_id: data.paraDepartamentoId ?? conv.departamento_id,
         status: data.paraUserId ? "active" : "waiting",
+        owner_type: data.paraUserId ? "HUMAN" : "NONE",
+        ai_enabled: false,
+        assigned_at: data.paraUserId ? new Date().toISOString() : null,
       })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
@@ -189,6 +199,10 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .update({
         status: "closed",
+        owner_type: "AI",
+        ai_enabled: true,
+        atribuida_user_id: null,
+        resolved_at: new Date().toISOString(),
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
       })
