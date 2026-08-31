@@ -75,6 +75,60 @@ paths:
       responses:
         "204": { description: Sem conteúdo }
 
+  /specialties:
+    get:
+      tags: [Catálogo]
+      summary: Especialidades atendidas na clínica da chave
+      description: "Escopo exigido: `availability:read`. Devolve apenas id e nome."
+      responses:
+        "200":
+          description: Lista de especialidades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        nome: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /doctors:
+    get:
+      tags: [Catálogo]
+      summary: Médicos ativos da clínica da chave
+      description: "Escopo exigido: `availability:read`. Devolve apenas id, nome e especialidade."
+      parameters:
+        - { name: especialidade_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Lista de médicos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        nome: { type: string }
+                        especialidade_id: { type: [string, "null"], format: uuid }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
   /appointments:
     get:
       tags: [Agendamentos]
