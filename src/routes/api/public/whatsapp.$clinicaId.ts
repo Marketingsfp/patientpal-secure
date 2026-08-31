@@ -233,17 +233,26 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     .update({ status: "aberta", ultima_msg_em: new Date().toISOString() })
                     .eq("clinica_id", params.clinicaId)
                     .eq("contato_telefone", from)
-                    .neq("status", "aberta");
+                    .in("status", ["closed", "finished"]);
                 }
 
-                // Modo híbrido: Nina responde fora do horário humano.
+                // Atendimento híbrido: a Nina é o 1º nível e responde sempre,
+                // MENOS quando a conversa já está com uma pessoa (ou na fila
+                // aguardando alguém assumir). O dono da conversa manda.
+                const { estadoConversaPorTelefone, ninaPodeResponder } = await import(
+                  "@/lib/atendimento/handoff.server"
+                );
+                const convEstado = from
+                  ? await estadoConversaPorTelefone(params.clinicaId, from)
+                  : null;
+                const iaLiberada = ninaPodeResponder(convEstado);
+
                 // Se a clínica desligou a Nina (flag `nina_desativada`), não responde nada.
                 const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
                 const ninaOff = await ninaDesativadaNaClinica(params.clinicaId);
-                const foraDoHorario = !dentroHorarioAtendimento(cfg);
                 const deveResponder =
                   !ninaOff &&
-                  foraDoHorario &&
+                  iaLiberada &&
                   (Boolean(textoPaciente) ||
                     audioFalhou ||
                     ["image", "document", "sticker"].includes(tipo));
@@ -265,7 +274,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     } else {
                       reply = respostaMidiaNaoSuportada(tipo);
                     }
+
+                    // Revalida o dono ANTES de enviar: um atendente pode ter
+                    // assumido enquanto o modelo pensava. Nesse caso, a resposta
+                    // é descartada para o paciente não receber IA e humano juntos.
+                    if (reply && from) {
+                      const agora = await estadoConversaPorTelefone(params.clinicaId, from);
+                      if (!ninaPodeResponder(agora)) reply = "";
+                    }
                     if (reply) {
+
                       // Paciente mandou áudio → Nina responde falando (se a
                       // clínica não desligou). Qualquer falha cai para texto.
                       let audioEnviado = false;
