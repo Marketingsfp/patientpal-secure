@@ -604,17 +604,30 @@ export const cancelarNfse = createServerFn({ method: "POST" })
       body: JSON.stringify({ justificativa: data.justificativa }),
     });
     const body = await resp.json().catch(() => ({}));
-    if (!resp.ok) return { ok: false, error: body?.mensagem ?? `HTTP ${resp.status}` };
 
-    await supabase
-      .from("nfse")
-      .update({
-        status: "cancelada",
-        cancelada_em: new Date().toISOString(),
-        cancelada_motivo: data.justificativa,
-        payload_resposta: body,
-      })
-      .eq("id", data.id);
+    // A Focus devolve a recusa da Prefeitura DENTRO de um HTTP 200, com
+    // status "erro_cancelamento" e a lista `erros`. Sem olhar o status a nota
+    // ficaria marcada como cancelada aqui e continuaria valendo na Prefeitura.
+    const primeiroErro = body?.erros?.[0];
+    const motivo =
+      [primeiroErro?.mensagem ?? body?.mensagem, primeiroErro?.correcao]
+        .filter(Boolean)
+        .join(" — ") || null;
+    if (!resp.ok) return { ok: false, error: motivo ?? `HTTP ${resp.status}` };
+    if (body?.status && body?.status !== "cancelado") {
+      return { ok: false, error: motivo ?? `A Prefeitura respondeu "${body?.status}".` };
+    }
+
+    const cancelamento = {
+      status: "cancelada",
+      cancelada_em: new Date().toISOString(),
+      cancelada_motivo: data.justificativa,
+      payload_resposta: body,
+    };
+    // Daqui em diante o cancelamento já foi aceito e não tem volta, então o
+    // registro local precisa refletir isso mesmo que a RLS barre este usuário.
+    const { error: upErr } = await supabase.from("nfse").update(cancelamento).eq("id", data.id);
+    if (upErr) await supabaseAdmin.from("nfse").update(cancelamento).eq("id", data.id);
     return { ok: true };
   });
 

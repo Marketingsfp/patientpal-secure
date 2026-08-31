@@ -962,8 +962,17 @@ function NfsePage() {
                   placeholder="Ex.: Nota emitida em duplicidade para o mesmo atendimento."
                   maxLength={255}
                 />
-                <div className="text-xs text-muted-foreground text-right">
-                  {cancelarJustificativa.length}/255
+                <div className="flex items-start justify-between gap-2 text-xs">
+                  <span className="text-red-600">
+                    {cancelarJustificativa.trim().length < 15
+                      ? `Escreva o motivo com pelo menos 15 letras para liberar o botão (faltam ${
+                          15 - cancelarJustificativa.trim().length
+                        }).`
+                      : ""}
+                  </span>
+                  <span className="text-muted-foreground shrink-0">
+                    {cancelarJustificativa.length}/255
+                  </span>
                 </div>
               </div>
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
