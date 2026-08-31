@@ -870,9 +870,13 @@ ${procs || "(nenhum)"}`;
   let executar:
     | typeof import("@/lib/nina/paciente-tools.server").executarFerramentaPaciente
     | null = null;
-  if (podeAgendar) {
+  {
+    // Consulta de agenda vale para TODAS as clínicas (não cria nada, não
+    // expõe paciente). Só as ferramentas que gravam dependem da flag.
     const mod = await import("@/lib/nina/paciente-tools.server");
-    ferramentas = [...mod.FERRAMENTAS_NINA_PACIENTE];
+    ferramentas = podeAgendar
+      ? [...mod.FERRAMENTAS_NINA_PACIENTE]
+      : [...mod.FERRAMENTAS_NINA_CONSULTA];
     executar = mod.executarFerramentaPaciente;
     ctxFerramentas = {
       clinicaId,
