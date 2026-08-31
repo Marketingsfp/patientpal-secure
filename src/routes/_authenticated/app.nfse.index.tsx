@@ -120,6 +120,13 @@ function NfsePage() {
   const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
   const ehSaoFrancisco =
     nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
+  // Quem emitiu cada nota é informação de gestão, não de operação: só Admin,
+  // Gestor e Supervisor enxergam. Para os demais a coluna some da tela, sai da
+  // planilha e deixa de ser pesquisável — senão daria para descobrir o emissor
+  // filtrando pelo nome mesmo sem a coluna à vista.
+  const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes(
+    (clinicaAtual?.role ?? "").toLowerCase(),
+  );
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
@@ -188,9 +195,9 @@ function NfsePage() {
     // Nome de quem emitiu: `nfse` guarda só o UUID em `emitida_por`, e não há
     // FK declarada para `profiles`, então o embed do PostgREST não funciona —
     // resolvemos em uma segunda consulta, como o Caixa e o Movimento fazem.
-    const idsUsuarios = Array.from(
-      new Set(brutas.map((r) => r.emitida_por).filter((v): v is string => !!v)),
-    );
+    const idsUsuarios = podeVerQuemEmitiu
+      ? Array.from(new Set(brutas.map((r) => r.emitida_por).filter((v): v is string => !!v)))
+      : [];
     const nomes = new Map<string, string>();
     if (idsUsuarios.length > 0) {
       const { data: perfis } = await supabase
@@ -218,7 +225,7 @@ function NfsePage() {
   };
   useEffect(() => {
     void load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id, emitentes, periodo.inicio, periodo.fim]);
+  }, [clinicaAtual?.clinica_id, emitentes, periodo.inicio, periodo.fim, podeVerQuemEmitiu]);
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
@@ -410,7 +417,10 @@ function NfsePage() {
         { rotulo: "CPF/CNPJ do tomador", tipo: "texto", largura: 20 },
         { rotulo: "Valor", tipo: "moeda", largura: 14 },
         { rotulo: "Status", tipo: "texto", largura: 14 },
-        { rotulo: "Emitido por", tipo: "texto", largura: 30 },
+        // "Emitido por" só entra na planilha para quem enxerga a coluna na tela.
+        ...(podeVerQuemEmitiu
+          ? [{ rotulo: "Emitido por", tipo: "texto", largura: 30 } as ColunaXlsx]
+          : []),
       ];
       const linhas = filtrados.map((r) => [
         r.numero ?? "",
@@ -421,7 +431,9 @@ function NfsePage() {
         documentoBr(r.tomador_documento),
         Number(r.valor_servicos) || 0,
         r.status,
-        r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—"),
+        ...(podeVerQuemEmitiu
+          ? [r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—")]
+          : []),
       ]);
       const total = filtrados.reduce((s, r) => s + (Number(r.valor_servicos) || 0), 0);
       const nomeEmitenteFiltro =
@@ -442,7 +454,17 @@ function NfsePage() {
         ],
         colunas,
         linhas,
-        totais: ["", "", "", "", "", `${filtrados.length} nota(s)`, total, "", ""],
+        totais: [
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${filtrados.length} nota(s)`,
+          total,
+          "",
+          ...(podeVerQuemEmitiu ? [""] : []),
+        ],
         resumo: {
           titulo: "Total por emitente",
           itens: totais.map((t) => ({
@@ -597,20 +619,26 @@ function NfsePage() {
               <TableHead>Tomador</TableHead>
               <TableHead className="w-32 text-right">Valor</TableHead>
               <TableHead className="w-28">Status</TableHead>
-              <TableHead className="w-40">Emitido por</TableHead>
+              {podeVerQuemEmitiu && <TableHead className="w-40">Emitido por</TableHead>}
               <TableHead className="w-40 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={podeVerQuemEmitiu ? 8 : 7}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={podeVerQuemEmitiu ? 8 : 7}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   Nenhuma nota.
                 </TableCell>
               </TableRow>
@@ -651,16 +679,21 @@ function NfsePage() {
                       {r.status}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    {r.emitida_por_nome ? (
-                      <span className="text-xs flex items-center gap-1" title={r.emitida_por_nome}>
-                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="truncate">{r.emitida_por_nome}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </TableCell>
+                  {podeVerQuemEmitiu && (
+                    <TableCell>
+                      {r.emitida_por_nome ? (
+                        <span
+                          className="text-xs flex items-center gap-1"
+                          title={r.emitida_por_nome}
+                        >
+                          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="truncate">{r.emitida_por_nome}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       {r.url_pdf && (

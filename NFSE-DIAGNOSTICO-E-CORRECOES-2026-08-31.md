@@ -94,6 +94,23 @@ O dado estava lá o tempo todo; a tela é que nunca o buscava nem o mostrava.
 
 **Nenhuma migration é necessária.** A coluna já existe e já está preenchida.
 
+### Restrição por perfil
+
+Quem emitiu cada nota é informação de gestão, não de operação. A pedido do dono,
+só **Admin, Gestor e Supervisor** enxergam. Para os demais perfis (recepção,
+caixa, financeiro, médico, enfermeiro):
+
+- a coluna **não aparece** na tabela;
+- o nome **não entra** na planilha exportada;
+- o nome **nem chega a ser carregado** do banco, então também não dá para
+  descobrir o emissor digitando o nome dele na busca — fechar a coluna sem
+  fechar a busca deixaria a informação acessível por tentativa.
+
+A checagem usa `clinicaAtual.role`, o mesmo padrão de Agenda, Caixa e Contratos.
+O perfil `supervisor` existe de fato no banco (um usuário), embora não faça
+parte da lista de presets em `src/lib/permissoes-presets.ts` — deve ter sido
+criado pela tela de Perfis.
+
 ---
 
 ## 3. Empresa emitente trocada (CASA DE SAUDE ↔ MA) — **confirmado**
