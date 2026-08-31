@@ -10875,6 +10875,7 @@ export type Database = {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
       }
+      seed_clinica_padrao: { Args: { _clinica_id: string }; Returns: undefined }
       seed_prontuario_modelos_padrao: {
         Args: { _clinica_id: string }
         Returns: undefined
