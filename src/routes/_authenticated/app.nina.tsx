@@ -44,6 +44,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { chatNina } from "@/lib/nina.functions";
+import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
+import NinaAprendizado from "@/components/nina/NinaAprendizado";
 import {
   obterWhatsappConfig,
   salvarWhatsappConfig,
