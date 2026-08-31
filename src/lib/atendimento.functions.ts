@@ -1129,6 +1129,8 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.userId, data.clinicaId);
+    // Pega as mensagens MAIS RECENTES (descendente) e reordena para exibição.
+    // Antes o limite cortava pelo começo e a conversa ficava parada no passado.
     const { data: rows, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
       .select(
@@ -1136,10 +1138,10 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId)
-      .order("recebida_em", { ascending: true })
+      .order("recebida_em", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    return (rows ?? []).slice().reverse();
   });
 
 export const enviarMensagemConversa = createServerFn({ method: "POST" })
