@@ -732,9 +732,30 @@ export async function executarFerramentaPaciente(
           periodo: p.periodo ?? null,
           data: p.data ?? null,
         });
-        await auditar(ctx, "consultar_disponibilidade", p, { ok: true });
-        if (slots.length === 0)
+        await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
+          ok: true,
+        });
+        if (slots.length === 0) {
+          // Diferencia "não atende nesse dia" de "atende, mas está cheio".
+          if (p.medico_id && p.data) {
+            const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
+            const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
+            const proximos = await consultarDisponibilidadeCore({
+              clinicaId: ctx.clinicaId,
+              medicoId: p.medico_id,
+              dias: 30,
+            });
+            const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora }));
+            return falha(
+              "NO_AVAILABILITY",
+              atende
+                ? `${nome} atende nesse dia, mas a agenda está sem horários disponíveis.`
+                : `${nome} não possui atendimento cadastrado nesse dia.`,
+              { motivo: atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA", proximos: sugestoes },
+            );
+          }
           return falha("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
+        }
         return {
           ok: true,
           horarios: slots.slice(0, 12).map((s) => ({
