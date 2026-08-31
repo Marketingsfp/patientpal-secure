@@ -521,6 +521,11 @@ function NinaPage() {
         <TabsContent value="atend-roteamento">
           <AtendRoteamento />
         </TabsContent>
+
+        {/* ============ APRENDIZADO ============ */}
+        <TabsContent value="aprendizado">
+          <NinaAprendizado />
+        </TabsContent>
       </Tabs>
     </div>
   );
