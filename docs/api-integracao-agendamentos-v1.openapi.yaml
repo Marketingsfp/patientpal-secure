@@ -321,15 +321,33 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: [string, "null"], format: date-time }
 
+    PacienteEntrada:
+      type: object
+      required: [cpf, nome, data_nascimento, telefone]
+      description: |
+        Alternativa a `paciente_id` (v1.1). Exige o escopo `patients:write` e
+        o cabeçalho `Idempotency-Key`. A API nunca responde se o CPF já existia.
+      properties:
+        cpf: { type: string, description: "Com ou sem pontuação; dígitos verificadores são validados." }
+        nome: { type: string, minLength: 2, maxLength: 200 }
+        data_nascimento: { type: string, format: date }
+        telefone: { type: string, minLength: 8, maxLength: 30 }
+        email: { type: [string, "null"], format: email }
+        sexo:
+          type: [string, "null"]
+          enum: [masculino, feminino, outro, nao_informar, null]
+
     CriarAgendamento:
       type: object
-      required: [id_externo, paciente_id, inicio, fim]
+      required: [id_externo, inicio, fim]
+      description: Informe `paciente_id` (v1) OU `paciente` (v1.1) — nunca os dois.
       properties:
         id_externo: { type: string, minLength: 1, maxLength: 120 }
         paciente_id:
           type: string
           format: uuid
-          description: O paciente já precisa existir na clínica — a v1 não cadastra paciente.
+          description: Paciente já existente na clínica da chave.
+        paciente: { $ref: "#/components/schemas/PacienteEntrada" }
         medico_id: { type: [string, "null"], format: uuid }
         especialidade_id: { type: [string, "null"], format: uuid }
         inicio: { type: string, format: date-time }
