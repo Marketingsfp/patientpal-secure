@@ -672,6 +672,9 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
 
     status = resultado.status;
     idExterno = resultado.idExterno ?? null;
+    // A criação de paciente fica registrada só aqui, no log interno — a
+    // resposta HTTP jamais revela se o CPF já existia na base.
+    if (resultado.pacienteCriado) erroResumo = "paciente_criado_via_api";
     if (!replay) {
       await concluirIdempotencia(db, ctx.api_key_id, idempotencyKey, status, resultado.body);
     }
