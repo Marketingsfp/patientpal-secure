@@ -360,7 +360,11 @@ function dataISODoSlot(iso: string) {
 
 /* ------------------------------------------------------------ definições AI */
 
-export const FERRAMENTAS_NINA_PACIENTE = [
+/**
+ * Ferramentas de CONSULTA (catálogo + agenda real). Disponíveis em todas as
+ * clínicas — consultar disponibilidade não cria nada e não expõe paciente.
+ */
+export const FERRAMENTAS_NINA_CONSULTA = [
   {
     type: "function",
     function: {
