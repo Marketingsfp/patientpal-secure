@@ -44,6 +44,7 @@ import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
+import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
 import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
@@ -338,6 +339,11 @@ const ApiPublicTtsVoicesRoute = ApiPublicTtsVoicesRouteImport.update({
 const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
   id: '/api/public/tts',
   path: '/api/public/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicIntakeSfpRoute = ApiPublicIntakeSfpRouteImport.update({
+  id: '/api/public/intake-sfp',
+  path: '/api/public/intake-sfp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicIntakeRoute = ApiPublicIntakeRouteImport.update({
@@ -1129,6 +1135,7 @@ export interface FileRoutesByFullPath {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1280,6 +1287,7 @@ export interface FileRoutesByTo {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1437,6 +1445,7 @@ export interface FileRoutesById {
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1594,6 +1603,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -1745,6 +1755,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -1901,6 +1912,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -1991,6 +2003,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicIntakeRoute: typeof ApiPublicIntakeRoute
+  ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
@@ -2248,6 +2261,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tts'
       fullPath: '/api/public/tts'
       preLoaderRoute: typeof ApiPublicTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/intake-sfp': {
+      id: '/api/public/intake-sfp'
+      path: '/api/public/intake-sfp'
+      fullPath: '/api/public/intake-sfp'
+      preLoaderRoute: typeof ApiPublicIntakeSfpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/intake': {
@@ -3465,6 +3485,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicIntakeRoute: ApiPublicIntakeRoute,
+  ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,
