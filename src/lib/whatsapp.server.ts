@@ -426,11 +426,15 @@ async function carregarEstadoIdentidade(
     tentativas: 0,
   };
   if (!telefone) return vazio;
+  // Telefone sempre em dígitos: a Meta manda ora "55…", ora "+55…" — sem
+  // normalizar, o mesmo contato virava duas conversas.
+  const digits = String(telefone).replace(/\D/g, "");
+  if (!digits) return vazio;
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select("id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas")
     .eq("clinica_id", clinicaId)
-    .eq("contato_telefone", telefone)
+    .in("contato_telefone", [digits, `+${digits}`])
     .order("ultima_msg_em", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
@@ -447,7 +451,7 @@ async function carregarEstadoIdentidade(
     .insert({
       clinica_id: clinicaId,
       canal: "whatsapp",
-      contato_telefone: telefone,
+      contato_telefone: digits,
       status: "aberta",
       ultima_msg_em: new Date().toISOString(),
     })
