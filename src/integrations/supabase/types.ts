@@ -146,6 +146,7 @@ export type Database = {
           sinalizado_em: string | null
           sinalizado_por: string | null
           sinalizado_por_nome: string | null
+          solicitacao_pendente: boolean
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
           tipo_atendimento: string
@@ -198,6 +199,7 @@ export type Database = {
           sinalizado_em?: string | null
           sinalizado_por?: string | null
           sinalizado_por_nome?: string | null
+          solicitacao_pendente?: boolean
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
@@ -250,6 +252,7 @@ export type Database = {
           sinalizado_em?: string | null
           sinalizado_por?: string | null
           sinalizado_por_nome?: string | null
+          solicitacao_pendente?: boolean
           status?: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta?: boolean
           tipo_atendimento?: string
@@ -5315,6 +5318,36 @@ export type Database = {
           },
         ]
       }
+      intake_rate_limit: {
+        Row: {
+          chave: string
+          contador: number
+          created_at: string
+          id: string
+          janela: string
+          janela_inicio: string
+          updated_at: string
+        }
+        Insert: {
+          chave: string
+          contador?: number
+          created_at?: string
+          id?: string
+          janela: string
+          janela_inicio?: string
+          updated_at?: string
+        }
+        Update: {
+          chave?: string
+          contador?: number
+          created_at?: string
+          id?: string
+          janela?: string
+          janela_inicio?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       integracao_api_keys: {
         Row: {
           ativo: boolean
@@ -7989,6 +8022,7 @@ export type Database = {
           nome: string
           numero: string | null
           numero_pasta: string | null
+          origem: string | null
           prontuarios_anteriores: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
@@ -8027,6 +8061,7 @@ export type Database = {
           nome: string
           numero?: string | null
           numero_pasta?: string | null
+          origem?: string | null
           prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
@@ -8065,6 +8100,7 @@ export type Database = {
           nome?: string
           numero?: string | null
           numero_pasta?: string | null
+          origem?: string | null
           prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
@@ -9993,6 +10029,7 @@ export type Database = {
           nome: string
           numero: string | null
           numero_pasta: string | null
+          origem: string | null
           prontuarios_anteriores: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
@@ -10190,6 +10227,21 @@ export type Database = {
           _valor_mensal: number
         }
         Returns: Json
+      }
+      criar_solicitacao_site: {
+        Args: {
+          _clinica_id: string
+          _especialidade_id: string
+          _fim: string
+          _id_externo: string
+          _inicio: string
+          _medico_id: string
+          _observacoes: string
+          _paciente_id: string
+          _paciente_nome: string
+          _procedimento: string
+        }
+        Returns: string
       }
       cubo_bi_financeiro_agregado: {
         Args: {
@@ -10529,6 +10581,15 @@ export type Database = {
         }
         Returns: string
       }
+      intake_consumir_rate_limit: {
+        Args: {
+          _chave: string
+          _janela: string
+          _limite: number
+          _segundos: number
+        }
+        Returns: boolean
+      }
       integracao_criar_api_key: {
         Args: {
           _clinica_id: string
@@ -10853,6 +10914,7 @@ export type Database = {
           nome: string
           numero: string | null
           numero_pasta: string | null
+          origem: string | null
           prontuarios_anteriores: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
