@@ -438,9 +438,19 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
 
+    // Marcador interno: o histórico continua visível no console, com o aviso
+    // de que a sessão encerrou e a memória da Nina foi zerada.
+    const { registrarMarcadorSistema } = await import("@/lib/atendimento/handoff.server");
+    await registrarMarcadorSistema({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      texto: `✅ Conversa de teste encerrada (sessão ${lead.sessao_seq}). A memória da Nina foi resetada — a próxima mensagem começa do zero.`,
+    }).catch(() => {});
+
     // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
+
     await supabaseAdmin
       .from("nina_teste_leads")
       .update({
