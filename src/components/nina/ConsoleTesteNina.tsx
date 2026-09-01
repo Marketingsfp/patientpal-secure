@@ -150,18 +150,20 @@ export function ConsoleTesteNina() {
     setProcessando(true);
     try {
       await resolver({ data: { clinicaId, leadId, conversaId } });
-      setMsgs([]);
       setConversaId(null);
       setErro(null);
       setAudio(null);
+      // O histórico permanece na tela: só entra o marcador de encerramento.
+      await carregarHistorico(leadId);
       await carregarLeads();
-      toast.success("Conversa resolvida. A próxima mensagem começa sem memória.");
+      toast.success("Conversa encerrada. A memória da Nina foi resetada.");
     } catch (e: any) {
       mostrarErro(e);
     } finally {
       setProcessando(false);
     }
   };
+
 
   return (
     <Card>
