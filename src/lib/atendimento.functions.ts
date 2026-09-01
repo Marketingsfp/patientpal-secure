@@ -154,7 +154,9 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (e1) throw new Error(e1.message);
-    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
+    // A conversa pode ter sido encerrada/removida enquanto estava selecionada
+    // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
+    if (!conv) return null;
     await supabaseAdmin.from("atend_transferencias").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
@@ -1166,7 +1168,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
-    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
+    // A conversa pode ter sido encerrada/removida enquanto estava selecionada
+    // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
+    if (!conv) return null;
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
 
     const to = conv.contato_telefone.startsWith("+")
@@ -1229,7 +1233,9 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    if (!conv) throw new Error("Conversa não encontrada nesta clínica");
+    // A conversa pode ter sido encerrada/removida enquanto estava selecionada
+    // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
+    if (!conv) return null;
 
     let paciente: any = null;
     let agendamentos: any[] = [];
