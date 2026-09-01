@@ -17,7 +17,14 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { brl, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
+import { brl, fmtDate, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
+import { hojeBR } from "@/lib/date-utils";
+import {
+  carregarContextoRateio,
+  carregarRateio,
+  totaisRateio,
+  type RateioLinha,
+} from "@/lib/financeiro/rateio-receita";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -34,6 +41,20 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/")({
   component: FinDashboard,
 });
 
+/**
+ * O período do dashboard nunca passa de hoje.
+ *
+ * A base tem centenas de milhares de parcelas de carnê importadas do sistema
+ * anterior, já gravadas como "confirmado" com a data de cada vencimento futuro.
+ * Somando o mês inteiro, o card de Receitas mostrava dinheiro que ainda não
+ * entrou (em 01/09/2026 eram R$ 9.547,00 de vencimentos de 02/09 a 29/09).
+ */
+function periodoAteHoje(periodo: Periodo) {
+  const { from, to } = rangeFromPeriodo(periodo);
+  const hoje = hojeBR();
+  return { de: from, ate: to > hoje ? hoje : to };
+}
+
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
@@ -41,10 +62,11 @@ function FinDashboard() {
   const [stats, setStats] = useState({
     receitas: 0,
     despesas: 0,
-    repasse: 0,
     cartaoConsulta: 0,
     consultaPart: 0,
     exames: 0,
+    /** Receita só dos atendimentos — base do ticket médio. */
+    receitaAtend: 0,
   });
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
   const [reload, setReload] = useState(0);
@@ -59,16 +81,11 @@ function FinDashboard() {
       cat: AtendCat | null;
     }>
   >([]);
-  const [rawAtends, setRawAtends] = useState<
-    Array<{
-      id: string;
-      data: string;
-      procedimento: string | null;
-      valor_total: number;
-      valor_medico: number;
-      status: string;
-    }>
-  >([]);
+  const [repasse, setRepasse] = useState<{
+    total: number;
+    linhas: RateioLinha[];
+    carregando: boolean;
+  }>({ total: 0, linhas: [], carregando: true });
   const [drill, setDrill] = useState<
     | null
     | "saldo"
@@ -84,30 +101,26 @@ function FinDashboard() {
 
   useEffect(() => {
     if (!clinicaAtual) return;
-    const { from, to } = rangeFromPeriodo(periodo);
+    const { de, ate } = periodoAteHoje(periodo);
+    let cancelado = false;
     (async () => {
-      const [resumoRes, { data: at }, { data: lancs }] = await Promise.all([
+      const [resumoRes, { data: lancs }] = await Promise.all([
         supabase.rpc("fin_resumo_periodo", {
           p_clinica: clinicaAtual.clinica_id,
-          p_ini: from,
-          p_fim: to,
+          p_ini: de,
+          p_fim: ate,
         }),
-        supabase
-          .from("fin_atendimentos")
-          .select("id, data, procedimento, valor_total, valor_medico, status")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("created_at", from + "T00:00:00")
-          .lte("created_at", to + "T23:59:59"),
         supabase
           .from("fin_lancamentos")
           .select("id, tipo, descricao, valor, data, status")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("status", "confirmado")
-          .gte("data", from)
-          .lte("data", to)
+          .gte("data", de)
+          .lte("data", ate)
           .order("data", { ascending: false })
           .limit(10000),
       ]);
+      if (cancelado) return;
       let receitas = 0,
         despesas = 0;
       for (const row of (resumoRes.data ?? []) as Array<{
@@ -119,7 +132,6 @@ function FinDashboard() {
         if (row.tipo === "receita") receitas += Number(row.total) || 0;
         else if (row.tipo === "despesa") despesas += Number(row.total) || 0;
       }
-      const repasse = (at ?? []).reduce((s, a) => s + Number(a.valor_medico ?? 0), 0);
       const lancsList = (lancs ?? []) as Array<{
         id: string;
         tipo: string;
@@ -134,23 +146,64 @@ function FinDashboard() {
       }));
       let cartaoConsulta = 0,
         consultaPart = 0,
-        exames = 0;
+        exames = 0,
+        receitaAtend = 0;
       for (const l of classified) {
+        if (l.cat === null) continue;
         if (l.cat === "cartao_consulta") cartaoConsulta++;
         else if (l.cat === "consulta_particular") consultaPart++;
-        else if (l.cat === "exame") exames++;
+        else exames++;
+        // Mensalidade, adesão e recebimento avulso ficam de fora: são receita
+        // da clínica, mas não são atendimento e afundariam o ticket médio.
+        receitaAtend += Number(l.valor) || 0;
       }
-      setStats({ receitas, despesas, repasse, cartaoConsulta, consultaPart, exames });
-      setRawAtends((at ?? []) as typeof rawAtends);
+      setStats({ receitas, despesas, cartaoConsulta, consultaPart, exames, receitaAtend });
       setRawLancs(classified);
     })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaAtual, periodo, reload]);
+
+  /**
+   * Repasse dos médicos.
+   *
+   * Vem da mesma conta do relatório Rateio da Receita: a grade cadastrada de
+   * cada médico aplicada aos atendimentos do período. O card antigo somava a
+   * coluna `valor_medico` de `fin_atendimentos`, que hoje só guarda atendimento
+   * externo lançado à mão — em produção são poucas dezenas de linhas por mês, e
+   * o card vivia mostrando R$ 0,00 enquanto a clínica pagava repasse.
+   *
+   * Fica num efeito separado porque é a busca mais pesada da tela; os outros
+   * cards não esperam por ela.
+   */
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const { de, ate } = periodoAteHoje(periodo);
+    let cancelado = false;
+    setRepasse({ total: 0, linhas: [], carregando: true });
+    (async () => {
+      try {
+        const ctx = await carregarContextoRateio(clinicaAtual.clinica_id);
+        const linhas = await carregarRateio(ctx, { clinicaId: clinicaAtual.clinica_id, de, ate });
+        if (cancelado) return;
+        setRepasse({ total: totaisRateio(linhas).repasse, linhas, carregando: false });
+      } catch {
+        if (!cancelado) setRepasse({ total: 0, linhas: [], carregando: false });
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
   }, [clinicaAtual, periodo, reload]);
 
   const saldo = stats.receitas - stats.despesas;
   const atendTotal = stats.cartaoConsulta + stats.consultaPart + stats.exames;
-  const media = atendTotal > 0 ? stats.receitas / atendTotal : 0;
+  const media = atendTotal > 0 ? stats.receitaAtend / atendTotal : 0;
 
-  const fmtDt = (d: string) => new Date(d).toLocaleDateString("pt-BR");
+  // `fmtDate` completa a hora antes de converter: `new Date("2026-09-01")` é
+  // meia-noite em UTC, que no fuso da clínica ainda é o dia 31/08.
+  const fmtDt = (d: string) => fmtDate(d);
 
   return (
     <div className="space-y-6">
@@ -248,7 +301,7 @@ function FinDashboard() {
           onClick={() => setDrill("repasse")}
           icon={Stethoscope}
           label="Repasse médicos"
-          value={brl(stats.repasse)}
+          value={repasse.carregando ? "…" : brl(repasse.total)}
           accent="warning"
         />
       </div>
@@ -277,7 +330,7 @@ function FinDashboard() {
               {drill === "consultaPart" && `Consultas Particulares — ${stats.consultaPart}`}
               {drill === "exames" && `Exames — ${stats.exames}`}
               {drill === "ticket" && `Ticket médio — ${brl(media)}`}
-              {drill === "repasse" && `Repasse a médicos — ${brl(stats.repasse)}`}
+              {drill === "repasse" && `Repasse a médicos — ${brl(repasse.total)}`}
             </DialogTitle>
           </DialogHeader>
           <div className="overflow-auto flex-1">
@@ -375,10 +428,17 @@ function FinDashboard() {
                   })()
                 : drill === "repasse"
                   ? (() => {
-                      if (rawAtends.length === 0)
+                      if (repasse.carregando)
                         return (
                           <p className="text-sm text-muted-foreground py-6 text-center">
-                            Sem atendimentos.
+                            Calculando o repasse pela grade dos médicos…
+                          </p>
+                        );
+                      const comRepasse = repasse.linhas.filter((l) => l.repasse > 0);
+                      if (comRepasse.length === 0)
+                        return (
+                          <p className="text-sm text-muted-foreground py-6 text-center">
+                            Nenhum atendimento com repasse no período.
                           </p>
                         );
                       return (
@@ -386,23 +446,21 @@ function FinDashboard() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Data</TableHead>
+                              <TableHead>Médico</TableHead>
                               <TableHead>Procedimento</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Valor</TableHead>
+                              <TableHead className="text-right">Receita</TableHead>
                               <TableHead className="text-right">Repasse médico</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {rawAtends.map((a) => (
-                              <TableRow key={a.id}>
-                                <TableCell className="whitespace-nowrap">{fmtDt(a.data)}</TableCell>
-                                <TableCell>{a.procedimento ?? "—"}</TableCell>
-                                <TableCell>{a.status}</TableCell>
-                                <TableCell className="text-right">
-                                  {brl(Number(a.valor_total))}
-                                </TableCell>
+                            {comRepasse.map((l) => (
+                              <TableRow key={l.id}>
+                                <TableCell className="whitespace-nowrap">{fmtDt(l.data)}</TableCell>
+                                <TableCell>{l.medico_nome}</TableCell>
+                                <TableCell>{l.procedimento ?? "—"}</TableCell>
+                                <TableCell className="text-right">{brl(l.receita)}</TableCell>
                                 <TableCell className="text-right text-amber-600">
-                                  {brl(Number(a.valor_medico))}
+                                  {brl(l.repasse)}
                                 </TableCell>
                               </TableRow>
                             ))}
