@@ -22,6 +22,8 @@ import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 
 /** POLICLÍNICA MENINO JESUS — clínica em produção do site institucional. */
 export const INTAKE_CLINICA_ID = "7570ddde-8c1c-4b55-ba72-cf12b2a6c940";
+// Policlínica São Francisco de Paula (site institucional próprio).
+export const INTAKE_CLINICA_ID_SFP = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
 
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -111,7 +113,10 @@ function janelaPreferida(data?: string | null, hora?: string | null, periodo?: s
   return { inicio: inicio.toISOString(), fim: new Date(inicio.getTime() + 30 * 60000).toISOString() };
 }
 
-export async function handleIntake(request: Request): Promise<Response> {
+export async function handleIntake(
+  request: Request,
+  clinicaId: string = INTAKE_CLINICA_ID,
+): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (request.method !== "POST") return json(405, { error: { code: "method_not_allowed" } });
 
@@ -168,7 +173,7 @@ export async function handleIntake(request: Request): Promise<Response> {
 
   const idExterno = `site-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const contatoBase = {
-    clinica_id: INTAKE_CLINICA_ID,
+    clinica_id: clinicaId,
     nome: body.nome,
     telefone: body.telefone,
     email: body.email ?? null,
@@ -200,7 +205,7 @@ export async function handleIntake(request: Request): Promise<Response> {
     return json(422, { error: { code: "invalid_cpf", message: "CPF inválido." } });
   }
 
-  const cpfHash = await hash(`${INTAKE_CLINICA_ID}:${cpf}`);
+  const cpfHash = await hash(`${clinicaId}:${cpf}`);
   const { data: okCpf } = await db.rpc("intake_consumir_rate_limit", {
     _chave: `cpf:${cpfHash}`,
     _janela: "dia",
@@ -217,7 +222,7 @@ export async function handleIntake(request: Request): Promise<Response> {
   }
 
   const { data: resolvido, error: eResolver } = await db.rpc("integracao_resolver_paciente", {
-    _clinica_id: INTAKE_CLINICA_ID,
+    _clinica_id: clinicaId,
     _cpf_digits: cpf,
     _nome: body.nome,
     _data_nascimento: body.data_nascimento,
@@ -242,7 +247,7 @@ export async function handleIntake(request: Request): Promise<Response> {
       .from("pacientes")
       .update({ origem: "site_publico" } as never)
       .eq("id", r.paciente_id)
-      .eq("clinica_id", INTAKE_CLINICA_ID);
+      .eq("clinica_id", clinicaId);
   }
 
   const janela = janelaPreferida(body.data_preferida, body.hora_preferida, body.periodo_preferido);
@@ -263,7 +268,7 @@ export async function handleIntake(request: Request): Promise<Response> {
   ].filter(Boolean);
 
   const { data: agId, error: eAg } = await db.rpc("criar_solicitacao_site", {
-    _clinica_id: INTAKE_CLINICA_ID,
+    _clinica_id: clinicaId,
     _paciente_id: r.paciente_id,
     _paciente_nome: body.nome,
     _inicio: janela.inicio,
