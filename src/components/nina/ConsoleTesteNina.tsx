@@ -156,27 +156,54 @@ export function ConsoleTesteNina() {
       const margem = 40;
       const largura = doc.internal.pageSize.getWidth() - margem * 2;
       const alturaPag = doc.internal.pageSize.getHeight();
+      const alturaLinha = 13;
       let y = margem;
 
-      const quebrar = (altura: number) => {
-        if (y + altura > alturaPag - margem) {
-          doc.addPage();
-          y = margem;
+      // A fonte padrão do PDF (WinAnsi) não tem emoji nem caracteres fora do
+      // Latin-1: sem esse saneamento eles saem como símbolos trocados.
+      const sanear = (txt: string) =>
+        txt
+          .normalize("NFC")
+          .replace(/\r\n?/g, "\n")
+          .replace(/[\u2018\u2019\u201B]/g, "'")
+          .replace(/[\u201C\u201D]/g, '"')
+          .replace(/[\u2013\u2014]/g, "-")
+          .replace(/\u2026/g, "...")
+          .replace(/\u00a0/g, " ")
+          .replace(/[\u200b-\u200f\u2028\u2029\ufeff]/g, "")
+          // eslint-disable-next-line no-control-regex
+          .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
+          .replace(/[^\n\u0020-\u00ff]/g, "");
+
+      const escrever = (linhas: string[], x: number, tamanho: number, negrito: boolean) => {
+        doc.setFont("helvetica", negrito ? "bold" : "normal");
+        doc.setFontSize(tamanho);
+        for (const linha of linhas) {
+          if (y + alturaLinha > alturaPag - margem) {
+            doc.addPage();
+            y = margem;
+            doc.setFont("helvetica", negrito ? "bold" : "normal");
+            doc.setFontSize(tamanho);
+          }
+          doc.text(linha, x, y);
+          y += alturaLinha;
         }
       };
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text("Console de teste da Nina — conversa de homologação", margem, y);
-      y += 18;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text(
-        `${leadAtual.nome} · ${leadAtual.telefone} · sessão ${leadAtual.sessao} · exportado em ${new Date().toLocaleString("pt-BR")}`,
+      escrever(["Console de teste da Nina - conversa de homologacao"], margem, 14, true);
+      y += 4;
+      escrever(
+        doc.splitTextToSize(
+          sanear(
+            `${leadAtual.nome} · ${leadAtual.telefone} · sessão ${leadAtual.sessao} · exportado em ${new Date().toLocaleString("pt-BR")}`,
+          ),
+          largura,
+        ) as string[],
         margem,
-        y,
+        10,
+        false,
       );
-      y += 20;
+      y += 10;
 
       for (const m of msgs) {
         const quem =
@@ -186,17 +213,22 @@ export function ConsoleTesteNina() {
               ? "Nina"
               : "Paciente (teste)";
         const quando = new Date(m.created_at).toLocaleString("pt-BR");
-        const linhas = doc.splitTextToSize(String(m.body ?? ""), largura - 12) as string[];
 
-        quebrar(28 + linhas.length * 12);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.text(`${quem} · ${quando}`, margem, y);
-        y += 12;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text(linhas, margem + 12, y);
-        y += linhas.length * 12 + 10;
+        escrever([sanear(`${quem} · ${quando}`)], margem, 9, true);
+
+        // Quebra por parágrafo para preservar as quebras de linha originais
+        // da mensagem (listas, horários em linhas separadas etc.).
+        const corpo = sanear(String(m.body ?? "")).split("\n");
+        const linhas: string[] = [];
+        for (const par of corpo) {
+          if (par.trim() === "") {
+            linhas.push("");
+            continue;
+          }
+          linhas.push(...(doc.splitTextToSize(par, largura - 12) as string[]));
+        }
+        escrever(linhas.length ? linhas : ["(sem texto)"], margem + 12, 10, false);
+        y += 8;
       }
 
       const nome = `nina-teste-${leadAtual.nome.toLowerCase().replace(/\s+/g, "-")}-${new Date()
@@ -208,6 +240,7 @@ export function ConsoleTesteNina() {
       mostrarErro(e);
     }
   };
+
 
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
