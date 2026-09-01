@@ -135,7 +135,7 @@ function corHoverDaClinica(nome?: string): string {
 
 function logoDaClinica(nome?: string): string | null {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
+  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFranciscoCdn.url;
   if (n.includes("menino jesus")) return logoMeninoJesus;
   if (n.includes("consulta hoje")) return logoConsultaHoje;
   return null;
