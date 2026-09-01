@@ -45,6 +45,7 @@ import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
+import { Route as ApiPublicIntakeConsultaHojeRouteImport } from './routes/api/public/intake-consulta-hoje'
 import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
@@ -346,6 +347,12 @@ const ApiPublicIntakeSfpRoute = ApiPublicIntakeSfpRouteImport.update({
   path: '/api/public/intake-sfp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicIntakeConsultaHojeRoute =
+  ApiPublicIntakeConsultaHojeRouteImport.update({
+    id: '/api/public/intake-consulta-hoje',
+    path: '/api/public/intake-consulta-hoje',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicIntakeRoute = ApiPublicIntakeRouteImport.update({
   id: '/api/public/intake',
   path: '/api/public/intake',
@@ -1135,6 +1142,7 @@ export interface FileRoutesByFullPath {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
@@ -1287,6 +1295,7 @@ export interface FileRoutesByTo {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
@@ -1445,6 +1454,7 @@ export interface FileRoutesById {
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/api/public/intake': typeof ApiPublicIntakeRoute
+  '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
@@ -1603,6 +1613,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
@@ -1755,6 +1766,7 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
@@ -1912,6 +1924,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
     | '/api/public/intake'
+    | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/tts'
     | '/api/public/tts-voices'
@@ -2003,6 +2016,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicIntakeRoute: typeof ApiPublicIntakeRoute
+  ApiPublicIntakeConsultaHojeRoute: typeof ApiPublicIntakeConsultaHojeRoute
   ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
@@ -2268,6 +2282,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/intake-sfp'
       fullPath: '/api/public/intake-sfp'
       preLoaderRoute: typeof ApiPublicIntakeSfpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/intake-consulta-hoje': {
+      id: '/api/public/intake-consulta-hoje'
+      path: '/api/public/intake-consulta-hoje'
+      fullPath: '/api/public/intake-consulta-hoje'
+      preLoaderRoute: typeof ApiPublicIntakeConsultaHojeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/intake': {
@@ -3485,6 +3506,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicIntakeRoute: ApiPublicIntakeRoute,
+  ApiPublicIntakeConsultaHojeRoute: ApiPublicIntakeConsultaHojeRoute,
   ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
