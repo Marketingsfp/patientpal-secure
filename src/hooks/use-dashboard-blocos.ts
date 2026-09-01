@@ -71,6 +71,30 @@ export interface Aniversariantes {
 }
 
 /**
+ * Inadimplência real do Cartão — TODA parcela já vencida, de qualquer mês.
+ *
+ * É diferente de `mensalidades`, que fala só do mês corrente e alimenta os
+ * cards "pagas / a vencer / em atraso" do bloco do Cartão. O card do topo
+ * precisa da carteira inteira: olhando só o mês, no dia 1º nenhuma parcela
+ * ainda passou dos 5 dias de tolerância e o indicador mostrava 0,0% com 1.881
+ * contratos ativos e 2.150 parcelas de fato vencidas.
+ *
+ * Vem somada de dentro do banco (`dashboard_blocos_periodo`) porque são
+ * milhares de parcelas e o número cresce todo mês — trazer as linhas para o
+ * navegador custaria uma paginação cada vez mais longa a cada carga da tela.
+ */
+export interface InadimplenciaCartao {
+  /** Parcelas vencidas há mais de 5 dias e não pagas. */
+  atrasadas: number;
+  atrasadasValor: number;
+  /** Tudo o que já venceu até hoje, pago ou não. É o divisor do percentual. */
+  baseValor: number;
+  /** Quantos contratos distintos têm ao menos uma parcela nessa situação. */
+  contratos: number;
+  pct: number;
+}
+
+/**
  * Taxas operacionais do mês. Saem da MESMA função que alimenta a aba Produção
  * (`painel_executivo_periodo`) — chamada aqui com o intervalo do mês, para que
  * o bloco não dependa do filtro de período do topo da tela.
@@ -92,6 +116,12 @@ export interface DashboardBlocos {
   contratos: ResumoContratos | null;
   /** Mensalidades com vencimento no mês corrente. `null` = não foi possível somar. */
   mensalidades: ResumoMensalidades | null;
+  /**
+   * Inadimplência de toda a carteira. `null` enquanto o arquivo
+   * APLICAR-PAINEL-EXECUTIVO-CORRECOES-2026-09-01.sql não tiver sido rodado —
+   * até lá a tela cai no número do mês corrente e diz que é do mês.
+   */
+  inadimplencia: InadimplenciaCartao | null;
   /** Receita x despesa mês a mês do ano corrente. */
   evolucao: EvolucaoMensal;
   /**
@@ -189,10 +219,12 @@ async function carregar(clinicaId: string): Promise<DashboardBlocos> {
   const blocos = (blocosRes.data ?? null) as {
     atendimentos?: Partial<AtendimentosPorCategoria>;
     aniversariantes?: Partial<Aniversariantes>;
+    inadimplencia?: Partial<InadimplenciaCartao>;
   } | null;
 
   const at = blocos?.atendimentos;
   const an = blocos?.aniversariantes;
+  const inad = blocos?.inadimplencia;
 
   const prod =
     ((execRes.data ?? null) as { producao?: Record<string, unknown> } | null)?.producao ?? {};
@@ -213,6 +245,15 @@ async function carregar(clinicaId: string): Promise<DashboardBlocos> {
         }
       : null,
     aniversariantes: an ? { hoje: num(an.hoje), mes: num(an.mes) } : null,
+    inadimplencia: inad
+      ? {
+          atrasadas: num(inad.atrasadas),
+          atrasadasValor: num(inad.atrasadasValor),
+          baseValor: num(inad.baseValor),
+          contratos: num(inad.contratos),
+          pct: num(inad.pct),
+        }
+      : null,
     producao: {
       agendados,
       confirmados: num(prod.confirmados),

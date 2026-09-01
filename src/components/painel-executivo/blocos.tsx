@@ -131,6 +131,7 @@ export function BlocoTopoExecutivo({
   const despesaMes = idx >= 0 ? (ev?.despesas[idx] ?? 0) : 0;
   const ct = dados?.contratos ?? null;
   const ms = dados?.mensalidades ?? null;
+  const inadim = dados?.inadimplencia ?? null;
   const at = dados?.atendimentos ?? null;
 
   return (
@@ -167,19 +168,32 @@ export function BlocoTopoExecutivo({
           ajuda="Todos os contratos do Cartão Benefícios com situação 'ativo' na clínica, e a soma das mensalidades deles. É a carteira inteira, não uma página de lista."
         />
 
+        {/*
+          A inadimplência do topo olha a CARTEIRA INTEIRA, não o mês: parcela
+          vencida em julho e nunca paga continua sendo dívida em setembro.
+          Enquanto o SQL de correção não tiver sido rodado, `inadim` vem nulo e
+          o card cai no número do mês corrente — dizendo, no detalhe e na ajuda,
+          que é do mês, para ninguém ler 0,0% como "está tudo pago".
+        */}
         <CardIndicador
           destaque
           carregando={carregando}
-          tom={ms && ms.inadimplenciaPct > 0 ? "vermelho" : "neutro"}
+          tom={(inadim?.pct ?? ms?.inadimplenciaPct ?? 0) > 0 ? "vermelho" : "neutro"}
           icone={AlertTriangle}
           titulo="Inadimplência real do cartão"
-          valor={ms ? pct(ms.inadimplenciaPct) : "—"}
+          valor={inadim ? pct(inadim.pct) : ms ? pct(ms.inadimplenciaPct) : "—"}
           detalhe={
-            ms
-              ? `${money(ms.atrasadasValor)} em ${int(ms.atrasadas)} parcela(s) vencida(s)`
-              : "Não foi possível somar as mensalidades"
+            inadim
+              ? `${money(inadim.atrasadasValor)} em ${int(inadim.atrasadas)} parcela(s) de ${int(inadim.contratos)} contrato(s)`
+              : ms
+                ? `${money(ms.atrasadasValor)} em ${int(ms.atrasadas)} parcela(s) — só do mês`
+                : "Não foi possível somar as mensalidades"
           }
-          ajuda={`Parcelas com vencimento neste mês, não pagas e atrasadas há mais de ${DIAS_TOLERANCIA_MENSALIDADE} dias — a mesma régua que bloqueia o cartão no balcão. O percentual é o valor atrasado sobre tudo o que o mês tinha para receber.`}
+          ajuda={
+            inadim
+              ? `Toda parcela já vencida da carteira, de qualquer mês, não paga e atrasada há mais de ${DIAS_TOLERANCIA_MENSALIDADE} dias — a mesma régua que faz o paciente ser atendido como Particular no balcão. O percentual é o valor atrasado sobre tudo o que já venceu até hoje (${money(inadim.baseValor)}).`
+              : `Mostrando só as parcelas com vencimento NESTE mês, o que subestima a dívida (no dia 1º nenhuma passou ainda dos ${DIAS_TOLERANCIA_MENSALIDADE} dias de tolerância). Falta rodar o arquivo APLICAR-PAINEL-EXECUTIVO-CORRECOES-2026-09-01.sql no SQL editor para o card passar a olhar a carteira inteira.`
+          }
         />
 
         <CardIndicador
@@ -196,11 +210,11 @@ export function BlocoTopoExecutivo({
           }
           /*
             O número grande é o TOTAL de atendimentos realizados, não a soma de
-            consultas + exames. Os dois separados deixariam de fora os 623
+            consultas + exames. Os dois separados deixariam de fora os 729
             atendimentos de agosto cujo serviço está sem tipo no cadastro — o
-            card publicaria 1.524 numa clínica que atendeu 2.147.
+            card publicaria 2.344 numa clínica que atendeu 3.073.
           */
-          ajuda="Todos os atendimentos realizados no mês. A linha de baixo mostra quanto disso é consulta e quanto é exame; o que falta para o total são serviços ainda sem 'tipo de procedimento' no cadastro, e aparecem na pizza ao lado. Exames de laboratório do mesmo paciente no mesmo dia contam como um atendimento só, pela regra aprovada em 07/07/2026."
+          ajuda="Todos os atendimentos realizados no mês: os marcados como realizados na agenda e também os que já geraram recebimento confirmado no caixa — a recepção quase nunca volta na agenda para mudar o status, e contar só por ele deixava de fora 9 de cada 10 atendimentos. A linha de baixo mostra quanto disso é consulta e quanto é exame; o que falta para o total são serviços ainda sem 'tipo de procedimento' no cadastro, e aparecem na pizza ao lado. Exames de laboratório do mesmo paciente no mesmo dia contam como um atendimento só, pela regra aprovada em 07/07/2026."
         />
       </div>
     </Bloco>
@@ -287,11 +301,16 @@ export function BlocoVisaoClinica({
    * Fatias da pizza. A soma delas é sempre o total de atendimentos realizados.
    *
    * "Sem tipo cadastrado" é uma fatia de verdade, não um resto escondido: em
-   * agosto de 2026 são 623 de 2.147 atendimentos, de serviços como
-   * ECOCARDIOGRAMA e PREVENTIVO que estão no cadastro sem o campo "tipo de
+   * agosto de 2026 são 729 de 3.073 atendimentos, de serviços como
+   * ECOCARDIOGRAMA (ADULTO), PREVENTIVO, EXAMES LABORATORIAIS e RESTAURACAO
+   * RESINA FOTOPOLIMERIZAVEL, que estão no cadastro sem o campo "tipo de
    * procedimento". Empurrá-los para dentro de Consultas ou de Exames seria
    * inventar regra de negócio; deixá-los de fora faria a pizza mentir sobre o
    * tamanho do mês.
+   *
+   * "Procedimentos" fica em zero nesta clínica porque nenhum serviço está
+   * cadastrado com o tipo "procedimento" ou "cirurgia" — a fatia some sozinha
+   * do gráfico enquanto isso (o `.filter(value > 0)` abaixo).
    */
   const fatias = useMemo(
     () =>
