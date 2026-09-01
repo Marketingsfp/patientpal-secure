@@ -310,7 +310,9 @@ export function ConsoleTesteNina() {
                 <CheckCheck className="h-4 w-4" />
                 Resolver
               </Button>
+              </div>
             </div>
+
 
             <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
               {msgs.length === 0 ? (
