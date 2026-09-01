@@ -24,6 +24,8 @@ import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 export const INTAKE_CLINICA_ID = "7570ddde-8c1c-4b55-ba72-cf12b2a6c940";
 // Policlínica São Francisco de Paula (site institucional próprio).
 export const INTAKE_CLINICA_ID_SFP = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
+// Clínica Consulta Hoje — Queimados/RJ (site institucional próprio).
+export const INTAKE_CLINICA_ID_CONSULTA_HOJE = "e9e41341-0e53-4216-8284-caeeaf6fb887";
 
 const MAX_BODY_BYTES = 32 * 1024;
 
