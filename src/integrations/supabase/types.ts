@@ -724,6 +724,7 @@ export type Database = {
           identidade_confirmada: boolean
           identidade_perguntada_em: string | null
           identidade_tentativas: number
+          is_teste: boolean
           janela_24h_em: string | null
           owner_type: string
           primeiro_resp_em: string | null
@@ -761,6 +762,7 @@ export type Database = {
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
+          is_teste?: boolean
           janela_24h_em?: string | null
           owner_type?: string
           primeiro_resp_em?: string | null
@@ -798,6 +800,7 @@ export type Database = {
           identidade_confirmada?: boolean
           identidade_perguntada_em?: string | null
           identidade_tentativas?: number
+          is_teste?: boolean
           janela_24h_em?: string | null
           owner_type?: string
           primeiro_resp_em?: string | null
@@ -7385,6 +7388,57 @@ export type Database = {
           },
         ]
       }
+      nina_teste_leads: {
+        Row: {
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          environment: string
+          id: string
+          indice: number
+          is_test: boolean
+          nome: string
+          sessao_seq: number
+          source_channel: string
+          status: string
+          telefone_base: string
+          telefone_sessao: string
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          indice: number
+          is_test?: boolean
+          nome: string
+          sessao_seq?: number
+          source_channel?: string
+          status?: string
+          telefone_base: string
+          telefone_sessao: string
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          indice?: number
+          is_test?: boolean
+          nome?: string
+          sessao_seq?: number
+          source_channel?: string
+          status?: string
+          telefone_base?: string
+          telefone_sessao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nina_testes_regressao: {
         Row: {
           ativo: boolean
@@ -9649,6 +9703,7 @@ export type Database = {
           enviada_por: string | null
           from_number: string | null
           id: string
+          is_teste: boolean
           media_mime: string | null
           media_url: string | null
           quoted_message_id: string | null
@@ -9671,6 +9726,7 @@ export type Database = {
           enviada_por?: string | null
           from_number?: string | null
           id?: string
+          is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
           quoted_message_id?: string | null
@@ -9693,6 +9749,7 @@ export type Database = {
           enviada_por?: string | null
           from_number?: string | null
           id?: string
+          is_teste?: boolean
           media_mime?: string | null
           media_url?: string | null
           quoted_message_id?: string | null
