@@ -145,6 +145,70 @@ export function ConsoleTesteNina() {
     }
   };
 
+  const baixarPdf = async () => {
+    if (!leadAtual || msgs.length === 0) {
+      toast.error("Não há mensagens para exportar.");
+      return;
+    }
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const margem = 40;
+      const largura = doc.internal.pageSize.getWidth() - margem * 2;
+      const alturaPag = doc.internal.pageSize.getHeight();
+      let y = margem;
+
+      const quebrar = (altura: number) => {
+        if (y + altura > alturaPag - margem) {
+          doc.addPage();
+          y = margem;
+        }
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("Console de teste da Nina — conversa de homologação", margem, y);
+      y += 18;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(
+        `${leadAtual.nome} · ${leadAtual.telefone} · sessão ${leadAtual.sessao} · exportado em ${new Date().toLocaleString("pt-BR")}`,
+        margem,
+        y,
+      );
+      y += 20;
+
+      for (const m of msgs) {
+        const quem =
+          m.enviada_por === "sistema"
+            ? "— sistema —"
+            : m.direction === "out"
+              ? "Nina"
+              : "Paciente (teste)";
+        const quando = new Date(m.created_at).toLocaleString("pt-BR");
+        const linhas = doc.splitTextToSize(String(m.body ?? ""), largura - 12) as string[];
+
+        quebrar(28 + linhas.length * 12);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(`${quem} · ${quando}`, margem, y);
+        y += 12;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(linhas, margem + 12, y);
+        y += linhas.length * 12 + 10;
+      }
+
+      const nome = `nina-teste-${leadAtual.nome.toLowerCase().replace(/\s+/g, "-")}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`;
+      doc.save(nome);
+      toast.success("PDF gerado com as mensagens do lead de teste.");
+    } catch (e: any) {
+      mostrarErro(e);
+    }
+  };
+
   const resolverConversa = async () => {
     if (!clinicaId || !leadId || !conversaId) return;
     setProcessando(true);
