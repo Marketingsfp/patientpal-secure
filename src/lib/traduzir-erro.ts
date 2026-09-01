@@ -57,6 +57,13 @@ function traduzirPostgres(msg: string, code?: string, details?: string): string 
   const campo = nomeCampoAmigavel(detalhe);
   switch (code) {
     case "23505":
+      // Envio repetido do MESMO recebimento (mesmo atendimento, mesmo valor,
+      // mesma data). Sem este caso a recepção via só "Já existe um registro
+      // com esses dados." e não tinha como saber que o pagamento anterior
+      // havia entrado — o risco era cobrar o paciente de novo por medo.
+      if (detalhe.includes("ux_fin_lanc_receita_duplicata_exata")) {
+        return "Este mesmo recebimento já foi registrado (mesmo atendimento, mesmo valor, mesma data). Confira no caixa antes de lançar de novo — para receber uma parcela diferente, mude o valor ou a data.";
+      }
       return campo
         ? `Já existe um cadastro com esse ${campo}.`
         : "Já existe um registro com esses dados.";
