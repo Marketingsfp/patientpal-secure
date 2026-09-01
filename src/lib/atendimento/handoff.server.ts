@@ -231,6 +231,18 @@ export async function encaminharParaHumano(args: {
     detalhes: { posicao: count ?? 1 },
   });
 
+  await registrarMarcadorSistema({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    texto:
+      `🔁 Conversa transferida da Nina para atendimento humano` +
+      (depto?.nome ? ` · Setor: ${depto.nome}` : "") +
+      ` · Motivo: ${args.motivo}` +
+      (args.urgencia === "alta" ? " · URGENTE" : "") +
+      ` · Posição na fila: ${count ?? 1}` +
+      (args.resumo ? `\nResumo: ${args.resumo}` : ""),
+  });
+
   return {
     ok: true,
     posicao_fila: count ?? 1,
