@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConsoleTesteNina } from "@/components/nina/ConsoleTesteNina";
 
 const PREFIXO = "[TESTE]";
 
@@ -209,6 +210,8 @@ export function HomologacaoWhatsapp() {
 
   return (
     <div className="space-y-4">
+      <ConsoleTesteNina />
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
