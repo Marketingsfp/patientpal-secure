@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
-import { SolicitacoesSite } from "@/components/recepcao/solicitacoes-site";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -221,7 +220,6 @@ function RecepcaoPage() {
 
   return (
     <div className="space-y-6">
-      <SolicitacoesSite />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground/90">Recepção · Filas</h1>
