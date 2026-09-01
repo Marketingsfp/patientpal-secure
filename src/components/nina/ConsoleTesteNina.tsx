@@ -188,8 +188,8 @@ export function ConsoleTesteNina() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-          <div className="max-h-[220px] space-y-1 overflow-y-auto rounded-lg border p-2 md:max-h-[520px]">
+        <div className="grid gap-5 md:grid-cols-[200px_1fr]">
+          <div className="max-h-[180px] space-y-1 overflow-y-auto rounded-lg border p-2 md:max-h-[640px]">
             {leads.map((l) => (
               <button
                 key={l.id}
@@ -215,7 +215,7 @@ export function ConsoleTesteNina() {
             )}
           </div>
 
-          <div className="flex min-h-[360px] flex-col gap-3">
+          <div className="flex min-h-[540px] flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-sm text-muted-foreground">
                 {leadAtual ? (
@@ -238,7 +238,7 @@ export function ConsoleTesteNina() {
               </Button>
             </div>
 
-            <ScrollArea className="h-[300px] rounded-lg border p-3">
+            <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
               {msgs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Conversa nova e sem memória. Envie a primeira mensagem como paciente.
@@ -309,9 +309,9 @@ export function ConsoleTesteNina() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 pt-1">
               <Select value={tipo} onValueChange={(v) => setTipo(v as typeof tipo)}>
-                <SelectTrigger className="w-full sm:w-[260px]">
+                <SelectTrigger className="w-full sm:w-[240px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
