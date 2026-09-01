@@ -173,6 +173,8 @@ import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.funct
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
+import { problemaNoDocumentoDoTomador } from "@/lib/nfse-tomador";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import {
   obterEtapaSinal,
@@ -979,9 +981,76 @@ function AgendaPage() {
   // Seleção múltipla para emissão agrupada de NFS-e (mesmo paciente / mesmo dia).
   const [nfseSel, setNfseSel] = useState<Set<string>>(new Set());
   const [emitindoNfseLote, setEmitindoNfseLote] = useState(false);
+  // Emissão em massa a partir da seleção da TABELA: uma NFS-e para cada
+  // atendimento marcado, sem abrir ficha por ficha. Não se confunde com
+  // `nfseSel` acima, que junta vários atendimentos do MESMO paciente em UMA
+  // nota só.
+  const [emitindoNfseSelecao, setEmitindoNfseSelecao] = useState(false);
+  const [progressoNfseSelecao, setProgressoNfseSelecao] = useState<{
+    feito: number;
+    total: number;
+  } | null>(null);
   useEffect(() => {
     setNfseSel(new Set());
   }, [dataRef]);
+  /**
+   * Triagem da seleção da tabela para a emissão de NFS-e em massa.
+   *
+   * Nota fiscal emitida por engano só se desfaz cancelando na prefeitura, e a
+   * emissão em massa justamente tira da recepção a conferência ficha por
+   * ficha. Por isso a regra aqui é conservadora: só entra no lote o
+   * atendimento que não deixa dúvida — tem paciente, o pagamento está
+   * confirmado, o valor recebido é maior que zero e ainda não existe nota.
+   * Todo o resto sai da lista com o motivo escrito, para ser resolvido um a um.
+   *
+   * Pagamento parcial fica de fora de propósito: a nota sairia pelo valor já
+   * recebido e não pelo do serviço, e essa é uma decisão que precisa passar
+   * pelo diálogo da emissão individual, onde dá para escolher o valor.
+   */
+  const nfseLoteTriagem = useMemo(() => {
+    const elegiveis: Array<{ ag: Agendamento; valor: number }> = [];
+    const fora: Array<{ ag: Agendamento; motivo: string }> = [];
+    for (const a of items) {
+      if (!selecionados.has(a.id)) continue;
+      if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
+        fora.push({ ag: a, motivo: "horário sem paciente" });
+        continue;
+      }
+      if (nfseMap.has(a.id)) {
+        fora.push({ ag: a, motivo: "já tem nota fiscal emitida" });
+        continue;
+      }
+      if (a.origem_externa) {
+        fora.push({ ag: a, motivo: "atendimento externo — faturado na outra clínica" });
+        continue;
+      }
+      if (!pagosSet.has(a.id)) {
+        fora.push({ ag: a, motivo: "pagamento ainda não registrado" });
+        continue;
+      }
+      if (parciaisSet.has(a.id)) {
+        fora.push({
+          ag: a,
+          motivo: "pagamento parcial — emita pela ficha, para escolher o valor da nota",
+        });
+        continue;
+      }
+      const valor = Number(pagoInfoMap.get(a.id)?.valor ?? 0);
+      if (!(valor > 0)) {
+        fora.push({ ag: a, motivo: "valor recebido zerado (cortesia, retorno ou gratuidade)" });
+        continue;
+      }
+      elegiveis.push({ ag: a, valor });
+    }
+    const total = elegiveis.reduce((s, e) => s + e.valor, 0);
+    return {
+      elegiveis,
+      fora,
+      motivosFora: Array.from(new Set(fora.map((f) => f.motivo))),
+      total: Math.round(total * 100) / 100,
+    };
+  }, [items, selecionados, nfseMap, pagosSet, pagoInfoMap, parciaisSet]);
+
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [cidadeMap, setCidadeMap] = useState<Map<string, string | null>>(new Map());
@@ -3775,8 +3844,17 @@ function AgendaPage() {
     else s.add(id);
     setSelecionados(s);
   };
+  /**
+   * Quantas das linhas visíveis (página atual, já filtrada) estão marcadas.
+   * Serve para o cabeçalho mostrar três estados: nada marcado, tudo marcado e
+   * parcialmente marcado — comparar só o tamanho dos dois conjuntos dava
+   * "tudo marcado" quando a seleção tinha o mesmo número de linhas, mas de
+   * outra página.
+   */
+  const marcadosNaPagina = paginados.reduce((n, p) => (selecionados.has(p.id) ? n + 1 : n), 0);
+  const todosDaPaginaMarcados = paginados.length > 0 && marcadosNaPagina === paginados.length;
   const toggleAll = () => {
-    if (selecionados.size === paginados.length) setSelecionados(new Set());
+    if (todosDaPaginaMarcados) setSelecionados(new Set());
     else setSelecionados(new Set(paginados.map((p) => p.id)));
   };
 
@@ -6831,6 +6909,264 @@ function AgendaPage() {
     }
   };
 
+  /**
+   * Emite uma NFS-e para CADA atendimento marcado na tabela — o caminho do fim
+   * do dia, quando a recepção precisa tirar dezenas de notas de pacientes
+   * diferentes sem abrir uma ficha de cada vez.
+   *
+   * Diferença para `emitirNfseAgrupada`: lá vários atendimentos do MESMO
+   * paciente viram UMA nota; aqui cada atendimento vira a SUA nota.
+   *
+   * Como nota fiscal errada só se desfaz com cancelamento na prefeitura, o
+   * lote é cercado:
+   *  - a triagem (`nfseLoteTriagem`) já deixou de fora tudo que tem dúvida;
+   *  - o cadastro do paciente é conferido ANTES da primeira nota, para o lote
+   *    não parar no meio com metade emitida;
+   *  - a empresa emitente é perguntada uma vez só e vale para o lote inteiro;
+   *  - o resumo do que vai sair é confirmado antes do envio;
+   *  - as notas saem UMA DE CADA VEZ, porque o número da DPS é sequencial e
+   *    envios simultâneos disputam o mesmo número.
+   */
+  const emitirNfseDosSelecionados = async () => {
+    if (!clinicaAtual) return;
+    if (!podeEscrever) {
+      avisoSemPermissaoAgenda();
+      return;
+    }
+    if (emitindoNfseSelecao) return;
+    const brl = (v: number) =>
+      Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const { elegiveis, fora } = nfseLoteTriagem;
+    if (elegiveis.length === 0) {
+      toast.error(
+        fora.length > 0
+          ? `Nenhum dos ${fora.length} atendimentos marcados pode gerar nota agora — ${fora[0].motivo}.`
+          : "Marque os atendimentos que devem gerar nota fiscal.",
+      );
+      return;
+    }
+
+    // Ficha incompleta é o motivo nº 1 de recusa da prefeitura: sem CPF a DPS
+    // nem chega a ser aceita, e sem endereço a nota sai com o endereço da
+    // Receita. Conferimos tudo de uma vez, antes de mandar a primeira nota.
+    const pacIds = Array.from(new Set(elegiveis.map((e) => e.ag.paciente_id as string)));
+    const { data: pacsData, error: errPacs } = await supabase
+      .from("pacientes")
+      .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+      .in("id", pacIds);
+    if (errPacs) {
+      mostrarErro(errPacs, "falha ao carregar os pacientes do lote");
+      return;
+    }
+    type PacienteLote = NonNullable<typeof pacsData>[number];
+    const pacPorId = new Map<string, PacienteLote>(
+      ((pacsData ?? []) as PacienteLote[]).map((p) => [p.id, p]),
+    );
+    const prontos: Array<{ ag: Agendamento; valor: number; pac: PacienteLote }> = [];
+    const impedidos: string[] = [];
+    for (const e of elegiveis) {
+      const pac = pacPorId.get(e.ag.paciente_id as string);
+      if (!pac) {
+        impedidos.push(`${e.ag.paciente_nome ?? "Paciente"} — cadastro não encontrado.`);
+        continue;
+      }
+      const problemaDoc = problemaNoDocumentoDoTomador(pac.nome, pac.cpf);
+      if (problemaDoc) {
+        impedidos.push(`${pac.nome} — ${problemaDoc}`);
+        continue;
+      }
+      if (!(pac.logradouro ?? "").trim()) {
+        impedidos.push(
+          `${pac.nome} — sem endereço no cadastro. Complete a ficha do paciente e emita de novo.`,
+        );
+        continue;
+      }
+      prontos.push({ ag: e.ag, valor: e.valor, pac });
+    }
+
+    if (prontos.length === 0) {
+      await confirmDialog({
+        title: "Nenhuma nota pode ser emitida",
+        tone: "warning",
+        confirmText: "Entendi",
+        cancelText: "Fechar",
+        description: `Os atendimentos marcados estão com o cadastro incompleto:\n\n${impedidos
+          .slice(0, 8)
+          .map((m) => `• ${m}`)
+          .join("\n")}${impedidos.length > 8 ? `\n• …e mais ${impedidos.length - 8}` : ""}`,
+      });
+      return;
+    }
+
+    const totalLote = prontos.reduce((s, p) => s + p.valor, 0);
+    const listaResumo = prontos
+      .slice(0, 8)
+      .map((p) => `• ${p.pac.nome} — ${brl(p.valor)}`)
+      .join("\n");
+    const restoResumo = prontos.length > 8 ? `\n• …e mais ${prontos.length - 8}` : "";
+    const aviso = [
+      impedidos.length > 0
+        ? `${impedidos.length} ficaram de fora por cadastro incompleto (CPF ou endereço).`
+        : "",
+      fora.length > 0 ? `${fora.length} marcados não entram nesta emissão.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const plural = prontos.length > 1;
+    const ok = await confirmDialog({
+      title: `Emitir ${prontos.length} nota${plural ? "s" : ""} fiscal${plural ? "is" : ""}?`,
+      tone: "warning",
+      confirmText: `Emitir ${prontos.length} nota${plural ? "s" : ""}`,
+      description:
+        `Sai UMA nota para cada atendimento marcado, pelo valor já recebido:\n\n` +
+        `${listaResumo}${restoResumo}\n\nTotal: ${brl(totalLote)}\n\n` +
+        `${aviso ? aviso + "\n\n" : ""}` +
+        `Nota emitida por engano só se desfaz com cancelamento na prefeitura — confira a lista antes de continuar.`,
+    });
+    if (!ok) return;
+
+    const emitenteIdEscolhido = await pickEmitenteNfse();
+    if (!emitenteIdEscolhido) {
+      toast.error("Selecione a empresa emitente para emitir as notas.");
+      return;
+    }
+
+    setEmitindoNfseSelecao(true);
+    setProgressoNfseSelecao({ feito: 0, total: prontos.length });
+    const toastId = toast.loading(`Emitindo nota 1 de ${prontos.length}…`);
+    const emitidas: Array<{ nfseId: string; agId: string }> = [];
+    const falhas: string[] = [];
+    try {
+      for (let i = 0; i < prontos.length; i++) {
+        const { ag, valor, pac } = prontos[i];
+        setProgressoNfseSelecao({ feito: i, total: prontos.length });
+        toast.loading(`Emitindo nota ${i + 1} de ${prontos.length} — ${pac.nome}…`, {
+          id: toastId,
+        });
+        try {
+          const res = await emitirNfseFn({
+            data: {
+              emitenteId: emitenteIdEscolhido,
+              pacienteId: pac.id,
+              agendamentoId: ag.id,
+              valorServicos: Math.round(Number(valor) * 100) / 100,
+              // Sem diálogo para revisar texto a texto, a descrição é montada
+              // completa (procedimento + paciente + data), como nas outras
+              // telas de emissão.
+              descricaoServicos: montarDiscriminacaoNfse({
+                procedimento: ag.procedimento,
+                pacienteNome: pac.nome,
+                dataReferencia: ag.inicio,
+              }),
+              tomador: {
+                nome: pac.nome,
+                cpfCnpj: pac.cpf ?? undefined,
+                // E-mail torto na ficha reprova a validação e derrubaria a nota
+                // inteira; como o campo é opcional, só vai quando é válido.
+                email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pac.email ?? "")
+                  ? (pac.email as string)
+                  : undefined,
+                cep: pac.cep ?? undefined,
+                logradouro: pac.logradouro ?? undefined,
+                numero: pac.numero ?? undefined,
+                bairro: pac.bairro ?? undefined,
+                municipio: pac.cidade ?? undefined,
+                uf: pac.estado ?? undefined,
+              },
+            },
+          });
+          avisarEmitenteDivergente(res);
+          const r = res as { ok?: boolean; id?: string; error?: string };
+          if (r?.ok === false || !r?.id) {
+            falhas.push(`${pac.nome} — ${r?.error ?? "a prefeitura recusou a nota"}`);
+            continue;
+          }
+          emitidas.push({ nfseId: r.id, agId: ag.id });
+        } catch (err) {
+          falhas.push(`${pac.nome} — ${(err as Error)?.message ?? "falha no envio"}`);
+        }
+      }
+      setProgressoNfseSelecao({ feito: prontos.length, total: prontos.length });
+
+      // Status e PDF só ficam prontos alguns segundos depois do envio. Uma
+      // espera única para o lote inteiro (e não 4s por nota) já basta, porque
+      // a consulta acontece depois que todas foram enviadas.
+      if (emitidas.length > 0) {
+        toast.loading(`Conferindo o resultado de ${emitidas.length} nota(s)…`, { id: toastId });
+        await new Promise((r) => setTimeout(r, 4000));
+        for (const e of emitidas) {
+          try {
+            await consultarNfseFn({ data: { id: e.nfseId } });
+          } catch {
+            /* o webhook da prefeitura também atualiza o status depois */
+          }
+        }
+        const { data: novas } = await supabase
+          .from("nfse")
+          .select("id, status, url_pdf, numero")
+          .in(
+            "id",
+            emitidas.map((e) => e.nfseId),
+          );
+        const porNfseId = new Map(
+          (
+            (novas ?? []) as Array<{
+              id: string;
+              status: string | null;
+              url_pdf: string | null;
+              numero: string | null;
+            }>
+          ).map((n) => [n.id, n]),
+        );
+        setNfseMap((prev) => {
+          const m = new Map(prev);
+          for (const e of emitidas) {
+            const n = porNfseId.get(e.nfseId);
+            if (n)
+              m.set(e.agId, { id: n.id, status: n.status, url_pdf: n.url_pdf, numero: n.numero });
+          }
+          return m;
+        });
+        // Tira da seleção só o que virou nota: o que falhou continua marcado
+        // para uma nova tentativa.
+        setSelecionados((prev) => {
+          const s = new Set(prev);
+          for (const e of emitidas) s.delete(e.agId);
+          return s;
+        });
+      }
+
+      toast.dismiss(toastId);
+      if (falhas.length === 0) {
+        toast.success(
+          `${emitidas.length} nota${emitidas.length > 1 ? "s" : ""} emitida${
+            emitidas.length > 1 ? "s" : ""
+          }. Os PDFs ficam em Financeiro › NFS-e.`,
+        );
+      } else {
+        toast.warning(`${emitidas.length} emitida(s) · ${falhas.length} não saíram.`);
+        await confirmDialog({
+          title: `${falhas.length} nota(s) não saíram`,
+          tone: "warning",
+          confirmText: "Entendi",
+          cancelText: "Fechar",
+          description: `${emitidas.length} nota(s) foram emitidas normalmente. Estas não:\n\n${falhas
+            .slice(0, 8)
+            .map((m) => `• ${m}`)
+            .join("\n")}${
+            falhas.length > 8 ? `\n• …e mais ${falhas.length - 8}` : ""
+          }\n\nElas continuam marcadas na lista para você tentar de novo.`,
+        });
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      mostrarErro(err, "falha na emissão em lote de NFS-e");
+    } finally {
+      setEmitindoNfseSelecao(false);
+      setProgressoNfseSelecao(null);
+    }
+  };
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (!pagosSet.has(a.id)) {
@@ -7396,6 +7732,13 @@ function AgendaPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={cobrarSelecionados}>
                   💳 Cobrar selecionados (1 pagamento)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={emitirNfseDosSelecionados}
+                  disabled={nfseLoteTriagem.elegiveis.length === 0 || emitindoNfseSelecao}
+                >
+                  🧾 Emitir NFS-e dos selecionados ({nfseLoteTriagem.elegiveis.length})
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={baixarLoteRealizado}>
@@ -9852,6 +10195,63 @@ function AgendaPage() {
             </div>
           </div>
         )}
+        {/* Nota fiscal em lote: age sobre as linhas marcadas na tabela e emite
+            UMA nota por atendimento. Só aparece quando algum dos marcados pode
+            virar nota — quem selecionou linhas para excluir, cobrar ou
+            reagendar não é interrompido por esta barra. */}
+        {podeEscrever && nfseLoteTriagem.elegiveis.length > 0 && (
+          <div className="mb-3 rounded-lg border-2 border-sky-300 bg-sky-50 px-3 py-2 text-[14px] text-sky-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-semibold">Nota fiscal em lote</span>
+                <span className="mx-1.5 text-sky-400">·</span>
+                {nfseLoteTriagem.elegiveis.length}{" "}
+                {nfseLoteTriagem.elegiveis.length === 1
+                  ? "atendimento pronto para emitir"
+                  : "atendimentos prontos para emitir"}
+                <span className="mx-1.5 text-sky-400">·</span>
+                <span className="font-semibold tabular-nums">
+                  {nfseLoteTriagem.total.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </span>
+                {nfseLoteTriagem.fora.length > 0 && (
+                  <div className="mt-0.5 text-[12px] text-sky-700">
+                    {nfseLoteTriagem.fora.length}{" "}
+                    {nfseLoteTriagem.fora.length === 1
+                      ? "marcado fica de fora"
+                      : "marcados ficam de fora"}
+                    : {nfseLoteTriagem.motivosFora.join("; ")}.
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={emitirNfseDosSelecionados}
+                  disabled={emitindoNfseSelecao}
+                >
+                  <FileText className="mr-1.5 h-3.5 w-3.5" />
+                  {emitindoNfseSelecao && progressoNfseSelecao
+                    ? `Emitindo ${Math.min(
+                        progressoNfseSelecao.feito + 1,
+                        progressoNfseSelecao.total,
+                      )} de ${progressoNfseSelecao.total}…`
+                    : `Emitir NFS-e dos selecionados (${nfseLoteTriagem.elegiveis.length})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelecionados(new Set())}
+                  disabled={emitindoNfseSelecao}
+                >
+                  Limpar seleção
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
           {loading && items.length === 0 ? (
@@ -10158,10 +10558,17 @@ function AgendaPage() {
               <TableRow className="bg-muted">
                 <TableHead
                   className="w-8 rounded-tl-lg px-1.5"
-                  title="Selecione para ações em lote"
+                  title="Marcar todas as linhas desta página, do jeito que estão filtradas"
                 >
                   <Checkbox
-                    checked={paginados.length > 0 && selecionados.size === paginados.length}
+                    aria-label={
+                      todosDaPaginaMarcados
+                        ? "Desmarcar todos os atendimentos da página"
+                        : "Selecionar todos os atendimentos da página"
+                    }
+                    checked={
+                      todosDaPaginaMarcados ? true : marcadosNaPagina > 0 ? "indeterminate" : false
+                    }
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
