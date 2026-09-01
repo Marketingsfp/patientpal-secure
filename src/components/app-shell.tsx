@@ -1251,7 +1251,7 @@ function AppShellInner() {
                 <img
                   src={branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)!}
                   alt={clinicaAtual.clinica.nome}
-                  className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-contain bg-white border border-slate-200 shadow-sm"
+                  className="hidden sm:block h-8 w-auto max-w-[150px] shrink-0 object-contain"
                 />
               )}
             {memberships.length > 0 && (
