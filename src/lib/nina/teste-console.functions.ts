@@ -155,15 +155,27 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-    if (!lead.conversa_id) return { mensagens: [], conversaId: null, sessao: lead.sessao_seq };
+
+    // O console mostra TODAS as sessões do lead (histórico visual completo).
+    // A memória da Nina continua isolada: ela só enxerga o telefone da sessão atual.
+    const { data: convs } = await supabaseAdmin
+      .from("atend_conversas")
+      .select("id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("is_teste", true)
+      .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
+    const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
+    if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
+    if (ids.length === 0)
+      return { mensagens: [], conversaId: lead.conversa_id, sessao: lead.sessao_seq };
 
     const { data: msgs, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
       .select("id, direction, body, enviada_por, created_at")
       .eq("clinica_id", data.clinicaId)
-      .eq("conversa_id", lead.conversa_id)
+      .in("conversa_id", ids)
       .order("created_at", { ascending: true })
-      .limit(200);
+      .limit(400);
     if (error) throw new Error(error.message);
     return {
       conversaId: lead.conversa_id,
@@ -171,6 +183,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       mensagens: (msgs ?? []) as any[],
     };
   });
+
 
 export const enviarMensagemTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -425,9 +438,19 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
 
+    // Marcador interno: o histórico continua visível no console, com o aviso
+    // de que a sessão encerrou e a memória da Nina foi zerada.
+    const { registrarMarcadorSistema } = await import("@/lib/atendimento/handoff.server");
+    await registrarMarcadorSistema({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      texto: `✅ Conversa de teste encerrada (sessão ${lead.sessao_seq}). A memória da Nina foi resetada — a próxima mensagem começa do zero.`,
+    }).catch(() => {});
+
     // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
+
     await supabaseAdmin
       .from("nina_teste_leads")
       .update({

@@ -150,18 +150,20 @@ export function ConsoleTesteNina() {
     setProcessando(true);
     try {
       await resolver({ data: { clinicaId, leadId, conversaId } });
-      setMsgs([]);
       setConversaId(null);
       setErro(null);
       setAudio(null);
+      // O histórico permanece na tela: só entra o marcador de encerramento.
+      await carregarHistorico(leadId);
       await carregarLeads();
-      toast.success("Conversa resolvida. A próxima mensagem começa sem memória.");
+      toast.success("Conversa encerrada. A memória da Nina foi resetada.");
     } catch (e: any) {
       mostrarErro(e);
     } finally {
       setProcessando(false);
     }
   };
+
 
   return (
     <Card>
@@ -244,6 +246,15 @@ export function ConsoleTesteNina() {
               ) : (
                 <div className="space-y-2">
                   {msgs.map((m) => {
+                    if (m.enviada_por === "sistema") {
+                      return (
+                        <div key={m.id} className="flex justify-center">
+                          <div className="max-w-[90%] rounded-md border border-dashed bg-muted/50 px-3 py-1.5 text-center text-xs text-muted-foreground">
+                            {m.body}
+                          </div>
+                        </div>
+                      );
+                    }
                     const daNina = m.direction === "out";
                     return (
                       <div
@@ -264,6 +275,7 @@ export function ConsoleTesteNina() {
                       </div>
                     );
                   })}
+
                 </div>
               )}
               {processando && (
