@@ -226,12 +226,13 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 });
 
                 // Mensagem nova do paciente reabre conversa fechada.
-                if (from) {
+                const fromDigits = String(from ?? "").replace(/\D/g, "");
+                if (fromDigits) {
                   await supabaseAdmin
                     .from("atend_conversas")
                     .update({ status: "aberta", ultima_msg_em: new Date().toISOString() })
                     .eq("clinica_id", params.clinicaId)
-                    .eq("contato_telefone", from)
+                    .in("contato_telefone", [fromDigits, `+${fromDigits}`])
                     .in("status", ["closed", "finished"]);
                 }
 
