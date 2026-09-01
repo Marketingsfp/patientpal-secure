@@ -39,15 +39,22 @@ export async function estadoConversaPorId(
   return (data as EstadoConversa | null) ?? null;
 }
 
+/** Telefone sempre comparado/gravado como só dígitos (evita conversa duplicada com e sem "+"). */
+export function normalizarTelefone(t: string | null | undefined): string {
+  return String(t ?? "").replace(/\D/g, "");
+}
+
 export async function estadoConversaPorTelefone(
   clinicaId: string,
   telefone: string,
 ): Promise<EstadoConversa | null> {
+  const digits = normalizarTelefone(telefone);
+  if (!digits) return null;
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(CAMPOS)
     .eq("clinica_id", clinicaId)
-    .eq("contato_telefone", telefone)
+    .in("contato_telefone", [digits, `+${digits}`])
     .order("ultima_msg_em", { ascending: false })
     .limit(1)
     .maybeSingle();
