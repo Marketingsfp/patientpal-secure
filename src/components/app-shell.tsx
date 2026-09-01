@@ -99,7 +99,7 @@ import {
   fecharSeletorPortais,
   useSeletorPortaisAberto,
 } from "@/components/portal-launcher";
-import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
+import logoSaoFranciscoCdn from "@/assets/logo-policlinica-sao-francisco-de-paula.png.asset.json";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
@@ -135,7 +135,7 @@ function corHoverDaClinica(nome?: string): string {
 
 function logoDaClinica(nome?: string): string | null {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
+  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFranciscoCdn.url;
   if (n.includes("menino jesus")) return logoMeninoJesus;
   if (n.includes("consulta hoje")) return logoConsultaHoje;
   return null;
@@ -1246,13 +1246,14 @@ function AppShellInner() {
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
-            {clinicaAtual && (
-              <img
-                src="https://s3-sa-east-1.amazonaws.com/doctoralia.com.br/doctor/13fc26/13fc266c1e82a5993f2e7d1f0c1d67e0_220_square.jpg"
-                alt={clinicaAtual.clinica.nome}
-                className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
-              />
-            )}
+            {clinicaAtual &&
+              (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (
+                <img
+                  src={branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)!}
+                  alt={clinicaAtual.clinica.nome}
+                  className="hidden sm:block h-9 w-9 shrink-0 rounded-full object-contain bg-white border border-slate-200 shadow-sm"
+                />
+              )}
             {memberships.length > 0 && (
               <Select
                 value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
