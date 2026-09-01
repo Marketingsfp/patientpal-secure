@@ -982,6 +982,16 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
   }
 
+  // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
+  // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
+  if (houveHandoff) {
+    const AVISO_TRANSFERENCIA =
+      "🔁 *Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
+    if (!resposta.includes("Transferido para atendimento humano")) {
+      resposta = `${resposta.trim()}\n\n${AVISO_TRANSFERENCIA}`.trim();
+    }
+  }
+
 
   if (!resposta) {
     resposta =
