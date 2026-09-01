@@ -640,6 +640,18 @@ export function AtendInbox() {
                 )}
                 {msgs.map((m) => {
                   const out = m.direction === "out";
+                  if (m.enviada_por === "sistema") {
+                    return (
+                      <div key={m.id} className="flex justify-center">
+                        <div className="max-w-[85%] rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap text-center">
+                          {m.body}
+                          <div className="mt-1 text-[10px] opacity-70">
+                            {fmtHora(m.recebida_em)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
                       <div

@@ -118,6 +118,35 @@ async function resolverDepartamento(clinicaId: string, nome?: string | null) {
   return lista[0];
 }
 
+/**
+ * Marcador visível na conversa (aparece para o atendente na timeline do chat).
+ * Não vai para a Meta: é só um registro de sistema em `whatsapp_mensagens`.
+ */
+export async function registrarMarcadorSistema(args: {
+  clinicaId: string;
+  conversaId: string;
+  texto: string;
+}) {
+  const { data: conv } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("contato_telefone")
+    .eq("id", args.conversaId)
+    .eq("clinica_id", args.clinicaId)
+    .maybeSingle();
+  const { error } = await supabaseAdmin.from("whatsapp_mensagens").insert({
+    clinica_id: args.clinicaId,
+    conversa_id: args.conversaId,
+    direction: "out",
+    from_number: null,
+    to_number: (conv as { contato_telefone?: string | null } | null)?.contato_telefone ?? null,
+    body: args.texto,
+    tipo: "text",
+    status: "system",
+    enviada_por: "sistema",
+  });
+  if (error) console.error("[handoff] falha ao registrar marcador", error.message);
+}
+
 export type ResultadoHandoff = {
   ok: boolean;
   ja_estava_com_humano?: boolean;
@@ -200,6 +229,18 @@ export async function encaminharParaHumano(args: {
     evento: "ENTROU_NA_FILA",
     departamentoId: depto?.id ?? null,
     detalhes: { posicao: count ?? 1 },
+  });
+
+  await registrarMarcadorSistema({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    texto:
+      `🔁 Conversa transferida da Nina para atendimento humano` +
+      (depto?.nome ? ` · Setor: ${depto.nome}` : "") +
+      ` · Motivo: ${args.motivo}` +
+      (args.urgencia === "alta" ? " · URGENTE" : "") +
+      ` · Posição na fila: ${count ?? 1}` +
+      (args.resumo ? `\nResumo: ${args.resumo}` : ""),
   });
 
   return {
