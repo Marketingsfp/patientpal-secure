@@ -159,6 +159,7 @@ export type ResultadoHandoff = {
   ja_estava_com_humano?: boolean;
   posicao_fila?: number;
   departamento?: string | null;
+  atribuida_para?: string | null;
   mensagem: string;
 };
 
