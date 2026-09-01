@@ -73,6 +73,8 @@ export const listarConversas = createServerFn({ method: "POST" })
     let q = supabaseAdmin
       .from("atend_conversas")
       .select("*")
+      // Conversas do console de homologação nunca aparecem no atendimento real.
+      .eq("is_teste", false)
       .eq("clinica_id", data.clinicaId)
       .order("ultima_msg_em", { ascending: false })
       .limit(data.limit);
@@ -1079,21 +1081,25 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
       supabaseAdmin
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
+        .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .gte("created_at", isoHoje),
       supabaseAdmin
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
+        .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "active"),
       supabaseAdmin
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
+        .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "waiting"),
       supabaseAdmin
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
+        .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "closed")
         .gte("closed_at", isoHoje),
