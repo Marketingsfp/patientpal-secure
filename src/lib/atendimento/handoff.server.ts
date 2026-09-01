@@ -159,6 +159,7 @@ export type ResultadoHandoff = {
   ja_estava_com_humano?: boolean;
   posicao_fila?: number;
   departamento?: string | null;
+  atribuida_para?: string | null;
   mensagem: string;
 };
 
@@ -250,13 +251,122 @@ export async function encaminharParaHumano(args: {
       (args.resumo ? `\nResumo: ${args.resumo}` : ""),
   });
 
+  // Se houver atendente online, a conversa já sai da fila atribuída a ele.
+  const atribuida = await atribuirAtendenteOnline({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    departamentoId: depto?.id ?? null,
+  });
+
   return {
     ok: true,
-    posicao_fila: count ?? 1,
+    posicao_fila: atribuida ? 0 : (count ?? 1),
     departamento: depto?.nome ?? null,
-    mensagem: "Conversa encaminhada para a equipe. A IA parou de responder.",
+    atribuida_para: atribuida?.nome ?? null,
+    mensagem: atribuida
+      ? `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
+      : "Conversa encaminhada para a equipe. A IA parou de responder.",
   };
 }
+
+/** Janela em que consideramos o atendente realmente online (heartbeat). */
+const PRESENCA_FRESCA_MS = 5 * 60 * 1000;
+
+/**
+ * Atribui a conversa a um atendente online (status ONLINE + aceita_novas),
+ * escolhendo quem tem menos conversas ativas. Se ninguém estiver online,
+ * a conversa fica na fila como antes.
+ */
+export async function atribuirAtendenteOnline(args: {
+  clinicaId: string;
+  conversaId: string;
+  departamentoId?: string | null;
+}): Promise<{ userId: string; nome: string } | null> {
+  const desde = new Date(Date.now() - PRESENCA_FRESCA_MS).toISOString();
+  const { data: presencas } = await supabaseAdmin
+    .from("atend_agente_presenca")
+    .select("user_id, status, aceita_novas, visto_em")
+    .eq("clinica_id", args.clinicaId)
+    .eq("status", "ONLINE")
+    .eq("aceita_novas", true)
+    .gte("visto_em", desde);
+
+  let candidatos = (presencas ?? []).map((p) => p.user_id);
+  if (candidatos.length === 0) return null;
+
+  // Prioriza quem pertence ao setor de destino, quando houver.
+  if (args.departamentoId) {
+    const { data: membros } = await supabaseAdmin
+      .from("atend_departamento_membros")
+      .select("user_id")
+      .eq("clinica_id", args.clinicaId)
+      .eq("departamento_id", args.departamentoId);
+    const doSetor = candidatos.filter((u) =>
+      (membros ?? []).some((m) => m.user_id === u),
+    );
+    if (doSetor.length > 0) candidatos = doSetor;
+  }
+
+  // Menor carga: conversas ativas atribuídas a cada candidato.
+  const { data: ativas } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("atribuida_user_id")
+    .eq("clinica_id", args.clinicaId)
+    .in("status", ["active", "in_progress"])
+    .in("atribuida_user_id", candidatos);
+  const carga = new Map<string, number>(candidatos.map((u) => [u, 0]));
+  (ativas ?? []).forEach((c) => {
+    const u = c.atribuida_user_id as string | null;
+    if (u && carga.has(u)) carga.set(u, (carga.get(u) ?? 0) + 1);
+  });
+  const escolhido = candidatos.sort(
+    (a, b) => (carga.get(a) ?? 0) - (carga.get(b) ?? 0),
+  )[0];
+  if (!escolhido) return null;
+
+  const agora = new Date().toISOString();
+  const { error } = await supabaseAdmin
+    .from("atend_conversas")
+    .update({
+      owner_type: "HUMAN",
+      ai_enabled: false,
+      atribuida_user_id: escolhido,
+      status: "active",
+      aguardando_desde: null,
+      updated_at: agora,
+    })
+    .eq("id", args.conversaId)
+    .eq("clinica_id", args.clinicaId)
+    .is("atribuida_user_id", null);
+  if (error) {
+    console.error("[handoff] falha ao atribuir atendente online", error.message);
+    return null;
+  }
+
+  const { data: prof } = await supabaseAdmin
+    .from("profiles")
+    .select("nome")
+    .eq("id", escolhido)
+    .maybeSingle();
+  const nome = ((prof as { nome?: string | null } | null)?.nome ?? "Atendente").trim();
+
+  await registrarEvento({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    evento: "ASSUMIDA",
+    userId: escolhido,
+    departamentoId: args.departamentoId ?? null,
+    motivo: "Atribuição automática (atendente online)",
+  });
+  await registrarMarcadorSistema({
+    clinicaId: args.clinicaId,
+    conversaId: args.conversaId,
+    texto: `👤 Atribuída automaticamente a ${nome} (online).`,
+  });
+
+  return { userId: escolhido, nome };
+}
+
 
 /** Devolve a conversa para a Nina (reativa a IA). */
 export async function devolverParaIA(args: {
