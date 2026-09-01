@@ -15,6 +15,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Lead = {
@@ -55,6 +62,8 @@ export function ConsoleTesteNina() {
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [ultimoTexto, setUltimoTexto] = useState("");
+  const [tipo, setTipo] = useState<"text" | "audio" | "image" | "document" | "sticker">("text");
+  const [audio, setAudio] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement | null>(null);
 
   const carregarLeads = useCallback(async () => {
@@ -98,6 +107,7 @@ export function ConsoleTesteNina() {
       setMsgs([]);
       setConversaId(null);
     }
+    setAudio(null);
   }, [leadId, carregarHistorico]);
 
   useEffect(() => {
@@ -109,18 +119,21 @@ export function ConsoleTesteNina() {
   const dispararMensagem = async (conteudo: string) => {
     if (!clinicaId || !leadId) return;
     const corpo = conteudo.trim();
-    if (!corpo) return;
+    // Só texto exige conteúdo: áudio sem transcrição e mídias simulam o webhook real.
+    if (tipo === "text" && !corpo) return;
     setProcessando(true);
     setErro(null);
     setUltimoTexto(corpo);
     try {
       const chave = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const r = (await enviar({ data: { clinicaId, leadId, texto: corpo, chave } })) as {
+      const r = (await enviar({ data: { clinicaId, leadId, tipo, texto: corpo, chave } })) as {
         duplicada: boolean;
         reply: string | null;
         erro: string | null;
+        audio: { base64: string; mime: string; texto: string } | null;
       };
       setTexto("");
+      setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
       await carregarHistorico(leadId);
       await carregarLeads();
       if (r.erro) setErro(r.erro);
@@ -140,6 +153,7 @@ export function ConsoleTesteNina() {
       setMsgs([]);
       setConversaId(null);
       setErro(null);
+      setAudio(null);
       await carregarLeads();
       toast.success("Conversa resolvida. A próxima mensagem começa sem memória.");
     } catch (e: any) {
@@ -274,18 +288,47 @@ export function ConsoleTesteNina() {
               </div>
             )}
 
+            {audio && (
+              <div className="space-y-1 rounded-lg border p-2">
+                <p className="text-xs text-muted-foreground">
+                  Resposta em áudio da Nina (mesma voz usada no WhatsApp)
+                </p>
+                <audio controls src={audio} className="w-full" />
+              </div>
+            )}
+
             <div className="space-y-2">
+              <Select value={tipo} onValueChange={(v) => setTipo(v as typeof tipo)}>
+                <SelectTrigger className="w-full sm:w-[260px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Texto</SelectItem>
+                  <SelectItem value="audio">Áudio (texto = transcrição)</SelectItem>
+                  <SelectItem value="image">Imagem</SelectItem>
+                  <SelectItem value="document">Documento</SelectItem>
+                  <SelectItem value="sticker">Figurinha</SelectItem>
+                </SelectContent>
+              </Select>
               <Textarea
                 rows={3}
                 value={texto}
-                placeholder="Escreva a mensagem como se fosse o paciente…"
+                placeholder={
+                  tipo === "audio"
+                    ? "Transcrição do áudio (deixe vazio para simular falha na transcrição)…"
+                    : tipo === "text"
+                      ? "Escreva a mensagem como se fosse o paciente…"
+                      : "Mídia sem texto — a Nina responde como no WhatsApp."
+                }
                 onChange={(e) => setTexto(e.target.value)}
-                disabled={processando || !podeEscrever}
+                disabled={processando || !podeEscrever || tipo !== "text" && tipo !== "audio"}
               />
               <div className="flex justify-end">
                 <Button
                   onClick={() => void dispararMensagem(texto)}
-                  disabled={processando || !podeEscrever || !leadId || !texto.trim()}
+                  disabled={
+                    processando || !podeEscrever || !leadId || (tipo === "text" && !texto.trim())
+                  }
                 >
                   {processando ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -179,7 +179,10 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         leadId: z.string().uuid(),
-        texto: z.string().trim().min(1).max(2000),
+        // Espelha os tipos que chegam pelo webhook da Meta.
+        tipo: z.enum(["text", "audio", "image", "document", "sticker"]).default("text"),
+        // Em áudio, o texto é a "transcrição": vazio simula transcrição falha.
+        texto: z.string().trim().max(2000).default(""),
         chave: z.string().min(6).max(80),
       })
       .parse(input),
@@ -190,6 +193,22 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
     const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
     const conversaId = await garantirConversa(supabaseAdmin, data.clinicaId, lead);
 
+    const ehAudio = data.tipo === "audio";
+    const textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
+    const audioFalhou = ehAudio && !textoPaciente;
+    if (data.tipo === "text" && !textoPaciente) {
+      return { duplicada: false, reply: null as string | null, erro: "Mensagem vazia.", audio: null };
+    }
+
+    // Mesmo corpo gravado pelo webhook real (áudio recebe o prefixo 🎤).
+    const body = ehAudio
+      ? textoPaciente
+        ? `🎤 ${textoPaciente}`
+        : "🎤 [áudio não transcrito]"
+      : data.tipo === "text"
+        ? textoPaciente
+        : `[${data.tipo}]`;
+
     // Anti-duplo-clique: a mesma chave nunca entra duas vezes.
     const waId = `test-${lead.id}-${data.chave}`;
     const { data: jaExiste } = await supabaseAdmin
@@ -198,7 +217,7 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .eq("wa_message_id", waId)
       .maybeSingle();
-    if (jaExiste) return { duplicada: true, reply: null as string | null, erro: null };
+    if (jaExiste) return { duplicada: true, reply: null as string | null, erro: null, audio: null };
 
     const agora = new Date().toISOString();
     await supabaseAdmin.from("whatsapp_mensagens").insert({
@@ -209,42 +228,131 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       direction: "in",
       from_number: lead.telefone_sessao,
       to_number: CANAL_TESTE,
-      body: data.texto,
-      tipo: "text",
+      body,
+      tipo: data.tipo,
+      transcricao: ehAudio && textoPaciente ? textoPaciente : null,
       status: "received",
       enviada_por: "paciente",
       is_teste: true,
     });
     await supabaseAdmin
       .from("atend_conversas")
-      .update({ ultima_msg_em: agora, ultima_msg_preview: data.texto.slice(0, 160) })
+      .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
       .eq("id", conversaId);
 
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
     const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
     if (await ninaDesativadaNaClinica(data.clinicaId)) {
-      return { duplicada: false, reply: null, erro: "A Nina está desativada nesta clínica." };
+      return {
+        duplicada: false,
+        reply: null,
+        erro: "A Nina está desativada nesta clínica.",
+        audio: null,
+      };
     }
+
+    // Atendimento híbrido: se a conversa já está com uma pessoa (ou na fila),
+    // a Nina cala — exatamente como no WhatsApp.
+    const { estadoConversaPorId, ninaPodeResponder } = await import(
+      "@/lib/atendimento/handoff.server"
+    );
+    const estadoAntes = await estadoConversaPorId(data.clinicaId, conversaId);
+    if (!ninaPodeResponder(estadoAntes)) {
+      return {
+        duplicada: false,
+        reply: null,
+        erro: "Conversa está com atendimento humano — a Nina não responde (igual ao WhatsApp).",
+        audio: null,
+      };
+    }
+
+    const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } = await import(
+      "@/lib/whatsapp-midia.server"
+    );
 
     let reply = "";
     try {
-      const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
-      reply = await gerarRespostaNina(data.clinicaId, data.texto, lead.telefone_sessao);
+      if (textoPaciente) {
+        const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
+        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao);
+      } else if (audioFalhou) {
+        reply = RESPOSTA_AUDIO_FALHOU;
+      } else {
+        reply = respostaMidiaNaoSuportada(data.tipo);
+      }
     } catch (e) {
       return {
         duplicada: false,
         reply: null,
         erro: String((e as Error)?.message ?? e).slice(0, 300),
+        audio: null,
       };
     }
 
     // A conversa pode ter sido resolvida enquanto a Nina pensava: descarta.
     const atual = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
     if (atual.conversa_id !== conversaId) {
-      return { duplicada: false, reply: null, erro: "Conversa resolvida durante o processamento." };
+      return {
+        duplicada: false,
+        reply: null,
+        erro: "Conversa resolvida durante o processamento.",
+        audio: null,
+      };
     }
 
-    if (reply.trim()) {
+    // Revalida o dono ANTES de "enviar": a própria Nina pode ter transferido
+    // a conversa durante a resposta.
+    const estadoDepois = await estadoConversaPorId(data.clinicaId, conversaId);
+    const transferida = !ninaPodeResponder(estadoDepois);
+
+    // Paciente mandou áudio → Nina responde falando (mesma regra do WhatsApp).
+    let audio: { base64: string; mime: string; texto: string } | null = null;
+    let precisaTextoCompleto = true;
+    if (reply.trim() && ehAudio) {
+      try {
+        const {
+          respostaAudioDesativada,
+          prepararParaFala,
+          pareceLista,
+          resumoFalado,
+          sintetizarFala,
+          LIMITE_FALA_CURTA,
+        } = await import("@/lib/nina-audio.server");
+        if (!(await respostaAudioDesativada(data.clinicaId))) {
+          const longa = reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
+          const falado = longa ? resumoFalado(reply) : prepararParaFala(reply);
+          const sintetizado = await sintetizarFala(falado);
+          if (sintetizado) {
+            audio = {
+              base64: Buffer.from(sintetizado.bytes).toString("base64"),
+              mime: sintetizado.mime,
+              texto: falado,
+            };
+            precisaTextoCompleto = longa;
+            await supabaseAdmin.from("whatsapp_mensagens").insert({
+              clinica_id: data.clinicaId,
+              conversa_id: conversaId,
+              canal: CANAL_TESTE,
+              wa_message_id: `${waId}-audio`,
+              direction: "out",
+              from_number: CANAL_TESTE,
+              to_number: lead.telefone_sessao,
+              body: `🎤 ${falado}`,
+              tipo: "audio",
+              transcricao: falado,
+              media_mime: sintetizado.mime,
+              status: "sent",
+              enviada_por: "nina",
+              is_teste: true,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Nina teste: resposta em áudio falhou (caindo para texto)", e);
+      }
+    }
+
+    if (reply.trim() && (!audio || precisaTextoCompleto)) {
       await supabaseAdmin.from("whatsapp_mensagens").insert({
         clinica_id: data.clinicaId,
         conversa_id: conversaId,
@@ -259,6 +367,8 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         enviada_por: "nina",
         is_teste: true,
       });
+    }
+    if (reply.trim()) {
       await supabaseAdmin
         .from("atend_conversas")
         .update({
@@ -268,8 +378,15 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         .eq("id", conversaId);
     }
 
-    return { duplicada: false, reply, erro: null as string | null };
+    return {
+      duplicada: false,
+      reply,
+      erro: null as string | null,
+      audio,
+      transferida,
+    };
   });
+
 
 export const resolverConversaTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

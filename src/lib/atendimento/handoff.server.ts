@@ -251,6 +251,23 @@ export async function encaminharParaHumano(args: {
       (args.resumo ? `\nResumo: ${args.resumo}` : ""),
   });
 
+  // Conversas do console de homologação nunca ocupam um atendente real:
+  // o restante do fluxo (fila, marcador, IA silenciada) é idêntico.
+  const { data: convRow } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("is_teste")
+    .eq("id", args.conversaId)
+    .maybeSingle();
+  if ((convRow as any)?.is_teste) {
+    return {
+      ok: true,
+      posicao_fila: count ?? 1,
+      departamento: depto?.nome ?? null,
+      atribuida_para: null,
+      mensagem: "Conversa encaminhada para a equipe. A IA parou de responder.",
+    };
+  }
+
   // Se houver atendente online, a conversa já sai da fila atribuída a ele.
   const atribuida = await atribuirAtendenteOnline({
     clinicaId: args.clinicaId,
