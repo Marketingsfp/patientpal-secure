@@ -450,19 +450,31 @@ export function ContratosCards({
     let cancelado = false;
     void (async () => {
       const { hojeIso } = limitesDoMes();
+      // Os indicadores filtram a relação inteira, então as parcelas precisam
+      // vir de todos os contratos — mas não de uma vez só: com ~2.000
+      // contratos o `Promise.all` sobre todos os lotes disparava ~100
+      // requisições simultâneas e a tela travava. Agora as consultas saem em
+      // fila, no máximo 4 ao mesmo tempo.
       const LOTE = 20;
+      const CONCORRENCIA = 4;
       const lotes: string[][] = [];
       for (let i = 0; i < lista.length; i += LOTE) lotes.push(lista.slice(i, i + LOTE));
-      const respostas = await Promise.all(
-        lotes.map((slice) =>
-          supabase
-            .from("contrato_mensalidades")
-            .select("contrato_id, vencimento, status, pago_em, numero_parcela")
-            .in("contrato_id", slice)
-            .gt("numero_parcela", 0),
-        ),
-      );
+      const respostas: Array<{ data: unknown }> = [];
+      for (let i = 0; i < lotes.length; i += CONCORRENCIA) {
+        if (cancelado) return;
+        const bloco = await Promise.all(
+          lotes.slice(i, i + CONCORRENCIA).map((slice) =>
+            supabase
+              .from("contrato_mensalidades")
+              .select("contrato_id, vencimento, status, pago_em, numero_parcela")
+              .in("contrato_id", slice)
+              .gt("numero_parcela", 0),
+          ),
+        );
+        respostas.push(...bloco);
+      }
       if (cancelado) return;
+
       const linhas = respostas.flatMap(
         (r) =>
           (r.data ?? []) as Array<{

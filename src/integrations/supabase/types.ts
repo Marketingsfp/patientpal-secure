@@ -1682,6 +1682,51 @@ export type Database = {
         }
         Relationships: []
       }
+      campanhas_marketing: {
+        Row: {
+          agendada_para: string | null
+          clinica_id: string
+          created_at: string
+          enviada_em: string | null
+          id: string
+          mensagem: string
+          nome: string
+          segmento: string | null
+          status: string
+          tipo: string
+          total_envios: number
+          updated_at: string
+        }
+        Insert: {
+          agendada_para?: string | null
+          clinica_id: string
+          created_at?: string
+          enviada_em?: string | null
+          id?: string
+          mensagem: string
+          nome: string
+          segmento?: string | null
+          status?: string
+          tipo?: string
+          total_envios?: number
+          updated_at?: string
+        }
+        Update: {
+          agendada_para?: string | null
+          clinica_id?: string
+          created_at?: string
+          enviada_em?: string | null
+          id?: string
+          mensagem?: string
+          nome?: string
+          segmento?: string | null
+          status?: string
+          tipo?: string
+          total_envios?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cargos: {
         Row: {
           ativo: boolean
@@ -6566,6 +6611,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "mkt_envios_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas_marketing"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "mkt_envios_clinica_id_fkey"
             columns: ["clinica_id"]

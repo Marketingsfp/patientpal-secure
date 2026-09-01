@@ -169,27 +169,49 @@ export const emitirNfse = createServerFn({ method: "POST" })
     //
     // Só bloqueia contra nota que ainda vale: nota com erro ou cancelada não
     // impede uma nova, que é justamente o caso de reemitir depois de recusa.
+    //
+    // E não pode barrar a NOTA PARCIAL: no mesmo atendimento de R$ 400 a
+    // recepção emite R$ 200 no nome do paciente e R$ 200 no nome de quem
+    // pagou. São notas legítimas e diferentes. Por isso a trava só considera
+    // duplicidade quando a nota já existente é do MESMO tomador e do MESMO
+    // valor — que é exatamente o caso do clique repetido. Nota ainda em
+    // "processando" continua bloqueando qualquer nova emissão, porque nesse
+    // instante não dá para saber com que valor ela vai sair.
     const vinculo = data.agendamentoId
       ? { coluna: "agendamento_id" as const, valor: data.agendamentoId, rotulo: "atendimento" }
       : data.pagamentoId
         ? { coluna: "pagamento_id" as const, valor: data.pagamentoId, rotulo: "pagamento" }
         : null;
     if (vinculo) {
-      const { data: jaExiste } = await supabase
+      const { data: existentes } = await supabase
         .from("nfse")
-        .select("id, numero, status")
+        .select("id, numero, status, valor_servicos, tomador_documento")
         .eq(vinculo.coluna, vinculo.valor)
         .in("status", ["processando", "emitida"])
-        .limit(1)
-        .maybeSingle();
-      if (jaExiste) {
+        .limit(50);
+
+      const soDigitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
+      const docNovo = soDigitos(data.tomador.cpfCnpj);
+      const valorNovo = Number(data.valorServicos ?? 0).toFixed(2);
+
+      const emProcessamento = (existentes ?? []).find((n) => n.status === "processando");
+      if (emProcessamento) {
         throw new Error(
-          jaExiste.numero
-            ? `Este ${vinculo.rotulo} já tem a NFS-e nº ${jaExiste.numero} emitida. Para emitir outra, cancele a atual primeiro.`
-            : `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+          `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+        );
+      }
+      const duplicada = (existentes ?? []).find(
+        (n) =>
+          soDigitos(n.tomador_documento) === docNovo &&
+          Number(n.valor_servicos ?? 0).toFixed(2) === valorNovo,
+      );
+      if (duplicada) {
+        throw new Error(
+          `Este ${vinculo.rotulo} já tem a NFS-e nº ${duplicada.numero ?? ""} emitida para este mesmo tomador e valor. Para emitir outra igual, cancele a atual primeiro.`,
         );
       }
     }
+
 
     // Trava contra emissão sem CPF/CNPJ do tomador (ver `nfse-tomador.ts`).
     //
