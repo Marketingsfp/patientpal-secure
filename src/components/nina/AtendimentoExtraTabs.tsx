@@ -238,6 +238,14 @@ export function AtendInbox() {
         obterContato({ data: { clinicaId, conversaId: sel.id } }),
         listarNotasFn({ data: { clinicaId, conversaId: sel.id } }),
       ]);
+      if (!c) {
+        // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
+        setSel(null);
+        setMsgs([]);
+        setContato(null);
+        setNotas([]);
+        return;
+      }
       setMsgs(m);
       setContato(c);
       setNotas(n);
