@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, CheckCheck, FlaskConical, Loader2, RefreshCw, Send, User } from "lucide-react";
+import { Bot, CheckCheck, Download, FlaskConical, Loader2, RefreshCw, Send, User } from "lucide-react";
 import { toast } from "sonner";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
