@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { Check, Copy, Loader2, QrCode, TriangleAlert } from "lucide-react";
+import { Check, Copy, Loader2, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { montarPayloadPix } from "@/lib/pix/br-code";
-import { buscarPixDaClinica, type MotivoPixIndisponivel } from "@/lib/pix/chave-clinica";
+import { buscarPixDaClinica } from "@/lib/pix/chave-clinica";
 
 /**
  * Diálogo que mostra o QR Code PIX de uma cobrança.
@@ -22,6 +22,12 @@ import { buscarPixDaClinica, type MotivoPixIndisponivel } from "@/lib/pix/chave-
  * "Confirmar recebimento" apenas chama de volta quem abriu o diálogo, que
  * segue pelo caminho normal de baixa (lançamento financeiro, movimento de
  * caixa e GR). Nenhuma regra de cobrança é repetida aqui.
+ *
+ * O QR Code é um conforto, não uma exigência. Quando a clínica não tem chave
+ * PIX cadastrada — ou o código não pode ser montado por qualquer outro motivo
+ * — o diálogo não trava nem enche a tela de aviso: ele segue direto para a
+ * baixa, do mesmo jeito que as outras formas de pagamento. Quem recebe o PIX
+ * pela maquininha ou pela chave do banco não precisa do código na tela.
  *
  * O sistema não tem integração com banco: não há como saber automaticamente
  * que o PIX caiu. Por isso o texto da tela pede para conferir o comprovante
@@ -49,24 +55,6 @@ interface Props {
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/** Texto de orientação para cada motivo de o QR não sair. */
-const AVISO: Record<MotivoPixIndisponivel, { titulo: string; detalhe: string }> = {
-  "coluna-ausente": {
-    titulo: "O campo da chave PIX ainda não existe no banco",
-    detalhe:
-      "Falta aplicar a atualização do banco que cria os campos de PIX da clínica. Enquanto isso, o pagamento por PIX continua funcionando normalmente — só não sai o QR Code.",
-  },
-  "nao-configurado": {
-    titulo: "A chave PIX da clínica ainda não foi cadastrada",
-    detalhe:
-      "Cadastre a chave em Unidades › editar a clínica › Recebimento por PIX. Sem ela não há como gerar o QR Code.",
-  },
-  erro: {
-    titulo: "Não foi possível ler a chave PIX da clínica",
-    detalhe: "Tente de novo. Se continuar, siga o pagamento sem o QR Code.",
-  },
-};
-
 export function PixCobrancaDialog({
   open,
   onOpenChange,
@@ -81,8 +69,15 @@ export function PixCobrancaDialog({
   const [carregando, setCarregando] = useState(false);
   const [payload, setPayload] = useState<string | null>(null);
   const [qr, setQr] = useState<string>("");
-  const [motivo, setMotivo] = useState<MotivoPixIndisponivel | null>(null);
+  const [semCodigo, setSemCodigo] = useState(false);
   const [copiado, setCopiado] = useState(false);
+
+  // Guardado em ref porque quem chama costuma passar uma função nova a cada
+  // render — no array de dependências ela reiniciaria o efeito sem parar.
+  const onConfirmarRef = useRef(onConfirmar);
+  onConfirmarRef.current = onConfirmar;
+  // Só segue direto para a baixa uma vez por abertura do diálogo.
+  const seguiuDiretoRef = useRef(false);
 
   // Monta a cobrança toda vez que o diálogo abre. Não guarda entre aberturas
   // porque valor e parcela mudam a cada pagamento.
@@ -90,18 +85,29 @@ export function PixCobrancaDialog({
     if (!open) {
       setPayload(null);
       setQr("");
-      setMotivo(null);
+      setSemCodigo(false);
       setCopiado(false);
+      seguiuDiretoRef.current = false;
       return;
     }
     let cancelado = false;
     setCarregando(true);
     void (async () => {
-      const { pix, motivo: falha } = await buscarPixDaClinica(clinicaId);
+      // Sem QR Code o pagamento não para: vai direto para a tela de baixa, que
+      // é o mesmo caminho das outras formas de pagamento.
+      const seguirSemCodigo = () => {
+        if (cancelado) return;
+        setCarregando(false);
+        setSemCodigo(true);
+        if (!podeConfirmar || seguiuDiretoRef.current) return;
+        seguiuDiretoRef.current = true;
+        onConfirmarRef.current();
+      };
+
+      const { pix } = await buscarPixDaClinica(clinicaId);
       if (cancelado) return;
       if (!pix) {
-        setMotivo(falha);
-        setCarregando(false);
+        seguirSemCodigo();
         return;
       }
       const { payload: texto } = montarPayloadPix({
@@ -112,10 +118,9 @@ export function PixCobrancaDialog({
         txid,
         descricao,
       });
+      // Chave existe, mas falta nome ou cidade da clínica no cadastro.
       if (!texto) {
-        // Chave existe, mas falta nome ou cidade da clínica no cadastro.
-        setMotivo("nao-configurado");
-        setCarregando(false);
+        seguirSemCodigo();
         return;
       }
       const imagem = await QRCode.toDataURL(texto, {
@@ -131,7 +136,7 @@ export function PixCobrancaDialog({
     return () => {
       cancelado = true;
     };
-  }, [open, clinicaId, valor, txid, descricao]);
+  }, [open, clinicaId, valor, txid, descricao, podeConfirmar]);
 
   // O aviso de "copiado" some sozinho; sem isso ele fica preso na tela.
   useEffect(() => {
@@ -172,14 +177,10 @@ export function PixCobrancaDialog({
             <Loader2 className="h-4 w-4 animate-spin" />
             Gerando o código…
           </div>
-        ) : motivo ? (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold">
-              <TriangleAlert className="h-4 w-4" />
-              {AVISO[motivo].titulo}
-            </div>
-            <p className="text-muted-foreground">{AVISO[motivo].detalhe}</p>
-          </div>
+        ) : semCodigo ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Receba o PIX pelo caminho de sempre e confirme aqui embaixo.
+          </p>
         ) : (
           <div className="space-y-3">
             <div className="flex justify-center">
