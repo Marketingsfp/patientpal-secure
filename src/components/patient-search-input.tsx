@@ -266,7 +266,11 @@ export function PatientSearchInput({
                         Prontuário {prontuarioExibicao(p)}
                       </span>
                     )}
-                    {p.numero_pasta && (
+                    {/* O número da pasta agora é o próprio prontuário exibido
+                        quando existe. Repetir o mesmo número em dois selos
+                        confundiria a recepção, então só mostramos a pasta
+                        quando ela for diferente. */}
+                    {p.numero_pasta && p.numero_pasta.trim() !== prontuarioExibicao(p) && (
                       <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
                         Pasta {p.numero_pasta}
                       </span>

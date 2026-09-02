@@ -3842,7 +3842,7 @@ function DetalheContrato({
       supabase
         .from("pacientes")
         .select(
-          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario, codigo_prontuario_anterior",
+          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario, codigo_prontuario_anterior, numero_pasta",
         )
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),

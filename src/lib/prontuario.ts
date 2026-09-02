@@ -86,6 +86,12 @@ export async function conflitoCodigoProntuario(
 export interface ProntuarioExibivel {
   codigo_prontuario?: string | null;
   codigo_prontuario_anterior?: string | null;
+  /**
+   * Número da pasta física. Quando existe, é o que a recepção usa para achar a
+   * pasta na estante, e por isso tem prioridade sobre os outros dois. Telas que
+   * não carregam esta coluna continuam funcionando como antes.
+   */
+  numero_pasta?: string | null;
 }
 
 /**
@@ -97,10 +103,23 @@ export interface ProntuarioExibivel {
  * que está na ficha de papel e nos documentos antigos. Quem foi cadastrado já
  * no sistema novo não tem histórico e continua com o número interno.
  *
+ * Acima dos dois vem `numero_pasta`, quando o paciente tem um. A clínica tem
+ * duas numerações herdadas do sistema antigo, com faixas que se cruzam, e para
+ * quem tem pasta física é o número dela que está na capa e na guia.
+ *
  * Usar só para exibir e imprimir. Cadastro, busca por código e checagem de
  * duplicidade continuam em `codigo_prontuario`, que é a coluna com índice único.
  */
 export function prontuarioExibicao(p: ProntuarioExibivel | null | undefined): string | null {
+  // O número da pasta física vem primeiro quando existe. Ele é o número escrito
+  // na capa da pasta que a recepção pega na estante, e é ele que o paciente vê
+  // na guia. São 3.693 pacientes com pasta cadastrada cujo número histórico é
+  // outro — o caso da VANILDA DOS SANTOS VENTURA, que tem pasta 1348 e saía
+  // impressa como 194897. Pior: 194897 é o `codigo_prontuario` de outra
+  // paciente, então o mesmo número respondia por duas pessoas diferentes
+  // dependendo de qual campo se olhava.
+  const pasta = (p?.numero_pasta ?? "").trim();
+  if (pasta) return pasta;
   const antigo = (p?.codigo_prontuario_anterior ?? "").trim();
   if (antigo) return antigo;
   return (p?.codigo_prontuario ?? "").trim() || null;

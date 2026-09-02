@@ -76,3 +76,47 @@ describe("erroCodigoProntuario", () => {
     expect(erroCodigoProntuario("  2656813  ")).toBeNull();
   });
 });
+
+// A clínica tem duas numerações herdadas do sistema antigo, e as faixas se
+// cruzam: 194897 é o `codigo_prontuario_anterior` da VANILDA DOS SANTOS
+// VENTURA e, ao mesmo tempo, o `codigo_prontuario` da BEATRIZ MOREIRA DE
+// AZEVEDO. A guia da Vanilda saía impressa com 194897 em vez de 1348, que é o
+// número da pasta dela na estante. São 3.693 pacientes nessa situação.
+
+describe("prontuarioExibicao com número de pasta", () => {
+  it("usa o número da pasta física quando ele existe", () => {
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: "1348",
+        codigo_prontuario_anterior: "194897",
+        numero_pasta: "1348",
+      }),
+    ).toBe("1348");
+  });
+
+  it("cai no histórico quando o paciente não tem pasta", () => {
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: "194897",
+        codigo_prontuario_anterior: "322719",
+        numero_pasta: null,
+      }),
+    ).toBe("322719");
+  });
+
+  it("trata pasta em branco como ausente", () => {
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: "2435051",
+        codigo_prontuario_anterior: "01234",
+        numero_pasta: "   ",
+      }),
+    ).toBe("01234");
+  });
+
+  it("não muda nada para tela que não carrega a coluna da pasta", () => {
+    expect(
+      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: "01234" }),
+    ).toBe("01234");
+  });
+});
