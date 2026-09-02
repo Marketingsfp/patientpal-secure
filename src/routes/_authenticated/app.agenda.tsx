@@ -915,7 +915,7 @@ function AgendaPage() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<
-    Map<string, { id: string; nome: string }[]>
+    Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>
   >(new Map());
   // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
   // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
@@ -2707,22 +2707,23 @@ function AgendaPage() {
       ),
       supabase
         .from("medico_agendas")
-        .select("id,nome,medico_id,ativo,ordem")
+        .select("id,nome,medico_id,ativo,ordem,ordem_chegada")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("ordem", { ascending: true })
         .order("nome", { ascending: true }),
     ]);
     const agendasData = agendasRes.data;
-    const ag = new Map<string, { id: string; nome: string }[]>();
+    const ag = new Map<string, { id: string; nome: string; ordem_chegada?: boolean }[]>();
     for (const a of (agendasData ?? []) as Array<{
       id: string;
       nome: string;
       medico_id: string | null;
+      ordem_chegada?: boolean | null;
     }>) {
       if (!a.medico_id) continue;
       const arr = ag.get(a.medico_id) ?? [];
-      arr.push({ id: a.id, nome: a.nome });
+      arr.push({ id: a.id, nome: a.nome, ordem_chegada: !!a.ordem_chegada });
       ag.set(a.medico_id, arr);
     }
     setAgendasPorMedico(ag);
@@ -4483,17 +4484,75 @@ function AgendaPage() {
     );
   };
 
-  const openNew = () => {
+  // Agenda de ORDEM DE CHEGADA do médico (ficha livre), se ele tiver uma.
+  // Nessas agendas o horário é só a posição na fila: o médico atende por
+  // ficha, na ordem em que o paciente chega.
+  const agendaDeFila = (medicoId: string | null | undefined) =>
+    medicoId ? ((agendasPorMedico.get(medicoId) ?? []).find((a) => a.ordem_chegada) ?? null) : null;
+
+  // Próxima posição da fila num dia: 1 minuto depois do último atendimento já
+  // marcado. O passo é de 1 minuto (e não da duração da consulta) porque a
+  // ficha é POSICIONAL — o relógio só ordena a fila — e um passo curto faz o
+  // dia comportar muito mais encaixes antes de esbarrar na virada da noite.
+  const proximaPosicaoDaFila = async (
+    medicoId: string,
+    agendaId: string,
+    diaIso: string,
+  ): Promise<{ inicio: Date } | { erro: string }> => {
+    if (!clinicaAtual) return { erro: "Selecione a clínica." };
+    const iniDia = new Date(`${diaIso}T00:00:00`);
+    const fimDia = new Date(`${diaIso}T23:59:59`);
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select("inicio")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", medicoId)
+      .eq("agenda_id", agendaId)
+      // Cancelado entra na conta de propósito: a ficha é posicional e a linha
+      // cancelada continua ocupando a posição dela na fila do dia (é assim que
+      // `fichaPorId` numera). Ignorar o cancelado faria a próxima ficha nascer
+      // antes de uma que já existe e embaralharia a numeração.
+      .gte("inicio", iniDia.toISOString())
+      .lte("inicio", fimDia.toISOString())
+      .order("inicio", { ascending: false })
+      .limit(1);
+    if (error) return { erro: "Não foi possível ler a fila do médico. Tente de novo." };
+    const ultimo = ((data ?? []) as Array<{ inicio: string }>)[0]?.inicio ?? null;
+    if (!ultimo) return { inicio: new Date(`${diaIso}T08:00:00`) };
+    const proximo = new Date(new Date(ultimo).getTime() + 60000);
+    if (proximo > fimDia) {
+      return {
+        erro:
+          "A fila deste médico chegou ao fim do dia (23:59) e não cabe mais ficha nesta data. " +
+          "Marque o paciente para o próximo dia de atendimento.",
+      };
+    }
+    return { inicio: proximo };
+  };
+
+  const openNew = async () => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
       return;
     }
     setEditing(null);
-    const base = new Date(`${dataRef}T09:00:00`);
-    const end = new Date(base.getTime() + 30 * 60000);
+    let base = new Date(`${dataRef}T09:00:00`);
     // Pré-preenche a partir dos filtros ativos da agenda.
     const medicoFiltro =
       filtroMedico !== "todos" && medicos.some((m) => m.id === filtroMedico) ? filtroMedico : "";
+    // Médico de ordem de chegada: o encaixe entra no FIM da fila do dia. Não
+    // pode cair no meio — a ficha é posicional, e uma linha inserida antes
+    // empurraria o número de todo mundo que já recebeu ficha impressa.
+    const filaDoMedico = agendaDeFila(medicoFiltro);
+    if (filaDoMedico) {
+      const pos = await proximaPosicaoDaFila(medicoFiltro, filaDoMedico.id, dataRef);
+      if ("erro" in pos) {
+        toast.error(pos.erro, { duration: 8000 });
+        return;
+      }
+      base = pos.inicio;
+    }
+    const end = new Date(base.getTime() + 30 * 60000);
     let pacienteId = "";
     let pacienteNome = "";
     const termoCli = normalizarTermoBusca(filtroCliente);
@@ -5287,14 +5346,41 @@ function AgendaPage() {
         }
       }
     }
+    // Encaixe em agenda de ORDEM DE CHEGADA: a linha nova sempre entra no fim
+    // da fila do dia, qualquer que seja o horário digitado. `editing` vazio
+    // significa linha nova (ocupar uma vaga já existente da grade passa por
+    // `editing`), e é só aí que existe risco de empurrar a numeração: a ficha
+    // é posicional, então uma linha inserida no meio do dia renumeraria todas
+    // as fichas seguintes — inclusive as que a recepção já imprimiu.
+    let inicioParaSalvar = form.inicio;
+    let fimParaSalvar = form.fim;
+    const filaNoSalvamento = !editing ? agendaDeFila(form.medico_id) : null;
+    if (filaNoSalvamento && form.medico_id) {
+      const diaIso = new Date(form.inicio).toLocaleDateString("en-CA", {
+        timeZone: "America/Sao_Paulo",
+      });
+      const pos = await proximaPosicaoDaFila(form.medico_id, filaNoSalvamento.id, diaIso);
+      if ("erro" in pos) {
+        toast.error(pos.erro, { duration: 8000 });
+        return;
+      }
+      const duracaoMs = Math.max(
+        60000,
+        new Date(form.fim).getTime() - new Date(form.inicio).getTime(),
+      );
+      if (pos.inicio.getTime() !== new Date(form.inicio).getTime()) {
+        inicioParaSalvar = toLocalInput(pos.inicio.toISOString());
+        fimParaSalvar = toLocalInput(new Date(pos.inicio.getTime() + duracaoMs).toISOString());
+      }
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
       medico_id: form.medico_id || null,
-      inicio: new Date(form.inicio).toISOString(),
-      fim: new Date(form.fim).toISOString(),
+      inicio: new Date(inicioParaSalvar).toISOString(),
+      fim: new Date(fimParaSalvar).toISOString(),
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
@@ -6675,7 +6761,7 @@ function AgendaPage() {
       const k = e.key.toLowerCase();
       if (k === "n") {
         e.preventDefault();
-        openNew();
+        void openNew();
       } else if (k === "f") {
         const el = document.querySelector<HTMLElement>("[data-agenda-filtro-prof]");
         if (el) {
@@ -7858,7 +7944,7 @@ function AgendaPage() {
                 <Button
                   size="sm"
                   data-turbo-novo
-                  onClick={openNew}
+                  onClick={() => void openNew()}
                   disabled={!clinicaAtual}
                   className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold shadow-md lg:shadow-none bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
@@ -7884,6 +7970,14 @@ function AgendaPage() {
               <form onSubmit={submit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-y-auto scroll-hidden space-y-1.5 px-4 sm:px-6 py-2">
                   {editing && open && <FichaEmUsoAlert agendamentoId={editing.id} />}
+                  {!editing && agendaDeFila(form.medico_id) && (
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50/70 text-sky-900 px-3 py-2 text-xs">
+                      <span className="mt-0.5">🎫</span>
+                      Este médico atende por <span className="font-semibold">ordem de chegada</span>
+                      . A ficha entra no fim da fila do dia, com o próximo número da sequência — o
+                      horário abaixo é só a posição na fila.
+                    </div>
+                  )}
                   {editing && pagosSet.has(editing.id) && (
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
                       <span className="mt-0.5">⚠️</span>

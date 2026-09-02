@@ -6009,6 +6009,7 @@ export type Database = {
           medico_id: string | null
           nome: string
           ordem: number
+          ordem_chegada: boolean
           sala: string | null
           tipo_recurso: string | null
           updated_at: string
@@ -6022,6 +6023,7 @@ export type Database = {
           medico_id?: string | null
           nome: string
           ordem?: number
+          ordem_chegada?: boolean
           sala?: string | null
           tipo_recurso?: string | null
           updated_at?: string
@@ -6035,6 +6037,7 @@ export type Database = {
           medico_id?: string | null
           nome?: string
           ordem?: number
+          ordem_chegada?: boolean
           sala?: string | null
           tipo_recurso?: string | null
           updated_at?: string

@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Switch } from "@/components/ui/switch";
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
   component: Page,
   head: () => ({ meta: [{ title: "Horários médicos — ClinicaOS" }] }),
@@ -119,6 +120,10 @@ interface Agenda {
   nome: string;
   ativo: boolean;
   ordem: number;
+  // Agenda de ficha / ordem de chegada: o médico não atende em hora marcada, a
+  // grade só ordena a fila. Com isso ligado a recepção continua dando ficha
+  // depois que as vagas geradas do dia acabam.
+  ordem_chegada: boolean;
 }
 interface DispRow extends DispExt {
   agenda_id: string;
@@ -224,7 +229,7 @@ function Page() {
           .order("hora_inicio"),
         supabase
           .from("medico_agendas" as never)
-          .select("id, medico_id, nome, ativo, ordem")
+          .select("id, medico_id, nome, ativo, ordem, ordem_chegada")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .order("ordem")
           .order("nome"),
@@ -490,6 +495,34 @@ function Page() {
       diasSel.length > 1 ? `${diasSel.length} horários adicionados` : "Horário adicionado",
     );
     void load();
+  };
+
+  // Liga/desliga o atendimento por ordem de chegada numa agenda. Com isso
+  // ligado, a grade de horários passa a ser só a ordem da fila: a recepção
+  // continua dando ficha (091, 092…) mesmo depois que as vagas geradas do dia
+  // acabam, e cada encaixe entra no fim da fila para não mudar o número das
+  // fichas já impressas.
+  const toggleOrdemChegada = async (a: Agenda) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const novo = !a.ordem_chegada;
+    setAgendas((xs) => xs.map((x) => (x.id === a.id ? { ...x, ordem_chegada: novo } : x)));
+    const { error } = await supabase
+      .from("medico_agendas" as never)
+      .update({ ordem_chegada: novo } as never)
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error, "falha ao mudar o tipo de atendimento da agenda");
+      void load();
+      return;
+    }
+    toast.success(
+      novo
+        ? `"${a.nome}": passou a atender por ordem de chegada — fichas livres.`
+        : `"${a.nome}": voltou a atender por hora marcada.`,
+    );
   };
 
   const salvarEdicao = async () => {
@@ -1505,6 +1538,42 @@ function Page() {
                       </span>
                     )}
                   </div>
+
+                  {agendasMed.length > 0 && (
+                    <Card>
+                      <CardContent className="py-4 space-y-3">
+                        <div>
+                          <Label className="text-sm">Como este médico atende</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Hora marcada: o paciente só entra numa vaga da grade, e quando as vagas
+                            do dia acabam a agenda fecha. Ordem de chegada: a grade vira só a ordem
+                            da fila e a recepção continua dando ficha (091, 092…) sem limite de
+                            horário — cada encaixe entra no fim da fila do dia.
+                          </p>
+                        </div>
+                        {agendasMed.map((a) => (
+                          <div
+                            key={a.id}
+                            className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium uppercase truncate">{a.nome}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {a.ordem_chegada
+                                  ? "Ordem de chegada — fichas livres"
+                                  : "Hora marcada — limitado às vagas geradas"}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={a.ordem_chegada}
+                              disabled={!podeEscrever}
+                              onCheckedChange={() => void toggleOrdemChegada(a)}
+                            />
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card>
                     <CardContent className="py-4 flex flex-wrap gap-2 items-end">

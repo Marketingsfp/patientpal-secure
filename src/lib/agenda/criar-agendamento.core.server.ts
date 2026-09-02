@@ -121,6 +121,12 @@ export async function criarAgendamentoCore(
 
   type AgendaComTipos = {
     id: string;
+    ativo: boolean | null;
+    // Agenda por ORDEM DE CHEGADA (ficha livre): o médico não atende por hora
+    // marcada, a grade só serve para ordenar a fila. Nessas agendas a recepção
+    // pode continuar dando ficha depois que as vagas geradas acabam — ver a
+    // checagem 2/3 mais abaixo.
+    ordem_chegada: boolean | null;
     medico_agenda_procedimentos: Array<{ procedimentos: { tipo: string | null } | null }>;
   };
 
@@ -184,7 +190,7 @@ export async function criarAgendamentoCore(
       recursoId
         ? supabase
             .from("medico_agendas")
-            .select("id, medico_agenda_procedimentos(procedimentos(tipo))")
+            .select("id, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))")
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .then((r) => (r.error ? null : (r.data as unknown as AgendaComTipos[])))
@@ -296,6 +302,21 @@ export async function criarAgendamentoCore(
     }
   }
 
+  // Agenda de ORDEM DE CHEGADA deste médico, se houver. Nela a grade de
+  // horários é só a ordem da fila: o médico atende por ficha, na sequência em
+  // que o paciente chega, e não em hora marcada. Por isso a recepção precisa
+  // continuar dando ficha (091, 092…) depois que as vagas geradas acabam —
+  // sem essa exceção o dia trava no fim da janela de geração.
+  const agendaOrdemChegada =
+    (agendasDoMedico ?? []).find((a) => a.ordem_chegada && a.ativo !== false) ?? null;
+
+  // Quando o encaixe é aceito sem consumir uma vaga da grade, o `agenda_id`
+  // precisa ser gravado depois do INSERT (a RPC transacional não recebe esse
+  // campo). Sem isso a ficha sai errada: a numeração é POSICIONAL dentro de
+  // (dia, médico, agenda) — ver `fichaPorId` na Agenda e `print-gr.ts` — e uma
+  // linha sem agenda formaria uma fila própria, voltando a imprimir "001".
+  let agendaIdParaGravarNoEncaixe: string | null = null;
+
   // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo ----------
   if (precisaValidarAgenda && recursoId) {
     const rotuloRecurso = "médico";
@@ -310,7 +331,7 @@ export async function criarAgendamentoCore(
       slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
     }
     const excluindoEditing = editing_id ? lista.filter((x) => x.id !== editing_id) : lista;
-    if (excluindoEditing.length === 0) {
+    if (excluindoEditing.length === 0 && !agendaOrdemChegada) {
       return {
         ok: false,
         validation_error: {
@@ -326,7 +347,7 @@ export async function criarAgendamentoCore(
       const sFim = new Date(s.fim).getTime();
       return sIni <= inicioMs && sFim >= fimMs;
     });
-    if (!slotEscolhido) {
+    if (!slotEscolhido && !agendaOrdemChegada) {
       return {
         ok: false,
         validation_error: {
@@ -334,9 +355,17 @@ export async function criarAgendamentoCore(
         },
       };
     }
+    if (!slotEscolhido && agendaOrdemChegada && !editing_id) {
+      // Encaixe de fila: não consome vaga da grade, entra como linha nova no
+      // horário pedido. A tela manda esse horário DEPOIS do último atendimento
+      // do dia, para a ficha nascer no fim da fila e não renumerar as que já
+      // foram impressas. Só vale para linha NOVA — remarcar um atendimento que
+      // já existe não pode trocar a agenda dele de lugar.
+      agendaIdParaGravarNoEncaixe = agendaOrdemChegada.id;
+    }
 
     // ---------- 4b. Tipo da agenda × tipo do procedimento ----------
-    const agendaAlvoId = slotEscolhido.agenda_id;
+    const agendaAlvoId = slotEscolhido?.agenda_id ?? agendaOrdemChegada?.id ?? null;
     if (agendaAlvoId && nomesProcParaTipo.length > 0) {
       const daAgenda = (agendasDoMedico ?? []).find((a) => a.id === agendaAlvoId) ?? null;
       let tiposAgenda: Set<string>;
@@ -485,6 +514,27 @@ export async function criarAgendamentoCore(
       };
     }
     novoId = resultado.id;
+  }
+
+  // ---------- 6a. Agenda do encaixe de ordem de chegada ----------
+  // A RPC transacional insere sem `agenda_id`. Numa agenda de ordem de chegada
+  // o encaixe não veio de nenhuma vaga da grade, então o vínculo é gravado
+  // aqui — é ele que faz a ficha continuar a sequência do dia (091, 092…) em
+  // vez de abrir uma fila separada começando em 001.
+  if (agendaIdParaGravarNoEncaixe && novoId) {
+    const { error: eAgenda } = await supabase
+      .from("agendamentos")
+      .update({ agenda_id: agendaIdParaGravarNoEncaixe } as never)
+      .eq("id", novoId)
+      .eq("clinica_id", clinica_id);
+    if (eAgenda) return { ok: false, pg_error: toPgErrorLikeLocal(eAgenda) };
+    if (siblingIds.length > 0) {
+      await supabase
+        .from("agendamentos")
+        .update({ agenda_id: agendaIdParaGravarNoEncaixe } as never)
+        .in("id", siblingIds)
+        .eq("clinica_id", clinica_id);
+    }
   }
 
   // ---------- 6b. Marcação de origem da integração ----------
