@@ -69,6 +69,17 @@ type Vinculos = {
   detalhes: Array<{ tabela: string; coluna: string; qtd: number }>;
 };
 
+/** Grupos por página. A busca é paginada no banco, não no navegador. */
+const POR_PAGINA = 50;
+
+/**
+ * O que a opção "Todos" busca. São os três tipos confiáveis e rápidos.
+ * Os dois tipos por semelhança de nome ficam de fora porque precisam comparar
+ * com estes três para não repetir grupo, e por isso estouram o limite de tempo
+ * do banco — continuam disponíveis escolhendo o tipo na lista.
+ */
+const TIPOS_EM_TODOS: Grupo["tipo"][] = ["cpf", "telefone", "nome_dn"];
+
 const TIPO_LABEL: Record<Grupo["tipo"], string> = {
   cpf: "Mesmo CPF",
   telefone: "Mesmo telefone",
@@ -161,7 +172,12 @@ function DuplicadosPage() {
   const podeMesclar = usePodeEscrever("clientes-duplicados");
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [tipo, setTipo] = useState<"" | Grupo["tipo"]>("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const [temMais, setTemMais] = useState(false);
+  // Abre já em "Mesmo nome + nascimento": é o tipo com mais casos reais e o
+  // mais barato de calcular. "Todos" varre mais coisa e pode estourar o tempo.
+  const [tipo, setTipo] = useState<"" | Grupo["tipo"]>("nome_dn");
   const [filtroNome, setFiltroNome] = useState("");
   const [sel, setSel] = useState<Record<string, Set<string>>>({});
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
@@ -173,23 +189,60 @@ function DuplicadosPage() {
   const [conferindo, setConferindo] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
-  const reload = () => {
+  const buscarTipo = (alvo: Grupo["tipo"], proxima: number) =>
+    supabase.rpc("listar_duplicados_pacientes", {
+      _clinica_ids: clinicaIds,
+      _tipo: alvo,
+      _limite: POR_PAGINA,
+      _offset: proxima * POR_PAGINA,
+    });
+
+  const reload = (proxima = 0) => {
     if (clinicaIds.length === 0) return;
     setLoading(true);
-    supabase
-      .rpc("listar_duplicados_pacientes", {
-        _clinica_ids: clinicaIds,
-        _tipo: tipo || undefined,
-        _limite: 200,
-      })
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        setGrupos((data ?? []) as unknown as Grupo[]);
-        setLoading(false);
-      });
+    setErro(null);
+
+    // "Todos" vira três buscas em paralelo, uma por tipo, em vez de uma só.
+    // Cada varredura da tabela de pacientes leva alguns segundos; as três
+    // juntas numa requisição só estouram o limite de 8s do banco, mas
+    // separadas cada uma tem o seu próprio limite e todas cabem.
+    const alvos: Grupo["tipo"][] = tipo ? [tipo] : TIPOS_EM_TODOS;
+
+    Promise.all(alvos.map((alvo) => buscarTipo(alvo, proxima))).then((respostas) => {
+      setLoading(false);
+
+      const falha = respostas.find((r) => r.error)?.error;
+      if (falha) {
+        // Sem isto o erro só ia para o console e a tela dizia "nenhum grupo
+        // encontrado", que é indistinguível de não haver duplicados.
+        console.error(falha);
+        setErro(
+          falha.code === "57014"
+            ? "A busca demorou mais que o limite do banco e foi interrompida. Escolha um tipo específico na lista ao lado."
+            : falha.message || "Não foi possível carregar os duplicados.",
+        );
+        if (proxima === 0) setGrupos([]);
+        setTemMais(false);
+        return;
+      }
+
+      const lotes = respostas.map((r) => (r.data ?? []) as unknown as Grupo[]);
+      // Maiores grupos primeiro, que é a ordem que o banco já usa dentro de
+      // cada tipo — aqui só reordena a junção dos três.
+      const lote = lotes.flat().sort((a, b) => b.qtd - a.qtd);
+      setGrupos((atual) => (proxima === 0 ? lote : [...atual, ...lote]));
+      setTemMais(lotes.some((l) => l.length === POR_PAGINA));
+      setPagina(proxima);
+    });
   };
 
-  useEffect(reload, [clinicaIds, tipo]);
+  useEffect(() => {
+    setGrupos([]);
+    setPagina(0);
+    setTemMais(false);
+    reload(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaIds, tipo]);
 
   const groupKey = (g: Grupo, i: number) => `${g.tipo}-${g.chave}-${i}`;
 
@@ -352,7 +405,7 @@ function DuplicadosPage() {
             value={tipo}
             onChange={(e) => setTipo(e.target.value as "" | Grupo["tipo"])}
           >
-            <option value="">Todos</option>
+            <option value="">Todos (CPF, telefone, nome + nascimento)</option>
             <option value="cpf">Mesmo CPF</option>
             <option value="telefone">Mesmo telefone</option>
             <option value="nome_dn">Mesmo nome + nascimento</option>
@@ -362,7 +415,12 @@ function DuplicadosPage() {
         </div>
       </div>
       {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {!loading && gruposFiltrados.length === 0 && (
+      {erro && (
+        <p className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-xl px-3 py-2">
+          {erro}
+        </p>
+      )}
+      {!loading && !erro && gruposFiltrados.length === 0 && (
         <p className="text-sm text-muted-foreground">Nenhum grupo suspeito encontrado.</p>
       )}
       <div className="grid gap-3">
@@ -473,6 +531,22 @@ function DuplicadosPage() {
           </Card>
         ))}
       </div>
+
+      {temMais && !erro && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => reload(pagina + 1)}
+            className="border border-border rounded-xl px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {loading ? "Carregando…" : "Carregar mais grupos"}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {grupos.length} grupos carregados
+          </span>
+        </div>
+      )}
 
       <AlertDialog
         open={!!confirmKey}
