@@ -36,6 +36,8 @@ import {
   conflitoCodigoProntuario,
   normalizarCodigoProntuario,
 } from "@/lib/prontuario";
+import { normalizarNomeBusca, normalizarTermoBusca } from "@/lib/busca-texto";
+import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
@@ -933,6 +935,21 @@ function AgendaPage() {
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
+  // O que é digitado no campo Cliente é UMA coisa; o que vai ao banco é outra.
+  //
+  // Antes, cada tecla no campo recarregava a agenda inteira: digitar "MARIA
+  // SILVA" disparava onze consultas, e a resposta da última — a única que
+  // interessa — ficava atrás das outras dez na fila. Agora a consulta espera
+  // 350ms de silêncio; ao COLAR, dispara na hora (aplicarBuscaCliente), que é
+  // como a recepção usa o campo.
+  //
+  // O termo também é limpo antes de ir ao banco: espaço sobrando, espaço
+  // duplicado no meio ou espaço "duro" vindo de PDF/WhatsApp faziam o filtro
+  // por nome não casar com nenhum agendamento.
+  const { termo: filtroClienteBusca, aplicarAgora: aplicarBuscaCliente } = useBuscaDebounced(
+    normalizarTermoBusca(filtroCliente),
+    350,
+  );
   const [filtroFicha, setFiltroFicha] = useState("");
   const [filtroApenasMultiplo, setFiltroApenasMultiplo] = useState<boolean>(false);
   const [page, setPage] = useState(1);
@@ -2266,7 +2283,7 @@ function AgendaPage() {
     // Empurra a busca por nome de cliente para o servidor — sem isso a
     // janela de 30 dias pode trazer mais que o limite do PostgREST e
     // descartar justamente o paciente buscado.
-    const termoCli = filtroCliente.trim();
+    const termoCli = filtroClienteBusca;
     const digitosCli = termoCli.replace(/\D/g, "");
     // Há busca por cliente empurrada para o servidor? Quando há, o resultado
     // já vem pequeno e podemos manter a janela de datas aberta.
@@ -2295,11 +2312,9 @@ function AgendaPage() {
       }
       q = q.in("paciente_id", ids);
     } else if (termoCli.length >= 2) {
-      const termo = termoCli
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toUpperCase();
-      q = q.ilike("paciente_nome", `%${termo}%`);
+      // `paciente_nome` está gravado sem acento e em maiúsculas (conferido em
+      // produção: 92.418 agendamentos, nenhum fora desse formato).
+      q = q.ilike("paciente_nome", `%${normalizarNomeBusca(termoCli)}%`);
     }
     if (apenasData) {
       // "Exibir apenas a data selecionada" — restringe estritamente ao dia
@@ -2971,7 +2986,7 @@ function AgendaPage() {
     apenasData,
     filtroStatus,
     filtroMedico,
-    filtroCliente,
+    filtroClienteBusca,
   ]);
 
   // Mantém a ref sempre apontando para o `load` atual (com os filtros/data
@@ -3702,7 +3717,14 @@ function AgendaPage() {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
       }
-      if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente)))
+      // `chaveNomeAgenda` (e não `normalizar`) dos dois lados: ele também junta
+      // espaços repetidos. Sem isso, um nome colado com espaço duplo escondia
+      // TODAS as linhas aqui na tela, mesmo depois de o banco devolver o
+      // paciente certo.
+      if (
+        filtroCliente &&
+        !chaveNomeAgenda(a.paciente_nome).includes(chaveNomeAgenda(filtroCliente))
+      )
         return false;
       if (filtroFicha) {
         const f = fichaPorId.get(a.id) ?? "";
@@ -4473,7 +4495,7 @@ function AgendaPage() {
       filtroMedico !== "todos" && medicos.some((m) => m.id === filtroMedico) ? filtroMedico : "";
     let pacienteId = "";
     let pacienteNome = "";
-    const termoCli = filtroCliente.trim();
+    const termoCli = normalizarTermoBusca(filtroCliente);
     if (termoCli) {
       const alvo = normalizar(termoCli);
       const matches = pacientes.filter((p) => normalizar(p.nome).includes(alvo));
@@ -7490,6 +7512,10 @@ function AgendaPage() {
         <Input
           value={filtroCliente}
           onChange={(e) => setFiltroCliente(e.target.value)}
+          onPaste={() => {
+            // Colou o nome inteiro: busca na hora, sem esperar os 350ms.
+            aplicarBuscaCliente();
+          }}
           placeholder="Nome ou CPF..."
           className="h-9 w-full truncate rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800"
         />
@@ -7498,7 +7524,12 @@ function AgendaPage() {
       <div className="flex shrink-0 items-end gap-1.5">
         <button
           type="button"
-          onClick={load}
+          onClick={() => {
+            // Publica na hora o que está digitado — sem isso o clique usaria o
+            // termo anterior, ainda parado nos 350ms de espera.
+            aplicarBuscaCliente();
+            load();
+          }}
           aria-label="Buscar"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
         >

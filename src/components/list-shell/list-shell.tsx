@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,11 +63,19 @@ export function ListShell<S extends string>({
   bodyClassName,
 }: ListShellProps<S>) {
   const [inner, setInner] = useState(searchValue);
+  // Marcado no `onPaste`: quem cola já entregou o termo inteiro, então a
+  // colagem não espera o atraso que existe para agrupar a digitação.
+  const colouRef = useRef(false);
   useEffect(() => {
     setInner(searchValue);
   }, [searchValue]);
   useEffect(() => {
     if (inner === searchValue) return;
+    if (colouRef.current) {
+      colouRef.current = false;
+      onSearchChange(inner);
+      return;
+    }
     const t = setTimeout(() => onSearchChange(inner), searchDebounceMs);
     return () => clearTimeout(t);
   }, [inner, searchDebounceMs, onSearchChange, searchValue]);
@@ -89,6 +97,9 @@ export function ListShell<S extends string>({
         <Input
           value={inner}
           onChange={(e) => setInner(e.target.value)}
+          onPaste={() => {
+            colouRef.current = true;
+          }}
           placeholder={searchPlaceholder}
           className="pl-9 h-10"
           aria-label="Busca"

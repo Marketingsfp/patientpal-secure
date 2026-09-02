@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   CommandDialog,
@@ -10,6 +10,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { normalizarTermoBusca } from "@/lib/busca-texto";
 
 export interface CommandEntry {
   id: string;
@@ -45,15 +46,20 @@ export function CommandPalette({
   const [term, setTerm] = useState("");
   const [asyncResults, setAsyncResults] = useState<CommandEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  // Marcado no onPaste: a colagem já traz o termo inteiro e não espera o atraso.
+  const colouRef = useRef(false);
 
   useEffect(() => {
     if (!asyncSearch) return;
-    const q = term.trim();
+    // Limpa espaço sobrando/duplicado e espaço "duro" antes de ir ao banco.
+    const q = normalizarTermoBusca(term);
     if (q.length < 2) {
       setAsyncResults([]);
       return;
     }
     setLoading(true);
+    const atraso = colouRef.current ? 0 : 300;
+    colouRef.current = false;
     const t = setTimeout(async () => {
       try {
         const r = await asyncSearch(q);
@@ -61,7 +67,7 @@ export function CommandPalette({
       } finally {
         setLoading(false);
       }
-    }, 180);
+    }, atraso);
     return () => clearTimeout(t);
   }, [term, asyncSearch]);
 
@@ -70,7 +76,7 @@ export function CommandPalette({
     // resultados server-side não têm o prefixo `o:`/`a:`/... no seu texto).
     // Nesse caso filtramos manualmente as `entries` de navegação por termo,
     // para que a lista de telas não fique inteira poluindo a busca.
-    const q = term.trim().toLowerCase();
+    const q = normalizarTermoBusca(term).toLowerCase();
     const localEntries =
       !asyncSearch || q.length < 2
         ? entries
@@ -91,7 +97,14 @@ export function CommandPalette({
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={!asyncSearch}>
-      <CommandInput placeholder={placeholder} value={term} onValueChange={setTerm} />
+      <CommandInput
+        placeholder={placeholder}
+        value={term}
+        onValueChange={setTerm}
+        onPaste={() => {
+          colouRef.current = true;
+        }}
+      />
       <CommandList>
         <CommandEmpty>{loading ? "Buscando…" : "Nenhum resultado."}</CommandEmpty>
         {grouped.map(([group, items], idx) => (

@@ -1,6 +1,7 @@
 import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { normalizarTermoBusca } from "@/lib/busca-texto";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -257,11 +258,25 @@ function ClientesPage() {
   };
 
   // Debounce único da busca, usado pelos dois caminhos (manual e cache).
-  const [debouncedBusca, setDebouncedBusca] = useState(busca);
+  //
+  // O termo é limpo ANTES de ir ao banco: texto colado costuma vir com espaço
+  // sobrando, espaço duplicado no meio ou espaço "duro" de PDF/página web, e
+  // qualquer um deles faz o LIKE do banco não casar com nenhum paciente.
+  //
+  // Ao COLAR, a espera é pulada — a colagem já traz o nome inteiro, não há
+  // digitação seguinte para agrupar.
+  const buscaLimpa = normalizarTermoBusca(busca);
+  const [debouncedBusca, setDebouncedBusca] = useState(buscaLimpa);
+  const colouRef = useRef(false);
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedBusca(busca), 300);
+    if (colouRef.current) {
+      colouRef.current = false;
+      setDebouncedBusca(buscaLimpa);
+      return;
+    }
+    const t = setTimeout(() => setDebouncedBusca(buscaLimpa), 300);
     return () => clearTimeout(t);
-  }, [busca]);
+  }, [buscaLimpa]);
 
   // Página atual (paginação de 500 em 500) — vale para os dois caminhos
   // (manual e com cache) e somente quando não há termo de busca. Ao buscar por
@@ -641,6 +656,9 @@ function ClientesPage() {
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
+            onPaste={() => {
+              colouRef.current = true;
+            }}
             placeholder="Buscar por nº serviço, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
             className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-indigo-500"
           />

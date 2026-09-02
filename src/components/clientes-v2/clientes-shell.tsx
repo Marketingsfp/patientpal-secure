@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Link } from "@tanstack/react-router";
 import { Info, Plus, Rows3, LayoutList, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizarTermoBusca } from "@/lib/busca-texto";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
@@ -84,9 +84,13 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   );
   const [refreshing, setRefreshing] = useState(false);
 
-  // Busca com atraso de 300ms: evita uma consulta por tecla digitada.
-  const qDebounced = useDebouncedValue(q, 300);
-  const modoBusca = qDebounced.trim().length >= 2;
+  // O atraso de 300ms já é aplicado UMA vez, dentro do ListShell (que também
+  // dispara na hora quando o usuário cola). Antes havia um segundo atraso aqui
+  // em cima daquele: os dois somados davam 600ms de espera para cada busca.
+  // O termo é limpo antes de ir ao banco — colar com espaço sobrando ou espaço
+  // duplicado fazia o LIKE não casar com ninguém.
+  const termoBusca = normalizarTermoBusca(q);
+  const modoBusca = termoBusca.length >= 2;
   const scope = useMemo(
     () => (clinicaIds.length ? clinicaIds : clinicaAtual ? [clinicaAtual.clinica_id] : []),
     [clinicaIds, clinicaAtual],
@@ -178,9 +182,9 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   );
 
   useEffect(() => {
-    if (modoBusca) void loadBusca(qDebounced.trim());
+    if (modoBusca) void loadBusca(termoBusca);
     else void loadRecentes();
-  }, [modoBusca, qDebounced, loadBusca, loadRecentes]);
+  }, [modoBusca, termoBusca, loadBusca, loadRecentes]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -188,12 +192,12 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       await Promise.all([
         refetchTotal(),
         Promise.resolve(kpis.refresh()),
-        modoBusca ? loadBusca(qDebounced.trim()) : loadRecentes(),
+        modoBusca ? loadBusca(termoBusca) : loadRecentes(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchTotal, kpis, modoBusca, qDebounced, loadBusca, loadRecentes]);
+  }, [refetchTotal, kpis, modoBusca, termoBusca, loadBusca, loadRecentes]);
 
   const filtrados = useMemo(() => {
     let r = rows;

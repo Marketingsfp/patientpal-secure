@@ -2,6 +2,7 @@ import { getFlagUsuario, setFlagUsuario } from "@/lib/cache/prefs-cache";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { CommandEntry } from "@/components/list-shell";
+import { normalizarTermoBusca } from "@/lib/busca-texto";
 
 export type UBTipo =
   | "paciente"
@@ -51,8 +52,12 @@ const ROUTE_OF: Record<UBTipo, (r: UBRow) => string> = {
 
 /** Prefixos: p:silva (paciente), o:2024, a:, n:, c:, m:, r: (procedimento) */
 function parseTerm(input: string): { termo: string; tipos?: UBTipo[] } {
-  const m = /^([poancmr]):(.*)$/i.exec(input.trim());
-  if (!m) return { termo: input.trim() };
+  // O termo é limpo (espaço sobrando, espaço duplicado, espaço "duro" de
+  // PDF/página web) antes de virar padrão LIKE no banco. Sem isso, um nome
+  // colado do WhatsApp não casa com paciente nenhum.
+  const limpo = normalizarTermoBusca(input);
+  const m = /^([poancmr]):(.*)$/i.exec(limpo);
+  if (!m) return { termo: limpo };
   const map: Record<string, UBTipo[]> = {
     p: ["paciente"],
     o: ["orcamento"],
@@ -62,7 +67,7 @@ function parseTerm(input: string): { termo: string; tipos?: UBTipo[] } {
     m: ["medico"],
     r: ["procedimento"],
   };
-  return { termo: m[2].trim(), tipos: map[m[1].toLowerCase()] };
+  return { termo: normalizarTermoBusca(m[2]), tipos: map[m[1].toLowerCase()] };
 }
 
 export interface UseUniversalSearchOpts {

@@ -1,6 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
+import { normalizarTermoBusca } from "../../busca-texto";
 
 export default defineTool({
   name: "buscar_pacientes",
@@ -13,7 +14,10 @@ export default defineTool({
     limite: z.number().int().optional().describe("Máximo de resultados (padrão 20, teto 50)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ termo, clinica_id, limite }, ctx) => {
+  handler: async ({ termo: termoBruto, clinica_id, limite }, ctx) => {
+    // Espaço duplicado ou espaço "duro" no termo faz o ilike não casar com
+    // nenhum paciente — o mesmo tratamento aplicado nos campos de busca da tela.
+    const termo = normalizarTermoBusca(termoBruto);
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Não autenticado." }], isError: true };
     }

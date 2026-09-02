@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { VoiceInput } from "@/components/voice-input";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { normalizarTermoBusca } from "@/lib/busca-texto";
 
 export interface PatientOption {
   id: string;
@@ -52,16 +53,11 @@ interface PatientSearchInputProps {
  * qualquer tela nova (agendamentos, prontuário, financeiro, odontograma etc.).
  * Respeita o multi-tenancy (clinica_id) e o modo "Todas" do ClinicSwitcher.
  */
-// Remove acentos e normaliza para uppercase — os nomes são salvos assim
-// no banco (trigger uppercase_text_fields + strip_accents), então a busca
-// fica mais rápida e tolerante a "joão" / "JOAO" / "joao".
-function normalizarBusca(s: string) {
-  return (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
-}
+// Atraso entre a última tecla e a consulta ao banco. Com 252 mil pacientes,
+// disparar a cada tecla enfileira consultas que já nascem descartadas e
+// atrasam justamente a última — a única que interessa. Ao COLAR, a espera é
+// pulada (ver `colouRef`): não há digitação seguinte para agrupar.
+const ATRASO_BUSCA_MS = 300;
 
 // Tenta interpretar o termo como uma data de nascimento.
 // Aceita: DD/MM/AAAA, DD-MM-AAAA, DDMMAAAA, AAAA-MM-DD, DD/MM (ano qualquer).
@@ -107,6 +103,11 @@ export function PatientSearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const reqIdRef = useRef(0);
   const cacheRef = useRef<Map<string, PatientOption[]>>(new Map());
+  // Marcado no `onPaste` e consumido na próxima busca: a colagem já traz o
+  // nome inteiro, então ela não espera o atraso pensado para a digitação.
+  const colouRef = useRef(false);
+  // Termo já limpo — usado tanto na consulta quanto no texto da tela.
+  const termoLimpo = normalizarTermoBusca(query);
 
   useEffect(() => {
     setQuery(value?.nome ?? "");
@@ -114,7 +115,10 @@ export function PatientSearchInput({
 
   useEffect(() => {
     if (!open || scope.length === 0) return;
-    const term = query.trim();
+    // Texto colado costuma vir com espaço sobrando, espaço duplicado ou espaço
+    // "duro" de PDF/página web. Sem esta limpeza o LIKE do banco não casa com
+    // nada e a recepção conclui que o paciente não está cadastrado.
+    const term = termoLimpo;
     const digits = term.replace(/\D/g, "");
     if (term.length < 2 && digits.length < 2) {
       setOptions([]);
@@ -127,6 +131,8 @@ export function PatientSearchInput({
       setLoading(false);
       return;
     }
+    const atraso = colouRef.current ? 0 : ATRASO_BUSCA_MS;
+    colouRef.current = false;
     const handle = setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       setLoading(true);
@@ -165,9 +171,10 @@ export function PatientSearchInput({
       cacheRef.current.set(cacheKey, rows);
       setOptions(rows);
       setLoading(false);
-    }, 150);
+    }, atraso);
     return () => clearTimeout(handle);
-  }, [query, open, scope]);
+    // Depende do termo JÁ LIMPO: digitar um espaço a mais não refaz a consulta.
+  }, [termoLimpo, open, scope]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -190,6 +197,10 @@ export function PatientSearchInput({
           if (value) onSelect(null);
         }}
         onFocus={() => setOpen(true)}
+        onPaste={() => {
+          // Dispara a busca sem esperar: quem cola já entregou o termo inteiro.
+          colouRef.current = true;
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             // Não deixar o Enter submeter o formulário pai sem que o
@@ -216,7 +227,7 @@ export function PatientSearchInput({
             append={false}
             onTranscript={(text) => {
               // Limpa pontuação típica que o STT pode inserir
-              const limpo = text.replace(/[.,;:!?]+$/g, "").trim();
+              const limpo = normalizarTermoBusca(text.replace(/[.,;:!?]+$/g, ""));
               setQuery(limpo);
               setOpen(true);
               if (value) onSelect(null);
@@ -224,7 +235,7 @@ export function PatientSearchInput({
           />
         </div>
       )}
-      {open && query.trim().length >= 2 && (
+      {open && termoLimpo.length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-72 overflow-auto">
           {loading && <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>}
           {!loading && options.length === 0 && (
@@ -234,13 +245,13 @@ export function PatientSearchInput({
                 <button
                   type="button"
                   onClick={() => {
-                    onRequestCreate(query.trim());
+                    onRequestCreate(termoLimpo);
                     setOpen(false);
                   }}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-dashed border-primary/40 text-primary hover:bg-primary/5 text-sm font-medium"
                 >
                   <UserPlus className="h-4 w-4" />
-                  Cadastrar novo paciente{query.trim() ? `: "${query.trim()}"` : ""}
+                  Cadastrar novo paciente{termoLimpo ? `: "${termoLimpo}"` : ""}
                 </button>
               )}
             </div>
