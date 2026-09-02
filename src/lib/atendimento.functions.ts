@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
@@ -8,7 +10,7 @@ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
  *  Helpers
  * ======================================================= */
 async function assertMember(
-  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  supabase: SupabaseClient<Database>,
   userId: string,
   clinicaId: string,
 ) {
@@ -20,7 +22,7 @@ async function assertMember(
   if (!data) throw new Error("Sem acesso a esta clínica");
 }
 async function assertManager(
-  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  supabase: SupabaseClient<Database>,
   userId: string,
   clinicaId: string,
 ) {
@@ -39,15 +41,11 @@ async function assertManager(
  * clínica selecionada antes de executar a ação. A sessão autenticada também
  * aplica as políticas de isolamento por clínica no banco.
  *
- * que o `conversaId` vindo do cliente também pertença. Sem esta checagem, um
- * usuário autenticado de qualquer clínica alcança conversas de outra só
- * enviando o id, o que expõe dado de saúde entre clínicas (LGPD, art. 11).
- *
  * Use isto sempre que o id do registro vier do cliente e a consulta não puder
  * ser filtrada direto por `clinica_id`.
  */
 async function assertConversaDaClinica(
-  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  supabase: SupabaseClient<Database>,
   conversaId: string,
   clinicaId: string,
 ) {
