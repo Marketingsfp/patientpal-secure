@@ -260,9 +260,27 @@ export function interpretarDias(valor: string): DiasInterpretados {
     if (!dia) continue;
 
     const resto = palavras.slice(consumidas);
-    const regra = resto.join(" ").replace(/^[-–—:]+\s*/, "").trim() || null;
+    const restoTexto = resto.join(" ").replace(/^[-–—:]+\s*/, "").trim();
     // O horário pode vir dentro da própria célula de dias ("QUA 07:00h").
-    adicionar(dia, regra, regra ? normalizarHorario(regra) : null);
+    const horaNoDia = restoTexto ? normalizarHorario(restoTexto) : null;
+    const regra =
+      restoTexto
+        .replace(/\b([01]?\d|2[0-3])\s*[:h]\s*([0-5]\d)?h?\b/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[\s-–—:,]+|[\s-–—:,]+$/g, "")
+        .trim() || null;
+    adicionar(dia, regra, horaNoDia);
+  }
+
+  // Horário/regra escritos uma única vez no FIM da célula valem para todos os
+  // dias listados ("Seg e Qua 07:00h (Ordem de Chegada)").
+  const comHora = dias.filter((d) => d.horario);
+  if (dias.length > 1 && comHora.length === 1 && dias[dias.length - 1]!.horario) {
+    const ultimo = dias[dias.length - 1]!;
+    for (const d of dias) {
+      if (!d.horario) d.horario = ultimo.horario ?? null;
+      if (!d.regra) d.regra = ultimo.regra ?? null;
+    }
   }
 
   const texto = dias.length
