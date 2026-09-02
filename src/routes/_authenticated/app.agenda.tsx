@@ -1713,6 +1713,7 @@ function AgendaPage() {
           clinicaDoPaciente,
           codigoProntuario,
           pacInfo.id,
+          pacInfo.codigo_prontuario ?? null,
         );
         if (conflito) {
           toast.error(conflito);

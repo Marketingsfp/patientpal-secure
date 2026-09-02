@@ -71,9 +71,9 @@ function MedicoHome() {
       // Busca pacientes que já tiveram algum agendamento com este médico
       const { data: ags, error: agErr } = await supabase
         .from("agendamentos")
-        .select("paciente_id, data_hora, pacientes:paciente_id(id, nome, cpf, telefone)")
+        .select("paciente_id, inicio, pacientes:paciente_id(id, nome, cpf, telefone)")
         .eq("medico_id", medico.id)
-        .order("data_hora", { ascending: false })
+        .order("inicio", { ascending: false })
         .limit(1000);
 
       if (agErr) {
@@ -88,7 +88,7 @@ function MedicoHome() {
         const p = (
           a as unknown as {
             paciente_id: string;
-            data_hora: string;
+            inicio: string;
             pacientes: {
               id: string;
               nome: string;
@@ -104,7 +104,7 @@ function MedicoHome() {
             nome: p.nome,
             cpf: p.cpf,
             telefone: p.telefone,
-            ultimo_atendimento: (a as unknown as { data_hora: string }).data_hora ?? null,
+            ultimo_atendimento: (a as unknown as { inicio: string }).inicio ?? null,
           });
         }
       }

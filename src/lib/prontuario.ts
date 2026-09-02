@@ -65,9 +65,17 @@ export async function conflitoCodigoProntuario(
   clinicaId: string,
   codigo: string | null,
   ignorarPacienteId?: string,
+  codigoOriginal?: string | null,
 ): Promise<string | null> {
-  const foraDaRegua = erroCodigoProntuario(codigo);
+  // Cadastros antigos com 8 dígitos (a falha de numeração de 19/08/2026)
+  // continuam válidos como estão: a régua só vale para o que for digitado
+  // agora. Sem isso, a recepção não conseguiria nem trocar um telefone.
+  const naoMudou =
+    codigoOriginal !== undefined &&
+    (codigo ?? "").trim() === (codigoOriginal ?? "").trim();
+  const foraDaRegua = naoMudou ? null : erroCodigoProntuario(codigo);
   if (foraDaRegua) return foraDaRegua;
+
   if (!codigo) return null;
   const { data } = await supabase
     .from("pacientes")

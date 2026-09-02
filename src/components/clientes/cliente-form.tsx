@@ -1161,6 +1161,7 @@ export function ClienteForm({
       clinicaId,
       dados.codigo_prontuario,
       editing?.id,
+      editing ? ((editing as any).codigo_prontuario ?? null) : undefined,
     );
     if (conflito) {
       toast.error(conflito);
