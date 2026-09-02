@@ -20,7 +20,7 @@ import {
 } from "./kb-parser";
 
 export const BUCKET_KB = "nina-kb";
-const MODELO_EMBEDDING = "google/text-embedding-004";
+const MODELO_EMBEDDING = "google/gemini-embedding-001";
 const DIM = 768;
 
 export interface BaseKb {
@@ -68,7 +68,7 @@ async function gerarEmbeddings(textos: string[]): Promise<Array<number[] | null>
       const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MODELO_EMBEDDING, input: lote }),
+        body: JSON.stringify({ model: MODELO_EMBEDDING, input: lote, dimensions: DIM }),
       });
       if (!res.ok) {
         console.error("[Nina KB] embeddings falharam", res.status, await res.text().catch(() => ""));
@@ -188,12 +188,12 @@ export async function processarBase(baseId: string): Promise<ResultadoProcessame
 
   const LOTE = 400;
   for (let i = 0; i < linhas.length; i += LOTE) {
+    // Os registros desta versão já foram apagados acima, então insert simples
+    // mantém o reprocessamento idempotente sem depender de índice único.
     const { error } = await supabaseAdmin
       .from("nina_kb_registros")
-      .upsert(linhas.slice(i, i + LOTE) as any, {
-        onConflict: "base_id,aba_origem,linha_origem,procedimento,medico,dia,horario",
-        ignoreDuplicates: false,
-      });
+      .insert(linhas.slice(i, i + LOTE) as any);
+
     if (error) {
       await supabaseAdmin.from("nina_kb_registros").delete().eq("base_id", baseId);
       return falhar([`Falha ao gravar os registros: ${error.message}`], validacao.avisos);
