@@ -78,3 +78,29 @@ describe("classifyAtendimento — atendimento pelo cartão", () => {
     expect(classifyAtendimento("EDILEUZA DORALICE DOS SANTOS BARROS — EXAME CARTAO")).toBe("exame");
   });
 });
+
+describe("classifyAtendimento — recebimento vindo do Check-in", () => {
+  it("consulta paga no Check-in não vira exame", () => {
+    // Formato gravado pela tela de Check-in até 02/09/2026: procedimento
+    // antes do travessão, paciente depois. Linhas reais da produção.
+    expect(
+      classifyAtendimento(
+        "CONSULTA (ANGIOLOGIA) — TATIANA RIBEIRO LINS (ANDRE LUIS LIMA DA SILVA)",
+      ),
+    ).toBe("consulta_particular");
+  });
+
+  it("procedimento pago no Check-in continua sendo exame", () => {
+    expect(
+      classifyAtendimento(
+        "INFILTRACAO DR PAULO ROBERTO (CADA) (ORTOPEDIA) — VILMA DA PENHA PEDRO NUNES (PAULO ROBERTO L MONTEIRO)",
+      ),
+    ).toBe("exame");
+  });
+
+  it("parêntese colado no nome do paciente não decide a categoria", () => {
+    // Aqui "(CONSULTA)" é complemento do nome, não o procedimento: o que vale
+    // é o trecho depois do travessão.
+    expect(classifyAtendimento("ALEXANDRE BARROS (CONSULTA) — EXAMES LABORATORIAIS")).toBe("exame");
+  });
+});

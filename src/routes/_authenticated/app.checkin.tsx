@@ -948,9 +948,15 @@ function CheckinPage() {
         tipo="receita"
         agendamentoId={pagamentoAlvo?.id ?? null}
         pacienteIdFixo={pagamentoAlvo?.paciente_id ?? null}
+        // Formato canônico "PACIENTE — PROCEDIMENTO (MÉDICO)", o mesmo que a
+        // agenda e o caixa gravam. O Check-in escrevia o procedimento ANTES do
+        // travessão; como a classificação de receita lê o trecho DEPOIS do
+        // travessão para decidir consulta x exame (ver
+        // src/lib/atendimento-classify.ts), toda consulta paga por aqui era
+        // contada como exame no painel financeiro.
         initialDescricao={
           pagamentoAlvo
-            ? `${pagamentoAlvo.procedimento ?? "CONSULTA"} — ${pagamentoAlvo.paciente_nome}${pagamentoAlvo.medicos?.nome ? ` (${pagamentoAlvo.medicos.nome})` : ""}`
+            ? `${pagamentoAlvo.paciente_nome} — ${pagamentoAlvo.procedimento ?? "CONSULTA"}${pagamentoAlvo.medicos?.nome ? ` (${pagamentoAlvo.medicos.nome})` : ""}`
             : ""
         }
         initialValor={pagamentoValor}

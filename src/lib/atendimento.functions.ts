@@ -1295,7 +1295,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       contratos = ctR.data ?? [];
     }
 
-
     const { data: atribuidoProfile } = conv.atribuida_user_id
       ? await supabaseAdmin
           .from("profiles")
@@ -1369,7 +1368,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
     const { data: pausados } = await supabaseAdmin
       .from("atend_pausas_log")
       .select("user_id")
-      .is("fim", null)
+      .is("finalizada_em", null)
       .eq("clinica_id", data.clinicaId);
     const pausadosSet = new Set((pausados ?? []).map((p: any) => p.user_id));
 
@@ -1546,10 +1545,12 @@ export const supervisaoLive = createServerFn({ method: "POST" })
       deptIds.length
         ? supabaseAdmin.from("atend_departamentos").select("id, nome").in("id", deptIds)
         : Promise.resolve({ data: [] }),
+      // Pausa em aberto = `finalizada_em` nulo. Ver comentário no relatório
+      // abaixo: esta tabela não tem `inicio`/`fim`/`motivo`.
       supabaseAdmin
         .from("atend_pausas_log")
-        .select("user_id, motivo, inicio")
-        .is("fim", null)
+        .select("user_id, reason_id, iniciada_em")
+        .is("finalizada_em", null)
         .eq("clinica_id", data.clinicaId),
     ]);
     const profMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
@@ -1595,12 +1596,15 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("created_at", data.de)
         .lte("created_at", data.ate),
+      // Log de pausas: as colunas reais são `iniciada_em`, `finalizada_em` e
+      // `reason_id` (migration 20260527111301). O nome do motivo mora em
+      // `atend_pause_reasons.nome` — não existe coluna `motivo` aqui.
       supabaseAdmin
         .from("atend_pausas_log")
-        .select("user_id, motivo, inicio, fim")
+        .select("user_id, reason_id, iniciada_em, finalizada_em")
         .eq("clinica_id", data.clinicaId)
-        .gte("inicio", data.de)
-        .lte("inicio", data.ate),
+        .gte("iniciada_em", data.de)
+        .lte("iniciada_em", data.ate),
     ]);
 
     const userIds = Array.from(
