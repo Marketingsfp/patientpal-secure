@@ -244,7 +244,13 @@ function textoParaEmbedding(r: RegistroKb): string {
     r.categoria && `Especialidade: ${r.categoria}`,
     r.procedimento && `Procedimento: ${r.procedimento}`,
     r.medico && `Profissional: ${r.medico}`,
-    r.dia && `Dia: ${r.dia}`,
+    r.dia && `Dias de atendimento: ${r.dia}`,
+    (r.extras as any)?.dia_original && `Dias (planilha): ${(r.extras as any).dia_original}`,
+    Array.isArray((r.extras as any)?.dias) && (r.extras as any).dias.length
+      ? `Escala: ${(r.extras as any).dias
+          .map((d: any) => [d.dia, d.horario, d.regra].filter(Boolean).join(" "))
+          .join(" | ")}`
+      : null,
     r.horario && `Horário: ${r.horario}`,
     r.preco_dinheiro !== null && `Dinheiro/PIX: R$ ${r.preco_dinheiro}`,
     r.preco_cartao !== null && `Cartão: R$ ${r.preco_cartao}`,
