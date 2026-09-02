@@ -511,7 +511,14 @@ export async function consultarBase(params: {
     ambiguo: !agregou && empatados.length > 0,
     base: { id: base.id, versao: base.versao, arquivo: base.arquivo_nome },
     registros,
-    consolidado: consolidarPorMedico(registros),
+    consolidado: consolidarPorMedico(
+      medicoAlvo
+        ? registros.filter(
+            (r) =>
+              r.medico && normalizarTexto(r.medico).includes(normalizarTexto(medicoAlvo)),
+          )
+        : registros,
+    ),
     diagnostico: {
       termos,
       medico_identificado: medicoAlvo ?? null,
