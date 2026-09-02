@@ -863,6 +863,12 @@ ${procs || "(nenhum)"}`;
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
+    await (async () => {
+      const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
+      return await blocoPromptBaseConhecimento(clinicaId).catch(() => "");
+    })(),
+
+
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
   ]

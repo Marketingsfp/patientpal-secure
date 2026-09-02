@@ -466,7 +466,29 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_base_conhecimento",
+      description:
+        "FONTE DE VERDADE administrativa da clínica (planilha oficial). Consulte SEMPRE antes de falar sobre especialidades, exames, procedimentos, médicos, dias e horários de atendimento, preços em dinheiro/PIX e no cartão, preparos, observações e regras. Nunca responda esses assuntos sem chamar esta ferramenta. O horário retornado é a escala do profissional, não vaga disponível.",
+      parameters: {
+        type: "object",
+        properties: {
+          termo: {
+            type: "string",
+            description:
+              "Assunto perguntado pelo paciente (ex.: 'ultrassom de tireoide', 'neurologista', 'consulta cardiologia').",
+          },
+          medico: { type: "string", description: "Filtrar por nome do profissional (opcional)." },
+          dia: { type: "string", description: "Filtrar por dia da semana (opcional)." },
+        },
+        required: ["termo"],
+      },
+    },
+  },
 ] as const;
+
 
 /** Ferramentas que alteram estado/expõem paciente — só com a flag de agenda. */
 export const FERRAMENTAS_NINA_AGENDAMENTO = [
@@ -593,10 +615,55 @@ export async function executarFerramentaPaciente(
 
   try {
     switch (nome) {
+      case "consultar_base_conhecimento": {
+        const p = z
+          .object({
+            termo: z.string().trim().min(2).max(200),
+            medico: z.string().trim().max(160).optional(),
+            dia: z.string().trim().max(40).optional(),
+          })
+          .parse(args);
+        const { consultarBase, registrarConsultaKb } = await import("@/lib/nina/kb.server");
+        const { expandirTermos } = await import("@/lib/nina/kb-parser");
+        const achado = await consultarBase({
+          clinicaId: ctx.clinicaId,
+          termo: p.termo,
+          medico: p.medico ?? null,
+          dia: p.dia ?? null,
+        });
+        void registrarConsultaKb({
+          clinicaId: ctx.clinicaId,
+          baseId: achado.base?.id ?? null,
+          versao: achado.base?.versao ?? null,
+          canal: "whatsapp",
+          pergunta: p.termo,
+          termos: expandirTermos(p.termo),
+          encontrados: achado.registros,
+        });
+        if (!achado.encontrado)
+          return {
+            ok: true,
+            encontrado: false,
+            instrucao:
+              "Nada encontrado na base oficial. Diga ao paciente que não encontrou a informação na base e encaminhe para a equipe. NÃO invente.",
+          };
+        return {
+          ok: true,
+          encontrado: true,
+          ambiguo: achado.ambiguo,
+          versao_base: achado.base?.versao ?? null,
+          instrucao: achado.ambiguo
+            ? "Há mais de uma opção parecida: pergunte ao paciente qual exame está no pedido médico antes de responder."
+            : "Responda usando SOMENTE estes registros. Horário é escala administrativa, não vaga; vaga vem das ferramentas de agenda.",
+          registros: achado.registros,
+        };
+      }
+
       case "listar_especialidades": {
         const lista = await listarEspecialidades(ctx.clinicaId);
         return { ok: true, especialidades: lista.map((e) => e.nome) };
       }
+
 
       case "buscar_medicos": {
         const p = zBuscarMedicos.parse(args);
