@@ -160,6 +160,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { useRevisaoNfseLote, type LinhaNfseLote } from "@/components/nfse/nfse-lote-dialog";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -175,7 +176,6 @@ import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.funct
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
-import { problemaNoDocumentoDoTomador } from "@/lib/nfse-tomador";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import {
@@ -880,6 +880,7 @@ function AgendaPage() {
   const { user } = useAuth();
   const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { revisar: revisarNfseLote, dialog: revisaoNfseLoteDialog } = useRevisaoNfseLote();
   const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
@@ -7048,8 +7049,10 @@ function AgendaPage() {
    *  - a triagem (`nfseLoteTriagem`) já deixou de fora tudo que tem dúvida;
    *  - o cadastro do paciente é conferido ANTES da primeira nota, para o lote
    *    não parar no meio com metade emitida;
+   *  - nada é enviado sem passar pela tela de revisão (`useRevisaoNfseLote`),
+   *    onde o caixa confere nota a nota e pode trocar o tomador por um
+   *    terceiro pagador — de uma vez para o lote todo ou linha a linha;
    *  - a empresa emitente é perguntada uma vez só e vale para o lote inteiro;
-   *  - o resumo do que vai sair é confirmado antes do envio;
    *  - as notas saem UMA DE CADA VEZ, porque o número da DPS é sequencial e
    *    envios simultâneos disputam o mesmo número.
    */
@@ -7060,8 +7063,6 @@ function AgendaPage() {
       return;
     }
     if (emitindoNfseSelecao) return;
-    const brl = (v: number) =>
-      Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const { elegiveis, fora } = nfseLoteTriagem;
     if (elegiveis.length === 0) {
       toast.error(
@@ -7074,7 +7075,9 @@ function AgendaPage() {
 
     // Ficha incompleta é o motivo nº 1 de recusa da prefeitura: sem CPF a DPS
     // nem chega a ser aceita, e sem endereço a nota sai com o endereço da
-    // Receita. Conferimos tudo de uma vez, antes de mandar a primeira nota.
+    // Receita. Carregamos as fichas de uma vez, antes de abrir a revisão, para
+    // a tela já mostrar quem está incompleto — ali a operadora resolve
+    // escolhendo um terceiro pagador, em vez de perder o atendimento do lote.
     const pacIds = Array.from(new Set(elegiveis.map((e) => e.ag.paciente_id as string)));
     const { data: pacsData, error: errPacs } = await supabase
       .from("pacientes")
@@ -7088,68 +7091,88 @@ function AgendaPage() {
     const pacPorId = new Map<string, PacienteLote>(
       ((pacsData ?? []) as PacienteLote[]).map((p) => [p.id, p]),
     );
-    const prontos: Array<{ ag: Agendamento; valor: number; pac: PacienteLote }> = [];
-    const impedidos: string[] = [];
-    for (const e of elegiveis) {
-      const pac = pacPorId.get(e.ag.paciente_id as string);
-      if (!pac) {
-        impedidos.push(`${e.ag.paciente_nome ?? "Paciente"} — cadastro não encontrado.`);
-        continue;
-      }
-      const problemaDoc = problemaNoDocumentoDoTomador(pac.nome, pac.cpf);
-      if (problemaDoc) {
-        impedidos.push(`${pac.nome} — ${problemaDoc}`);
-        continue;
-      }
-      if (!(pac.logradouro ?? "").trim()) {
-        impedidos.push(
-          `${pac.nome} — sem endereço no cadastro. Complete a ficha do paciente e emita de novo.`,
-        );
-        continue;
-      }
-      prontos.push({ ag: e.ag, valor: e.valor, pac });
-    }
 
-    if (prontos.length === 0) {
-      await confirmDialog({
-        title: "Nenhuma nota pode ser emitida",
-        tone: "warning",
-        confirmText: "Entendi",
-        cancelText: "Fechar",
-        description: `Os atendimentos marcados estão com o cadastro incompleto:\n\n${impedidos
-          .slice(0, 8)
-          .map((m) => `• ${m}`)
-          .join("\n")}${impedidos.length > 8 ? `\n• …e mais ${impedidos.length - 8}` : ""}`,
-      });
+    // Uma linha por atendimento para a tela de revisão. O tomador começa sendo
+    // o próprio paciente; quem estiver sem CPF ou sem endereço aparece marcado
+    // em vermelho e trava a confirmação até ser resolvido ou tirado do lote.
+    const linhas: LinhaNfseLote[] = elegiveis.map((e) => {
+      const pac = pacPorId.get(e.ag.paciente_id as string);
+      return {
+        id: e.ag.id,
+        pacienteId: e.ag.paciente_id as string,
+        pacienteNome: pac?.nome ?? e.ag.paciente_nome ?? "Paciente",
+        procedimento: e.ag.procedimento,
+        dataReferencia: e.ag.inicio,
+        valor: e.valor,
+        paciente: pac
+          ? {
+              nome: pac.nome,
+              cpfCnpj: pac.cpf ?? undefined,
+              email: pac.email ?? undefined,
+              cep: pac.cep ?? undefined,
+              logradouro: pac.logradouro ?? undefined,
+              numero: pac.numero ?? undefined,
+              bairro: pac.bairro ?? undefined,
+              municipio: pac.cidade ?? undefined,
+              uf: pac.estado ?? undefined,
+            }
+          : null,
+      };
+    });
+
+    // Nada é enviado antes desta tela: é aqui que o caixa confere nota a nota
+    // e, se for o caso, troca o tomador por um terceiro pagador.
+    const revisadas = await revisarNfseLote({
+      linhas,
+      avisoFora:
+        fora.length > 0
+          ? `${fora.length} marcado${fora.length === 1 ? "" : "s"} não entra${
+              fora.length === 1 ? "" : "m"
+            } nesta emissão: ${nfseLoteTriagem.motivosFora.join("; ")}.`
+          : "",
+    });
+    if (!revisadas || revisadas.length === 0) {
+      if (revisadas) toast.error("Nenhuma nota no lote — emissão cancelada.");
       return;
     }
 
-    const totalLote = prontos.reduce((s, p) => s + p.valor, 0);
-    const listaResumo = prontos
-      .slice(0, 8)
-      .map((p) => `• ${p.pac.nome} — ${brl(p.valor)}`)
-      .join("\n");
-    const restoResumo = prontos.length > 8 ? `\n• …e mais ${prontos.length - 8}` : "";
-    const aviso = [
-      impedidos.length > 0
-        ? `${impedidos.length} ficaram de fora por cadastro incompleto (CPF ou endereço).`
-        : "",
-      fora.length > 0 ? `${fora.length} marcados não entram nesta emissão.` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    const plural = prontos.length > 1;
-    const ok = await confirmDialog({
-      title: `Emitir ${prontos.length} nota${plural ? "s" : ""} fiscal${plural ? "is" : ""}?`,
-      tone: "warning",
-      confirmText: `Emitir ${prontos.length} nota${plural ? "s" : ""}`,
-      description:
-        `Sai UMA nota para cada atendimento marcado, pelo valor já recebido:\n\n` +
-        `${listaResumo}${restoResumo}\n\nTotal: ${brl(totalLote)}\n\n` +
-        `${aviso ? aviso + "\n\n" : ""}` +
-        `Nota emitida por engano só se desfaz com cancelamento na prefeitura — confira a lista antes de continuar.`,
+    // Já revisado, cada linha vira o que de fato vai para a prefeitura: valor
+    // (cheio ou parcial), descrição e tomador escolhido.
+    const emailValido = (v: string | null | undefined) =>
+      /^[^@s]+@[^@s]+.[^@s]+$/.test(v ?? "") ? (v as string) : undefined;
+    const prontos = revisadas.map(({ linha, tomador }) => {
+      const parcial = aplicarValorParcial(linha.valor, tomador);
+      const descBase = montarDiscriminacaoNfse({
+        procedimento: linha.procedimento,
+        pacienteNome: linha.pacienteNome,
+        dataReferencia: linha.dataReferencia,
+      });
+      const dep = (tomador.dependenteAtendido ?? "").trim();
+      // O nome do paciente já está na descrição; só acrescenta o dependente
+      // quando é outra pessoa, para a nota não repetir o mesmo nome duas vezes.
+      const descComDep =
+        dep && dep.toLowerCase() !== linha.pacienteNome.trim().toLowerCase()
+          ? `${descBase} — Dependente do pagador: ${dep}`
+          : descBase;
+      return {
+        linha,
+        valor: parcial.valor,
+        descricao: `${descComDep}${parcial.descricaoSufixo}`,
+        tomador: {
+          nome: tomador.nome,
+          cpfCnpj: tomador.cpfCnpj ?? undefined,
+          // E-mail torto na ficha reprova a validação e derrubaria a nota
+          // inteira; como o campo é opcional, só vai quando é válido.
+          email: emailValido(tomador.email),
+          cep: tomador.cep ?? undefined,
+          logradouro: tomador.logradouro ?? undefined,
+          numero: tomador.numero ?? undefined,
+          bairro: tomador.bairro ?? undefined,
+          municipio: tomador.municipio ?? undefined,
+          uf: tomador.uf ?? undefined,
+        },
+      };
     });
-    if (!ok) return;
 
     const emitenteIdEscolhido = await pickEmitenteNfse();
     if (!emitenteIdEscolhido) {
@@ -7164,52 +7187,33 @@ function AgendaPage() {
     const falhas: string[] = [];
     try {
       for (let i = 0; i < prontos.length; i++) {
-        const { ag, valor, pac } = prontos[i];
+        const { linha, valor, descricao, tomador } = prontos[i];
         setProgressoNfseSelecao({ feito: i, total: prontos.length });
-        toast.loading(`Emitindo nota ${i + 1} de ${prontos.length} — ${pac.nome}…`, {
+        toast.loading(`Emitindo nota ${i + 1} de ${prontos.length} — ${linha.pacienteNome}…`, {
           id: toastId,
         });
         try {
           const res = await emitirNfseFn({
             data: {
               emitenteId: emitenteIdEscolhido,
-              pacienteId: pac.id,
-              agendamentoId: ag.id,
+              // O paciente continua sendo o cliente do serviço na nota; quem
+              // recebe a nota é o tomador revisado na tela do lote.
+              pacienteId: linha.pacienteId,
+              agendamentoId: linha.id,
               valorServicos: Math.round(Number(valor) * 100) / 100,
-              // Sem diálogo para revisar texto a texto, a descrição é montada
-              // completa (procedimento + paciente + data), como nas outras
-              // telas de emissão.
-              descricaoServicos: montarDiscriminacaoNfse({
-                procedimento: ag.procedimento,
-                pacienteNome: pac.nome,
-                dataReferencia: ag.inicio,
-              }),
-              tomador: {
-                nome: pac.nome,
-                cpfCnpj: pac.cpf ?? undefined,
-                // E-mail torto na ficha reprova a validação e derrubaria a nota
-                // inteira; como o campo é opcional, só vai quando é válido.
-                email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pac.email ?? "")
-                  ? (pac.email as string)
-                  : undefined,
-                cep: pac.cep ?? undefined,
-                logradouro: pac.logradouro ?? undefined,
-                numero: pac.numero ?? undefined,
-                bairro: pac.bairro ?? undefined,
-                municipio: pac.cidade ?? undefined,
-                uf: pac.estado ?? undefined,
-              },
+              descricaoServicos: descricao,
+              tomador,
             },
           });
           avisarEmitenteDivergente(res);
           const r = res as { ok?: boolean; id?: string; error?: string };
           if (r?.ok === false || !r?.id) {
-            falhas.push(`${pac.nome} — ${r?.error ?? "a prefeitura recusou a nota"}`);
+            falhas.push(`${linha.pacienteNome} — ${r?.error ?? "a prefeitura recusou a nota"}`);
             continue;
           }
-          emitidas.push({ nfseId: r.id, agId: ag.id });
+          emitidas.push({ nfseId: r.id, agId: linha.id });
         } catch (err) {
-          falhas.push(`${pac.nome} — ${(err as Error)?.message ?? "falha no envio"}`);
+          falhas.push(`${linha.pacienteNome} — ${(err as Error)?.message ?? "falha no envio"}`);
         }
       }
       setProgressoNfseSelecao({ feito: prontos.length, total: prontos.length });
@@ -7670,6 +7674,7 @@ function AgendaPage() {
     <div className="space-y-3">
       {emitenteNfseDialog}
       {tomadorNfseDialog}
+      {revisaoNfseLoteDialog}
       {descricaoNfseDialog}
       {nfseSel.size > 0 &&
         (() => {

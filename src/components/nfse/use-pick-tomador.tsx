@@ -52,6 +52,19 @@ export interface PickTomadorInput {
   pacienteLabel?: string;
   /** Valor total do serviço, usado no preview do valor parcial. */
   valorBase?: number;
+  /**
+   * Preenche o formulário do terceiro já com estes dados. Usado quando se
+   * REEDITA um tomador já escolhido (revisão do lote), para não obrigar a
+   * digitar tudo de novo.
+   */
+  terceiroInicial?: TomadorPayload | null;
+  /**
+   * Modo "um terceiro para o lote inteiro": o diálogo pergunta só QUEM é o
+   * tomador, sem valor e sem dependente atendido — esses dois variam de nota
+   * para nota e são resolvidos pela tela do lote (o dependente de cada nota é
+   * o paciente daquele atendimento).
+   */
+  modoLote?: boolean;
 }
 
 const fmtBRL = (v: number) =>
@@ -150,6 +163,7 @@ export function usePickTomador() {
   // os campos do formulário, que seguem editáveis depois do preenchimento.
   const [terceiroCadastro, setTerceiroCadastro] = useState<PatientOption | null>(null);
   const [carregandoCadastro, setCarregandoCadastro] = useState(false);
+  const [modoLote, setModoLote] = useState(false);
   const resolverRef = useRef<((v: TomadorPayload | null) => void) | null>(null);
 
   const pick = useCallback(async (input: PickTomadorInput): Promise<TomadorPayload | null> => {
@@ -157,26 +171,32 @@ export function usePickTomador() {
     setPacienteLabel(input.pacienteLabel ?? input.paciente?.nome ?? "Paciente");
     // Se o paciente não serve como tomador (sem CPF ou sem endereço), já abre
     // no modo terceiro, que pede os dois no próprio diálogo.
-    setModo(input.paciente && !impedimentoDoPaciente(input.paciente) ? "paciente" : "terceiro");
+    setModoLote(!!input.modoLote);
+    setModo(
+      !input.modoLote && input.paciente && !impedimentoDoPaciente(input.paciente)
+        ? "paciente"
+        : "terceiro",
+    );
     const base = Number(input.valorBase) || 0;
     setValorBase(base);
     setValorTexto(base > 0 ? base.toFixed(2) : "");
     setErro("");
+    const ini = input.terceiroInicial;
     setTerceiro({
-      nome: "",
-      cpfCnpj: "",
-      email: "",
-      cep: "",
-      logradouro: "",
-      numero: "",
-      bairro: "",
-      municipio: "",
-      uf: "",
+      nome: ini?.nome ?? "",
+      cpfCnpj: ini?.cpfCnpj ?? "",
+      email: ini?.email ?? "",
+      cep: ini?.cep ?? "",
+      logradouro: ini?.logradouro ?? "",
+      numero: ini?.numero ?? "",
+      bairro: ini?.bairro ?? "",
+      municipio: ini?.municipio ?? "",
+      uf: ini?.uf ?? "",
       dependenteAtendido: "",
     });
     setTerceiroCadastro(null);
     setCarregandoCadastro(false);
-    setDependenteAtendido(input.paciente?.nome ?? "");
+    setDependenteAtendido(input.modoLote ? "" : (input.paciente?.nome ?? ""));
     return new Promise<TomadorPayload | null>((resolve) => {
       resolverRef.current = resolve;
       setOpen(true);
@@ -230,8 +250,10 @@ export function usePickTomador() {
   };
 
   const confirm = () => {
-    const valorEmitir = +(Number(valorTexto) || 0).toFixed(2);
-    if (valorEmitir <= 0) {
+    // No modo lote o valor de cada nota é o do próprio atendimento — a tela do
+    // lote é que sabe qual é, então aqui não se pergunta nem se valida.
+    const valorEmitir = modoLote ? undefined : +(Number(valorTexto) || 0).toFixed(2);
+    if (!modoLote && !(valorEmitir && valorEmitir > 0)) {
       setErro("Informe o valor a emitir na NFS-e.");
       return;
     }
@@ -288,7 +310,7 @@ export function usePickTomador() {
       bairro: terceiro.bairro?.trim() || undefined,
       municipio: terceiro.municipio?.trim() || undefined,
       uf: terceiro.uf?.trim() || undefined,
-      dependenteAtendido: dependenteAtendido.trim() || undefined,
+      dependenteAtendido: modoLote ? undefined : dependenteAtendido.trim() || undefined,
       valorEmitir,
     });
   };
@@ -311,54 +333,61 @@ export function usePickTomador() {
         if (!o) cancel();
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Em nome de quem emitir a NFS-e?</DialogTitle>
+          <DialogTitle>
+            {modoLote
+              ? "Terceiro pagador para todas as notas do lote"
+              : "Em nome de quem emitir a NFS-e?"}
+          </DialogTitle>
           <DialogDescription>
-            Escolha se a nota vai para o paciente (cliente do serviço) ou para um terceiro que pagou
-            pelo atendimento.
+            {modoLote
+              ? "Todas as notas do lote sairão no nome desta pessoa ou empresa. O paciente de cada atendimento continua na descrição da nota, como dependente do pagador."
+              : "Escolha se a nota vai para o paciente (cliente do serviço) ou para um terceiro que pagou pelo atendimento."}
           </DialogDescription>
         </DialogHeader>
 
-        <RadioGroup
-          value={modo}
-          onValueChange={(v) => {
-            setModo(v as "paciente" | "terceiro");
-            setErro("");
-          }}
-          className="space-y-2"
-        >
-          <label
-            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || impedimentoPaciente ? "opacity-60 cursor-not-allowed" : ""}`}
+        {!modoLote && (
+          <RadioGroup
+            value={modo}
+            onValueChange={(v) => {
+              setModo(v as "paciente" | "terceiro");
+              setErro("");
+            }}
+            className="space-y-2"
           >
-            <RadioGroupItem
-              value="paciente"
-              disabled={!paciente || !!impedimentoPaciente}
-              className="mt-0.5"
-            />
-            <div className="text-sm">
-              <div className="font-medium">Cliente do serviço (paciente)</div>
-              <div className="text-xs text-muted-foreground">
-                {paciente ? pacienteLabel : "Nenhum paciente vinculado ao atendimento."}
-                {paciente?.cpfCnpj ? ` • CPF/CNPJ ${paciente.cpfCnpj}` : ""}
+            <label
+              className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "paciente" ? "border-primary bg-primary/5" : ""} ${!paciente || impedimentoPaciente ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
+              <RadioGroupItem
+                value="paciente"
+                disabled={!paciente || !!impedimentoPaciente}
+                className="mt-0.5"
+              />
+              <div className="text-sm">
+                <div className="font-medium">Cliente do serviço (paciente)</div>
+                <div className="text-xs text-muted-foreground">
+                  {paciente ? pacienteLabel : "Nenhum paciente vinculado ao atendimento."}
+                  {paciente?.cpfCnpj ? ` • CPF/CNPJ ${paciente.cpfCnpj}` : ""}
+                </div>
+                {impedimentoPaciente && (
+                  <div className="text-xs text-destructive mt-1">{impedimentoPaciente}</div>
+                )}
               </div>
-              {impedimentoPaciente && (
-                <div className="text-xs text-destructive mt-1">{impedimentoPaciente}</div>
-              )}
-            </div>
-          </label>
-          <label
-            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "terceiro" ? "border-primary bg-primary/5" : ""}`}
-          >
-            <RadioGroupItem value="terceiro" className="mt-0.5" />
-            <div className="text-sm">
-              <div className="font-medium">Terceiro (outro pagador)</div>
-              <div className="text-xs text-muted-foreground">
-                Empresa ou pessoa diferente do paciente. Endereço obrigatório.
+            </label>
+            <label
+              className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer ${modo === "terceiro" ? "border-primary bg-primary/5" : ""}`}
+            >
+              <RadioGroupItem value="terceiro" className="mt-0.5" />
+              <div className="text-sm">
+                <div className="font-medium">Terceiro (outro pagador)</div>
+                <div className="text-xs text-muted-foreground">
+                  Empresa ou pessoa diferente do paciente. Endereço obrigatório.
+                </div>
               </div>
-            </div>
-          </label>
-        </RadioGroup>
+            </label>
+          </RadioGroup>
+        )}
 
         {modo === "terceiro" && (
           <div className="space-y-3 border-t pt-3">
@@ -447,67 +476,71 @@ export function usePickTomador() {
           </div>
         )}
 
-        <div className="space-y-1 border-t pt-3">
-          <Label>Dependente atendido (opcional)</Label>
-          <Textarea
-            rows={2}
-            maxLength={200}
-            placeholder="Nome do dependente / paciente efetivamente atendido"
-            value={dependenteAtendido}
-            onChange={(e) => setDependenteAtendido(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Se preenchido, aparecerá na descrição da NFS-e como "Dependente do pagador: …". Deixe em
-            branco se o próprio tomador foi atendido.
-          </p>
-        </div>
+        {!modoLote && (
+          <div className="space-y-1 border-t pt-3">
+            <Label>Dependente atendido (opcional)</Label>
+            <Textarea
+              rows={2}
+              maxLength={200}
+              placeholder="Nome do dependente / paciente efetivamente atendido"
+              value={dependenteAtendido}
+              onChange={(e) => setDependenteAtendido(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Se preenchido, aparecerá na descrição da NFS-e como "Dependente do pagador: …". Deixe
+              em branco se o próprio tomador foi atendido.
+            </p>
+          </div>
+        )}
 
-        <div className="space-y-2 border-t pt-3">
-          <Label>Valor a emitir na NFS-e (R$)</Label>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Atalhos: só preenchem o mesmo campo, não travam a digitação. */}
-            {[100, 75, 50, 25].map((p) => {
-              const v = +(((Number(valorBase) || 0) * p) / 100).toFixed(2);
-              const ativo = Math.abs(valorFinal - v) < 0.005;
-              return (
-                <Button
-                  key={p}
-                  type="button"
-                  size="sm"
-                  variant={ativo ? "default" : "outline"}
-                  disabled={!valorBase}
-                  onClick={() => {
-                    setValorTexto(v.toFixed(2));
+        {!modoLote && (
+          <div className="space-y-2 border-t pt-3">
+            <Label>Valor a emitir na NFS-e (R$)</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Atalhos: só preenchem o mesmo campo, não travam a digitação. */}
+              {[100, 75, 50, 25].map((p) => {
+                const v = +(((Number(valorBase) || 0) * p) / 100).toFixed(2);
+                const ativo = Math.abs(valorFinal - v) < 0.005;
+                return (
+                  <Button
+                    key={p}
+                    type="button"
+                    size="sm"
+                    variant={ativo ? "default" : "outline"}
+                    disabled={!valorBase}
+                    onClick={() => {
+                      setValorTexto(v.toFixed(2));
+                      setErro("");
+                    }}
+                  >
+                    {fmtBRL(v)}
+                  </Button>
+                );
+              })}
+              <div className="w-32">
+                <CurrencyInput
+                  value={valorTexto}
+                  onChange={(v) => {
+                    setValorTexto(v);
                     setErro("");
                   }}
-                >
-                  {fmtBRL(v)}
-                </Button>
-              );
-            })}
-            <div className="w-32">
-              <CurrencyInput
-                value={valorTexto}
-                onChange={(v) => {
-                  setValorTexto(v);
-                  setErro("");
-                }}
-              />
+                />
+              </div>
             </div>
+            {valorBase > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e:{" "}
+                <b>{fmtBRL(valorFinal)}</b>
+                {valorFinal > 0 && valorFinal < valorBase - 0.005 ? " (nota parcial)" : ""}
+              </p>
+            )}
+            {valorFinal > valorBase + 0.005 && valorBase > 0 && (
+              <p className="text-xs text-amber-600">
+                Atenção: o valor digitado é maior que o valor do serviço.
+              </p>
+            )}
           </div>
-          {valorBase > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Valor total do serviço: <b>{fmtBRL(valorBase)}</b> · Nesta NFS-e:{" "}
-              <b>{fmtBRL(valorFinal)}</b>
-              {valorFinal > 0 && valorFinal < valorBase - 0.005 ? " (nota parcial)" : ""}
-            </p>
-          )}
-          {valorFinal > valorBase + 0.005 && valorBase > 0 && (
-            <p className="text-xs text-amber-600">
-              Atenção: o valor digitado é maior que o valor do serviço.
-            </p>
-          )}
-        </div>
+        )}
 
         {erro && (
           <div className="rounded-md border border-destructive/50 bg-destructive/5 text-destructive text-xs p-2">
@@ -519,7 +552,9 @@ export function usePickTomador() {
           <Button variant="outline" onClick={cancel}>
             Cancelar
           </Button>
-          <Button onClick={confirm}>Emitir nesta pessoa</Button>
+          <Button onClick={confirm}>
+            {modoLote ? "Aplicar a todas as notas" : "Emitir nesta pessoa"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

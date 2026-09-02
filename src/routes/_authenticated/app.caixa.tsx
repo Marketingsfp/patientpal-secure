@@ -5482,6 +5482,32 @@ function Page() {
                 </div>
               );
             })()}
+            {/* Aviso de valor colado no calculado.
+                O modal já abre com todas as formas preenchidas com o valor
+                calculado (ver `conferenciaInicial`), então dá para encerrar o
+                caixa sem contar nada: o sistema grava diferença R$ 0,00 e uma
+                falta real some do histórico. Foi o que aconteceu no caixa de
+                02/09/2026, fechado com R$ 9.556,49 informado = calculado
+                enquanto faltavam R$ 230,00 na gaveta. O aviso não trava o
+                fechamento — só lembra de conferir o dinheiro de verdade. */}
+            {Math.abs(saldoDoDiaFechamento) > 0.005 &&
+              Math.abs(totalConferidoOwn - saldoDoDiaFechamento) < 0.005 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                        Atenção: o valor informado é igual ao calculado pelo sistema.
+                      </p>
+                      <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                        Confirme se este é o valor real contado fisicamente na gaveta. Lançar o
+                        valor real, mesmo com faltas ou sobras, é fundamental para o controle do
+                        financeiro.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             <div>
               <Label>Observações (justifique sobras ou faltas)</Label>
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
