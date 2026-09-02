@@ -20,7 +20,7 @@ import {
 } from "./kb-parser";
 
 export const BUCKET_KB = "nina-kb";
-const MODELO_EMBEDDING = "google/text-embedding-004";
+const MODELO_EMBEDDING = "google/gemini-embedding-001";
 const DIM = 768;
 
 export interface BaseKb {
@@ -68,7 +68,7 @@ async function gerarEmbeddings(textos: string[]): Promise<Array<number[] | null>
       const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MODELO_EMBEDDING, input: lote }),
+        body: JSON.stringify({ model: MODELO_EMBEDDING, input: lote, dimensions: DIM }),
       });
       if (!res.ok) {
         console.error("[Nina KB] embeddings falharam", res.status, await res.text().catch(() => ""));
