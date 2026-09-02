@@ -38,6 +38,16 @@ package-lock.json
 # Não afeta supabase/migrations/*.sql nem docs/*.sql, que continuam versionados.
 /*.sql
 
+# Diagnósticos, auditorias e planilhas de conferência gerados sob demanda para
+# a direção (um caixa que não fechou, uma cobrança duplicada, um relatório de
+# divergência...). São o retrato de um dia específico, não documentação do
+# sistema: envelhecem em uma semana e só poluiriam o histórico do código.
+# Ficam na pasta do projeto para consulta, fora do git.
+#
+# Documentação de verdade continua versionada: AGENTS.md, HANDOFF.md,
+# roadmap.md, PLANO_SEGURANCA.md, docs/ e supabase/migrations/.
+/docs-diagnosticos/
+
 # Scratch/geração local — nunca deve ser versionado nem entrar no lint/CI
 /tmp/
 /output/
