@@ -10950,6 +10950,7 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       kpis_clientes_v2: {
         Args: { _clinica_id: string }
         Returns: {
