@@ -24,15 +24,50 @@ export function normalizarCodigoProntuario(valor: string | null | undefined): st
 }
 
 /**
- * Confere se o número já pertence a outro paciente da mesma clínica (existe
- * índice único por clínica). Devolve a mensagem pronta para exibir ao usuário,
- * ou null quando o número está livre.
+ * Maior quantidade de dígitos aceita num número de prontuário.
+ *
+ * A régua vem do sistema antigo, que numerava com até 7 dígitos. O limite não
+ * é estético: o número automático de um paciente novo é calculado como "maior
+ * número da clínica + 1". Em 19/08/2026 alguém digitou 24378101 (o prontuário
+ * 2437810 de outra paciente com um dígito a mais) e, a partir dali, todos os
+ * cadastros novos passaram a nascer com 8 dígitos, fora da régua.
+ */
+export const MAX_DIGITOS_PRONTUARIO = 7;
+
+/**
+ * Recusa um número de prontuário fora da régua do sistema antigo.
+ *
+ * Só vale para números puros: alguns cadastros antigos têm letra no código e
+ * continuam válidos como estão. Devolve a mensagem pronta para exibir, ou null
+ * quando o número pode ser usado.
+ */
+export function erroCodigoProntuario(codigo: string | null | undefined): string | null {
+  const limpo = (codigo ?? "").trim();
+  if (!limpo) return null;
+  if (/^\d+$/.test(limpo) && limpo.length > MAX_DIGITOS_PRONTUARIO) {
+    return `O número de prontuário tem no máximo ${MAX_DIGITOS_PRONTUARIO} dígitos, e você digitou ${limpo.length}. Confira o número na ficha.`;
+  }
+  return null;
+}
+
+/**
+ * Diz se o número digitado pode ser usado. Junta as duas checagens que toda
+ * tela de cadastro precisa fazer: o número está dentro da régua de 7 dígitos e
+ * ainda não pertence a outro paciente da mesma clínica (existe índice único por
+ * clínica). Devolve a mensagem pronta para exibir ao usuário, ou null quando o
+ * número está livre.
+ *
+ * As duas checagens moram juntas de propósito: este é o único ponto por onde
+ * passam todas as telas que aceitam o número digitado — cadastro completo,
+ * cadastro rápido, agenda e o assistente de novo agendamento.
  */
 export async function conflitoCodigoProntuario(
   clinicaId: string,
   codigo: string | null,
   ignorarPacienteId?: string,
 ): Promise<string | null> {
+  const foraDaRegua = erroCodigoProntuario(codigo);
+  if (foraDaRegua) return foraDaRegua;
   if (!codigo) return null;
   const { data } = await supabase
     .from("pacientes")
