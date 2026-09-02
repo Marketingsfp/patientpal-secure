@@ -11,17 +11,15 @@
 //      `profiles_peer_select` (ou o cadastro está sem o campo `nome`).
 //
 // Nos dois casos a GR caía no último fallback e imprimia o nome de quem estava
-// IMPRIMINDO, não o de quem faturou. Aqui a resolução é feita com a chave de
-// serviço, então nunca volta vazia por falta de permissão — e o nome ainda tem
-// duas redes de segurança (metadados do login e e-mail) quando o cadastro está
-// sem nome preenchido.
+// IMPRIMINDO, não o de quem faturou. A consulta agora usa a sessão autenticada
+// recebida pelo middleware e respeita o RLS. Isso evita que uma configuração
+// administrativa ausente derrube a impressão inteira.
 //
 // Acesso: só responde a quem é membro da clínica informada, e só olha
 // agendamentos que realmente pertencem a ela.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
 const schema = z.object({
@@ -35,16 +33,21 @@ export const nomeDeQuemFaturou = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => schema.parse(i))
   .handler(async ({ data, context }): Promise<NomeQuemFaturouResult> => {
-    const { data: membro, error: errMembro } = await supabaseAdmin.rpc("is_member", {
-      _user_id: context.userId,
-      _clinica_id: data.clinicaId,
-    });
+    const { supabase, userId } = context;
+
+    const { data: membro, error: errMembro } = await supabase
+      .from("clinica_memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("clinica_id", data.clinicaId)
+      .eq("ativo", true)
+      .maybeSingle();
     if (errMembro) throw new Error(errMembro.message);
     if (!membro) throw new Error("Sem acesso a esta clínica");
 
     // O id do agendamento vem do cliente: confere que é mesmo desta clínica
     // antes de olhar o financeiro dele.
-    const { data: ags, error: errAgs } = await supabaseAdmin
+    const { data: ags, error: errAgs } = await supabase
       .from("agendamentos")
       .select("id")
       .eq("clinica_id", data.clinicaId)
@@ -53,7 +56,7 @@ export const nomeDeQuemFaturou = createServerFn({ method: "POST" })
     const ids = ((ags ?? []) as Array<{ id: string }>).map((r) => r.id);
     if (ids.length === 0) return { nome: null };
 
-    const { data: lancs, error: errLancs } = await supabaseAdmin
+    const { data: lancs, error: errLancs } = await supabase
       .from("fin_lancamentos")
       .select("criado_por, tipo, created_at")
       .in("agendamento_id", ids)
@@ -72,15 +75,12 @@ export const nomeDeQuemFaturou = createServerFn({ method: "POST" })
       null;
     if (!autor) return { nome: null };
 
-    const { data: prof } = await supabaseAdmin
+    const { data: prof, error: errProf } = await supabase
       .from("profiles")
       .select("nome")
       .eq("id", autor)
       .maybeSingle();
+    if (errProf) throw new Error(errProf.message);
     const nomeCadastro = ((prof as { nome: string | null } | null)?.nome ?? "").trim();
-    if (nomeCadastro) return { nome: nomeCadastro };
-
-    const { data: u } = await supabaseAdmin.auth.admin.getUserById(autor);
-    const meta = ((u?.user?.user_metadata as { nome?: string } | undefined)?.nome ?? "").trim();
-    return { nome: meta || u?.user?.email || null };
+    return { nome: nomeCadastro || null };
   });
