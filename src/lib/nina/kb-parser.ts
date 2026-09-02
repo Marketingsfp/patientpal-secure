@@ -268,6 +268,7 @@ export function interpretarDias(valor: string): DiasInterpretados {
         .replace(/\b([01]?\d|2[0-3])\s*[:h]\s*([0-5]\d)?h?\b/g, " ")
         .replace(/\s{2,}/g, " ")
         .replace(/^[\s-–—:,]+|[\s-–—:,]+$/g, "")
+        .replace(/^\((.*)\)$/, "$1")
         .trim() || null;
     adicionar(dia, regra, horaNoDia);
   }
@@ -283,8 +284,14 @@ export function interpretarDias(valor: string): DiasInterpretados {
     }
   }
 
+  const regraComum =
+    dias.length > 1 && dias.every((d) => d.regra && d.regra === dias[0]!.regra)
+      ? dias[0]!.regra
+      : null;
   const texto = dias.length
-    ? dias.map((d) => (d.regra ? `${d.dia} (${d.regra})` : d.dia)).join(" e ")
+    ? regraComum
+      ? `${dias.map((d) => d.dia).join(" e ")} (${regraComum})`
+      : dias.map((d) => (d.regra ? `${d.dia} (${d.regra})` : d.dia)).join(" e ")
     : null;
   return { dias_original: original, dias, texto };
 }
