@@ -1,34 +1,63 @@
 import { describe, expect, it } from "bun:test";
 import { erroCodigoProntuario, prontuarioExibicao } from "./prontuario";
 
-// A importação do sistema antigo (junho/2026) gravou a numeração histórica em
-// `codigo_prontuario_anterior` e criou um número interno novo em
-// `codigo_prontuario`. Em 241.261 dos 252.062 pacientes os dois são
-// diferentes, e a recepção precisa ver o histórico — é ele que está na ficha
-// de papel. Estes testes travam essa ordem de preferência para que uma
-// refatoração futura não volte a exibir o número interno.
+// O número que vale é o que a recepção digita e confere no campo "Número de
+// prontuário" do cadastro — `codigo_prontuario`. O código herdado da
+// importação de junho/2026 só aparece quando o campo principal está vazio.
+//
+// A regra foi definida pelo dono em 02/09/2026 conferindo três cadastros
+// contra o papel, e os números abaixo são os reais desses três pacientes.
+// Estes testes existem porque a ordem já foi a inversa: até 02/09 o histórico
+// ganhava, e a guia saía com o número errado.
 
 describe("prontuarioExibicao", () => {
-  it("prefere a numeração histórica do sistema antigo", () => {
+  it("usa o número de prontuário do cadastro, não o herdado", () => {
+    // GILBERTO ALEXANDRINO DA SILVA: aparecia como 378132.
     expect(
-      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: "01234" }),
+      prontuarioExibicao({ codigo_prontuario: "2430133", codigo_prontuario_anterior: "378132" }),
+    ).toBe("2430133");
+  });
+
+  it("vale também quando o cadastro tem pasta física", () => {
+    // VANILDA DOS SANTOS VENTURA: a guia saía com 194897, que é o
+    // `codigo_prontuario` de OUTRA paciente.
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: "1348",
+        codigo_prontuario_anterior: "194897",
+        numero_pasta: "1348",
+      }),
+    ).toBe("1348");
+  });
+
+  it("cai na pasta quando o número de prontuário está vazio", () => {
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: "",
+        codigo_prontuario_anterior: "84297",
+        numero_pasta: "1644",
+      }),
+    ).toBe("1644");
+  });
+
+  it("só usa o herdado quando não há prontuário nem pasta", () => {
+    expect(
+      prontuarioExibicao({
+        codigo_prontuario: null,
+        codigo_prontuario_anterior: "130072",
+        numero_pasta: null,
+      }),
+    ).toBe("130072");
+  });
+
+  it("trata campo só com espaços como vazio", () => {
+    expect(
+      prontuarioExibicao({ codigo_prontuario: "   ", codigo_prontuario_anterior: "01234" }),
     ).toBe("01234");
   });
 
-  it("cai no número interno quando o paciente não veio da importação", () => {
-    expect(
-      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: null }),
-    ).toBe("2435051");
-  });
-
-  it("trata histórico em branco como ausente", () => {
-    expect(
-      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: "   " }),
-    ).toBe("2435051");
-  });
-
   it("remove espaços em volta do número exibido", () => {
-    expect(prontuarioExibicao({ codigo_prontuario_anterior: " 01234 " })).toBe("01234");
+    expect(prontuarioExibicao({ codigo_prontuario: " 2430133 " })).toBe("2430133");
   });
 
   it("devolve null quando não há nenhum número", () => {
@@ -43,6 +72,12 @@ describe("prontuarioExibicao", () => {
   it("aceita paciente ainda não carregado", () => {
     expect(prontuarioExibicao(null)).toBe(null);
     expect(prontuarioExibicao(undefined)).toBe(null);
+  });
+
+  it("não muda nada para tela que não carrega a coluna da pasta", () => {
+    expect(
+      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: "01234" }),
+    ).toBe("2435051");
   });
 });
 
@@ -74,49 +109,5 @@ describe("erroCodigoProntuario", () => {
 
   it("ignora espaços em volta antes de contar os dígitos", () => {
     expect(erroCodigoProntuario("  2656813  ")).toBeNull();
-  });
-});
-
-// A clínica tem duas numerações herdadas do sistema antigo, e as faixas se
-// cruzam: 194897 é o `codigo_prontuario_anterior` da VANILDA DOS SANTOS
-// VENTURA e, ao mesmo tempo, o `codigo_prontuario` da BEATRIZ MOREIRA DE
-// AZEVEDO. A guia da Vanilda saía impressa com 194897 em vez de 1348, que é o
-// número da pasta dela na estante. São 3.693 pacientes nessa situação.
-
-describe("prontuarioExibicao com número de pasta", () => {
-  it("usa o número da pasta física quando ele existe", () => {
-    expect(
-      prontuarioExibicao({
-        codigo_prontuario: "1348",
-        codigo_prontuario_anterior: "194897",
-        numero_pasta: "1348",
-      }),
-    ).toBe("1348");
-  });
-
-  it("cai no histórico quando o paciente não tem pasta", () => {
-    expect(
-      prontuarioExibicao({
-        codigo_prontuario: "194897",
-        codigo_prontuario_anterior: "322719",
-        numero_pasta: null,
-      }),
-    ).toBe("322719");
-  });
-
-  it("trata pasta em branco como ausente", () => {
-    expect(
-      prontuarioExibicao({
-        codigo_prontuario: "2435051",
-        codigo_prontuario_anterior: "01234",
-        numero_pasta: "   ",
-      }),
-    ).toBe("01234");
-  });
-
-  it("não muda nada para tela que não carrega a coluna da pasta", () => {
-    expect(
-      prontuarioExibicao({ codigo_prontuario: "2435051", codigo_prontuario_anterior: "01234" }),
-    ).toBe("01234");
   });
 });

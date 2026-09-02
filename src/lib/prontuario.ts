@@ -87,40 +87,46 @@ export interface ProntuarioExibivel {
   codigo_prontuario?: string | null;
   codigo_prontuario_anterior?: string | null;
   /**
-   * Número da pasta física. Quando existe, é o que a recepção usa para achar a
-   * pasta na estante, e por isso tem prioridade sobre os outros dois. Telas que
-   * não carregam esta coluna continuam funcionando como antes.
+   * Número da pasta física. Entra quando o cadastro não tem número de
+   * prontuário preenchido. Telas que não carregam esta coluna continuam
+   * funcionando como antes.
    */
   numero_pasta?: string | null;
 }
 
 /**
- * Número de prontuário que deve aparecer na tela.
+ * Número de prontuário que deve aparecer na tela e sair impresso.
  *
- * A importação do sistema antigo (junho/2026) gravou a numeração histórica em
- * `codigo_prontuario_anterior` e gerou um número interno novo em
- * `codigo_prontuario`. Para a recepção, o número que vale é o histórico — é ele
- * que está na ficha de papel e nos documentos antigos. Quem foi cadastrado já
- * no sistema novo não tem histórico e continua com o número interno.
+ * A ordem é: **`codigo_prontuario`, depois `numero_pasta`, depois
+ * `codigo_prontuario_anterior`.**
  *
- * Acima dos dois vem `numero_pasta`, quando o paciente tem um. A clínica tem
- * duas numerações herdadas do sistema antigo, com faixas que se cruzam, e para
- * quem tem pasta física é o número dela que está na capa e na guia.
+ * O que manda é o número que a recepção digita e confere no campo "Número de
+ * prontuário" do cadastro. É ele que está na ficha que a recepção usa, e é ele
+ * que o paciente vê na guia. O código herdado só aparece quando o campo
+ * principal está vazio — na prática, quase nunca, já que o banco gera um número
+ * automático em todo cadastro novo.
+ *
+ * O histórico continua servindo para BUSCA: quem chega com uma guia ou cartão
+ * antigo é encontrado digitando o número velho. Só não é ele que aparece
+ * escrito depois.
+ *
+ * A regra foi definida pelo dono em 02/09/2026, conferindo três cadastros
+ * contra o papel: GILBERTO ALEXANDRINO DA SILVA (2430133, saía 378132),
+ * VANILDA DOS SANTOS VENTURA (1348, saía 194897) e LAIZ DA COSTA PIRES (1644,
+ * saía 84297). Antes disso a ordem era a inversa, e o número herdado ganhava.
+ *
+ * Ela também resolve uma ambiguidade real: 130.368 pacientes têm um
+ * `codigo_prontuario_anterior` que é, ao mesmo tempo, o `codigo_prontuario` de
+ * OUTRO paciente — o histórico não tem índice único, o `codigo_prontuario` tem.
+ * Exibir o campo com índice único faz um número apontar para uma pessoa só.
  *
  * Usar só para exibir e imprimir. Cadastro, busca por código e checagem de
- * duplicidade continuam em `codigo_prontuario`, que é a coluna com índice único.
+ * duplicidade continuam lendo as colunas direto.
  */
 export function prontuarioExibicao(p: ProntuarioExibivel | null | undefined): string | null {
-  // O número da pasta física vem primeiro quando existe. Ele é o número escrito
-  // na capa da pasta que a recepção pega na estante, e é ele que o paciente vê
-  // na guia. São 3.693 pacientes com pasta cadastrada cujo número histórico é
-  // outro — o caso da VANILDA DOS SANTOS VENTURA, que tem pasta 1348 e saía
-  // impressa como 194897. Pior: 194897 é o `codigo_prontuario` de outra
-  // paciente, então o mesmo número respondia por duas pessoas diferentes
-  // dependendo de qual campo se olhava.
+  const codigo = (p?.codigo_prontuario ?? "").trim();
+  if (codigo) return codigo;
   const pasta = (p?.numero_pasta ?? "").trim();
   if (pasta) return pasta;
-  const antigo = (p?.codigo_prontuario_anterior ?? "").trim();
-  if (antigo) return antigo;
-  return (p?.codigo_prontuario ?? "").trim() || null;
+  return (p?.codigo_prontuario_anterior ?? "").trim() || null;
 }
