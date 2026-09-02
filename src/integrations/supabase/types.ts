@@ -10902,6 +10902,7 @@ export type Database = {
           token_publico: string
         }[]
       }
+      normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
         Args: { _clinica_id: string; _paciente_id: string }
         Returns: Json
