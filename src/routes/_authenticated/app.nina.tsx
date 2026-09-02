@@ -243,6 +243,8 @@ function NinaPage() {
     "atend-relatorios",
     "atend-roteamento",
     "aprendizado",
+    "base-conhecimento",
+
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
