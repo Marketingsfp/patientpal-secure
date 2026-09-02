@@ -529,7 +529,13 @@ function NinaPage() {
         <TabsContent value="aprendizado">
           <NinaAprendizado />
         </TabsContent>
+
+        {/* ============ BASE DE CONHECIMENTOS ============ */}
+        <TabsContent value="base-conhecimento">
+          <BaseConhecimento />
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 }
