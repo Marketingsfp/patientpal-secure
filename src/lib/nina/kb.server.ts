@@ -467,18 +467,54 @@ export async function consultarBase(params: {
     achados = semanticos;
   }
 
+  // AGREGAÇÃO: quando a pergunta é sobre um profissional, o backend junta TODOS
+  // os registros dele antes de qualquer resposta — nunca só o melhor resultado.
+  const medicoAlvo =
+    params.medico?.trim() || (await identificarMedico(base.id, params.termo ?? ""));
+  let totalMedico = 0;
+  let agregou = false;
+  if (medicoAlvo) {
+    const { data: doMedico } = await supabaseAdmin
+      .from("nina_kb_registros")
+      .select(COLUNAS_ACHADO)
+      .eq("base_id", base.id)
+      .ilike("medico", `%${medicoAlvo}%`)
+      .limit(200);
+    const extras = (doMedico ?? []).map((r: any) => ({
+      ...r,
+      score: pontuar(r, termos),
+      origem: "agregada" as const,
+    }));
+    totalMedico = extras.length;
+    if (extras.length) {
+      agregou = true;
+      const vistos = new Set(achados.map((a) => a.id));
+      achados = [...achados, ...extras.filter((e) => !vistos.has(e.id))];
+    }
+  }
+
   const melhor = achados[0]?.score ?? 0;
   const empatados = achados.filter(
     (a) => a.score >= melhor * 0.95 && normalizarTexto(a.procedimento ?? "") !== normalizarTexto(achados[0]?.procedimento ?? ""),
   );
 
+  const registros = achados.map((a) => ({ ...a, texto_busca: undefined } as unknown as AchadoKb));
+
   return {
-    encontrado: achados.length > 0,
-    ambiguo: empatados.length > 0,
+    encontrado: registros.length > 0,
+    ambiguo: !agregou && empatados.length > 0,
     base: { id: base.id, versao: base.versao, arquivo: base.arquivo_nome },
-    registros: achados.map((a) => ({ ...a, texto_busca: undefined } as unknown as AchadoKb)),
+    registros,
+    consolidado: consolidarPorMedico(registros),
+    diagnostico: {
+      termos,
+      medico_identificado: medicoAlvo ?? null,
+      agregou_por_medico: agregou,
+      total_registros_medico: totalMedico,
+    },
   };
 }
+
 
 async function buscaSemantica(baseId: string, termo: string, limite: number): Promise<AchadoKb[]> {
   const [vetor] = await gerarEmbeddings([termo]);
