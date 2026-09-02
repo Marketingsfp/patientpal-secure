@@ -299,8 +299,26 @@ export interface AchadoKb {
   preparo: string | null;
   linha_origem: number | null;
   aba_origem: string | null;
+  extras?: Record<string, any> | null;
   score: number;
-  origem: "estruturada" | "semantica";
+  origem: "estruturada" | "semantica" | "agregada";
+}
+
+/** Consolidação feita no BACKEND antes de chamar o modelo. */
+export interface ConsolidadoKb {
+  medico: string;
+  dias: Array<{ dia: string; regra: string | null; horario: string | null }>;
+  dias_original: string[];
+  itens: Array<{
+    categoria: string | null;
+    procedimento: string | null;
+    dia: string | null;
+    dia_original: string | null;
+    horario: string | null;
+    preco_dinheiro: number | null;
+    preco_cartao: number | null;
+    linha_origem: number | null;
+  }>;
 }
 
 export interface RespostaConsultaKb {
@@ -308,7 +326,75 @@ export interface RespostaConsultaKb {
   ambiguo: boolean;
   base: { id: string; versao: number; arquivo: string } | null;
   registros: AchadoKb[];
+  consolidado?: ConsolidadoKb[];
+  diagnostico?: {
+    termos: string[];
+    medico_identificado: string | null;
+    agregou_por_medico: boolean;
+    total_registros_medico: number;
+  };
   mensagem?: string;
+}
+
+const COLUNAS_ACHADO =
+  "id, categoria, tipo, procedimento, medico, dia, horario, preco_dinheiro, preco_cartao, observacoes, preparo, extras, linha_origem, aba_origem, texto_busca";
+
+/**
+ * Identifica o profissional citado na pergunta comparando os nomes que existem
+ * na base ativa (sem hardcode de nome algum).
+ */
+async function identificarMedico(baseId: string, termo: string): Promise<string | null> {
+  const alvo = new Set(normalizarTexto(termo).split(" ").filter((t) => t.length >= 3));
+  if (!alvo.size) return null;
+  const { data } = await supabaseAdmin
+    .from("nina_kb_registros")
+    .select("medico")
+    .eq("base_id", baseId)
+    .not("medico", "is", null)
+    .limit(5000);
+  const nomes = [...new Set((data ?? []).map((r: any) => String(r.medico)))];
+  let melhor: { nome: string; hits: number } | null = null;
+  for (const nome of nomes) {
+    const partes = normalizarTexto(nome)
+      .split(" ")
+      .filter((t) => t.length >= 3 && !["dr", "dra", "doutor", "doutora"].includes(t));
+    if (!partes.length) continue;
+    const hits = partes.filter((p) => alvo.has(p)).length;
+    const suficiente = hits >= 2 || (hits === 1 && partes.length === 1);
+    if (suficiente && (!melhor || hits > melhor.hits)) melhor = { nome, hits };
+  }
+  return melhor?.nome ?? null;
+}
+
+function consolidarPorMedico(registros: AchadoKb[]): ConsolidadoKb[] {
+  const mapa = new Map<string, ConsolidadoKb>();
+  for (const r of registros) {
+    if (!r.medico) continue;
+    const chave = normalizarTexto(r.medico);
+    const atual =
+      mapa.get(chave) ?? { medico: r.medico, dias: [], dias_original: [], itens: [] };
+    const estruturados = Array.isArray((r.extras as any)?.dias) ? (r.extras as any).dias : [];
+    for (const d of estruturados) {
+      if (!d?.dia) continue;
+      const ja = atual.dias.find((x) => x.dia === d.dia && x.horario === (d.horario ?? null));
+      if (!ja)
+        atual.dias.push({ dia: d.dia, regra: d.regra ?? null, horario: d.horario ?? null });
+    }
+    const original = (r.extras as any)?.dia_original ?? null;
+    if (original && !atual.dias_original.includes(original)) atual.dias_original.push(original);
+    atual.itens.push({
+      categoria: r.categoria,
+      procedimento: r.procedimento,
+      dia: r.dia,
+      dia_original: original,
+      horario: r.horario,
+      preco_dinheiro: r.preco_dinheiro,
+      preco_cartao: r.preco_cartao,
+      linha_origem: r.linha_origem,
+    });
+    mapa.set(chave, atual);
+  }
+  return [...mapa.values()];
 }
 
 function pontuar(reg: any, termos: string[]): number {
@@ -348,7 +434,7 @@ export async function consultarBase(params: {
   let q = supabaseAdmin
     .from("nina_kb_registros")
     .select(
-      "id, categoria, tipo, procedimento, medico, dia, horario, preco_dinheiro, preco_cartao, observacoes, preparo, linha_origem, aba_origem, texto_busca",
+      COLUNAS_ACHADO,
     )
     .eq("base_id", base.id)
     .limit(400);
