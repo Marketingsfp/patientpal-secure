@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
 import { BadgePacienteDistante } from "@/components/paciente/badge-paciente-distante";
+import { hojeBR } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -93,7 +94,10 @@ function RecepcaoPage() {
 
   const carregar = async () => {
     if (!clinicaAtual) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    // `data_dia` é gravado pelo banco no fuso da clínica. Usar a data em UTC
+    // aqui (`toISOString`) esvaziava a fila a partir das 21h de São Paulo, que
+    // já é o dia seguinte em UTC.
+    const hoje = hojeBR();
     const sel =
       "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome, cidade)";
     const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
@@ -225,6 +229,11 @@ function RecepcaoPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground/90">Recepção · Filas</h1>
           <p className="text-sm text-muted-foreground/80 leading-relaxed mt-0.5">
             Chame a próxima senha e acompanhe a fila em tempo real.
+          </p>
+          {/* A unidade fica escrita na tela: fila vazia por causa de unidade
+              trocada já custou uma manhã de atendimento. */}
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-1">
+            Unidade: {clinicaAtual.clinica.nome}
           </p>
         </div>
         <div className="flex items-center justify-end gap-3 flex-wrap">

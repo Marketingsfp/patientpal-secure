@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { hojeBR } from "@/lib/date-utils";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
@@ -500,7 +501,10 @@ function FluxoPage() {
       toast.error("Defina o consultório (botão de configuração no topo)");
       return;
     }
-    const hoje = new Date().toISOString().slice(0, 10);
+    // Data no fuso da clínica: o banco grava `data_dia` em São Paulo. Com a
+    // data em UTC, a partir das 21h a contagem reiniciava no dia errado e a
+    // inserção batia na chave única (clínica, dia, tipo, número).
+    const hoje = hojeBR();
     const { data: ult } = await supabase
       .from("senhas")
       .select("numero")

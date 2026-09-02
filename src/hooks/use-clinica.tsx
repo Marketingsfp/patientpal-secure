@@ -31,6 +31,14 @@ interface ClinicaContextValue {
   setModoTodas: (v: boolean) => void;
   /** IDs efetivos para queries: [clinicaAtual.id] ou todas as memberships. */
   clinicaIds: string[];
+  /**
+   * `true` quando a clínica atual é uma escolha firme — veio da URL (painel/
+   * totem públicos), de uma seleção salva que ainda existe, ou o usuário só
+   * tem uma unidade. `false` quando estamos apenas usando a primeira da lista
+   * como palpite. Telas que GRAVAM em nome da unidade (totem) ou que a
+   * representam numa TV devem se recusar a operar com palpite.
+   */
+  clinicaFixada: boolean;
   branding: ClinicaBranding | null;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -178,8 +186,15 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     gravarPreferencia(TODAS_KEY, v ? "1" : "0");
   };
 
-  const clinicaAtual =
-    memberships.find((m) => m.clinica_id === clinicaAtualId) ?? memberships[0] ?? null;
+  // A escolha explícita do usuário (salva no navegador) só vale se a unidade
+  // ainda estiver entre os vínculos ativos.
+  const clinicaEscolhida = memberships.find((m) => m.clinica_id === clinicaAtualId) ?? null;
+  const clinicaAtual = clinicaEscolhida ?? memberships[0] ?? null;
+  // Quem tem uma única unidade nunca está adivinhando. Com várias, cair na
+  // primeira da lista é palpite — foi assim que, depois de uma queda de
+  // energia que apagou o armazenamento do navegador, um totem passou a
+  // emitir senhas em nome da unidade errada.
+  const clinicaFixada = clinicaEscolhida !== null || memberships.length === 1;
 
   const clinicaIds = modoTodas
     ? memberships.map((m) => m.clinica_id)
@@ -198,6 +213,7 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
         modoTodas,
         setModoTodas,
         clinicaIds,
+        clinicaFixada,
         branding,
         loading,
         refresh: load,

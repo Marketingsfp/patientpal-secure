@@ -99,6 +99,8 @@ export function PublicClinicaProvider({
         modoTodas: false,
         setModoTodas: () => {},
         clinicaIds: membership ? [membership.clinica_id] : [],
+        // A unidade veio pinada na URL (id ou token): não há palpite possível.
+        clinicaFixada: true,
         branding: membership?.clinica.branding ?? null,
         loading,
         refresh: async () => {},

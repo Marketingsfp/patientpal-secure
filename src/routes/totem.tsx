@@ -96,7 +96,7 @@ type CheckinInfo = {
 
 export function TotemPage() {
   const navigate = useNavigate();
-  const { clinicaAtual, loading } = useClinica();
+  const { clinicaAtual, loading, clinicaFixada, memberships, setClinicaAtual } = useClinica();
   const [step, setStep] = useState<Step>("menu");
   const [busy, setBusy] = useState(false);
   const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha } | null>(null);
@@ -517,6 +517,45 @@ export function TotemPage() {
             Faça login no painel administrativo e selecione a clínica antes de abrir o totem.
           </p>
           <Button onClick={() => navigate({ to: "/app" })}>Ir para o painel</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Trava de unidade. O totem GRAVA senhas em nome de uma unidade: se a
+  // escolha salva no navegador se perdeu (limpeza de dados, reinstalação,
+  // quiosque religado depois de queda de energia), o contexto cai na primeira
+  // unidade da lista — e as senhas passam a nascer na clínica errada, sem
+  // ninguém perceber. Em vez de adivinhar, o totem para e pede a unidade uma
+  // única vez; a escolha fica salva neste aparelho.
+  if (!clinicaFixada) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+        <div className="w-full max-w-2xl space-y-6 text-center">
+          <div className="space-y-2">
+            <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
+            <h1 className="text-2xl font-semibold">Confirme a unidade deste totem</h1>
+            <p className="text-muted-foreground">
+              Este aparelho perdeu a unidade que estava configurada. Toque na unidade correta antes
+              de liberar o totem — as senhas são emitidas em nome dela.
+            </p>
+          </div>
+          <div className="grid gap-3">
+            {memberships.map((m) => (
+              <button
+                key={m.clinica_id}
+                type="button"
+                onClick={() => setClinicaAtual(m.clinica_id)}
+                className="w-full rounded-2xl border-2 border-border bg-card px-6 py-5 text-lg font-semibold hover:border-primary hover:bg-primary/5 active:scale-[0.99] transition"
+              >
+                {formatarNomeClinica(m.clinica.nome)}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Para não precisar disso de novo, abra o totem pelo link fixo da unidade (Configurações ›
+            Painel &amp; Totem).
+          </p>
         </div>
       </div>
     );

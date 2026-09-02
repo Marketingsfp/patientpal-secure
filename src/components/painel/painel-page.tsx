@@ -24,7 +24,7 @@ type Senha = {
 };
 
 export function PainelPage() {
-  const { clinicaAtual, loading } = useClinica();
+  const { clinicaAtual, loading, clinicaFixada, memberships, setClinicaAtual } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
   // Espelho da senha em exibição. Serve para a atualização instantânea vinda do
@@ -606,6 +606,39 @@ export function PainelPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         Nenhuma clínica selecionada.
+      </div>
+    );
+
+  // Mesma trava do totem: uma TV que perdeu a unidade salva não pode assumir a
+  // primeira da lista — ficaria mostrando (ou deixando de mostrar) chamadas de
+  // outra clínica, em silêncio. Aqui a tela diz o que houve em vez de ficar
+  // preta esperando uma chamada que nunca vem.
+  if (!clinicaFixada)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+        <div className="w-full max-w-xl space-y-5 text-center">
+          <h1 className="text-2xl font-semibold">Confirme a unidade deste painel</h1>
+          <p className="text-muted-foreground">
+            Esta TV perdeu a unidade que estava configurada. Escolha a unidade correta para voltar a
+            exibir as chamadas.
+          </p>
+          <div className="grid gap-3">
+            {memberships.map((m) => (
+              <button
+                key={m.clinica_id}
+                type="button"
+                onClick={() => setClinicaAtual(m.clinica_id)}
+                className="w-full rounded-2xl border-2 border-border bg-card px-6 py-5 text-lg font-semibold hover:border-primary hover:bg-primary/5 transition"
+              >
+                {m.clinica.nome}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Para não precisar disso de novo, abra o painel pelo link fixo da unidade (Configurações
+            › Painel &amp; Totem).
+          </p>
+        </div>
       </div>
     );
 
