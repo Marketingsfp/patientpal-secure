@@ -264,7 +264,25 @@ export const FERRAMENTAS_NINA = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_base_conhecimento",
+      description:
+        "Base de Conhecimentos oficial da clínica (planilha administrativa). Use SEMPRE antes de responder sobre especialidades, exames, procedimentos, médicos, dias/horários de atendimento, preços em dinheiro/PIX e cartão, preparos e observações. Horário aqui é escala administrativa, não vaga disponível.",
+      parameters: {
+        type: "object",
+        properties: {
+          termo: { type: "string", description: "Assunto perguntado." },
+          medico: { type: "string" },
+          dia: { type: "string" },
+        },
+        required: ["termo"],
+      },
+    },
+  },
 ] as const;
+
 
 function parseJson(txt: unknown, campo: string): Record<string, unknown> {
   if (typeof txt === "object" && txt) return txt as Record<string, unknown>;
