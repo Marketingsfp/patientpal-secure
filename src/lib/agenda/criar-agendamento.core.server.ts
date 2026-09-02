@@ -23,7 +23,7 @@
 // Escopo de clínica: para ator "integracao" (service role, sem RLS) a clínica
 // é conferida no código, obrigatoriamente, antes de qualquer leitura/gravação.
 
-import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
+import { hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
 import { assertEscopoClinica, type CtxAgenda } from "./ator.server";
 import type {
   CriarAgendamentoInput,
@@ -145,10 +145,13 @@ export async function criarAgendamentoCore(
             .then((r) => r.data)
         : Promise.resolve(null),
       // MED-03. Outro agendamento do MESMO paciente no mesmo horário.
+      // `medico_id` entra na leitura porque a regra passou a distinguir
+      // conflito com o MESMO profissional (bloqueia) de conflito com outro
+      // profissional (só avisa) — ver o trecho da checagem mais abaixo.
       pacienteId
         ? supabase
             .from("agendamentos")
-            .select("id, inicio")
+            .select("id, inicio, medico_id")
             .eq("clinica_id", clinica_id)
             .eq("paciente_id", pacienteId)
             .neq("status", "cancelado")
@@ -248,16 +251,48 @@ export async function criarAgendamentoCore(
       };
     }
   }
-  const pacienteOuHorarioMudou = horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
+  const pacienteOuHorarioMudou =
+    horarioMudou || !atual || atual.paciente_id !== payload.paciente_id;
   if (pacienteId && pacienteOuHorarioMudou) {
-    const conflito = (conflitos ?? []).find((c) => c.id !== editing_id);
+    // MED-03 (revisto em 2026-09-02). Antes, QUALQUER agendamento do mesmo
+    // paciente que cruzasse o horário bloqueava — inclusive com outro médico e
+    // outra especialidade, o que impedia a rotina normal da clínica (paciente
+    // que faz exame e consulta no mesmo dia, ou dois procedimentos ao mesmo
+    // tempo com profissionais diferentes).
+    //
+    // Agora só é bloqueio de verdade o choque na agenda do MESMO profissional
+    // (duas fichas no mesmo horário com o mesmo médico). Com profissional
+    // diferente vira aviso: a tela pergunta e, confirmando, reenvia com
+    // `confirmacoes.permitir_conflito_paciente`.
+    const conflitos_ = (conflitos ?? []) as Array<{
+      id: string;
+      inicio: string;
+      medico_id: string | null;
+    }>;
+    const outros = conflitos_.filter((c) => c.id !== editing_id);
+    const mesmoProfissional = recursoId
+      ? (outros.find((c) => c.medico_id === recursoId) ?? null)
+      : null;
+    const conflito = mesmoProfissional ?? outros[0] ?? null;
     if (conflito) {
-      return {
-        ok: false,
-        validation_error: {
-          message: `Este paciente já tem outro agendamento nesse horário (${new Date(conflito.inicio).toLocaleString("pt-BR")}). Escolha outro horário ou cancele o conflito primeiro.`,
-        },
-      };
+      const quando = new Date(conflito.inicio).toLocaleString("pt-BR", { timeZone: TZ_CLINICA });
+      if (mesmoProfissional) {
+        return {
+          ok: false,
+          validation_error: {
+            message: `Este paciente já tem outro agendamento nesse horário com o mesmo profissional (${quando}). Escolha outro horário ou cancele o conflito primeiro.`,
+          },
+        };
+      }
+      if (!data.confirmacoes?.permitir_conflito_paciente) {
+        return {
+          ok: false,
+          validation_error: {
+            message: `Atenção: este paciente já tem outro atendimento nesse horário (${quando}), com outro profissional. Deseja agendar mesmo assim?`,
+            confirmavel: "conflito_paciente",
+          },
+        };
+      }
     }
   }
 

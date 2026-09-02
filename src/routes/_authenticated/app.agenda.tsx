@@ -5298,22 +5298,39 @@ function AgendaPage() {
     const crono = iniciarCronometro(
       irParaPagamento ? "abrir tela de pagamento" : "salvar agendamento",
     );
-    const result = await fnCriarAgendamento({
-      data: {
-        clinica_id: clinicaAtual.clinica_id,
-        editing_id: editing?.id ?? null,
-        payload: payload as never,
-        checagens: {
-          validar_paciente_completo: true,
-          validar_agenda_aberta:
-            !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
-          validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
+    const enviarAoServidor = (permitirConflitoPaciente: boolean) =>
+      fnCriarAgendamento({
+        data: {
+          clinica_id: clinicaAtual.clinica_id,
+          editing_id: editing?.id ?? null,
+          payload: payload as never,
+          checagens: {
+            validar_paciente_completo: true,
+            validar_agenda_aberta:
+              !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
+            validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
+          },
+          procedimentos: procedimentosParaSalvar,
+          multi_exames_modo: multiExamesModo,
+          pending_orc_item_ids: pendingOrcItemIds,
+          confirmacoes: { permitir_conflito_paciente: permitirConflitoPaciente },
         },
-        procedimentos: procedimentosParaSalvar,
-        multi_exames_modo: multiExamesModo,
-        pending_orc_item_ids: pendingOrcItemIds,
-      },
-    });
+      });
+    let result = await enviarAoServidor(false);
+    // Paciente com outro atendimento no mesmo horário, mas com OUTRO
+    // profissional: o servidor devolve isso como aviso, não como bloqueio.
+    // Pergunta e, se a recepção confirmar, grava do mesmo jeito.
+    if (
+      !result.ok &&
+      "validation_error" in result &&
+      result.validation_error.confirmavel === "conflito_paciente"
+    ) {
+      if (!(await confirmDialog(result.validation_error.message))) {
+        setSaving(false);
+        return;
+      }
+      result = await enviarAoServidor(true);
+    }
     crono.marcar("salvar no servidor");
     if (!result.ok) {
       setSaving(false);
@@ -7846,34 +7863,17 @@ function AgendaPage() {
                     disabled={editing ? pagosSet.has(editing.id) : false}
                     className="space-y-2 contents disabled:opacity-90"
                   >
-                    <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:flex-wrap">
-                        <Label className="text-[11px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">
-                          Nº do orçamento
-                        </Label>
-                        <Input
-                          placeholder="Ex.: 123 ou D-2026-00001"
-                          value={form.orcamento_numero}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              orcamento_numero: e.target.value
-                                .replace(/[^0-9A-Za-z\-\s]/g, "")
-                                .toUpperCase(),
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !form.orcamento_id) {
-                              e.preventDefault();
-                              void buscarOrcamento();
-                            }
-                          }}
-                          disabled={
-                            !!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)
-                          }
-                          className="w-full sm:max-w-[170px] h-8 bg-white"
-                        />
-                        {form.orcamento_id ? (
+                    {/* Bloco "Nº do orçamento" retirado da tela da recepção
+                        (2026-09-02): ninguém digita mais o número aqui. O
+                        vínculo com orçamento continua funcionando, mas só entra
+                        pelo fluxo da tela de Orçamentos (botão Agendar /
+                        ?orc=123 / split view), e aqui vira só um resumo. */}
+                    {form.orcamento_id && (
+                      <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+                            Orçamento {form.orcamento_numero}
+                          </span>
                           <Button
                             type="button"
                             variant="outline"
@@ -7881,28 +7881,9 @@ function AgendaPage() {
                             onClick={limparOrcamento}
                             disabled={editing ? pagosSet.has(editing.id) : false}
                           >
-                            Limpar
+                            Desvincular
                           </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void buscarOrcamento()}
-                            disabled={buscandoOrc}
-                          >
-                            {buscandoOrc ? "Buscando…" : "Buscar"}
-                          </Button>
-                        )}
-                        {!form.orcamento_id && (
-                          <span className="hidden sm:block text-[12px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                            Opcional — vincula qualquer orçamento (exames, consultas, procedimentos,
-                            odontologia) em uma única ficha. Aceita o nº simples ou o código
-                            completo (ex.: D-2026-00001).
-                          </span>
-                        )}
-                      </div>
-                      {form.orcamento_id && (
+                        </div>
                         <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
                           <p className="font-medium text-slate-900">
                             Marcando {form.orcamento_itens.length} exame(s) em uma única ficha.
@@ -7916,8 +7897,8 @@ function AgendaPage() {
                             </ul>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-700">
                         Paciente <span className="text-rose-500">*</span>

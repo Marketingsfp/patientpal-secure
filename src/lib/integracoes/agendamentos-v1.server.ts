@@ -306,6 +306,10 @@ async function handleCriar(
       validar_inadimplencia: body.tipo_atendimento === "convenio",
     },
     pending_orc_item_ids: [],
+    // A API não tem como fazer a pergunta de confirmação da tela. Atendimento
+    // em paralelo com OUTRO profissional é permitido pela clínica, então já
+    // entra confirmado; choque com o MESMO profissional continua bloqueado.
+    confirmacoes: { permitir_conflito_paciente: true },
     integracao_marca: {
       origem_integracao: ctx.origem_integracao,
       id_externo: body.id_externo,

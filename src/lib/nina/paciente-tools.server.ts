@@ -1045,6 +1045,10 @@ export async function executarFerramentaPaciente(
               validar_inadimplencia: false,
             },
             pending_orc_item_ids: [],
+            // Sem tela para perguntar: atendimento em paralelo com OUTRO
+            // profissional já entra confirmado (choque com o mesmo
+            // profissional continua bloqueado).
+            confirmacoes: { permitir_conflito_paciente: true },
           },
         );
 

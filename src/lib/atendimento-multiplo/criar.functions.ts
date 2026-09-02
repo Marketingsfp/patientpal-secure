@@ -87,12 +87,19 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
     const overlap = (aIni: string, aFim: string, bIni: string, bFim: string) =>
       new Date(aIni).getTime() < new Date(bFim).getTime() &&
       new Date(aFim).getTime() > new Date(bIni).getTime();
+    // Choque entre dois itens do MESMO atendimento só é problema quando os dois
+    // são com o mesmo profissional — dois serviços simultâneos com
+    // profissionais diferentes são rotina na clínica (2026-09-02).
     for (let i = 0; i < itens.length; i++) {
       for (let j = i + 1; j < itens.length; j++) {
-        if (overlap(itens[i].inicio, itens[i].fim, itens[j].inicio, itens[j].fim)) {
+        if (
+          itens[i].medico_id &&
+          itens[i].medico_id === itens[j].medico_id &&
+          overlap(itens[i].inicio, itens[i].fim, itens[j].inicio, itens[j].fim)
+        ) {
           return {
             ok: false,
-            message: `Dois serviços deste atendimento têm horários conflitantes entre si (item ${i + 1} e ${j + 1}).`,
+            message: `Dois serviços deste atendimento têm horários conflitantes entre si com o mesmo profissional (item ${i + 1} e ${j + 1}).`,
           };
         }
       }
@@ -101,19 +108,34 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
     const maxFim = itens.reduce((max, it) => (it.fim > max ? it.fim : max), itens[0].fim);
     const { data: existentes } = await supabase
       .from("agendamentos")
-      .select("id, inicio, fim")
+      .select("id, inicio, fim, medico_id")
       .eq("clinica_id", clinica_id)
       .eq("paciente_id", paciente_id)
       .neq("status", "cancelado")
       .lt("inicio", maxFim)
       .gt("fim", minIni);
+    // Mesma regra do agendamento avulso (MED-03): só bloqueia quando o choque
+    // é na agenda do MESMO profissional. Atendimento em paralelo com outro
+    // profissional/especialidade é permitido.
     const conflitoExistente = (
-      (existentes ?? []) as Array<{ id: string; inicio: string; fim: string }>
-    ).find((ex) => itens.some((it) => overlap(it.inicio, it.fim, ex.inicio, ex.fim)));
+      (existentes ?? []) as Array<{
+        id: string;
+        inicio: string;
+        fim: string;
+        medico_id: string | null;
+      }>
+    ).find((ex) =>
+      itens.some(
+        (it) =>
+          !!it.medico_id &&
+          it.medico_id === ex.medico_id &&
+          overlap(it.inicio, it.fim, ex.inicio, ex.fim),
+      ),
+    );
     if (conflitoExistente) {
       return {
         ok: false,
-        message: `Este paciente já tem outro agendamento nesse horário (${new Date(conflitoExistente.inicio).toLocaleString("pt-BR")}). Escolha outro horário ou cancele o conflito primeiro.`,
+        message: `Este paciente já tem outro agendamento nesse horário com o mesmo profissional (${new Date(conflitoExistente.inicio).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}). Escolha outro horário ou cancele o conflito primeiro.`,
       };
     }
 

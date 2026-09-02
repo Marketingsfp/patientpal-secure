@@ -37,6 +37,12 @@ export type CriarAgendamentoInput = {
     validar_inadimplencia: boolean; // paciente_id && tipo_atendimento === "convenio"
   };
   pending_orc_item_ids: string[];
+  // Confirmações que a recepção já deu na tela. Hoje só existe uma:
+  // o paciente ter outro atendimento no mesmo horário com OUTRO profissional
+  // (ver MED-03 em criar-agendamento.core.server.ts). Sem isso o servidor
+  // devolve `validation_error.confirmavel` e a tela pergunta antes de repetir
+  // a gravação com o flag ligado.
+  confirmacoes?: { permitir_conflito_paciente?: boolean };
 };
 
 export type PgErrorLike = {
@@ -71,7 +77,14 @@ export type CriarAgendamentoResult =
   | {
       ok: false;
       // Erro de validação com mensagem PT-BR pronta para toast.
-      validation_error: { message: string; toast_duration?: number };
+      // `confirmavel` marca o caso em que a regra é só um aviso: a tela pode
+      // perguntar "deseja agendar mesmo assim?" e reenviar com a confirmação
+      // correspondente em `confirmacoes`.
+      validation_error: {
+        message: string;
+        toast_duration?: number;
+        confirmavel?: "conflito_paciente";
+      };
     }
   | {
       ok: false;
