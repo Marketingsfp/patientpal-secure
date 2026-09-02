@@ -363,7 +363,13 @@ export function parseAba(aba: string, matriz: string[][]): ResultadoParse {
     if (!herdouPreco.dinheiro && dinheiro !== null) ultimoDinheiro = dinheiro;
     if (!herdouPreco.cartao && cartao !== null) ultimoCartao = cartao;
 
-    const medico = pega("medico") || null;
+    // O médico também é herdado: na planilha, as linhas seguintes do mesmo
+    // profissional só repetem o dia/horário e deixam o nome em branco.
+    const medicoCelula = pega("medico") || null;
+    if (catCelula || procCelula) ultimoMedico = null;
+    if (medicoCelula) ultimoMedico = medicoCelula;
+    const medico = medicoCelula ?? ultimoMedico;
+
     const dia = diaBruto ? (normalizarDia(diaBruto) ?? diaBruto) : null;
     const horario = horaBruta ? normalizarHorario(horaBruta) : null;
     const observacoes = pega("observacoes") || null;
