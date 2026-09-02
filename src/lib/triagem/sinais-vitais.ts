@@ -18,6 +18,12 @@ export function calcularImc(peso: string, altura: string): number | null {
   return isFinite(v) && v > 0 ? Number(v.toFixed(2)) : null;
 }
 
+/**
+ * Classificação nutricional do IMC em adultos, na escala da OMS adotada pela
+ * ABESO. Os graus da obesidade são nomeados (I, II e III) porque é assim que
+ * a classificação oficial se escreve — e porque um termo técnico registrado no
+ * prontuário evita que o achado seja anotado com palavra informal.
+ */
 export function classificarImc(imc: number | null) {
   if (imc == null) return null;
   if (imc < 18.5)
@@ -29,8 +35,18 @@ export function classificarImc(imc: number | null) {
     };
   if (imc < 30)
     return { label: "Sobrepeso", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-300" };
+  if (imc < 35)
+    return {
+      label: "Obesidade grau I",
+      classe: "bg-orange-500/15 text-orange-700 dark:text-orange-300 font-semibold",
+    };
+  if (imc < 40)
+    return {
+      label: "Obesidade grau II",
+      classe: "bg-rose-500/15 text-rose-700 dark:text-rose-300 font-semibold",
+    };
   return {
-    label: "Obesidade",
+    label: "Obesidade grau III",
     classe: "bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold",
   };
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft, Ban, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { hojeBR } from "@/lib/date-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -143,17 +144,18 @@ function Page() {
     vigencia_fim: "",
   });
   const [diasSel, setDiasSel] = useState<number[]>([1]);
-  const hojeIso = new Date().toISOString().slice(0, 10);
-  const em30Iso = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 29);
-    return d.toISOString().slice(0, 10);
-  })();
+  // Dia de hoje no fuso da clínica. `new Date().toISOString()` daria o dia
+  // seguinte depois das 21h no horário de Brasília, porque a conversão é para
+  // UTC — a agenda seria gerada começando amanhã sem ninguém pedir.
+  const hojeIso = hojeBR();
   const [gerar, setGerar] = useState({
     medico_id: "",
     dias: "30",
+    // "De" e "Até" abrem no mesmo dia: gerar um mês inteiro de uma vez é
+    // decisão de quem opera, e não o padrão da tela. Quem quiser um período
+    // maior muda a data final à mão.
     data_inicio: hojeIso,
-    data_fim: em30Iso,
+    data_fim: hojeIso,
     limite_fichas: "",
     hora_inicio: "",
     hora_fim: "",
