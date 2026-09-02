@@ -280,7 +280,9 @@ export function parseAba(aba: string, matriz: string[][]): ResultadoParse {
   let categoria: string | null = null;
   let procedimento: string | null = null;
   let tipo: string | null = null;
+  let ultimoMedico: string | null = null;
   let ultimoDinheiro: number | null = null;
+
   let ultimoCartao: number | null = null;
 
   for (let i = idxCabecalho + 1; i < matriz.length; i++) {
