@@ -205,13 +205,14 @@ export function interpretarDias(valor: string): DiasInterpretados {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const adicionar = (dia: string, regra: string | null) => {
+  const adicionar = (dia: string, regra: string | null, horario: string | null = null) => {
     const existente = dias.find((d) => d.dia === dia);
     if (existente) {
       if (regra && !existente.regra) existente.regra = regra;
+      if (horario && !existente.horario) existente.horario = horario;
       return;
     }
-    dias.push({ dia, regra });
+    dias.push({ dia, regra, horario });
   };
 
   for (const segmento of segmentos) {
@@ -260,7 +261,8 @@ export function interpretarDias(valor: string): DiasInterpretados {
 
     const resto = palavras.slice(consumidas);
     const regra = resto.join(" ").replace(/^[-–—:]+\s*/, "").trim() || null;
-    adicionar(dia, regra);
+    // O horário pode vir dentro da própria célula de dias ("QUA 07:00h").
+    adicionar(dia, regra, regra ? normalizarHorario(regra) : null);
   }
 
   const texto = dias.length
@@ -325,7 +327,7 @@ export function relacionarDiasHorarios(
 ): DiaInterpretado[] {
   const v = String(horarioBruto ?? "").trim();
   if (!dias.length) return dias;
-  if (!v) return dias.map((d) => ({ ...d, horario: null }));
+  if (!v) return dias.map((d) => ({ ...d, horario: d.horario ?? null }));
 
   const trechos = v
     .split(/\s*[\/;|]\s*/)
@@ -354,7 +356,7 @@ export function relacionarDiasHorarios(
 
   // 3) Um horário (ou intervalo) para todos.
   const unico = normalizarHorario(v);
-  return dias.map((d) => ({ ...d, horario: unico }));
+  return dias.map((d) => ({ ...d, horario: d.horario ?? unico }));
 }
 
 
