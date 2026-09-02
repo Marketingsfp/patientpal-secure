@@ -652,6 +652,7 @@ export async function executarFerramentaPaciente(
           encontrado: true,
           ambiguo: achado.ambiguo,
           versao_base: achado.base?.versao ?? null,
+          consolidado_por_profissional: achado.consolidado ?? [],
           instrucao: achado.ambiguo
             ? "Há mais de uma opção parecida: pergunte ao paciente qual exame está no pedido médico antes de responder."
             : "Responda usando SOMENTE estes registros. Horário é escala administrativa, não vaga; vaga vem das ferramentas de agenda.",

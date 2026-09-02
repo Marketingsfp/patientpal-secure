@@ -336,6 +336,7 @@ export async function executarFerramentaNina(
             encontrado: true,
             ambiguo: achado.ambiguo,
             versao_base: achado.base?.versao ?? null,
+            consolidado_por_profissional: achado.consolidado ?? [],
             registros: achado.registros,
           }
         : { encontrado: false, instrucao: "Nada na base oficial. Não invente; diga que não encontrou." };
