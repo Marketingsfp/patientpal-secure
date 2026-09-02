@@ -244,7 +244,13 @@ function textoParaEmbedding(r: RegistroKb): string {
     r.categoria && `Especialidade: ${r.categoria}`,
     r.procedimento && `Procedimento: ${r.procedimento}`,
     r.medico && `Profissional: ${r.medico}`,
-    r.dia && `Dia: ${r.dia}`,
+    r.dia && `Dias de atendimento: ${r.dia}`,
+    (r.extras as any)?.dia_original && `Dias (planilha): ${(r.extras as any).dia_original}`,
+    Array.isArray((r.extras as any)?.dias) && (r.extras as any).dias.length
+      ? `Escala: ${(r.extras as any).dias
+          .map((d: any) => [d.dia, d.horario, d.regra].filter(Boolean).join(" "))
+          .join(" | ")}`
+      : null,
     r.horario && `Horário: ${r.horario}`,
     r.preco_dinheiro !== null && `Dinheiro/PIX: R$ ${r.preco_dinheiro}`,
     r.preco_cartao !== null && `Cartão: R$ ${r.preco_cartao}`,
@@ -299,8 +305,26 @@ export interface AchadoKb {
   preparo: string | null;
   linha_origem: number | null;
   aba_origem: string | null;
+  extras?: Record<string, any> | null;
   score: number;
-  origem: "estruturada" | "semantica";
+  origem: "estruturada" | "semantica" | "agregada";
+}
+
+/** Consolidação feita no BACKEND antes de chamar o modelo. */
+export interface ConsolidadoKb {
+  medico: string;
+  dias: Array<{ dia: string; regra: string | null; horario: string | null }>;
+  dias_original: string[];
+  itens: Array<{
+    categoria: string | null;
+    procedimento: string | null;
+    dia: string | null;
+    dia_original: string | null;
+    horario: string | null;
+    preco_dinheiro: number | null;
+    preco_cartao: number | null;
+    linha_origem: number | null;
+  }>;
 }
 
 export interface RespostaConsultaKb {
@@ -308,7 +332,75 @@ export interface RespostaConsultaKb {
   ambiguo: boolean;
   base: { id: string; versao: number; arquivo: string } | null;
   registros: AchadoKb[];
+  consolidado?: ConsolidadoKb[];
+  diagnostico?: {
+    termos: string[];
+    medico_identificado: string | null;
+    agregou_por_medico: boolean;
+    total_registros_medico: number;
+  };
   mensagem?: string;
+}
+
+const COLUNAS_ACHADO =
+  "id, categoria, tipo, procedimento, medico, dia, horario, preco_dinheiro, preco_cartao, observacoes, preparo, extras, linha_origem, aba_origem, texto_busca";
+
+/**
+ * Identifica o profissional citado na pergunta comparando os nomes que existem
+ * na base ativa (sem hardcode de nome algum).
+ */
+async function identificarMedico(baseId: string, termo: string): Promise<string | null> {
+  const alvo = new Set(normalizarTexto(termo).split(" ").filter((t) => t.length >= 3));
+  if (!alvo.size) return null;
+  const { data } = await supabaseAdmin
+    .from("nina_kb_registros")
+    .select("medico")
+    .eq("base_id", baseId)
+    .not("medico", "is", null)
+    .limit(5000);
+  const nomes = [...new Set((data ?? []).map((r: any) => String(r.medico)))];
+  let melhor: { nome: string; hits: number } | null = null;
+  for (const nome of nomes) {
+    const partes = normalizarTexto(nome)
+      .split(" ")
+      .filter((t) => t.length >= 3 && !["dr", "dra", "doutor", "doutora"].includes(t));
+    if (!partes.length) continue;
+    const hits = partes.filter((p) => alvo.has(p)).length;
+    const suficiente = hits >= 2 || (hits === 1 && partes.length === 1);
+    if (suficiente && (!melhor || hits > melhor.hits)) melhor = { nome, hits };
+  }
+  return melhor?.nome ?? null;
+}
+
+function consolidarPorMedico(registros: AchadoKb[]): ConsolidadoKb[] {
+  const mapa = new Map<string, ConsolidadoKb>();
+  for (const r of registros) {
+    if (!r.medico) continue;
+    const chave = normalizarTexto(r.medico);
+    const atual =
+      mapa.get(chave) ?? { medico: r.medico, dias: [], dias_original: [], itens: [] };
+    const estruturados = Array.isArray((r.extras as any)?.dias) ? (r.extras as any).dias : [];
+    for (const d of estruturados) {
+      if (!d?.dia) continue;
+      const ja = atual.dias.find((x) => x.dia === d.dia && x.horario === (d.horario ?? null));
+      if (!ja)
+        atual.dias.push({ dia: d.dia, regra: d.regra ?? null, horario: d.horario ?? null });
+    }
+    const original = (r.extras as any)?.dia_original ?? null;
+    if (original && !atual.dias_original.includes(original)) atual.dias_original.push(original);
+    atual.itens.push({
+      categoria: r.categoria,
+      procedimento: r.procedimento,
+      dia: r.dia,
+      dia_original: original,
+      horario: r.horario,
+      preco_dinheiro: r.preco_dinheiro,
+      preco_cartao: r.preco_cartao,
+      linha_origem: r.linha_origem,
+    });
+    mapa.set(chave, atual);
+  }
+  return [...mapa.values()];
 }
 
 function pontuar(reg: any, termos: string[]): number {
@@ -348,7 +440,7 @@ export async function consultarBase(params: {
   let q = supabaseAdmin
     .from("nina_kb_registros")
     .select(
-      "id, categoria, tipo, procedimento, medico, dia, horario, preco_dinheiro, preco_cartao, observacoes, preparo, linha_origem, aba_origem, texto_busca",
+      COLUNAS_ACHADO,
     )
     .eq("base_id", base.id)
     .limit(400);
@@ -381,18 +473,61 @@ export async function consultarBase(params: {
     achados = semanticos;
   }
 
+  // AGREGAÇÃO: quando a pergunta é sobre um profissional, o backend junta TODOS
+  // os registros dele antes de qualquer resposta — nunca só o melhor resultado.
+  const medicoAlvo =
+    params.medico?.trim() || (await identificarMedico(base.id, params.termo ?? ""));
+  let totalMedico = 0;
+  let agregou = false;
+  if (medicoAlvo) {
+    const { data: doMedico } = await supabaseAdmin
+      .from("nina_kb_registros")
+      .select(COLUNAS_ACHADO)
+      .eq("base_id", base.id)
+      .ilike("medico", `%${medicoAlvo}%`)
+      .limit(200);
+    const extras = (doMedico ?? []).map((r: any) => ({
+      ...r,
+      score: pontuar(r, termos),
+      origem: "agregada" as const,
+    }));
+    totalMedico = extras.length;
+    if (extras.length) {
+      agregou = true;
+      const vistos = new Set(achados.map((a) => a.id));
+      achados = [...achados, ...extras.filter((e) => !vistos.has(e.id))];
+    }
+  }
+
   const melhor = achados[0]?.score ?? 0;
   const empatados = achados.filter(
     (a) => a.score >= melhor * 0.95 && normalizarTexto(a.procedimento ?? "") !== normalizarTexto(achados[0]?.procedimento ?? ""),
   );
 
+  const registros = achados.map((a) => ({ ...a, texto_busca: undefined } as unknown as AchadoKb));
+
   return {
-    encontrado: achados.length > 0,
-    ambiguo: empatados.length > 0,
+    encontrado: registros.length > 0,
+    ambiguo: !agregou && empatados.length > 0,
     base: { id: base.id, versao: base.versao, arquivo: base.arquivo_nome },
-    registros: achados.map((a) => ({ ...a, texto_busca: undefined } as unknown as AchadoKb)),
+    registros,
+    consolidado: consolidarPorMedico(
+      medicoAlvo
+        ? registros.filter(
+            (r) =>
+              r.medico && normalizarTexto(r.medico).includes(normalizarTexto(medicoAlvo)),
+          )
+        : registros,
+    ),
+    diagnostico: {
+      termos,
+      medico_identificado: medicoAlvo ?? null,
+      agregou_por_medico: agregou,
+      total_registros_medico: totalMedico,
+    },
   };
 }
+
 
 async function buscaSemantica(baseId: string, termo: string, limite: number): Promise<AchadoKb[]> {
   const [vetor] = await gerarEmbeddings([termo]);

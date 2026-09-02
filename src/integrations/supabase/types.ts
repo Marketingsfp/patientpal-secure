@@ -10771,6 +10771,21 @@ export type Database = {
           procedimento: string
         }[]
       }
+      grupos_duplicados_pacientes: {
+        Args: {
+          _clinica_ids: string[]
+          _limite?: number
+          _offset?: number
+          _tipo: string
+        }
+        Returns: {
+          chave: string
+          clinica_id: string
+          ids: string[]
+          qtd: number
+          tipo: string
+        }[]
+      }
       has_any_role: {
         Args: {
           _clinica_id: string
@@ -10980,7 +10995,12 @@ export type Database = {
         }[]
       }
       listar_duplicados_pacientes: {
-        Args: { _clinica_ids: string[]; _limite?: number; _tipo?: string }
+        Args: {
+          _clinica_ids: string[]
+          _limite?: number
+          _offset?: number
+          _tipo?: string
+        }
         Returns: {
           chave: string
           clinica_id: string

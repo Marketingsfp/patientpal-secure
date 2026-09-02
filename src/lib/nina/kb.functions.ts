@@ -198,13 +198,24 @@ export const testarBaseKb = createServerFn({ method: "POST" })
     let resposta = naoEncontrei;
     const key = process.env["LOVABLE_API_KEY"];
     if (achado.encontrado && key) {
-      const fatos = achado.registros
-        .slice(0, 8)
+      const consolidado = (achado.consolidado ?? [])
         .map(
-          (r, i) =>
-            `${i + 1}. Especialidade: ${r.categoria ?? "-"} | Procedimento: ${r.procedimento ?? "-"} | Médico: ${r.medico ?? "-"} | Dia: ${r.dia ?? "-"} | Horário: ${r.horario ?? "-"} | Dinheiro/PIX: ${r.preco_dinheiro ?? "-"} | Cartão: ${r.preco_cartao ?? "-"} | Preparo: ${r.preparo ?? "-"} | Observação: ${r.observacoes ?? "-"}`,
+          (c: any) =>
+            `PROFISSIONAL: ${c.medico}\nDias de atendimento (todos): ${c.dias
+              .map((d: any) => [d.dia, d.horario, d.regra && `(${d.regra})`].filter(Boolean).join(" "))
+              .join(", ") || "-"}\nValores originais da planilha: ${c.dias_original.join(" ; ") || "-"}`,
         )
         .join("\n");
+      const fatos = achado.registros
+        .slice(0, 20)
+        .map(
+          (r, i) =>
+            `${i + 1}. Especialidade: ${r.categoria ?? "-"} | Procedimento: ${r.procedimento ?? "-"} | Médico: ${r.medico ?? "-"} | Dias: ${r.dia ?? "-"} (planilha: ${(r as any).extras?.dia_original ?? "-"}) | Horário: ${r.horario ?? "-"} | Dinheiro/PIX: ${r.preco_dinheiro ?? "-"} | Cartão: ${r.preco_cartao ?? "-"} | Preparo: ${r.preparo ?? "-"} | Observação: ${r.observacoes ?? "-"}`,
+        )
+        .join("\n");
+      const contexto = consolidado
+        ? `RESUMO CONSOLIDADO (já agregado pelo sistema — use TODOS os dias listados):\n${consolidado}\n\nREGISTROS:\n${fatos}`
+        : fatos;
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -214,7 +225,7 @@ export const testarBaseKb = createServerFn({ method: "POST" })
           messages: [
             {
               role: "system",
-              content: `Você é a Nina, atendente da clínica. Responda em português do Brasil, de forma curta e natural, usando SOMENTE os fatos abaixo. Nunca invente preço, médico, dia, horário ou preparo. Se os fatos não responderem à pergunta, responda exatamente: "${naoEncontrei}". Se houver duas opções parecidas, peça ao paciente para esclarecer qual exame está no pedido médico. Horário aqui é escala do profissional, não vaga disponível.\n\nFATOS DA BASE:\n${fatos}`,
+              content: `Você é a Nina, atendente da clínica. Responda em português do Brasil, de forma curta e natural, usando SOMENTE os fatos abaixo. Nunca invente preço, médico, dia, horário ou preparo. Se os fatos não responderem à pergunta, responda exatamente: "${naoEncontrei}". Se houver duas opções parecidas, peça ao paciente para esclarecer qual exame está no pedido médico. Horário aqui é escala do profissional, não vaga disponível.\n\nQuando a pergunta for sobre dias/escala de um profissional, liste TODOS os dias do resumo consolidado, sem omitir nenhum.\n\nFATOS DA BASE:\n${contexto}`,
             },
             { role: "user", content: data.pergunta },
           ],

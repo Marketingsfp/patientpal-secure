@@ -251,13 +251,53 @@ export function BaseConhecimento() {
                   : " nada encontrado"}
                 {resultado.ambiguo ? " · resultado ambíguo" : ""}
               </div>
+
+              {(resultado.consolidado ?? []).map((c: any) => (
+                <div key={c.medico} className="rounded-md border bg-muted/40 p-3 text-xs">
+                  <div className="font-medium">Médico: {c.medico}</div>
+                  <div>Dias originais (planilha): {c.dias_original.join(" ; ") || "—"}</div>
+                  <div>
+                    Dias interpretados:{" "}
+                    {c.dias
+                      .map((d: any) =>
+                        [d.dia, d.horario, d.regra ? `(${d.regra})` : null]
+                          .filter(Boolean)
+                          .join(" "),
+                      )
+                      .join(" · ") || "—"}
+                  </div>
+                </div>
+              ))}
+
+              {ehAdmin && (
+                <details className="rounded-md border p-2 text-xs">
+                  <summary className="cursor-pointer select-none font-medium">
+                    Dados recuperados (técnico)
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    <div>Pergunta: {pergunta}</div>
+                    <div>Termos: {(resultado.diagnostico?.termos ?? []).join(", ") || "—"}</div>
+                    <div>
+                      Médico identificado: {resultado.diagnostico?.medico_identificado ?? "—"} ·
+                      agregado: {resultado.diagnostico?.agregou_por_medico ? "sim" : "não"} ·
+                      registros do médico: {resultado.diagnostico?.total_registros_medico ?? 0}
+                    </div>
+                    <div>Versão da base: {resultado.base?.versao ?? "—"}</div>
+                    <pre className="max-h-72 overflow-auto rounded bg-muted p-2 text-[11px]">
+                      {JSON.stringify(resultado.registros ?? [], null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              )}
+
               {(resultado.registros ?? []).slice(0, 6).map((r: any) => (
                 <div key={r.id} className="rounded-md border p-2 text-xs">
                   <div className="font-medium">{r.procedimento ?? r.categoria ?? "—"}</div>
                   <div className="text-muted-foreground">
                     {[
                       r.medico && `Médico: ${r.medico}`,
-                      r.dia && `Dia: ${r.dia}`,
+                      r.dia && `Dias: ${r.dia}`,
+                      r.extras?.dia_original && `Original: ${r.extras.dia_original}`,
                       r.horario && `Horário: ${r.horario}`,
                       r.preco_dinheiro != null && `Dinheiro/PIX: R$ ${r.preco_dinheiro}`,
                       r.preco_cartao != null && `Cartão: R$ ${r.preco_cartao}`,
@@ -270,6 +310,7 @@ export function BaseConhecimento() {
                   </div>
                 </div>
               ))}
+
             </div>
           )}
         </CardContent>
