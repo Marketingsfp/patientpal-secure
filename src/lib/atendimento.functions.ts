@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
@@ -8,16 +7,24 @@ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 /* =========================================================
  *  Helpers
  * ======================================================= */
-async function assertMember(userId: string, clinicaId: string) {
-  const { data, error } = await supabaseAdmin.rpc("is_member", {
+async function assertMember(
+  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  userId: string,
+  clinicaId: string,
+) {
+  const { data, error } = await supabase.rpc("is_member", {
     _user_id: userId,
     _clinica_id: clinicaId,
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem acesso a esta clínica");
 }
-async function assertManager(userId: string, clinicaId: string) {
-  const { data, error } = await supabaseAdmin.rpc("can_manage_clinica", {
+async function assertManager(
+  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  userId: string,
+  clinicaId: string,
+) {
+  const { data, error } = await supabase.rpc("can_manage_clinica", {
     _user_id: userId,
     _clinica_id: clinicaId,
   });
@@ -28,8 +35,10 @@ async function assertManager(userId: string, clinicaId: string) {
 /**
  * Confere que a conversa realmente pertence à clínica informada.
  *
- * Necessário porque este arquivo usa `supabaseAdmin` (service_role), que IGNORA
- * o RLS. `assertMember` prova apenas que o usuário pertence à clínica X — não
+ * Defesa adicional ao RLS: confirma que o identificador recebido pertence à
+ * clínica selecionada antes de executar a ação. A sessão autenticada também
+ * aplica as políticas de isolamento por clínica no banco.
+ *
  * que o `conversaId` vindo do cliente também pertença. Sem esta checagem, um
  * usuário autenticado de qualquer clínica alcança conversas de outra só
  * enviando o id, o que expõe dado de saúde entre clínicas (LGPD, art. 11).
@@ -37,8 +46,12 @@ async function assertManager(userId: string, clinicaId: string) {
  * Use isto sempre que o id do registro vier do cliente e a consulta não puder
  * ser filtrada direto por `clinica_id`.
  */
-async function assertConversaDaClinica(conversaId: string, clinicaId: string) {
-  const { data, error } = await supabaseAdmin
+async function assertConversaDaClinica(
+  supabase: Parameters<Parameters<typeof requireSupabaseAuth>[0]>[0]["context"]["supabase"],
+  conversaId: string,
+  clinicaId: string,
+) {
+  const { data, error } = await supabase
     .from("atend_conversas")
     .select("id")
     .eq("id", conversaId)
@@ -69,8 +82,8 @@ export const listarConversas = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    let q = supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    let q = context.supabase
       .from("atend_conversas")
       .select("*")
       // Conversas do console de homologação nunca aparecem no atendimento real.
@@ -108,7 +121,7 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     const patch: {
       atribuida_user_id: string | null;
       status: "active" | "waiting";
@@ -125,7 +138,7 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       assigned_at: data.userId ? new Date().toISOString() : null,
     };
     if (data.departamentoId !== undefined) patch.departamento_id = data.departamentoId;
-    const { error } = await supabaseAdmin
+    const { error } = await context.supabase
       .from("atend_conversas")
       .update(patch)
       .eq("id", data.conversaId)
@@ -148,8 +161,8 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: conv, error: e1 } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: conv, error: e1 } = await context.supabase
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")
       .eq("id", data.conversaId)
@@ -159,7 +172,7 @@ export const transferirConversa = createServerFn({ method: "POST" })
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
-    await supabaseAdmin.from("atend_transferencias").insert({
+    await context.supabase.from("atend_transferencias").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
       de_user_id: conv.atribuida_user_id,
@@ -168,7 +181,7 @@ export const transferirConversa = createServerFn({ method: "POST" })
       para_departamento_id: data.paraDepartamentoId ?? null,
       motivo: data.motivo ?? null,
     });
-    const { error: e2 } = await supabaseAdmin
+    const { error: e2 } = await context.supabase
       .from("atend_conversas")
       .update({
         atribuida_user_id: data.paraUserId ?? null,
@@ -195,11 +208,11 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: prot } = await supabaseAdmin.rpc("atend_gerar_protocolo", {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: prot } = await context.supabase.rpc("atend_gerar_protocolo", {
       _clinica_id: data.clinicaId,
     });
-    const { error } = await supabaseAdmin
+    const { error } = await context.supabase
       .from("atend_conversas")
       .update({
         status: "closed",
@@ -222,8 +235,8 @@ export const marcarLida = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await context.supabase
       .from("atend_conversas")
       .update({ unread_count: 0 })
       .eq("id", data.conversaId)
@@ -240,8 +253,8 @@ export const listarNotas = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_notas_internas")
       .select("*")
       .eq("conversa_id", data.conversaId)
@@ -263,16 +276,16 @@ export const criarNota = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     // Sem isto, a nota entraria na conversa de outra clínica: o INSERT grava
     // `clinica_id` da clínica do autor, mas `conversa_id` vem do cliente.
-    await assertConversaDaClinica(data.conversaId, data.clinicaId);
-    const { data: prof } = await supabaseAdmin
+    await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
+    const { data: prof } = await context.supabase
       .from("profiles")
       .select("nome")
       .eq("id", context.userId)
       .maybeSingle();
-    const { error } = await supabaseAdmin.from("atend_notas_internas").insert({
+    const { error } = await context.supabase.from("atend_notas_internas").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
       autor_user_id: context.userId,
@@ -290,8 +303,8 @@ export const listarDepartamentos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: deps, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: deps, error } = await context.supabase
       .from("atend_departamentos")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -315,7 +328,7 @@ export const salvarDepartamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => DepartSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       nome: data.nome,
@@ -325,7 +338,7 @@ export const salvarDepartamento = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_departamentos")
         .update(row)
         .eq("id", data.id)
@@ -333,7 +346,7 @@ export const salvarDepartamento = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_departamentos")
       .insert(row)
       .select("id")
@@ -348,8 +361,8 @@ export const excluirDepartamento = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_departamentos")
       .delete()
       .eq("id", data.id)
@@ -369,8 +382,8 @@ export const listarMembros = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    let q = supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    let q = context.supabase
       .from("atend_departamento_membros")
       .select("*")
       .eq("clinica_id", data.clinicaId);
@@ -379,7 +392,7 @@ export const listarMembros = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!rows || rows.length === 0) return [] as any[];
     const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
-    const { data: profs } = await supabaseAdmin
+    const { data: profs } = await context.supabase
       .from("profiles")
       .select("id, nome")
       .in("id", userIds);
@@ -400,17 +413,17 @@ export const adicionarMembro = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     // `departamentoId` vem do cliente: sem conferir, um gestor vincularia um
     // usuário a um departamento de outra clínica.
-    const { data: dep } = await supabaseAdmin
+    const { data: dep } = await context.supabase
       .from("atend_departamentos")
       .select("id")
       .eq("id", data.departamentoId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (!dep) throw new Error("Departamento não encontrado nesta clínica");
-    const { error } = await supabaseAdmin.from("atend_departamento_membros").upsert(
+    const { error } = await context.supabase.from("atend_departamento_membros").upsert(
       {
         clinica_id: data.clinicaId,
         departamento_id: data.departamentoId,
@@ -429,8 +442,8 @@ export const removerMembro = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_departamento_membros")
       .delete()
       .eq("id", data.id)
@@ -445,8 +458,8 @@ export const travarMinhaFila = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), travada: z.boolean() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_departamento_membros")
       .update({ queue_locked: data.travada })
       .eq("clinica_id", data.clinicaId)
@@ -459,8 +472,8 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows } = await context.supabase
       .from("atend_departamento_membros")
       .select("queue_locked")
       .eq("clinica_id", data.clinicaId)
@@ -478,8 +491,8 @@ export const listarKb = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_kb")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -504,7 +517,7 @@ export const salvarKb = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       titulo: data.titulo,
@@ -514,7 +527,7 @@ export const salvarKb = createServerFn({ method: "POST" })
       publicado: data.publicado,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_kb")
         .update(row)
         .eq("id", data.id)
@@ -522,7 +535,7 @@ export const salvarKb = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_kb")
       .insert(row)
       .select("id")
@@ -537,8 +550,8 @@ export const excluirKb = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_kb")
       .delete()
       .eq("id", data.id)
@@ -554,8 +567,8 @@ export const listarMacros = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_macros")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -584,7 +597,7 @@ export const salvarMacro = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       atalho: data.atalho.toLowerCase(),
@@ -593,7 +606,7 @@ export const salvarMacro = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_macros")
         .update(row)
         .eq("id", data.id)
@@ -601,7 +614,7 @@ export const salvarMacro = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_macros")
       .insert(row)
       .select("id")
@@ -616,8 +629,8 @@ export const excluirMacro = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_macros")
       .delete()
       .eq("id", data.id)
@@ -633,8 +646,8 @@ export const listarPauseReasons = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_pause_reasons")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -664,7 +677,7 @@ export const salvarPauseReason = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       nome: data.nome,
@@ -675,7 +688,7 @@ export const salvarPauseReason = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_pause_reasons")
         .update(row)
         .eq("id", data.id)
@@ -683,7 +696,7 @@ export const salvarPauseReason = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_pause_reasons")
       .insert(row)
       .select("id")
@@ -698,8 +711,8 @@ export const excluirPauseReason = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_pause_reasons")
       .delete()
       .eq("id", data.id)
@@ -714,9 +727,9 @@ export const iniciarPausa = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), reasonId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     // `reasonId` vem do cliente: confere que o motivo é desta clínica.
-    const { data: motivo } = await supabaseAdmin
+    const { data: motivo } = await context.supabase
       .from("atend_pause_reasons")
       .select("id")
       .eq("id", data.reasonId)
@@ -724,12 +737,12 @@ export const iniciarPausa = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!motivo) throw new Error("Motivo de pausa não encontrado nesta clínica");
     // fecha pausas abertas
-    await supabaseAdmin
+    await context.supabase
       .from("atend_pausas_log")
       .update({ finalizada_em: new Date().toISOString() })
       .eq("user_id", context.userId)
       .is("finalizada_em", null);
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_pausas_log")
       .insert({
         clinica_id: data.clinicaId,
@@ -746,8 +759,8 @@ export const finalizarPausa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_pausas_log")
       .update({ finalizada_em: new Date().toISOString() })
       .eq("user_id", context.userId)
@@ -760,8 +773,8 @@ export const pausaAtual = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: row } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: row } = await context.supabase
       .from("atend_pausas_log")
       .select("*, atend_pause_reasons(nome, cor, tolerancia_minutos)")
       .eq("user_id", context.userId)
@@ -779,8 +792,8 @@ export const listarHorarios = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_horarios")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -806,7 +819,7 @@ export const salvarHorario = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       dia_semana: data.dia_semana,
@@ -816,7 +829,7 @@ export const salvarHorario = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_horarios")
         .update(row)
         .eq("id", data.id)
@@ -824,7 +837,7 @@ export const salvarHorario = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_horarios")
       .insert(row)
       .select("id")
@@ -839,8 +852,8 @@ export const excluirHorario = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_horarios")
       .delete()
       .eq("id", data.id)
@@ -856,8 +869,8 @@ export const listarNumerosAutorizados = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_numeros_autorizados")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -883,8 +896,8 @@ export const adicionarNumero = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin.from("atend_numeros_autorizados").insert({
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase.from("atend_numeros_autorizados").insert({
       clinica_id: data.clinicaId,
       telefone: data.telefone,
       nota: data.nota ?? null,
@@ -899,8 +912,8 @@ export const removerNumero = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_numeros_autorizados")
       .delete()
       .eq("id", data.id)
@@ -916,11 +929,11 @@ export const obterProtocoloConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await context.supabase
       .from("atend_protocolo_config")
       .upsert({ clinica_id: data.clinicaId }, { onConflict: "clinica_id", ignoreDuplicates: true });
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await context.supabase
       .from("atend_protocolo_config")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -942,8 +955,8 @@ export const salvarProtocoloConfig = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin.from("atend_protocolo_config").upsert(
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase.from("atend_protocolo_config").upsert(
       {
         clinica_id: data.clinicaId,
         prefixo: data.prefixo.toUpperCase(),
@@ -963,8 +976,8 @@ export const listarBotConfigs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_bot_configs")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -1002,7 +1015,7 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     const row = {
       clinica_id: data.clinicaId,
       departamento_id: data.departamentoId ?? null,
@@ -1016,7 +1029,7 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
       ativo: data.ativo,
     };
     if (data.id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_bot_configs")
         .update(row)
         .eq("id", data.id)
@@ -1024,7 +1037,7 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await supabaseAdmin
+    const { data: ins, error } = await context.supabase
       .from("atend_bot_configs")
       .insert(row)
       .select("id")
@@ -1040,8 +1053,8 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("clinica_memberships")
       .select("user_id, role")
       .eq("clinica_id", data.clinicaId)
@@ -1049,7 +1062,7 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const userIds = (rows ?? []).map((r: any) => r.user_id);
     const { data: profs } = userIds.length
-      ? await supabaseAdmin.from("profiles").select("id, nome").in("id", userIds)
+      ? await context.supabase.from("profiles").select("id, nome").in("id", userIds)
       : { data: [] as any[] };
     const nomeMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
     return (rows ?? []).map((r: any) => ({
@@ -1066,7 +1079,7 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     // Início do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC),
     // `new Date()` + `setHours(0,0,0)` fazia as métricas "de hoje" incluírem
     // as 3 últimas horas de ontem.
@@ -1078,32 +1091,32 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
       { count: fechadas },
       { data: csatRows },
     ] = await Promise.all([
-      supabaseAdmin
+      context.supabase
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
         .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .gte("created_at", isoHoje),
-      supabaseAdmin
+      context.supabase
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
         .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "active"),
-      supabaseAdmin
+      context.supabase
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
         .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "waiting"),
-      supabaseAdmin
+      context.supabase
         .from("atend_conversas")
         .select("id", { count: "exact", head: true })
         .eq("is_teste", false)
         .eq("clinica_id", data.clinicaId)
         .eq("status", "closed")
         .gte("closed_at", isoHoje),
-      supabaseAdmin
+      context.supabase
         .from("atend_avaliacoes")
         .select("nota")
         .eq("clinica_id", data.clinicaId)
@@ -1136,10 +1149,10 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     // Pega as mensagens MAIS RECENTES (descendente) e reordena para exibição.
     // Antes o limite cortava pelo começo e a conversa ficava parada no passado.
-    const { data: rows, error } = await supabaseAdmin
+    const { data: rows, error } = await context.supabase
       .from("whatsapp_mensagens")
       .select(
         "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status",
@@ -1164,10 +1177,10 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     const cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
-    const { data: conv, error: cErr } = await supabaseAdmin
+    const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
       .select("id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id")
       .eq("id", data.conversaId)
@@ -1189,7 +1202,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       data.text,
     );
 
-    await supabaseAdmin.from("whatsapp_mensagens").insert({
+    await context.supabase.from("whatsapp_mensagens").insert({
       clinica_id: data.clinicaId,
       conversa_id: data.conversaId,
       wa_message_id,
@@ -1217,7 +1230,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         );
       }
     }
-    await supabaseAdmin
+    await context.supabase
       .from("atend_conversas")
       .update(patch)
       .eq("id", data.conversaId)
@@ -1232,8 +1245,8 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: conv } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: conv } = await context.supabase
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
       .eq("id", data.conversaId)
@@ -1249,7 +1262,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     const pendencias: any = null;
 
     if (conv.contato_paciente_id) {
-      const { data: p } = await supabaseAdmin
+      const { data: p } = await context.supabase
         .from("pacientes")
         .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
         .eq("id", conv.contato_paciente_id)
@@ -1257,7 +1270,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       paciente = p;
     } else if (conv.contato_telefone) {
       const digits = conv.contato_telefone.replace(/\D/g, "");
-      const { data: p } = await supabaseAdmin
+      const { data: p } = await context.supabase
         .from("pacientes")
         .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
         .eq("clinica_id", data.clinicaId)
@@ -1269,7 +1282,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
 
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
-        supabaseAdmin
+        context.supabase
           .from("agendamentos")
           // O nome do médico não fica em `agendamentos`; vem do vínculo com
           // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
@@ -1278,7 +1291,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .eq("paciente_id", paciente.id)
           .order("inicio", { ascending: false })
           .limit(5),
-        supabaseAdmin
+        context.supabase
           .from("contratos_assinatura")
           .select("id, numero, status, data_inicio")
           .eq("paciente_id", paciente.id)
@@ -1296,7 +1309,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     }
 
     const { data: atribuidoProfile } = conv.atribuida_user_id
-      ? await supabaseAdmin
+      ? await context.supabase
           .from("profiles")
           .select("nome")
           .eq("id", conv.atribuida_user_id)
@@ -1327,12 +1340,12 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
 
     // Pega departamento alvo
     let deptId = data.departamentoId;
     if (!deptId) {
-      const { data: c } = await supabaseAdmin
+      const { data: c } = await context.supabase
         .from("atend_conversas")
         .select("departamento_id")
         .eq("id", data.conversaId)
@@ -1343,7 +1356,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
     if (!deptId) throw new Error("Conversa sem departamento — configure roteamento.");
 
     // Membros disponíveis (não em pausa, fila desbloqueada)
-    const { data: membros } = await supabaseAdmin
+    const { data: membros } = await context.supabase
       .from("atend_departamento_membros")
       .select("user_id, max_simultaneas, queue_locked")
       .eq("clinica_id", data.clinicaId)
@@ -1351,7 +1364,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
       .eq("queue_locked", false);
     if (!membros || membros.length === 0) {
       // fica em waiting na fila do departamento
-      await supabaseAdmin
+      await context.supabase
         .from("atend_conversas")
         .update({
           departamento_id: deptId,
@@ -1365,7 +1378,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
 
     // Filtra em pausa
     const agora = new Date().toISOString();
-    const { data: pausados } = await supabaseAdmin
+    const { data: pausados } = await context.supabase
       .from("atend_pausas_log")
       .select("user_id")
       .is("finalizada_em", null)
@@ -1375,7 +1388,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
     // Carga atual
     const userIds = membros.map((m: any) => m.user_id).filter((u: string) => !pausadosSet.has(u));
     if (userIds.length === 0) {
-      await supabaseAdmin
+      await context.supabase
         .from("atend_conversas")
         .update({
           departamento_id: deptId,
@@ -1386,7 +1399,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Todos em pausa" };
     }
-    const { data: cargas } = await supabaseAdmin
+    const { data: cargas } = await context.supabase
       .from("atend_conversas")
       .select("atribuida_user_id")
       .eq("clinica_id", data.clinicaId)
@@ -1411,7 +1424,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
       }
     }
     if (!best) {
-      await supabaseAdmin
+      await context.supabase
         .from("atend_conversas")
         .update({
           departamento_id: deptId,
@@ -1422,7 +1435,7 @@ export const autoAtribuirRoundRobin = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId);
       return { ok: false, motivo: "Capacidade lotada" };
     }
-    await supabaseAdmin
+    await context.supabase
       .from("atend_conversas")
       .update({
         departamento_id: deptId,
@@ -1441,8 +1454,8 @@ export const listarRoutingRules = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_routing_rules")
       .select("*")
       .eq("clinica_id", data.clinicaId)
@@ -1480,17 +1493,17 @@ export const salvarRoutingRule = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
+    await assertManager(context.supabase, context.userId, data.clinicaId);
     const { id, clinicaId, ...rest } = data;
     if (id) {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_routing_rules")
         .update(rest)
         .eq("id", id)
         .eq("clinica_id", clinicaId);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabaseAdmin
+      const { error } = await context.supabase
         .from("atend_routing_rules")
         .insert({ clinica_id: clinicaId, ...rest });
       if (error) throw new Error(error.message);
@@ -1504,8 +1517,8 @@ export const excluirRoutingRule = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertManager(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin
+    await assertManager(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase
       .from("atend_routing_rules")
       .delete()
       .eq("id", data.id)
@@ -1521,8 +1534,8 @@ export const supervisaoLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: convs } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: convs } = await context.supabase
       .from("atend_conversas")
       .select(
         "id, status, contato_nome, contato_telefone, ultima_msg_em, ultima_msg_preview, aguardando_desde, atribuida_user_id, departamento_id, sla_first_response_seg, unread_count",
@@ -1540,14 +1553,14 @@ export const supervisaoLive = createServerFn({ method: "POST" })
     );
     const [{ data: profs }, { data: depts }, { data: pausas }] = await Promise.all([
       userIds.length
-        ? supabaseAdmin.from("profiles").select("id, nome").in("id", userIds)
+        ? context.supabase.from("profiles").select("id, nome").in("id", userIds)
         : Promise.resolve({ data: [] }),
       deptIds.length
-        ? supabaseAdmin.from("atend_departamentos").select("id, nome").in("id", deptIds)
+        ? context.supabase.from("atend_departamentos").select("id, nome").in("id", deptIds)
         : Promise.resolve({ data: [] }),
       // Pausa em aberto = `finalizada_em` nulo. Ver comentário no relatório
       // abaixo: esta tabela não tem `inicio`/`fim`/`motivo`.
-      supabaseAdmin
+      context.supabase
         .from("atend_pausas_log")
         .select("user_id, reason_id, iniciada_em")
         .is("finalizada_em", null)
@@ -1580,9 +1593,9 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
     const [{ data: convs }, { data: avals }, { data: pausasLog }] = await Promise.all([
-      supabaseAdmin
+      context.supabase
         .from("atend_conversas")
         .select(
           "id, status, departamento_id, atribuida_user_id, created_at, closed_at, sla_first_response_seg",
@@ -1590,7 +1603,7 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .gte("created_at", data.de)
         .lte("created_at", data.ate),
-      supabaseAdmin
+      context.supabase
         .from("atend_avaliacoes")
         .select("nota, created_at")
         .eq("clinica_id", data.clinicaId)
@@ -1599,7 +1612,7 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
       // Log de pausas: as colunas reais são `iniciada_em`, `finalizada_em` e
       // `reason_id` (migration 20260527111301). O nome do motivo mora em
       // `atend_pause_reasons.nome` — não existe coluna `motivo` aqui.
-      supabaseAdmin
+      context.supabase
         .from("atend_pausas_log")
         .select("user_id, reason_id, iniciada_em, finalizada_em")
         .eq("clinica_id", data.clinicaId)
@@ -1615,10 +1628,10 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
     );
     const [{ data: profs }, { data: depts }] = await Promise.all([
       userIds.length
-        ? supabaseAdmin.from("profiles").select("id, nome").in("id", userIds)
+        ? context.supabase.from("profiles").select("id, nome").in("id", userIds)
         : Promise.resolve({ data: [] }),
       deptIds.length
-        ? supabaseAdmin.from("atend_departamentos").select("id, nome").in("id", deptIds)
+        ? context.supabase.from("atend_departamentos").select("id, nome").in("id", deptIds)
         : Promise.resolve({ data: [] }),
     ]);
     const profMap = new Map((profs ?? []).map((p: any) => [p.id, p.nome]));
@@ -1720,8 +1733,8 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    let q = supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    let q = context.supabase
       .from("atend_conversas")
       .select(
         "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count",
@@ -1748,9 +1761,9 @@ export const assumirConversa = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await assertConversaDaClinica(data.conversaId, data.clinicaId);
-    const { data: ok, error } = await supabaseAdmin.rpc("atend_claim_conversa", {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
+    const { data: ok, error } = await context.supabase.rpc("atend_claim_conversa", {
       _conversa_id: data.conversaId,
       _clinica_id: data.clinicaId,
       _user_id: context.userId,
@@ -1780,8 +1793,8 @@ export const devolverParaNina = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { devolverParaIA } = await import("@/lib/atendimento/handoff.server");
     await devolverParaIA({
       clinicaId: data.clinicaId,
@@ -1807,8 +1820,8 @@ export const encaminharParaFilaHumana = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await assertConversaDaClinica(data.conversaId, data.clinicaId);
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { encaminharParaHumano } = await import("@/lib/atendimento/handoff.server");
     return encaminharParaHumano({
       clinicaId: data.clinicaId,
@@ -1827,9 +1840,9 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    await assertConversaDaClinica(data.conversaId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_conversa_eventos")
       .select("id, evento, user_id, motivo, detalhes, created_at")
       .eq("clinica_id", data.clinicaId)
@@ -1853,8 +1866,8 @@ export const definirPresenca = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { error } = await supabaseAdmin.from("atend_agente_presenca").upsert(
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { error } = await context.supabase.from("atend_agente_presenca").upsert(
       {
         clinica_id: data.clinicaId,
         user_id: context.userId,
@@ -1872,8 +1885,8 @@ export const listarPresenca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertMember(context.userId, data.clinicaId);
-    const { data: rows, error } = await supabaseAdmin
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase
       .from("atend_agente_presenca")
       .select("user_id, status, aceita_novas, visto_em")
       .eq("clinica_id", data.clinicaId);
