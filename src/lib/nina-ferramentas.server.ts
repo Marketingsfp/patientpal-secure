@@ -264,7 +264,25 @@ export const FERRAMENTAS_NINA = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_base_conhecimento",
+      description:
+        "Base de Conhecimentos oficial da clínica (planilha administrativa). Use SEMPRE antes de responder sobre especialidades, exames, procedimentos, médicos, dias/horários de atendimento, preços em dinheiro/PIX e cartão, preparos e observações. Horário aqui é escala administrativa, não vaga disponível.",
+      parameters: {
+        type: "object",
+        properties: {
+          termo: { type: "string", description: "Assunto perguntado." },
+          medico: { type: "string" },
+          dia: { type: "string" },
+        },
+        required: ["termo"],
+      },
+    },
+  },
 ] as const;
+
 
 function parseJson(txt: unknown, campo: string): Record<string, unknown> {
   if (typeof txt === "object" && txt) return txt as Record<string, unknown>;
@@ -293,6 +311,37 @@ export async function executarFerramentaNina(
   const args = (typeof argsRaw === "string" ? parseJson(argsRaw, "arguments") : (argsRaw ?? {})) as any;
 
   switch (nome) {
+    case "consultar_base_conhecimento": {
+      const { consultarBase, registrarConsultaKb } = await import("@/lib/nina/kb.server");
+      const { expandirTermos } = await import("@/lib/nina/kb-parser");
+      const termo = String(args.termo ?? "").trim().slice(0, 200);
+      if (termo.length < 2) throw new Error("Informe o assunto da consulta.");
+      const achado = await consultarBase({
+        clinicaId,
+        termo,
+        medico: args.medico ? String(args.medico).slice(0, 160) : null,
+        dia: args.dia ? String(args.dia).slice(0, 40) : null,
+      });
+      void registrarConsultaKb({
+        clinicaId,
+        baseId: achado.base?.id ?? null,
+        versao: achado.base?.versao ?? null,
+        canal: "interno",
+        pergunta: termo,
+        termos: expandirTermos(termo),
+        encontrados: achado.registros,
+      });
+      return achado.encontrado
+        ? {
+            encontrado: true,
+            ambiguo: achado.ambiguo,
+            versao_base: achado.base?.versao ?? null,
+            registros: achado.registros,
+          }
+        : { encontrado: false, instrucao: "Nada na base oficial. Não invente; diga que não encontrou." };
+    }
+
+
     case "consultar_dados": {
       const tabela = String(args.tabela ?? "");
       checarTabela(tabela, false);

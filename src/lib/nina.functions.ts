@@ -172,6 +172,12 @@ export const chatNina = createServerFn({ method: "POST" })
     const blocoAprendizado = blocoPromptAprendizados(aprendizados);
     if (blocoAprendizado) systemPrompt = `${systemPrompt}\n\n${blocoAprendizado}`;
 
+    // Base de Conhecimentos (planilha oficial) — fonte de verdade administrativa.
+    const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
+    const blocoKb = await blocoPromptBaseConhecimento(data.clinicaId).catch(() => "");
+    if (blocoKb) systemPrompt = `${systemPrompt}\n\n${blocoKb}`;
+
+
     const { FERRAMENTAS_NINA, executarFerramentaNina } = await import(
       "@/lib/nina-ferramentas.server"
     );

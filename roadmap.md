@@ -20,3 +20,13 @@
 - [ ] FASE 7 — Dataset de regressão a partir de erros reais
 - [ ] FASE 8 — Painel "Nina → Aprendizado" + dashboard de evolução
 - [ ] FASE 9 — Avaliação com o modelo real
+
+## Nina — Base de Conhecimentos (planilha TAP)
+- [x] Tabelas, RLS, bucket privado e busca semântica no banco
+- [x] Parser com herança de contexto, normalização e conflitos
+- [x] Pipeline de processamento, embeddings e ativação por versão
+- [x] Ferramenta `consultar_base_conhecimento` (Nina interna e WhatsApp)
+- [x] Aba "Base de conhecimentos" com upload, versões e homologação
+- [x] Testes do parser (`bun test`)
+- [ ] Calibrar com a planilha TAP real (pendente do envio pelo colaborador)
+

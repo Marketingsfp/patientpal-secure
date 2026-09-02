@@ -511,6 +511,13 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           { to: "/app/nina", hash: "aprendizado", label: "Aprendizado", icon: Brain },
           {
             to: "/app/nina",
+            hash: "base-conhecimento",
+            label: "Base de conhecimentos",
+            icon: BookOpen,
+          },
+
+          {
+            to: "/app/nina",
             hash: "homologacao",
             label: "Homologação (envio de testes)",
             icon: FlaskConical,

@@ -7388,6 +7388,236 @@ export type Database = {
           },
         ]
       }
+      nina_kb_bases: {
+        Row: {
+          arquivo_hash: string | null
+          arquivo_nome: string
+          arquivo_tamanho: number | null
+          arquivo_tipo: string | null
+          ativada_em: string | null
+          clinica_id: string
+          created_at: string
+          enviado_por: string | null
+          enviado_por_nome: string | null
+          erros: Json
+          id: string
+          linhas_lidas: number
+          processado_em: string | null
+          registros_total: number
+          status: string
+          storage_path: string | null
+          titulo: string
+          updated_at: string
+          validacao: Json
+          versao: number
+        }
+        Insert: {
+          arquivo_hash?: string | null
+          arquivo_nome: string
+          arquivo_tamanho?: number | null
+          arquivo_tipo?: string | null
+          ativada_em?: string | null
+          clinica_id: string
+          created_at?: string
+          enviado_por?: string | null
+          enviado_por_nome?: string | null
+          erros?: Json
+          id?: string
+          linhas_lidas?: number
+          processado_em?: string | null
+          registros_total?: number
+          status?: string
+          storage_path?: string | null
+          titulo?: string
+          updated_at?: string
+          validacao?: Json
+          versao?: number
+        }
+        Update: {
+          arquivo_hash?: string | null
+          arquivo_nome?: string
+          arquivo_tamanho?: number | null
+          arquivo_tipo?: string | null
+          ativada_em?: string | null
+          clinica_id?: string
+          created_at?: string
+          enviado_por?: string | null
+          enviado_por_nome?: string | null
+          erros?: Json
+          id?: string
+          linhas_lidas?: number
+          processado_em?: string | null
+          registros_total?: number
+          status?: string
+          storage_path?: string | null
+          titulo?: string
+          updated_at?: string
+          validacao?: Json
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_kb_bases_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_kb_consultas: {
+        Row: {
+          base_id: string | null
+          canal: string
+          clinica_id: string
+          created_at: string
+          encontrados: Json
+          id: string
+          intencao: string | null
+          pergunta: string | null
+          registro_usado: string | null
+          resposta: string | null
+          score: number | null
+          termos: string[] | null
+          versao: number | null
+        }
+        Insert: {
+          base_id?: string | null
+          canal?: string
+          clinica_id: string
+          created_at?: string
+          encontrados?: Json
+          id?: string
+          intencao?: string | null
+          pergunta?: string | null
+          registro_usado?: string | null
+          resposta?: string | null
+          score?: number | null
+          termos?: string[] | null
+          versao?: number | null
+        }
+        Update: {
+          base_id?: string | null
+          canal?: string
+          clinica_id?: string
+          created_at?: string
+          encontrados?: Json
+          id?: string
+          intencao?: string | null
+          pergunta?: string | null
+          registro_usado?: string | null
+          resposta?: string | null
+          score?: number | null
+          termos?: string[] | null
+          versao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_kb_consultas_base_id_fkey"
+            columns: ["base_id"]
+            isOneToOne: false
+            referencedRelation: "nina_kb_bases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_kb_consultas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_kb_registros: {
+        Row: {
+          aba_origem: string | null
+          base_id: string
+          bruto: Json
+          categoria: string | null
+          clinica_id: string
+          created_at: string
+          dia: string | null
+          embedding: string | null
+          extras: Json
+          horario: string | null
+          id: string
+          linha_origem: number | null
+          medico: string | null
+          observacoes: string | null
+          preco_cartao: number | null
+          preco_dinheiro: number | null
+          preparo: string | null
+          procedimento: string | null
+          secao: string | null
+          texto_busca: string
+          tipo: string | null
+          versao: number
+        }
+        Insert: {
+          aba_origem?: string | null
+          base_id: string
+          bruto?: Json
+          categoria?: string | null
+          clinica_id: string
+          created_at?: string
+          dia?: string | null
+          embedding?: string | null
+          extras?: Json
+          horario?: string | null
+          id?: string
+          linha_origem?: number | null
+          medico?: string | null
+          observacoes?: string | null
+          preco_cartao?: number | null
+          preco_dinheiro?: number | null
+          preparo?: string | null
+          procedimento?: string | null
+          secao?: string | null
+          texto_busca?: string
+          tipo?: string | null
+          versao?: number
+        }
+        Update: {
+          aba_origem?: string | null
+          base_id?: string
+          bruto?: Json
+          categoria?: string | null
+          clinica_id?: string
+          created_at?: string
+          dia?: string | null
+          embedding?: string | null
+          extras?: Json
+          horario?: string | null
+          id?: string
+          linha_origem?: number | null
+          medico?: string | null
+          observacoes?: string | null
+          preco_cartao?: number | null
+          preco_dinheiro?: number | null
+          preparo?: string | null
+          procedimento?: string | null
+          secao?: string | null
+          texto_busca?: string
+          tipo?: string | null
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_kb_registros_base_id_fkey"
+            columns: ["base_id"]
+            isOneToOne: false
+            referencedRelation: "nina_kb_bases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_kb_registros_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_teste_leads: {
         Row: {
           clinica_id: string
@@ -10900,6 +11130,25 @@ export type Database = {
           status: Database["public"]["Enums"]["agendamento_status"]
           teleconsulta: boolean
           token_publico: string
+        }[]
+      }
+      nina_kb_buscar_semantico: {
+        Args: { p_base_id: string; p_embedding: string; p_limite?: number }
+        Returns: {
+          aba_origem: string
+          categoria: string
+          dia: string
+          horario: string
+          id: string
+          linha_origem: number
+          medico: string
+          observacoes: string
+          preco_cartao: number
+          preco_dinheiro: number
+          preparo: string
+          procedimento: string
+          similaridade: number
+          tipo: string
         }[]
       }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
