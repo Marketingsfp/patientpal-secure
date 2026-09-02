@@ -376,8 +376,9 @@ export function parseAba(aba: string, matriz: string[][]): ResultadoParse {
     const preparo = pega("preparo") || null;
 
     // Sem nenhum conteúdo útil além do contexto herdado → ignora.
-    if (!medico && !dia && !horario && dinheiro === null && cartao === null && !observacoes && !preparo && !procCelula)
+    if (!medicoCelula && !dia && !horario && dinheiro === null && cartao === null && !observacoes && !preparo && !procCelula)
       continue;
+
 
     const rotulo = [categoria, procedimento, medico, dia, horario, observacoes, preparo]
       .filter(Boolean)
