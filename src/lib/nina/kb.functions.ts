@@ -207,10 +207,10 @@ export const testarBaseKb = createServerFn({ method: "POST" })
         )
         .join("\n");
       const fatos = achado.registros
-        .slice(0, 8)
+        .slice(0, 20)
         .map(
           (r, i) =>
-            `${i + 1}. Especialidade: ${r.categoria ?? "-"} | Procedimento: ${r.procedimento ?? "-"} | Médico: ${r.medico ?? "-"} | Dia: ${r.dia ?? "-"} | Horário: ${r.horario ?? "-"} | Dinheiro/PIX: ${r.preco_dinheiro ?? "-"} | Cartão: ${r.preco_cartao ?? "-"} | Preparo: ${r.preparo ?? "-"} | Observação: ${r.observacoes ?? "-"}`,
+            `${i + 1}. Especialidade: ${r.categoria ?? "-"} | Procedimento: ${r.procedimento ?? "-"} | Médico: ${r.medico ?? "-"} | Dias: ${r.dia ?? "-"} (planilha: ${(r as any).extras?.dia_original ?? "-"}) | Horário: ${r.horario ?? "-"} | Dinheiro/PIX: ${r.preco_dinheiro ?? "-"} | Cartão: ${r.preco_cartao ?? "-"} | Preparo: ${r.preparo ?? "-"} | Observação: ${r.observacoes ?? "-"}`,
         )
         .join("\n");
       const contexto = consolidado
