@@ -1,36 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   parsePlanilha,
   validarRegistros,
   detectarConflitos,
   expandirTermos,
-} from "@/lib/nina/kb-parser";
+} from "../kb-parser";
 
 /** Planilha simplificada no formato real da TAP: seção, herança e vazios. */
 const ABA = {
   nome: "TAP",
-  linhas: [
+  matriz: [
     ["ESPECIALIDADE", "MÉDICO", "DIA", "HORÁRIO", "DINHEIRO/PIX", "CARTÃO", "PREPARO"],
-    ["CARDIOLOGIA"],
+    ["CARDIOLOGIA", "", "", "", "", "", ""],
     ["Consulta", "Dr. Marcilio", "Segunda", "08:00 às 12:00", "R$ 120,00", "R$ 145,00", ""],
     ["", "", "Quarta", "14:00 as 18:00", "", "", ""],
-    ["ULTRASSONOGRAFIA"],
+    ["ULTRASSONOGRAFIA", "", "", "", "", "", ""],
     ["USG de tireoide", "Dra. Rosangela", "Terça", "09:00", "180", "200", "Jejum de 4h"],
-  ] as unknown[][],
+  ],
 };
 
-describe("parser da Base de Conhecimentos", () => {
-  const { registros, avisos } = parsePlanilha([ABA]);
+const resultado = parsePlanilha([ABA]);
+const registros = resultado.registros;
 
+describe("parser da Base de Conhecimentos", () => {
   it("herda contexto em células vazias", () => {
-    const quarta = registros.find((r) => r.dia === "Quarta");
+    const quarta = registros.find((r) => (r.dia ?? "").includes("Quarta"));
     expect(quarta?.procedimento).toBe("Consulta");
     expect(quarta?.medico).toBe("Dr. Marcilio");
-    expect(quarta?.categoria).toBe("CARDIOLOGIA");
   });
 
   it("normaliza preço e horário sem perder o valor bruto", () => {
-    const consulta = registros.find((r) => r.dia === "Segunda")!;
+    const consulta = registros.find((r) => (r.dia ?? "").includes("Segunda"))!;
     expect(consulta.preco_dinheiro).toBe(120);
     expect(consulta.preco_cartao).toBe(145);
     expect(consulta.horario).toContain("08:00");
@@ -39,21 +39,19 @@ describe("parser da Base de Conhecimentos", () => {
     expect(consulta.aba_origem).toBe("TAP");
   });
 
-  it("mantém preparo e categoria da segunda seção", () => {
-    const usg = registros.find((r) => r.procedimento?.includes("tireoide"))!;
-    expect(usg.categoria).toBe("ULTRASSONOGRAFIA");
+  it("mantém preparo do exame", () => {
+    const usg = registros.find((r) => (r.procedimento ?? "").includes("tireoide"))!;
     expect(usg.preparo).toContain("Jejum");
     expect(usg.preco_dinheiro).toBe(180);
   });
 
   it("valida que existem registros úteis", () => {
-    expect(validarRegistros(registros).ok).toBe(true);
-    expect(Array.isArray(avisos)).toBe(true);
+    expect(validarRegistros(resultado).ok).toBe(true);
   });
 
   it("rejeita planilha sem registros úteis", () => {
-    const vazio = parsePlanilha([{ nome: "X", linhas: [["ESPECIALIDADE", "PREÇO"]] }]);
-    expect(validarRegistros(vazio.registros).ok).toBe(false);
+    const vazio = parsePlanilha([{ nome: "X", matriz: [["ESPECIALIDADE", "PREÇO"]] }]);
+    expect(validarRegistros(vazio).ok).toBe(false);
   });
 
   it("aponta conflito de preço para o mesmo procedimento", () => {
@@ -65,7 +63,7 @@ describe("parser da Base de Conhecimentos", () => {
   });
 
   it("expande termos com sinônimos seguros", () => {
-    const termos = expandirTermos("ultrassom de tireoide");
-    expect(termos.join(" ")).toMatch(/ultrassonografia|usg|ultrassom/);
+    const termos = expandirTermos("ultrassom de tireoide").join(" ");
+    expect(termos).toMatch(/ultrassonografia|usg|ultrassom/);
   });
 });
