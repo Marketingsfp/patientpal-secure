@@ -46,6 +46,8 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { chatNina } from "@/lib/nina.functions";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
 import NinaAprendizado from "@/components/nina/NinaAprendizado";
+import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
+
 import {
   obterWhatsappConfig,
   salvarWhatsappConfig,
