@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { documentoTomadorValido } from "@/lib/nfse-tomador";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface TomadorPayload {
   nome: string;
@@ -143,6 +145,11 @@ export function usePickTomador() {
   // nome de um dependente. Pré-preenchemos com o nome do paciente do
   // agendamento como sugestão — o usuário pode limpar ou trocar antes de emitir.
   const [dependenteAtendido, setDependenteAtendido] = useState<string>("");
+  // Cadastro escolhido na busca do terceiro. Guardado só para o campo de busca
+  // continuar mostrando o nome selecionado — a verdade do que será emitido são
+  // os campos do formulário, que seguem editáveis depois do preenchimento.
+  const [terceiroCadastro, setTerceiroCadastro] = useState<PatientOption | null>(null);
+  const [carregandoCadastro, setCarregandoCadastro] = useState(false);
   const resolverRef = useRef<((v: TomadorPayload | null) => void) | null>(null);
 
   const pick = useCallback(async (input: PickTomadorInput): Promise<TomadorPayload | null> => {
@@ -167,12 +174,60 @@ export function usePickTomador() {
       uf: "",
       dependenteAtendido: "",
     });
+    setTerceiroCadastro(null);
+    setCarregandoCadastro(false);
     setDependenteAtendido(input.paciente?.nome ?? "");
     return new Promise<TomadorPayload | null>((resolve) => {
       resolverRef.current = resolve;
       setOpen(true);
     });
   }, []);
+
+  /**
+   * Puxa o cadastro escolhido na busca e preenche o formulário do terceiro.
+   *
+   * A busca de pacientes devolve só os campos de identificação, sem endereço —
+   * por isso lemos a ficha completa aqui. O terceiro pagador quase sempre já é
+   * um cadastro da clínica (pai, mãe, cônjuge), então redigitar nome, CPF e
+   * endereço à mão era retrabalho e fonte de erro de digitação no XML.
+   */
+  const preencherComCadastro = async (p: PatientOption | null) => {
+    setTerceiroCadastro(p);
+    setErro("");
+    if (!p) return;
+    setCarregandoCadastro(true);
+    const { data, error } = await supabase
+      .from("pacientes")
+      .select("nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+      .eq("id", p.id)
+      .maybeSingle();
+    setCarregandoCadastro(false);
+    if (error || !data) {
+      // Mesmo sem a ficha completa, o que a busca já trouxe adianta a digitação.
+      setTerceiro((t) => ({
+        ...t,
+        nome: p.nome ?? t.nome,
+        cpfCnpj: (p.cpf ?? "").replace(/\D/g, "") || t.cpfCnpj,
+        email: p.email ?? t.email,
+      }));
+      setErro(
+        "Não foi possível ler o endereço do cadastro. Confira e complete os campos abaixo antes de emitir.",
+      );
+      return;
+    }
+    setTerceiro((t) => ({
+      ...t,
+      nome: data.nome ?? "",
+      cpfCnpj: (data.cpf ?? "").replace(/\D/g, ""),
+      email: data.email ?? "",
+      cep: data.cep ?? "",
+      logradouro: data.logradouro ?? "",
+      numero: data.numero ?? "",
+      bairro: data.bairro ?? "",
+      municipio: data.cidade ?? "",
+      uf: (data.estado ?? "").toUpperCase(),
+    }));
+  };
 
   const confirm = () => {
     const valorEmitir = +(Number(valorTexto) || 0).toFixed(2);
@@ -307,6 +362,21 @@ export function usePickTomador() {
 
         {modo === "terceiro" && (
           <div className="space-y-3 border-t pt-3">
+            <div className="space-y-1">
+              <Label>Buscar cadastro (nome, CPF ou prontuário)</Label>
+              <PatientSearchInput
+                value={terceiroCadastro}
+                onSelect={(p) => {
+                  void preencherComCadastro(p);
+                }}
+                placeholder="Digite o nome, CPF ou prontuário de quem vai pagar…"
+              />
+              <p className="text-xs text-muted-foreground">
+                {carregandoCadastro
+                  ? "Buscando os dados do cadastro…"
+                  : "Opcional: escolha um cadastro para preencher os campos abaixo. Tudo continua editável."}
+              </p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2 space-y-1">
                 <Label>Nome / Razão social *</Label>
