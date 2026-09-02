@@ -67,3 +67,77 @@ describe("parser da Base de Conhecimentos", () => {
     expect(termos).toMatch(/ultrassonografia|usg|ultrassom/);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Regressão: célula com MÚLTIPLOS dias (bug "SEG / QUA" -> só quarta)  */
+/* ------------------------------------------------------------------ */
+
+import { interpretarDias, relacionarDiasHorarios, normalizarDia } from "../kb-parser";
+
+describe("interpretação de múltiplos dias", () => {
+  const casos: Array<[string, string[]]> = [
+    ["SEG / QUA", ["Segunda-feira", "Quarta-feira"]],
+    ["TER / QUI / SEX", ["Terça-feira", "Quinta-feira", "Sexta-feira"]],
+    ["SEG/TER/SEX", ["Segunda-feira", "Terça-feira", "Sexta-feira"]],
+    [
+      "SEG À SEX",
+      ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira"],
+    ],
+    [
+      "SEG À SAB",
+      [
+        "Segunda-feira",
+        "Terça-feira",
+        "Quarta-feira",
+        "Quinta-feira",
+        "Sexta-feira",
+        "Sábado",
+      ],
+    ],
+    ["TER/QUA/SAB", ["Terça-feira", "Quarta-feira", "Sábado"]],
+    ["SEG DE 15 EM 15 DIAS / QUI", ["Segunda-feira", "Quinta-feira"]],
+    ["SEG, QUA", ["Segunda-feira", "Quarta-feira"]],
+    ["SEG E QUA", ["Segunda-feira", "Quarta-feira"]],
+    ["2ª e 4ª", ["Segunda-feira", "Quarta-feira"]],
+  ];
+
+  for (const [entrada, esperado] of casos) {
+    it(`interpreta "${entrada}"`, () => {
+      const r = interpretarDias(entrada);
+      expect(r.dias.map((d) => d.dia)).toEqual(esperado);
+      expect(r.dias_original).toBe(entrada);
+    });
+  }
+
+  it("preserva a regra adicional do dia", () => {
+    const r = interpretarDias("SEG DE 15 EM 15 DIAS / QUI");
+    expect(r.dias[0]!.regra).toBe("de 15 em 15 dias");
+    expect(r.dias[1]!.regra).toBeNull();
+  });
+
+  it("mantém a relação posicional dia ↔ horário", () => {
+    const dias = relacionarDiasHorarios(interpretarDias("SEG / QUI").dias, "2ª 13:00 / 5ª 07:00");
+    expect(dias.find((d) => d.dia === "Segunda-feira")?.horario).toBe("13:00");
+    expect(dias.find((d) => d.dia === "Quinta-feira")?.horario).toBe("07:00");
+  });
+
+  it("bug do caso real: médico com SEG / QUA guarda os DOIS dias", () => {
+    const parsed = parsePlanilha([
+      {
+        nome: "TAP",
+        matriz: [
+          ["ESPECIALIDADE", "MÉDICO", "DIA", "HORÁRIO", "DINHEIRO/PIX", "CARTÃO"],
+          ["CLINICO GERAL", "ANDRE LUIS LIMA DA SILVA", "SEG / QUA", "07:00", "120", "145"],
+        ],
+      },
+    ]);
+    const reg = parsed.registros.find((r) => (r.medico ?? "").includes("ANDRE"))!;
+    const dias = (reg.extras as any).dias.map((d: any) => d.dia);
+    expect(dias).toContain("Segunda-feira");
+    expect(dias).toContain("Quarta-feira");
+    expect(reg.dia).toContain("Segunda-feira");
+    expect(reg.dia).toContain("Quarta-feira");
+    expect((reg.extras as any).dia_original).toBe("SEG / QUA");
+    expect(normalizarDia("SEG / QUA")).toBe("Segunda-feira e Quarta-feira");
+  });
+});
