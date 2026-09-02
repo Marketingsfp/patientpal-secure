@@ -57,6 +57,13 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
+  // Sem isto o TanStack Router NÃO remonta o componente quando só o
+  // `$agendamentoId` muda — ele reaproveita a mesma instância. Todo o estado
+  // clínico (SOAP, prescrição, CIDs, exames, transcrição, CPF do paciente)
+  // continuava em memória do atendimento anterior, e o médico podia imprimir
+  // a receita do paciente A com o cabeçalho do paciente B. Trocar de
+  // atendimento agora zera a tela, como se fosse aberta do começo.
+  remountDeps: ({ params }) => params.agendamentoId,
   head: () => ({ meta: [{ title: "Atendimento — ClinicaOS" }] }),
   validateSearch: (s: Record<string, unknown>): { from?: "agenda-v2" } => ({
     from: s.from === "agenda-v2" ? ("agenda-v2" as const) : undefined,
@@ -171,10 +178,18 @@ function AtendimentoEditorPage() {
   const [prescItens, setPrescItens] = useState<ItemPrescricao[]>([]);
   const [atestadoDias, setAtestadoDias] = useState("1");
   const [examesTexto, setExamesTexto] = useState("");
+  // Guarda o `id` junto com os dados: é ele que prova, na hora de imprimir,
+  // que o CPF e a data de nascimento no papel são do paciente deste
+  // atendimento — e não sobra da tela anterior.
   const [paciente, setPaciente] = useState<{
+    id: string;
     cpf: string | null;
     data_nascimento: string | null;
   } | null>(null);
+  // Prontuário já gravado para ESTE agendamento. Enquanto não existia, cada
+  // clique em "Finalizar atendimento" criava uma linha nova no banco e a tela
+  // reabria em branco — parecia que nada tinha sido salvo.
+  const [prontuarioId, setProntuarioId] = useState<string | null>(null);
   const [clinicaDados, setClinicaDados] = useState<DadosClinicaA4 | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
   const rascunhoRestaurado = useRef(false);
@@ -326,13 +341,21 @@ function AtendimentoEditorPage() {
   // Dados do paciente (CPF/idade) para os documentos A4.
   useEffect(() => {
     const pid = agendamento?.paciente_id;
+    // Descarta imediatamente o que estiver em memória de outro paciente. Sem
+    // isto, entre a troca de atendimento e a chegada da consulta a tela ficava
+    // com o nome do paciente novo e o CPF do anterior.
+    setPaciente((p) => (p && p.id === pid ? p : null));
     if (!pid) return;
+    // `cancelado` protege contra resposta que chega fora de ordem: a consulta
+    // lenta de um paciente não pode sobrescrever a do paciente aberto agora.
+    let cancelado = false;
     (async () => {
       const { data, error } = await supabase
         .from("pacientes")
         .select("cpf, data_nascimento")
         .eq("id", pid)
         .maybeSingle();
+      if (cancelado) return;
       if (error) {
         console.error("[atendimento] falha ao carregar dados do paciente", error);
         // `id` fixo: se a consulta falhar de novo (realtime, remontagem), o
@@ -343,9 +366,61 @@ function AtendimentoEditorPage() {
         });
         return;
       }
-      setPaciente((data as never) ?? null);
+      setPaciente({
+        id: pid,
+        cpf: data?.cpf ?? null,
+        data_nascimento: data?.data_nascimento ?? null,
+      });
     })();
+    return () => {
+      cancelado = true;
+    };
   }, [agendamento?.paciente_id]);
+
+  // Traz de volta o prontuário já gravado deste atendimento. É o que faz o
+  // médico reabrir a consulta e enxergar o que escreveu, em vez de uma tela em
+  // branco que sugere que a gravação falhou.
+  useEffect(() => {
+    if (!agendamentoId) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("prontuarios")
+        .select(
+          "id, queixa_principal, historia_doenca, exame_fisico, hipotese_diagnostica, conduta, prescricao, observacoes",
+        )
+        .eq("agendamento_id", agendamentoId)
+        .order("data", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelado) return;
+      if (error) {
+        console.error("[atendimento] falha ao carregar o prontuário deste atendimento", error);
+        // Sem esta informação um novo "Finalizar" criaria uma segunda linha
+        // para a mesma consulta. Melhor avisar do que duplicar o registro.
+        toast.warning("Não foi possível verificar se este atendimento já tem prontuário.", {
+          id: "atendimento-prontuario-existente",
+          description: "Recarregue a página antes de finalizar para não duplicar o registro.",
+        });
+        return;
+      }
+      if (!data) return;
+      setProntuarioId(data.id);
+      // Só preenche campo que ainda está vazio: um rascunho recuperado do
+      // navegador é mais recente que o gravado e não pode ser sobrescrito.
+      setSoap((s) => ({
+        queixa_principal: s.queixa_principal || (data.queixa_principal ?? ""),
+        historia_doenca: s.historia_doenca || (data.historia_doenca ?? ""),
+        exame_fisico: s.exame_fisico || (data.exame_fisico ?? ""),
+        hipotese_diagnostica: s.hipotese_diagnostica || (data.hipotese_diagnostica ?? ""),
+        conduta: s.conduta || (data.conduta ?? ""),
+        prescricao: s.prescricao || (data.prescricao ?? ""),
+      }));
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [agendamentoId]);
 
   // Dados da clínica (cabeçalho dos documentos A4).
   useEffect(() => {
@@ -642,6 +717,16 @@ function AtendimentoEditorPage() {
       toast.error("Paciente não identificado");
       return;
     }
+    // Trava de identidade: o prontuário só pode ser gravado quando o paciente
+    // em memória é comprovadamente o do agendamento aberto na barra de
+    // endereço. Se por qualquer motivo os dois divergirem, é melhor recusar do
+    // que gravar a consulta de um paciente na ficha de outro.
+    if (agendamento?.id !== agendamentoId) {
+      toast.error("Os dados do atendimento não conferem com a tela aberta.", {
+        description: "Recarregue a página antes de salvar.",
+      });
+      return;
+    }
     if (pagamento && !pagamento.pago) {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
       return;
@@ -649,7 +734,7 @@ function AtendimentoEditorPage() {
     setLoading("salvar");
     try {
       const cid = clinicaAtual.clinica_id;
-      const { error } = await supabase.from("prontuarios").insert({
+      const campos = {
         clinica_id: cid,
         paciente_id: pacienteId,
         medico_id: medico?.id ?? null,
@@ -657,7 +742,6 @@ function AtendimentoEditorPage() {
         // não tinham como ser distinguidas — nenhum campo ligava o
         // prontuário de volta ao agendamento que o originou.
         agendamento_id: agendamentoId,
-        data: new Date().toISOString(),
         queixa_principal: soap.queixa_principal || null,
         historia_doenca: soap.historia_doenca || null,
         exame_fisico: soap.exame_fisico || null,
@@ -665,8 +749,27 @@ function AtendimentoEditorPage() {
         conduta: soap.conduta || null,
         prescricao: soap.prescricao || null,
         observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
-      } as never);
+      };
+      // Uma consulta = um prontuário. Salvar de novo corrige o que já existe
+      // em vez de criar outra linha: antes, cada clique gerava um registro
+      // novo e o histórico do paciente enchia de cópias da mesma consulta.
+      // `.select("id")` é o que prova que a gravação passou pelas regras de
+      // acesso do banco — sem ele um bloqueio voltava como "sucesso" vazio.
+      const tabela = supabase.from("prontuarios");
+      const { data: gravado, error } = prontuarioId
+        ? await tabela
+            .update(campos as never)
+            .eq("id", prontuarioId)
+            .select("id")
+        : await tabela.insert({ ...campos, data: new Date().toISOString() } as never).select("id");
       if (error) throw error;
+      const linhaGravada = (gravado ?? [])[0] as { id: string } | undefined;
+      if (!linhaGravada) {
+        throw new Error(
+          "O prontuário não foi gravado. Verifique se o seu usuário tem permissão de médico ou admin nesta clínica e tente de novo.",
+        );
+      }
+      setProntuarioId(linhaGravada.id);
 
       // Falhas de rede daqui em diante NÃO desfazem o prontuário (ele já está
       // gravado e é o registro clínico que importa), mas precisam aparecer para
@@ -727,10 +830,27 @@ function AtendimentoEditorPage() {
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
       }
 
+      // Agora que salvar de novo corrige o prontuário em vez de criar outro, o
+      // trecho abaixo pode rodar duas vezes para a mesma consulta. Sem esta
+      // checagem o repasse do médico seria contado em dobro no Financeiro.
+      const { data: finExist, error: erroFinExist } = await supabase
+        .from("fin_atendimentos")
+        .select("id")
+        .eq("agendamento_id", agendamentoId)
+        .limit(1)
+        .maybeSingle();
+      if (erroFinExist) {
+        console.error("[atendimento] falha ao verificar o registro financeiro", erroFinExist);
+        valorConhecido = false;
+        falhas.push(
+          "não foi possível verificar o registro financeiro deste atendimento, e o repasse não foi gerado",
+        );
+      }
+
       // Só cria fin_atendimentos quando NÃO houver fin_lancamentos vinculado
       // ao agendamento — caso contrário duplicaria o registro no Financeiro
       // (o repasse já vive em fin_lancamentos gerado no caixa).
-      if (valorConhecido && valorTotal > 0 && !lancExist) {
+      if (valorConhecido && valorTotal > 0 && !lancExist && !finExist) {
         const { error: erroFin } = await supabase.from("fin_atendimentos").insert({
           clinica_id: cid,
           paciente_id: pacienteId,
@@ -809,6 +929,21 @@ function AtendimentoEditorPage() {
   };
 
   function imprimirA4(tipo: "receita" | "exames" | "atestado" | "conduta") {
+    // Trava de identidade do documento impresso. O papel sai da clínica na mão
+    // do paciente: se o cabeçalho e o corpo puderem vir de atendimentos
+    // diferentes, é receita de um paciente no nome de outro. Só imprime quando
+    // o agendamento carregado é o da barra de endereço e o nome do paciente
+    // está de fato disponível.
+    if (!agendamento || agendamento.id !== agendamentoId || !pacienteId || !pacienteNome) {
+      toast.error("Os dados do paciente ainda não carregaram.", {
+        description: "Aguarde o nome aparecer no topo da tela antes de imprimir.",
+      });
+      return;
+    }
+    // CPF e nascimento vêm de outra consulta ao banco. Se o que está em
+    // memória for de outro paciente, imprime sem eles em vez de imprimir
+    // errado — o documento continua válido, só sem esses dois campos.
+    const dadosDoPaciente = paciente?.id === pacienteId ? paciente : null;
     let conteudo = "";
     let rodapeTexto: string | null = null;
     if (tipo === "receita") {
@@ -845,8 +980,8 @@ function AtendimentoEditorPage() {
       },
       paciente: {
         nome: pacienteNome,
-        cpf: paciente?.cpf ?? null,
-        dataNascimento: paciente?.data_nascimento ?? null,
+        cpf: dadosDoPaciente?.cpf ?? null,
+        dataNascimento: dadosDoPaciente?.data_nascimento ?? null,
       },
       conteudo,
       rodapeTexto,

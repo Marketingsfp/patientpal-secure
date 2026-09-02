@@ -39,8 +39,30 @@ interface Prontuario {
   observacoes: string | null;
 }
 type Form = Omit<Prontuario, "id">;
-const EMPTY: Form = {
-  data: new Date().toISOString().slice(0, 16),
+
+/**
+ * Converte uma data para o texto que o campo "datetime-local" entende.
+ *
+ * `toISOString()` devolve o horário de Greenwich. Usar aquele texto direto no
+ * campo jogava o horário três horas para a frente: uma consulta das 14h era
+ * gravada como 17h, e ao editar de novo pulava mais três horas. Descontar o
+ * fuso antes deixa o campo mostrando a hora do relógio da clínica.
+ */
+function paraCampoLocal(valor: Date | string): string {
+  const d = typeof valor === "string" ? new Date(valor) : valor;
+  if (Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+/**
+ * Formulário em branco. É uma função, e não um objeto fixo, porque a data
+ * precisa ser a de agora: num computador que fica dias com o sistema aberto,
+ * um objeto fixo faria todo prontuário novo nascer com a data em que a página
+ * foi carregada.
+ */
+const formVazio = (): Form => ({
+  data: paraCampoLocal(new Date()),
   paciente_id: "",
   medico_id: null,
   queixa_principal: "",
@@ -50,7 +72,7 @@ const EMPTY: Form = {
   historia_doenca: "",
   exame_fisico: "",
   observacoes: "",
-};
+});
 
 function ProntuariosPage() {
   const { clinicaAtual } = useClinica();
@@ -96,9 +118,9 @@ function ProntuariosPage() {
           ),
         },
       ]}
-      emptyForm={EMPTY}
+      emptyForm={formVazio}
       toForm={(r) => ({
-        data: r.data.slice(0, 16),
+        data: paraCampoLocal(r.data),
         paciente_id: r.paciente_id,
         medico_id: r.medico_id,
         queixa_principal: r.queixa_principal ?? "",

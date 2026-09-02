@@ -46,8 +46,15 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   subtitle?: string;
   icon: ReactNode;
   columns: ColumnDef<T>[];
-  /** Default value for the form when creating a new row. */
-  emptyForm: F;
+  /**
+   * Default value for the form when creating a new row.
+   *
+   * Pode ser uma função quando algum campo depende do momento da abertura
+   * (data/hora de agora, por exemplo). Um objeto fixo é calculado uma única
+   * vez, e num computador de recepção que fica dias com a tela aberta o
+   * cadastro novo nascia com a data em que a página foi carregada.
+   */
+  emptyForm: F | (() => F);
   /** Convert row to form values when editing. */
   toForm: (row: T) => F;
   /** Convert form values into the payload for insert/update (clinica_id is added automatically). */
@@ -98,12 +105,14 @@ export function SimpleCrud<T extends { id: string }, F>({
   premium,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
+  const novoForm = (): F =>
+    typeof emptyForm === "function" ? (emptyForm as () => F)() : emptyForm;
   const [items, setItems] = useState<T[]>([]);
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
-  const [form, setForm] = useState<F>(emptyForm);
+  const [form, setForm] = useState<F>(() => novoForm());
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -142,7 +151,7 @@ export function SimpleCrud<T extends { id: string }, F>({
 
   const openNew = () => {
     setEditing(null);
-    setForm(emptyForm);
+    setForm(novoForm());
     setOpen(true);
   };
   const openEdit = (r: T) => {
