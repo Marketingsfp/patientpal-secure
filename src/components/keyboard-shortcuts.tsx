@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getTurboMode, isTypingTarget } from "@/lib/turbo-mode";
+import { abrirTabelaValores } from "@/lib/tabela-valores/abrir";
 
 /**
  * Atalhos globais de teclado para reduzir o uso do mouse.
@@ -150,6 +151,15 @@ export function KeyboardShortcuts() {
         }
       }
 
+      // Alt+V → abre a Tabela de Valores por cima da tela atual.
+      // Alt (e não uma letra solta) porque a recepção digita o tempo todo em
+      // campos de busca e nome de paciente.
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        abrirTabelaValores();
+        return;
+      }
+
       // Alt+1..9 → atalho para itens do menu lateral
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= "1" && e.key <= "9") {
         const idx = Number(e.key) - 1;
@@ -204,6 +214,7 @@ function ShortcutsHelpDialog({
         items: [
           { keys: ["?"], desc: "Abrir / fechar este painel" },
           { keys: ["/"], desc: "Focar busca rápida (paciente, etc.)" },
+          { keys: ["Alt", "V"], desc: "Abrir a Tabela de Valores (consulta de preços)" },
           { keys: ["Esc"], desc: "Fechar diálogos abertos" },
           { keys: ["Enter"], desc: "Confirmar ação principal do diálogo" },
         ],

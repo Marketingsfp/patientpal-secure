@@ -57,6 +57,10 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/crm": "crm",
   "/app/alertas-enfermagem": "alertas-enfermagem",
   "/app/consulta-rapida": "consulta-rapida",
+  // Consulta de preços do balcão. Só leitura, e o mesmo conteúdo já visível
+  // em "Informações rápidas" — por isso reaproveita aquele módulo em vez de
+  // criar uma permissão nova que precisaria ser liberada perfil por perfil.
+  "/app/tabela-valores": "consulta-rapida",
   "/app/nina": "nina",
   "/app/odontologia": "odontologia",
   "/app/odontologia/orcamentos": "odontologia",

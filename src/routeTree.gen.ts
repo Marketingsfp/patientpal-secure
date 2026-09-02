@@ -51,6 +51,7 @@ import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
 import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
+import { Route as AuthenticatedAppTabelaValoresRouteImport } from './routes/_authenticated/app.tabela-valores'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRevisaoConvenioRouteImport } from './routes/_authenticated/app.revisao-convenio'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
@@ -380,6 +381,12 @@ const AuthenticatedAppTiposServicoRoute =
   AuthenticatedAppTiposServicoRouteImport.update({
     id: '/tipos-servico',
     path: '/tipos-servico',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppTabelaValoresRoute =
+  AuthenticatedAppTabelaValoresRouteImport.update({
+    id: '/tabela-valores',
+    path: '/tabela-valores',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppSetoresRoute = AuthenticatedAppSetoresRouteImport.update({
@@ -1137,6 +1144,7 @@ export interface FileRoutesByFullPath {
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/tabela-valores': typeof AuthenticatedAppTabelaValoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
@@ -1290,6 +1298,7 @@ export interface FileRoutesByTo {
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/app/tabela-valores': typeof AuthenticatedAppTabelaValoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
@@ -1449,6 +1458,7 @@ export interface FileRoutesById {
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/revisao-convenio': typeof AuthenticatedAppRevisaoConvenioRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
+  '/_authenticated/app/tabela-valores': typeof AuthenticatedAppTabelaValoresRoute
   '/_authenticated/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
@@ -1608,6 +1618,7 @@ export interface FileRouteTypes {
     | '/app/relatorios'
     | '/app/revisao-convenio'
     | '/app/setores'
+    | '/app/tabela-valores'
     | '/app/tipos-servico'
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
@@ -1761,6 +1772,7 @@ export interface FileRouteTypes {
     | '/app/relatorios'
     | '/app/revisao-convenio'
     | '/app/setores'
+    | '/app/tabela-valores'
     | '/app/tipos-servico'
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
@@ -1919,6 +1931,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/revisao-convenio'
     | '/_authenticated/app/setores'
+    | '/_authenticated/app/tabela-valores'
     | '/_authenticated/app/tipos-servico'
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
@@ -2324,6 +2337,13 @@ declare module '@tanstack/react-router' {
       path: '/tipos-servico'
       fullPath: '/app/tipos-servico'
       preLoaderRoute: typeof AuthenticatedAppTiposServicoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/tabela-valores': {
+      id: '/_authenticated/app/tabela-valores'
+      path: '/tabela-valores'
+      fullPath: '/app/tabela-valores'
+      preLoaderRoute: typeof AuthenticatedAppTabelaValoresRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/setores': {
@@ -3320,6 +3340,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppRevisaoConvenioRoute: typeof AuthenticatedAppRevisaoConvenioRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
+  AuthenticatedAppTabelaValoresRoute: typeof AuthenticatedAppTabelaValoresRoute
   AuthenticatedAppTiposServicoRoute: typeof AuthenticatedAppTiposServicoRoute
   AuthenticatedAppTreinamentosRoute: typeof AuthenticatedAppTreinamentosRoute
   AuthenticatedAppTriagemEnfermagemRoute: typeof AuthenticatedAppTriagemEnfermagemRoute
@@ -3414,6 +3435,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppRevisaoConvenioRoute: AuthenticatedAppRevisaoConvenioRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
+  AuthenticatedAppTabelaValoresRoute: AuthenticatedAppTabelaValoresRoute,
   AuthenticatedAppTiposServicoRoute: AuthenticatedAppTiposServicoRoute,
   AuthenticatedAppTreinamentosRoute: AuthenticatedAppTreinamentosRoute,
   AuthenticatedAppTriagemEnfermagemRoute:

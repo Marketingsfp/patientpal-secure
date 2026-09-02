@@ -50,6 +50,7 @@ import {
   HeartPulse,
   Contact,
   ConciergeBell,
+  Tag,
   Briefcase,
   MapPin,
   Palmtree,
@@ -103,6 +104,7 @@ import logoSaoFranciscoCdn from "@/assets/logo-policlinica-sao-francisco-de-paul
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
+import { BotaoTabelaValores } from "@/components/tabela-valores/tabela-valores-dialog";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
@@ -375,6 +377,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
       { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
       { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
+      { to: "/app/tabela-valores", label: "Tabela de valores", icon: Tag },
       { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
       { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
       { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
@@ -966,7 +969,6 @@ function AppShellInner() {
         .filter((row) => row.items.length > 0)
     : permissionFilteredRows;
 
-
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
   // consultas de cada módulo; não substitua as permissões por um menu fixo.
@@ -1246,14 +1248,13 @@ function AppShellInner() {
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
-            {clinicaAtual &&
-              (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (
-                <img
-                  src={branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)!}
-                  alt={clinicaAtual.clinica.nome}
-                  className="hidden sm:block h-8 w-auto max-w-[150px] shrink-0 object-contain"
-                />
-              )}
+            {clinicaAtual && (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (
+              <img
+                src={branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)!}
+                alt={clinicaAtual.clinica.nome}
+                className="hidden sm:block h-8 w-auto max-w-[150px] shrink-0 object-contain"
+              />
+            )}
             {memberships.length > 0 && (
               <Select
                 value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
@@ -1294,6 +1295,9 @@ function AppShellInner() {
             <div className="hidden md:flex min-w-0 max-w-[280px] mr-1">
               <UniversalSearchBar />
             </div>
+            {/* Consulta de preços — fica no cabeçalho para a atendente
+                responder "quanto custa?" sem sair da Agenda ou da Recepção. */}
+            <BotaoTabelaValores />
             <Button
               variant="ghost"
               size="sm"
