@@ -41,6 +41,10 @@ export function textoEvento(ev: ConversaEvento): string {
         ? `Conversa transferida por ${por} para ${para}`
         : `Conversa transferida por ${por}`;
     }
+    case "IA_MEMORIA_RESETADA":
+      return "Memória da Nina foi resetada";
+    case "ATENDIMENTO_ENCERRADO":
+      return "Atendimento encerrado — a Nina reassumirá caso o paciente envie uma nova mensagem";
     case "HANDOFF_SOLICITADO":
       return "Nina solicitou atendimento humano";
     case "ENTROU_NA_FILA":
