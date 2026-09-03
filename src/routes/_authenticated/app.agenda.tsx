@@ -1683,6 +1683,8 @@ function AgendaPage() {
   const podeEditarCliente = usePodeEscrever("clientes");
   type PacInfoEdit = {
     codigo_prontuario: string;
+    /** Pasta física do arquivo da Ortodontia. Não é o prontuário. */
+    pasta_ortodontica: string;
     cpf: string;
     data_nascimento: string;
     telefone: string;
@@ -1696,6 +1698,7 @@ function AgendaPage() {
   };
   const emptyPacEdit: PacInfoEdit = {
     codigo_prontuario: "",
+    pasta_ortodontica: "",
     cpf: "",
     data_nascimento: "",
     telefone: "",
@@ -1735,6 +1738,7 @@ function AgendaPage() {
     if (pacInfo) {
       setPacEdit({
         codigo_prontuario: pacInfo.codigo_prontuario ?? "",
+        pasta_ortodontica: pacInfo.pasta_ortodontica ?? "",
         cpf: pacInfo.cpf ?? "",
         data_nascimento: pacInfo.data_nascimento ?? "",
         telefone: pacInfo.telefone ?? "",
@@ -1755,6 +1759,7 @@ function AgendaPage() {
     if (!pacInfo) return false;
     const orig: PacInfoEdit = {
       codigo_prontuario: pacInfo.codigo_prontuario ?? "",
+      pasta_ortodontica: pacInfo.pasta_ortodontica ?? "",
       cpf: pacInfo.cpf ?? "",
       data_nascimento: pacInfo.data_nascimento ?? "",
       telefone: pacInfo.telefone ?? "",
@@ -1797,6 +1802,10 @@ function AgendaPage() {
         }
       }
       const patchBase = {
+        // Pasta física da Ortodontia: campo livre, sem checagem de duplicidade
+        // (duas pessoas da mesma família podem dividir uma pasta). Vazio aqui
+        // significa mesmo "apagar", diferente do prontuário logo abaixo.
+        pasta_ortodontica: pacEdit.pasta_ortodontica.trim() || null,
         cpf: somenteDigitos(pacEdit.cpf) || null,
         data_nascimento: pacEdit.data_nascimento.trim() || null,
         telefone: somenteDigitos(pacEdit.telefone) || null,
@@ -1856,7 +1865,7 @@ function AgendaPage() {
     const { data } = await supabase
       .from("pacientes")
       .select(
-        "id,clinica_id,nome,cpf,telefone,email,data_nascimento,codigo_prontuario,numero_pasta,cep,cidade,estado,bairro,logradouro,numero,foto_url",
+        "id,clinica_id,nome,cpf,telefone,email,data_nascimento,codigo_prontuario,numero_pasta,pasta_ortodontica,cep,cidade,estado,bairro,logradouro,numero,foto_url",
       )
       .eq("id", pacienteId)
       .maybeSingle();
@@ -12014,6 +12023,25 @@ function AgendaPage() {
                   />
                   <p className="text-[12px] leading-tight text-muted-foreground">
                     {AJUDA_PRONTUARIO}
+                  </p>
+                </div>
+                {/* Pasta física do arquivo da Ortodontia — é outro número, não
+                    o prontuário. A recepção puxa a pasta na gaveta antes do
+                    atendimento, então precisa vê-la e corrigi-la aqui mesmo. */}
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Pasta Ortodôntica</Label>
+                  <Input
+                    value={pacEdit.pasta_ortodontica}
+                    onChange={(e) =>
+                      setPacEdit((s) => ({ ...s, pasta_ortodontica: e.target.value }))
+                    }
+                    placeholder="Ex.: 1220"
+                    maxLength={LIMITES.codigo}
+                    className="h-8"
+                  />
+                  <p className="text-[12px] leading-tight text-muted-foreground">
+                    Número da pasta física do arquivo da Ortodontia. Deixe em branco se o paciente
+                    não tem pasta.
                   </p>
                 </div>
                 <div className="space-y-1">
