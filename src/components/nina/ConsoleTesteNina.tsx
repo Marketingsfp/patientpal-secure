@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  ConversationSystemEvent,
+  type ConversaEvento,
+} from "@/components/nina/ConversationSystemEvent";
 
 type Lead = {
   id: string;
