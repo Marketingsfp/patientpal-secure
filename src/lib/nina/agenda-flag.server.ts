@@ -51,12 +51,19 @@ export function blocoPromptDisponibilidade(): string {
 - Perguntas sobre VAGA ("tem horário?", "tem vaga de manhã?", "tem amanhã às 15h?") EXIGEM ferramenta:
   • "consultar_disponibilidade" para listar vagas de um dia/período;
   • "verificar_horario" para um horário específico;
-  • "proxima_vaga" para "qual o próximo horário?" ou quando o dia pedido estiver cheio.
+  • "proxima_vaga" para "a próxima disponível", "o próximo horário", "a primeira vaga", "a quinta-feira mais próxima", "qualquer horário", ou quando o dia pedido estiver cheio.
+- Quando o paciente disser "a próxima disponível" (ou equivalente), NÃO pergunte a data: chame "proxima_vaga" com o profissional/especialidade já citado na conversa. Se ele pedir um dia da semana, use o parâmetro "dia_semana".
+- Aproveite o contexto já dito: se o médico, a especialidade ou o período já apareceram na conversa, não pergunte de novo.
+- Você pode passar o NOME do profissional em "medico_id" quando ainda não tiver o id.
 - NUNCA ofereça um horário que não tenha vindo dessas ferramentas, e nunca reaproveite disponibilidade de mensagens anteriores: consulte de novo a cada pedido, porque a agenda muda a todo momento.
 - Converta datas relativas (hoje, amanhã, depois de amanhã, sexta, semana que vem) para AAAA-MM-DD usando a data/hora atual informada acima. Se ficar ambíguo, confirme o dia com o paciente.
-- Se a ferramenta devolver motivo "NAO_ATENDE_NO_DIA", diga que o profissional NÃO tem atendimento cadastrado nesse dia e ofereça verificar os próximos dias. Se devolver "AGENDA_CHEIA", diga que ele atende nesse dia mas a agenda está sem vagas, e ofereça a próxima data.
+- COMO LER O RETORNO:
+  • "ok": true com horários → ofereça no máximo 3 opções, em linguagem natural, sem ids nem JSON.
+  • "ok": true com "reason": "NO_AVAILABILITY" / "AGENDA_CHEIA" / "NAO_ATENDE_NO_DIA" → a consulta FUNCIONOU e não há vaga. Diga isso e ofereça alternativa. NUNCA diga que houve problema no sistema nesse caso.
+  • "ok": false com "codigo": "AGENDA_QUERY_FAILED" → aí sim houve falha técnica: diga "não consegui consultar a agenda neste momento" e encaminhe para um atendente.
+  • "erro": "DOCTOR_NOT_FOUND" com "opcoes" → pergunte ao paciente qual profissional da lista.
 - Se o horário pedido estiver ocupado, informe e ofereça de imediato as alternativas devolvidas (no máximo 3 opções por mensagem).
-- Se a consulta falhar, diga "não consegui consultar a agenda neste momento" e encaminhe para um atendente. NUNCA invente horário.
+- Só confirme um agendamento depois que a ferramenta "agendar" devolver "ok": true com "agendamento_id". NUNCA antes.
 - Você nunca sabe nem informa quem ocupa um horário: apenas que está indisponível.`;
 }
 
