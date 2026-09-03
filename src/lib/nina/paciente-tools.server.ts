@@ -1024,7 +1024,26 @@ async function executarFerramentaInterna(
           }
           return semVaga("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
         }
+        // Primeiro horário listado é o que a Nina normalmente oferece: guarda
+        // como "oferta corrente" para o "sim" do paciente ter a que se referir.
+        {
+          const s0 = slots[0]!;
+          mutarEstado(ctx, {
+            appointment: {
+              doctor_id: s0.medico_id,
+              doctor_name: s0.medico_nome,
+              specialty: s0.especialidade ?? null,
+              date: s0.data,
+              time: s0.hora,
+              slot_inicio: s0.inicio,
+              slot_fim: s0.fim,
+              slot_confirmed_by_patient: false,
+            },
+            stage: "AWAITING_SLOT_CONFIRMATION",
+          });
+        }
         return {
+
           ok: true,
           horarios: slots.slice(0, 12).map((s) => ({
             medico_id: s.medico_id,
