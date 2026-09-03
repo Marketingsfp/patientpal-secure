@@ -77,6 +77,8 @@ export const pacienteSchema = z.object({
   responsavel_telefone: telefoneOpcional,
   responsavel_parentesco: opcional(LIMITES.nome),
   numero_pasta: opcional(LIMITES.codigo),
+  /** Pasta física de arquivo da Ortodontia. Não é o prontuário. */
+  pasta_ortodontica: opcional(LIMITES.codigo),
   codigo_prontuario: opcional(LIMITES.codigo),
   observacoes: z
     .string()

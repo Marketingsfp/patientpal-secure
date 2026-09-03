@@ -8340,6 +8340,7 @@ export type Database = {
           numero: string | null
           numero_pasta: string | null
           origem: string | null
+          pasta_ortodontica: string | null
           prontuarios_anteriores: string | null
           responsavel_cpf: string | null
           responsavel_nome: string | null
@@ -8379,6 +8380,7 @@ export type Database = {
           numero?: string | null
           numero_pasta?: string | null
           origem?: string | null
+          pasta_ortodontica?: string | null
           prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null
@@ -8418,6 +8420,7 @@ export type Database = {
           numero?: string | null
           numero_pasta?: string | null
           origem?: string | null
+          pasta_ortodontica?: string | null
           prontuarios_anteriores?: string | null
           responsavel_cpf?: string | null
           responsavel_nome?: string | null

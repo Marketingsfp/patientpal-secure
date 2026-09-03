@@ -61,6 +61,8 @@ export interface Paciente {
   nome: string;
   cpf: string | null;
   numero_pasta: string | null;
+  /** Pasta física de arquivo da Ortodontia — não é o prontuário. */
+  pasta_ortodontica?: string | null;
   codigo_prontuario?: string | null;
   /** Numeração histórica do sistema antigo. Somente leitura — nunca é gravada. */
   codigo_prontuario_anterior?: string | null;
@@ -88,6 +90,7 @@ type FormState = {
   nome: string;
   cpf: string;
   numero_pasta: string;
+  pasta_ortodontica: string;
   codigo_prontuario: string;
   telefone: string;
   telefone2: string;
@@ -112,6 +115,7 @@ const EMPTY: FormState = {
   nome: "",
   cpf: "",
   numero_pasta: "",
+  pasta_ortodontica: "",
   codigo_prontuario: "",
   telefone: "",
   telefone2: "",
@@ -382,6 +386,7 @@ export function ClienteForm({
       nome: editing.nome,
       cpf: mascaraCPF(editing.cpf ?? ""),
       numero_pasta: editing.numero_pasta ?? "",
+      pasta_ortodontica: editing.pasta_ortodontica ?? "",
       codigo_prontuario: (editing as any).codigo_prontuario ?? "",
       telefone: mascaraTelefone(editing.telefone ?? ""),
       telefone2: mascaraTelefone(editing.telefone2 ?? ""),
@@ -1133,6 +1138,7 @@ export function ClienteForm({
       responsavel_telefone: form.responsavel_telefone,
       responsavel_parentesco: form.responsavel_parentesco,
       numero_pasta: form.numero_pasta,
+      pasta_ortodontica: form.pasta_ortodontica,
       codigo_prontuario: form.codigo_prontuario,
     });
     if (!parsed.success) {
@@ -1188,6 +1194,9 @@ export function ClienteForm({
       responsavel_cpf: dados.responsavel_cpf,
       responsavel_telefone: dados.responsavel_telefone,
       responsavel_parentesco: dados.responsavel_parentesco,
+      // Pasta física da Ortodontia: a recepção precisa corrigir na hora do
+      // atendimento, então não é restrita a admin como o número de serviço.
+      pasta_ortodontica: dados.pasta_ortodontica,
       clinica_id: clinicaId,
     } as Record<string, unknown>;
     // Número de serviço / pasta: só admin pode alterar.
@@ -1364,7 +1373,7 @@ export function ClienteForm({
                     <p className="text-xs text-destructive">{errosNome["nome"]}</p>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label>Número de prontuário</Label>
                     <Input
@@ -1391,6 +1400,25 @@ export function ClienteForm({
                       disabled={!isAdmin}
                       readOnly={!isAdmin}
                     />
+                  </div>
+                  {/* Pasta física do arquivo da Ortodontia. É outro número, não
+                      o prontuário: a recepção puxa a pasta pela gaveta antes do
+                      atendimento. Fica editável por qualquer perfil que já pode
+                      editar o cadastro, porque é a recepção que o preenche. */}
+                  <div className="space-y-1">
+                    <Label>Pasta Ortodôntica</Label>
+                    <Input
+                      value={form.pasta_ortodontica}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, pasta_ortodontica: e.target.value }))
+                      }
+                      placeholder="Ex.: 1220"
+                      maxLength={LIMITES.codigo}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Número da pasta física do arquivo da Ortodontia. Deixe em branco se o paciente
+                      não tem pasta.
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

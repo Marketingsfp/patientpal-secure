@@ -4,6 +4,7 @@ import {
   Camera,
   Check,
   FileText,
+  FolderOpen,
   IdCard,
   Loader2,
   MapPin,
@@ -46,6 +47,8 @@ interface PacData {
   codigo_prontuario_anterior: string | null;
   /** Numeração legada, usada como reserva quando não há código_prontuario. */
   numero_pasta: string | null;
+  /** Pasta física do arquivo da Ortodontia. Outro número, não o prontuário. */
+  pasta_ortodontica: string | null;
   cep: string | null;
   logradouro: string | null;
   numero: string | null;
@@ -64,6 +67,7 @@ const EMPTY: PacData = {
   codigo_prontuario: null,
   codigo_prontuario_anterior: null,
   numero_pasta: null,
+  pasta_ortodontica: null,
   cep: "",
   logradouro: "",
   numero: "",
@@ -80,6 +84,9 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
   const [savingPhone, setSavingPhone] = useState(false);
   const [edited, setEdited] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [editandoPasta, setEditandoPasta] = useState(false);
+  const [pastaDraft, setPastaDraft] = useState("");
+  const [salvandoPasta, setSalvandoPasta] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
 
@@ -90,7 +97,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
       const { data: row } = await supabase
         .from("pacientes")
         .select(
-          "telefone,telefone2,cpf,data_nascimento,codigo_prontuario,codigo_prontuario_anterior,numero_pasta,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
+          "telefone,telefone2,cpf,data_nascimento,codigo_prontuario,codigo_prontuario_anterior,numero_pasta,pasta_ortodontica,cep,logradouro,numero,complemento,bairro,cidade,estado,foto_url",
         )
         .eq("id", pacienteId)
         .maybeSingle();
@@ -104,6 +111,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           codigo_prontuario: row.codigo_prontuario ?? null,
           codigo_prontuario_anterior: row.codigo_prontuario_anterior ?? null,
           numero_pasta: row.numero_pasta ?? null,
+          pasta_ortodontica: row.pasta_ortodontica ?? null,
           cep: row.cep ?? "",
           logradouro: row.logradouro ?? "",
           numero: row.numero ?? "",
@@ -147,6 +155,29 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
     }
     toast.success("Dados do paciente atualizados.");
     setEdited(false);
+  }
+
+  /**
+   * Pasta física do arquivo da Ortodontia. Grava sozinha, sem passar pelo botão
+   * "Confirmar dados": a recepção anota esse número enquanto puxa a pasta e não
+   * pode perder o que digitou por não ter clicado em confirmar.
+   */
+  async function salvarPastaOrto() {
+    const valor = pastaDraft.trim() || null;
+    setEditandoPasta(false);
+    if (valor === (data.pasta_ortodontica ?? null)) return;
+    setSalvandoPasta(true);
+    const { error } = await supabase
+      .from("pacientes")
+      .update({ pasta_ortodontica: valor })
+      .eq("id", pacienteId);
+    setSalvandoPasta(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    setData((d) => ({ ...d, pasta_ortodontica: valor }));
+    toast.success(valor ? `Pasta ortodôntica ${valor} salva.` : "Pasta ortodôntica removida.");
   }
 
   async function salvarEndereco() {
@@ -256,6 +287,61 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
           Prontuário
           <span className="font-mono font-semibold text-foreground">{prontuario ?? "—"}</span>
         </span>
+        {/* Pasta física do arquivo da Ortodontia. Fica aqui, e não só no
+            cadastro completo, porque a recepção precisa ler (e às vezes anotar)
+            esse número antes de chamar o paciente para o atendimento. Ganha
+            destaque âmbar quando preenchida, para saltar aos olhos na ficha. */}
+        {editandoPasta ? (
+          <span className="inline-flex items-center gap-1 rounded border bg-background px-2 py-1 text-[12px] leading-none text-muted-foreground">
+            <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+            Pasta orto.
+            <Input
+              autoFocus
+              value={pastaDraft}
+              onChange={(e) => setPastaDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  // Não deixa o Enter submeter a ficha do agendamento inteira;
+                  // o blur logo abaixo é quem grava.
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setPastaDraft(data.pasta_ortodontica ?? "");
+                  setEditandoPasta(false);
+                }
+              }}
+              onBlur={() => {
+                void salvarPastaOrto();
+              }}
+              placeholder="Ex.: 1220"
+              maxLength={30}
+              className="h-6 w-24 px-1 py-0 text-[12px] font-mono"
+            />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setPastaDraft(data.pasta_ortodontica ?? "");
+              setEditandoPasta(true);
+            }}
+            title="Pasta física do arquivo da Ortodontia. Clique para preencher ou corrigir."
+            className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[12px] leading-none ${
+              data.pasta_ortodontica?.trim()
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {salvandoPasta ? (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+            ) : (
+              <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+            )}
+            Pasta orto.
+            <span className="font-mono font-semibold">{data.pasta_ortodontica?.trim() || "—"}</span>
+          </button>
+        )}
         {edited && (
           <Button type="button" size="sm" onClick={salvarDadosBasicos} disabled={savingPhone}>
             {savingPhone ? (
