@@ -267,6 +267,9 @@ export const fecharConversa = createServerFn({ method: "POST" })
         resolved_at: new Date().toISOString(),
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
+        // Fim do fluxo: o estado transitório da Nina (paciente identificado,
+        // horário oferecido) morre junto com a conversa resolvida.
+        nina_fluxo_estado: null,
       })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);

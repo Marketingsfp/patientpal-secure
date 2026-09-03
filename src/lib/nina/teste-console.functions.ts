@@ -476,6 +476,7 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
         identidade_confirmada: false,
         identidade_perguntada_em: null,
         identidade_tentativas: 0,
+        nina_fluxo_estado: null,
         handoff_resumo: null,
         handoff_motivo: null,
         closed_at: agora,
