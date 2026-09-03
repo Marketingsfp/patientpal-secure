@@ -11032,6 +11032,10 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      is_gestor_de_alguma_clinica: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
