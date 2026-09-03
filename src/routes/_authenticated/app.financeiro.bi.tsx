@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, Fragment } from "react";
-import { BarChart3 } from "lucide-react";
+import { useEffect, useMemo, useState, Fragment } from "react";
+import { BarChart3, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,18 +14,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { classifyAtendimento, type AtendCat } from "@/lib/atendimento-classify";
+import {
+  DateRangeFilter,
+  computeRange,
+  type DateRange,
+  type DatePreset,
+} from "@/components/date-range-filter";
+import { dataBR } from "@/lib/financeiro/preset-periodo";
+import {
+  agruparSerie,
+  granularidadeDoIntervalo,
+  totaisDaSerie,
+  type LinhaSerieDiaria,
+  type PontoSerie,
+} from "@/lib/financeiro/bi-serie";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
   component: Page,
   head: () => ({ meta: [{ title: "BI — Financeiro" }] }),
 });
 
-interface Row {
-  mes: string;
-  Receitas: number;
-  Despesas: number;
-}
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const MESES_PT = [
   "Jan",
@@ -44,7 +52,11 @@ const MESES_PT = [
 
 function Page() {
   const { clinicaAtual } = useClinica();
-  const [data, setData] = useState<Row[]>([]);
+  // O período parte do mês corrente, como nas telas de Estatísticas e
+  // Relatórios, para a equipe não ter que reaprender o filtro em cada aba.
+  const [preset, setPreset] = useState<DatePreset>("mes");
+  const [range, setRange] = useState<DateRange>(() => computeRange("mes"));
+  const [data, setData] = useState<PontoSerie[]>([]);
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<null | "receitas" | "despesas" | "saldo">(null);
   const [atend12, setAtend12] = useState<
@@ -72,40 +84,16 @@ function Page() {
         return;
       }
       setLoading(true);
-      const since = new Date();
-      since.setMonth(since.getMonth() - 5);
-      since.setDate(1);
-      const ini = since.toISOString().slice(0, 10);
-      const fim = new Date().toISOString().slice(0, 10);
       const { data: rows } = await supabase.rpc("fin_serie_diaria", {
         p_clinica: clinicaAtual.clinica_id,
-        p_ini: ini,
-        p_fim: fim,
+        p_ini: range.from,
+        p_fim: range.to,
         p_status: "confirmado",
       });
-      const buckets: Record<string, Row> = {};
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        d.setDate(1);
-        const key = d.toISOString().slice(0, 7);
-        buckets[key] = {
-          mes: d.toLocaleDateString("pt-BR", { month: "short" }),
-          Receitas: 0,
-          Despesas: 0,
-        };
-      }
-      ((rows ?? []) as Array<{ data: string; tipo: string; total: number }>).forEach((r) => {
-        const key = r.data.slice(0, 7);
-        const b = buckets[key];
-        if (!b) return;
-        if (r.tipo === "receita") b.Receitas += Number(r.total);
-        else if (r.tipo === "despesa") b.Despesas += Number(r.total);
-      });
-      setData(Object.values(buckets));
+      setData(agruparSerie(rows as LinhaSerieDiaria[] | null, range));
       setLoading(false);
     })();
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, range.from, range.to]);
 
   useEffect(() => {
     (async () => {
@@ -180,8 +168,15 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id]);
 
-  const totalR = data.reduce((s, r) => s + r.Receitas, 0);
-  const totalD = data.reduce((s, r) => s + r.Despesas, 0);
+  const { receitas: totalR, despesas: totalD } = totaisDaSerie(data);
+  const periodoLabel = useMemo(
+    () =>
+      range.from === range.to ? dataBR(range.from) : `${dataBR(range.from)} a ${dataBR(range.to)}`,
+    [range.from, range.to],
+  );
+  // Só muda o cabeçalho da coluna da tabela de detalhe: em recorte curto cada
+  // linha é um dia, em recorte longo cada linha é um mês.
+  const granularidade = granularidadeDoIntervalo(range);
 
   return (
     <div className="space-y-6">
@@ -190,26 +185,48 @@ function Page() {
           <BarChart3 className="h-6 w-6 text-primary" />
           BI Financeiro
         </h1>
-        <p className="text-sm text-muted-foreground">Comparativo dos últimos 6 meses</p>
+        <p className="text-sm text-muted-foreground">Período: {periodoLabel}</p>
       </div>
+
+      {/* Barra de filtros: as pílulas Dia/Semana/Quinzena/Mês/Período são o
+          mesmo componente das telas de Estatísticas e Relatórios, para o
+          recorte significar exatamente a mesma coisa nas três. */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Filter className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Filtros do BI
+          </h2>
+        </div>
+        <DateRangeFilter
+          value={range}
+          preset={preset}
+          onChange={(r, p) => {
+            setRange(r);
+            setPreset(p);
+          }}
+          className="lg:items-end"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("receitas")}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Receitas (6m)</p>
+            <p className="text-sm text-muted-foreground">Receitas no período</p>
             <p className="text-2xl font-semibold text-green-600">{fmt(totalR)}</p>
             <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("despesas")}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Despesas (6m)</p>
+            <p className="text-sm text-muted-foreground">Despesas no período</p>
             <p className="text-2xl font-semibold text-red-600">{fmt(totalD)}</p>
             <p className="text-[11px] text-muted-foreground mt-1">Clique para ver detalhes</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:bg-muted/40" onClick={() => setDrill("saldo")}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Saldo (6m)</p>
+            <p className="text-sm text-muted-foreground">Saldo no período</p>
             <p
               className={`text-2xl font-semibold ${totalR - totalD >= 0 ? "text-green-600" : "text-red-600"}`}
             >
@@ -221,17 +238,22 @@ function Page() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Receitas vs Despesas</CardTitle>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>Receitas vs Despesas</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {granularidade === "dia" ? "uma barra por dia" : "uma barra por mês"} — {periodoLabel}
+            </span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           ) : (
             <MiniBarChart
-              labels={data.map((r) => r.mes)}
+              labels={data.map((r) => r.label)}
               series={[
-                { name: "Receitas", color: "#10b981", values: data.map((r) => r.Receitas) },
-                { name: "Despesas", color: "#ef4444", values: data.map((r) => r.Despesas) },
+                { name: "Receitas", color: "#10b981", values: data.map((r) => r.receitas) },
+                { name: "Despesas", color: "#ef4444", values: data.map((r) => r.despesas) },
               ]}
               height={320}
               formatY={fmt}
@@ -243,7 +265,12 @@ function Page() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Atendimentos por mês — últimos 12 meses</span>
+            <span>
+              Atendimentos por mês — últimos 12 meses
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                (histórico completo, não segue os filtros acima)
+              </span>
+            </span>
             <button
               type="button"
               onClick={() => setAtendDrill(true)}
@@ -287,16 +314,16 @@ function Page() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {drill === "receitas" && `Receitas — últimos 6 meses (${fmt(totalR)})`}
-              {drill === "despesas" && `Despesas — últimos 6 meses (${fmt(totalD)})`}
-              {drill === "saldo" && `Saldo — últimos 6 meses (${fmt(totalR - totalD)})`}
+              {drill === "receitas" && `Receitas — ${periodoLabel} (${fmt(totalR)})`}
+              {drill === "despesas" && `Despesas — ${periodoLabel} (${fmt(totalD)})`}
+              {drill === "saldo" && `Saldo — ${periodoLabel} (${fmt(totalR - totalD)})`}
             </DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mês</TableHead>
+                  <TableHead>{granularidade === "dia" ? "Dia" : "Mês"}</TableHead>
                   <TableHead className="text-right">Receitas</TableHead>
                   <TableHead className="text-right">Despesas</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
@@ -304,14 +331,14 @@ function Page() {
               </TableHeader>
               <TableBody>
                 {data.map((r) => (
-                  <TableRow key={r.mes}>
-                    <TableCell className="capitalize">{r.mes}</TableCell>
-                    <TableCell className="text-right text-green-600">{fmt(r.Receitas)}</TableCell>
-                    <TableCell className="text-right text-red-600">{fmt(r.Despesas)}</TableCell>
+                  <TableRow key={r.chave}>
+                    <TableCell className="capitalize">{r.label}</TableCell>
+                    <TableCell className="text-right text-green-600">{fmt(r.receitas)}</TableCell>
+                    <TableCell className="text-right text-red-600">{fmt(r.despesas)}</TableCell>
                     <TableCell
-                      className={`text-right font-medium ${r.Receitas - r.Despesas >= 0 ? "text-green-600" : "text-red-600"}`}
+                      className={`text-right font-medium ${r.receitas - r.despesas >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
-                      {fmt(r.Receitas - r.Despesas)}
+                      {fmt(r.receitas - r.despesas)}
                     </TableCell>
                   </TableRow>
                 ))}
