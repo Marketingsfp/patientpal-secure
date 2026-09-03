@@ -100,3 +100,25 @@ describe("composição por forma de pagamento", () => {
     expect(html).not.toContain('class="composicao"');
   });
 });
+
+describe("compactação e assinatura da folha", () => {
+  it("mantém resumo, composição e assinatura inteiros na quebra de página", () => {
+    const html = montarRelatorioHtml(base);
+    expect(html).toContain(".blocos, .assinaturas { break-inside: avoid;");
+    expect(html).toContain("tfoot { display: table-row-group; break-inside: avoid;");
+  });
+
+  it("imprime uma linha por assinatura pedida", () => {
+    const html = montarRelatorioHtml({
+      ...base,
+      assinaturas: [{ cargo: "Médico / Profissional" }, { cargo: "Responsável Financeiro" }],
+    });
+    expect(html.match(/class="assinatura"/g)?.length).toBe(2);
+    expect(html).toContain("Médico / Profissional");
+    expect(html).toContain("Assinatura e carimbo");
+  });
+
+  it("sem assinatura pedida a folha não sai com linha em branco no pé", () => {
+    expect(montarRelatorioHtml(base)).not.toContain('class="assinaturas"');
+  });
+});

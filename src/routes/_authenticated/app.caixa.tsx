@@ -78,6 +78,7 @@ import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
 import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
+import { blocoAssinaturasRelatorio, CSS_RELATORIO_A4 } from "@/lib/print-relatorio-base";
 import { ResumoFormas } from "@/components/caixa/resumo-formas";
 import { TimelineGaveta } from "@/components/caixa/timeline-gaveta";
 import {
@@ -3676,8 +3677,9 @@ function Page() {
             .join("") +
           "</ul></div>";
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-    const style =
-      "body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}";
+    // Estilo compartilhado por todos os relatórios impressos: fonte e linhas
+    // compactas para caber em uma folha, resumo e assinatura sem quebra.
+    const style = CSS_RELATORIO_A4;
     const empty =
       '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
     const html =
@@ -3695,7 +3697,7 @@ function Page() {
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
       (linhasCat || empty) +
       "</tbody></table>" +
-      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
+      '<table class="resumo"><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
       (linhasForma || empty) +
       "</tbody>" +
       '<tfoot><tr><td>TOTAL</td><td class="right">' +
@@ -3711,6 +3713,10 @@ function Page() {
       (qtd === 1 ? "" : "s") +
       "</span></div>" +
       linhasReabertura +
+      blocoAssinaturasRelatorio([
+        { cargo: "Operador do Caixa" },
+        { cargo: "Responsável Financeiro" },
+      ]) +
       "<script>window.onload=function(){window.print();}</script></body></html>";
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) {
@@ -3781,14 +3787,11 @@ function Page() {
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
       <title>Sessão de caixa</title>
       <style>
-        body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}
-        h1{font-size:18px;margin:0 0 4px;}
-        .meta{font-size:12px;color:#475569;margin-bottom:12px;}
-        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;margin-bottom:12px;}
-        .grid div{border:1px solid #e2e8f0;border-radius:6px;padding:8px;}
-        table{width:100%;border-collapse:collapse;font-size:12px;}
-        th,td{border-bottom:1px solid #e2e8f0;padding:6px;text-align:left;}
-        th{background:#f1f5f9;}
+        ${CSS_RELATORIO_A4}
+        h1{text-align:left;}
+        .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:8.5pt;margin-bottom:8px;
+          break-inside:avoid;page-break-inside:avoid;}
+        .grid div{border:1px solid #e2e8f0;border-radius:6px;padding:5px 7px;}
       </style></head><body>
       <h1>Sessão de caixa</h1>
       <div class="meta">${esc(s.user_nome ?? "—")} · ${fmtDT(s.aberto_em)} → ${fmtDT(s.fechado_em)}</div>
@@ -3801,6 +3804,7 @@ function Page() {
       <table><thead><tr>
         <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Usuário</th><th style="text-align:right;">Valor</th>
       </tr></thead><tbody>${linhas}</tbody></table>
+      ${blocoAssinaturasRelatorio([{ cargo: "Operador do Caixa" }, { cargo: "Conferido por" }])}
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
     const w = window.open("", "_blank", "width=900,height=700");

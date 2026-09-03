@@ -27,6 +27,7 @@ import { exportToExcel } from "@/lib/export-csv";
 import { hojeBR } from "@/lib/date-utils";
 import { contaPadrao, dedupContas } from "@/lib/financeiro/contas";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
+import { blocoAssinaturasRelatorio, CSS_RELATORIO_A4 } from "@/lib/print-relatorio-base";
 import {
   classificarForma,
   filtroFormaPostgrest,
@@ -1765,8 +1766,9 @@ function Page() {
       : p(fromDate) + " — " + p(toDate);
     const clinicaNome = "";
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-    const style =
-      "body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}";
+    // Estilo compartilhado por todos os relatórios impressos: fonte e linhas
+    // compactas para caber em uma folha, resumo e assinatura sem quebra.
+    const style = CSS_RELATORIO_A4;
     const html =
       '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' +
       style +
@@ -1787,7 +1789,7 @@ function Page() {
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' +
       linhasCat +
       "</tbody></table>" +
-      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Saldo da forma</th></tr></thead><tbody>' +
+      '<table class="resumo"><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Saldo da forma</th></tr></thead><tbody>' +
       linhasForma +
       "</tbody>" +
       '<tfoot><tr><td>TOTAL</td><td class="right">' +
@@ -1802,6 +1804,7 @@ function Page() {
       " registro" +
       (source.length === 1 ? "" : "s") +
       "</span></div>" +
+      blocoAssinaturasRelatorio([{ cargo: "Responsável Financeiro" }]) +
       "<script>window.onload=function(){window.print();}</script></body></html>";
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) {

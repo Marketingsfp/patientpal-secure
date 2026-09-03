@@ -13,6 +13,11 @@
 
 import { esc, headerA4 } from "./print-doc-a4";
 import { printHtmlViaIframe } from "./print-html";
+import {
+  blocoAssinaturasRelatorio,
+  CSS_ASSINATURA_RELATORIO,
+  type AssinaturaRelatorio,
+} from "./print-relatorio-base";
 
 /** Uma coluna da tabela impressa, já com o valor formatado pela tela. */
 export type ColunaImpressa = {
@@ -43,6 +48,11 @@ export type RelatorioImpresso = {
    * o fechamento.
    */
   composicao?: { titulo: string; itens: { rotulo: string; valor: string }[] };
+  /**
+   * Linhas de assinatura no pé da folha, quando o relatório é conferido e
+   * arquivado em papel. Sem isto o rodapé sai só com a data de emissão.
+   */
+  assinaturas?: AssinaturaRelatorio[];
 };
 
 const CSS_RELATORIO = `
@@ -53,53 +63,54 @@ const CSS_RELATORIO = `
   .doc { background: #fff; border: 1px solid #d4d4d8; border-radius: 10px; padding: 10mm; }
 
   header { display: flex; align-items: flex-start; justify-content: space-between;
-    gap: 12px; border-bottom: 2px solid #18181b; padding-bottom: 8px; }
-  .clinica { font-size: 18pt; font-weight: 800; line-height: 1.15;
+    gap: 12px; border-bottom: 2px solid #18181b; padding-bottom: 6px; }
+  .clinica { font-size: 15pt; font-weight: 800; line-height: 1.15;
     text-transform: uppercase; letter-spacing: .2px; }
-  .sub { font-size: 10pt; color: #52525b; margin-top: 3px; }
-  .selo { flex: none; font-size: 9.5pt; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .6px; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #1e3a8a;
+  .sub { font-size: 8.5pt; color: #52525b; margin-top: 2px; }
+  .selo { flex: none; font-size: 8pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; padding: 3px 10px; border-radius: 999px; border: 1.5px solid #1e3a8a;
     color: #1e3a8a; background: #eff6ff; }
 
-  .titulo { text-align: center; font-size: 14pt; font-weight: 800; letter-spacing: 2px;
-    text-transform: uppercase; margin: 12px 0 10px; }
+  .titulo { text-align: center; font-size: 12pt; font-weight: 800; letter-spacing: 2px;
+    text-transform: uppercase; margin: 8px 0 7px; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
   thead { display: table-header-group; }
-  tfoot { display: table-row-group; }
-  th { text-align: left; text-transform: uppercase; letter-spacing: .5px; font-size: 7.5pt;
+  tfoot { display: table-row-group; break-inside: avoid; page-break-inside: avoid; }
+  th { text-align: left; text-transform: uppercase; letter-spacing: .5px; font-size: 7pt;
     color: #3f3f46; background: #f4f4f5; border-bottom: 1.5px solid #18181b;
-    padding: 6px 5px; }
-  td { padding: 5px; border-bottom: 1px solid #e4e4e7; vertical-align: top;
+    padding: 4px 4px; }
+  td { padding: 3px 4px; border-bottom: 1px solid #e4e4e7; vertical-align: top;
     word-break: break-word; }
   th.num, td.num { text-align: right; white-space: nowrap; }
   tbody tr:nth-child(even) td { background: #fafafa; }
   tfoot td { border-top: 1.5px solid #18181b; border-bottom: none;
-    font-weight: 800; font-size: 9pt; padding-top: 7px; }
+    font-weight: 800; font-size: 8.5pt; padding-top: 5px; }
   tr { break-inside: avoid; page-break-inside: avoid; }
 
   .blocos { display: flex; justify-content: flex-end; align-items: flex-start;
-    gap: 12mm; margin-top: 14px; flex-wrap: wrap; }
+    gap: 12mm; margin-top: 10px; flex-wrap: wrap; }
   .resumo { width: 90mm; }
   .resumo .linha { display: flex; justify-content: space-between; align-items: baseline;
-    gap: 14px; font-size: 10.5pt; padding: 5px 0; border-bottom: 1px dotted #a1a1aa; }
+    gap: 14px; font-size: 9.5pt; padding: 3px 0; border-bottom: 1px dotted #a1a1aa; }
   .resumo .linha:last-child { border-bottom: none; border-top: 1.5px solid #18181b;
     font-weight: 800; }
   .resumo .v { font-weight: 600; white-space: nowrap; }
 
   .composicao { width: 80mm; }
-  .composicao .tit { font-size: 8.5pt; font-weight: 800; text-transform: uppercase;
+  .composicao .tit { font-size: 8pt; font-weight: 800; text-transform: uppercase;
     letter-spacing: .6px; color: #3f3f46; border-bottom: 1.5px solid #18181b;
-    padding-bottom: 4px; }
+    padding-bottom: 3px; }
   .composicao .linha { display: flex; justify-content: space-between; align-items: baseline;
-    gap: 12px; font-size: 9.5pt; padding: 4px 0; border-bottom: 1px dotted #d4d4d8; }
+    gap: 12px; font-size: 8.5pt; padding: 2px 0; border-bottom: 1px dotted #d4d4d8; }
   .composicao .linha:last-child { border-bottom: none; }
   .composicao .v { font-weight: 600; white-space: nowrap; }
 
-  .vazio { text-align: center; font-size: 11pt; color: #52525b; padding: 20px 0; }
+  .vazio { text-align: center; font-size: 10pt; color: #52525b; padding: 14px 0; }
 
-  .rodape { text-align: center; font-size: 8pt; color: #71717a; margin-top: 16px;
-    border-top: 1px solid #e4e4e7; padding-top: 7px; }
+  .rodape { text-align: center; font-size: 7.5pt; color: #71717a; margin-top: 10px;
+    border-top: 1px solid #e4e4e7; padding-top: 6px; }
+${CSS_ASSINATURA_RELATORIO}
 
   @media print {
     @page { size: A4 landscape; margin: 8mm; }
@@ -107,7 +118,9 @@ const CSS_RELATORIO = `
     html { background: #fff; }
     .folha { max-width: none; margin: 0; padding: 0; }
     .doc { border: none; border-radius: 0; padding: 0; }
-    .blocos { break-inside: avoid; page-break-inside: avoid; }
+    /* Resumo, composição, totais e assinatura descem juntos: o pior papel é
+     * o que joga só o fechamento para uma segunda folha. */
+    .blocos, .assinaturas { break-inside: avoid; page-break-inside: avoid; }
   }`;
 
 const agora = () => {
@@ -168,6 +181,7 @@ ${headerA4(r.clinicaNome, `Relatório do período ${r.periodo}`, { texto: "Relat
         <tfoot>${rodapeTabela}</tfoot>
       </table>
       ${blocos}
+      ${blocoAssinaturasRelatorio(r.assinaturas)}
       <div class="rodape">Emitido em ${esc(agora())} — ${esc(r.linhas.length.toLocaleString("pt-BR"))} registro(s)</div>
     </div>
   </div>`;
