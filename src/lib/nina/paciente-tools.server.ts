@@ -1110,7 +1110,21 @@ async function executarFerramentaInterna(
             motivo: "NAO_ATENDE_NO_DIA",
             alternativas: [],
           };
+        if (alvo)
+          mutarEstado(ctx, {
+            appointment: {
+              doctor_id: r.id,
+              doctor_name: nome,
+              date: p.data,
+              time: hora,
+              slot_inicio: alvo.inicio,
+              slot_fim: alvo.fim,
+              slot_confirmed_by_patient: false,
+            },
+            stage: "AWAITING_SLOT_CONFIRMATION",
+          });
         return {
+
           ok: true,
           medico: nome,
           medico_id: r.id,
