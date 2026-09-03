@@ -1263,11 +1263,18 @@ async function executarFerramentaInterna(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
+        const rMed = await resolverMedico(ctx.clinicaId, p.medico_id);
+        if (!rMed.ok)
+          return falha("DOCTOR_NOT_FOUND", "Não encontrei esse profissional nesta unidade.", {
+            opcoes: rMed.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })),
+          });
+        const medicoIdReal = rMed.id;
+
         const origemMarca = origemAgendamentoNina(ctx);
         const ehTeste = origemMarca === "nina_homologacao";
         // Chave de idempotência: mesma conversa + mesmo profissional + mesmo
         // horário nunca gera dois registros (índice único no banco).
-        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${p.medico_id}|${p.inicio}`;
+        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${medicoIdReal}|${p.inicio}`;
 
         // --- Idempotência: mesma intenção, mesmo horário, um único registro.
         const { data: jaExiste } = await supabaseAdmin
