@@ -82,6 +82,9 @@ export function ConsoleTesteNina() {
   // Homologação: limpar da agenda o que a Nina marcou nesta sessão.
   const [limparAgenda, setLimparAgenda] = useState(true);
   const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
+  // Estado estruturado do fluxo (homologação): mostra por que a Nina
+  // perguntou — ou deixou de perguntar — algo.
+  const [debugEstado, setDebugEstado] = useState<Record<string, unknown> | null>(null);
 
   const carregarLeads = useCallback(async () => {
     if (!clinicaId) return;
@@ -114,10 +117,13 @@ export function ConsoleTesteNina() {
         if (r.conversaId) {
           const f = (await ferramentasFn({
             data: { clinicaId, conversaId: r.conversaId },
-          })) as { eventos: EventoFerramenta[] };
+          })) as { eventos: EventoFerramenta[]; debug?: Record<string, unknown> };
           setFerramentas(f.eventos);
+          setDebugEstado(f.debug ?? null);
         } else {
           setFerramentas([]);
+      setDebugEstado(null);
+          setDebugEstado(null);
         }
       } catch (e: any) {
         mostrarErro(e);
@@ -387,6 +393,22 @@ export function ConsoleTesteNina() {
               </Button>
               </div>
             </div>
+
+            {debugEstado && (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Estado do fluxo (homologação — nunca visível ao paciente)
+                </p>
+                <div className="grid max-h-40 grid-cols-1 gap-x-4 overflow-y-auto font-mono text-[11px] leading-tight sm:grid-cols-2">
+                  {Object.entries(debugEstado).map(([k, v]) => (
+                    <div key={k}>
+                      <span className="text-muted-foreground">{k}:</span>{" "}
+                      <span>{v === null || v === undefined ? "—" : String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {ferramentas.length > 0 && (
               <div className="rounded-md border bg-muted/30 p-2">
