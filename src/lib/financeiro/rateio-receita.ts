@@ -48,6 +48,12 @@ import {
   partesDoPagamentoMisto,
   type ParteMisto,
 } from "@/lib/financeiro/formas-pagamento";
+import {
+  carregarCategorias,
+  mapaDeCategorias,
+  type CategoriaFinanceira,
+} from "@/lib/financeiro/categorias-carregar";
+import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
 import { addDias, variacao } from "@/lib/financeiro/periodos";
 
 /** O PostgREST devolve no máximo 1.000 linhas por requisição. */
@@ -70,6 +76,17 @@ export interface RateioLinha {
   procedimento: string | null;
   /** Grupo de serviço do cadastro do procedimento (pode não existir). */
   grupo: string | null;
+  /**
+   * Categoria financeira do lançamento (`fin_categorias.nome`), em caixa alta.
+   *
+   * É por ela que o seletor de Categoria da tela recorta o relatório. Vem do
+   * `categoria_id` do lançamento da agenda; o atendimento lançado à mão
+   * (`fin_atendimentos`) não tem categoria nenhuma — conferido em produção,
+   * nenhuma das 286 linhas da tabela tem `lancamento_id` de onde herdá-la —,
+   * então ele cai em `(SEM CATEGORIA)` e continua aparecendo enquanto o filtro
+   * estiver em "todas".
+   */
+  categoria_nome: string;
   receita: number;
   repasse: number;
   /** Parte do médico terceiro (dono do equipamento), quando houver. */
@@ -166,6 +183,20 @@ export interface RateioContexto {
   rotuloGrupoPorServico: Map<string, string>;
   /** nome normalizado do serviço -> tipo (fallback de repasse por categoria). */
   procTipos: Map<string, string>;
+  /**
+   * Cadastro de Financeiro → Categorias, para o seletor de Categoria da tela
+   * ter as opções antes do primeiro "Buscar". Só as de receita entram: o
+   * rateio olha atendimento, e categoria de despesa (aluguel, salários) nunca
+   * aparece numa linha dele.
+   */
+  categorias: CategoriaFinanceira[];
+  /**
+   * id → nome de TODAS as categorias, inclusive as de despesa. O seletor só
+   * mostra as de receita, mas o carimbo da linha usa o que estiver gravado no
+   * lançamento: uma linha apontando para uma categoria de despesa tem que
+   * mostrar o nome dela, não virar "(SEM CATEGORIA)" e sumir da conferência.
+   */
+  categoriaNomePorId: Map<string, string>;
   repasseMedicos: Map<string, RepasseMedico>;
   convenioPorNome: Map<string, RepasseConvenio>;
   convenioPorNomeCru: Map<string, RepasseConvenio>;
@@ -199,7 +230,7 @@ async function buscarTudo<T>(montar: () => any): Promise<T[]> {
 
 /** Carrega catálogos dos filtros + grade de repasse da clínica. */
 export async function carregarContextoRateio(clinicaId: string): Promise<RateioContexto> {
-  const [medicosRaw, especialidadesRaw, procedimentosRaw, repasseLista, mapaConvenio] =
+  const [medicosRaw, especialidadesRaw, procedimentosRaw, repasseLista, mapaConvenio, categorias] =
     await Promise.all([
       buscarTudo<Record<string, unknown>>(() =>
         supabase
@@ -223,6 +254,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
       ),
       supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId }),
       carregarMapaConvenioPacientes(clinicaId),
+      carregarCategorias(clinicaId),
     ]);
 
   const medicos: MedicoOpcao[] = medicosRaw.map((m) => ({
@@ -321,6 +353,8 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     grupoPorServico,
     rotuloGrupoPorServico,
     procTipos,
+    categorias: categorias.filter((c) => c.tipo === "receita"),
+    categoriaNomePorId: mapaDeCategorias(categorias),
     repasseMedicos,
     convenioPorNome,
     convenioPorNomeCru,
@@ -419,6 +453,8 @@ function reparte(
     observacoes?: string | null;
     /** `fin_lancamentos.composicao_pagamento` — fonte confiável do misto. */
     composicaoPagamento?: unknown;
+    /** `fin_lancamentos.categoria_id`; ausente no atendimento lançado à mão. */
+    categoriaId?: string | null;
     /** Repasse digitado à mão na tela de Atendimentos, se houver. */
     override?: number | null;
     /** Repasse já gravado na linha (atendimentos manuais antigos). */
@@ -462,6 +498,13 @@ function reparte(
     grupo: params.procedimento
       ? (ctx.rotuloGrupoPorServico.get(normRepasse(params.procedimento)) ?? null)
       : null,
+    // Caixa alta porque é assim que a categoria é comparada e exibida em todo
+    // o financeiro (ver `chaveCategoria`): o cadastro tem a mesma conta
+    // escrita "Boletos" e "BOLETOS".
+    categoria_nome:
+      (params.categoriaId ? ctx.categoriaNomePorId.get(params.categoriaId) : "")
+        ?.trim()
+        .toUpperCase() || SEM_CATEGORIA,
     receita: round2(receita),
     repasse: round2(repasse),
     terceiro: round2(terceiro),
@@ -500,7 +543,7 @@ export async function carregarRateio(
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, data, descricao, valor, valor_medico_override, convenio_modalidade, medico_id, paciente_id, agendamento_id, forma_pagamento, observacoes, composicao_pagamento, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)",
+          "id, data, descricao, valor, valor_medico_override, convenio_modalidade, categoria_id, medico_id, paciente_id, agendamento_id, forma_pagamento, observacoes, composicao_pagamento, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio)",
         )
         .eq("clinica_id", clinicaId)
         .eq("tipo", "receita")
@@ -572,6 +615,7 @@ export async function carregarRateio(
         formaPagamento: (r.forma_pagamento as string) ?? null,
         observacoes: (r.observacoes as string) ?? null,
         composicaoPagamento: r.composicao_pagamento,
+        categoriaId: (r.categoria_id as string) ?? null,
         override,
       }),
     );
@@ -612,6 +656,16 @@ export function filtrarRateio(
     return true;
   });
 }
+
+/**
+ * Categorias que apareceram nas linhas carregadas.
+ *
+ * Alimenta o seletor de Categoria da tela junto com o cadastro (ver
+ * `opcoesDeCategoria`), do mesmo jeito que `categoriasPresentes` faz na
+ * Movimentação Financeira.
+ */
+export const categoriasDoRateio = (linhas: RateioLinha[]): string[] =>
+  Array.from(new Set(linhas.map((l) => l.categoria_nome)));
 
 /** Percentual da receita que ficou com a clínica (0 quando não houve receita). */
 export const margemClinica = (receita: number, liquido: number): number =>

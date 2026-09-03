@@ -40,10 +40,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { brl, fmtDate } from "@/lib/financeiro/format";
 import { imprimirRelatorio } from "@/lib/print-relatorio-financeiro";
+import type { AssinaturaRelatorio } from "@/lib/print-relatorio-base";
 import { exportarPastaXlsx, exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
 // Relatório de Movimentação Financeira: a regra das duas visões vive no módulo
 // puro `extrato-caixa`; o acesso ao banco, em `extrato-carregar`.
 import {
+  categoriaDaLinha,
+  categoriasPresentes,
+  CATEGORIA_TRANSFERENCIA,
   colunasExtrato,
   fatiasDeEntrada,
   linhasExtrato,
@@ -53,6 +57,18 @@ import {
   type TotaisExtrato,
 } from "@/lib/financeiro/extrato-caixa";
 import { carregarMovimentacao } from "@/lib/financeiro/extrato-carregar";
+// Seletor de Categoria: o recorte que o financeiro usa para auditar uma conta
+// de cada vez. A regra é a mesma nos dois relatórios que o oferecem, e por isso
+// mora num módulo puro só dela.
+import {
+  chaveCategoria,
+  descricaoSelecao,
+  filtrarPorCategoria,
+  opcoesDeCategoria,
+  rotuloSelecao,
+  SEM_CATEGORIA,
+} from "@/lib/financeiro/filtro-categoria";
+import { carregarCategorias, type CategoriaFinanceira } from "@/lib/financeiro/categorias-carregar";
 // Sessões e Manutenções: a folha junta o pacote fechado da fisioterapia com o
 // ciclo mensal da ortodontia. A regra que separa os dois (e que impede a
 // manutenção de virar dívida acumulada) vive no módulo puro `relatorio-sessoes`;
@@ -73,6 +89,7 @@ import {
   agruparRateio,
   carregarContextoRateio,
   carregarRateio,
+  categoriasDoRateio,
   compararRateio,
   totaisRateio,
   type RateioAgruparPor,
@@ -203,6 +220,21 @@ const TITULOS: Record<Tipo, string> = {
   movimentacao: "Movimentação Financeira",
   sessoes: "Sessões e Manutenções",
 };
+
+/**
+ * Quem assina a folha impressa.
+ *
+ * Todo relatório sai com espaço para a firma de quem conferiu, porque o papel
+ * é arquivado como comprovante da conferência. O rateio leva uma segunda
+ * linha: ele também é entregue ao profissional, que confere a própria
+ * produção antes de receber, e a assinatura do financeiro sozinha não prova
+ * que ele viu o cálculo.
+ */
+const ASSINATURAS_PADRAO: AssinaturaRelatorio[] = [{ cargo: "Responsável Financeiro" }];
+const ASSINATURAS_RATEIO: AssinaturaRelatorio[] = [
+  { cargo: "Médico / Profissional" },
+  { cargo: "Responsável Financeiro" },
+];
 
 const ROTULO_COMPARACAO: Record<ModoComparacao, string> = {
   anterior: "Período imediatamente anterior",
@@ -348,6 +380,92 @@ function ComposicaoPorForma({ fatias }: { fatias: FatiaDaReceita[] }) {
   );
 }
 
+/**
+ * Seletor de Categoria da barra de filtros.
+ *
+ * É multi-escolha porque a conferência raramente é de uma conta só — "quero
+ * PARTICULAR e EXAME CARTAO CONSULTA juntos" é o pedido comum. Por isso clicar
+ * numa opção MARCA e DESMARCA sem fechar a lista; só "TODAS AS CATEGORIAS",
+ * que limpa a seleção, fecha, porque ali a escolha terminou.
+ *
+ * A seleção vazia é "todas" (ver `filtro-categoria`), então a tela nasce
+ * mostrando o relatório completo e ninguém precisa marcar nada para usá-la
+ * como sempre usou.
+ */
+function SeletorCategorias({
+  opcoes,
+  valor,
+  onChange,
+  desabilitado,
+  placeholder,
+}: {
+  /** Nomes já normalizados em caixa alta, na ordem em que devem aparecer. */
+  opcoes: string[];
+  valor: string[];
+  onChange: (valor: string[]) => void;
+  desabilitado?: boolean;
+  placeholder?: string;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const alternar = (nome: string) => {
+    const chave = chaveCategoria(nome);
+    onChange(valor.includes(chave) ? valor.filter((c) => c !== chave) : [...valor, chave]);
+  };
+  return (
+    <Popover open={aberto} onOpenChange={setAberto}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          className={cn("w-full justify-between font-normal", CAMPO)}
+          disabled={desabilitado}
+        >
+          <span className="truncate">
+            {desabilitado ? (placeholder ?? "Carregando...") : rotuloSelecao(valor)}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 w-[min(var(--radix-popover-trigger-width),24rem)] max-w-[92vw]"
+        align="start"
+      >
+        <Command>
+          <CommandInput placeholder="Buscar categoria..." />
+          <CommandList>
+            <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="TODAS AS CATEGORIAS"
+                onSelect={() => {
+                  onChange([]);
+                  setAberto(false);
+                }}
+              >
+                <Check
+                  className={cn("mr-2 h-4 w-4", valor.length === 0 ? "opacity-100" : "opacity-0")}
+                />
+                TODAS AS CATEGORIAS
+              </CommandItem>
+              {opcoes.map((nome) => (
+                <CommandItem key={nome} value={nome} onSelect={() => alternar(nome)}>
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      valor.includes(nome) ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="truncate">{nome}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** Card de fechamento do rateio, com a variação contra o período comparado. */
 function CardResumo({
   titulo,
@@ -428,6 +546,15 @@ function Page() {
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
   const [servicoAberto, setServicoAberto] = useState(false);
   const [buscaServico, setBuscaServico] = useState("");
+  // --- Filtro de Categoria (Rateio e Movimentação Financeira) --------------
+  // Recorte da MESMA lista carregada, como o sintético/analítico: marcar ou
+  // desmarcar uma categoria refaz a tabela, os totais e os cards na hora, sem
+  // ir ao banco de novo. Lista vazia = todas as categorias.
+  const [categorias, setCategorias] = useState<string[]>([]);
+  /** Cadastro de Financeiro → Categorias, para o seletor da Movimentação. */
+  const [cadastroCategorias, setCadastroCategorias] = useState<CategoriaFinanceira[]>([]);
+  const [catCarregando, setCatCarregando] = useState(false);
+  const cadastroPedido = useRef(false);
   // --- Filtro exclusivo de Sessões e Manutenções ---------------------------
   // Recorte da MESMA lista carregada, como o sintético/analítico do extrato:
   // trocar de "Tudo" para "Busca ativa" não vai ao banco de novo.
@@ -471,9 +598,10 @@ function Page() {
     sessoes?: LinhaSessao[];
   } | null>(null);
 
-  // "Agrupar por" e "Sintético/Analítico" são recortes do MESMO resultado, então
-  // ficam fora da chave: trocar qualquer um deles reorganiza a tabela na hora,
-  // sem ir ao banco de novo. O período de comparação, não: ele é outra consulta.
+  // "Agrupar por", "Sintético/Analítico" e "Categoria" são recortes do MESMO
+  // resultado, então ficam fora da chave: trocar qualquer um deles reorganiza a
+  // tabela na hora, sem ir ao banco de novo. O período de comparação, não: ele
+  // é outra consulta.
   const chaveAtual =
     tipo === "rateio"
       ? [
@@ -517,14 +645,69 @@ function Page() {
     };
   }, [tipo, clinicaAtual, ctxRateio]);
 
+  /**
+   * Cadastro de categorias para o seletor da Movimentação Financeira. O Rateio
+   * não passa por aqui: as categorias dele já vêm dentro do contexto acima,
+   * carregado junto com médicos, especialidades e serviços.
+   *
+   * Mesmo `ref` de guarda do contexto do rateio, pelo mesmo motivo: sem ele
+   * uma falha de rede deixaria o efeito num ciclo de tentativas.
+   */
+  useEffect(() => {
+    if (tipo !== "movimentacao" || !clinicaAtual) {
+      cadastroPedido.current = false;
+      return;
+    }
+    if (cadastroCategorias.length > 0 || cadastroPedido.current) return;
+    cadastroPedido.current = true;
+    let cancelado = false;
+    setCatCarregando(true);
+    carregarCategorias(clinicaAtual.clinica_id)
+      .then((lista) => {
+        if (!cancelado) setCadastroCategorias(lista);
+      })
+      .catch((e) => {
+        if (!cancelado) mostrarErro(e);
+      })
+      .finally(() => {
+        if (!cancelado) setCatCarregando(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [tipo, clinicaAtual, cadastroCategorias]);
+
+  /**
+   * Trocar de relatório zera a seleção de categorias.
+   *
+   * As listas não são as mesmas: o Rateio só vê categorias de receita, a
+   * Movimentação vê também as de despesa e a transferência entre caixas. Sem
+   * zerar, quem tivesse marcado REPASSE MEDICO na Movimentação passaria para o
+   * Rateio e veria uma tela vazia sem entender por quê.
+   */
+  useEffect(() => {
+    setCategorias([]);
+  }, [tipo]);
+
+  /** Linhas cruas do rateio, já recortadas pelas categorias escolhidas. */
   const linhasRateio = useMemo(
-    () => (atualizado && resultado?.rateio ? resultado.rateio : []),
-    [atualizado, resultado],
+    () =>
+      filtrarPorCategoria(
+        atualizado && resultado?.rateio ? resultado.rateio : [],
+        categorias,
+        (l) => l.categoria_nome,
+      ),
+    [atualizado, resultado, categorias],
   );
   /** Movimentações cruas do extrato; base dos totais e das duas visões. */
   const movsExtrato = useMemo(
-    () => (atualizado && resultado?.movimentacao ? resultado.movimentacao : []),
-    [atualizado, resultado],
+    () =>
+      filtrarPorCategoria(
+        atualizado && resultado?.movimentacao ? resultado.movimentacao : [],
+        categorias,
+        categoriaDaLinha,
+      ),
+    [atualizado, resultado, categorias],
   );
   const totaisM = useMemo(() => totaisExtrato(movsExtrato), [movsExtrato]);
   /** Linhas cruas de sessões; base dos totais e do filtro em memória. */
@@ -549,9 +732,47 @@ function Page() {
    */
   const fatiasDoExtrato = useMemo(() => fatiasDeEntrada(movsExtrato), [movsExtrato]);
   const linhasRateioComp = useMemo(
-    () => (atualizado && resultado?.rateioComp ? resultado.rateioComp : []),
-    [atualizado, resultado],
+    () =>
+      filtrarPorCategoria(
+        atualizado && resultado?.rateioComp ? resultado.rateioComp : [],
+        categorias,
+        (l) => l.categoria_nome,
+      ),
+    [atualizado, resultado, categorias],
   );
+  /** Só estes dois relatórios têm categoria em cada linha. */
+  const usaCategoria = tipo === "rateio" || tipo === "movimentacao";
+
+  /**
+   * Opções do seletor: o cadastro de Financeiro → Categorias somado ao que
+   * apareceu no período JÁ CARREGADO (sempre a lista crua, nunca a filtrada —
+   * senão marcar uma categoria apagaria as outras do próprio seletor).
+   *
+   * Os rótulos deduzidos entram fixos porque não existem no cadastro: a
+   * transferência entre caixas (sangria e suprimento) e o `(SEM CATEGORIA)`,
+   * que é onde caem os lançamentos sem `categoria_id` e os atendimentos
+   * digitados à mão.
+   */
+  const opcoesCategoria = useMemo(() => {
+    if (tipo === "rateio") {
+      return opcoesDeCategoria(
+        (ctxRateio?.categorias ?? []).map((c) => c.nome),
+        [SEM_CATEGORIA, ...categoriasDoRateio(resultado?.rateio ?? [])],
+      );
+    }
+    if (tipo === "movimentacao") {
+      return opcoesDeCategoria(
+        cadastroCategorias.map((c) => c.nome),
+        [
+          CATEGORIA_TRANSFERENCIA,
+          SEM_CATEGORIA,
+          ...categoriasPresentes(resultado?.movimentacao ?? []),
+        ],
+      );
+    }
+    return [];
+  }, [tipo, ctxRateio, cadastroCategorias, resultado]);
+
   const totaisR = useMemo(() => totaisRateio(linhasRateio), [linhasRateio]);
   const totaisComp = useMemo(() => totaisRateio(linhasRateioComp), [linhasRateioComp]);
   /**
@@ -613,11 +834,11 @@ function Page() {
     [tipo, rTipo, rAgrupar, comparacaoVisivel],
   );
 
-  // A troca de agrupamento pode encurtar a lista; voltar para a primeira página
-  // evita a tela em branco de uma página que não existe mais.
+  // A troca de agrupamento (ou de categoria) pode encurtar a lista; voltar para
+  // a primeira página evita a tela em branco de uma página que não existe mais.
   useEffect(() => {
     setPagina(1);
-  }, [rTipo, rAgrupar, sFiltro]);
+  }, [rTipo, rAgrupar, sFiltro, categorias]);
 
   // Ao escolher "Intervalo personalizado" os campos abrem preenchidos com o
   // período anterior — em branco, o comparativo nasceria comparando o período
@@ -815,6 +1036,9 @@ function Page() {
       partes.push(`Grupo: ${g?.rotulo ?? rGrupo}`);
     }
     if (rServico !== "todos") partes.push(`Serviço: ${rServico}`);
+    // Sem esta linha, uma folha com o total menor circula sem dizer por que o
+    // total é menor — que é exatamente a dúvida de quem confere.
+    if (categorias.length > 0) partes.push(descricaoSelecao(categorias));
     partes.push(rTipo === "sintetico" ? "Sintético" : "Analítico");
     partes.push(`Agrupado por ${ROTULO_AGRUPADOR[rAgrupar].toLowerCase()}`);
     return partes.join(" · ");
@@ -851,6 +1075,13 @@ function Page() {
     }
     setLoading(true);
     let data: Linha[] = [];
+    // `cruas*` e `movs` são o que a tela, o papel e a planilha usam: já
+    // recortados pelas categorias escolhidas. `brutas*` é o que fica guardado
+    // no resultado — sem recorte —, para que marcar e desmarcar categoria
+    // continue sendo um recorte em memória e não uma ida ao banco.
+    let brutasRateio: RateioLinha[] | undefined;
+    let brutasComp: RateioLinha[] | undefined;
+    let brutasMovs: MovimentacaoExtrato[] | undefined;
     let cruas: RateioLinha[] | undefined;
     let cruasComp: RateioLinha[] | undefined;
     let movs: MovimentacaoExtrato[] | undefined;
@@ -874,27 +1105,30 @@ function Page() {
               })
             : Promise.resolve([] as RateioLinha[]),
         ]);
-        cruas = atual;
-        cruasComp = anterior;
+        brutasRateio = atual;
+        brutasComp = anterior;
+        cruas = filtrarPorCategoria(atual, categorias, (l) => l.categoria_nome);
+        cruasComp = filtrarPorCategoria(anterior, categorias, (l) => l.categoria_nome);
         if (rTipo === "analitico") {
-          data = ordenarAnalitico(atual, rAgrupar) as unknown as Linha[];
+          data = ordenarAnalitico(cruas, rAgrupar) as unknown as Linha[];
         } else {
-          const grupos = agruparRateio(atual, rAgrupar);
+          const grupos = agruparRateio(cruas, rAgrupar);
           data = (comparar
             ? compararRateio(
                 grupos,
-                agruparRateio(anterior, rAgrupar),
+                agruparRateio(cruasComp, rAgrupar),
                 rAgrupar,
                 diffDias(periodoComp.de, from),
               )
             : grupos) as unknown as Linha[];
         }
       } else if (tipo === "movimentacao") {
-        movs = await carregarMovimentacao({
+        brutasMovs = await carregarMovimentacao({
           clinicaId: clinicaAtual.clinica_id,
           de: from,
           ate: to,
         });
+        movs = filtrarPorCategoria(brutasMovs, categorias, categoriaDaLinha);
         data = linhasExtrato(movs, rTipo);
       } else if (tipo === "sessoes") {
         sessoes = await carregarSessoes({
@@ -948,9 +1182,9 @@ function Page() {
       from,
       to,
       linhas: data,
-      rateio: cruas,
-      rateioComp: cruasComp,
-      movimentacao: movs,
+      rateio: brutasRateio,
+      rateioComp: brutasComp,
+      movimentacao: brutasMovs,
       sessoes,
     });
     setPagina(1);
@@ -987,6 +1221,7 @@ function Page() {
       linhasCtx.push(
         `${rTipo === "sintetico" ? "Sintético" : "Analítico"} · entradas e saídas do caixa geral`,
       );
+      linhasCtx.push(descricaoSelecao(categorias));
     }
     if (tipo === "sessoes") {
       linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
@@ -1025,7 +1260,11 @@ function Page() {
             `${TITULOS.movimentacao} — ${clinicaAtual?.clinica.nome ?? "Clínica"}`,
             `Período: ${fmtDate(from)} a ${fmtDate(to)}`,
             `${visao === "analitico" ? "Analítico" : "Sintético"} · entradas e saídas do caixa geral`,
-          ],
+            // As duas abas saem com o MESMO recorte de categoria da tela: elas
+            // são conciliadas lado a lado, e uma filtrada contra outra inteira
+            // não fecharia.
+            descricaoSelecao(categorias),
+          ].filter(Boolean),
           colunas: cols.map((c) => ({ rotulo: c.rotulo, tipo: tipoXlsx(c) })),
           linhas: linhasExtrato(res.movs, visao).map((linha) =>
             cols.map((c) => valorXlsx(c, linha[c.chave])),
@@ -1177,6 +1416,7 @@ function Page() {
             valor: brl(f.valor),
           })),
         },
+        assinaturas: ASSINATURAS_RATEIO,
       });
       return;
     }
@@ -1188,7 +1428,13 @@ function Page() {
       imprimirRelatorio({
         clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
         titulo: TITULOS.movimentacao,
-        periodo: `${periodo} · ${rTipo === "sintetico" ? "Sintético" : "Analítico"}`,
+        periodo: [
+          periodo,
+          rTipo === "sintetico" ? "Sintético" : "Analítico",
+          descricaoSelecao(categorias),
+        ]
+          .filter(Boolean)
+          .join(" · "),
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeExtrato(colunas, tm),
@@ -1197,6 +1443,7 @@ function Page() {
           titulo: "Por forma de pagamento",
           itens: resumoPorForma(res.movs).map((i) => ({ rotulo: i.rotulo, valor: brl(i.valor) })),
         },
+        assinaturas: ASSINATURAS_PADRAO,
       });
       return;
     }
@@ -1213,6 +1460,7 @@ function Page() {
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeSessoes(colunas, ts),
         resumo: resumoSessoes(ts),
+        assinaturas: ASSINATURAS_PADRAO,
       });
       return;
     }
@@ -1252,6 +1500,7 @@ function Page() {
               { rotulo: "Saldo do período", valor: brl(saldo) },
             ]
           : undefined,
+      assinaturas: ASSINATURAS_PADRAO,
     });
   };
 
@@ -1293,21 +1542,42 @@ function Page() {
               Mês, Período): as abas aplicam o intervalo sozinhas e os campos de
               data só aparecem em "Período". */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-1.5 lg:w-72">
-              <Label className={ROTULO}>Tipo de relatório</Label>
-              <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
-                <SelectTrigger className={CAMPO}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lancamentos">Lançamentos</SelectItem>
-                  <SelectItem value="atendimentos">Atendimentos</SelectItem>
-                  <SelectItem value="notas">Notas</SelectItem>
-                  <SelectItem value="rateio">Rateio da Receita</SelectItem>
-                  <SelectItem value="movimentacao">Movimentação Financeira</SelectItem>
-                  <SelectItem value="sessoes">Sessões e Manutenções</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="space-y-1.5 sm:w-72">
+                <Label className={ROTULO}>Tipo de relatório</Label>
+                <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
+                  <SelectTrigger className={CAMPO}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lancamentos">Lançamentos</SelectItem>
+                    <SelectItem value="atendimentos">Atendimentos</SelectItem>
+                    <SelectItem value="notas">Notas</SelectItem>
+                    <SelectItem value="rateio">Rateio da Receita</SelectItem>
+                    <SelectItem value="movimentacao">Movimentação Financeira</SelectItem>
+                    <SelectItem value="sessoes">Sessões e Manutenções</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Categoria fica ao lado do tipo de relatório, e não dentro do
+                  bloco de opções de cada um, porque ela é a pergunta que o
+                  financeiro faz PRIMEIRO ("quero auditar o repasse médico") —
+                  antes mesmo de escolher sintético ou analítico. */}
+              {usaCategoria && (
+                <div className="space-y-1.5 sm:w-64">
+                  <Label className={ROTULO}>Categoria</Label>
+                  {/* Enquanto o cadastro não chega o botão fica travado: uma
+                      lista com só os rótulos deduzidos (transferência e sem
+                      categoria) pareceria o cadastro inteiro da clínica. */}
+                  <SeletorCategorias
+                    opcoes={opcoesCategoria}
+                    valor={categorias}
+                    onChange={setCategorias}
+                    desabilitado={tipo === "rateio" ? !ctxRateio : catCarregando}
+                    placeholder="Carregando..."
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className={ROTULO}>Período</Label>
@@ -1322,6 +1592,13 @@ function Page() {
               />
             </div>
           </div>
+          {usaCategoria && categorias.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Mostrando só <strong>{categorias.join(", ")}</strong>. Os totais do rodapé, os cards e
+              o resumo já vêm recalculados com essa seleção, e o mesmo recorte vai para a impressão,
+              o Excel e o CSV.
+            </p>
+          )}
 
           {tipo === "rateio" && (
             <>

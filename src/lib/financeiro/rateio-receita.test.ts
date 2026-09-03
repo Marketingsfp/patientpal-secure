@@ -20,6 +20,7 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   especialidade_nome: "CARDIOLOGIA",
   procedimento: "CONSULTA",
   grupo: "Cardiologia",
+  categoria_nome: "PARTICULAR",
   receita: 100,
   repasse: 60,
   terceiro: 0,

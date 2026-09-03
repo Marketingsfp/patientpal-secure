@@ -19,6 +19,7 @@
  * do relatório não bater com o extrato do banco.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { carregarCategorias, mapaDeCategorias } from "./categorias-carregar";
 import { classificarForma, LABEL_FORMA } from "./formas-pagamento";
 import { ehLancamentoRetroativo, mapaDaGaveta, TIPOS_QUE_PESAM_NA_GAVETA } from "./retroativos";
 import type { MovimentacaoExtrato } from "./extrato-caixa";
@@ -154,16 +155,15 @@ export async function carregarMovimentacao(params: {
         .lte("created_at", `${ate}T23:59:59`)
         .order("created_at"),
     ),
-    supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaId),
+    // Mesmo cadastro que alimenta o seletor de Categoria da tela de Relatórios
+    // — ver `./categorias-carregar`.
+    carregarCategorias(clinicaId),
     supabase.from("fin_contas").select("id, nome, banco").eq("clinica_id", clinicaId),
   ]);
 
-  if (categorias.error) throw categorias.error;
   if (contas.error) throw contas.error;
 
-  const catMap = new Map(
-    ((categorias.data ?? []) as Array<{ id: string; nome: string }>).map((c) => [c.id, c.nome]),
-  );
+  const catMap = mapaDeCategorias(categorias);
   const contaMap = new Map(
     ((contas.data ?? []) as Array<{ id: string; nome: string; banco: string | null }>).map((c) => [
       c.id,

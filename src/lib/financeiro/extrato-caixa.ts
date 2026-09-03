@@ -31,9 +31,16 @@
 import type { ColunaRateio } from "./rateio-colunas";
 import type { FormaCanonica } from "./formas-pagamento";
 import { receitaPorForma, type FatiaDaReceita } from "./receita-por-forma";
+import { SEM_CATEGORIA } from "./filtro-categoria";
 
-/** Rótulo usado quando a linha não tem categoria e nem dá para deduzi-la. */
-export const SEM_CATEGORIA = "(SEM CATEGORIA)";
+/**
+ * Rótulo usado quando a linha não tem categoria e nem dá para deduzi-la.
+ *
+ * Mora em `./filtro-categoria` porque o seletor de Categoria da tela de
+ * Relatórios precisa oferecer exatamente esse mesmo rótulo como opção; é
+ * reexportado aqui para quem já lia daqui continuar lendo.
+ */
+export { SEM_CATEGORIA };
 
 /** Categoria das sangrias e suprimentos, que não passam por `fin_categorias`. */
 export const CATEGORIA_TRANSFERENCIA = "TRANSFERENCIA ENTRE CAIXAS";
@@ -141,6 +148,18 @@ export function categoriaDaLinha(m: MovimentacaoExtrato): string {
   if (d.startsWith("REPASSE TERCEIRO")) return "REPASSE TERCEIRO";
   if (d.startsWith("REPASSE MEDICO") || d.startsWith("REPASSE MÉDICO")) return "REPASSE MEDICO";
   return SEM_CATEGORIA;
+}
+
+/**
+ * Categorias que realmente apareceram nas movimentações carregadas.
+ *
+ * Alimenta o seletor de Categoria da tela junto com o cadastro de
+ * `fin_categorias` (ver `opcoesDeCategoria`): sozinho, o cadastro não teria a
+ * transferência entre caixas nem o `(SEM CATEGORIA)`, que não são linhas do
+ * cadastro e sim rótulos deduzidos aqui.
+ */
+export function categoriasPresentes(movs: MovimentacaoExtrato[]): string[] {
+  return Array.from(new Set(movs.map(categoriaDaLinha)));
 }
 
 /**
