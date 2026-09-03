@@ -65,6 +65,9 @@ export function ConsoleTesteNina() {
   const [tipo, setTipo] = useState<"text" | "audio" | "image" | "document" | "sticker">("text");
   const [audio, setAudio] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement | null>(null);
+  // Homologação: limpar da agenda o que a Nina marcou nesta sessão.
+  const [limparAgenda, setLimparAgenda] = useState(true);
+  const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
 
   const carregarLeads = useCallback(async () => {
     if (!clinicaId) return;
