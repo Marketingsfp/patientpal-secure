@@ -898,8 +898,9 @@ ${procs || "(nenhum)"}`;
       pacienteId: telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null,
       pacienteNome: telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null,
       conversaId: estadoId.conversaId,
-      origem: "whatsapp",
+      origem: opcoes?.teste ? "homologacao" : "whatsapp",
       podeAgendar,
+      teste: opcoes?.teste === true,
     };
   }
 
