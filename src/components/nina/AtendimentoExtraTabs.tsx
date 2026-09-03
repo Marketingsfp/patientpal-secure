@@ -295,6 +295,26 @@ export function AtendInbox() {
     !!clinicaId && !!sel?.id,
   );
 
+  // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
+  const timeline = useMemo(() => {
+    const itens: (
+      | { kind: "msg"; at: number; msg: any }
+      | { kind: "evento"; at: number; ev: ConversaEvento }
+    )[] = [
+      ...msgs.map((m) => ({
+        kind: "msg" as const,
+        at: new Date(m.recebida_em ?? m.created_at ?? 0).getTime(),
+        msg: m,
+      })),
+      ...eventos.map((ev) => ({
+        kind: "evento" as const,
+        at: new Date(ev.created_at).getTime(),
+        ev,
+      })),
+    ];
+    return itens.sort((a, b) => a.at - b.at);
+  }, [msgs, eventos]);
+
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
     const j = sel.janela_24h_em ? new Date(sel.janela_24h_em).getTime() : 0;
@@ -658,7 +678,11 @@ export function AtendInbox() {
                 {msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
-                {msgs.map((m) => {
+                {timeline.map((item) => {
+                  if (item.kind === "evento") {
+                    return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
+                  }
+                  const m = item.msg;
                   const out = m.direction === "out";
                   if (m.enviada_por === "sistema") {
                     return (
