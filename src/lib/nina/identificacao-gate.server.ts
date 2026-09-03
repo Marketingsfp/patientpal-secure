@@ -252,11 +252,11 @@ export async function aplicarGateIdentificacao(params: {
       fim: a.slot_fim,
       procedimento: a.procedure ?? a.specialty ?? "Consulta",
     });
-    if (ag.ok && (ag as { appointment_id?: string }).appointment_id) {
-      const d = ag as { date?: string; time?: string; medico?: string };
+    if (ag.ok && (ag as unknown as { appointment_id?: string }).appointment_id) {
+      const d = ag as unknown as { date?: string; time?: string; medico?: string };
       log("agendamento_criado", {
         conversa: ctx.conversaId,
-        appointment_id: (ag as { appointment_id: string }).appointment_id,
+        appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
       });
       return `Prontinho! ✅ Seu agendamento foi realizado com sucesso.\n\n*Profissional:* ${
         d.medico ?? a.doctor_name ?? "-"
