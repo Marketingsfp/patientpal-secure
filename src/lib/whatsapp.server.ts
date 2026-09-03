@@ -413,6 +413,10 @@ export interface EstadoIdentidade {
   confirmada: boolean;
   perguntadaEm: string | null;
   tentativas: number;
+  /** Paciente já vinculado à conversa (identificação anterior). */
+  pacienteIdConversa: string | null;
+  /** Estado estruturado do fluxo da Nina, gravado na conversa. */
+  fluxoEstadoBruto: unknown;
 }
 
 async function carregarEstadoIdentidade(
@@ -424,6 +428,8 @@ async function carregarEstadoIdentidade(
     confirmada: false,
     perguntadaEm: null,
     tentativas: 0,
+    pacienteIdConversa: null,
+    fluxoEstadoBruto: null,
   };
   if (!telefone) return vazio;
   // Telefone sempre em dígitos: a Meta manda ora "55…", ora "+55…" — sem
@@ -432,7 +438,9 @@ async function carregarEstadoIdentidade(
   if (!digits) return vazio;
   const { data } = await supabaseAdmin
     .from("atend_conversas")
-    .select("id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas")
+    .select(
+      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado",
+    )
     .eq("clinica_id", clinicaId)
     .in("contato_telefone", [digits, `+${digits}`])
     .order("ultima_msg_em", { ascending: false, nullsFirst: false })
@@ -444,8 +452,11 @@ async function carregarEstadoIdentidade(
       confirmada: (data as any).identidade_confirmada === true,
       perguntadaEm: (data as any).identidade_perguntada_em ?? null,
       tentativas: Number((data as any).identidade_tentativas ?? 0),
+      pacienteIdConversa: (data as any).contato_paciente_id ?? null,
+      fluxoEstadoBruto: (data as any).nina_fluxo_estado ?? null,
     };
   }
+
   const { data: nova } = await supabaseAdmin
     .from("atend_conversas")
     .insert({
