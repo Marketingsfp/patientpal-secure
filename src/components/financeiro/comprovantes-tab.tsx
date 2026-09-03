@@ -51,6 +51,15 @@ type Row = {
   medico_nome: string | null;
   paciente_id: string | null;
   paciente_nome: string | null;
+  /**
+   * REPASSE TRIPLO — percentual do terceiro (dono do equipamento) nesta linha.
+   * Só preenchido nas linhas vindas de `fin_repasse_terceiro`.
+   */
+  percentual?: number | null;
+  /** REPASSE TRIPLO — de quem é a linha: do executante ou do terceiro. */
+  papel?: "executante" | "terceiro";
+  /** Só nas linhas de terceiro: quem executou o atendimento. */
+  executante_nome?: string | null;
 };
 
 type Grupo = {
@@ -64,6 +73,14 @@ type Grupo = {
   total: number;
   qtd: number;
   itens: Row[];
+  /**
+   * REPASSE TRIPLO — de quem é o comprovante. O terceiro recebe num lançamento
+   * de despesa próprio e por isso vira um comprovante próprio, com nome e
+   * assinatura dele.
+   */
+  papel: "executante" | "terceiro";
+  /** Só nos grupos de terceiro: quem executou os atendimentos. */
+  executante_nome?: string | null;
 };
 
 const brl = (v: number) =>
@@ -251,7 +268,7 @@ export function ComprovantesTab() {
     if (!clinicaId) return;
     setLoading(true);
     try {
-      const [atRes, lcRes] = await Promise.all([
+      const [atRes, lcRes, terRes] = await Promise.all([
         supabase
           .from("fin_atendimentos")
           .select(
@@ -274,9 +291,24 @@ export function ComprovantesTab() {
           .lte("repasse_pago_em", ate)
           .order("repasse_pago_em", { ascending: false })
           .limit(5000),
+        // REPASSE TRIPLO — repasses pagos ao dono do equipamento. Vivem numa
+        // tabela própria (`fin_repasse_terceiro`) porque saem num lançamento
+        // de despesa separado do repasse do executante; sem esta consulta o
+        // terceiro não tinha 2ª via nenhuma para imprimir.
+        supabase
+          .from("fin_repasse_terceiro")
+          .select(
+            "id, data, percentual, valor, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, terceiro_medico_id, executante_medico_id, terceiro:medicos!fin_repasse_terceiro_terceiro_medico_id_fkey(nome), executante:medicos!fin_repasse_terceiro_executante_medico_id_fkey(nome), lancamento:fin_lancamentos!fin_repasse_terceiro_lancamento_id_fkey(descricao, paciente_id, pacientes:paciente_id(nome), agendamento:agendamentos(procedimento, paciente_nome, inicio)), atendimento:fin_atendimentos!fin_repasse_terceiro_atendimento_id_fkey(procedimento, paciente_id, pacientes:paciente_id(nome))",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("repasse_pago_em", de)
+          .lte("repasse_pago_em", ate)
+          .order("repasse_pago_em", { ascending: false })
+          .limit(5000),
       ]);
       if (atRes.error) throw atRes.error;
       if (lcRes.error) throw lcRes.error;
+      if (terRes.error) throw terRes.error;
       // Extrai o nome do paciente/procedimento da descrição do lançamento
       // quando não houver relacionamento direto — as descrições seguem o
       // padrão "NOME PACIENTE — PROCEDIMENTO — extras".
@@ -378,7 +410,52 @@ export function ComprovantesTab() {
             info.paciente,
         };
       });
-      setRows([...mappedAt, ...mappedLc]);
+      // REPASSE TRIPLO — cada linha paga ao dono do equipamento vira uma linha
+      // de comprovante com o nome DELE, e não o do executante. Paciente e
+      // serviço vêm do atendimento de origem (lançamento da agenda ou
+      // atendimento manual), com a descrição como último recurso.
+      const mappedTer: Row[] = (terRes.data ?? []).map((r: Record<string, unknown>) => {
+        const lanc = r.lancamento as {
+          descricao?: string | null;
+          pacientes?: { nome?: string } | null;
+          agendamento?: {
+            procedimento?: string | null;
+            paciente_nome?: string | null;
+            inicio?: string | null;
+          } | null;
+        } | null;
+        const atend = r.atendimento as {
+          procedimento?: string | null;
+          pacientes?: { nome?: string } | null;
+        } | null;
+        const info = parseDescricao(lanc?.descricao ?? null);
+        return {
+          id: r.id as string,
+          data:
+            (lanc?.agendamento?.inicio ? lanc.agendamento.inicio.slice(0, 10) : null) ??
+            (r.data as string),
+          procedimento: atend?.procedimento ?? lanc?.agendamento?.procedimento ?? info.procedimento,
+          valor_medico: Number(r.valor) || 0,
+          valor_laudo: 0,
+          repasse_pago_em: (r.repasse_pago_em as string) ?? null,
+          repasse_pago_at: (r.repasse_pago_at as string) ?? null,
+          repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
+          repasse_conta_id: (r.repasse_conta_id as string) ?? null,
+          repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
+          medico_id: (r.terceiro_medico_id as string) ?? null,
+          medico_nome: (r.terceiro as { nome?: string } | null)?.nome ?? null,
+          paciente_id: null,
+          paciente_nome:
+            atend?.pacientes?.nome ??
+            lanc?.pacientes?.nome ??
+            lanc?.agendamento?.paciente_nome ??
+            info.paciente,
+          percentual: r.percentual == null ? null : Number(r.percentual),
+          papel: "terceiro" as const,
+          executante_nome: (r.executante as { nome?: string } | null)?.nome ?? null,
+        };
+      });
+      setRows([...mappedAt, ...mappedLc, ...mappedTer]);
     } catch (err) {
       toast.error("Erro ao carregar comprovantes: " + (err as Error).message);
     } finally {
@@ -414,7 +491,11 @@ export function ComprovantesTab() {
     for (const r of filtered) {
       const dataPag =
         r.repasse_pago_em ?? (r.repasse_pago_at ? r.repasse_pago_at.slice(0, 10) : r.data);
-      const key = `${r.medico_id ?? "sem"}|${dataPag}|${r.repasse_lancamento_id ?? "nolot"}`;
+      // O prefixo do papel separa o comprovante do terceiro do comprovante do
+      // executante mesmo quando o mesmo médico aparece nos dois papéis no
+      // mesmo dia — são pagamentos e recibos distintos.
+      const papel = r.papel ?? "executante";
+      const key = `${papel}|${r.medico_id ?? "sem"}|${dataPag}|${r.repasse_lancamento_id ?? "nolot"}`;
       let g = map.get(key);
       if (!g) {
         g = {
@@ -428,6 +509,8 @@ export function ComprovantesTab() {
           total: 0,
           qtd: 0,
           itens: [],
+          papel,
+          executante_nome: r.executante_nome ?? null,
         };
         map.set(key, g);
       }
@@ -502,6 +585,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; line-height:
 .reimp .t { font-size: 13pt; font-weight: 800; text-transform: uppercase; }
 .reimp .s { font-size: 9pt; margin-top: 1mm; }
 .resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 8mm; row-gap: 1.4mm; border: 1px solid #d4d4d4; border-radius: 4px; padding: 2.4mm; margin-bottom: 2.5mm; }
+.resumo .col-2 { grid-column: 1 / -1; }
 .mut { color: #555; font-size: 8pt; }
 .tot { font-size: 10pt; font-weight: 700; }
 table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.2pt; }
@@ -607,7 +691,18 @@ body.resumo-only .rows-full { display: none !important; }
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell>{g.medico_nome}</TableCell>
+                    <TableCell>
+                      {g.medico_nome}
+                      {g.papel === "terceiro" && (
+                        <div
+                          className="text-[11px] text-amber-700 dark:text-amber-500"
+                          title="Repasse de terceiro (dono do equipamento) — pago em lançamento próprio"
+                        >
+                          Terceiro (equipamento)
+                          {g.executante_nome ? ` · executante: ${g.executante_nome}` : ""}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">{g.qtd}</TableCell>
                     <TableCell className="text-right font-medium">{brl(g.total)}</TableCell>
                     <TableCell>{g.forma_pagamento}</TableCell>
@@ -675,14 +770,16 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
   const emitidoEm = new Date().toLocaleString("pt-BR");
   const dataPagBR = fmtDate(g.data_pagamento);
   const hora = derivarHora(g.pago_at);
+  const ehTerceiro = g.papel === "terceiro";
   const rowsHtml = g.itens
     .map((it) => {
       const valor = (Number(it.valor_medico) || 0) + (Number(it.valor_laudo) || 0);
+      const pct = it.percentual == null ? "" : ` <span class="mut">(${it.percentual}%)</span>`;
       return `<tr>
         <td>${escapeHtml(fmtDate(it.data))}</td>
         <td>${escapeHtml(it.paciente_nome ?? "—")}</td>
         <td>${escapeHtml(it.procedimento ?? "—")}</td>
-        <td>${escapeHtml(brl(valor))}</td>
+        <td>${escapeHtml(brl(valor))}${pct}</td>
       </tr>`;
     })
     .join("");
@@ -698,6 +795,7 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
       .repasse-preview .resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 4px; border: 1px solid #d4d4d4; border-radius: 4px; padding: 8px; margin-bottom: 10px; }
       .repasse-preview .mut { color: #555; font-size: 9pt; }
       .repasse-preview .tot { font-size: 11pt; font-weight: 700; }
+      .repasse-preview .col-2 { grid-column: 1 / -1; }
       .repasse-preview table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
       .repasse-preview th, .repasse-preview td { padding: 6px 8px; border-bottom: 1px solid #e5e5e5; vertical-align: top; overflow-wrap: anywhere; }
       .repasse-preview th { text-align: left; font-weight: 700; background: #f4f4f5; }
@@ -720,17 +818,32 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
         <div style="font-size:12pt;font-weight:600;">${escapeHtml(clinicaNome)}</div>
       </div>
       <div class="right">
-        <div style="font-size:10pt;font-weight:600;">Comprovante de repasse médico</div>
+        <div style="font-size:10pt;font-weight:600;">${
+          ehTerceiro
+            ? "Comprovante de repasse — terceiro (equipamento)"
+            : "Comprovante de repasse médico"
+        }</div>
         <div class="mut">Emitido em ${escapeHtml(emitidoEm)}</div>
       </div>
     </div>
     <div class="resumo">
-      <div><span class="mut">Médico: </span><b>${escapeHtml(g.medico_nome)}</b></div>
+      <div><span class="mut">${
+        ehTerceiro ? "Terceiro (dono do equipamento): " : "Médico: "
+      }</span><b>${escapeHtml(g.medico_nome)}</b></div>
       <div><span class="mut">Data e hora do pagamento: </span><b>${dataPagBR}${hora ? ` às ${hora}` : " (horário não registrado)"}</b></div>
       <div><span class="mut">Forma: </span><b>${escapeHtml(g.forma_pagamento)}</b></div>
       <div><span class="mut">Conta: </span><b>${escapeHtml(g.conta_nome)}</b></div>
       <div><span class="mut">Atendimentos: </span><b>${g.qtd}</b></div>
-      <div style="text-align:right;"><span class="mut">Total pago ao médico: </span><b class="tot">${escapeHtml(brl(g.total))}</b></div>
+      <div style="text-align:right;"><span class="mut">${
+        ehTerceiro ? "Total pago ao terceiro: " : "Total pago ao médico: "
+      }</span><b class="tot">${escapeHtml(brl(g.total))}</b></div>
+      ${
+        ehTerceiro
+          ? `<div class="col-2"><span class="mut">Atendimentos executados por: </span><b>${escapeHtml(
+              g.executante_nome ?? "—",
+            )}</b></div>`
+          : ""
+      }
     </div>
     <div class="rows-full">
       <table>
@@ -751,7 +864,9 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
         </tfoot>
       </table>
       <div class="sig">
-        <div><div class="line">Assinatura do médico</div></div>
+        <div><div class="line">${
+          ehTerceiro ? `Assinatura de ${escapeHtml(g.medico_nome)}` : "Assinatura do médico"
+        }</div></div>
         <div><div class="line">Assinatura da clínica</div></div>
       </div>
     </div>

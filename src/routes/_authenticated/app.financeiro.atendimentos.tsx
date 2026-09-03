@@ -137,6 +137,16 @@ interface Atend {
   terceiro_valor?: number;
   /** Repasse do terceiro já foi pago (existe linha em fin_repasse_terceiro) */
   terceiro_pago?: boolean;
+  /**
+   * Dados do pagamento do terceiro, copiados de `fin_repasse_terceiro`. O
+   * terceiro é pago no MESMO commit do executante, mas em lançamento próprio —
+   * a 2ª via do recibo dele precisa da data/forma/conta gravadas na linha
+   * dele, não das do executante.
+   */
+  terceiro_pago_em?: string | null;
+  terceiro_pago_at?: string | null;
+  terceiro_forma_pagamento?: string | null;
+  terceiro_conta_id?: string | null;
 }
 interface Medico {
   id: string;
@@ -199,6 +209,21 @@ const EMPTY = {
   status: "realizado",
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/**
+ * Deriva HH:mm de um timestamp de pagamento somente quando ele tem hora
+ * explícita (>00:00 UTC). Registros antigos foram backfillados de `date` para
+ * timestamptz em 00:00 UTC — comparar em UTC evita falso-positivo quando o
+ * fuso local gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
+ */
+const derivarHoraPagamento = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const isBackfill = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+  if (isBackfill) return null;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 // Ícone da forma de pagamento
 function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
@@ -361,6 +386,8 @@ function AtendimentosPage() {
     valorMedico: number;
     pagoEm: string | null;
     pagoHora: string | null;
+    /** REPASSE TRIPLO — % do valor do atendimento pago ao terceiro nesta linha */
+    percentual?: number | null;
   };
   type Comprovante = {
     clinicaNome: string;
@@ -375,6 +402,20 @@ function AtendimentosPage() {
     emitidoEm: string;
     reimpressao: boolean;
     multiplasDatas?: number;
+    /**
+     * REPASSE TRIPLO — de quem é este recibo. O terceiro (dono do equipamento)
+     * recebe num lançamento de despesa PRÓPRIO, então precisa de um recibo
+     * próprio para assinar; o recibo do executante não comprova o que foi pago
+     * a ele.
+     */
+    papel: "executante" | "terceiro";
+    /** Só nos blocos de terceiro: quem executou os atendimentos. */
+    executanteNome?: string | null;
+    /**
+     * Só no bloco do executante: a fatia de cada terceiro no mesmo lote, para
+     * a divisão ficar visível também no papel do médico principal.
+     */
+    terceiros?: { nome: string; total: number; qtd: number; percentuais: number[] }[];
   } | null;
   const [comprovante, setComprovante] = useState<Comprovante>(null);
   const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
@@ -480,6 +521,8 @@ function AtendimentosPage() {
               padding: 2.4mm;
               margin-bottom: 2.5mm;
             }
+            /* Linha da divisão do repasse (terceiro) ocupa as duas colunas. */
+            .comprovante-resumo .col-span-2 { grid-column: 1 / -1; }
             table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
@@ -533,19 +576,7 @@ function AtendimentosPage() {
     const medicoNome =
       medicoIds.size === 1 ? (medMap.get([...medicoIds][0]) ?? "—") : `${medicoIds.size} médicos`;
     const contaNome = contas.find((c) => c.id === meta.conta_id)?.nome ?? "—";
-    // Deriva HH:mm somente quando o timestamp tem hora explícita (>00:00 UTC).
-    // Registros antigos foram backfillados de `date` para timestamptz em
-    // 00:00 UTC — comparar em UTC evita falso-positivo quando o fuso local
-    // gera hh != 0 (ex.: 21:00 em BRT para 00:00 UTC).
-    const derivarHora = (iso: string | null | undefined): string | null => {
-      if (!iso) return null;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return null;
-      const isBackfill =
-        d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
-      if (isBackfill) return null;
-      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    };
+    const derivarHora = derivarHoraPagamento;
     // Data/hora do pagamento do lote. Precisa ser calculada ANTES das linhas
     // porque serve de fallback para a coluna "Pago em" de cada linha.
     const horaPagamento = derivarHora(meta.pago_at ?? null);
@@ -566,6 +597,15 @@ function AtendimentosPage() {
       };
     });
     const total = rows.reduce((s, r) => s + r.valorMedico, 0);
+    // REPASSE TRIPLO — resumo da fatia de cada terceiro do mesmo lote, para o
+    // recibo do executante mostrar a divisão inteira (o valor dele NÃO inclui
+    // a parte do terceiro: são dois pagamentos separados).
+    const terceiros = agruparTerceiros(itens, !!meta.reimpressao).map((t) => ({
+      nome: t.nome,
+      total: t.total,
+      qtd: t.itens.length,
+      percentuais: t.percentuais,
+    }));
     return {
       clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
       medicoNome,
@@ -578,20 +618,132 @@ function AtendimentosPage() {
       qtd: rows.length,
       emitidoEm: new Date().toLocaleString("pt-BR"),
       reimpressao: !!meta.reimpressao,
+      papel: "executante",
+      terceiros,
     };
+  };
+  /**
+   * REPASSE TRIPLO — agrupa os atendimentos por terceiro (dono do equipamento).
+   * Na 2ª via (`apenasPagos`) entra só quem já tem o repasse gravado em
+   * `fin_repasse_terceiro`; no ato do pagamento entra o inverso — os que ainda
+   * não estavam pagos, exatamente os que a RPC acabou de pagar.
+   */
+  const agruparTerceiros = (itens: Atend[], apenasPagos: boolean) => {
+    const m = new Map<
+      string,
+      { terceiroId: string; nome: string; total: number; percentuais: number[]; itens: Atend[] }
+    >();
+    for (const a of itens) {
+      if (!a.terceiro_medico_id) continue;
+      const valor = Number(a.terceiro_valor) || 0;
+      if (valor <= 0) continue;
+      if (apenasPagos ? !a.terceiro_pago : !!a.terceiro_pago) continue;
+      const k = a.terceiro_medico_id;
+      let g = m.get(k);
+      if (!g) {
+        g = {
+          terceiroId: k,
+          nome: medMap.get(k) ?? "Terceiro",
+          total: 0,
+          percentuais: [],
+          itens: [],
+        };
+        m.set(k, g);
+      }
+      g.total = +(g.total + valor).toFixed(2);
+      g.itens.push(a);
+      const pct = a.terceiro_percentual == null ? null : Number(a.terceiro_percentual);
+      if (pct != null && !g.percentuais.includes(pct)) g.percentuais.push(pct);
+    }
+    for (const g of m.values()) g.percentuais.sort((x, y) => x - y);
+    return [...m.values()];
+  };
+  /**
+   * REPASSE TRIPLO — um comprovante PRÓPRIO para cada terceiro. O financeiro
+   * precisa de um papel assinável por profissional: o terceiro recebe num
+   * lançamento de despesa separado do executante e não aparecia em recibo
+   * nenhum.
+   */
+  const buildComprovantesTerceiro = (
+    itens: Atend[],
+    meta: { data: string; forma_pagamento: string; conta_id: string; reimpressao?: boolean },
+  ): NonNullable<Comprovante>[] => {
+    const blocos: NonNullable<Comprovante>[] = [];
+    for (const g of agruparTerceiros(itens, !!meta.reimpressao)) {
+      const primeiro = g.itens[0];
+      // Na 2ª via valem a data/forma/conta gravadas no pagamento do terceiro;
+      // no ato do pagamento ainda não existe linha no banco, então valem os
+      // dados do lote que está sendo pago (é o mesmo COMMIT).
+      const dataPag =
+        (meta.reimpressao ? primeiro.terceiro_pago_em : null) || meta.data || primeiro.data;
+      const pagoAt = meta.reimpressao ? (primeiro.terceiro_pago_at ?? null) : null;
+      const formas = new Set(g.itens.map((x) => x.terceiro_forma_pagamento ?? "").filter(Boolean));
+      const contasSet = new Set(g.itens.map((x) => x.terceiro_conta_id ?? "").filter(Boolean));
+      const formaPag = meta.reimpressao
+        ? formas.size === 1
+          ? [...formas][0]
+          : formas.size > 1
+            ? "Vários"
+            : meta.forma_pagamento
+        : meta.forma_pagamento;
+      const contaId = meta.reimpressao
+        ? contasSet.size === 1
+          ? [...contasSet][0]
+          : meta.conta_id
+        : meta.conta_id;
+      const horaPagamento = derivarHoraPagamento(pagoAt);
+      const executantes = new Set(g.itens.map((x) => x.medico_id ?? "").filter(Boolean));
+      const executanteNome =
+        executantes.size === 1
+          ? (medMap.get([...executantes][0]) ?? "—")
+          : executantes.size > 1
+            ? `${executantes.size} médicos`
+            : "—";
+      const rows: CompItem[] = g.itens.map((a) => ({
+        data: a.data,
+        medico: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        paciente: nomePaciente(a) || "—",
+        servico: a.procedimento ?? "—",
+        valorMedico: Number(a.terceiro_valor) || 0,
+        pagoEm: (meta.reimpressao ? a.terceiro_pago_em : null) || dataPag || null,
+        pagoHora: meta.reimpressao ? derivarHoraPagamento(a.terceiro_pago_at ?? null) : null,
+        percentual: a.terceiro_percentual ?? null,
+      }));
+      const datas = new Set(rows.map((r) => r.pagoEm ?? "").filter(Boolean));
+      blocos.push({
+        clinicaNome: clinicaAtual?.clinica?.nome ?? "—",
+        medicoNome: g.nome,
+        dataPagamento: dataPag,
+        horaPagamento,
+        formaPagamento: formaPag || "—",
+        contaNome: contas.find((c) => c.id === contaId)?.nome ?? "—",
+        itens: rows,
+        total: g.total,
+        qtd: rows.length,
+        emitidoEm: new Date().toLocaleString("pt-BR"),
+        reimpressao: !!meta.reimpressao,
+        multiplasDatas: datas.size > 1 ? datas.size : 0,
+        papel: "terceiro",
+        executanteNome,
+      });
+    }
+    return blocos;
   };
   const abrirComprovanteDoItem = (a: Atend) => {
     const dataPag =
       a.repasse_pago_em ?? (a.repasse_pago_at ? a.repasse_pago_at.slice(0, 10) : a.data);
-    const c = buildComprovante([a], {
+    const meta = {
       data: dataPag,
       forma_pagamento: a.repasse_forma_pagamento || a.forma_pagamento || "",
       conta_id: a.repasse_conta_id ?? "",
-      pago_at: a.repasse_pago_at ?? null,
       reimpressao: true,
-    });
-    setComprovante(c);
-    setComprovantes(c ? [c] : []);
+    };
+    const c = buildComprovante([a], { ...meta, pago_at: a.repasse_pago_at ?? null });
+    // REPASSE TRIPLO — o terceiro recebeu num lançamento próprio, então ganha
+    // um recibo próprio logo depois do recibo do executante.
+    const blocos = [...(c ? [c] : []), ...buildComprovantesTerceiro([a], meta)];
+    setComprovante(blocos[0] ?? null);
+    setComprovantes(blocos);
     setComprovanteOpen(true);
   };
   // Constrói um comprovante em 2ª via para cada médico presente em `itens`.
@@ -627,6 +779,17 @@ function AtendimentosPage() {
         blocos.push(c);
       }
     }
+    // REPASSE TRIPLO — um bloco a mais por dono de equipamento que já recebeu
+    // pelos atendimentos reimpressos. Fica depois dos blocos dos executantes,
+    // cada um em sua própria página.
+    blocos.push(
+      ...buildComprovantesTerceiro(itens, {
+        data: "",
+        forma_pagamento: "",
+        conta_id: "",
+        reimpressao: true,
+      }),
+    );
     if (blocos.length) {
       setComprovante(blocos[0]);
       setComprovantes(blocos);
@@ -895,6 +1058,11 @@ function AtendimentosPage() {
       repasse_pago_at: hojeIso,
       repasse_forma_pagamento: laudoTarget.forma_pagamento ?? null,
       repasse_conta_id: laudoTarget.repasse_conta_id ?? null,
+      // Este recibo é do laudo, não do repasse do atendimento: o eventual
+      // terceiro (dono do equipamento) não recebe nada aqui e não pode
+      // aparecer na divisão impressa.
+      terceiro_medico_id: null,
+      terceiro_valor: 0,
     };
     const c = buildComprovante([itemComprovante], {
       data: hoje,
@@ -1318,11 +1486,21 @@ function AtendimentosPage() {
     // REPASSE TRIPLO — quais repasses de terceiro já foram pagos no período.
     // A tabela só ganha linha quando o terceiro é efetivamente pago, então a
     // ausência de linha significa "ainda a receber".
-    const terceirosPagos = new Set<string>();
+    const terceirosPagos = new Map<
+      string,
+      {
+        pago_em: string | null;
+        pago_at: string | null;
+        forma_pagamento: string | null;
+        conta_id: string | null;
+      }
+    >();
     {
       const { data: pagos, error: ePagos } = await supabase
         .from("fin_repasse_terceiro")
-        .select("origem, lancamento_id, atendimento_id, terceiro_medico_id")
+        .select(
+          "origem, lancamento_id, atendimento_id, terceiro_medico_id, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id",
+        )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
         .lte("data", fFim);
@@ -1333,7 +1511,13 @@ function AtendimentosPage() {
       }
       for (const p of pagos ?? []) {
         const ref = p.origem === "agenda" ? p.lancamento_id : p.atendimento_id;
-        if (ref) terceirosPagos.add(`${p.origem}:${ref}:${p.terceiro_medico_id}`);
+        if (ref)
+          terceirosPagos.set(`${p.origem}:${ref}:${p.terceiro_medico_id}`, {
+            pago_em: p.repasse_pago_em ?? null,
+            pago_at: p.repasse_pago_at ?? null,
+            forma_pagamento: p.repasse_forma_pagamento ?? null,
+            conta_id: p.repasse_conta_id ?? null,
+          });
       }
     }
     const marcaTerceiro = (
@@ -1342,12 +1526,19 @@ function AtendimentosPage() {
       terceiro: RepasseTerceiro | null,
     ) =>
       terceiro
-        ? {
-            terceiro_medico_id: terceiro.medico_id,
-            terceiro_percentual: terceiro.percentual,
-            terceiro_valor: terceiro.valor,
-            terceiro_pago: terceirosPagos.has(`${origem}:${id}:${terceiro.medico_id}`),
-          }
+        ? (() => {
+            const pago = terceirosPagos.get(`${origem}:${id}:${terceiro.medico_id}`);
+            return {
+              terceiro_medico_id: terceiro.medico_id,
+              terceiro_percentual: terceiro.percentual,
+              terceiro_valor: terceiro.valor,
+              terceiro_pago: !!pago,
+              terceiro_pago_em: pago?.pago_em ?? null,
+              terceiro_pago_at: pago?.pago_at ?? null,
+              terceiro_forma_pagamento: pago?.forma_pagamento ?? null,
+              terceiro_conta_id: pago?.conta_id ?? null,
+            };
+          })()
         : {};
 
     const manuais: Atend[] = manuaisRaw.map((r) => {
@@ -2280,6 +2471,11 @@ function AtendimentosPage() {
       // Quantos lançamentos separados de terceiro (dono de equipamento) foram
       // gerados — só para avisar o operador no fim.
       let terceirosGerados = 0;
+      // Itens cujo pagamento realmente entrou no banco. É desta lista que sai o
+      // recibo do terceiro: se a RPC de algum médico falhar, o dono do
+      // equipamento daqueles atendimentos também não recebeu, e não pode sair
+      // recibo dele.
+      const itensPagosOk: Atend[] = [];
       for (const [medId, list] of byMed) {
         const totalCalc = list.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0);
         const total = usarValorManual ? valorManualNum : totalCalc;
@@ -2384,6 +2580,7 @@ function AtendimentosPage() {
           continue;
         }
         terceirosGerados += terceiros.length;
+        itensPagosOk.push(...list);
         // Se usamos valor manual, ajusta o valor_medico de cada atendimento
         // MANUAL proporcionalmente para que o comprovante e o total pago
         // batam. Para atendimentos de agenda o valor_medico é derivado das
@@ -2424,10 +2621,21 @@ function AtendimentosPage() {
         pago_at: new Date().toISOString(),
         reimpressao: false,
       });
+      // REPASSE TRIPLO — cada dono de equipamento pago neste lote sai com o
+      // recibo dele, numa página própria, logo depois do recibo do executante.
+      const blocos = [
+        ...(c ? [c] : []),
+        ...buildComprovantesTerceiro(itensPagosOk, {
+          data: payForm.data,
+          forma_pagamento: payForm.forma_pagamento,
+          conta_id: payForm.conta_id,
+          reimpressao: false,
+        }),
+      ];
       setPayOpen(false);
-      if (c) {
-        setComprovante(c);
-        setComprovantes([c]);
+      if (blocos.length) {
+        setComprovante(blocos[0]);
+        setComprovantes(blocos);
         setComprovanteOpen(true);
       }
       await load();
@@ -3656,7 +3864,9 @@ function AtendimentosPage() {
               <DialogHeader className="no-print">
                 <DialogTitle>
                   Comprovante de pagamento de repasse
-                  {comprovantes.length > 1 ? ` — ${comprovantes.length} médicos` : ""}
+                  {comprovantes.length > 1
+                    ? ` — ${comprovantes.length} comprovantes (1 por profissional)`
+                    : ""}
                 </DialogTitle>
               </DialogHeader>
               {comprovantes.length > 0 && (
@@ -3707,7 +3917,9 @@ function AtendimentosPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-base font-semibold">
-                            Comprovante de repasse médico
+                            {comprovante.papel === "terceiro"
+                              ? "Comprovante de repasse — terceiro (equipamento)"
+                              : "Comprovante de repasse médico"}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Emitido em {comprovante.emitidoEm}
@@ -3717,7 +3929,11 @@ function AtendimentosPage() {
 
                       <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
                         <div>
-                          <span className="text-xs text-muted-foreground">Médico: </span>
+                          <span className="text-xs text-muted-foreground">
+                            {comprovante.papel === "terceiro"
+                              ? "Terceiro (dono do equipamento): "
+                              : "Médico: "}
+                          </span>
                           <b>{comprovante.medicoNome}</b>
                         </div>
                         <div>
@@ -3747,10 +3963,46 @@ function AtendimentosPage() {
                         </div>
                         <div className="text-right">
                           <span className="text-xs text-muted-foreground">
-                            Total pago ao médico:{" "}
+                            {comprovante.papel === "terceiro"
+                              ? "Total pago ao terceiro: "
+                              : "Total pago ao médico: "}
                           </span>
                           <b className="text-base text-primary">{fmt(comprovante.total)}</b>
                         </div>
+                        {comprovante.papel === "terceiro" && (
+                          <div className="col-span-2">
+                            <span className="text-xs text-muted-foreground">
+                              Atendimentos executados por:{" "}
+                            </span>
+                            <b>{comprovante.executanteNome ?? "—"}</b>
+                          </div>
+                        )}
+                        {/* REPASSE TRIPLO — a divisão aparece também no recibo do
+                            médico principal, para o financeiro conferir num papel
+                            só quem mais recebeu por estes atendimentos. */}
+                        {comprovante.papel === "executante" && !!comprovante.terceiros?.length && (
+                          <div className="col-span-2">
+                            <span className="text-xs text-muted-foreground">
+                              Repasse dividido — também recebeu por estes atendimentos:{" "}
+                            </span>
+                            <b>
+                              {comprovante.terceiros
+                                .map(
+                                  (t) =>
+                                    `${t.nome}${
+                                      t.percentuais.length
+                                        ? ` (${t.percentuais.join("% / ")}%)`
+                                        : ""
+                                    } — ${fmt(t.total)} em ${t.qtd} atend.`,
+                                )
+                                .join(" · ")}
+                            </b>
+                            <span className="text-xs text-muted-foreground">
+                              {" "}
+                              — pago em comprovante próprio, não incluído no total acima.
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <table className="w-full text-xs border-collapse">
@@ -3758,7 +4010,9 @@ function AtendimentosPage() {
                           <tr className="border-b bg-muted/40">
                             <th className="text-left p-2">Data</th>
                             <th className="text-left p-2">Pago em</th>
-                            <th className="text-left p-2">Médico</th>
+                            <th className="text-left p-2">
+                              {comprovante.papel === "terceiro" ? "Executante" : "Médico"}
+                            </th>
                             <th className="text-left p-2">Paciente</th>
                             <th className="text-left p-2">Serviço</th>
                             <th className="text-right p-2">Valor pago (R$)</th>
@@ -3780,6 +4034,9 @@ function AtendimentosPage() {
                               <td className="p-2">{it.servico}</td>
                               <td className="p-2 text-right whitespace-nowrap">
                                 {fmt(it.valorMedico)}
+                                {it.percentual != null ? (
+                                  <span className="text-muted-foreground"> ({it.percentual}%)</span>
+                                ) : null}
                               </td>
                             </tr>
                           ))}
@@ -3796,7 +4053,11 @@ function AtendimentosPage() {
 
                       <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
                         <div className="text-center">
-                          <div className="border-t pt-1">Assinatura do médico</div>
+                          <div className="border-t pt-1">
+                            {comprovante.papel === "terceiro"
+                              ? `Assinatura de ${comprovante.medicoNome}`
+                              : "Assinatura do médico"}
+                          </div>
                         </div>
                         <div className="text-center">
                           <div className="border-t pt-1">Assinatura da clínica</div>
