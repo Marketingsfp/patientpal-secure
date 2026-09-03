@@ -246,14 +246,22 @@ export function ConsoleTesteNina() {
     if (!clinicaId || !leadId || !conversaId) return;
     setProcessando(true);
     try {
-      await resolver({ data: { clinicaId, leadId, conversaId } });
+      const r = (await resolver({
+        data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
+      })) as { agendamentosRemovidos?: number };
       setConversaId(null);
       setErro(null);
       setAudio(null);
+      setFerramentas([]);
       // O histórico permanece na tela: só entra o marcador de encerramento.
       await carregarHistorico(leadId);
       await carregarLeads();
-      toast.success("Conversa encerrada. A memória da Nina foi resetada.");
+      const n = r?.agendamentosRemovidos ?? 0;
+      toast.success(
+        n > 0
+          ? `Conversa encerrada, memória resetada e ${n} agendamento(s) de teste removido(s).`
+          : "Conversa encerrada. A memória da Nina foi resetada.",
+      );
     } catch (e: any) {
       mostrarErro(e);
     } finally {
