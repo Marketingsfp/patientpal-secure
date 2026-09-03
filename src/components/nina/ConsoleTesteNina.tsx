@@ -10,6 +10,7 @@ import {
   historicoLeadTeste,
   enviarMensagemTeste,
   resolverConversaTeste,
+  ferramentasUsadasTeste,
 } from "@/lib/nina/teste-console.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export function ConsoleTesteNina() {
   const historico = useServerFn(historicoLeadTeste);
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
+  const ferramentasFn = useServerFn(ferramentasUsadasTeste);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
