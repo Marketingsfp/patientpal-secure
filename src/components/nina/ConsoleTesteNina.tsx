@@ -436,13 +436,16 @@ export function ConsoleTesteNina() {
 
 
             <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
-              {msgs.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Conversa nova e sem memória. Envie a primeira mensagem como paciente.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {msgs.map((m) => {
+                  {timeline.map((item) => {
+                    if (item.kind === "evento")
+                      return <ConversationSystemEvent key={item.id} evento={item.evento} />;
+                    const m = item.msg;
                     if (m.enviada_por === "sistema") {
                       return (
                         <div key={m.id} className="flex justify-center">
