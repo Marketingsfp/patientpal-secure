@@ -1496,7 +1496,20 @@ async function executarFerramentaInterna(
           teste: ehTeste,
         });
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
+        mutarEstado(ctx, {
+          appointment: {
+            doctor_id: medicoIdReal,
+            doctor_name: rMed.nome,
+            procedure: p.procedimento,
+            slot_inicio: p.inicio,
+            slot_fim: p.fim,
+            slot_confirmed_by_patient: true,
+            appointment_id: r.id,
+          },
+          stage: "BOOKED",
+        });
         return {
+
           ok: true,
           agendamento_id: r.id,
           teste: ehTeste,
