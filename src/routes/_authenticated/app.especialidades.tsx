@@ -59,7 +59,9 @@ interface Esp {
 
 function EspecialidadesPage() {
   const podeEscrever = usePodeEscrever("especialidades");
+  const adminPlataforma = useAdminPlataforma();
   const queryClient = useQueryClient();
+
   const [q, setQ] = useState("");
   const [qInput, setQInput] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
