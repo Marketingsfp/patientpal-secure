@@ -902,11 +902,13 @@ ${procs || "(nenhum)"}`;
   }
   if (pacienteIdEfetivo && !fluxoEstado.patient.identified) {
     fluxoEstado.patient = {
+      ...fluxoEstado.patient,
       id: pacienteIdEfetivo,
       first_name: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
       identified: true,
       validated: true,
     };
+
   }
 
   const systemPromptFinal = [
