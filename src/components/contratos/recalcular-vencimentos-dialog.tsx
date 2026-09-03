@@ -35,7 +35,12 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   parcelas: Parcela[];
-  onDone: () => void | Promise<void>;
+  /**
+   * Recebe as parcelas que realmente mudaram de data no banco, para a tela
+   * que abriu o diálogo atualizar a grade imediatamente — sem depender de um
+   * recarregamento que pode ser mascarado por rascunhos de edição.
+   */
+  onDone: (atualizadas: Array<{ id: string; vencimento: string }>) => void | Promise<void>;
 }
 
 const fmtBR = (iso: string) => {
@@ -80,15 +85,22 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
   const [cascatear, setCascatear] = useState<boolean>(true);
   const [salvando, setSalvando] = useState(false);
 
+  // Preenche os campos ao abrir. As dependências são os VALORES da primeira
+  // parcela pendente, não o objeto: `parcelas` chega como array recriado a cada
+  // render da tela de contratos, então depender do objeto refazia o preenchimento
+  // (apagando a data que o operador acabou de digitar) sempre que a tela
+  // renderizasse de novo com o diálogo aberto.
+  const basePendenteId = primeiraPendente?.id ?? "";
+  const basePendenteVenc = primeiraPendente?.vencimento ?? "";
   useEffect(() => {
     if (!open) return;
-    setParcelaId(primeiraPendente?.id ?? "");
-    setNovoVenc(primeiraPendente?.vencimento ?? "");
+    setParcelaId(basePendenteId);
+    setNovoVenc(basePendenteVenc);
     setIntervaloTipo("meses");
     setIntervaloValor("1");
     setCascatear(true);
     setSalvando(false);
-  }, [open, primeiraPendente]);
+  }, [open, basePendenteId, basePendenteVenc]);
 
   const parcelaSelecionada = elegiveis.find((p) => p.id === parcelaId) ?? null;
 
@@ -130,12 +142,18 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
       // Executa updates em paralelo — cada linha vai isoladamente ao banco,
       // mas o efeito prático (todas as parcelas afetadas atualizadas) é
       // apresentado atomicamente ao usuário via toast único.
+      // `.select("id")` para saber quais linhas realmente mudaram: o UPDATE em
+      // contrato_mensalidades passa por RLS e, para um perfil sem escrita no
+      // módulo, o banco não devolve erro — apenas não altera nada. Sem esta
+      // checagem a tela dizia "parcelas recalculadas" e as datas continuavam
+      // as antigas.
       const results = await Promise.all(
         aAtualizar.map((p) =>
           supabase
             .from("contrato_mensalidades")
             .update({ vencimento: p.novoVencimento })
-            .eq("id", p.id),
+            .eq("id", p.id)
+            .select("id"),
         ),
       );
       const erro = results.find((r) => r.error)?.error;
@@ -143,9 +161,24 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
         mostrarErro(erro);
         return;
       }
-      toast.success(`${aAtualizar.length} parcela(s) recalculada(s).`);
+      const gravadas = aAtualizar
+        .filter((_, i) => (results[i].data ?? []).length > 0)
+        .map((p) => ({ id: p.id, vencimento: p.novoVencimento }));
+      if (gravadas.length === 0) {
+        toast.error(
+          "Nada foi alterado: seu perfil não tem permissão para editar as parcelas deste contrato. Peça a um administrador ou gestor.",
+        );
+        return;
+      }
+      if (gravadas.length < aAtualizar.length) {
+        toast.warning(
+          `${gravadas.length} de ${aAtualizar.length} parcela(s) recalculada(s) — as demais não puderam ser alteradas.`,
+        );
+      } else {
+        toast.success(`${gravadas.length} parcela(s) recalculada(s).`);
+      }
       onOpenChange(false);
-      await onDone();
+      await onDone(gravadas);
     } finally {
       setSalvando(false);
     }

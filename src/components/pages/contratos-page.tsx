@@ -3454,6 +3454,29 @@ function DetalheContrato({
       ),
     );
   };
+  // Abre o diálogo "Recalcular vencimentos".
+  // As células de data da grade mostram `rascunhos[id]?.vencimento ?? m.vencimento`,
+  // ou seja, um rascunho não salvo fica POR CIMA do que veio do banco. Enquanto
+  // sobrasse rascunho, o recálculo gravava certo no banco e a tela continuava
+  // exibindo as datas antigas — foi por isso que a recepção concluiu que o botão
+  // "não recalculava" e passou a usar "Adicionar parcela" como contorno (esse
+  // botão descarta os rascunhos e recarrega, revelando as datas novas).
+  const abrirRecalcVencimentos = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (totalRascunhos > 0) {
+      if (
+        !(await confirmDialog(
+          "Existem alterações não salvas nas mensalidades. Deseja descartar e recalcular os vencimentos?",
+        ))
+      )
+        return;
+      setRascunhos({});
+    }
+    setRecalcVencOpen(true);
+  };
   const adicionarParcela = async () => {
     // Alerta se houver rascunhos pendentes — evita perder edições ao recarregar.
     if (totalRascunhos > 0) {
@@ -5570,7 +5593,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <Button size="sm" variant="outline" onClick={adicionarParcela}>
                         <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setRecalcVencOpen(true)}>
+                      <Button size="sm" variant="outline" onClick={abrirRecalcVencimentos}>
                         <RefreshCw className="h-3 w-3 mr-1" /> Recalcular vencimentos
                       </Button>
                     </div>
@@ -7317,7 +7340,23 @@ h1, h2, h3 { margin: 0 0 6mm; }
           vencimento: m.vencimento,
           status: m.status,
         }))}
-        onDone={load}
+        onDone={async (atualizadas) => {
+          // Atualiza a grade na hora, direto no array de parcelas em tela, e
+          // limpa qualquer rascunho das linhas recalculadas — senão o rascunho
+          // voltaria a exibir (e, ao "Salvar alterações", a regravar) a data antiga.
+          if (atualizadas.length > 0) {
+            const porId = new Map(atualizadas.map((p) => [p.id, p.vencimento]));
+            setMens((rows) =>
+              rows.map((r) => (porId.has(r.id) ? { ...r, vencimento: porId.get(r.id)! } : r)),
+            );
+            setRascunhos((prev) => {
+              const novo = { ...prev };
+              for (const p of atualizadas) delete novo[p.id];
+              return novo;
+            });
+          }
+          await load();
+        }}
       />
       <Dialog
         open={!!retroDialog?.open}
