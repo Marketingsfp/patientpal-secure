@@ -1402,6 +1402,23 @@ async function executarFerramentaInterna(
           };
         }
 
+        // --- Mesma mecânica da tela de Agenda: marcar é CONVERTER o slot
+        // "DISPONIVEL" que cobre o intervalo, e não inserir uma linha nova ao
+        // lado dele. Sem isso o horário continuava aparecendo como livre e a
+        // grade podia receber outra marcação na mesma vaga.
+        const { data: slotLivre } = await supabaseAdmin
+          .from("agendamentos")
+          .select("id")
+          .eq("clinica_id", ctx.clinicaId)
+          .eq("medico_id", medicoIdReal)
+          .eq("paciente_nome", "DISPONIVEL")
+          .lte("inicio", p.inicio)
+          .gte("fim", p.fim)
+          .order("inicio")
+          .limit(1)
+          .maybeSingle();
+        const slotId = (slotLivre as { id: string } | null)?.id ?? null;
+
         // --- Núcleo compartilhado com a tela de Agenda. Ele revalida o slot no
         // momento da gravação: é isso que impede dupla reserva.
         const { criarAgendamentoCore } = await import("@/lib/agenda/criar-agendamento.core.server");
@@ -1419,7 +1436,7 @@ async function executarFerramentaInterna(
           },
           {
             clinica_id: ctx.clinicaId,
-            editing_id: null,
+            editing_id: slotId,
             payload: {
               clinica_id: ctx.clinicaId,
               // Agendamento de homologação fica visível na agenda com marca
