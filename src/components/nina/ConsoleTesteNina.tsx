@@ -74,6 +74,8 @@ export function ConsoleTesteNina() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // Eventos operacionais da conversa (resolvida, memória resetada, atribuição).
+  const [eventosConversa, setEventosConversa] = useState<ConversaEvento[]>([]);
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
