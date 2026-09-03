@@ -515,14 +515,26 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
 
-    // Marcador interno: o histórico continua visível no console, com o aviso
-    // de que a sessão encerrou e a memória da Nina foi zerada.
-    const { registrarMarcadorSistema } = await import("@/lib/atendimento/handoff.server");
-    await registrarMarcadorSistema({
+    // Eventos persistentes na linha do tempo (nada de popup): o histórico
+    // continua visível no console e mostra, no ponto exato, quem encerrou e
+    // que a memória da Nina foi zerada.
+    const { registrarMarcadorSistema, registrarEvento } = await import(
+      "@/lib/atendimento/handoff.server"
+    );
+    await registrarEvento({
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
-      texto: `✅ Conversa de teste encerrada (sessão ${lead.sessao_seq}). A memória da Nina foi resetada — a próxima mensagem começa do zero.`,
-    }).catch(() => {});
+      evento: "FINALIZADA",
+      userId: context.userId,
+      detalhes: { sessao: lead.sessao_seq, origem: "console_teste" },
+    });
+    await registrarEvento({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "IA_MEMORIA_RESETADA",
+      userId: context.userId,
+      detalhes: { sessao: lead.sessao_seq },
+    });
 
     // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
     // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
