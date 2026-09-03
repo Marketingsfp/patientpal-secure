@@ -102,6 +102,7 @@ async function auditar(
       dados_depois: {
         source: "nina_ai",
         origem: ctx.origem,
+        teste: ctx.teste === true,
         conversa_id: ctx.conversaId,
         paciente_id: ctx.pacienteId,
         ferramenta,
