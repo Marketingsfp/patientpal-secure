@@ -1,0 +1,2 @@
+ALTER TABLE public.atend_conversas ADD COLUMN IF NOT EXISTS nina_fluxo_estado jsonb;
+COMMENT ON COLUMN public.atend_conversas.nina_fluxo_estado IS 'Estado estruturado do fluxo da Nina (paciente identificado, horario oferecido, etapa). Sem CPF/nascimento. Limpo ao resolver a conversa.';

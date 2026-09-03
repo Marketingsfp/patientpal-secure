@@ -738,6 +738,7 @@ export type Database = {
           identidade_tentativas: number
           is_teste: boolean
           janela_24h_em: string | null
+          nina_fluxo_estado: Json | null
           owner_type: string
           primeiro_resp_em: string | null
           prioridade: number
@@ -776,6 +777,7 @@ export type Database = {
           identidade_tentativas?: number
           is_teste?: boolean
           janela_24h_em?: string | null
+          nina_fluxo_estado?: Json | null
           owner_type?: string
           primeiro_resp_em?: string | null
           prioridade?: number
@@ -814,6 +816,7 @@ export type Database = {
           identidade_tentativas?: number
           is_teste?: boolean
           janela_24h_em?: string | null
+          nina_fluxo_estado?: Json | null
           owner_type?: string
           primeiro_resp_em?: string | null
           prioridade?: number

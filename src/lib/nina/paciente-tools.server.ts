@@ -50,6 +50,24 @@ function falha(erro: CodigoErroNina, mensagem: string, extra?: Record<string, un
   return { ok: false as const, erro, mensagem, ...(extra ?? {}) };
 }
 
+/* ------------------------------------------------- estado estruturado (ctx) */
+
+/** Atualiza o estado do fluxo em memória; quem persiste é o pipeline chamador. */
+function mutarEstado(
+  ctx: CtxNinaPaciente,
+  patch: {
+    patient?: Partial<import("./fluxo-estado.server").EstadoFluxoNina["patient"]>;
+    appointment?: Partial<import("./fluxo-estado.server").EstadoFluxoNina["appointment"]>;
+    stage?: import("./fluxo-estado.server").EtapaFluxoNina;
+  },
+) {
+  if (!ctx.estado) return;
+  if (patch.patient) Object.assign(ctx.estado.patient, patch.patient);
+  if (patch.appointment) Object.assign(ctx.estado.appointment, patch.appointment);
+  if (patch.stage) ctx.estado.flow.stage = patch.stage;
+}
+
+
 /** Contexto da conversa. `pacienteId` só existe depois de identificação válida. */
 export type CtxNinaPaciente = {
   clinicaId: string;
@@ -63,12 +81,19 @@ export type CtxNinaPaciente = {
   /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
   podeAgendar?: boolean;
   /**
+   * Estado estruturado do fluxo, carregado da conversa antes da chamada do
+   * modelo e regravado depois. É o que impede a Nina de "esquecer" o paciente
+   * já identificado entre uma mensagem e outra.
+   */
+  estado?: import("./fluxo-estado.server").EstadoFluxoNina;
+  /**
    * Conversa do console de Homologação. Tudo que for gravado nasce marcado
    * como teste (`is_mock_data`), com o nome prefixado por [TESTE NINA] e
    * removível ao resolver a sessão.
    */
   teste?: boolean;
 };
+
 
 /** Marca gravada em `agendamentos.origem_integracao`. */
 export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
