@@ -58,11 +58,23 @@ export type CtxNinaPaciente = {
   pacienteId: string | null;
   pacienteNome: string | null;
   conversaId: string | null;
-  /** Origem do disparo — só para auditoria. */
-  origem: "whatsapp" | "chat_interno";
+  /** Origem do disparo — auditoria e marcação do agendamento. */
+  origem: "whatsapp" | "chat_interno" | "homologacao";
   /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
   podeAgendar?: boolean;
+  /**
+   * Conversa do console de Homologação. Tudo que for gravado nasce marcado
+   * como teste (`is_mock_data`), com o nome prefixado por [TESTE NINA] e
+   * removível ao resolver a sessão.
+   */
+  teste?: boolean;
 };
+
+/** Marca gravada em `agendamentos.origem_integracao`. */
+export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
+  if (ctx.teste || ctx.origem === "homologacao") return "nina_homologacao";
+  return ctx.origem === "whatsapp" ? "nina_whatsapp" : "nina_chat_interno";
+}
 
 /* ------------------------------------------------------------------ auditoria */
 
