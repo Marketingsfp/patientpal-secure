@@ -24,8 +24,15 @@ import { dataBR } from "@/lib/financeiro/preset-periodo";
 import {
   agruparSerie,
   granularidadeDoIntervalo,
+  janelaDaSerie,
+  matrizAtendimentos,
+  serieAtendimentos,
   totaisDaSerie,
+  MESES_PT,
+  type LinhaMatriz,
   type LinhaSerieDiaria,
+  type MatrizAtend,
+  type PontoAtend,
   type PontoSerie,
 } from "@/lib/financeiro/bi-serie";
 
@@ -35,20 +42,40 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/bi")({
 });
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const MESES_PT = [
-  "Jan",
-  "Fev",
-  "Mar",
-  "Abr",
-  "Mai",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Set",
-  "Out",
-  "Nov",
-  "Dez",
-];
+
+/** Quantos meses o gráfico de atendimentos mostra. */
+const MESES_NO_GRAFICO = 12;
+
+type RespostaRpc = { data: unknown[] | null; error: { code?: string; message?: string } | null };
+
+/**
+ * Busca a matriz de atendimentos.
+ *
+ * A versão da função no banco que aceita janela de datas (_ini/_fim) é
+ * recente: sem ela, a função varre o histórico inteiro da clínica — hoje 842
+ * mil lançamentos, cerca de 7 segundos — e estoura o limite de 8 segundos por
+ * consulta do usuário logado, o que devolvia erro e desenhava um gráfico
+ * zerado. Enquanto o SQL novo não estiver aplicado, cai na função antiga, para
+ * a tela não quebrar dependendo da ordem entre aplicar o SQL e publicar.
+ */
+async function buscarMatriz(clinica: string, janela?: { from: string; to: string }) {
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<RespostaRpc>;
+  if (janela) {
+    const r = await rpc("fin_atendimentos_matriz", {
+      _clinica: clinica,
+      _ini: janela.from,
+      _fim: janela.to,
+    });
+    const semAssinatura =
+      r.error?.code === "PGRST202" ||
+      /could not find the function|does not exist/i.test(r.error?.message ?? "");
+    if (!r.error || !semAssinatura) return r;
+  }
+  return rpc("fin_atendimentos_matriz", { _clinica: clinica });
+}
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -59,22 +86,17 @@ function Page() {
   const [data, setData] = useState<PontoSerie[]>([]);
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<null | "receitas" | "despesas" | "saldo">(null);
-  const [atend12, setAtend12] = useState<
-    Array<{ label: string; cartao: number; particular: number; exames: number }>
-  >([]);
-  const [atendMatriz, setAtendMatriz] = useState<{
-    anos: number[];
-    linhas: Array<{
-      mesIdx: number;
-      porAno: Record<number, { cartao: number; particular: number; exames: number; total: number }>;
-    }>;
-    totalPorAno: Record<
-      number,
-      { cartao: number; particular: number; exames: number; total: number }
-    >;
-    totalGeral: number;
-  }>({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 });
+  const [atend12, setAtend12] = useState<PontoAtend[]>([]);
+  const [atendCarregando, setAtendCarregando] = useState(true);
+  // Guardado para a tela poder dizer que falhou, em vez de mostrar zero:
+  // gráfico zerado foi lido como "os atendimentos sumiram".
+  const [atendErro, setAtendErro] = useState<string | null>(null);
+  const [atendTentativa, setAtendTentativa] = useState(0);
+  const [atendMatriz, setAtendMatriz] = useState<MatrizAtend | null>(null);
+  const [matrizCarregando, setMatrizCarregando] = useState(false);
+  const [matrizErro, setMatrizErro] = useState<string | null>(null);
   const [atendDrill, setAtendDrill] = useState(false);
+  const janela = useMemo(() => janelaDaSerie(MESES_NO_GRAFICO), []);
 
   useEffect(() => {
     (async () => {
@@ -95,78 +117,42 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id, range.from, range.to]);
 
+  // Gráfico de atendimentos: pede ao banco só a janela que ele desenha.
   useEffect(() => {
     (async () => {
       if (!clinicaAtual) {
         setAtend12([]);
-        setAtendMatriz({ anos: [], linhas: [], totalPorAno: {}, totalGeral: 0 });
+        setAtendErro(null);
+        setAtendCarregando(false);
         return;
       }
-      // Agregação feita server-side via RPC (a tabela tem centenas de milhares de linhas).
-      type Cell = { cartao: number; particular: number; exames: number; total: number };
-      const empty = (): Cell => ({ cartao: 0, particular: 0, exames: 0, total: 0 });
-      const matriz: Record<number, Record<number, Cell>> = {};
-      const { data: rows } = await (
-        supabase.rpc as unknown as (
-          fn: string,
-          args: Record<string, unknown>,
-        ) => Promise<{ data: unknown[] | null; error: unknown }>
-      )("fin_atendimentos_matriz", { _clinica: clinicaAtual.clinica_id });
-      for (const r of (rows ?? []) as Array<{
-        ano: number;
-        mes: number;
-        cartao: number;
-        particular: number;
-        exames: number;
-      }>) {
-        if (!matriz[r.ano]) matriz[r.ano] = {};
-        const cartao = Number(r.cartao) || 0;
-        const particular = Number(r.particular) || 0;
-        const exames = Number(r.exames) || 0;
-        matriz[r.ano][r.mes] = { cartao, particular, exames, total: cartao + particular + exames };
+      setAtendCarregando(true);
+      setAtendErro(null);
+      const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id, janela);
+      if (error) {
+        setAtend12([]);
+        setAtendErro(error.message ?? "Falha ao consultar o banco.");
+        setAtendCarregando(false);
+        return;
       }
-      const anos = Object.keys(matriz)
-        .map(Number)
-        .sort((a, b) => a - b);
-      const linhas = Array.from({ length: 12 }, (_, m) => {
-        const porAno: Record<number, Cell> = {};
-        for (const a of anos) porAno[a] = matriz[a][m] ?? empty();
-        return { mesIdx: m, porAno };
-      });
-      const totalPorAno: Record<number, Cell> = {};
-      for (const a of anos) {
-        const t = empty();
-        for (const l of linhas) {
-          const c = l.porAno[a];
-          t.cartao += c.cartao;
-          t.particular += c.particular;
-          t.exames += c.exames;
-          t.total += c.total;
-        }
-        totalPorAno[a] = t;
-      }
-      const totalGeral = Object.values(totalPorAno).reduce((s, v) => s + v.total, 0);
-      setAtendMatriz({ anos, linhas, totalPorAno, totalGeral });
-
-      // Série dos últimos 12 meses
-      const serie: Array<{ label: string; cartao: number; particular: number; exames: number }> =
-        [];
-      const hoje = new Date();
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-        const ano = d.getFullYear();
-        const mes = d.getMonth();
-        const c = matriz[ano]?.[mes] ?? empty();
-        serie.push({
-          label: `${MESES_PT[mes]}/${String(ano).slice(2)}`,
-          cartao: c.cartao,
-          particular: c.particular,
-          exames: c.exames,
-        });
-      }
-      setAtend12(serie);
+      setAtend12(serieAtendimentos(rows as LinhaMatriz[] | null, MESES_NO_GRAFICO));
+      setAtendCarregando(false);
     })();
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, janela, atendTentativa]);
+
+  // Tabela ano × mês: histórico inteiro, então só é buscada quando alguém
+  // abre a janela de detalhe.
+  useEffect(() => {
+    if (!atendDrill || !clinicaAtual || atendMatriz || matrizCarregando) return;
+    (async () => {
+      setMatrizCarregando(true);
+      setMatrizErro(null);
+      const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id);
+      if (error) setMatrizErro(error.message ?? "Falha ao consultar o banco.");
+      else setAtendMatriz(matrizAtendimentos(rows as LinhaMatriz[] | null));
+      setMatrizCarregando(false);
+    })();
+  }, [atendDrill, clinicaAtual?.clinica_id, atendMatriz, matrizCarregando]);
 
   const { receitas: totalR, despesas: totalD } = totaisDaSerie(data);
   const periodoLabel = useMemo(
@@ -281,7 +267,25 @@ function Page() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {atend12.length === 0 ? (
+          {atendErro ? (
+            /* Antes o erro era engolido e a tela desenhava barras zeradas, o
+               que foi lido como "os atendimentos sumiram". */
+            <div className="py-10 text-center">
+              <p className="text-sm font-medium">Não foi possível carregar os atendimentos.</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                O banco recusou a consulta: {atendErro}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAtendTentativa((n) => n + 1)}
+                className="mt-3 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                Tentar de novo
+              </button>
+            </div>
+          ) : atendCarregando ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">Carregando...</div>
+          ) : atend12.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground text-sm">Sem dados.</div>
           ) : (
             <MiniBarChart
@@ -295,7 +299,7 @@ function Page() {
               formatY={(n) => String(Math.round(n))}
             />
           )}
-          <p className="text-[12px] text-muted-foreground mt-2">
+          <p className="text-[12px] text-muted-foreground mt-2" hidden={!!atendErro}>
             Total no período exibido:{" "}
             <b>{atend12.reduce((s, r) => s + r.cartao + r.particular + r.exames, 0)}</b>{" "}
             atendimentos (cartão: {atend12.reduce((s, r) => s + r.cartao, 0)}, particular:{" "}
@@ -351,10 +355,21 @@ function Page() {
       <Dialog open={atendDrill} onOpenChange={setAtendDrill}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Atendimentos por ano × mês — Total: {atendMatriz.totalGeral}</DialogTitle>
+            <DialogTitle>
+              Atendimentos por ano × mês
+              {atendMatriz ? ` — Total: ${atendMatriz.totalGeral.toLocaleString("pt-BR")}` : ""}
+            </DialogTitle>
           </DialogHeader>
           <div className="max-h-[65vh] overflow-auto">
-            {atendMatriz.anos.length === 0 ? (
+            {matrizCarregando ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Somando o histórico completo...
+              </p>
+            ) : matrizErro ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Não foi possível somar o histórico completo: {matrizErro}
+              </p>
+            ) : !atendMatriz || atendMatriz.anos.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
                 Sem atendimentos cadastrados.
               </p>

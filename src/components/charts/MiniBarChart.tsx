@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { passoDoRotulo } from "@/lib/charts/passo-rotulo";
 
 export interface BarSeries {
   name: string;
@@ -15,9 +16,21 @@ export interface MiniBarChartProps {
   formatY?: (n: number) => string;
 }
 
+/** Largura usada antes de medir a tela (SSR e primeiro render). */
+const W_PADRAO = 800;
+
 /**
- * Bar chart agrupado em SVG puro — feito para datasets pequenos
- * (até ~30 barras totais). Zero dependências, < 1 KB de código.
+ * Bar chart agrupado em SVG puro. Zero dependências.
+ *
+ * Duas coisas aqui existem por causa de gráfico com muitas barras (o BI
+ * Financeiro por dia chega a 31):
+ *
+ * 1. A largura do `viewBox` acompanha a largura real do elemento. Antes era
+ *    fixa em 800 com `preserveAspectRatio="none"`, então em tela larga o SVG
+ *    era esticado na horizontal e o texto do eixo saía deformado.
+ * 2. O eixo X escreve um rótulo a cada N barras, sendo N o mínimo para os
+ *    textos não se encavalarem. Com 30 dias no mês os rótulos ficavam
+ *    sobrepostos e ilegíveis.
  */
 export function MiniBarChart({
   labels,
@@ -25,7 +38,20 @@ export function MiniBarChart({
   height = 320,
   formatY = (n) => String(n),
 }: MiniBarChartProps) {
-  const W = 800;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [larguraMedida, setLarguraMedida] = useState(W_PADRAO);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entradas) => {
+      const w = Math.round(entradas[0]?.contentRect.width ?? 0);
+      if (w > 0) setLarguraMedida(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const W = Math.max(320, larguraMedida);
   const padL = 56;
   const padR = 16;
   const padT = 16;
@@ -42,8 +68,11 @@ export function MiniBarChart({
   const barW = (groupW * 0.7) / Math.max(series.length, 1);
   const yTicks = 4;
 
+  // De quantas em quantas barras o eixo X recebe rótulo (ver passo-rotulo.ts).
+  const passoRotulo = useMemo(() => passoDoRotulo(labels, groupW), [labels, groupW]);
+
   return (
-    <div className="w-full" style={{ height }}>
+    <div ref={wrapRef} className="w-full" style={{ height }}>
       <svg viewBox={`0 0 ${W} ${height}`} className="w-full h-full" preserveAspectRatio="none">
         {/* Grade Y + labels */}
         {Array.from({ length: yTicks + 1 }, (_, i) => {
@@ -91,20 +120,24 @@ export function MiniBarChart({
                     fill={s.color}
                     rx={2}
                   >
-                    <title>{`${s.name}: ${formatY(v)}`}</title>
+                    {/* O rótulo entra na dica porque o eixo X pode ter
+                        pulado esta barra. */}
+                    <title>{`${lbl} — ${s.name}: ${formatY(v)}`}</title>
                   </rect>
                 );
               })}
-              <text
-                x={padL + groupW * gi + groupW / 2}
-                y={height - padB + 16}
-                fontSize="11"
-                textAnchor="middle"
-                fill="currentColor"
-                opacity={0.7}
-              >
-                {lbl}
-              </text>
+              {gi % passoRotulo === 0 && (
+                <text
+                  x={padL + groupW * gi + groupW / 2}
+                  y={height - padB + 16}
+                  fontSize="11"
+                  textAnchor="middle"
+                  fill="currentColor"
+                  opacity={0.7}
+                >
+                  {lbl}
+                </text>
+              )}
             </g>
           );
         })}

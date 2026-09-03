@@ -35,7 +35,7 @@ export interface LinhaSerieDiaria {
   total: number | string;
 }
 
-const MESES_PT = [
+export const MESES_PT = [
   "Jan",
   "Fev",
   "Mar",
@@ -136,4 +136,127 @@ export function totaisDaSerie(pontos: PontoSerie[]): {
   const receitas = pontos.reduce((s, p) => s + p.receitas, 0);
   const despesas = pontos.reduce((s, p) => s + p.despesas, 0);
   return { receitas, despesas, saldo: receitas - despesas };
+}
+
+/* -------------------------------------------------------------------------
+ * Atendimentos por mês (RPC `fin_atendimentos_matriz`)
+ *
+ * ATENÇÃO: a função do banco devolve `mes` de 0 a 11, não de 1 a 12 — ela faz
+ * `EXTRACT(MONTH FROM data) - 1` para o número já servir de índice de array em
+ * JavaScript. Somar 1 aqui desloca o gráfico um mês inteiro.
+ * ------------------------------------------------------------------------- */
+
+/** Linha crua devolvida pela RPC `fin_atendimentos_matriz`. */
+export interface LinhaMatriz {
+  ano: number | string;
+  mes: number | string;
+  cartao: number | string;
+  particular: number | string;
+  exames: number | string;
+}
+
+/** Uma célula da tabela ano × mês. */
+export interface CelulaAtend {
+  cartao: number;
+  particular: number;
+  exames: number;
+  total: number;
+}
+
+export interface MatrizAtend {
+  anos: number[];
+  linhas: Array<{ mesIdx: number; porAno: Record<number, CelulaAtend> }>;
+  totalPorAno: Record<number, CelulaAtend>;
+  totalGeral: number;
+}
+
+const celulaVazia = (): CelulaAtend => ({ cartao: 0, particular: 0, exames: 0, total: 0 });
+
+/** Indexa as linhas da RPC por ano e mês (0–11). */
+function indexar(
+  rows: LinhaMatriz[] | null | undefined,
+): Record<number, Record<number, CelulaAtend>> {
+  const matriz: Record<number, Record<number, CelulaAtend>> = {};
+  for (const r of rows ?? []) {
+    const ano = Number(r?.ano);
+    const mes = Number(r?.mes);
+    if (!Number.isFinite(ano) || !Number.isFinite(mes) || mes < 0 || mes > 11) continue;
+    const cartao = Number(r.cartao) || 0;
+    const particular = Number(r.particular) || 0;
+    const exames = Number(r.exames) || 0;
+    if (!matriz[ano]) matriz[ano] = {};
+    matriz[ano][mes] = { cartao, particular, exames, total: cartao + particular + exames };
+  }
+  return matriz;
+}
+
+/** A tabela ano × mês da janela de detalhe, com os totais por ano. */
+export function matrizAtendimentos(rows: LinhaMatriz[] | null | undefined): MatrizAtend {
+  const matriz = indexar(rows);
+  const anos = Object.keys(matriz)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const linhas = Array.from({ length: 12 }, (_, m) => {
+    const porAno: Record<number, CelulaAtend> = {};
+    for (const a of anos) porAno[a] = matriz[a][m] ?? celulaVazia();
+    return { mesIdx: m, porAno };
+  });
+  const totalPorAno: Record<number, CelulaAtend> = {};
+  for (const a of anos) {
+    const t = celulaVazia();
+    for (const l of linhas) {
+      const c = l.porAno[a];
+      t.cartao += c.cartao;
+      t.particular += c.particular;
+      t.exames += c.exames;
+      t.total += c.total;
+    }
+    totalPorAno[a] = t;
+  }
+  const totalGeral = Object.values(totalPorAno).reduce((s, v) => s + v.total, 0);
+  return { anos, linhas, totalPorAno, totalGeral };
+}
+
+export interface PontoAtend {
+  label: string;
+  cartao: number;
+  particular: number;
+  exames: number;
+}
+
+/**
+ * A série do gráfico: os últimos `meses` meses terminando no mês de `ref`,
+ * em ordem. Mês sem linha na RPC entra como zero, para o eixo não pular mês.
+ */
+export function serieAtendimentos(
+  rows: LinhaMatriz[] | null | undefined,
+  meses = 12,
+  ref: Date = new Date(),
+): PontoAtend[] {
+  const matriz = indexar(rows);
+  const out: PontoAtend[] = [];
+  for (let i = meses - 1; i >= 0; i--) {
+    const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+    const ano = d.getFullYear();
+    const mes = d.getMonth();
+    const c = matriz[ano]?.[mes] ?? celulaVazia();
+    out.push({
+      label: `${MESES_PT[mes]}/${String(ano).slice(2)}`,
+      cartao: c.cartao,
+      particular: c.particular,
+      exames: c.exames,
+    });
+  }
+  return out;
+}
+
+/**
+ * A janela de datas que a série do gráfico precisa: do dia 1 do mês mais
+ * antigo até hoje. Sem isso a RPC varre o histórico inteiro da clínica.
+ */
+export function janelaDaSerie(meses = 12, ref: Date = new Date()): DateRange {
+  const ini = new Date(ref.getFullYear(), ref.getMonth() - (meses - 1), 1);
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(ini), to: iso(ref) };
 }
