@@ -1,10 +1,11 @@
 /**
  * Liga/desliga a Nina "que agenda" por clínica.
  *
- * A evolução foi aprovada apenas para a POLICLÍNICA MENINO JESUS. Em vez de
- * cravar o id no código, a decisão fica em `clinica_feature_flags` — mesma
- * mecânica das outras funcionalidades por clínica do projeto. Clínica sem a
- * flag ligada continua com a Nina informativa de antes, sem nenhuma mudança.
+ * Desde 02/09/2026 o agendamento pela Nina vale para TODAS as clínicas
+ * (decisão do time). A flag `nina_agenda_ativa` continua existindo, mas
+ * agora só serve para DESLIGAR: se a clínica tiver a linha gravada com
+ * `ativo = false`, a Nina volta a ser apenas informativa naquela unidade.
+ * Sem linha nenhuma = ligado.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
@@ -17,8 +18,10 @@ export async function ferramentasAgendaAtivas(clinicaId: string): Promise<boolea
     .eq("clinica_id", clinicaId)
     .eq("flag_key", FLAG_NINA_AGENDA)
     .maybeSingle();
-  if (error) return false;
-  return Boolean(data?.ativo);
+  // Falha de leitura não pode derrubar o atendimento: mantém o padrão ligado.
+  if (error) return true;
+  if (!data) return true;
+  return Boolean(data.ativo);
 }
 
 /**
