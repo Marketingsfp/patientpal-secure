@@ -106,6 +106,37 @@ export const listarConversas = createServerFn({ method: "POST" })
     return rows ?? [];
   });
 
+
+/**
+ * Registra um evento de estado da conversa (resolvida, atribuída, transferida…)
+ * usando a sessão do próprio usuário — a política de RLS exige ser membro da
+ * clínica. Falha aqui nunca derruba a ação principal: o evento é o registro
+ * visual da linha do tempo, não a operação em si.
+ */
+async function registrarEventoConversa(
+  supabase: { from: (t: string) => any },
+  args: {
+    clinicaId: string;
+    conversaId: string;
+    evento: string;
+    userId?: string | null;
+    departamentoId?: string | null;
+    motivo?: string | null;
+    detalhes?: Record<string, unknown> | null;
+  },
+) {
+  const { error } = await supabase.from("atend_conversa_eventos").insert({
+    clinica_id: args.clinicaId,
+    conversa_id: args.conversaId,
+    evento: args.evento,
+    user_id: args.userId ?? null,
+    departamento_id: args.departamentoId ?? null,
+    motivo: args.motivo ?? null,
+    detalhes: args.detalhes ?? null,
+  });
+  if (error) console.error("[atendimento] evento não registrado:", args.evento, error.message);
+}
+
 export const atribuirConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -142,6 +173,13 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: data.userId ? "ASSUMIDA" : "DESATRIBUIDA",
+      userId: data.userId ?? context.userId,
+      departamentoId: data.departamentoId ?? null,
+    });
     return { ok: true };
   });
 
@@ -192,6 +230,15 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (e2) throw new Error(e2.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "TRANSFERIDA",
+      userId: context.userId,
+      departamentoId: data.paraDepartamentoId ?? conv.departamento_id,
+      motivo: data.motivo ?? null,
+      detalhes: { para_user_id: data.paraUserId ?? null },
+    });
     return { ok: true };
   });
 
@@ -224,6 +271,13 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "FINALIZADA",
+      userId: context.userId,
+      detalhes: { protocolo: prot as string },
+    });
     return { ok: true, protocol: prot as string };
   });
 
