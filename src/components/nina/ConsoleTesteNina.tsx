@@ -109,11 +109,19 @@ export function ConsoleTesteNina() {
         };
         setMsgs(r.mensagens);
         setConversaId(r.conversaId);
+        if (r.conversaId) {
+          const f = (await ferramentasFn({
+            data: { clinicaId, conversaId: r.conversaId },
+          })) as { eventos: EventoFerramenta[] };
+          setFerramentas(f.eventos);
+        } else {
+          setFerramentas([]);
+        }
       } catch (e: any) {
         mostrarErro(e);
       }
     },
-    [clinicaId, historico],
+    [clinicaId, historico, ferramentasFn],
   );
 
   useEffect(() => {
