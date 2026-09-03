@@ -6752,10 +6752,13 @@ function AgendaPage() {
           n.add(a.id);
           return n;
         });
-        // Auto check-in apenas se o atendimento for do mesmo dia.
+        // Auto check-in apenas se o atendimento for do mesmo dia — o paciente
+        // está no balcão agora. Dia da CLÍNICA (America/Sao_Paulo), não UTC:
+        // com `toISOString()` um registro feito à noite já cai no dia seguinte
+        // e fazia check-in num atendimento que ainda é de amanhã.
         try {
-          const hoje = new Date().toISOString().slice(0, 10);
-          if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
+          const hoje = hojeBR();
+          if (a.inicio && dataClinicaDe(a.inicio) === hoje) {
             const { error: errFluxo } = await supabase
               .from("agendamentos")
               .update({
@@ -9286,11 +9289,14 @@ function AgendaPage() {
               // Auto check-in: apenas para atendimentos do MESMO DIA do pagamento.
               // Se o pagamento é antecipado (consulta em outro dia), o paciente
               // ainda não chegou — o check-in será feito manualmente na recepção.
-              const hoje = new Date().toISOString().slice(0, 10);
+              // Dia da CLÍNICA (America/Sao_Paulo), não UTC: com `toISOString()`
+              // uma cobrança feita à noite já caía no dia seguinte e liberava o
+              // check-in de um atendimento que ainda é de amanhã.
+              const hoje = hojeBR();
               const mesmoDia = todos.filter((id) => {
                 const ag = items.find((x) => x.id === id);
                 if (!ag) return false;
-                return new Date(ag.inicio).toISOString().slice(0, 10) === hoje;
+                return dataClinicaDe(ag.inicio) === hoje;
               });
               if (mesmoDia.length > 0) {
                 const { error: errFluxo } = await supabase
@@ -10781,13 +10787,14 @@ function AgendaPage() {
               const fichaNum = fichaPorId.get(a.id) ?? "";
               const realizado = a.status === "realizado";
               const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-              const hojeIsoLocal = new Date().toISOString().slice(0, 10);
-              const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
-              const pagoHoje = pagosSet.has(a.id) && ehHoje;
+              // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
+              // do `fluxo_etapa`, que avança quando a recepção clica em
+              // "Confirmar chegada / Check-in". Já existir lançamento quitado
+              // NÃO pinta a linha: quem pagava adiantado (ex.: paga dia 20 a
+              // consulta do dia 30) aparecia azul no dia 30 sem ter chegado.
               const presente =
                 !realizado &&
-                (pagoHoje ||
-                  !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
               const estornoPend = estornoPendAgs.has(a.id);
               const ocultarPaciente = estornoPend && isMedicoOnly;
               const ehLivre = isSlotLivre(a.paciente_nome);
@@ -11168,13 +11175,12 @@ function AgendaPage() {
                   const fichaNum = fichaPorId.get(a.id) ?? "";
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                  const hojeIsoLocal = new Date().toISOString().slice(0, 10);
-                  const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
-                  const pagoHoje = pagosSet.has(a.id) && ehHoje;
+                  // PRESENÇA ≠ PAGAMENTO — mesma regra da visão em cartões: o
+                  // azul vem só do check-in manual da recepção (`fluxo_etapa`),
+                  // nunca da existência de um pagamento antecipado.
                   const presente =
                     !realizado &&
-                    (pagoHoje ||
-                      !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                    !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
                   const estornoPend = estornoPendAgs.has(a.id);
                   const ocultarPaciente = estornoPend && isMedicoOnly;
                   const ehLivre = isSlotLivre(a.paciente_nome);
