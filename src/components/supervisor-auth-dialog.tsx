@@ -42,6 +42,24 @@ export function SupervisorAuthDialog({
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const allowed = rolesPermitidos ?? ["admin", "gestor", "financeiro"];
+  // Cada ação tem a sua alçada (o desconto aceita o financeiro, o sem
+  // faturamento não), então o texto da tela e o da recusa são montados a
+  // partir da lista recebida. Antes eram fixos em "admin, gestor ou
+  // financeiro" e mandavam a funcionária chamar exatamente quem o sistema ia
+  // recusar em seguida.
+  const rolesLabel: Record<string, string> = {
+    admin: "administrador",
+    gestor: "gestor",
+    financeiro: "financeiro",
+    supervisor: "supervisor",
+    caixa: "caixa",
+    recepcao: "recepção",
+  };
+  const nomesAllowed = allowed.map((r) => rolesLabel[r] ?? r);
+  const listaAllowed =
+    nomesAllowed.length > 1
+      ? `${nomesAllowed.slice(0, -1).join(", ")} ou ${nomesAllowed[nomesAllowed.length - 1]}`
+      : (nomesAllowed[0] ?? "supervisor");
 
   useEffect(() => {
     if (!open) {
@@ -103,7 +121,7 @@ export function SupervisorAuthDialog({
     setLoading(false);
     if (!ok)
       return toast.error(
-        "Este usuário não tem permissão para autorizar (precisa ser admin, gestor ou financeiro).",
+        `Este usuário não tem permissão para autorizar (precisa ser ${listaAllowed}).`,
       );
     toast.success(`Autorizado por ${nome}`);
     onAuthorized({ userId: sup.user.id, email: sup.user.email ?? email.trim(), nome, role: role! });
@@ -118,8 +136,7 @@ export function SupervisorAuthDialog({
             <ShieldCheck className="h-5 w-5 text-primary" /> Autorização da supervisão
           </DialogTitle>
           <DialogDescription>
-            Para {acao}, peça ao supervisor (admin, gestor ou financeiro) que informe e-mail e
-            senha.
+            Para {acao}, peça a quem tem alçada ({listaAllowed}) que informe e-mail e senha.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

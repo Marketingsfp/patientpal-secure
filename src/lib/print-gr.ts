@@ -7,7 +7,6 @@ import {
   categoriaZeraRepasse,
   classificarForma,
 } from "@/lib/financeiro/formas-pagamento";
-import { SEM_FATURAMENTO_ROTULO, SEM_FATURAMENTO_SUBTITULO } from "@/lib/agenda/sem-faturamento";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { hojeBR } from "@/lib/date-utils";
 
@@ -651,8 +650,20 @@ async function printGuiaAtendimentoCore({
   // A quarta situação não vem de categoria nenhuma, e sim de uma marcação na
   // própria agenda: SEM FATURAMENTO (Toxicológico e afins). Ali não existe
   // lançamento financeiro para consultar — a cobrança é feita pelo parceiro,
-  // fora da clínica — então a guia tem de sair zerada dos dois lados sem
-  // depender de `lancs`. Ver `src/lib/agenda/sem-faturamento.ts`.
+  // fora da clínica — então nada de dinheiro pode ser calculado a partir de
+  // `lancs`. Ver `src/lib/agenda/sem-faturamento.ts`.
+  //
+  // O QUE A GUIA IMPRIME NESSE CASO: NADA sobre dinheiro. A versão anterior
+  // estampava a tarja "SEM FATURAMENTO / COBRANÇA FEITA PELO PARCEIRO" e a
+  // linha "PRESTADOR R$ 0,00", e o efeito na clínica foi o oposto do
+  // pretendido: o médico lia o cupom e entendia que tinha atendido de graça,
+  // que não haveria repasse nenhum, e o assunto virava discussão no corredor.
+  // O acerto do repasse desses atendimentos é combinado fora da guia, entre a
+  // clínica e o parceiro. Então a guia sai limpa — paciente, ficha,
+  // profissional e procedimento — sem caixa de valores e sem tarja. O controle
+  // interno (caixa zerado, motivo, quem autorizou) continua inteiro nas
+  // colunas do agendamento e no histórico; ele é administrativo e não precisa
+  // ser impresso no cupom que fica com o médico e com o paciente.
   const semFaturamento = (a as { sem_faturamento?: boolean | null }).sem_faturamento === true;
   const ehSemCobranca =
     semFaturamento ||
@@ -670,19 +681,14 @@ async function printGuiaAtendimentoCore({
   const ehRetornoClinica =
     !semFaturamento &&
     lancs.some((l) => l.status === "confirmado" && categoriaEhRetorno(nomeCategoriaLancamento(l)));
-  // A tarja precisa dizer a verdade sobre POR QUE a guia está zerada. Imprimir
-  // "CORTESIA" num Toxicológico faria o paciente entender que a clínica abriu
-  // mão de um valor — quando na verdade ele já vai pagar, só que ao parceiro.
-  const rotuloLiberacao = semFaturamento
-    ? SEM_FATURAMENTO_ROTULO
-    : ehRetornoClinica
-      ? "RETORNO DE CONSULTA"
-      : "CORTESIA";
-  const subtituloLiberacao = semFaturamento
-    ? SEM_FATURAMENTO_SUBTITULO
-    : ehRetornoClinica
-      ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
-      : "ATENDIMENTO LIBERADO — SEM COBRANÇA";
+  // A tarja precisa dizer a verdade sobre POR QUE a guia está zerada. Ela só
+  // aparece nos casos em que a CLÍNICA abriu mão do valor (retorno, cortesia);
+  // o sem faturamento não imprime tarja nenhuma, porque ali ninguém abriu mão
+  // de nada — quem cobra é o parceiro.
+  const rotuloLiberacao = ehRetornoClinica ? "RETORNO DE CONSULTA" : "CORTESIA";
+  const subtituloLiberacao = ehRetornoClinica
+    ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
+    : "ATENDIMENTO LIBERADO — SEM COBRANÇA";
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -930,9 +936,10 @@ async function printGuiaAtendimentoCore({
   };
   if (semFaturamento) {
     // Marcado na agenda como sem faturamento: não existe dinheiro a imprimir,
-    // mesmo que o chamador tenha passado um `pagamento` por engano. Zerar aqui
-    // é o que garante o "Valor do Procedimento: R$ 0,00" pedido pela clínica —
-    // e, com `valorBase` zerado logo abaixo, também o CLÍNICA e o PRESTADOR.
+    // mesmo que o chamador tenha passado um `pagamento` por engano. A guia não
+    // mostra valor nenhum nesse caso (nem zerado), mas zerar aqui continua
+    // necessário: é o que impede um `pagamento` recebido por engano de
+    // ressuscitar a caixa de valores mais abaixo.
     valor = 0;
     pagResolvido = undefined;
   } else if (pagamento) {
@@ -1251,13 +1258,9 @@ async function printGuiaAtendimentoCore({
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
   // fallback silencioso para dinheiro já causou guias mostrando forma errada
   // para pagamentos reais em débito/pix/etc.
-  const formaLbl = semFaturamento
-    ? // Sem faturamento não tem forma de pagamento nenhuma: "NÃO INFORMADO"
-      // aqui daria a entender que alguém esqueceu de preencher.
-      "SEM COBRANÇA"
-    : pagResolvido?.forma_pagamento
-      ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase())
-      : "NÃO INFORMADO";
+  const formaLbl = pagResolvido?.forma_pagamento
+    ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase())
+    : "NÃO INFORMADO";
   const parcelasTxt =
     pagResolvido &&
     pagResolvido.forma_pagamento === "cartao_credito" &&
@@ -1463,7 +1466,11 @@ async function printGuiaAtendimentoCore({
           // A gratuidade do convênio NÃO entra aqui: com valor zero e repasse
           // a mostrar, ela cai na caixa "GRATUIDADE / PACIENTE ISENTO" logo
           // abaixo, que é a que exibe clínica e prestador.
-          valor > 0 || ehSemRepasse
+          //
+          // O SEM FATURAMENTO fica fora de todas as caixas: a guia dele não
+          // fala de dinheiro nenhum, nem para dizer que é zero. Ver o
+          // comentário longo lá em cima, onde `semFaturamento` é calculado.
+          !semFaturamento && (valor > 0 || ehSemRepasse)
           ? `
     <div class="box-total">
       ${
@@ -1474,7 +1481,7 @@ async function printGuiaAtendimentoCore({
       }
       <div class="linha-principal">
         <div>
-          <span class="k label">${semFaturamento ? "Valor do procedimento" : "Valor recebido"}</span>
+          <span class="k label">Valor recebido</span>
           <div class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</div>
         </div>
         <div class="valor-grande">${fmtBRL(valor)}</div>
@@ -2241,21 +2248,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         </table>
         ${
           g.semFaturamento
-            ? // Sem faturamento imprime os três valores zerados de forma
-              // explícita, e não simplesmente omite a caixa: a guia é o
-              // comprovante que fica com o paciente e com o médico, e ela
-              // precisa mostrar preto no branco que a clínica não recebeu nada
-              // por este atendimento e que ninguém tem repasse a cobrar.
-              `
-        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">${SEM_FATURAMENTO_ROTULO}</div>
-        <div class="center sm">${SEM_FATURAMENTO_SUBTITULO}</div>
-        <div class="sep"></div>
-        <table>
-          <tr><td class="label">VALOR DO PROCEDIMENTO:</td><td class="v right">${fmtBRL(0)}</td></tr>
-          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(0)}</td></tr>
-          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(0)}</td></tr>
-        </table>
-        `
+            ? // Sem faturamento não imprime NADA sobre dinheiro — nem a tarja,
+              // nem os valores zerados. A versão anterior estampava
+              // "PRESTADOR R$ 0,00" e o médico entendia que tinha atendido de
+              // graça; o acerto desses atendimentos é feito fora da guia,
+              // entre a clínica e o parceiro. A guia fica com a lista de
+              // procedimentos e mais nada. Mesma decisão da guia individual.
+              ""
             : g.allGratuidade
               ? `
         <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">${

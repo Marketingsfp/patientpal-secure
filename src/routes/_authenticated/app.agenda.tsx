@@ -50,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -153,8 +154,13 @@ import {
   Ban,
 } from "lucide-react";
 import {
+  MOTIVOS_SEM_FATURAMENTO,
+  MOTIVO_SEM_FATURAMENTO_OUTRO,
+  ROLES_AUTORIZAM_SEM_FATURAMENTO,
   definirSemFaturamento,
   ehSemFaturamento,
+  motivoSemFaturamentoFinal,
+  podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
 } from "@/lib/agenda/sem-faturamento";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
@@ -246,6 +252,9 @@ type Agendamento = {
   sem_faturamento_em?: string | null;
   sem_faturamento_por?: string | null;
   sem_faturamento_por_nome?: string | null;
+  sem_faturamento_motivo?: string | null;
+  sem_faturamento_autorizado_por?: string | null;
+  sem_faturamento_autorizado_por_nome?: string | null;
   /**
    * Total combinado da cobrança. Só é preenchido quando o paciente paga
    * parcialmente (entrada/sinal) — é ele que permite calcular o saldo devedor.
@@ -322,7 +331,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,sem_faturamento_motivo,sem_faturamento_autorizado_por,sem_faturamento_autorizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -1198,10 +1207,18 @@ function AgendaPage() {
      */
     semConvenio: boolean;
   } | null>(null);
+  /**
+   * Nome do convênio quando o paciente é titular APENAS FINANCEIRO — ele paga
+   * o cartão para os dependentes e não usa os benefícios. Sem este aviso a
+   * recepção via o paciente "sem convênio" e não entendia por que a cobrança
+   * saía pelo valor cheio, já que ele aparece como dono do contrato.
+   */
+  const [avisoApenasFinanceiro, setAvisoApenasFinanceiro] = useState<string | null>(null);
   const contratoPacienteReqId = useRef(0);
   useEffect(() => {
     if (!open || !clinicaAtual || !form.paciente_id) {
       setContratoPacienteInfo(null);
+      setAvisoApenasFinanceiro(null);
       return;
     }
     const reqId = ++contratoPacienteReqId.current;
@@ -1221,6 +1238,11 @@ function AgendaPage() {
         .eq("clinica_id", clinicaId)
         .eq("status", "ativo")
         .eq("paciente_id", pacId)
+        // Titular apenas financeiro paga o cartão mas não usa os benefícios
+        // (`titularUsaBeneficio`). Sem este filtro a tela marcava o
+        // atendimento dele como "Convênio" e o caixa cobrava pela tabela do
+        // cartão. O contrato segue valendo para os dependentes ativos.
+        .eq("titular_apenas_financeiro", false)
         .order("data_inicio", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(LIMITE_CONTRATOS_CANDIDATOS);
@@ -1250,8 +1272,23 @@ function AgendaPage() {
       if (reqId !== contratoPacienteReqId.current) return;
       if (!contrato) {
         setContratoPacienteInfo(null);
+        // Sem contrato que dê benefício: pode ser um paciente sem cartão ou o
+        // titular que só paga. Distinguir os dois é o que evita a recepção
+        // achar que o desconto "sumiu" de quem tem o contrato no próprio nome.
+        const { data: soFinanceiro } = await supabase
+          .from("contratos_assinatura")
+          .select("id, cb_convenios(nome)")
+          .eq("clinica_id", clinicaId)
+          .eq("status", "ativo")
+          .eq("paciente_id", pacId)
+          .eq("titular_apenas_financeiro", true)
+          .limit(1);
+        if (reqId !== contratoPacienteReqId.current) return;
+        const linha = ((soFinanceiro ?? []) as any[])[0];
+        setAvisoApenasFinanceiro(linha ? (linha.cb_convenios?.nome ?? "Convênio") : null);
         return;
       }
+      setAvisoApenasFinanceiro(null);
       // 2) Mensalidades vencidas — tolerância de 5 dias corridos após o
       //    vencimento: dentro dela o convênio segue liberado normalmente
       //    (mesma regra de `obterInfoConvenioPaciente`). Só bloqueia
@@ -1587,6 +1624,25 @@ function AgendaPage() {
     autorizadoPor: string;
   }>({ tipo: "valor", input: "", motivo: "", autorizadoPor: "" });
   const ehSupervisorDesc = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+
+  // --- Sem faturamento: motivo obrigatório + autorização da supervisão ------
+  // Marcar um atendimento como sem faturamento apaga uma receita da clínica
+  // com um clique, então a ação passou a exigir as duas coisas que uma isenção
+  // sempre exigiu no financeiro: alguém com alçada e um motivo escrito.
+  // `semFatAcao` guarda o que está pendente enquanto o supervisor digita a
+  // senha — sem ele, ao voltar do diálogo de senha não haveria como saber se a
+  // intenção era marcar ou remover a marcação.
+  const podeAutorizarSemFat = podeAutorizarSemFaturamento(clinicaAtual?.role);
+  const [semFatDlgOpen, setSemFatDlgOpen] = useState(false);
+  const [semFatSupOpen, setSemFatSupOpen] = useState(false);
+  const [semFatSalvando, setSemFatSalvando] = useState(false);
+  const [semFatAcao, setSemFatAcao] = useState<{
+    ag: Agendamento;
+    marcar: boolean;
+  } | null>(null);
+  const [semFatMotivo, setSemFatMotivo] = useState<string>("");
+  const [semFatMotivoLivre, setSemFatMotivoLivre] = useState("");
+
   // Aplica desconto pendente a um valor (R$).
   const aplicarDescontoPendente = (valor: number): number => {
     if (!descontoPendente) return valor;
@@ -6002,6 +6058,13 @@ function AgendaPage() {
    *
    * Marcar não cria lançamento nenhum: é justamente a ausência de lançamento
    * que mantém o caixa e o "A Receber" limpos.
+   *
+   * A ação NÃO é mais um liga/desliga direto. Como ela apaga uma receita da
+   * clínica, passou a exigir alçada (admin, gestor ou supervisor) e, ao
+   * marcar, um motivo escrito — os mesmos dois controles que a cortesia e o
+   * desconto já tinham no financeiro. Quem não tem alçada continua podendo
+   * iniciar a ação no balcão: a tela pede a senha de um supervisor na hora, em
+   * vez de simplesmente esconder o botão e deixar a recepção sem saída.
    */
   const alternarSemFaturamento = async (a: Agendamento) => {
     if (!podeEscrever) {
@@ -6019,28 +6082,112 @@ function AgendaPage() {
       );
       return;
     }
+    setSemFatAcao({ ag: a, marcar });
     if (marcar) {
-      const ok = await confirmDialog(
-        `Marcar este atendimento como SEM FATURAMENTO?\n\nPaciente: ${a.paciente_nome}\nProcedimento: ${a.procedimento ?? "—"}\n\nEle deixará de ser cobrado no caixa (o paciente paga direto ao parceiro) e a Guia de Atendimento sairá com valor, clínica e prestador zerados.`,
-      );
-      if (!ok) return;
+      // O motivo é pedido antes de qualquer coisa: é ele que a gerência vai
+      // ler depois, e pedi-lo depois da senha faria o supervisor autorizar sem
+      // ver o que estava autorizando.
+      setSemFatMotivo("");
+      setSemFatMotivoLivre("");
+      setSemFatDlgOpen(true);
+      return;
     }
-    const nomeUsuario =
-      (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
-    const res = await definirSemFaturamento(a.id, marcar, {
+    // Remover a marcação não precisa de motivo, mas precisa da mesma alçada:
+    // sem isso, a recepção desfaria com um clique a decisão do supervisor.
+    if (!podeAutorizarSemFat) {
+      setSemFatSupOpen(true);
+      return;
+    }
+    const ok = await confirmDialog(
+      `Voltar a faturar este atendimento?\n\nPaciente: ${a.paciente_nome}\nProcedimento: ${a.procedimento ?? "—"}\n\nEle volta a ser cobrado normalmente no caixa.`,
+    );
+    if (!ok) {
+      setSemFatAcao(null);
+      return;
+    }
+    await gravarSemFaturamento(a, false, {
       id: user?.id ?? null,
-      nome: nomeUsuario,
+      nome: nomeUsuarioLogado(),
     });
+  };
+
+  /** Nome de quem está operando a tela, para o rastro da marcação. */
+  const nomeUsuarioLogado = (): string | null =>
+    (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+
+  /**
+   * Grava a marcação (ou a remoção) já com autorização e motivo definidos.
+   *
+   * Separada do fluxo da tela porque chega por três caminhos diferentes: o
+   * supervisor que marca direto, a recepcionista cuja ação foi liberada pela
+   * senha do supervisor, e a remoção da marcação.
+   */
+  const gravarSemFaturamento = async (
+    a: Agendamento,
+    marcar: boolean,
+    autorizador: { id: string | null; nome: string | null },
+    motivo?: string,
+  ) => {
+    if (!clinicaAtual) {
+      toast.error("Sem clínica selecionada.");
+      return;
+    }
+    setSemFatSalvando(true);
+    const res = await definirSemFaturamento({
+      agendamentoId: a.id,
+      clinicaId: clinicaAtual.clinica_id,
+      marcar,
+      operador: {
+        id: user?.id ?? null,
+        nome: nomeUsuarioLogado(),
+        email: user?.email ?? null,
+      },
+      autorizador,
+      motivo,
+    });
+    setSemFatSalvando(false);
     if (!res.ok) {
       mostrarErro(res.erro);
       return;
     }
     // Atualização otimista: o selo muda na hora, com o paciente no balcão.
     setItems((lista) => lista.map((it) => (it.id === a.id ? { ...it, ...res.patch } : it)));
+    setSemFatDlgOpen(false);
+    setSemFatAcao(null);
+    setSemFatMotivo("");
+    setSemFatMotivoLivre("");
     toast.success(
       marcar
-        ? "Atendimento marcado como sem faturamento. A GR já pode ser impressa, zerada."
+        ? "Atendimento marcado como sem faturamento, com o motivo registrado no histórico."
         : "Marcação removida. O atendimento volta a ser cobrado normalmente.",
+    );
+  };
+
+  /**
+   * Botão "confirmar" do modal de motivo: valida o motivo e decide se grava
+   * direto (supervisão) ou se ainda precisa pedir a senha.
+   */
+  const confirmarSemFaturamento = async () => {
+    const alvo = semFatAcao;
+    if (!alvo) return;
+    const motivo = motivoSemFaturamentoFinal(semFatMotivo, semFatMotivoLivre);
+    if (!motivo) {
+      toast.error(
+        semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO
+          ? "Descreva o motivo da isenção (pelo menos 4 letras)."
+          : "Escolha o motivo da isenção.",
+      );
+      return;
+    }
+    if (!podeAutorizarSemFat) {
+      setSemFatSupOpen(true);
+      return;
+    }
+    await gravarSemFaturamento(
+      alvo.ag,
+      true,
+      { id: user?.id ?? null, nome: nomeUsuarioLogado() },
+      motivo,
     );
   };
 
@@ -8301,6 +8448,14 @@ function AgendaPage() {
                         contratos.
                       </p>
                     )}
+                    {avisoApenasFinanceiro && (
+                      <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                        Paciente é <b>titular apenas financeiro</b> do {avisoApenasFinanceiro}: paga
+                        o cartão para os dependentes e <b>não usa os benefícios</b>. Este
+                        atendimento é cobrado como <b>Particular</b>. Se ele também deve ter
+                        desconto, o setor de contratos precisa cadastrá-lo como beneficiário.
+                      </p>
+                    )}
                     {previaCobranca && (
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold text-slate-700">
@@ -9521,6 +9676,137 @@ function AgendaPage() {
           setDescForm((f) => ({ ...f, autorizadoPor: info.nome }));
           setDescontoDlgOpen(false);
           toast.success("Desconto aplicado com autorização da supervisão.");
+        }}
+      />
+
+      {/*
+        SEM FATURAMENTO — motivo obrigatório.
+
+        O modal aparece antes de qualquer gravação, inclusive para o supervisor:
+        o motivo não é burocracia da recepção, é o que responde, meses depois,
+        por que aquele atendimento não entrou no caixa. A lista fechada existe
+        para que os casos sejam contáveis; "Outro" cobre o que ela não previu.
+      */}
+      <Dialog
+        open={semFatDlgOpen}
+        onOpenChange={(v) => {
+          setSemFatDlgOpen(v);
+          if (!v) setSemFatAcao(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-amber-600" /> Atendimento sem faturamento
+            </DialogTitle>
+            <DialogDescription>
+              {semFatAcao?.ag.paciente_nome}
+              {semFatAcao?.ag.procedimento ? ` — ${semFatAcao.ag.procedimento}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              O atendimento deixará de ser cobrado no caixa da clínica (o paciente paga direto ao
+              parceiro). O motivo abaixo fica gravado no histórico do agendamento, junto com quem
+              autorizou e a data.
+            </p>
+            <div className="space-y-1">
+              <Label>Motivo da isenção *</Label>
+              <Select value={semFatMotivo} onValueChange={setSemFatMotivo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVOS_SEM_FATURAMENTO.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {semFatMotivo === MOTIVO_SEM_FATURAMENTO_OUTRO && (
+              <div className="space-y-1">
+                <Label>Descreva o motivo *</Label>
+                <Textarea
+                  rows={2}
+                  maxLength={300}
+                  value={semFatMotivoLivre}
+                  onChange={(e) => setSemFatMotivoLivre(e.target.value)}
+                  placeholder="Ex.: perícia do INSS, convênio X fatura direto…"
+                />
+              </div>
+            )}
+            {!podeAutorizarSemFat && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Esta ação é restrita à supervisão (admin, gestor ou supervisor). Ao confirmar, será
+                pedida a senha de um supervisor.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSemFatDlgOpen(false);
+                setSemFatAcao(null);
+              }}
+              disabled={semFatSalvando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void confirmarSemFaturamento()}
+              disabled={semFatSalvando}
+            >
+              {semFatSalvando
+                ? "Gravando…"
+                : podeAutorizarSemFat
+                  ? "Marcar sem faturamento"
+                  : "Autorizar e marcar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/*
+        A senha do supervisor libera tanto a marcação quanto a remoção dela — o
+        que a diretoria isentou, só a diretoria volta atrás. Quem autorizou fica
+        gravado separado de quem operou a tela: no balcão são duas pessoas
+        diferentes.
+      */}
+      <SupervisorAuthDialog
+        open={semFatSupOpen}
+        onOpenChange={(v) => {
+          setSemFatSupOpen(v);
+          // Desistiu de remover a marcação: nada fica pendurado. No caminho de
+          // marcar, o modal de motivo continua aberto atrás e é ele que limpa.
+          if (!v && semFatAcao && !semFatAcao.marcar) setSemFatAcao(null);
+        }}
+        acao={
+          semFatAcao?.marcar
+            ? "marcar este atendimento como SEM FATURAMENTO"
+            : "voltar a faturar este atendimento"
+        }
+        rolesPermitidos={[...ROLES_AUTORIZAM_SEM_FATURAMENTO]}
+        onAuthorized={(info) => {
+          const alvo = semFatAcao;
+          if (!alvo) return;
+          const motivo = alvo.marcar
+            ? (motivoSemFaturamentoFinal(semFatMotivo, semFatMotivoLivre) ?? undefined)
+            : undefined;
+          if (alvo.marcar && !motivo) {
+            toast.error("Escolha o motivo da isenção.");
+            return;
+          }
+          void gravarSemFaturamento(
+            alvo.ag,
+            alvo.marcar,
+            { id: info.userId, nome: info.nome },
+            motivo,
+          );
         }}
       />
 
