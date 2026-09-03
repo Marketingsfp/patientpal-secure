@@ -72,8 +72,11 @@ export type EventoConversa =
   | "HANDOFF_SOLICITADO"
   | "ENTROU_NA_FILA"
   | "ASSUMIDA"
+  | "DESATRIBUIDA"
   | "TRANSFERIDA"
   | "DEVOLVIDA_PARA_IA"
+  | "ATRIBUIDA_IA"
+  | "REABERTA"
   | "FINALIZADA"
   | "IA_SILENCIADA";
 
