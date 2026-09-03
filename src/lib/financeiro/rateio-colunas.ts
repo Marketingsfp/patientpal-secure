@@ -78,6 +78,15 @@ export function colunasRateio(
         rotulo: ROTULO_AGRUPADOR[agruparPor],
         formato: agruparPor === "data" ? "data" : "texto",
       },
+      // Agrupado por profissional a especialidade vem junto, como no
+      // analítico: é por ela que o financeiro separa os repasses no
+      // fechamento. Nos outros agrupamentos ela seria redundante (já é o
+      // próprio agrupador) ou misturada (uma data tem várias).
+      ...(agruparPor === "profissional"
+        ? ([
+            { chave: "especialidade_nome", rotulo: "Especialidade", formato: "texto" },
+          ] as ColunaRateio[])
+        : []),
       { chave: "qtd", rotulo: "Qtd. atend.", formato: "numero" },
       ...dinheiro,
     ];

@@ -156,6 +156,7 @@ describe("compararRateio", () => {
   const grupo = (over: Partial<RateioGrupo>): RateioGrupo => ({
     chave: "med-1",
     rotulo: "DRA. ANA",
+    especialidade_nome: "CARDIOLOGIA",
     qtd: 1,
     receita: 100,
     repasse: 60,

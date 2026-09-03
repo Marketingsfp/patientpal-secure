@@ -68,6 +68,58 @@ describe("colunas do sintetico", () => {
     expect(primeira.rotulo).toBe("Profissional");
     expect((grupo as unknown as Record<string, unknown>)[primeira.chave]).toBe("DRA. ANA");
   });
+
+  it("agrupado por profissional traz o fechamento que o financeiro pediu", () => {
+    expect(colunasRateio("sintetico", "profissional", false).map((c) => c.rotulo)).toEqual([
+      "Profissional",
+      "Especialidade",
+      "Qtd. atend.",
+      "Receita bruta",
+      "Repasse prestador",
+      "Líquido clínica",
+      "% clínica",
+    ]);
+  });
+
+  it("a especialidade so entra no agrupamento por profissional", () => {
+    for (const agruparPor of ["data", "especialidade"] as const) {
+      const chaves = colunasRateio("sintetico", agruparPor, false).map((c) => c.chave);
+      expect(chaves).not.toContain("especialidade_nome");
+    }
+  });
+
+  it("uma linha por medico, somando o periodo inteiro", () => {
+    const grupos = agruparRateio(
+      [
+        linha,
+        { ...linha, id: "2", data: "2026-08-26", receita: 200, repasse: 120, liquido: 80 },
+        {
+          ...linha,
+          id: "3",
+          medico_id: "med-2",
+          medico_nome: "DR. BRUNO",
+          especialidade_id: "esp-2",
+          especialidade_nome: "ORTOPEDIA",
+        },
+      ],
+      "profissional",
+    );
+    expect(grupos.map((g) => g.rotulo)).toEqual(["DR. BRUNO", "DRA. ANA"]);
+    const ana = grupos.find((g) => g.rotulo === "DRA. ANA")!;
+    expect(ana.qtd).toBe(2);
+    expect(ana.receita).toBe(300);
+    expect(ana.repasse).toBe(180);
+    expect(ana.liquido).toBe(120);
+    expect(ana.especialidade_nome).toBe("CARDIOLOGIA");
+  });
+
+  it("grupo que mistura especialidades nao escolhe uma delas", () => {
+    const [grupo] = agruparRateio(
+      [linha, { ...linha, id: "2", especialidade_id: "esp-2", especialidade_nome: "ORTOPEDIA" }],
+      "data",
+    );
+    expect(grupo.especialidade_nome).toBe("Vários");
+  });
 });
 
 describe("colunas do analitico", () => {

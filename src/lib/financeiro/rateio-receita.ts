@@ -96,6 +96,15 @@ export interface RateioLinha {
 export interface RateioGrupo {
   chave: string;
   rotulo: string;
+  /**
+   * Especialidade do agrupador. Existe para o sintético por PROFISSIONAL
+   * mostrar, ao lado do nome do médico, a mesma especialidade que o analítico
+   * mostra em cada atendimento — é por ela que o financeiro separa os repasses
+   * no fechamento. Quando o grupo mistura especialidades (agrupamento por
+   * data, ou o balaio "Sem profissional") sai "Vários", nunca uma delas
+   * escolhida ao acaso.
+   */
+  especialidade_nome: string;
   qtd: number;
   receita: number;
   repasse: number;
@@ -611,6 +620,8 @@ export const margemClinica = (receita: number, liquido: number): number =>
 /** Consolida as linhas no agrupador escolhido (relatório sintético). */
 export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPor): RateioGrupo[] {
   const acc = new Map<string, RateioGrupo>();
+  /** Especialidades distintas vistas em cada grupo (ver `especialidade_nome`). */
+  const especialidades = new Map<string, Set<string>>();
   for (const l of linhas) {
     const chave =
       agruparPor === "data"
@@ -627,12 +638,16 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
     const atual = acc.get(chave) ?? {
       chave,
       rotulo,
+      especialidade_nome: "",
       qtd: 0,
       receita: 0,
       repasse: 0,
       liquido: 0,
       margem: 0,
     };
+    const vistas = especialidades.get(chave) ?? new Set<string>();
+    vistas.add(l.especialidade_nome);
+    especialidades.set(chave, vistas);
     atual.qtd += 1;
     atual.receita = round2(atual.receita + l.receita);
     atual.repasse = round2(atual.repasse + l.repasse);
@@ -641,7 +656,11 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
     acc.set(chave, atual);
   }
   const grupos = Array.from(acc.values());
-  for (const g of grupos) g.margem = margemClinica(g.receita, g.liquido);
+  for (const g of grupos) {
+    g.margem = margemClinica(g.receita, g.liquido);
+    const vistas = Array.from(especialidades.get(g.chave) ?? []);
+    g.especialidade_nome = vistas.length === 1 ? vistas[0] : vistas.length === 0 ? "" : "Vários";
+  }
   return grupos.sort((a, b) =>
     agruparPor === "data"
       ? a.rotulo.localeCompare(b.rotulo)
@@ -703,6 +722,7 @@ export function compararRateio(
       chave,
       // Na comparação por data o rótulo é o dia equivalente do período atual.
       rotulo: agruparPor === "data" ? chave : g.rotulo,
+      especialidade_nome: g.especialidade_nome,
       qtd: 0,
       receita: 0,
       repasse: 0,
