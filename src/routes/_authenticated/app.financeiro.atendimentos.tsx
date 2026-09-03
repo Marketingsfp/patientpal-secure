@@ -176,6 +176,8 @@ interface Convenio {
   cartao_desconto_valor?: number | null;
   terceiro_id?: string | null;
   percentual_terceiro?: number | null;
+  tipo_repasse_terceiro?: string | null;
+  valor_terceiro?: number | null;
 }
 interface Conta {
   id: string;
@@ -1748,7 +1750,7 @@ function AtendimentosPage() {
         const { data: cv, error: cvErr } = await supabase
           .from("medico_convenios")
           .select(
-            "medico_id, nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro",
+            "medico_id, nome, tipo_repasse, percentual, valor, ativo, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro, tipo_repasse_terceiro, valor_terceiro",
           )
           .in("medico_id", ids)
           .eq("ativo", true)
@@ -3285,14 +3287,18 @@ function AtendimentosPage() {
                                 className="mt-0.5 font-normal text-[11px] text-amber-700 dark:text-amber-500"
                                 title={`Repasse de terceiro (dono do equipamento): ${
                                   medMap.get(a.terceiro_medico_id) ?? "—"
-                                } — ${a.terceiro_percentual ?? "?"}% do valor do atendimento`}
+                                } — ${
+                                  a.terceiro_percentual != null
+                                    ? `${a.terceiro_percentual}% do valor do atendimento`
+                                    : "valor fixo por atendimento"
+                                }`}
                               >
                                 + {fmt(Number(a.terceiro_valor))}{" "}
                                 <span className="text-muted-foreground">
                                   {medMap.get(a.terceiro_medico_id) ?? "terceiro"}
                                   {a.terceiro_percentual != null
                                     ? ` (${a.terceiro_percentual}%)`
-                                    : ""}
+                                    : " (R$ fixo)"}
                                   {a.terceiro_pago ? " • pago" : ""}
                                 </span>
                               </div>
@@ -3992,7 +3998,7 @@ function AtendimentosPage() {
                                     `${t.nome}${
                                       t.percentuais.length
                                         ? ` (${t.percentuais.join("% / ")}%)`
-                                        : ""
+                                        : " (R$ fixo)"
                                     } — ${fmt(t.total)} em ${t.qtd} atend.`,
                                 )
                                 .join(" · ")}

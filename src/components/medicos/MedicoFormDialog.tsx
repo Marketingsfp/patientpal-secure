@@ -79,8 +79,12 @@ interface ConvenioRow {
   cartao_desconto_valor: string;
   /** REPASSE TRIPLO — médico terceiro (dono do equipamento). "" = sem terceiro */
   terceiro_id: string;
+  /** REPASSE TRIPLO — como o terceiro recebe: % do total ou R$ fixo por atendimento */
+  tipo_repasse_terceiro: "percentual" | "valor";
   /** REPASSE TRIPLO — % do valor total do atendimento pago ao terceiro */
   percentual_terceiro: string;
+  /** REPASSE TRIPLO — valor fixo em R$ por atendimento pago ao terceiro */
+  valor_terceiro: string;
   ativo: boolean;
 }
 
@@ -116,7 +120,9 @@ const REPASSE_EXTRA_VAZIO = {
   cartao_consulta_valor: "",
   cartao_desconto_valor: "",
   terceiro_id: "",
+  tipo_repasse_terceiro: "percentual" as "percentual" | "valor",
   percentual_terceiro: "",
+  valor_terceiro: "",
 };
 
 /**
@@ -631,7 +637,7 @@ export function MedicoFormDialog({
       const { data: convs } = await supabase
         .from("medico_convenios")
         .select(
-          "id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro, ativo",
+          "id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro, tipo_repasse_terceiro, valor_terceiro, ativo",
         )
         .eq("medico_id", med.id)
         .order("created_at");
@@ -646,6 +652,8 @@ export function MedicoFormDialog({
               cartao_desconto_valor?: number | null;
               terceiro_id?: string | null;
               percentual_terceiro?: number | null;
+              tipo_repasse_terceiro?: string | null;
+              valor_terceiro?: number | null;
             };
             return {
               id: c.id,
@@ -663,8 +671,10 @@ export function MedicoFormDialog({
               cartao_desconto_valor:
                 r.cartao_desconto_valor != null ? String(r.cartao_desconto_valor) : "",
               terceiro_id: r.terceiro_id ?? "",
+              tipo_repasse_terceiro: r.tipo_repasse_terceiro === "valor" ? "valor" : "percentual",
               percentual_terceiro:
                 r.percentual_terceiro != null ? String(r.percentual_terceiro) : "",
+              valor_terceiro: r.valor_terceiro != null ? String(r.valor_terceiro) : "",
               ativo: c.ativo ?? true,
             };
           }),
@@ -1065,12 +1075,27 @@ export function MedicoFormDialog({
             c.convenio_tipo_repasse === "valor" ? numeroOuNulo(c.convenio_valor) : null,
           cartao_consulta_valor: numeroOuNulo(c.cartao_consulta_valor),
           cartao_desconto_valor: numeroOuNulo(c.cartao_desconto_valor),
-          // Repasse triplo: só grava a dupla (terceiro + percentual) quando os
-          // dois estão preenchidos. Terceiro sem percentual não pagaria nada e
-          // percentual sem terceiro não teria a quem pagar.
+          // Repasse triplo: só grava a dupla (terceiro + número) quando os
+          // dois estão preenchidos. Terceiro sem número não pagaria nada e
+          // número sem terceiro não teria a quem pagar. O número é o % ou o
+          // R$ fixo, conforme o seletor; a coluna do outro tipo vai nula para
+          // não sobrar lixo de uma escolha anterior.
           terceiro_id:
-            c.terceiro_id && numeroOuNulo(c.percentual_terceiro) != null ? c.terceiro_id : null,
-          percentual_terceiro: c.terceiro_id ? numeroOuNulo(c.percentual_terceiro) : null,
+            c.terceiro_id &&
+            numeroOuNulo(
+              c.tipo_repasse_terceiro === "valor" ? c.valor_terceiro : c.percentual_terceiro,
+            ) != null
+              ? c.terceiro_id
+              : null,
+          tipo_repasse_terceiro: c.tipo_repasse_terceiro,
+          percentual_terceiro:
+            c.terceiro_id && c.tipo_repasse_terceiro === "percentual"
+              ? numeroOuNulo(c.percentual_terceiro)
+              : null,
+          valor_terceiro:
+            c.terceiro_id && c.tipo_repasse_terceiro === "valor"
+              ? numeroOuNulo(c.valor_terceiro)
+              : null,
           ativo: c.ativo,
         }));
       if (convRows.length) {
@@ -1986,10 +2011,11 @@ export function MedicoFormDialog({
                 <p className="text-xs text-muted-foreground mt-1">
                   <b>Repasse triplo:</b> quando o serviço usa equipamento de outro médico, clique em{" "}
                   <b>Adicionar</b> na coluna <b>Terceiro</b> e informe quem é o dono do equipamento
-                  e o percentual dele. Executante e terceiro recebem, cada um, o seu percentual do{" "}
-                  <b>valor total do atendimento</b>, e a clínica fica com o que sobrar (ex.: exame
-                  com 40% executante + 30% terceiro deixa 30% para a clínica). No fechamento, cada
-                  um recebe um <b>lançamento separado</b>.
+                  e quanto ele recebe: um <b>percentual</b> do <b>valor total do atendimento</b> ou
+                  um <b>valor fixo em R$</b> por atendimento. O executante recebe pela regra dele e
+                  a clínica fica com o que sobrar (ex.: exame de R$ 100 com 40% executante + 30%
+                  terceiro deixa 30% para a clínica; com 40% executante + R$ 25 fixos deixa R$ 35).
+                  No fechamento, cada um recebe um <b>lançamento separado</b>.
                 </p>
               </div>
               <Button
@@ -2044,13 +2070,39 @@ export function MedicoFormDialog({
                       const temTerceiro = !!c.terceiro_id;
                       const terceiroNome =
                         terceirosCatalog.find((t) => t.id === c.terceiro_id)?.nome ?? "";
-                      const pctTerceiro = parseFloat(
-                        (c.percentual_terceiro || "").replace(",", "."),
-                      );
+                      // Terceiro em R$ fixo não entra na soma de percentuais:
+                      // o seu pedaço é um valor, não uma fatia do total.
+                      const terceiroFixo = c.tipo_repasse_terceiro === "valor";
+                      const pctTerceiro = terceiroFixo
+                        ? NaN
+                        : parseFloat((c.percentual_terceiro || "").replace(",", "."));
+                      const valorTerceiro = terceiroFixo
+                        ? parseFloat((c.valor_terceiro || "").replace(",", "."))
+                        : NaN;
+                      const terceiroPreenchido = terceiroFixo
+                        ? Number.isFinite(valorTerceiro)
+                        : Number.isFinite(pctTerceiro);
+                      const terceiroLbl = terceiroFixo
+                        ? Number.isFinite(valorTerceiro)
+                          ? `R$ ${valorTerceiro.toFixed(2).replace(".", ",")}`
+                          : "—"
+                        : Number.isFinite(pctTerceiro)
+                          ? `${pctTerceiro}%`
+                          : "—";
                       const pctExecutante = parseFloat((c.percentual || "").replace(",", "."));
                       const somaPct =
                         (Number.isFinite(pctExecutante) ? pctExecutante : 0) +
                         (Number.isFinite(pctTerceiro) ? pctTerceiro : 0);
+                      const clinicaLbl =
+                        c.tipo_repasse === "percentual" && Number.isFinite(pctExecutante)
+                          ? terceiroFixo
+                            ? Number.isFinite(valorTerceiro)
+                              ? `${+(100 - pctExecutante).toFixed(2)}% − R$ ${valorTerceiro
+                                  .toFixed(2)
+                                  .replace(".", ",")}`
+                              : `${+(100 - pctExecutante).toFixed(2)}%`
+                            : `${+(100 - somaPct).toFixed(2)}%`
+                          : "restante";
                       const executanteLbl =
                         c.tipo_repasse === "valor"
                           ? c.valor
@@ -2234,7 +2286,13 @@ export function MedicoFormDialog({
                                     cs.map((x, j) =>
                                       j === i
                                         ? temTerceiro
-                                          ? { ...x, terceiro_id: "", percentual_terceiro: "" }
+                                          ? {
+                                              ...x,
+                                              terceiro_id: "",
+                                              tipo_repasse_terceiro: "percentual",
+                                              percentual_terceiro: "",
+                                              valor_terceiro: "",
+                                            }
                                           : {
                                               ...x,
                                               terceiro_id: terceirosCatalog[0]?.id ?? "",
@@ -2277,7 +2335,7 @@ export function MedicoFormDialog({
                                     <Users className="h-3.5 w-3.5" />
                                     REPASSE TRIPLO — equipamento de terceiro
                                   </div>
-                                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
+                                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_140px]">
                                     <div className="space-y-1">
                                       <Label className="text-[12px] text-muted-foreground">
                                         Terceiro (dono do equipamento)
@@ -2303,26 +2361,76 @@ export function MedicoFormDialog({
                                     </div>
                                     <div className="space-y-1">
                                       <Label className="text-[12px] text-muted-foreground">
-                                        % do terceiro
+                                        Tipo de repasse
                                       </Label>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        min={0}
-                                        max={100}
-                                        placeholder="ex.: 30"
-                                        value={c.percentual_terceiro}
+                                      <select
+                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                        value={c.tipo_repasse_terceiro}
                                         onChange={(e) =>
                                           setConvenios((cs) =>
                                             cs.map((x, j) =>
                                               j === i
-                                                ? { ...x, percentual_terceiro: e.target.value }
+                                                ? {
+                                                    ...x,
+                                                    tipo_repasse_terceiro: e.target.value as
+                                                      | "percentual"
+                                                      | "valor",
+                                                  }
                                                 : x,
                                             ),
                                           )
                                         }
-                                      />
+                                      >
+                                        <option value="percentual">% Percentual</option>
+                                        <option value="valor">R$ Valor fixo</option>
+                                      </select>
                                     </div>
+                                    {terceiroFixo ? (
+                                      <div className="space-y-1">
+                                        <Label className="text-[12px] text-muted-foreground">
+                                          R$ do terceiro
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          min={0}
+                                          placeholder="ex.: 25,00"
+                                          value={c.valor_terceiro}
+                                          onChange={(e) =>
+                                            setConvenios((cs) =>
+                                              cs.map((x, j) =>
+                                                j === i
+                                                  ? { ...x, valor_terceiro: e.target.value }
+                                                  : x,
+                                              ),
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <Label className="text-[12px] text-muted-foreground">
+                                          % do terceiro
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          min={0}
+                                          max={100}
+                                          placeholder="ex.: 30"
+                                          value={c.percentual_terceiro}
+                                          onChange={(e) =>
+                                            setConvenios((cs) =>
+                                              cs.map((x, j) =>
+                                                j === i
+                                                  ? { ...x, percentual_terceiro: e.target.value }
+                                                  : x,
+                                              ),
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                   {/* Divisão lado a lado — o que cada um recebe deste serviço */}
                                   <div className="flex flex-wrap items-stretch gap-2">
@@ -2339,31 +2447,43 @@ export function MedicoFormDialog({
                                         Terceiro{terceiroNome ? ` (${terceiroNome})` : ""}
                                       </div>
                                       <div className="text-sm font-semibold text-amber-700 dark:text-amber-500">
-                                        {Number.isFinite(pctTerceiro) ? `${pctTerceiro}%` : "—"}
+                                        {terceiroLbl}
+                                        {terceiroFixo && Number.isFinite(valorTerceiro) && (
+                                          <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                                            por atendimento
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="flex-1 min-w-40 rounded-md border bg-muted px-3 py-2">
                                       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                                         Clínica (fica com o resto)
                                       </div>
-                                      <div className="text-sm font-semibold">
-                                        {c.tipo_repasse === "percentual" && Number.isFinite(somaPct)
-                                          ? `${+(100 - somaPct).toFixed(2)}%`
-                                          : "restante"}
-                                      </div>
+                                      <div className="text-sm font-semibold">{clinicaLbl}</div>
                                     </div>
                                   </div>
-                                  {c.tipo_repasse === "percentual" && somaPct > 100 && (
-                                    <p className="text-xs text-destructive">
-                                      Executante + terceiro somam {+somaPct.toFixed(2)}% — passa dos
-                                      100% do valor do atendimento. A clínica ficaria no prejuízo
-                                      neste serviço.
+                                  {!terceiroFixo &&
+                                    c.tipo_repasse === "percentual" &&
+                                    somaPct > 100 && (
+                                      <p className="text-xs text-destructive">
+                                        Executante + terceiro somam {+somaPct.toFixed(2)}% — passa
+                                        dos 100% do valor do atendimento. A clínica ficaria no
+                                        prejuízo neste serviço.
+                                      </p>
+                                    )}
+                                  {terceiroFixo && Number.isFinite(valorTerceiro) && (
+                                    <p className="text-xs text-muted-foreground">
+                                      O terceiro recebe <b>{terceiroLbl}</b> em cada atendimento
+                                      deste serviço, seja qual for o valor cobrado do paciente. Se o
+                                      valor pago for menor que isso, ele recebe o que entrou.
                                     </p>
                                   )}
-                                  {!c.percentual_terceiro.trim() && (
+                                  {!terceiroPreenchido && (
                                     <p className="text-xs text-muted-foreground">
-                                      Preencha o <b>% do terceiro</b> para o repasse ser gravado.
-                                      Sem percentual, este serviço continua sem repasse de terceiro.
+                                      Preencha o{" "}
+                                      <b>{terceiroFixo ? "R$ do terceiro" : "% do terceiro"}</b>{" "}
+                                      para o repasse ser gravado. Sem esse número, este serviço
+                                      continua sem repasse de terceiro.
                                     </p>
                                   )}
                                 </div>

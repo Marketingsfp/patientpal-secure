@@ -276,4 +276,87 @@ describe("repasse triplo (terceiro dono do equipamento)", () => {
     const r = calcRepasseFull(ctx, null, 250, "MAPEAMENTO DE RETINA", null, null);
     expect(r.terceiro).toBeNull();
   });
+
+  // Terceiro em VALOR FIXO: recebe exatamente o cadastrado por atendimento; o
+  // executante segue a regra dele e a clínica fica com o restante.
+  const LINHA_TERCEIRO_FIXO: RepasseConvenio = {
+    ...LINHA_EXAME_COM_TERCEIRO,
+    tipo_repasse_terceiro: "valor",
+    percentual_terceiro: null,
+    valor_terceiro: 25,
+  };
+
+  it("terceiro em valor fixo recebe o valor exato e a clinica fica com o resto", () => {
+    const r = resolverRepasse({
+      linha: LINHA_TERCEIRO_FIXO,
+      med: MEDICO,
+      base: 100,
+      forma: "particular",
+    });
+    expect(r.repasse).toBe(40);
+    expect(r.terceiro?.valor).toBe(25);
+    expect(r.terceiro?.percentual).toBeNull();
+    expect(+(r.total - r.repasse - (r.terceiro?.valor ?? 0)).toFixed(2)).toBe(35);
+  });
+
+  it("valor fixo do terceiro nao muda quando o valor do atendimento muda", () => {
+    const a = resolverRepasse({
+      linha: LINHA_TERCEIRO_FIXO,
+      med: MEDICO,
+      base: 100,
+      forma: "particular",
+    });
+    const b = resolverRepasse({
+      linha: LINHA_TERCEIRO_FIXO,
+      med: MEDICO,
+      base: 300,
+      forma: "particular",
+    });
+    expect(a.terceiro?.valor).toBe(25);
+    expect(b.terceiro?.valor).toBe(25);
+  });
+
+  it("valor fixo do terceiro nunca passa do que o paciente pagou", () => {
+    const r = resolverRepasse({
+      linha: LINHA_TERCEIRO_FIXO,
+      med: MEDICO,
+      base: 20,
+      forma: "particular",
+    });
+    expect(r.terceiro?.valor).toBe(20);
+  });
+
+  it("valor fixo do terceiro e pago integral quando nao houve pagamento no caixa", () => {
+    const r = resolverRepasse({
+      linha: LINHA_TERCEIRO_FIXO,
+      med: MEDICO,
+      base: 0,
+      forma: "convenio",
+    });
+    expect(r.terceiro?.valor).toBe(25);
+  });
+
+  it("terceiro em valor fixo ignora o percentual antigo que ficou gravado", () => {
+    const linha: RepasseConvenio = { ...LINHA_TERCEIRO_FIXO, percentual_terceiro: 30 };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 100, forma: "particular" });
+    expect(r.terceiro?.valor).toBe(25);
+  });
+
+  it("terceiro em valor fixo zerado ou vazio nao gera repasse", () => {
+    const zerado: RepasseConvenio = { ...LINHA_TERCEIRO_FIXO, valor_terceiro: 0 };
+    const vazio: RepasseConvenio = { ...LINHA_TERCEIRO_FIXO, valor_terceiro: null };
+    expect(
+      resolverRepasse({ linha: zerado, med: MEDICO, base: 100, forma: "particular" }).terceiro,
+    ).toBeNull();
+    expect(
+      resolverRepasse({ linha: vazio, med: MEDICO, base: 100, forma: "particular" }).terceiro,
+    ).toBeNull();
+  });
+
+  it("linha antiga sem tipo do terceiro continua em percentual", () => {
+    const linha: RepasseConvenio = { ...LINHA_EXAME_COM_TERCEIRO, tipo_repasse_terceiro: null };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 100, forma: "particular" });
+    expect(r.terceiro?.percentual).toBe(30);
+    expect(r.terceiro?.valor).toBe(30);
+  });
 });

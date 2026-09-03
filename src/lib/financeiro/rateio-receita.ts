@@ -261,7 +261,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     supabase
       .from("medico_convenios")
       .select(
-        "medico_id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro",
+        "medico_id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, terceiro_id, percentual_terceiro, tipo_repasse_terceiro, valor_terceiro",
       )
       .eq("ativo", true)
       .order("medico_id"),

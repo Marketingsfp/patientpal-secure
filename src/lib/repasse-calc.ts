@@ -35,18 +35,27 @@ export interface RepasseConvenio {
    */
   terceiro_id?: string | null;
   /**
+   * REPASSE TRIPLO — como o terceiro recebe: `percentual` do VALOR TOTAL do
+   * atendimento (padrão, e o que vale para as linhas antigas) ou `valor` fixo
+   * em reais por atendimento. Nulo = percentual.
+   */
+  tipo_repasse_terceiro?: string | null;
+  /**
    * REPASSE TRIPLO — percentual do VALOR TOTAL do atendimento pago ao terceiro.
    * Vale para qualquer forma de atendimento (particular, convênio, cartões),
    * porque o combinado com o dono do equipamento é sobre o exame, não sobre a
    * forma de pagamento do paciente.
    */
   percentual_terceiro?: number | null;
+  /** REPASSE TRIPLO — valor fixo em reais por atendimento (tipo `valor`). */
+  valor_terceiro?: number | null;
 }
 
 /** Parte do terceiro (dono do equipamento) apurada num atendimento. */
 export interface RepasseTerceiro {
   medico_id: string;
-  percentual: number;
+  /** Percentual aplicado; `null` quando a regra é em valor fixo. */
+  percentual: number | null;
   valor: number;
 }
 
@@ -198,16 +207,34 @@ export function resolverRepasse(params: {
 /**
  * REPASSE TRIPLO — parte do médico terceiro (dono do equipamento).
  *
- * É sempre um percentual do VALOR TOTAL do atendimento, igual ao percentual do
- * executante: numa regra de 30% clínica / 40% executante / 30% terceiro os três
- * pedaços somam o total. Devolve `null` quando a linha não tem terceiro
- * configurado ou quando o percentual é zero.
+ * Duas regras possíveis, escolhidas no cadastro do serviço:
+ *
+ *  - `percentual` (padrão): percentual do VALOR TOTAL do atendimento, igual ao
+ *    percentual do executante — numa regra de 30% clínica / 40% executante /
+ *    30% terceiro os três pedaços somam o total;
+ *  - `valor`: valor fixo em reais por atendimento. O terceiro recebe exatamente
+ *    o cadastrado e a clínica fica com o que sobra depois dele e do executante.
+ *    Quando houve pagamento no caixa o fixo nunca passa do que entrou; sem
+ *    pagamento registrado (convênio cobra direto da clínica) é pago integral,
+ *    a mesma regra do valor fixo do executante.
+ *
+ * Devolve `null` quando a linha não tem terceiro configurado ou quando o
+ * número cadastrado é zero.
  */
 export function repasseDoTerceiro(
   linha: RepasseConvenio | null | undefined,
   total: number,
 ): RepasseTerceiro | null {
   if (!linha?.terceiro_id) return null;
+  if (linha.tipo_repasse_terceiro === "valor") {
+    const fixo = valorCelulaRepasse(linha.valor_terceiro);
+    if (fixo == null || fixo <= 0) return null;
+    return {
+      medico_id: linha.terceiro_id,
+      percentual: null,
+      valor: +(total > 0 ? Math.min(fixo, total) : fixo).toFixed(2),
+    };
+  }
   const pct = valorCelulaRepasse(linha.percentual_terceiro);
   if (pct == null || pct <= 0) return null;
   return {

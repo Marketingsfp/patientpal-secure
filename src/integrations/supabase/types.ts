@@ -6108,8 +6108,10 @@ export type Database = {
           percentual_terceiro: number | null
           terceiro_id: string | null
           tipo_repasse: string
+          tipo_repasse_terceiro: string
           updated_at: string
           valor: number | null
+          valor_terceiro: number | null
         }
         Insert: {
           ativo?: boolean
@@ -6126,8 +6128,10 @@ export type Database = {
           percentual_terceiro?: number | null
           terceiro_id?: string | null
           tipo_repasse?: string
+          tipo_repasse_terceiro?: string
           updated_at?: string
           valor?: number | null
+          valor_terceiro?: number | null
         }
         Update: {
           ativo?: boolean
@@ -6144,8 +6148,10 @@ export type Database = {
           percentual_terceiro?: number | null
           terceiro_id?: string | null
           tipo_repasse?: string
+          tipo_repasse_terceiro?: string
           updated_at?: string
           valor?: number | null
+          valor_terceiro?: number | null
         }
         Relationships: [
           {
