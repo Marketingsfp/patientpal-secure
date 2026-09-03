@@ -442,7 +442,37 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
       })
       .reverse();
 
-    return { eventos };
+    // Estado estruturado atual do fluxo — só visível na homologação, nunca
+    // para o paciente. É o que permite depurar "por que ela perguntou isso".
+    const { carregarFluxoEstado } = await import("@/lib/nina/fluxo-estado.server");
+    const estado = await carregarFluxoEstado(
+      supabaseAdmin as never,
+      data.clinicaId,
+      data.conversaId,
+    );
+    const ultima = eventos[eventos.length - 1] ?? null;
+    const debug = {
+      patient_id: estado.patient.id,
+      patient_identified: estado.patient.identified,
+      patient_validated: estado.patient.validated,
+      patient_first_name: estado.patient.first_name,
+      doctor_id: estado.appointment.doctor_id,
+      doctor_name: estado.appointment.doctor_name,
+      specialty: estado.appointment.specialty,
+      procedure: estado.appointment.procedure,
+      selected_date: estado.appointment.date,
+      selected_time: estado.appointment.time,
+      slot_inicio: estado.appointment.slot_inicio,
+      slot_fim: estado.appointment.slot_fim,
+      slot_confirmed_by_patient: estado.appointment.slot_confirmed_by_patient,
+      appointment_id: estado.appointment.appointment_id,
+      current_flow_stage: estado.flow.stage,
+      tool_called: ultima?.ferramenta ?? null,
+      tool_result: ultima ? (ultima.ok ? "ok" : (ultima.erro ?? "erro")) : null,
+      updated_at: estado.updated_at,
+    };
+
+    return { eventos, debug };
   });
 
 export const resolverConversaTeste = createServerFn({ method: "POST" })
