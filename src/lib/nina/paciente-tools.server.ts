@@ -372,6 +372,81 @@ function dataISODoSlot(iso: string) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/* ------------------------------------------------ agenda: resultado e logs */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Log técnico de homologação. Nunca chega ao paciente. */
+function logAgenda(ferramenta: string, dados: Record<string, unknown>) {
+  try {
+    console.info(`[NINA_AGENDA] ${ferramenta}`, JSON.stringify(dados));
+  } catch {
+    /* log nunca derruba atendimento */
+  }
+}
+
+/**
+ * "Consultei e não há vaga" NÃO é erro. Antes isso voltava como `ok:false`, e
+ * o modelo respondia "houve um problema ao consultar a agenda" — confundindo
+ * agenda cheia com falha de sistema. Agora sai como sucesso, com `slots` vazio
+ * e um motivo explícito.
+ */
+function semVaga(motivo: string, mensagem: string, extra?: Record<string, unknown>) {
+  return { ok: true as const, slots: [], horarios: [], reason: motivo, mensagem, ...(extra ?? {}) };
+}
+
+/** Falha TÉCNICA de consulta — só aqui a Nina pode dizer que não conseguiu consultar. */
+function falhaAgenda(e: unknown, ferramenta: string) {
+  console.error(`[NINA_AGENDA] AGENDA_QUERY_FAILED em ${ferramenta}`, e);
+  return {
+    ok: false as const,
+    erro: "INTERNAL_ERROR" as const,
+    codigo: "AGENDA_QUERY_FAILED",
+    mensagem: "Não consegui consultar a agenda neste momento.",
+  };
+}
+
+/**
+ * Resolve o profissional a partir do que o modelo mandou: id real ou nome
+ * ("Dr. Armando"). Com homônimos, desempata por quem tem vaga futura; se ainda
+ * assim houver dúvida, devolve as opções para a Nina perguntar.
+ */
+async function resolverMedico(
+  clinicaId: string,
+  termo: string,
+): Promise<
+  | { ok: true; id: string; nome: string }
+  | { ok: false; opcoes: Array<{ id: string; nome: string }> }
+> {
+  if (UUID_RE.test(termo)) {
+    const nome = await nomeMedico(termo);
+    if (nome) return { ok: true, id: termo, nome };
+    return { ok: false, opcoes: [] };
+  }
+  const t = normalizar(termo).replace(/^(dr|dra|doutor|doutora)\.?\s+/, "");
+  const { data } = await supabaseAdmin
+    .from("medicos")
+    .select("id, nome")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true);
+  const todos = (data ?? []) as Array<{ id: string; nome: string }>;
+  const candidatos = todos.filter((m) => {
+    const n = normalizar(m.nome);
+    return n.includes(t) || t.includes(n);
+  });
+  if (candidatos.length === 0) return { ok: false, opcoes: [] };
+  if (candidatos.length === 1) return { ok: true, id: candidatos[0]!.id, nome: candidatos[0]!.nome };
+
+  const comVaga: Array<{ id: string; nome: string }> = [];
+  for (const m of candidatos) {
+    const slots = await consultarDisponibilidadeCore({ clinicaId, medicoId: m.id, dias: 60 });
+    if (slots.length > 0) comVaga.push(m);
+  }
+  if (comVaga.length === 1) return { ok: true, id: comVaga[0]!.id, nome: comVaga[0]!.nome };
+  return { ok: false, opcoes: (comVaga.length > 0 ? comVaga : candidatos).slice(0, 5) };
+}
+
+
 
 /* ------------------------------------------------------------ definições AI */
 
