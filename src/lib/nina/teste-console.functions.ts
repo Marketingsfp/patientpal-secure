@@ -310,10 +310,29 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       "@/lib/whatsapp-midia.server"
     );
 
+    // Diagnóstico da homologação: uma linha por mensagem processada, com o
+    // estado de cada etapa. Nunca aparece para o paciente.
+    const t0 = Date.now();
+    const diag = {
+      conversation_id: conversaId,
+      message_wa_id: waId,
+      message_received_at: agora,
+      conversation_status: estadoAntes?.status ?? null,
+      assigned_to: estadoAntes?.owner_type ?? null,
+      processing_status: "processing" as "processing" | "completed" | "failed",
+      model_called: false,
+      response_saved: false,
+      duration_ms: 0,
+      error_code: null as string | null,
+      error_message: null as string | null,
+    };
+
     let reply = "";
+    let falhaTecnica = false;
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
+        diag.model_called = true;
         reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
           teste: true,
         });
@@ -323,12 +342,22 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         reply = respostaMidiaNaoSuportada(data.tipo);
       }
     } catch (e) {
-      return {
-        duplicada: false,
-        reply: null,
-        erro: String((e as Error)?.message ?? e).slice(0, 300),
-        audio: null,
-      };
+      // Falha técnica real: a mensagem NÃO pode ficar sem desfecho. Gravamos
+      // um retorno seguro na própria conversa e registramos o erro.
+      falhaTecnica = true;
+      diag.processing_status = "failed";
+      diag.error_code = "NINA_PIPELINE_ERROR";
+      diag.error_message = String((e as Error)?.message ?? e).slice(0, 300);
+      console.error("[NINA_MESSAGE_PROCESSING]", { ...diag, duration_ms: Date.now() - t0 });
+      reply =
+        "Não consegui consultar essa informação neste momento. Posso tentar novamente ou verificar outro horário para você.";
+    }
+    if (!reply.trim()) {
+      // O modelo terminou sem texto (ex.: encerrou logo após uma ferramenta):
+      // ainda assim o paciente recebe uma resposta.
+      diag.error_code = diag.error_code ?? "EMPTY_MODEL_RESPONSE";
+      reply =
+        "Não consegui concluir essa consulta agora. Pode me dizer novamente o médico e o horário desejado?";
     }
 
     // A conversa pode ter sido resolvida enquanto a Nina pensava: descarta.
@@ -420,10 +449,15 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         .eq("id", conversaId);
     }
 
+    diag.response_saved = !!reply.trim();
+    diag.duration_ms = Date.now() - t0;
+    if (diag.processing_status !== "failed") diag.processing_status = "completed";
+    console.info("[NINA_MESSAGE_PROCESSING]", diag);
+
     return {
       duplicada: false,
       reply,
-      erro: null as string | null,
+      erro: falhaTecnica ? diag.error_message : null,
       audio,
       transferida,
     };
