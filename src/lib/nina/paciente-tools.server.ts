@@ -604,7 +604,34 @@ const zAgendar = z.object({
 
 /* ------------------------------------------------------------------ executor */
 
+/**
+ * Executor público. Toda chamada — inclusive as que já auditam por dentro —
+ * passa por aqui, e o painel de Homologação lê exatamente esse rastro
+ * (`audit_log`, ação `NINA_TOOL`) para mostrar "qual ferramenta a Nina usou,
+ * com quais parâmetros e o que o backend respondeu".
+ */
 export async function executarFerramentaPaciente(
+  ctx: CtxNinaPaciente,
+  nome: string,
+  argsRaw: unknown,
+): Promise<ResultadoFerramenta> {
+  const inicio = Date.now();
+  const resultado = await executarFerramentaInterna(ctx, nome, argsRaw);
+  void auditar(
+    ctx,
+    "tool",
+    {
+      ferramenta: nome,
+      argumentos: argsRaw ?? null,
+      ms: Date.now() - inicio,
+      resposta: JSON.parse(JSON.stringify(resultado)),
+    },
+    { ok: resultado.ok, erro: resultado.ok ? undefined : resultado.erro },
+  );
+  return resultado;
+}
+
+async function executarFerramentaInterna(
   ctx: CtxNinaPaciente,
   nome: string,
   argsRaw: unknown,
