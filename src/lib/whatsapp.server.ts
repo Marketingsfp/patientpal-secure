@@ -984,7 +984,15 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
 
   let resposta = "";
   let houveHandoff = false;
-  const MAX_RODADAS = podeAgendar ? 5 : 3;
+  // Só vira `true` quando a ferramenta "agendar" devolve sucesso COM
+  // appointment_id verificado no banco.
+  let agendamentoConfirmado = false;
+  let correcaoFalsoSucessoUsada = false;
+  // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
+  // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
+  const AFIRMA_AGENDAMENTO =
+    /(estou|vou|irei)\s+agend|agendando|agendei|agendada|agendado|marcada|marquei|reserv(ei|ada)|confirmad[oa]\s+(seu|sua)\s+(consulta|agendamento|hor[áa]rio)/i;
+  const MAX_RODADAS = podeAgendar ? 6 : 3;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -1011,9 +1019,38 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     const chamadas = msg?.tool_calls ?? [];
 
     if (chamadas.length === 0) {
-      resposta = (msg?.content ?? "").trim();
+      const texto = (msg?.content ?? "").trim();
+      // ---------------- defesa contra falso sucesso ----------------
+      // O modelo encerrou o turno afirmando que agendou, mas nenhuma
+      // gravação foi confirmada. Damos UMA chance de chamar a ferramenta.
+      if (
+        podeAgendar &&
+        !agendamentoConfirmado &&
+        AFIRMA_AGENDAMENTO.test(texto) &&
+        !correcaoFalsoSucessoUsada &&
+        rodada < MAX_RODADAS - 1
+      ) {
+        correcaoFalsoSucessoUsada = true;
+        console.warn("[NINA_APPOINTMENT] falso sucesso bloqueado", {
+          conversa_id: estadoId.conversaId,
+          texto: texto.slice(0, 200),
+        });
+        mensagens.push({ role: "assistant", content: texto });
+        mensagens.push({
+          role: "user",
+          content:
+            "[SISTEMA] Nenhum agendamento foi gravado. É PROIBIDO dizer que agendou, que está agendando ou que vai agendar sem chamar a ferramenta 'agendar' e receber appointment_id. Chame agora a ferramenta 'agendar' com os campos inicio/fim exatos do horário confirmado. Se não for possível, responda apenas: 'Não consegui concluir seu agendamento neste momento. Vou verificar novamente.'",
+        });
+        continue;
+      }
+      if (podeAgendar && !agendamentoConfirmado && AFIRMA_AGENDAMENTO.test(texto)) {
+        resposta = "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.";
+        break;
+      }
+      resposta = texto;
       break;
     }
+
 
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     for (const c of chamadas) {
@@ -1032,11 +1069,25 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         console.error("[Nina] ferramenta falhou", nome, e);
         resultado = { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar o sistema." };
       }
+      // Fonte única da verdade sobre "agendou de fato": appointment_id
+      // devolvido pela ferramenta depois da verificação no banco.
+      if (nome === "agendar") {
+        const r = resultado as { ok?: boolean; appointment_id?: string; duplicado?: boolean };
+        if (r?.ok && (r.appointment_id || r.duplicado)) agendamentoConfirmado = true;
+        console.info("[NINA_APPOINTMENT]", {
+          conversation_id: estadoId.conversaId,
+          create_appointment_called: true,
+          appointment_id: r?.appointment_id ?? null,
+          final_result: r?.ok ? "SUCCESS" : "FAILED",
+          error_code: r?.ok ? null : (resultado as { erro?: string })?.erro ?? null,
+        });
+      }
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
         content: JSON.stringify(resultado).slice(0, 8000),
       });
+
     }
   }
 

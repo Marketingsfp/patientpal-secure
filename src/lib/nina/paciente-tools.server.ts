@@ -38,6 +38,7 @@ export type CodigoErroNina =
   | "NO_AVAILABILITY"
   | "SLOT_UNAVAILABLE"
   | "APPOINTMENT_ALREADY_EXISTS"
+  | "APPOINTMENT_CREATION_FAILED"
   | "VALIDATION_ERROR"
   | "PERMISSION_DENIED"
   | "INTERNAL_ERROR";
@@ -1487,12 +1488,38 @@ async function executarFerramentaInterna(
             .eq("clinica_id", ctx.clinicaId);
         }
 
+        // --- Verificação pós-gravação: só chamamos de sucesso o que dá para
+        // reler no banco. Se o SELECT não achar, o resultado vira falha — a
+        // Nina jamais confirma um agendamento que não está persistido.
+        const { data: conferido } = await supabaseAdmin
+          .from("agendamentos")
+          .select("id, clinica_id, paciente_id, medico_id, inicio, fim, status")
+          .eq("id", r.id)
+          .eq("clinica_id", ctx.clinicaId)
+          .maybeSingle();
+        if (!conferido) {
+          logAgenda("agendar", {
+            medico: rMed.nome,
+            medico_id: medicoIdReal,
+            inicio: p.inicio,
+            confirmado: false,
+            erro: "APPOINTMENT_NOT_PERSISTED",
+            agendamento_id: r.id,
+          });
+          await auditar(ctx, "agendar", p, { ok: false, erro: "APPOINTMENT_NOT_PERSISTED" });
+          return falha(
+            "APPOINTMENT_CREATION_FAILED",
+            "Não consegui confirmar a gravação do agendamento no sistema.",
+          );
+        }
+
         logAgenda("agendar", {
           medico: rMed.nome,
           medico_id: medicoIdReal,
           inicio: p.inicio,
           confirmado: true,
           agendamento_id: r.id,
+          verificado: true,
           teste: ehTeste,
         });
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
@@ -1509,8 +1536,18 @@ async function executarFerramentaInterna(
           stage: "BOOKED",
         });
         return {
-
           ok: true,
+          // Contrato estruturado: a Nina só confirma quando vê `success` e
+          // `appointment_id`.
+          success: true,
+          appointment_id: r.id,
+          patient_id: (conferido as { paciente_id: string | null }).paciente_id,
+          doctor_id: (conferido as { medico_id: string | null }).medico_id,
+          unit_id: (conferido as { clinica_id: string }).clinica_id,
+          date: formatarData(p.inicio),
+          time: formatarHora(p.inicio),
+          status: (conferido as { status: string }).status,
+          verificado_no_banco: true,
           agendamento_id: r.id,
           teste: ehTeste,
           medico: rMed.nome,
@@ -1520,6 +1557,7 @@ async function executarFerramentaInterna(
             procedimento: p.procedimento,
           },
         };
+
       }
 
       default:
