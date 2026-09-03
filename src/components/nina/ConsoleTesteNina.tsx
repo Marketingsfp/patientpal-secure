@@ -76,6 +76,24 @@ export function ConsoleTesteNina() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // Eventos operacionais da conversa (resolvida, memória resetada, atribuição).
   const [eventosConversa, setEventosConversa] = useState<ConversaEvento[]>([]);
+  // Mensagens e eventos na MESMA linha do tempo, ordenados por created_at.
+  const timeline = useMemo<
+    ({ id: string; em: string } & (
+      | { kind: "msg"; msg: Msg }
+      | { kind: "evento"; evento: ConversaEvento }
+    ))[]
+  >(() => {
+    const itens = [
+      ...msgs.map((m) => ({ id: `m-${m.id}`, em: m.created_at, kind: "msg" as const, msg: m })),
+      ...eventosConversa.map((e) => ({
+        id: `e-${e.id}`,
+        em: e.created_at,
+        kind: "evento" as const,
+        evento: e,
+      })),
+    ];
+    return itens.sort((a, b) => a.em.localeCompare(b.em));
+  }, [msgs, eventosConversa]);
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
