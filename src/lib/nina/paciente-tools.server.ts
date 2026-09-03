@@ -1285,12 +1285,24 @@ async function executarFerramentaInterna(
         }
         ctx.pacienteId = r.paciente_id;
         ctx.pacienteNome = p.nome;
+        // Estado estruturado: a partir daqui, esta conversa tem paciente
+        // identificado e validado — nada de pedir CPF/nome/nascimento de novo.
+        mutarEstado(ctx, {
+          patient: {
+            id: r.paciente_id,
+            first_name: p.nome.split(" ")[0] ?? null,
+            identified: true,
+            validated: true,
+          },
+          stage: "CHOOSING_SLOT",
+        });
         if (ctx.conversaId) {
           await supabaseAdmin
             .from("atend_conversas")
             .update({ contato_paciente_id: r.paciente_id, identidade_confirmada: true })
             .eq("id", ctx.conversaId);
         }
+
         await auditar(ctx, "identificar_paciente", { cpf: "***", criado: r.criado }, {
           ok: true,
           id: r.paciente_id,
