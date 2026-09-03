@@ -1326,7 +1326,7 @@ async function executarFerramentaInterna(
               // clara — a recepção nunca confunde com paciente real.
               paciente_nome: ehTeste ? `[TESTE NINA] ${ctx.pacienteNome}` : ctx.pacienteNome,
               paciente_id: ctx.pacienteId,
-              medico_id: p.medico_id,
+              medico_id: medicoIdReal,
               inicio: p.inicio,
               fim: p.fim,
               procedimento: p.procedimento,
