@@ -1364,6 +1364,14 @@ async function executarFerramentaInterna(
           const msg =
             "validation_error" in r ? r.validation_error.message : r.pg_error.message;
           const slotOcupado = /slot|hor[áa]rio|dispon/i.test(msg);
+          logAgenda("agendar", {
+            medico: rMed.nome,
+            medico_id: medicoIdReal,
+            inicio: p.inicio,
+            confirmado: false,
+            erro: slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR",
+            detalhe: msg,
+          });
           await auditar(ctx, "agendar", p, {
             ok: false,
             erro: slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR",
@@ -1380,11 +1388,20 @@ async function executarFerramentaInterna(
             .eq("clinica_id", ctx.clinicaId);
         }
 
+        logAgenda("agendar", {
+          medico: rMed.nome,
+          medico_id: medicoIdReal,
+          inicio: p.inicio,
+          confirmado: true,
+          agendamento_id: r.id,
+          teste: ehTeste,
+        });
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
         return {
           ok: true,
           agendamento_id: r.id,
           teste: ehTeste,
+          medico: rMed.nome,
           agendamento: {
             data: formatarData(p.inicio),
             hora: formatarHora(p.inicio),
