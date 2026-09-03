@@ -7,6 +7,7 @@ import {
   categoriaZeraRepasse,
   classificarForma,
 } from "@/lib/financeiro/formas-pagamento";
+import { SEM_FATURAMENTO_ROTULO, SEM_FATURAMENTO_SUBTITULO } from "@/lib/agenda/sem-faturamento";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { hojeBR } from "@/lib/date-utils";
 
@@ -562,7 +563,7 @@ async function printGuiaAtendimentoCore({
     supabase
       .from("agendamentos")
       .select(
-        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor",
+        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor, sem_faturamento",
       )
       .eq("id", agendamentoId)
       .maybeSingle(),
@@ -646,22 +647,42 @@ async function printGuiaAtendimentoCore({
   // ninguém recebe (só retorno e cortesia). Trocar uma pela outra aqui volta a
   // cortar o repasse da gratuidade de convênio, que é justamente o caso em que
   // o médico tem de receber.
-  const ehSemCobranca = lancs.some(
-    (l) => l.status === "confirmado" && categoriaEhSemCobranca(nomeCategoriaLancamento(l)),
-  );
-  const ehSemRepasse = lancs.some(
-    (l) => l.status === "confirmado" && categoriaZeraRepasse(nomeCategoriaLancamento(l)),
-  );
+  //
+  // A quarta situação não vem de categoria nenhuma, e sim de uma marcação na
+  // própria agenda: SEM FATURAMENTO (Toxicológico e afins). Ali não existe
+  // lançamento financeiro para consultar — a cobrança é feita pelo parceiro,
+  // fora da clínica — então a guia tem de sair zerada dos dois lados sem
+  // depender de `lancs`. Ver `src/lib/agenda/sem-faturamento.ts`.
+  const semFaturamento = (a as { sem_faturamento?: boolean | null }).sem_faturamento === true;
+  const ehSemCobranca =
+    semFaturamento ||
+    lancs.some(
+      (l) => l.status === "confirmado" && categoriaEhSemCobranca(nomeCategoriaLancamento(l)),
+    );
+  const ehSemRepasse =
+    semFaturamento ||
+    lancs.some(
+      (l) => l.status === "confirmado" && categoriaZeraRepasse(nomeCategoriaLancamento(l)),
+    );
   // Rótulo impresso na tarja da guia. O retorno é rotina e direito do
   // paciente; imprimir "CORTESIA" nele daria a entender que a diretoria abriu
   // uma exceção, que é justamente o que ele não é.
-  const ehRetornoClinica = lancs.some(
-    (l) => l.status === "confirmado" && categoriaEhRetorno(nomeCategoriaLancamento(l)),
-  );
-  const rotuloLiberacao = ehRetornoClinica ? "RETORNO DE CONSULTA" : "CORTESIA";
-  const subtituloLiberacao = ehRetornoClinica
-    ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
-    : "ATENDIMENTO LIBERADO — SEM COBRANÇA";
+  const ehRetornoClinica =
+    !semFaturamento &&
+    lancs.some((l) => l.status === "confirmado" && categoriaEhRetorno(nomeCategoriaLancamento(l)));
+  // A tarja precisa dizer a verdade sobre POR QUE a guia está zerada. Imprimir
+  // "CORTESIA" num Toxicológico faria o paciente entender que a clínica abriu
+  // mão de um valor — quando na verdade ele já vai pagar, só que ao parceiro.
+  const rotuloLiberacao = semFaturamento
+    ? SEM_FATURAMENTO_ROTULO
+    : ehRetornoClinica
+      ? "RETORNO DE CONSULTA"
+      : "CORTESIA";
+  const subtituloLiberacao = semFaturamento
+    ? SEM_FATURAMENTO_SUBTITULO
+    : ehRetornoClinica
+      ? "RETORNO INCLUSO NA CONSULTA — SEM COBRANÇA"
+      : "ATENDIMENTO LIBERADO — SEM COBRANÇA";
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -907,7 +928,14 @@ async function printGuiaAtendimentoCore({
       d.includes("CONSULTA CARTÃO")
     );
   };
-  if (pagamento) {
+  if (semFaturamento) {
+    // Marcado na agenda como sem faturamento: não existe dinheiro a imprimir,
+    // mesmo que o chamador tenha passado um `pagamento` por engano. Zerar aqui
+    // é o que garante o "Valor do Procedimento: R$ 0,00" pedido pela clínica —
+    // e, com `valorBase` zerado logo abaixo, também o CLÍNICA e o PRESTADOR.
+    valor = 0;
+    pagResolvido = undefined;
+  } else if (pagamento) {
     valor = Number(pagamento.valor);
   } else {
     let valorPago = 0;
@@ -1223,9 +1251,13 @@ async function printGuiaAtendimentoCore({
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
   // fallback silencioso para dinheiro já causou guias mostrando forma errada
   // para pagamentos reais em débito/pix/etc.
-  const formaLbl = pagResolvido?.forma_pagamento
-    ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase())
-    : "NÃO INFORMADO";
+  const formaLbl = semFaturamento
+    ? // Sem faturamento não tem forma de pagamento nenhuma: "NÃO INFORMADO"
+      // aqui daria a entender que alguém esqueceu de preencher.
+      "SEM COBRANÇA"
+    : pagResolvido?.forma_pagamento
+      ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase())
+      : "NÃO INFORMADO";
   const parcelasTxt =
     pagResolvido &&
     pagResolvido.forma_pagamento === "cartao_credito" &&
@@ -1442,7 +1474,7 @@ async function printGuiaAtendimentoCore({
       }
       <div class="linha-principal">
         <div>
-          <span class="k label">Valor recebido</span>
+          <span class="k label">${semFaturamento ? "Valor do procedimento" : "Valor recebido"}</span>
           <div class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</div>
         </div>
         <div class="valor-grande">${fmtBRL(valor)}</div>
@@ -1712,7 +1744,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     supabase
       .from("agendamentos")
       .select(
-        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento",
+        "id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento, sem_faturamento",
       )
       .in("id", ids),
     supabase
@@ -1982,6 +2014,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     allGratuidade: boolean;
     anyPago: boolean;
     ehRetorno: boolean;
+    /** Marcado na agenda como sem faturamento — a guia sai inteiramente zerada. */
+    semFaturamento: boolean;
   };
   const grupos = new Map<string, Grupo>();
 
@@ -1995,7 +2029,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     // fechados por R$ 0,00 e não dividem nada. Numa gratuidade de convênio a
     // tabela é usada, mas como BASE do repasse — o item continua marcado como
     // gratuidade e a guia não imprime valor recebido.
-    const ehSemRepasseItem = semRepasseByAg.get(a.id) === true;
+    // Sem faturamento (Toxicológico e afins) entra aqui pelo mesmo caminho do
+    // retorno e da cortesia — zera valor e repasse —, mas sem depender de
+    // lançamento nenhum: nesses atendimentos não existe lançamento a consultar.
+    const semFaturamentoItem = (a as { sem_faturamento?: boolean | null }).sem_faturamento === true;
+    const ehSemRepasseItem = semRepasseByAg.get(a.id) === true || semFaturamentoItem;
     const valorPago = valorPagoByAg.get(a.id);
     const valor = ehSemRepasseItem
       ? 0
@@ -2062,7 +2100,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     // GR independente com o repasse calculado só para aquele serviço.
     const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const gratuidade = gratuidadeByAg.get(a.id) === true;
+    const gratuidade = gratuidadeByAg.get(a.id) === true || semFaturamentoItem;
     const g: Grupo = grupos.get(key) ?? {
       medicoId: a.medico_id ?? null,
       agendaId: (a as any).agenda_id ?? null,
@@ -2076,6 +2114,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       allGratuidade: true,
       anyPago: false,
       ehRetorno: retornoByAg.get(a.id) === true,
+      semFaturamento: semFaturamentoItem,
     };
     g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
     if (!gratuidade) g.anyPago = true;
@@ -2201,8 +2240,24 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           ${linhas}
         </table>
         ${
-          g.allGratuidade
-            ? `
+          g.semFaturamento
+            ? // Sem faturamento imprime os três valores zerados de forma
+              // explícita, e não simplesmente omite a caixa: a guia é o
+              // comprovante que fica com o paciente e com o médico, e ela
+              // precisa mostrar preto no branco que a clínica não recebeu nada
+              // por este atendimento e que ninguém tem repasse a cobrar.
+              `
+        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">${SEM_FATURAMENTO_ROTULO}</div>
+        <div class="center sm">${SEM_FATURAMENTO_SUBTITULO}</div>
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">VALOR DO PROCEDIMENTO:</td><td class="v right">${fmtBRL(0)}</td></tr>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(0)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(0)}</td></tr>
+        </table>
+        `
+            : g.allGratuidade
+              ? `
         <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">${
           g.ehRetorno ? "RETORNO DE CONSULTA" : "GRATUIDADE"
         }</div>
@@ -2223,8 +2278,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
             : ""
         }
         `
-            : g.subtotal > 0
-              ? `
+              : g.subtotal > 0
+                ? `
         <div class="row" style="margin-top:8px">
           <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
           <div class="bold lg">${fmtBRL(g.subtotal)}</div>
@@ -2246,7 +2301,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
         </table>
         `
-              : ""
+                : ""
         }
         <div class="sep"></div>
         <div class="row sm">

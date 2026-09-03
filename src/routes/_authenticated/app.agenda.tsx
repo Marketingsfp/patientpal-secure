@@ -150,7 +150,13 @@ import {
   Camera,
   CreditCard,
   Eye,
+  Ban,
 } from "lucide-react";
+import {
+  definirSemFaturamento,
+  ehSemFaturamento,
+  rotuloSemFaturamento,
+} from "@/lib/agenda/sem-faturamento";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import {
   printComprovanteAgendamento,
@@ -233,6 +239,14 @@ type Agendamento = {
   sinalizado_por?: string | null;
   sinalizado_por_nome?: string | null;
   /**
+   * Atendimento que a clínica realiza mas não fatura — o paciente paga direto
+   * ao parceiro (caso do Toxicológico). Ver `@/lib/agenda/sem-faturamento`.
+   */
+  sem_faturamento?: boolean | null;
+  sem_faturamento_em?: string | null;
+  sem_faturamento_por?: string | null;
+  sem_faturamento_por_nome?: string | null;
+  /**
    * Total combinado da cobrança. Só é preenchido quando o paciente paga
    * parcialmente (entrada/sinal) — é ele que permite calcular o saldo devedor.
    * NULL no atendimento normal, que continua "pago" por ter lançamento.
@@ -308,7 +322,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -1040,6 +1054,10 @@ function AgendaPage() {
       }
       if (a.origem_externa) {
         fora.push({ ag: a, motivo: "atendimento externo — faturado na outra clínica" });
+        continue;
+      }
+      if (ehSemFaturamento(a)) {
+        fora.push({ ag: a, motivo: "sem faturamento — a nota é emitida pelo parceiro" });
         continue;
       }
       if (!pagosSet.has(a.id)) {
@@ -3911,6 +3929,14 @@ function AgendaPage() {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
+    // Mesma trava da cobrança individual, aplicada à seleção: um atendimento
+    // sem faturamento no meio do lote entraria como receita da clínica.
+    if (itens.some((i) => ehSemFaturamento(i))) {
+      toast.info(
+        "Há atendimentos marcados como sem faturamento na seleção. Desmarque-os antes de cobrar.",
+      );
+      return;
+    }
     try {
       // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
       const [{ data: jaPagosLote }, procs] = await Promise.all([
@@ -5837,7 +5863,10 @@ function AgendaPage() {
         if (!a.convenio_autorizado) {
           toast.warning("Convênio sem autorização confirmada na recepção.");
         }
-      } else if (!pagosSet.has(a.id) && !a.data_pagamento) {
+        // Sem faturamento não tem pagamento a esperar: o procedimento é feito e
+        // baixado normalmente, e quem cobra é o parceiro, fora da clínica. Sem
+        // esta exceção, o Toxicológico jamais poderia ser dado como realizado.
+      } else if (!ehSemFaturamento(a) && !pagosSet.has(a.id) && !a.data_pagamento) {
         toast.error(
           "Pagamento não identificado. O paciente deve pagar na chegada — registre o recebimento no caixa antes de realizar o atendimento.",
         );
@@ -5958,6 +5987,61 @@ function AgendaPage() {
       );
     setItems(patch);
     toast.success(marcar ? "Paciente sinalizado na agenda." : "Sinalização removida.");
+  };
+
+  /**
+   * Liga/desliga a marcação "sem faturamento" do atendimento.
+   *
+   * Existe para os exames que a clínica REALIZA mas não COBRA — o Toxicológico
+   * é o caso do dia a dia: quem recebe do paciente é o laboratório parceiro. O
+   * sistema antigo tinha essa opção e, sem ela, a recepção só tinha dois
+   * caminhos ruins: deixar o atendimento eternamente "não pago" (e com a GR
+   * bloqueada, porque a guia exige pagamento) ou inventar uma cortesia de
+   * R$ 0,00 — que joga uma isenção que nunca existiu para dentro do caixa e
+   * dos relatórios.
+   *
+   * Marcar não cria lançamento nenhum: é justamente a ausência de lançamento
+   * que mantém o caixa e o "A Receber" limpos.
+   */
+  const alternarSemFaturamento = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      avisoSemPermissaoAgenda();
+      return;
+    }
+    const marcar = !ehSemFaturamento(a);
+    // Marcar depois de cobrado deixaria a guia zerada com o dinheiro do
+    // paciente ainda na gaveta daquele dia, e a conferência do cupom não
+    // fecharia. O banco também recusa (trigger), mas avisar aqui poupa a
+    // funcionária de um erro técnico no meio do atendimento.
+    if (marcar && pagosSet.has(a.id)) {
+      toast.error(
+        "Este atendimento já foi cobrado no caixa. Estorne o pagamento no Financeiro antes de marcar como sem faturamento.",
+      );
+      return;
+    }
+    if (marcar) {
+      const ok = await confirmDialog(
+        `Marcar este atendimento como SEM FATURAMENTO?\n\nPaciente: ${a.paciente_nome}\nProcedimento: ${a.procedimento ?? "—"}\n\nEle deixará de ser cobrado no caixa (o paciente paga direto ao parceiro) e a Guia de Atendimento sairá com valor, clínica e prestador zerados.`,
+      );
+      if (!ok) return;
+    }
+    const nomeUsuario =
+      (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+    const res = await definirSemFaturamento(a.id, marcar, {
+      id: user?.id ?? null,
+      nome: nomeUsuario,
+    });
+    if (!res.ok) {
+      mostrarErro(res.erro);
+      return;
+    }
+    // Atualização otimista: o selo muda na hora, com o paciente no balcão.
+    setItems((lista) => lista.map((it) => (it.id === a.id ? { ...it, ...res.patch } : it)));
+    toast.success(
+      marcar
+        ? "Atendimento marcado como sem faturamento. A GR já pode ser impressa, zerada."
+        : "Marcação removida. O atendimento volta a ser cobrado normalmente.",
+    );
   };
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
@@ -6214,6 +6298,15 @@ function AgendaPage() {
       return;
     }
     if (!clinicaAtual) return;
+    // Trava de caixa: atendimento marcado como sem faturamento não abre a tela
+    // de cobrança. Sem isso, bastava um clique distraído no cifrão para o
+    // Toxicológico virar receita da clínica e entrar na gaveta do dia.
+    if (ehSemFaturamento(a)) {
+      toast.info(
+        "Atendimento sem faturamento — o paciente paga direto ao parceiro. Para cobrar, remova a marcação no menu (⋮) da linha.",
+      );
+      return;
+    }
     try {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
@@ -6806,6 +6899,14 @@ function AgendaPage() {
       avisoSemPermissaoAgenda();
       return;
     }
+    if (ehSemFaturamento(a)) {
+      // Quem fatura é o parceiro, então é ele quem emite a nota. Uma NFS-e da
+      // clínica aqui declararia um serviço que a clínica não recebeu.
+      toast.error(
+        "Atendimento sem faturamento — a nota fiscal é emitida pelo parceiro, não pela clínica.",
+      );
+      return;
+    }
     if (!pagosSet.has(a.id)) {
       toast.error("Registre o pagamento antes de emitir a NFS-e.");
       return;
@@ -7299,7 +7400,10 @@ function AgendaPage() {
 
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
-    if (!pagosSet.has(a.id)) {
+    // Atendimento sem faturamento nunca vai ter pagamento — exigir um aqui é o
+    // que impedia a recepção de entregar a guia do Toxicológico. A guia sai
+    // zerada (valor, clínica e prestador), montada em `print-gr.ts`.
+    if (!pagosSet.has(a.id) && !ehSemFaturamento(a)) {
       toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
       return;
     }
@@ -10408,6 +10512,7 @@ function AgendaPage() {
               // (--foreground) perde contraste sobre ele. O overlay se mistura
               // com o fundo real da linha e funciona nos dois temas.
               const sinalizado = !!a.sinalizado_em;
+              const semFaturamento = ehSemFaturamento(a);
               let bgClass = "bg-card";
               let borderLeft = "border-l-4 border-transparent";
               if (estornoPend) {
@@ -10429,8 +10534,14 @@ function AgendaPage() {
 
               const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
               const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
+              // Sem faturamento também faz check-in: o paciente comparece e é
+              // atendido normalmente — o que não existe é a cobrança.
               const podeCheckin =
-                !ehLivre && !realizado && pagosSet.has(a.id) && pendenteCheckin && podeEscrever;
+                !ehLivre &&
+                !realizado &&
+                (pagosSet.has(a.id) || semFaturamento) &&
+                pendenteCheckin &&
+                podeEscrever;
 
               return (
                 <div
@@ -10561,33 +10672,46 @@ function AgendaPage() {
                           size="sm"
                           onClick={() => cobrarAgendamento(a)}
                           className={`h-8 flex-1 text-xs ${
-                            a.origem_externa
-                              ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                              : parciaisSet.has(a.id)
-                                ? "border-amber-400 bg-amber-50 text-amber-700"
-                                : pagosSet.has(a.id)
-                                  ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                                  : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                            semFaturamento
+                              ? // Cinza, e não o vermelho de "Cobrar": aqui não
+                                // falta pagamento nenhum — não há cobrança
+                                // prevista, e a linha não pode parecer pendente.
+                                "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-100"
+                              : a.origem_externa
+                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                : parciaisSet.has(a.id)
+                                  ? "border-amber-400 bg-amber-50 text-amber-700"
+                                  : pagosSet.has(a.id)
+                                    ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                                    : "border-rose-200 text-rose-600 hover:bg-rose-50"
                           }`}
                           title={
-                            a.origem_externa
-                              ? "Atendimento externo — sem lançamento em caixa"
-                              : parciaisSet.has(a.id)
-                                ? "Parcialmente pago — clique para receber o saldo"
-                                : pagosSet.has(a.id)
-                                  ? "Pago"
-                                  : "Cobrar"
+                            semFaturamento
+                              ? rotuloSemFaturamento(a)
+                              : a.origem_externa
+                                ? "Atendimento externo — sem lançamento em caixa"
+                                : parciaisSet.has(a.id)
+                                  ? "Parcialmente pago — clique para receber o saldo"
+                                  : pagosSet.has(a.id)
+                                    ? "Pago"
+                                    : "Cobrar"
                           }
                         >
-                          <DollarSign
-                            className="h-3.5 w-3.5 mr-1"
-                            strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                          />
-                          {parciaisSet.has(a.id)
-                            ? rotuloSaldo(saldoMap.get(a.id)!)
-                            : pagosSet.has(a.id)
-                              ? "Pago"
-                              : "Cobrar"}
+                          {semFaturamento ? (
+                            <Ban className="h-3.5 w-3.5 mr-1" />
+                          ) : (
+                            <DollarSign
+                              className="h-3.5 w-3.5 mr-1"
+                              strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                            />
+                          )}
+                          {semFaturamento
+                            ? "Sem faturamento"
+                            : parciaisSet.has(a.id)
+                              ? rotuloSaldo(saldoMap.get(a.id)!)
+                              : pagosSet.has(a.id)
+                                ? "Pago"
+                                : "Cobrar"}
                         </Button>
                         {podeEscrever && (
                           <Button
@@ -10613,6 +10737,12 @@ function AgendaPage() {
                                   <Flag className="h-4 w-4 mr-2" />
                                   {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
+                                  <Ban className="h-4 w-4 mr-2" />
+                                  {semFaturamento
+                                    ? "Voltar a faturar este atendimento"
+                                    : "Sinalizar agenda sem faturamento"}
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                               </>
                             )}
@@ -10626,7 +10756,7 @@ function AgendaPage() {
                             )}
                             <DropdownMenuItem
                               onClick={() => imprimirGR(a)}
-                              disabled={!pagosSet.has(a.id)}
+                              disabled={!pagosSet.has(a.id) && !semFaturamento}
                             >
                               <Printer className="h-4 w-4 mr-2" /> Imprimir GR
                             </DropdownMenuItem>
@@ -10771,6 +10901,7 @@ function AgendaPage() {
                   // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
                   // estorno (mais crítico) e acima das demais cores.
                   const sinalizado = !!a.sinalizado_em;
+                  const semFaturamento = ehSemFaturamento(a);
                   let bgClass = "";
                   let borderLeft = "";
                   if (estornoPend) {
@@ -11029,7 +11160,11 @@ function AgendaPage() {
                                   "aguardando_recepcao",
                                   "recepcao",
                                 ].includes(etapa);
-                                if (pagosSet.has(a.id) && pendenteCheckin && podeEscrever) {
+                                if (
+                                  (pagosSet.has(a.id) || semFaturamento) &&
+                                  pendenteCheckin &&
+                                  podeEscrever
+                                ) {
                                   return (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -11077,28 +11212,39 @@ function AgendaPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Pagamento"
+                                    aria-label={semFaturamento ? "Sem faturamento" : "Pagamento"}
                                     onClick={() => cobrarAgendamento(a)}
                                     className={`h-7 w-7 shrink-0 rounded-md border-2 ${
-                                      a.origem_externa
-                                        ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                        : parciaisSet.has(a.id)
-                                          ? // Parcialmente pago: âmbar, para não
-                                            // se confundir com o verde de quitado.
-                                            "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
-                                          : pagosSet.has(a.id)
-                                            ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                            : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                      semFaturamento
+                                        ? // Cinza, e não o vermelho de "falta
+                                          // cobrar": não há cobrança prevista, e
+                                          // a linha não pode parecer pendente
+                                          // para quem varre a agenda do dia.
+                                          "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                        : a.origem_externa
+                                          ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                          : parciaisSet.has(a.id)
+                                            ? // Parcialmente pago: âmbar, para não
+                                              // se confundir com o verde de quitado.
+                                              "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                            : pagosSet.has(a.id)
+                                              ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                              : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
                                     }`}
                                   >
-                                    <DollarSign
-                                      className="h-3.5 w-3.5"
-                                      strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                                    />
+                                    {semFaturamento ? (
+                                      <Ban className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <DollarSign
+                                        className="h-3.5 w-3.5"
+                                        strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                                      />
+                                    )}
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {(() => {
+                                    if (semFaturamento) return rotuloSemFaturamento(a);
                                     if (a.origem_externa)
                                       return "Atendimento externo — sem lançamento em caixa";
                                     const saldoLinha = saldoMap.get(a.id);
@@ -11174,6 +11320,8 @@ function AgendaPage() {
                                         }
                                         if (selecionadaLote)
                                           return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
+                                        if (semFaturamento)
+                                          return "Sem faturamento — a nota fiscal é emitida pelo parceiro";
                                         if (!pagosSet.has(a.id))
                                           return "Nota Fiscal não emitida — registre o pagamento antes";
                                         return "Nota Fiscal não emitida — clique para emitir";
@@ -11202,6 +11350,12 @@ function AgendaPage() {
                                       <Flag className="h-4 w-4 mr-2" />
                                       {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
+                                      <Ban className="h-4 w-4 mr-2" />
+                                      {semFaturamento
+                                        ? "Voltar a faturar este atendimento"
+                                        : "Sinalizar agenda sem faturamento"}
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                   </>
                                 )}
@@ -11210,7 +11364,7 @@ function AgendaPage() {
                                   (() => {
                                     const nf = nfseMap.get(a.id);
                                     const emitida = !!nf;
-                                    const podeEmitir = pagosSet.has(a.id);
+                                    const podeEmitir = pagosSet.has(a.id) && !semFaturamento;
                                     if (!emitida && !podeEmitir) return null;
                                     return (
                                       <>
@@ -11263,12 +11417,17 @@ function AgendaPage() {
                                 {/* Imprimir GR */}
                                 <DropdownMenuItem
                                   onClick={() => imprimirGR(a)}
-                                  disabled={!pagosSet.has(a.id)}
+                                  disabled={!pagosSet.has(a.id) && !semFaturamento}
                                 >
                                   <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                  {!pagosSet.has(a.id) && (
+                                  {!pagosSet.has(a.id) && !semFaturamento && (
                                     <span className="ml-2 text-xs text-muted-foreground">
                                       (pagar)
+                                    </span>
+                                  )}
+                                  {semFaturamento && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      (zerada)
                                     </span>
                                   )}
                                 </DropdownMenuItem>
