@@ -563,31 +563,38 @@ export const FERRAMENTAS_NINA_PACIENTE = [
 /* -------------------------------------------------------------- schemas Zod */
 
 const zEspecialidade = z.object({ especialidade: z.string().max(120).optional() });
+// `medico_id` aceita o UUID devolvido por `buscar_medicos` OU o nome dito pelo
+// paciente. Exigir UUID fazia o Zod recusar a chamada ("Parâmetros
+// inválidos"), e o modelo traduzia isso para "houve um problema ao consultar a
+// agenda" — erro técnico que na verdade era só um nome no lugar do id.
 const zVerificarHorario = z.object({
-  medico_id: z.string().uuid(),
+  medico_id: z.string().trim().min(2).max(160),
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hora: z.string().regex(/^\d{1,2}:\d{2}$/),
 });
 const zProximaVaga = z.object({
-  medico_id: z.string().uuid().optional(),
+  medico_id: z.string().trim().min(2).max(160).optional(),
   especialidade: z.string().max(120).optional(),
   a_partir_de: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   periodo: z.enum(["manha", "tarde", "noite"]).optional(),
+  /** 0=domingo … 6=sábado. "a próxima quinta" vira dia_semana = 4. */
+  dia_semana: z.coerce.number().int().min(0).max(6).optional(),
+  dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zBuscarMedicos = zEspecialidade.extend({ nome: z.string().max(120).optional() });
 const zProcedimentos = z.object({ termo: z.string().trim().min(2).max(120) });
 const zDisponibilidade = z.object({
   especialidade: z.string().max(120).optional(),
-  medico_id: z.string().uuid().optional(),
+  medico_id: z.string().trim().min(2).max(160).optional(),
   data: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   periodo: z.enum(["manha", "tarde", "noite"]).optional(),
-  dias: z.coerce.number().int().min(1).max(30).optional(),
+  dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zIdentificar = z.object({
   cpf: z.string().min(11).max(20),
