@@ -9085,8 +9085,8 @@ export type Database = {
         Row: {
           agenda_obrigatoria: boolean
           ativo: boolean
-          clinica_id: string
           ciclo_dias: number | null
+          clinica_id: string
           codigo: string | null
           cor_agenda: string | null
           created_at: string
@@ -9130,8 +9130,8 @@ export type Database = {
         Insert: {
           agenda_obrigatoria?: boolean
           ativo?: boolean
-          clinica_id: string
           ciclo_dias?: number | null
+          clinica_id: string
           codigo?: string | null
           cor_agenda?: string | null
           created_at?: string
@@ -9175,8 +9175,8 @@ export type Database = {
         Update: {
           agenda_obrigatoria?: boolean
           ativo?: boolean
-          clinica_id?: string
           ciclo_dias?: number | null
+          clinica_id?: string
           codigo?: string | null
           cor_agenda?: string | null
           created_at?: string
@@ -10698,16 +10698,27 @@ export type Database = {
           valor_cartao: number
         }[]
       }
-      fin_atendimentos_matriz: {
-        Args: { _clinica: string }
-        Returns: {
-          ano: number
-          cartao: number
-          exames: number
-          mes: number
-          particular: number
-        }[]
-      }
+      fin_atendimentos_matriz:
+        | {
+            Args: { _clinica: string }
+            Returns: {
+              ano: number
+              cartao: number
+              exames: number
+              mes: number
+              particular: number
+            }[]
+          }
+        | {
+            Args: { _clinica: string; _fim: string; _ini: string }
+            Returns: {
+              ano: number
+              cartao: number
+              exames: number
+              mes: number
+              particular: number
+            }[]
+          }
       fin_resumo_categoria: {
         Args: {
           p_clinica: string
@@ -10764,6 +10775,7 @@ export type Database = {
           valor_pago: number
         }[]
       }
+      fn_norm_proc: { Args: { _t: string }; Returns: string }
       fn_pacotes_do_paciente: {
         Args: { _paciente_id: string }
         Returns: {
@@ -10781,8 +10793,17 @@ export type Database = {
           valor_total: number
         }[]
       }
+      fn_proc_chaves: { Args: { _texto: string }; Returns: string[] }
+      fn_procedimento_por_texto: {
+        Args: { _clinica_id: string; _texto: string }
+        Returns: string
+      }
       fn_registrar_lancamento_e_caixa: {
         Args: { p_lancamento: Json; p_movimento?: Json }
+        Returns: Json
+      }
+      fn_regras_procedimento: {
+        Args: { p_procedimento_id: string; p_unidade_id?: string }
         Returns: Json
       }
       fn_relatorio_sessoes: {
@@ -10806,10 +10827,6 @@ export type Database = {
           valor_contratado: number
           valor_pago: number
         }[]
-      }
-      fn_regras_procedimento: {
-        Args: { p_procedimento_id: string; p_unidade_id?: string }
-        Returns: Json
       }
       get_horarios_disponiveis: {
         Args: {

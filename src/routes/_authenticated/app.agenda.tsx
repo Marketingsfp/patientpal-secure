@@ -7240,7 +7240,7 @@ function AgendaPage() {
     // Já revisado, cada linha vira o que de fato vai para a prefeitura: valor
     // (cheio ou parcial), descrição e tomador escolhido.
     const emailValido = (v: string | null | undefined) =>
-      /^[^@s]+@[^@s]+.[^@s]+$/.test(v ?? "") ? (v as string) : undefined;
+      /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v ?? "") ? (v as string) : undefined;
     const prontos = revisadas.map(({ linha, tomador }) => {
       const parcial = aplicarValorParcial(linha.valor, tomador);
       const descBase = montarDiscriminacaoNfse({
