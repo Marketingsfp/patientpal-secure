@@ -53,6 +53,22 @@ import {
   type TotaisExtrato,
 } from "@/lib/financeiro/extrato-caixa";
 import { carregarMovimentacao } from "@/lib/financeiro/extrato-carregar";
+// Sessões e Manutenções: a folha junta o pacote fechado da fisioterapia com o
+// ciclo mensal da ortodontia. A regra que separa os dois (e que impede a
+// manutenção de virar dívida acumulada) vive no módulo puro `relatorio-sessoes`;
+// o acesso ao banco, em `carregar-sessoes`.
+import {
+  COLUNAS_SESSOES,
+  linhasSessoes,
+  resumoSessoes,
+  ROTULO_FILTRO,
+  filtrarSessoes,
+  totaisSessoes,
+  type FiltroSessoes,
+  type LinhaSessao,
+  type TotaisSessoes,
+} from "@/lib/sessoes/relatorio-sessoes";
+import { carregarSessoes } from "@/lib/sessoes/carregar-sessoes";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -128,7 +144,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios"
   head: () => ({ meta: [{ title: "Relatórios — Financeiro" }] }),
 });
 
-type Tipo = "lancamentos" | "atendimentos" | "notas" | "rateio" | "movimentacao";
+type Tipo = "lancamentos" | "atendimentos" | "notas" | "rateio" | "movimentacao" | "sessoes";
 
 type Linha = Record<string, unknown>;
 
@@ -152,7 +168,7 @@ const ROTULO = "text-xs font-medium text-slate-600";
  * Colunas de cada relatório. A ordem vale para a tela e para o papel — a lista
  * abaixo é a única fonte da verdade dos dois.
  */
-const COLUNAS: Record<Exclude<Tipo, "rateio" | "movimentacao">, Coluna[]> = {
+const COLUNAS: Record<Exclude<Tipo, "rateio" | "movimentacao" | "sessoes">, Coluna[]> = {
   lancamentos: [
     { chave: "data", rotulo: "Data", formato: "data" },
     { chave: "tipo", rotulo: "Tipo", formato: "texto" },
@@ -185,6 +201,7 @@ const TITULOS: Record<Tipo, string> = {
   notas: "Notas de pacientes",
   rateio: "Rateio da Receita",
   movimentacao: "Movimentação Financeira",
+  sessoes: "Sessões e Manutenções",
 };
 
 const ROTULO_COMPARACAO: Record<ModoComparacao, string> = {
@@ -411,6 +428,10 @@ function Page() {
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
   const [servicoAberto, setServicoAberto] = useState(false);
   const [buscaServico, setBuscaServico] = useState("");
+  // --- Filtro exclusivo de Sessões e Manutenções ---------------------------
+  // Recorte da MESMA lista carregada, como o sintético/analítico do extrato:
+  // trocar de "Tudo" para "Busca ativa" não vai ao banco de novo.
+  const [sFiltro, setSFiltro] = useState<FiltroSessoes>("todos");
   // --- Comparação de períodos ---------------------------------------------
   const [comparar, setComparar] = useState(false);
   const [modoComparacao, setModoComparacao] = useState<ModoComparacao>("anterior");
@@ -446,6 +467,8 @@ function Page() {
     /** Movimentações cruas do extrato, pelo mesmo motivo: trocar entre
      *  sintético e analítico é um recorte da mesma lista, não outra consulta. */
     movimentacao?: MovimentacaoExtrato[];
+    /** Linhas cruas de sessões/manutenções: o filtro é recorte em memória. */
+    sessoes?: LinhaSessao[];
   } | null>(null);
 
   // "Agrupar por" e "Sintético/Analítico" são recortes do MESMO resultado, então
@@ -504,6 +527,21 @@ function Page() {
     [atualizado, resultado],
   );
   const totaisM = useMemo(() => totaisExtrato(movsExtrato), [movsExtrato]);
+  /** Linhas cruas de sessões; base dos totais e do filtro em memória. */
+  const sessoesCruas = useMemo(
+    () => (atualizado && resultado?.sessoes ? resultado.sessoes : []),
+    [atualizado, resultado],
+  );
+  /**
+   * Os totais do quadro saem do que está FILTRADO na tela. Diferente do
+   * extrato, aqui o filtro não é uma outra visão do mesmo conjunto: escolher
+   * "Busca ativa" é escolher outro conjunto de pacientes, e um rodapé com o
+   * total geral em cima de 12 linhas visíveis confundiria quem confere.
+   */
+  const totaisS = useMemo(
+    () => totaisSessoes(filtrarSessoes(sessoesCruas, sFiltro)),
+    [sessoesCruas, sFiltro],
+  );
   /**
    * Quebra das entradas por forma, no card "Recebido". Sai das movimentações
    * cruas, e não das linhas da tabela: trocar de sintético para analítico muda
@@ -530,6 +568,8 @@ function Page() {
     // As duas visões do extrato saem da mesma lista carregada: trocar de
     // sintético para analítico reorganiza a tabela na hora, sem ir ao banco.
     if (resultado.tipo === "movimentacao") return linhasExtrato(movsExtrato, rTipo);
+    // Mesmo princípio: o filtro de sessões recorta a lista já carregada.
+    if (resultado.tipo === "sessoes") return linhasSessoes(sessoesCruas, sFiltro);
     if (resultado.tipo !== "rateio") return resultado.linhas;
     // No analítico o "Agrupar por" não soma nada: ele manda na ORDEM em que os
     // atendimentos aparecem, para a folha sair na sequência que o usuário pediu.
@@ -553,6 +593,8 @@ function Page() {
     linhasRateio,
     linhasRateioComp,
     movsExtrato,
+    sessoesCruas,
+    sFiltro,
     rTipo,
     rAgrupar,
     comparacaoVisivel,
@@ -565,7 +607,9 @@ function Page() {
         ? colunasRateio(rTipo, rAgrupar, comparacaoVisivel)
         : tipo === "movimentacao"
           ? colunasExtrato(rTipo)
-          : COLUNAS[tipo],
+          : tipo === "sessoes"
+            ? COLUNAS_SESSOES
+            : COLUNAS[tipo],
     [tipo, rTipo, rAgrupar, comparacaoVisivel],
   );
 
@@ -573,7 +617,7 @@ function Page() {
   // evita a tela em branco de uma página que não existe mais.
   useEffect(() => {
     setPagina(1);
-  }, [rTipo, rAgrupar]);
+  }, [rTipo, rAgrupar, sFiltro]);
 
   // Ao escolher "Intervalo personalizado" os campos abrem preenchidos com o
   // período anterior — em branco, o comparativo nasceria comparando o período
@@ -652,6 +696,35 @@ function Page() {
         : "";
     });
 
+  /**
+   * Rodapé de Sessões e Manutenções.
+   *
+   * "Contratado" e "A fazer" somam SÓ os pacotes: a manutenção ortodôntica não
+   * tem valor contratado nem sessão a fazer, e deixá-la entrar na conta
+   * inventaria um compromisso que a clínica não assumiu.
+   */
+  const rodapeSessoes = (cols: Coluna[], t: TotaisSessoes) =>
+    cols.map((c, i) => {
+      if (c.chave === "faltas") return t.faltas.toLocaleString("pt-BR");
+      if (c.chave === "restantes") {
+        return (t.sessoesContratadas - t.sessoesRealizadas - t.faltas).toLocaleString("pt-BR");
+      }
+      if (c.chave === "valor_contratado") return brl(t.contratado);
+      if (c.chave === "valor_pago") return brl(t.recebido);
+      if (i === 0) return `${t.linhas.toLocaleString("pt-BR")} registro(s)`;
+      return i === 1 ? `${t.buscaAtiva.toLocaleString("pt-BR")} sem agendamento` : "";
+    });
+
+  /** Mesmo rodapé com números crus, para o Excel conseguir somar a coluna. */
+  const rodapeSessoesXlsx = (cols: Coluna[], t: TotaisSessoes) =>
+    cols.map((c, i) => {
+      if (c.chave === "faltas") return t.faltas;
+      if (c.chave === "restantes") return t.sessoesContratadas - t.sessoesRealizadas - t.faltas;
+      if (c.chave === "valor_contratado") return t.contratado;
+      if (c.chave === "valor_pago") return t.recebido;
+      return i === 0 ? `${t.linhas.toLocaleString("pt-BR")} registro(s)` : "";
+    });
+
   /** Quadro de fechamento do extrato, igual na tela, no papel e na planilha. */
   const resumoDoExtrato = (t: TotaisExtrato) => [
     { rotulo: "Movimentações", valor: t.qtd.toLocaleString("pt-BR") },
@@ -666,18 +739,20 @@ function Page() {
       ? rodapeRateio(colunas, totaisR, totaisComp)
       : tipo === "movimentacao"
         ? rodapeExtrato(colunas, totaisM)
-        : colunas.map((c, i) => {
-            if (c.somar) {
-              // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
-              // o consolidado da coluna é o saldo do período.
-              const valor =
-                tipo === "lancamentos" && c.chave === "valor"
-                  ? totais.saldo
-                  : totais.somas[c.chave];
-              return brl(valor);
-            }
-            return i === 0 ? `${linhas.length.toLocaleString("pt-BR")} registro(s)` : "";
-          });
+        : tipo === "sessoes"
+          ? rodapeSessoes(colunas, totaisS)
+          : colunas.map((c, i) => {
+              if (c.somar) {
+                // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
+                // o consolidado da coluna é o saldo do período.
+                const valor =
+                  tipo === "lancamentos" && c.chave === "valor"
+                    ? totais.saldo
+                    : totais.somas[c.chave];
+                return brl(valor);
+              }
+              return i === 0 ? `${linhas.length.toLocaleString("pt-BR")} registro(s)` : "";
+            });
 
   /**
    * Mesma linha de totais, só que com números crus: na planilha o total tem
@@ -758,10 +833,17 @@ function Page() {
     cruas: RateioLinha[];
     cruasComp: RateioLinha[];
     movs: MovimentacaoExtrato[];
+    sessoes: LinhaSessao[];
   } | null> => {
     if (!clinicaAtual) return null;
     if (atualizado && resultado) {
-      return { linhas, cruas: linhasRateio, cruasComp: linhasRateioComp, movs: movsExtrato };
+      return {
+        linhas,
+        cruas: linhasRateio,
+        cruasComp: linhasRateioComp,
+        movs: movsExtrato,
+        sessoes: sessoesCruas,
+      };
     }
     if (tipo === "rateio" && !ctxRateio) {
       toast.info("Carregando o cadastro de médicos e serviços — tente de novo em instantes");
@@ -772,6 +854,7 @@ function Page() {
     let cruas: RateioLinha[] | undefined;
     let cruasComp: RateioLinha[] | undefined;
     let movs: MovimentacaoExtrato[] | undefined;
+    let sessoes: LinhaSessao[] | undefined;
     try {
       if (tipo === "rateio" && ctxRateio) {
         const filtrosComuns = {
@@ -813,6 +896,13 @@ function Page() {
           ate: to,
         });
         data = linhasExtrato(movs, rTipo);
+      } else if (tipo === "sessoes") {
+        sessoes = await carregarSessoes({
+          clinicaId: clinicaAtual.clinica_id,
+          de: from,
+          ate: to,
+        });
+        data = linhasSessoes(sessoes, sFiltro);
       } else if (tipo === "lancamentos") {
         data = await fetchAll(() =>
           supabase
@@ -861,6 +951,7 @@ function Page() {
       rateio: cruas,
       rateioComp: cruasComp,
       movimentacao: movs,
+      sessoes,
     });
     setPagina(1);
     return {
@@ -868,6 +959,7 @@ function Page() {
       cruas: cruas ?? [],
       cruasComp: cruasComp ?? [],
       movs: movs ?? [],
+      sessoes: sessoes ?? [],
     };
   };
 
@@ -894,6 +986,14 @@ function Page() {
     if (tipo === "movimentacao") {
       linhasCtx.push(
         `${rTipo === "sintetico" ? "Sintético" : "Analítico"} · entradas e saídas do caixa geral`,
+      );
+    }
+    if (tipo === "sessoes") {
+      linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
+      // Sem esta linha, quem recebe a folha lê a coluna "Recebido" de uma
+      // manutenção como se houvesse saldo a cobrar do resto.
+      linhasCtx.push(
+        "Manutenção de aparelho é cobrada por comparecimento: falta não gera cobrança retroativa.",
       );
     }
     return linhasCtx.filter(Boolean);
@@ -952,6 +1052,7 @@ function Page() {
       }
       return;
     }
+    const ts = totaisSessoes(filtrarSessoes(res.sessoes, sFiltro));
     try {
       await exportarRelatorioXlsx({
         arquivo: `${tipo === "rateio" ? "rateio_receita" : `relatorio_${tipo}`}_${from}_${to}`,
@@ -962,15 +1063,17 @@ function Page() {
         totais:
           tipo === "rateio"
             ? totaisXlsxRateio(colunas, t, tComp)
-            : colunas.map((c, i) =>
-                c.somar
-                  ? tipo === "lancamentos" && c.chave === "valor"
-                    ? totais.saldo
-                    : totais.somas[c.chave]
-                  : i === 0
-                    ? `${data.length.toLocaleString("pt-BR")} registro(s)`
-                    : "",
-              ),
+            : tipo === "sessoes"
+              ? rodapeSessoesXlsx(colunas, ts)
+              : colunas.map((c, i) =>
+                  c.somar
+                    ? tipo === "lancamentos" && c.chave === "valor"
+                      ? totais.saldo
+                      : totais.somas[c.chave]
+                    : i === 0
+                      ? `${data.length.toLocaleString("pt-BR")} registro(s)`
+                      : "",
+                ),
         // O mesmo bloco que a tela mostra no card, abaixo da tabela: quem abre
         // a planilha enxerga a quebra por forma de pagamento sem precisar
         // montar tabela dinâmica. Os valores vão como número, para somarem.
@@ -984,7 +1087,19 @@ function Page() {
                   tipo: "moeda" as const,
                 })),
               }
-            : undefined,
+            : tipo === "sessoes"
+              ? {
+                  titulo: "Resumo do acompanhamento",
+                  // Vai como texto: o quadro mistura contagem ("18 pacotes")
+                  // com dinheiro, e forçar tudo a número faria o Excel exibir
+                  // "R$ 18,00" onde são dezoito pacotes.
+                  itens: resumoSessoes(ts).map((i) => ({
+                    rotulo: i.rotulo,
+                    valor: i.valor,
+                    tipo: "texto" as const,
+                  })),
+                }
+              : undefined,
       });
       toast.success(`Planilha gerada (${data.length} linhas)`);
     } catch (e) {
@@ -1000,16 +1115,21 @@ function Page() {
       toast.info("Nenhum dado no período");
       return;
     }
-    // No rateio e no extrato o CSV sai com os mesmos rótulos da tela — quem
-    // abre no Excel não tem como saber o que significa "liquido", "margem" ou
-    // "banco_conta".
-    if (tipo === "rateio" || tipo === "movimentacao") {
+    // No rateio, no extrato e nas sessões o CSV sai com os mesmos rótulos da
+    // tela — quem abre no Excel não tem como saber o que significa "liquido",
+    // "margem", "banco_conta" ou "dias_parado".
+    if (tipo === "rateio" || tipo === "movimentacao" || tipo === "sessoes") {
       const linhasCsv = data.map((linha) => {
         const obj: Record<string, unknown> = {};
         for (const c of colunas) obj[c.rotulo] = valorXlsx(c, linha[c.chave]);
         return obj;
       });
-      const nome = tipo === "rateio" ? "rateio_receita" : `movimentacao_financeira_${rTipo}`;
+      const nome =
+        tipo === "rateio"
+          ? "rateio_receita"
+          : tipo === "sessoes"
+            ? `sessoes_manutencoes_${sFiltro}`
+            : `movimentacao_financeira_${rTipo}`;
       download(`${nome}_${from}_${to}.csv`, toCsv(linhasCsv));
       toast.success(`Relatório gerado (${data.length} linhas)`);
       return;
@@ -1077,6 +1197,22 @@ function Page() {
           titulo: "Por forma de pagamento",
           itens: resumoPorForma(res.movs).map((i) => ({ rotulo: i.rotulo, valor: brl(i.valor) })),
         },
+      });
+      return;
+    }
+    if (tipo === "sessoes") {
+      // Mesmo cuidado do rateio e do extrato: imprimir pode ser o primeiro
+      // clique, então os totais são recalculados aqui a partir das linhas
+      // cruas, e não lidos do `useMemo`, que só roda no render seguinte.
+      const ts = totaisSessoes(filtrarSessoes(res.sessoes, sFiltro));
+      imprimirRelatorio({
+        clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
+        titulo: TITULOS.sessoes,
+        periodo: `${periodo} · ${ROTULO_FILTRO[sFiltro]}`,
+        colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
+        linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
+        totais: rodapeSessoes(colunas, ts),
+        resumo: resumoSessoes(ts),
       });
       return;
     }
@@ -1169,6 +1305,7 @@ function Page() {
                   <SelectItem value="notas">Notas</SelectItem>
                   <SelectItem value="rateio">Rateio da Receita</SelectItem>
                   <SelectItem value="movimentacao">Movimentação Financeira</SelectItem>
+                  <SelectItem value="sessoes">Sessões e Manutenções</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1448,6 +1585,39 @@ function Page() {
             </div>
           )}
 
+          {/* Sessões e Manutenções: o filtro é recorte da mesma lista, então
+              troca na hora, sem novo "Buscar". "Busca ativa" é o motivo de o
+              relatório existir — quem tem tratamento em andamento e nenhuma
+              data marcada na agenda. */}
+          {tipo === "sessoes" && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="space-y-1.5 sm:w-72">
+                  <Label className={ROTULO}>Mostrar</Label>
+                  <Select value={sFiltro} onValueChange={(v) => setSFiltro(v as FiltroSessoes)}>
+                    <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(ROTULO_FILTRO) as FiltroSessoes[]).map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {ROTULO_FILTRO[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground sm:flex-1 sm:pb-2.5">
+                  Pacotes de fisioterapia entram com{" "}
+                  <strong>sessões contratadas x realizadas</strong> e situação de pagamento.
+                  Manutenção de aparelho é cobrada <strong>por comparecimento</strong>: falta não
+                  vira dívida, entra como paciente a buscar. A coluna <em>Dias parado</em> conta a
+                  partir de {fmtDate(to)}.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Bloco 4 — ação principal à esquerda, saídas do relatório à direita. */}
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
             <Button
@@ -1505,6 +1675,14 @@ function Page() {
               impresso daquele dia.
             </p>
           )}
+          {tipo === "sessoes" && (
+            <p className="text-xs text-muted-foreground">
+              Pacote em andamento aparece sempre, mesmo que tenha começado antes do período — é para
+              ele que a busca ativa existe. Pacote já concluído entra só se começou dentro do
+              período. A manutenção de aparelho <strong>não acumula cobrança</strong>: quem faltou
+              não deve o mês, apenas ficou parado.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -1557,6 +1735,31 @@ function Page() {
             titulo="Saldo do período"
             valor={brl(totaisM.saldo)}
             detalhe={totaisM.saldo < 0 ? "Saiu mais do que entrou" : undefined}
+          />
+        </div>
+      )}
+
+      {/* Cards de Sessões. O primeiro é o que a recepção usa todo dia: quantos
+          pacientes estão em tratamento e não têm data marcada. */}
+      {tipo === "sessoes" && atualizado && linhas.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <CardResumo
+            titulo="Sem agendamento"
+            valor={totaisS.buscaAtiva.toLocaleString("pt-BR")}
+            detalhe="pacientes para busca ativa"
+            invertido
+          />
+          <CardResumo
+            titulo="Sessões realizadas"
+            valor={totaisS.sessoesRealizadas.toLocaleString("pt-BR")}
+            detalhe={`de ${totaisS.sessoesContratadas.toLocaleString("pt-BR")} contratadas · ${totaisS.faltas.toLocaleString("pt-BR")} falta(s)`}
+          />
+          <CardResumo titulo="Recebido" valor={brl(totaisS.recebido)} />
+          <CardResumo
+            titulo="Saldo a receber"
+            valor={brl(totaisS.emAberto)}
+            detalhe="só pacotes — manutenção não acumula"
+            invertido
           />
         </div>
       )}

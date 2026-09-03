@@ -143,6 +143,10 @@ export type Database = {
           pacote_id: string | null
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
+          sem_faturamento: boolean
+          sem_faturamento_em: string | null
+          sem_faturamento_por: string | null
+          sem_faturamento_por_nome: string | null
           sinalizado_em: string | null
           sinalizado_por: string | null
           sinalizado_por_nome: string | null
@@ -196,6 +200,10 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          sem_faturamento?: boolean
+          sem_faturamento_em?: string | null
+          sem_faturamento_por?: string | null
+          sem_faturamento_por_nome?: string | null
           sinalizado_em?: string | null
           sinalizado_por?: string | null
           sinalizado_por_nome?: string | null
@@ -249,6 +257,10 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          sem_faturamento?: boolean
+          sem_faturamento_em?: string | null
+          sem_faturamento_por?: string | null
+          sem_faturamento_por_nome?: string | null
           sinalizado_em?: string | null
           sinalizado_por?: string | null
           sinalizado_por_nome?: string | null
@@ -9074,6 +9086,7 @@ export type Database = {
           agenda_obrigatoria: boolean
           ativo: boolean
           clinica_id: string
+          ciclo_dias: number | null
           codigo: string | null
           cor_agenda: string | null
           created_at: string
@@ -9096,6 +9109,7 @@ export type Database = {
           requer_medico: boolean
           requer_sala: boolean
           sala_obrigatoria: boolean
+          sessoes_incluidas: number | null
           tempo_padrao_min: number
           tipo: string
           tipo_destino: string | null
@@ -9117,6 +9131,7 @@ export type Database = {
           agenda_obrigatoria?: boolean
           ativo?: boolean
           clinica_id: string
+          ciclo_dias?: number | null
           codigo?: string | null
           cor_agenda?: string | null
           created_at?: string
@@ -9139,6 +9154,7 @@ export type Database = {
           requer_medico?: boolean
           requer_sala?: boolean
           sala_obrigatoria?: boolean
+          sessoes_incluidas?: number | null
           tempo_padrao_min?: number
           tipo?: string
           tipo_destino?: string | null
@@ -9160,6 +9176,7 @@ export type Database = {
           agenda_obrigatoria?: boolean
           ativo?: boolean
           clinica_id?: string
+          ciclo_dias?: number | null
           codigo?: string | null
           cor_agenda?: string | null
           created_at?: string
@@ -9182,6 +9199,7 @@ export type Database = {
           requer_medico?: boolean
           requer_sala?: boolean
           sala_obrigatoria?: boolean
+          sessoes_incluidas?: number | null
           tempo_padrao_min?: number
           tipo?: string
           tipo_destino?: string | null
@@ -10735,9 +10753,59 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_agendamento_coberto_por_pacote: {
+        Args: { _agendamento_id: string }
+        Returns: {
+          coberto: boolean
+          descricao: string
+          numero: number
+          pacote_id: string
+          total: number
+          valor_pago: number
+        }[]
+      }
+      fn_pacotes_do_paciente: {
+        Args: { _paciente_id: string }
+        Returns: {
+          agendamento_id: string
+          data_inicio: string
+          data_prevista: string
+          descricao: string
+          numero: number
+          pacote_id: string
+          sessao_id: string
+          sessao_status: string
+          status: string
+          total_sessoes: number
+          valor_pago: number
+          valor_total: number
+        }[]
+      }
       fn_registrar_lancamento_e_caixa: {
         Args: { p_lancamento: Json; p_movimento?: Json }
         Returns: Json
+      }
+      fn_relatorio_sessoes: {
+        Args: { _ate: string; _clinica_id: string; _de: string }
+        Returns: {
+          dias_parado: number
+          faltas: number
+          origem: string
+          paciente_id: string
+          paciente_nome: string
+          pendencia: string
+          procedimento: string
+          profissional: string
+          prontuario: string
+          proxima_data: string
+          realizadas: number
+          restantes: number
+          situacao_financeira: string
+          total_sessoes: number
+          ultima_data: string
+          valor_contratado: number
+          valor_pago: number
+        }[]
       }
       fn_regras_procedimento: {
         Args: { p_procedimento_id: string; p_unidade_id?: string }

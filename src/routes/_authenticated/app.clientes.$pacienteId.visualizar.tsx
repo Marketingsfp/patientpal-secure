@@ -13,6 +13,7 @@ import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoe
 import { PacienteAtendimentosResumo } from "@/components/clientes/paciente-atendimentos-resumo";
 import { PacienteOdontoPanel } from "@/components/clientes/paciente-odonto-panel";
 import { PacienteFisioPanel } from "@/components/clientes/paciente-fisio-panel";
+import { PacienteSessoesPanel } from "@/components/clientes/paciente-sessoes-panel";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
@@ -124,6 +125,11 @@ function VisualizarClientePage() {
             <TabsTrigger value="cartoes">Cartões</TabsTrigger>
             <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
             <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
+            {/* Sem trava de módulo de propósito: a recepção precisa responder
+                "quantas sessões faltam?" no balcão, e ela não tem Fisioterapia
+                liberada. A leitura vem de `fn_pacotes_do_paciente`, que devolve
+                só a parte administrativa — nada de evolução clínica. */}
+            <TabsTrigger value="sessoes">Sessões</TabsTrigger>
             {verOdonto && <TabsTrigger value="odontologia">Odontologia</TabsTrigger>}
             {verFisio && <TabsTrigger value="fisioterapia">Fisioterapia</TabsTrigger>}
           </TabsList>
@@ -152,6 +158,10 @@ function VisualizarClientePage() {
               pacienteId={paciente.id}
               clinicaId={clinicaAtual.clinica_id}
             />
+          </TabsContent>
+
+          <TabsContent value="sessoes">
+            <PacienteSessoesPanel pacienteId={paciente.id} />
           </TabsContent>
 
           <TabsContent value="hiperdia" className="space-y-6">

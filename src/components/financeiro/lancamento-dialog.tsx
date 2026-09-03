@@ -194,6 +194,15 @@ export function LancamentoDialog({
   const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
+  /** Sessão de pacote já paga na venda; `null` quando não há cobertura. */
+  const [coberturaPacote, setCoberturaPacote] = useState<{
+    descricao: string;
+    numero: number;
+    total: number;
+    valor_pago: number;
+  } | null>(null);
+  /** O operador confirmou que é uma cobrança extra, e não a sessão do pacote. */
+  const [cobrancaExtraOk, setCobrancaExtraOk] = useState(false);
   const [data, setData] = useState(() => hojeBR());
   const [categoriaId, setCategoriaId] = useState<string>("");
   const [contaId, setContaId] = useState<string>("");
@@ -477,6 +486,39 @@ export function LancamentoDialog({
     }
     return Math.min(origNum, Math.round(n * 100) / 100);
   })();
+  /**
+   * Este atendimento é uma sessão JÁ PAGA de um pacote?
+   *
+   * O paciente compra 5 sessões e paga na venda. Da segunda em diante o
+   * atendimento existe na agenda sem nada a receber, e cobrar de novo por
+   * hábito faz o paciente pagar duas vezes e o caixa do dia fechar errado.
+   * A consulta é uma função do banco porque as tabelas de sessão são fechadas
+   * pelo módulo `fisioterapia`, que o caixa não tem — lendo direto, a resposta
+   * viria vazia e o aviso nunca apareceria.
+   */
+  useEffect(() => {
+    if (!open || !agendamentoId || tipo !== "receita") {
+      setCoberturaPacote(null);
+      setCobrancaExtraOk(false);
+      return;
+    }
+    let cancelado = false;
+    void (async () => {
+      const { data, error } = await supabase.rpc("fn_agendamento_coberto_por_pacote", {
+        _agendamento_id: agendamentoId,
+      });
+      if (cancelado || error) return;
+      const linha = (data ?? [])[0] as
+        | { descricao: string; numero: number; total: number; valor_pago: number }
+        | undefined;
+      setCoberturaPacote(linha ?? null);
+      setCobrancaExtraOk(false);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [open, agendamentoId, tipo]);
+
   // Mantém o `valor` (total a pagar) sincronizado com o desconto.
   useEffect(() => {
     if (!open) return;
@@ -899,6 +941,17 @@ export function LancamentoDialog({
           toast.error("Este agendamento já possui um pagamento registrado.");
           setSaving(false);
           onOpenChange(false);
+          return;
+        }
+        // Sessão de pacote já quitado. Não é bloqueio definitivo — pode haver
+        // uma cobrança legítima à parte —, mas exige o operador dizer que sabe
+        // o que está fazendo. O diálogo fica aberto para ele marcar a caixa.
+        if (coberturaPacote && !cobrancaExtraOk) {
+          toast.error(
+            `Sessão ${coberturaPacote.numero} de ${coberturaPacote.total} já paga no pacote. ` +
+              "Confirme na caixa de aviso se esta é mesmo uma cobrança extra.",
+          );
+          setSaving(false);
           return;
         }
       }
@@ -1743,6 +1796,30 @@ export function LancamentoDialog({
                 {bloqueioCartao.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento só pode ser
                 pago como <strong>Particular</strong> — não use a categoria "
                 {bloqueioCartao.convenioNome ?? "Convênio"}" nem a forma "Convênio".
+              </div>
+            )}
+            {/* Sessão já paga na venda do pacote. Fica no topo do diálogo, antes
+                de qualquer campo: quem abriu para receber precisa ver isso
+                ANTES de digitar o valor, e não depois de tentar salvar. */}
+            {coberturaPacote && (
+              <div className="rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm space-y-2">
+                <div className="font-medium text-amber-900">
+                  Sessão {coberturaPacote.numero} de {coberturaPacote.total} — já paga no pacote
+                </div>
+                <p className="text-[12px] text-amber-900/80">
+                  {coberturaPacote.descricao} · já recebido{" "}
+                  {formatBRL(Number(coberturaPacote.valor_pago) || 0)}. Esta sessão foi paga na
+                  venda do pacote e <strong>não deve ser cobrada de novo</strong>. Se o paciente
+                  está pagando outra coisa hoje, confirme abaixo.
+                </p>
+                <label className="flex items-start gap-2 cursor-pointer text-[12px] text-amber-900">
+                  <Checkbox
+                    checked={cobrancaExtraOk}
+                    onCheckedChange={(v) => setCobrancaExtraOk(!!v)}
+                    className="mt-0.5"
+                  />
+                  <span>É uma cobrança extra, fora do pacote</span>
+                </label>
               </div>
             )}
             <div className="space-y-1.5">

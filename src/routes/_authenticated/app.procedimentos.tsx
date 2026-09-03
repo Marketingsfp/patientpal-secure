@@ -101,6 +101,10 @@ interface Procedimento {
   permite_encaixe?: boolean | null;
   tempo_padrao_min?: number | null;
   valor_variavel?: boolean | null;
+  /** 2 ou mais faz o pacote de sessões nascer no agendamento da venda. */
+  sessoes_incluidas?: number | null;
+  /** Intervalo esperado até o próximo comparecimento (30 = manutenção mensal). */
+  ciclo_dias?: number | null;
 }
 interface Cartao {
   id: string;
@@ -164,6 +168,8 @@ const EMPTY = {
   permite_encaixe: true,
   tempo_padrao_min: "30",
   valor_variavel: false,
+  sessoes_incluidas: "",
+  ciclo_dias: "",
 };
 
 const EMPTY_CARTAO = { nome: "", descricao: "", percentual_desconto: "0", ativo: true };
@@ -856,6 +862,9 @@ function ProcedimentosPage() {
       permite_encaixe: p.permite_encaixe ?? true,
       tempo_padrao_min: String(p.tempo_padrao_min ?? p.duracao_minutos ?? 30),
       valor_variavel: !!p.valor_variavel,
+      // Vazio, e não "0": zero sessões incluídas leria como um pacote de nada.
+      sessoes_incluidas: p.sessoes_incluidas ? String(p.sessoes_incluidas) : "",
+      ciclo_dias: p.ciclo_dias ? String(p.ciclo_dias) : "",
     });
     setOpen(true);
   };
@@ -903,6 +912,11 @@ function ProcedimentosPage() {
       permite_venda_direta: !!form.permite_venda_direta,
       permite_encaixe: !!form.permite_encaixe,
       tempo_padrao_min: Math.max(0, Number(form.tempo_padrao_min) || 30),
+      // Campo em branco grava NULL, nunca 0: é a diferença entre "procedimento
+      // avulso, comportamento de sempre" e "pacote de zero sessões".
+      sessoes_incluidas:
+        Number(form.sessoes_incluidas) >= 2 ? Number(form.sessoes_incluidas) : null,
+      ciclo_dias: Number(form.ciclo_dias) >= 1 ? Number(form.ciclo_dias) : null,
     };
     // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
     // nesta clínica e pergunta antes de cadastrar.
@@ -1888,6 +1902,45 @@ function ProcedimentosPage() {
                     />
                     Permite encaixe
                   </label>
+                </div>
+                {/* Sessões e ciclos. Até aqui o "(5 SESSOES)" existia só dentro
+                    do nome do procedimento, como texto — o sistema não tinha
+                    como saber que aquela venda dava direito a cinco visitas. */}
+                <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                  <p className="text-xs font-medium">Sessões e retornos</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Sessões incluídas na venda</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={200}
+                        placeholder="em branco = avulso"
+                        value={form.sessoes_incluidas}
+                        onChange={(e) => setForm({ ...form, sessoes_incluidas: e.target.value })}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        A partir de 2, agendar este procedimento abre o pacote sozinho e já reserva
+                        a grade de sessões do paciente. Ex.: Fisioterapia (5 sessões) = 5.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Retorno esperado (dias)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        placeholder="em branco = não controla"
+                        value={form.ciclo_dias}
+                        onChange={(e) => setForm({ ...form, ciclo_dias: e.target.value })}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Para manutenção de aparelho: 30 dias. Só alimenta a busca ativa de quem
+                        sumiu — <strong>não gera cobrança</strong> de mês em que o paciente não
+                        veio.
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-[12px] text-muted-foreground">
                   O modo de emissão de NFS-e (por item ou agrupada) é definido na configuração da

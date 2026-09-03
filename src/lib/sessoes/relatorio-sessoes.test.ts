@@ -1,0 +1,177 @@
+import { describe, expect, it } from "bun:test";
+import {
+  COLUNAS_SESSOES,
+  filtrarSessoes,
+  linhaExibida,
+  linhasSessoes,
+  precisaBuscaAtiva,
+  rotuloSessoes,
+  temPendenciaFinanceira,
+  totaisSessoes,
+  type LinhaSessao,
+} from "./relatorio-sessoes";
+
+/** Pacote de fisioterapia; cada teste sobrescreve só o que lhe interessa. */
+const pacote = (over: Partial<LinhaSessao> = {}): LinhaSessao => ({
+  origem: "pacote",
+  paciente_id: "p1",
+  paciente_nome: "MARIA DA SILVA",
+  prontuario: "0012345",
+  procedimento: "FISIOTERAPIA (5 SESSOES)",
+  profissional: "DRA. ANA",
+  total_sessoes: 5,
+  realizadas: 2,
+  faltas: 0,
+  restantes: 3,
+  valor_contratado: 200,
+  valor_pago: 200,
+  situacao_financeira: "pago",
+  ultima_data: "2026-08-20",
+  proxima_data: "2026-09-10",
+  dias_parado: 0,
+  pendencia: "Próxima em 10/09/2026",
+  ...over,
+});
+
+/** Manutenção de aparelho: cobrada por visita, sem total contratado. */
+const ciclo = (over: Partial<LinhaSessao> = {}): LinhaSessao => ({
+  origem: "ciclo",
+  paciente_id: "p2",
+  paciente_nome: "JOAO PEREIRA",
+  prontuario: "0067890",
+  procedimento: "MANUTENCAO",
+  profissional: "DR. CARLOS",
+  total_sessoes: 0,
+  realizadas: 3,
+  faltas: 0,
+  restantes: 0,
+  valor_contratado: 0,
+  valor_pago: 285,
+  situacao_financeira: "por_visita",
+  ultima_data: "2026-07-09",
+  proxima_data: null,
+  dias_parado: 56,
+  pendencia: "Atrasado — 56 dias sem manutenção",
+  ...over,
+});
+
+describe("busca ativa", () => {
+  it("não cobra busca ativa de quem já tem data futura marcada", () => {
+    expect(precisaBuscaAtiva(pacote({ proxima_data: "2026-09-10" }))).toBe(false);
+    expect(precisaBuscaAtiva(ciclo({ proxima_data: "2026-10-01" }))).toBe(false);
+  });
+
+  it("aponta o pacote com sessão sobrando e sem agendamento", () => {
+    expect(precisaBuscaAtiva(pacote({ proxima_data: null, restantes: 3 }))).toBe(true);
+  });
+
+  it("não persegue pacote já concluído", () => {
+    expect(precisaBuscaAtiva(pacote({ proxima_data: null, restantes: 0 }))).toBe(false);
+  });
+
+  it("aponta a manutenção sem próxima data, mesmo sem sessão sobrando", () => {
+    // O ciclo não tem fim: `restantes` é sempre 0 e não pode ser o critério.
+    expect(precisaBuscaAtiva(ciclo({ proxima_data: null, restantes: 0 }))).toBe(true);
+  });
+});
+
+describe("pendência financeira", () => {
+  it("acusa pacote em aberto e parcial", () => {
+    expect(temPendenciaFinanceira(pacote({ situacao_financeira: "aberto" }))).toBe(true);
+    expect(temPendenciaFinanceira(pacote({ situacao_financeira: "parcial" }))).toBe(true);
+  });
+
+  it("não acusa pacote pago", () => {
+    expect(temPendenciaFinanceira(pacote({ situacao_financeira: "pago" }))).toBe(false);
+  });
+
+  it("NUNCA acusa manutenção: faltar não gera dívida na ortodontia", () => {
+    // Regra de negócio do dono: quem não compareceu no mês não deve
+    // retroativo. Se este teste cair, o relatório passou a cobrar por
+    // atendimento que nunca aconteceu.
+    expect(temPendenciaFinanceira(ciclo({ valor_pago: 0, dias_parado: 300 }))).toBe(false);
+  });
+});
+
+describe("filtros", () => {
+  const base = [
+    pacote(),
+    pacote({ paciente_id: "p3", proxima_data: null, situacao_financeira: "aberto", valor_pago: 0 }),
+    ciclo(),
+  ];
+
+  it("separa pacotes de manutenções", () => {
+    expect(filtrarSessoes(base, "pacotes")).toHaveLength(2);
+    expect(filtrarSessoes(base, "ciclos")).toHaveLength(1);
+    expect(filtrarSessoes(base, "todos")).toHaveLength(3);
+  });
+
+  it("a busca ativa junta pacote sem agenda e manutenção parada", () => {
+    const r = filtrarSessoes(base, "faltosos");
+    expect(r.map((l) => l.paciente_id).sort()).toEqual(["p2", "p3"]);
+  });
+
+  it("a pendência financeira deixa a manutenção de fora", () => {
+    const r = filtrarSessoes(base, "financeiro");
+    expect(r.map((l) => l.paciente_id)).toEqual(["p3"]);
+  });
+});
+
+describe("apresentação da linha", () => {
+  it('mostra "2/5" no pacote', () => {
+    expect(rotuloSessoes(pacote({ realizadas: 2, total_sessoes: 5 }))).toBe("2/5");
+  });
+
+  it("mostra visitas na manutenção, e nunca um total contratado que não existe", () => {
+    expect(rotuloSessoes(ciclo({ realizadas: 3 }))).toBe("3 visitas");
+    expect(rotuloSessoes(ciclo({ realizadas: 1 }))).toBe("1 visita");
+  });
+
+  it("deixa Contratado e A fazer vazios na manutenção, em vez de zero", () => {
+    // Zero nessas colunas leria como "contratou R$ 0,00" e "não falta nada".
+    const l = linhaExibida(ciclo());
+    expect(l.valor_contratado).toBeNull();
+    expect(l.restantes).toBeNull();
+  });
+
+  it("toda coluna declarada existe na linha exibida", () => {
+    const l = linhaExibida(pacote());
+    for (const c of COLUNAS_SESSOES) expect(Object.hasOwn(l, c.chave)).toBe(true);
+  });
+
+  it("linhasSessoes aplica o filtro antes de formatar", () => {
+    expect(linhasSessoes([pacote(), ciclo()], "ciclos")).toHaveLength(1);
+  });
+});
+
+describe("totais", () => {
+  it("soma contratado só dos pacotes e recebido de todos", () => {
+    const t = totaisSessoes([pacote(), ciclo()]);
+    expect(t.pacotes).toBe(1);
+    expect(t.ciclos).toBe(1);
+    expect(t.contratado).toBe(200);
+    expect(t.recebido).toBe(485);
+    expect(t.sessoesContratadas).toBe(5);
+    expect(t.sessoesRealizadas).toBe(5);
+  });
+
+  it("saldo a receber ignora a manutenção", () => {
+    // A manutenção tem valor_contratado 0; se entrasse na conta, um paciente
+    // parado há meses viraria saldo devedor.
+    const t = totaisSessoes([ciclo({ valor_pago: 0 })]);
+    expect(t.emAberto).toBe(0);
+  });
+
+  it("saldo a receber do pacote é o que falta, nunca negativo", () => {
+    const t = totaisSessoes([
+      pacote({ valor_contratado: 200, valor_pago: 50 }),
+      pacote({ valor_contratado: 200, valor_pago: 250 }),
+    ]);
+    expect(t.emAberto).toBe(150);
+  });
+
+  it("conta quem precisa de busca ativa", () => {
+    const t = totaisSessoes([pacote({ proxima_data: null }), pacote(), ciclo()]);
+    expect(t.buscaAtiva).toBe(2);
+  });
+});
