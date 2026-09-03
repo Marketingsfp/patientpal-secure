@@ -4059,14 +4059,14 @@ function AtendimentosPage() {
 
                       <div className="grid grid-cols-2 gap-8 mt-10 pt-4 text-xs">
                         <div className="text-center">
+                          <div className="border-t pt-1">Assinatura da clínica</div>
+                        </div>
+                        <div className="text-center">
                           <div className="border-t pt-1">
                             {comprovante.papel === "terceiro"
                               ? `Assinatura de ${comprovante.medicoNome}`
                               : "Assinatura do médico"}
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="border-t pt-1">Assinatura da clínica</div>
                         </div>
                       </div>
                     </div>

@@ -864,10 +864,10 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
         </tfoot>
       </table>
       <div class="sig">
+        <div><div class="line">Assinatura da clínica</div></div>
         <div><div class="line">${
           ehTerceiro ? `Assinatura de ${escapeHtml(g.medico_nome)}` : "Assinatura do médico"
         }</div></div>
-        <div><div class="line">Assinatura da clínica</div></div>
       </div>
     </div>
     </div>
