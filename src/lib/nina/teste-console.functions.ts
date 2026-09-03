@@ -403,6 +403,48 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
   });
 
 
+/**
+ * Painel técnico da homologação: quais ferramentas a Nina chamou nesta
+ * conversa, com argumentos e resposta do backend. Lê o rastro do `audit_log`
+ * (ação NINA_TOOL) — nada de novo é gravado só para o painel.
+ */
+export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: linhas } = await supabaseAdmin
+      .from("audit_log")
+      .select("id, created_at, dados_depois")
+      .eq("clinica_id", data.clinicaId)
+      .eq("action", "NINA_TOOL")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    const eventos = ((linhas ?? []) as any[])
+      .filter((l) => l?.dados_depois?.conversa_id === data.conversaId)
+      .map((l) => {
+        const d = l.dados_depois ?? {};
+        const entrada = d.entrada ?? {};
+        return {
+          id: l.id as string,
+          em: l.created_at as string,
+          ferramenta: String(entrada.ferramenta ?? d.ferramenta ?? "?"),
+          argumentos: entrada.argumentos ?? null,
+          ms: Number(entrada.ms ?? 0),
+          ok: Boolean(d.ok),
+          erro: (d.erro as string | null) ?? null,
+          resposta: entrada.resposta ?? null,
+        };
+      })
+      .reverse();
+
+    return { eventos };
+  });
+
 export const resolverConversaTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -411,6 +453,8 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         leadId: z.string().uuid(),
         conversaId: z.string().uuid(),
+        /** Remove da agenda os agendamentos criados nesta sessão de teste. */
+        removerAgendamentos: z.boolean().optional(),
       })
       .parse(input),
   )
