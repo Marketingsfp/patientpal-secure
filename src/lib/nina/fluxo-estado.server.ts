@@ -102,7 +102,12 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
   if (!bruto || typeof bruto !== "object") return base;
   const o = bruto as Record<string, any>;
   return {
-    patient: { ...base.patient, ...(o["patient"] ?? {}) },
+    patient: {
+      ...base.patient,
+      ...(o["patient"] ?? {}),
+      pending: { ...base.patient.pending, ...(o["patient"]?.pending ?? {}) },
+    },
+
     appointment: { ...base.appointment, ...(o["appointment"] ?? {}) },
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
     updated_at: o["updated_at"] ?? null,
