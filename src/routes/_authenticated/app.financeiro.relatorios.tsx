@@ -40,7 +40,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { brl, fmtDate } from "@/lib/financeiro/format";
 import { imprimirRelatorio } from "@/lib/print-relatorio-financeiro";
-import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
+import { exportarPastaXlsx, exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
+// Relatório de Movimentação Financeira: a regra das duas visões vive no módulo
+// puro `extrato-caixa`; o acesso ao banco, em `extrato-carregar`.
+import {
+  colunasExtrato,
+  fatiasDeEntrada,
+  linhasExtrato,
+  resumoPorForma,
+  totaisExtrato,
+  type MovimentacaoExtrato,
+  type TotaisExtrato,
+} from "@/lib/financeiro/extrato-caixa";
+import { carregarMovimentacao } from "@/lib/financeiro/extrato-carregar";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -116,7 +128,8 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios"
   head: () => ({ meta: [{ title: "Relatórios — Financeiro" }] }),
 });
 
-type Tipo = "lancamentos" | "atendimentos" | "notas" | "rateio";
+type Tipo = "lancamentos" | "atendimentos" | "notas" | "rateio" | "movimentacao";
+
 type Linha = Record<string, unknown>;
 
 /** Quantas linhas cabem por página sem transformar a conferência em rolagem. */
@@ -139,7 +152,7 @@ const ROTULO = "text-xs font-medium text-slate-600";
  * Colunas de cada relatório. A ordem vale para a tela e para o papel — a lista
  * abaixo é a única fonte da verdade dos dois.
  */
-const COLUNAS: Record<Exclude<Tipo, "rateio">, Coluna[]> = {
+const COLUNAS: Record<Exclude<Tipo, "rateio" | "movimentacao">, Coluna[]> = {
   lancamentos: [
     { chave: "data", rotulo: "Data", formato: "data" },
     { chave: "tipo", rotulo: "Tipo", formato: "texto" },
@@ -171,6 +184,7 @@ const TITULOS: Record<Tipo, string> = {
   atendimentos: "Atendimentos",
   notas: "Notas de pacientes",
   rateio: "Rateio da Receita",
+  movimentacao: "Movimentação Financeira",
 };
 
 const ROTULO_COMPARACAO: Record<ModoComparacao, string> = {
@@ -201,6 +215,12 @@ function ordenarAnalitico(linhas: RateioLinha[], agruparPor: RateioAgruparPor): 
 /** Formata uma célula para a tela e para o papel (o Excel leva o valor cru). */
 function celula(coluna: Coluna, valor: unknown): string {
   if (coluna.formato === "moeda") return brl(num(valor));
+  // `moeda-opcional`: vazio é vazio, não R$ 0,00. Ver o comentário do formato
+  // em `rateio-colunas.ts` — é o que mantém legível o extrato onde cada linha
+  // preenche Valor Pago OU Valor Recebido.
+  if (coluna.formato === "moeda-opcional") {
+    return valor === null || valor === undefined || valor === "" ? "" : brl(num(valor));
+  }
   if (coluna.formato === "numero") return num(valor).toLocaleString("pt-BR");
   if (coluna.formato === "percentual") return pct(num(valor));
   if (coluna.formato === "variacao-moeda") return comSinal(num(valor), brl(num(valor)));
@@ -231,7 +251,9 @@ function corDaVariacao(valor: unknown): string {
 
 /** Tipo da coluna na planilha do Excel. */
 function tipoXlsx(c: Coluna): ColunaXlsx["tipo"] {
-  if (c.formato === "moeda" || c.formato === "variacao-moeda") return "moeda";
+  if (c.formato === "moeda" || c.formato === "variacao-moeda" || c.formato === "moeda-opcional") {
+    return "moeda";
+  }
   if (c.formato === "percentual" || c.formato === "variacao-percentual") return "percentual";
   if (c.formato === "numero") return "numero";
   return "texto";
@@ -421,6 +443,9 @@ function Page() {
     rateio?: RateioLinha[];
     /** Mesmas linhas para o período de comparação, quando ligada. */
     rateioComp?: RateioLinha[];
+    /** Movimentações cruas do extrato, pelo mesmo motivo: trocar entre
+     *  sintético e analítico é um recorte da mesma lista, não outra consulta. */
+    movimentacao?: MovimentacaoExtrato[];
   } | null>(null);
 
   // "Agrupar por" e "Sintético/Analítico" são recortes do MESMO resultado, então
@@ -473,6 +498,18 @@ function Page() {
     () => (atualizado && resultado?.rateio ? resultado.rateio : []),
     [atualizado, resultado],
   );
+  /** Movimentações cruas do extrato; base dos totais e das duas visões. */
+  const movsExtrato = useMemo(
+    () => (atualizado && resultado?.movimentacao ? resultado.movimentacao : []),
+    [atualizado, resultado],
+  );
+  const totaisM = useMemo(() => totaisExtrato(movsExtrato), [movsExtrato]);
+  /**
+   * Quebra das entradas por forma, no card "Recebido". Sai das movimentações
+   * cruas, e não das linhas da tabela: trocar de sintético para analítico muda
+   * a apresentação, nunca quanto entrou em cada forma.
+   */
+  const fatiasDoExtrato = useMemo(() => fatiasDeEntrada(movsExtrato), [movsExtrato]);
   const linhasRateioComp = useMemo(
     () => (atualizado && resultado?.rateioComp ? resultado.rateioComp : []),
     [atualizado, resultado],
@@ -490,6 +527,9 @@ function Page() {
 
   const linhas = useMemo<Linha[]>(() => {
     if (!atualizado || !resultado) return [];
+    // As duas visões do extrato saem da mesma lista carregada: trocar de
+    // sintético para analítico reorganiza a tabela na hora, sem ir ao banco.
+    if (resultado.tipo === "movimentacao") return linhasExtrato(movsExtrato, rTipo);
     if (resultado.tipo !== "rateio") return resultado.linhas;
     // No analítico o "Agrupar por" não soma nada: ele manda na ORDEM em que os
     // atendimentos aparecem, para a folha sair na sequência que o usuário pediu.
@@ -512,6 +552,7 @@ function Page() {
     resultado,
     linhasRateio,
     linhasRateioComp,
+    movsExtrato,
     rTipo,
     rAgrupar,
     comparacaoVisivel,
@@ -519,7 +560,12 @@ function Page() {
   ]);
 
   const colunas = useMemo(
-    () => (tipo === "rateio" ? colunasRateio(rTipo, rAgrupar, comparacaoVisivel) : COLUNAS[tipo]),
+    () =>
+      tipo === "rateio"
+        ? colunasRateio(rTipo, rAgrupar, comparacaoVisivel)
+        : tipo === "movimentacao"
+          ? colunasExtrato(rTipo)
+          : COLUNAS[tipo],
     [tipo, rTipo, rAgrupar, comparacaoVisivel],
   );
 
@@ -585,20 +631,53 @@ function Page() {
     });
   };
 
+  /**
+   * Rodapé do extrato.
+   *
+   * Vem dos totais do período INTEIRO (`totaisExtrato`), e não da soma das
+   * linhas exibidas: é isso que faz o sintético e o analítico mostrarem
+   * exatamente o mesmo rodapé. Quem confere usa essa igualdade para saber que
+   * nenhuma linha ficou de fora ao trocar de visão.
+   */
+  const rodapeExtrato = (cols: Coluna[], t: TotaisExtrato) =>
+    cols.map((c, i) => {
+      if (c.chave === "qtd") return t.qtd.toLocaleString("pt-BR");
+      if (c.chave === "pago") return brl(t.pago);
+      if (c.chave === "recebido") return brl(t.recebido);
+      if (c.chave === "saldo") return brl(t.saldo);
+      if (i === 0) return "TOTAL GERAL";
+      // No analítico a contagem não tem coluna própria; fica ao lado do rótulo.
+      return i === 1 && rTipo === "analitico"
+        ? `${t.qtd.toLocaleString("pt-BR")} movimentação(ões)`
+        : "";
+    });
+
+  /** Quadro de fechamento do extrato, igual na tela, no papel e na planilha. */
+  const resumoDoExtrato = (t: TotaisExtrato) => [
+    { rotulo: "Movimentações", valor: t.qtd.toLocaleString("pt-BR") },
+    { rotulo: "Total recebido (entradas)", valor: brl(t.recebido) },
+    { rotulo: "Total pago (saídas)", valor: brl(t.pago) },
+    { rotulo: "Saldo do período", valor: brl(t.saldo) },
+  ];
+
   /** Rodapé da tabela: contagem na 1ª coluna e a soma em cada coluna de dinheiro. */
   const rodape =
     tipo === "rateio"
       ? rodapeRateio(colunas, totaisR, totaisComp)
-      : colunas.map((c, i) => {
-          if (c.somar) {
-            // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
-            // o consolidado da coluna é o saldo do período.
-            const valor =
-              tipo === "lancamentos" && c.chave === "valor" ? totais.saldo : totais.somas[c.chave];
-            return brl(valor);
-          }
-          return i === 0 ? `${linhas.length.toLocaleString("pt-BR")} registro(s)` : "";
-        });
+      : tipo === "movimentacao"
+        ? rodapeExtrato(colunas, totaisM)
+        : colunas.map((c, i) => {
+            if (c.somar) {
+              // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
+              // o consolidado da coluna é o saldo do período.
+              const valor =
+                tipo === "lancamentos" && c.chave === "valor"
+                  ? totais.saldo
+                  : totais.somas[c.chave];
+              return brl(valor);
+            }
+            return i === 0 ? `${linhas.length.toLocaleString("pt-BR")} registro(s)` : "";
+          });
 
   /**
    * Mesma linha de totais, só que com números crus: na planilha o total tem
@@ -615,6 +694,22 @@ function Page() {
       repasse: t.repasse,
       liquido: t.liquido,
       margem: t.margem,
+    };
+    return cols.map((c, i) =>
+      c.chave in porChave ? porChave[c.chave] : i === 0 ? "TOTAL GERAL" : "",
+    );
+  };
+
+  /**
+   * Mesma linha de totais do extrato, com números crus: na planilha o total
+   * tem que continuar sendo número, senão o Excel não soma a coluna.
+   */
+  const rodapeExtratoXlsx = (cols: Coluna[], t: TotaisExtrato) => {
+    const porChave: Record<string, number> = {
+      qtd: t.qtd,
+      pago: t.pago,
+      recebido: t.recebido,
+      saldo: t.saldo,
     };
     return cols.map((c, i) =>
       c.chave in porChave ? porChave[c.chave] : i === 0 ? "TOTAL GERAL" : "",
@@ -662,10 +757,11 @@ function Page() {
     linhas: Linha[];
     cruas: RateioLinha[];
     cruasComp: RateioLinha[];
+    movs: MovimentacaoExtrato[];
   } | null> => {
     if (!clinicaAtual) return null;
     if (atualizado && resultado) {
-      return { linhas, cruas: linhasRateio, cruasComp: linhasRateioComp };
+      return { linhas, cruas: linhasRateio, cruasComp: linhasRateioComp, movs: movsExtrato };
     }
     if (tipo === "rateio" && !ctxRateio) {
       toast.info("Carregando o cadastro de médicos e serviços — tente de novo em instantes");
@@ -675,6 +771,7 @@ function Page() {
     let data: Linha[] = [];
     let cruas: RateioLinha[] | undefined;
     let cruasComp: RateioLinha[] | undefined;
+    let movs: MovimentacaoExtrato[] | undefined;
     try {
       if (tipo === "rateio" && ctxRateio) {
         const filtrosComuns = {
@@ -709,6 +806,13 @@ function Page() {
               )
             : grupos) as unknown as Linha[];
         }
+      } else if (tipo === "movimentacao") {
+        movs = await carregarMovimentacao({
+          clinicaId: clinicaAtual.clinica_id,
+          de: from,
+          ate: to,
+        });
+        data = linhasExtrato(movs, rTipo);
       } else if (tipo === "lancamentos") {
         data = await fetchAll(() =>
           supabase
@@ -756,9 +860,15 @@ function Page() {
       linhas: data,
       rateio: cruas,
       rateioComp: cruasComp,
+      movimentacao: movs,
     });
     setPagina(1);
-    return { linhas: data, cruas: cruas ?? [], cruasComp: cruasComp ?? [] };
+    return {
+      linhas: data,
+      cruas: cruas ?? [],
+      cruasComp: cruasComp ?? [],
+      movs: movs ?? [],
+    };
   };
 
   const buscar = async () => {
@@ -781,6 +891,11 @@ function Page() {
       linhasCtx.push(descricaoFiltrosRateio());
       if (comparar) linhasCtx.push(textoPeriodoComparado);
     }
+    if (tipo === "movimentacao") {
+      linhasCtx.push(
+        `${rTipo === "sintetico" ? "Sintético" : "Analítico"} · entradas e saídas do caixa geral`,
+      );
+    }
     return linhasCtx.filter(Boolean);
   };
 
@@ -794,6 +909,49 @@ function Page() {
     }
     const t = totaisRateio(res.cruas);
     const tComp = totaisRateio(res.cruasComp);
+    // O extrato sai com as DUAS abas no mesmo arquivo, e não só a visão que
+    // está na tela: o financeiro concilia a analítica e a sintética lado a
+    // lado, e dois arquivos soltos separam justamente o que precisa ser
+    // conferido junto. O seletor SINTÉTICO/ANALÍTICO continua valendo para a
+    // tela e para o papel.
+    if (tipo === "movimentacao") {
+      const tm = totaisExtrato(res.movs);
+      const aba = (visao: "analitico" | "sintetico") => {
+        const cols = colunasExtrato(visao);
+        return {
+          arquivo: "",
+          aba: visao === "analitico" ? "Analítica" : "Sintética",
+          cabecalho: [
+            `${TITULOS.movimentacao} — ${clinicaAtual?.clinica.nome ?? "Clínica"}`,
+            `Período: ${fmtDate(from)} a ${fmtDate(to)}`,
+            `${visao === "analitico" ? "Analítico" : "Sintético"} · entradas e saídas do caixa geral`,
+          ],
+          colunas: cols.map((c) => ({ rotulo: c.rotulo, tipo: tipoXlsx(c) })),
+          linhas: linhasExtrato(res.movs, visao).map((linha) =>
+            cols.map((c) => valorXlsx(c, linha[c.chave])),
+          ),
+          totais: rodapeExtratoXlsx(cols, tm),
+          resumo: {
+            titulo: "Por forma de pagamento",
+            itens: resumoPorForma(res.movs).map((i) => ({
+              rotulo: i.rotulo,
+              valor: i.valor,
+              tipo: "moeda" as const,
+            })),
+          },
+        };
+      };
+      try {
+        await exportarPastaXlsx(`movimentacao_financeira_${from}_${to}`, [
+          aba("analitico"),
+          aba("sintetico"),
+        ]);
+        toast.success(`Planilha gerada com as duas abas (${res.movs.length} movimentações)`);
+      } catch (e) {
+        mostrarErro(e);
+      }
+      return;
+    }
     try {
       await exportarRelatorioXlsx({
         arquivo: `${tipo === "rateio" ? "rateio_receita" : `relatorio_${tipo}`}_${from}_${to}`,
@@ -842,15 +1000,17 @@ function Page() {
       toast.info("Nenhum dado no período");
       return;
     }
-    if (tipo === "rateio") {
-      // No rateio o CSV sai com os mesmos rótulos da tela — quem abre no Excel
-      // não tem como saber o que significa "liquido" ou "margem".
+    // No rateio e no extrato o CSV sai com os mesmos rótulos da tela — quem
+    // abre no Excel não tem como saber o que significa "liquido", "margem" ou
+    // "banco_conta".
+    if (tipo === "rateio" || tipo === "movimentacao") {
       const linhasCsv = data.map((linha) => {
         const obj: Record<string, unknown> = {};
         for (const c of colunas) obj[c.rotulo] = valorXlsx(c, linha[c.chave]);
         return obj;
       });
-      download(`rateio_receita_${from}_${to}.csv`, toCsv(linhasCsv));
+      const nome = tipo === "rateio" ? "rateio_receita" : `movimentacao_financeira_${rTipo}`;
+      download(`${nome}_${from}_${to}.csv`, toCsv(linhasCsv));
       toast.success(`Relatório gerado (${data.length} linhas)`);
       return;
     }
@@ -896,6 +1056,26 @@ function Page() {
             rotulo: f.rotulo,
             valor: brl(f.valor),
           })),
+        },
+      });
+      return;
+    }
+    if (tipo === "movimentacao") {
+      // Mesmo cuidado do rateio: imprimir pode ser o primeiro clique, então os
+      // totais são recalculados aqui a partir das movimentações cruas, e não
+      // lidos do `useMemo`, que só roda no render seguinte.
+      const tm = totaisExtrato(res.movs);
+      imprimirRelatorio({
+        clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
+        titulo: TITULOS.movimentacao,
+        periodo: `${periodo} · ${rTipo === "sintetico" ? "Sintético" : "Analítico"}`,
+        colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
+        linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
+        totais: rodapeExtrato(colunas, tm),
+        resumo: resumoDoExtrato(tm),
+        composicao: {
+          titulo: "Por forma de pagamento",
+          itens: resumoPorForma(res.movs).map((i) => ({ rotulo: i.rotulo, valor: brl(i.valor) })),
         },
       });
       return;
@@ -988,6 +1168,7 @@ function Page() {
                   <SelectItem value="atendimentos">Atendimentos</SelectItem>
                   <SelectItem value="notas">Notas</SelectItem>
                   <SelectItem value="rateio">Rateio da Receita</SelectItem>
+                  <SelectItem value="movimentacao">Movimentação Financeira</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1237,6 +1418,36 @@ function Page() {
             </>
           )}
 
+          {/* Movimentação Financeira: o mesmo seletor SINTÉTICO/ANALÍTICO do
+              Rateio, sem "Agrupar por" (o agrupamento dela é sempre por
+              categoria) e sem comparação de períodos — conciliação bancária
+              confere UM período contra o extrato do banco, não dois entre si. */}
+          {tipo === "movimentacao" && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="space-y-1.5 sm:w-48">
+                  <Label className={ROTULO}>Tipo</Label>
+                  <Select value={rTipo} onValueChange={(v) => setRTipo(v as RateioTipo)}>
+                    <SelectTrigger className={cn(CAMPO, "bg-white")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sintetico">SINTÉTICO</SelectItem>
+                      <SelectItem value="analitico">ANALÍTICO</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground sm:flex-1 sm:pb-2.5">
+                  {rTipo === "sintetico"
+                    ? "SINTÉTICO: uma linha por categoria, com o total de entradas e saídas de cada uma."
+                    : "ANALÍTICO: uma linha por movimentação, com Valor Pago e Valor Recebido em colunas separadas."}{" "}
+                  O <strong>Excel sai sempre com as duas abas</strong> (Analítica e Sintética) no
+                  mesmo arquivo; a tela e a impressão seguem a visão escolhida aqui.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Bloco 4 — ação principal à esquerda, saídas do relatório à direita. */}
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
             <Button
@@ -1285,6 +1496,15 @@ function Page() {
               repassar.
             </p>
           )}
+          {tipo === "movimentacao" && (
+            <p className="text-xs text-muted-foreground">
+              Tudo que entrou e saiu do caixa geral no período: recebimentos de pacientes,
+              mensalidades e adesões do cartão, despesas, repasse médico, boletos e as sangrias e
+              suprimentos entre caixas. Lançamento cancelado fica de fora. Ajustes com data
+              retroativa entram e vêm marcados na coluna Situação — eles não estavam no cupom
+              impresso daquele dia.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -1317,6 +1537,26 @@ function Page() {
             valor={brl(totaisR.liquido)}
             detalhe={`Margem de ${pct(totaisR.margem)}`}
             delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
+          />
+        </div>
+      )}
+
+      {/* Cards de fechamento do extrato. Saem dos totais do período inteiro,
+          então não mudam ao trocar de sintético para analítico — é a mesma
+          conferência vista de dois jeitos. */}
+      {tipo === "movimentacao" && atualizado && linhas.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <CardResumo titulo="Movimentações" valor={totaisM.qtd.toLocaleString("pt-BR")} />
+          <CardResumo
+            titulo="Recebido (entradas)"
+            valor={brl(totaisM.recebido)}
+            composicao={fatiasDoExtrato}
+          />
+          <CardResumo titulo="Pago (saídas)" valor={brl(totaisM.pago)} invertido />
+          <CardResumo
+            titulo="Saldo do período"
+            valor={brl(totaisM.saldo)}
+            detalhe={totaisM.saldo < 0 ? "Saiu mais do que entrou" : undefined}
           />
         </div>
       )}

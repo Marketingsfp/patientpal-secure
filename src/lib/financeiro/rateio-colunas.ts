@@ -15,6 +15,15 @@ export type FormatoColuna =
   | "texto"
   | "data"
   | "moeda"
+  /**
+   * Dinheiro que pode não existir naquela linha: a célula sai EM BRANCO em vez
+   * de "R$ 0,00". Serve às colunas Valor Pago / Valor Recebido do relatório de
+   * Movimentação Financeira, onde cada linha preenche uma e deixa a outra
+   * vazia — com `moeda`, metade das células de um extrato de duas mil linhas
+   * viraria zero e a conferência visual se perderia no meio deles. Na soma do
+   * rodapé e na planilha continua sendo número.
+   */
+  | "moeda-opcional"
   | "numero"
   | "percentual"
   | "variacao-moeda"

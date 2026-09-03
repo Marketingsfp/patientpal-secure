@@ -112,11 +112,15 @@ export function largurasDasColunas(p: PlanilhaRelatorio): number[] {
 }
 
 /**
- * Monta e baixa a planilha. Roda só no navegador — é ele quem tem o clique do
- * usuário e a pasta de downloads.
+ * Monta UMA aba já formatada (números, larguras, cabeçalho congelado e
+ * autofiltro) a partir da descrição do relatório.
+ *
+ * Existe separada de `exportarRelatorioXlsx` porque o extrato do caixa sai com
+ * duas abas na MESMA pasta de trabalho — analítica e sintética. O financeiro
+ * concilia as duas lado a lado, e dois arquivos soltos separavam justamente o
+ * que precisa ser conferido junto.
  */
-export async function exportarRelatorioXlsx(p: PlanilhaRelatorio): Promise<void> {
-  const XLSX = await import("xlsx");
+function montarAbaXlsx(XLSX: typeof import("xlsx"), p: PlanilhaRelatorio) {
   const { matriz, linhaCabecalho, ultimaLinhaDaTabela, linhasDoResumo } = montarMatrizRelatorio(p);
   const aba = XLSX.utils.aoa_to_sheet(matriz);
 
@@ -148,9 +152,49 @@ export async function exportarRelatorioXlsx(p: PlanilhaRelatorio): Promise<void>
       { r: ultimaLinhaDaTabela, c: Math.max(0, p.colunas.length - 1) },
     ),
   };
+  return aba;
+}
 
+/** Nome de arquivo com a extensão garantida. */
+const comExtensao = (arquivo: string) => (arquivo.endsWith(".xlsx") ? arquivo : `${arquivo}.xlsx`);
+
+/**
+ * Monta e baixa a planilha. Roda só no navegador — é ele quem tem o clique do
+ * usuário e a pasta de downloads.
+ */
+export async function exportarRelatorioXlsx(p: PlanilhaRelatorio): Promise<void> {
+  const XLSX = await import("xlsx");
   const livro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(livro, aba, nomeDeAbaValido(p.aba ?? "Relatório"));
-  const arquivo = p.arquivo.endsWith(".xlsx") ? p.arquivo : `${p.arquivo}.xlsx`;
-  XLSX.writeFile(livro, arquivo, { bookType: "xlsx", compression: true });
+  XLSX.utils.book_append_sheet(
+    livro,
+    montarAbaXlsx(XLSX, p),
+    nomeDeAbaValido(p.aba ?? "Relatório"),
+  );
+  XLSX.writeFile(livro, comExtensao(p.arquivo), { bookType: "xlsx", compression: true });
+}
+
+/**
+ * Baixa UM arquivo com VÁRIAS abas.
+ *
+ * O nome do arquivo vem do parâmetro `arquivo`; o `arquivo` de cada planilha da
+ * lista é ignorado (só a `aba` importa). Abas com nome repetido recebem sufixo
+ * numérico, porque o Excel recusa a pasta inteira quando há duplicidade e o
+ * erro que ele mostra não diz qual aba causou o problema.
+ */
+export async function exportarPastaXlsx(
+  arquivo: string,
+  planilhas: PlanilhaRelatorio[],
+): Promise<void> {
+  if (!planilhas.length) return;
+  const XLSX = await import("xlsx");
+  const livro = XLSX.utils.book_new();
+  const usados = new Set<string>();
+  planilhas.forEach((p, i) => {
+    let nome = nomeDeAbaValido(p.aba ?? `Aba ${i + 1}`);
+    let n = 2;
+    while (usados.has(nome.toLowerCase())) nome = nomeDeAbaValido(`${nome.slice(0, 28)} ${n++}`);
+    usados.add(nome.toLowerCase());
+    XLSX.utils.book_append_sheet(livro, montarAbaXlsx(XLSX, p), nome);
+  });
+  XLSX.writeFile(livro, comExtensao(arquivo), { bookType: "xlsx", compression: true });
 }
