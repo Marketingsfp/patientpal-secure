@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Bot, CheckCheck, Download, FlaskConical, Loader2, RefreshCw, Send, User } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  ConversationSystemEvent,
+  type ConversaEvento,
+} from "@/components/nina/ConversationSystemEvent";
 
 type Lead = {
   id: string;
@@ -70,6 +74,26 @@ export function ConsoleTesteNina() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // Eventos operacionais da conversa (resolvida, memória resetada, atribuição).
+  const [eventosConversa, setEventosConversa] = useState<ConversaEvento[]>([]);
+  // Mensagens e eventos na MESMA linha do tempo, ordenados por created_at.
+  const timeline = useMemo<
+    ({ id: string; em: string } & (
+      | { kind: "msg"; msg: Msg }
+      | { kind: "evento"; evento: ConversaEvento }
+    ))[]
+  >(() => {
+    const itens = [
+      ...msgs.map((m) => ({ id: `m-${m.id}`, em: m.created_at, kind: "msg" as const, msg: m })),
+      ...eventosConversa.map((e) => ({
+        id: `e-${e.id}`,
+        em: e.created_at,
+        kind: "evento" as const,
+        evento: e,
+      })),
+    ];
+    return itens.sort((a, b) => a.em.localeCompare(b.em));
+  }, [msgs, eventosConversa]);
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -110,9 +134,11 @@ export function ConsoleTesteNina() {
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
+          eventos?: ConversaEvento[];
           conversaId: string | null;
         };
         setMsgs(r.mensagens);
+        setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
           const f = (await ferramentasFn({
@@ -277,22 +303,17 @@ export function ConsoleTesteNina() {
     if (!clinicaId || !leadId || !conversaId) return;
     setProcessando(true);
     try {
-      const r = (await resolver({
+      await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
-      })) as { agendamentosRemovidos?: number };
+      });
       setConversaId(null);
       setErro(null);
       setAudio(null);
       setFerramentas([]);
-      // O histórico permanece na tela: só entra o marcador de encerramento.
+      // Sem popup: a confirmação aparece como evento dentro da própria
+      // conversa (resolvida por… / memória resetada). Toast só para erro.
       await carregarHistorico(leadId);
       await carregarLeads();
-      const n = r?.agendamentosRemovidos ?? 0;
-      toast.success(
-        n > 0
-          ? `Conversa encerrada, memória resetada e ${n} agendamento(s) de teste removido(s).`
-          : "Conversa encerrada. A memória da Nina foi resetada.",
-      );
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -433,13 +454,16 @@ export function ConsoleTesteNina() {
 
 
             <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
-              {msgs.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Conversa nova e sem memória. Envie a primeira mensagem como paciente.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {msgs.map((m) => {
+                  {timeline.map((item) => {
+                    if (item.kind === "evento")
+                      return <ConversationSystemEvent key={item.id} evento={item.evento} />;
+                    const m = item.msg;
                     if (m.enviada_por === "sistema") {
                       return (
                         <div key={m.id} className="flex justify-center">

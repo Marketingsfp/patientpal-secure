@@ -78,7 +78,9 @@ export type EventoConversa =
   | "ATRIBUIDA_IA"
   | "REABERTA"
   | "FINALIZADA"
-  | "IA_SILENCIADA";
+  | "IA_SILENCIADA"
+  | "IA_MEMORIA_RESETADA"
+  | "ATENDIMENTO_ENCERRADO";
 
 export async function registrarEvento(args: {
   clinicaId: string;
