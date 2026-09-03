@@ -27,6 +27,9 @@ export type EtapaFluxoNina =
   | "IDENTIFYING_PATIENT"
   | "CHOOSING_SLOT"
   | "AWAITING_SLOT_CONFIRMATION"
+  | "AWAITING_PATIENT_DATA"
+  | "REVALIDATING_SLOT"
+  | "APPOINTMENT_FAILED"
   | "BOOKED";
 
 export type EstadoFluxoNina = {
@@ -36,6 +39,16 @@ export type EstadoFluxoNina = {
     first_name: string | null;
     identified: boolean;
     validated: boolean;
+    /**
+     * Dados de identificação já informados, mas ainda incompletos. Existe para
+     * o paciente poder mandar nome numa mensagem e CPF na seguinte sem que a
+     * Nina recomece a coleta.
+     */
+    pending: {
+      nome: string | null;
+      cpf: string | null;
+      data_nascimento: string | null;
+    };
   };
   appointment: {
     doctor_id: string | null;
@@ -47,6 +60,8 @@ export type EstadoFluxoNina = {
     slot_inicio: string | null;
     slot_fim: string | null;
     slot_confirmed_by_patient: boolean;
+    /** Paciente disse "sim/isso/pode marcar" para a vaga oferecida. */
+    intent_confirmed: boolean;
     appointment_id: string | null;
   };
   flow: { stage: EtapaFluxoNina };
@@ -55,7 +70,13 @@ export type EstadoFluxoNina = {
 
 export function estadoVazio(): EstadoFluxoNina {
   return {
-    patient: { id: null, first_name: null, identified: false, validated: false },
+    patient: {
+      id: null,
+      first_name: null,
+      identified: false,
+      validated: false,
+      pending: { nome: null, cpf: null, data_nascimento: null },
+    },
     appointment: {
       doctor_id: null,
       doctor_name: null,
@@ -66,12 +87,14 @@ export function estadoVazio(): EstadoFluxoNina {
       slot_inicio: null,
       slot_fim: null,
       slot_confirmed_by_patient: false,
+      intent_confirmed: false,
       appointment_id: null,
     },
     flow: { stage: "IDLE" },
     updated_at: null,
   };
 }
+
 
 /** Normaliza qualquer JSON gravado para o formato atual (tolerante a versões). */
 export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
