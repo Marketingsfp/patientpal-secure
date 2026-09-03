@@ -78,6 +78,14 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
     [elegiveis],
   );
 
+  // Linha da taxa de adesão (parcela 0). Não entra no cascateamento — ela não
+  // tem intervalo próprio, é cobrada junto com a 1ª mensalidade — mas segue a
+  // data da parcela 1 sempre que a parcela 1 for recalculada.
+  const adesao = useMemo(
+    () => parcelas.find((p) => Number(p.numero_parcela) === 0) ?? null,
+    [parcelas],
+  );
+
   const [parcelaId, setParcelaId] = useState<string>("");
   const [novoVenc, setNovoVenc] = useState<string>("");
   const [intervaloTipo, setIntervaloTipo] = useState<"dias" | "meses">("meses");
@@ -112,7 +120,7 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
     const intervalo = Math.max(1, Number(intervaloValor) || 0);
     const afetadas = cascatear ? elegiveis.slice(idx) : [elegiveis[idx]];
     let anterior = novoVenc;
-    return afetadas.map((p, i) => {
+    const linhas = afetadas.map((p, i) => {
       let venc: string;
       if (i === 0) {
         venc = novoVenc;
@@ -123,7 +131,20 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
       anterior = venc;
       return { ...p, novoVencimento: venc, alterado: venc !== p.vencimento };
     });
-  }, [parcelaSelecionada, novoVenc, intervaloTipo, intervaloValor, cascatear, elegiveis]);
+    // A taxa de adesão é cobrada junto com a 1ª mensalidade, então sua data
+    // acompanha a da parcela 1 — e só quando a parcela 1 está entre as
+    // recalculadas. Antes ela ficava para trás com o vencimento antigo e a
+    // recepção precisava corrigir essa linha à mão depois de cada recálculo.
+    const novaP1 = linhas.find((l) => Number(l.numero_parcela) === 1)?.novoVencimento;
+    if (adesao && novaP1) {
+      linhas.unshift({
+        ...adesao,
+        novoVencimento: novaP1,
+        alterado: novaP1 !== adesao.vencimento,
+      });
+    }
+    return linhas;
+  }, [parcelaSelecionada, novoVenc, intervaloTipo, intervaloValor, cascatear, elegiveis, adesao]);
 
   const totalAlteradas = preview.filter((p) => p.alterado).length;
 
@@ -194,7 +215,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
           </DialogTitle>
           <DialogDescription>
             Escolha a parcela inicial e o novo vencimento. As parcelas seguintes serão reescalonadas
-            de acordo com o intervalo escolhido.
+            de acordo com o intervalo escolhido. Se a 1ª parcela for recalculada, a taxa de adesão
+            acompanha a data dela.
           </DialogDescription>
         </DialogHeader>
 
@@ -268,7 +290,9 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
               <tbody>
                 {preview.map((p) => (
                   <tr key={p.id} className="border-t">
-                    <td className="px-3 py-1.5">{p.numero_parcela}</td>
+                    <td className="px-3 py-1.5">
+                      {Number(p.numero_parcela) === 0 ? "Taxa de adesão" : p.numero_parcela}
+                    </td>
                     <td className="px-3 py-1.5 text-muted-foreground">{fmtBR(p.vencimento)}</td>
                     <td
                       className={
