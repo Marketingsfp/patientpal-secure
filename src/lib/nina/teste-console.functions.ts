@@ -287,7 +287,9 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
-        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao);
+        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
+          teste: true,
+        });
       } else if (audioFalhou) {
         reply = RESPOSTA_AUDIO_FALHOU;
       } else {
