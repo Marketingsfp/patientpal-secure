@@ -152,6 +152,7 @@ import {
   CreditCard,
   Eye,
   Ban,
+  MessageSquareText,
 } from "lucide-react";
 import {
   MOTIVOS_SEM_FATURAMENTO,
@@ -11128,22 +11129,33 @@ function AgendaPage() {
                 <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Horário
                 </TableHead>
-                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {/* As três colunas de texto livre dividem a sobra da linha em
+                    proporção fixa. Sem isso um nome comprido de médico ou de
+                    procedimento estica a coluna e empurra as ações para fora
+                    da tela em notebook. O conteúdo delas trunca com "…". */}
+                <TableHead className="w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-[22%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-[18%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Situação
                 </TableHead>
-                <TableHead className="w-8 px-1 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {/* OBS — coluna-ícone de largura fixa. O texto da observação
+                    saiu da grade (comia ~180px em telas de notebook e empurrava
+                    as ações para fora); agora só um indicador aparece quando o
+                    agendamento tem observação, e o texto abre em tooltip/modal. */}
+                <TableHead
+                  className="w-[34px] min-w-[34px] max-w-[34px] px-1 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  title="Observação do agendamento"
+                >
                   Obs
                 </TableHead>
-                <TableHead className="w-8 px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
+                <TableHead className="w-[170px] px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -11429,27 +11441,45 @@ function AgendaPage() {
                         })()}
                       </TableCell>
 
-                      {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="py-1.5 px-1 align-middle">
+                      {/* OBS — indicador compacto. Sem observação a célula fica
+                          vazia (nem o traço, que já custava largura); com
+                          observação mostra o balão com a bolinha vermelha,
+                          o texto no tooltip e o modal completo no clique. */}
+                      <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1.5 px-1 align-middle text-center">
                         {(() => {
                           const obs = (a.observacoes ?? "").trim();
-                          if (ehLivre || ocultarPaciente || !obs) {
-                            return <span className="text-xs text-muted-foreground">—</span>;
-                          }
+                          if (ehLivre || ocultarPaciente || !obs) return null;
                           return (
-                            <button
-                              type="button"
-                              title="Ver observação completa"
-                              onClick={() => setObsAg(a)}
-                              className="block w-full truncate max-w-[180px] text-left text-xs font-medium text-primary cursor-pointer hover:underline"
-                            >
-                              {obs}
-                            </button>
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label="Ver observação do agendamento"
+                                    onClick={() => setObsAg(a)}
+                                    className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                                  >
+                                    <MessageSquareText className="h-4 w-4" />
+                                    <span
+                                      aria-hidden
+                                      className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-rose-500 ring-1 ring-background"
+                                    />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="left"
+                                  className="max-w-[320px] whitespace-pre-wrap break-words text-left"
+                                >
+                                  {obs}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           );
                         })()}
                       </TableCell>
 
-                      <TableCell className="w-[170px] py-1.5 px-3 text-right">
+                      {/* Ações - Botões na linha + Menu */}
+                      <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
                         <TooltipProvider delayDuration={200}>
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Check-in (✅) - aparece apenas para pacientes presentes */}
