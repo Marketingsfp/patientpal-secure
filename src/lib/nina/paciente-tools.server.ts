@@ -372,6 +372,81 @@ function dataISODoSlot(iso: string) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/* ------------------------------------------------ agenda: resultado e logs */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Log técnico de homologação. Nunca chega ao paciente. */
+function logAgenda(ferramenta: string, dados: Record<string, unknown>) {
+  try {
+    console.info(`[NINA_AGENDA] ${ferramenta}`, JSON.stringify(dados));
+  } catch {
+    /* log nunca derruba atendimento */
+  }
+}
+
+/**
+ * "Consultei e não há vaga" NÃO é erro. Antes isso voltava como `ok:false`, e
+ * o modelo respondia "houve um problema ao consultar a agenda" — confundindo
+ * agenda cheia com falha de sistema. Agora sai como sucesso, com `slots` vazio
+ * e um motivo explícito.
+ */
+function semVaga(motivo: string, mensagem: string, extra?: Record<string, unknown>) {
+  return { ok: true as const, slots: [], horarios: [], reason: motivo, mensagem, ...(extra ?? {}) };
+}
+
+/** Falha TÉCNICA de consulta — só aqui a Nina pode dizer que não conseguiu consultar. */
+function falhaAgenda(e: unknown, ferramenta: string) {
+  console.error(`[NINA_AGENDA] AGENDA_QUERY_FAILED em ${ferramenta}`, e);
+  return {
+    ok: false as const,
+    erro: "INTERNAL_ERROR" as const,
+    codigo: "AGENDA_QUERY_FAILED",
+    mensagem: "Não consegui consultar a agenda neste momento.",
+  };
+}
+
+/**
+ * Resolve o profissional a partir do que o modelo mandou: id real ou nome
+ * ("Dr. Armando"). Com homônimos, desempata por quem tem vaga futura; se ainda
+ * assim houver dúvida, devolve as opções para a Nina perguntar.
+ */
+async function resolverMedico(
+  clinicaId: string,
+  termo: string,
+): Promise<
+  | { ok: true; id: string; nome: string }
+  | { ok: false; opcoes: Array<{ id: string; nome: string }> }
+> {
+  if (UUID_RE.test(termo)) {
+    const nome = await nomeMedico(termo);
+    if (nome) return { ok: true, id: termo, nome };
+    return { ok: false, opcoes: [] };
+  }
+  const t = normalizar(termo).replace(/^(dr|dra|doutor|doutora)\.?\s+/, "");
+  const { data } = await supabaseAdmin
+    .from("medicos")
+    .select("id, nome")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true);
+  const todos = (data ?? []) as Array<{ id: string; nome: string }>;
+  const candidatos = todos.filter((m) => {
+    const n = normalizar(m.nome);
+    return n.includes(t) || t.includes(n);
+  });
+  if (candidatos.length === 0) return { ok: false, opcoes: [] };
+  if (candidatos.length === 1) return { ok: true, id: candidatos[0]!.id, nome: candidatos[0]!.nome };
+
+  const comVaga: Array<{ id: string; nome: string }> = [];
+  for (const m of candidatos) {
+    const slots = await consultarDisponibilidadeCore({ clinicaId, medicoId: m.id, dias: 60 });
+    if (slots.length > 0) comVaga.push(m);
+  }
+  if (comVaga.length === 1) return { ok: true, id: comVaga[0]!.id, nome: comVaga[0]!.nome };
+  return { ok: false, opcoes: (comVaga.length > 0 ? comVaga : candidatos).slice(0, 5) };
+}
+
+
 
 /* ------------------------------------------------------------ definições AI */
 
@@ -437,10 +512,13 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         type: "object",
         properties: {
           especialidade: { type: "string" },
-          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           data: { type: "string", description: "AAAA-MM-DD, quando o paciente pediu um dia" },
           periodo: { type: "string", description: "manha, tarde ou noite" },
-          dias: { type: "number", description: "Janela de busca em dias (padrão 14)" },
+          dias: { type: "number", description: "Janela de busca em dias (padrão 14, máx 60)" },
         },
       },
     },
@@ -454,7 +532,10 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       parameters: {
         type: "object",
         properties: {
-          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
           hora: { type: "string", description: "HH:MM, ex.: 15:00" },
         },
@@ -467,14 +548,23 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use em 'qual o próximo horário?' ou quando o dia pedido estiver cheio.",
+        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use SEMPRE que o paciente disser 'a próxima disponível', 'o próximo horário', 'a primeira vaga', 'a quinta-feira mais próxima', 'qualquer horário' — não peça uma data específica antes de chamar.",
       parameters: {
         type: "object",
         properties: {
-          medico_id: { type: "string" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           especialidade: { type: "string" },
           a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
           periodo: { type: "string", description: "manha, tarde ou noite" },
+          dia_semana: {
+            type: "number",
+            description:
+              "Filtra por dia da semana: 0=domingo, 1=segunda ... 4=quinta, 6=sábado. Use em 'a próxima quinta-feira'.",
+          },
+          dias: { type: "number", description: "Janela de busca em dias (padrão 60)" },
         },
       },
     },
@@ -563,31 +653,38 @@ export const FERRAMENTAS_NINA_PACIENTE = [
 /* -------------------------------------------------------------- schemas Zod */
 
 const zEspecialidade = z.object({ especialidade: z.string().max(120).optional() });
+// `medico_id` aceita o UUID devolvido por `buscar_medicos` OU o nome dito pelo
+// paciente. Exigir UUID fazia o Zod recusar a chamada ("Parâmetros
+// inválidos"), e o modelo traduzia isso para "houve um problema ao consultar a
+// agenda" — erro técnico que na verdade era só um nome no lugar do id.
 const zVerificarHorario = z.object({
-  medico_id: z.string().uuid(),
+  medico_id: z.string().trim().min(2).max(160),
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   hora: z.string().regex(/^\d{1,2}:\d{2}$/),
 });
 const zProximaVaga = z.object({
-  medico_id: z.string().uuid().optional(),
+  medico_id: z.string().trim().min(2).max(160).optional(),
   especialidade: z.string().max(120).optional(),
   a_partir_de: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   periodo: z.enum(["manha", "tarde", "noite"]).optional(),
+  /** 0=domingo … 6=sábado. "a próxima quinta" vira dia_semana = 4. */
+  dia_semana: z.coerce.number().int().min(0).max(6).optional(),
+  dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zBuscarMedicos = zEspecialidade.extend({ nome: z.string().max(120).optional() });
 const zProcedimentos = z.object({ termo: z.string().trim().min(2).max(120) });
 const zDisponibilidade = z.object({
   especialidade: z.string().max(120).optional(),
-  medico_id: z.string().uuid().optional(),
+  medico_id: z.string().trim().min(2).max(160).optional(),
   data: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   periodo: z.enum(["manha", "tarde", "noite"]).optional(),
-  dias: z.coerce.number().int().min(1).max(30).optional(),
+  dias: z.coerce.number().int().min(1).max(60).optional(),
 });
 const zIdentificar = z.object({
   cpf: z.string().min(11).max(20),
@@ -595,7 +692,9 @@ const zIdentificar = z.object({
   data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 const zAgendar = z.object({
-  medico_id: z.string().uuid(),
+  // Aceita id ou nome; a resolução acontece no executor (mesma regra das
+  // ferramentas de consulta). A gravação continua exigindo um id real.
+  medico_id: z.string().trim().min(2).max(160),
   inicio: z.string().min(10),
   fim: z.string().min(10),
   procedimento: z.string().trim().min(2).max(200),
@@ -834,43 +933,71 @@ async function executarFerramentaInterna(
           const lista = await listarEspecialidades(ctx.clinicaId);
           const esp = acharEspecialidade(p.especialidade, lista);
           if (!esp)
-            return falha(
-              "NO_AVAILABILITY",
+            return semVaga(
+              "ESPECIALIDADE_NAO_ATENDIDA",
               `A clínica não atende "${p.especialidade}". Atende: ${lista.map((e) => e.nome).join(", ")}`,
             );
           especialidadeId = esp.id;
         }
-        const slots = await consultarDisponibilidadeCore({
-          clinicaId: ctx.clinicaId,
-          especialidadeId,
-          medicoId: p.medico_id ?? null,
-          dias: p.dias ?? (p.data ? 30 : 14),
-          periodo: p.periodo ?? null,
+        let medicoId: string | null = null;
+        let medicoNome: string | null = null;
+        if (p.medico_id) {
+          const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+          if (!r.ok)
+            return falha(
+              "DOCTOR_NOT_FOUND",
+              r.opcoes.length > 0
+                ? "Há mais de um profissional com esse nome. Pergunte ao paciente qual deles."
+                : "Não encontrei esse profissional nesta unidade.",
+              { opcoes: r.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })) },
+            );
+          medicoId = r.id;
+          medicoNome = r.nome;
+        }
+        let slots: SlotNina[];
+        try {
+          slots = await consultarDisponibilidadeCore({
+            clinicaId: ctx.clinicaId,
+            especialidadeId,
+            medicoId,
+            dias: p.dias ?? (p.data ? 30 : 14),
+            periodo: p.periodo ?? null,
+            data: p.data ?? null,
+          });
+        } catch (e) {
+          return falhaAgenda(e, "consultar_disponibilidade");
+        }
+        logAgenda("consultar_disponibilidade", {
+          medico: medicoNome,
+          medico_id: medicoId,
+          especialidade_id: especialidadeId,
           data: p.data ?? null,
+          periodo: p.periodo ?? null,
+          slots: slots.length,
         });
         await auditar(ctx, "consultar_disponibilidade", { ...p, slots_encontrados: slots.length }, {
           ok: true,
         });
         if (slots.length === 0) {
           // Diferencia "não atende nesse dia" de "atende, mas está cheio".
-          if (p.medico_id && p.data) {
-            const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
-            const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
+          if (medicoId && p.data) {
+            const { atende } = await medicoAtendeNoDia(ctx.clinicaId, medicoId, p.data);
+            const nome = medicoNome ?? "O profissional";
             const proximos = await consultarDisponibilidadeCore({
               clinicaId: ctx.clinicaId,
-              medicoId: p.medico_id,
-              dias: 30,
-            });
+              medicoId,
+              dias: 60,
+            }).catch(() => [] as SlotNina[]);
             const sugestoes = proximos.slice(0, 3).map((s) => ({ data: s.data, hora: s.hora }));
-            return falha(
-              "NO_AVAILABILITY",
+            return semVaga(
+              atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA",
               atende
                 ? `${nome} atende nesse dia, mas a agenda está sem horários disponíveis.`
                 : `${nome} não possui atendimento cadastrado nesse dia.`,
               { motivo: atende ? "AGENDA_CHEIA" : "NAO_ATENDE_NO_DIA", proximos: sugestoes },
             );
           }
-          return falha("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
+          return semVaga("NO_AVAILABILITY", "Nenhum horário livre com esses critérios.");
         }
         return {
           ok: true,
@@ -890,15 +1017,38 @@ async function executarFerramentaInterna(
       case "verificar_horario": {
         const p = zVerificarHorario.parse(args);
         const hora = p.hora.padStart(5, "0");
-        const nome = (await nomeMedico(p.medico_id)) ?? "O profissional";
-        const { atende } = await medicoAtendeNoDia(ctx.clinicaId, p.medico_id, p.data);
-        const doDia = await consultarDisponibilidadeCore({
-          clinicaId: ctx.clinicaId,
-          medicoId: p.medico_id,
-          dias: 30,
-          data: p.data,
-        });
+        const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+        if (!r.ok)
+          return falha(
+            "DOCTOR_NOT_FOUND",
+            r.opcoes.length > 0
+              ? "Há mais de um profissional com esse nome. Pergunte ao paciente qual deles."
+              : "Não encontrei esse profissional nesta unidade.",
+            { opcoes: r.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })) },
+          );
+        const nome = r.nome;
+        const { atende } = await medicoAtendeNoDia(ctx.clinicaId, r.id, p.data);
+        let doDia: SlotNina[];
+        try {
+          doDia = await consultarDisponibilidadeCore({
+            clinicaId: ctx.clinicaId,
+            medicoId: r.id,
+            dias: 60,
+            data: p.data,
+          });
+        } catch (e) {
+          return falhaAgenda(e, "verificar_horario");
+        }
         const alvo = doDia.find((s) => s.hora === hora);
+        logAgenda("verificar_horario", {
+          medico: nome,
+          medico_id: r.id,
+          data: p.data,
+          hora,
+          atende_no_dia: atende,
+          slots: doDia.length,
+          disponivel: Boolean(alvo),
+        });
         await auditar(
           ctx,
           "verificar_horario",
@@ -909,6 +1059,7 @@ async function executarFerramentaInterna(
           return {
             ok: true,
             medico: nome,
+            medico_id: r.id,
             data: p.data,
             hora,
             disponivel: false,
@@ -918,6 +1069,7 @@ async function executarFerramentaInterna(
         return {
           ok: true,
           medico: nome,
+          medico_id: r.id,
           data: p.data,
           hora,
           disponivel: Boolean(alvo),
@@ -938,21 +1090,57 @@ async function executarFerramentaInterna(
           const lista = await listarEspecialidades(ctx.clinicaId);
           const esp = acharEspecialidade(p.especialidade, lista);
           if (!esp)
-            return falha(
-              "NO_AVAILABILITY",
+            return semVaga(
+              "ESPECIALIDADE_NAO_ATENDIDA",
               `A clínica não atende "${p.especialidade}". Atende: ${lista.map((e) => e.nome).join(", ")}`,
             );
           especialidadeId = esp.id;
         }
-        const todos = await consultarDisponibilidadeCore({
-          clinicaId: ctx.clinicaId,
-          especialidadeId,
-          medicoId: p.medico_id ?? null,
-          dias: 30,
-          periodo: p.periodo ?? null,
-        });
+        let medicoId: string | null = null;
+        let medicoNome: string | null = null;
+        if (p.medico_id) {
+          const r = await resolverMedico(ctx.clinicaId, p.medico_id);
+          if (!r.ok)
+            return falha(
+              "DOCTOR_NOT_FOUND",
+              r.opcoes.length > 0
+                ? "Há mais de um profissional com esse nome. Pergunte ao paciente qual deles."
+                : "Não encontrei esse profissional nesta unidade.",
+              { opcoes: r.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })) },
+            );
+          medicoId = r.id;
+          medicoNome = r.nome;
+        }
+        let todos: SlotNina[];
+        try {
+          todos = await consultarDisponibilidadeCore({
+            clinicaId: ctx.clinicaId,
+            especialidadeId,
+            medicoId,
+            // Busca larga: "a próxima disponível" não pode depender de o
+            // paciente informar cada data. 60 dias cobre médicos que atendem
+            // só um dia da semana.
+            dias: p.dias ?? 60,
+            limite: 800,
+            periodo: p.periodo ?? null,
+          });
+        } catch (e) {
+          return falhaAgenda(e, "proxima_vaga");
+        }
         const desde = p.a_partir_de ?? null;
-        const slots = desde ? todos.filter((s) => dataISODoSlot(s.inicio) >= desde) : todos;
+        let slots = desde ? todos.filter((s) => dataISODoSlot(s.inicio) >= desde) : todos;
+        if (p.dia_semana !== undefined)
+          slots = slots.filter((s) => diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana);
+        logAgenda("proxima_vaga", {
+          medico: medicoNome,
+          medico_id: medicoId,
+          especialidade_id: especialidadeId,
+          a_partir_de: desde,
+          dia_semana: p.dia_semana ?? null,
+          periodo: p.periodo ?? null,
+          slots: slots.length,
+          primeira: slots[0] ? `${slots[0].data} ${slots[0].hora}` : null,
+        });
         await auditar(
           ctx,
           "proxima_vaga",
@@ -960,9 +1148,10 @@ async function executarFerramentaInterna(
           { ok: slots.length > 0 },
         );
         if (slots.length === 0)
-          return falha(
+          return semVaga(
             "NO_AVAILABILITY",
-            "Não há vaga disponível nos próximos 30 dias com esses critérios.",
+            `Não há vaga disponível nos próximos ${p.dias ?? 60} dias com esses critérios.`,
+            { medico: medicoNome },
           );
         const primeira = slots[0]!;
         return {
@@ -978,6 +1167,7 @@ async function executarFerramentaInterna(
           },
           seguintes: slots.slice(1, 4).map((s) => ({
             medico: s.medico_nome,
+            medico_id: s.medico_id,
             data: s.data,
             hora: s.hora,
             inicio: s.inicio,
@@ -985,6 +1175,8 @@ async function executarFerramentaInterna(
           })),
         };
       }
+
+
 
 
 
@@ -1086,11 +1278,18 @@ async function executarFerramentaInterna(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
+        const rMed = await resolverMedico(ctx.clinicaId, p.medico_id);
+        if (!rMed.ok)
+          return falha("DOCTOR_NOT_FOUND", "Não encontrei esse profissional nesta unidade.", {
+            opcoes: rMed.opcoes.map((o) => ({ medico_id: o.id, nome: o.nome })),
+          });
+        const medicoIdReal = rMed.id;
+
         const origemMarca = origemAgendamentoNina(ctx);
         const ehTeste = origemMarca === "nina_homologacao";
         // Chave de idempotência: mesma conversa + mesmo profissional + mesmo
         // horário nunca gera dois registros (índice único no banco).
-        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${p.medico_id}|${p.inicio}`;
+        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${medicoIdReal}|${p.inicio}`;
 
         // --- Idempotência: mesma intenção, mesmo horário, um único registro.
         const { data: jaExiste } = await supabaseAdmin
@@ -1142,7 +1341,7 @@ async function executarFerramentaInterna(
               // clara — a recepção nunca confunde com paciente real.
               paciente_nome: ehTeste ? `[TESTE NINA] ${ctx.pacienteNome}` : ctx.pacienteNome,
               paciente_id: ctx.pacienteId,
-              medico_id: p.medico_id,
+              medico_id: medicoIdReal,
               inicio: p.inicio,
               fim: p.fim,
               procedimento: p.procedimento,
@@ -1180,6 +1379,14 @@ async function executarFerramentaInterna(
           const msg =
             "validation_error" in r ? r.validation_error.message : r.pg_error.message;
           const slotOcupado = /slot|hor[áa]rio|dispon/i.test(msg);
+          logAgenda("agendar", {
+            medico: rMed.nome,
+            medico_id: medicoIdReal,
+            inicio: p.inicio,
+            confirmado: false,
+            erro: slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR",
+            detalhe: msg,
+          });
           await auditar(ctx, "agendar", p, {
             ok: false,
             erro: slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR",
@@ -1196,11 +1403,20 @@ async function executarFerramentaInterna(
             .eq("clinica_id", ctx.clinicaId);
         }
 
+        logAgenda("agendar", {
+          medico: rMed.nome,
+          medico_id: medicoIdReal,
+          inicio: p.inicio,
+          confirmado: true,
+          agendamento_id: r.id,
+          teste: ehTeste,
+        });
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
         return {
           ok: true,
           agendamento_id: r.id,
           teste: ehTeste,
+          medico: rMed.nome,
           agendamento: {
             data: formatarData(p.inicio),
             hora: formatarHora(p.inicio),
