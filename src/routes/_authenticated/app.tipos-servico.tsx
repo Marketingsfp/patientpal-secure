@@ -116,8 +116,8 @@ function TiposServicoPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">Categorias de Serviço</h1>
           <p className="text-sm text-muted-foreground">
-            Cadastro das categorias de serviços da clínica (Consulta, Exames / Procedimentos,
-            Cirurgia…).
+            Cadastro das categorias de serviços (Consulta, Exames / Procedimentos, Cirurgia…) —
+            compartilhado por todas as clínicas.
           </p>
         </div>
         {podeEscrever && (

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useAdminPlataforma } from "@/hooks/use-admin-plataforma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -233,7 +234,7 @@ function EspecialidadesPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">Especialidades</h1>
           <p className="text-sm text-muted-foreground">
-            Cadastro global de especialidades médicas.
+            Cadastro global de especialidades médicas — vale para todas as clínicas.
           </p>
         </div>
         {podeEscrever && (
@@ -315,24 +316,24 @@ function EspecialidadesPage() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       {podeEscrever && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(r)}
-                            aria-label="Editar"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setToDelete(r)}
-                            aria-label="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(r)}
+                          aria-label="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {podeEscrever && adminPlataforma && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setToDelete(r)}
+                          aria-label="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
                   </TableCell>
