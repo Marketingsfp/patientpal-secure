@@ -106,6 +106,37 @@ export const listarConversas = createServerFn({ method: "POST" })
     return rows ?? [];
   });
 
+
+/**
+ * Registra um evento de estado da conversa (resolvida, atribuída, transferida…)
+ * usando a sessão do próprio usuário — a política de RLS exige ser membro da
+ * clínica. Falha aqui nunca derruba a ação principal: o evento é o registro
+ * visual da linha do tempo, não a operação em si.
+ */
+async function registrarEventoConversa(
+  supabase: { from: (t: string) => any },
+  args: {
+    clinicaId: string;
+    conversaId: string;
+    evento: string;
+    userId?: string | null;
+    departamentoId?: string | null;
+    motivo?: string | null;
+    detalhes?: Record<string, unknown> | null;
+  },
+) {
+  const { error } = await supabase.from("atend_conversa_eventos").insert({
+    clinica_id: args.clinicaId,
+    conversa_id: args.conversaId,
+    evento: args.evento,
+    user_id: args.userId ?? null,
+    departamento_id: args.departamentoId ?? null,
+    motivo: args.motivo ?? null,
+    detalhes: args.detalhes ?? null,
+  });
+  if (error) console.error("[atendimento] evento não registrado:", args.evento, error.message);
+}
+
 export const atribuirConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -142,6 +173,13 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: data.userId ? "ASSUMIDA" : "DESATRIBUIDA",
+      userId: data.userId ?? context.userId,
+      departamentoId: data.departamentoId ?? null,
+    });
     return { ok: true };
   });
 
@@ -192,6 +230,15 @@ export const transferirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (e2) throw new Error(e2.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "TRANSFERIDA",
+      userId: context.userId,
+      departamentoId: data.paraDepartamentoId ?? conv.departamento_id,
+      motivo: data.motivo ?? null,
+      detalhes: { para_user_id: data.paraUserId ?? null },
+    });
     return { ok: true };
   });
 
@@ -224,6 +271,13 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "FINALIZADA",
+      userId: context.userId,
+      detalhes: { protocolo: prot as string },
+    });
     return { ok: true, protocol: prot as string };
   });
 
@@ -1845,10 +1899,39 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
       .select("id, evento, user_id, motivo, detalhes, created_at")
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId)
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .order("created_at", { ascending: true })
+      .limit(200);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const lista = rows ?? [];
+    // Nome de quem agiu: o banner da timeline diz "resolvida por Fulano", não
+    // um UUID. Uma consulta só para todos os responsáveis dos eventos.
+    const ids = Array.from(
+      new Set(
+        lista.flatMap((r) => {
+          const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+          return [r.user_id, det?.para_user_id ?? null];
+        }).filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    );
+    const nomes = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      (profs ?? []).forEach((p: { id: string; nome: string | null }) => {
+        if (p.nome) nomes.set(p.id, p.nome);
+      });
+    }
+    return lista.map((r) => {
+      const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+      const paraId = det?.para_user_id ?? null;
+      return {
+        ...r,
+        user_nome: r.user_id ? (nomes.get(r.user_id) ?? null) : null,
+        para_nome: paraId ? (nomes.get(paraId) ?? null) : null,
+      };
+    });
   });
 
 /** Presença do atendente (Disponível / Ocupado / Ausente / Offline). */

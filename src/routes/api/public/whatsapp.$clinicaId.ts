@@ -228,12 +228,34 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // Mensagem nova do paciente reabre conversa fechada.
                 const fromDigits = String(from ?? "").replace(/\D/g, "");
                 if (fromDigits) {
-                  await supabaseAdmin
+                  const { data: reabertas } = await supabaseAdmin
                     .from("atend_conversas")
                     .update({ status: "aberta", ultima_msg_em: new Date().toISOString() })
                     .eq("clinica_id", params.clinicaId)
                     .in("contato_telefone", [fromDigits, `+${fromDigits}`])
-                    .in("status", ["closed", "finished"]);
+                    .in("status", ["closed", "finished"])
+                    .select("id, owner_type, ai_enabled");
+                  // Só marca "atribuída à Nina" quando a atribuição de fato mudou
+                  // (a conversa estava encerrada e volta com a IA no comando).
+                  // Enquanto a Nina seguir responsável, novas mensagens não
+                  // repetem o banner.
+                  const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
+                  for (const c of reabertas ?? []) {
+                    await registrarEvento({
+                      clinicaId: params.clinicaId,
+                      conversaId: (c as { id: string }).id,
+                      evento: "REABERTA",
+                      motivo: "Nova mensagem do paciente",
+                    });
+                    const dono = c as { owner_type?: string | null; ai_enabled?: boolean | null };
+                    if (dono.owner_type === "AI" && dono.ai_enabled !== false) {
+                      await registrarEvento({
+                        clinicaId: params.clinicaId,
+                        conversaId: (c as { id: string }).id,
+                        evento: "ATRIBUIDA_IA",
+                      });
+                    }
+                  }
                 }
 
                 // Atendimento híbrido: a Nina é o 1º nível e responde sempre,
