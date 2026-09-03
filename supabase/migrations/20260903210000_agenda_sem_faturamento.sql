@@ -76,13 +76,18 @@ BEGIN
   IF NEW.agendamento_id IS NULL THEN
     RETURN NEW;
   END IF;
-  IF COALESCE(NEW.tipo, '') <> 'receita' THEN
+  -- `tipo` e `status` são ENUMs. Um COALESCE(NEW.tipo, '') faz o Postgres
+  -- converter a string vazia para o enum ANTES de olhar o valor da linha, e
+  -- isso derruba TODA cobrança com a mensagem
+  -- 'invalid input value for enum fin_tipo_lancamento: ""'. Por isso a
+  -- comparação é direta, sem string vazia no meio.
+  IF NEW.tipo IS DISTINCT FROM 'receita'::public.fin_tipo_lancamento THEN
     RETURN NEW;
   END IF;
   IF COALESCE(NEW.valor, 0) <= 0 THEN
     RETURN NEW;
   END IF;
-  IF COALESCE(NEW.status, '') = 'cancelado' THEN
+  IF NEW.status IS NOT DISTINCT FROM 'cancelado'::public.fin_status_lancamento THEN
     RETURN NEW;
   END IF;
 
