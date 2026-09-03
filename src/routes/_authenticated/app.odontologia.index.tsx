@@ -38,6 +38,7 @@ import { EvolucaoOdontoTab } from "@/components/odontologia/evolucao-odonto-tab"
 import { AddToOrcamentoDialog } from "@/components/odontologia/add-to-orcamento-dialog";
 import { GaleriaOdontoTab } from "@/components/odontologia/galeria-odonto-tab";
 import { OdontoSubnav } from "@/components/odontologia/odonto-subnav";
+import { TabelaPrecosOdontoButton } from "@/components/odontologia/tabela-precos-odonto-button";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia/")({
   component: OdontologiaPage,
@@ -331,7 +332,10 @@ function OdontologiaPage() {
         </div>
       </div>
 
-      <OdontoSubnav />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <OdontoSubnav />
+        <TabelaPrecosOdontoButton especialidadeId={especialidadeOdontoId} />
+      </div>
 
       <div className="space-y-6">
         <Card>

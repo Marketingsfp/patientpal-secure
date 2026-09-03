@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
 import { OdontoSubnav } from "@/components/odontologia/odonto-subnav";
+import { TabelaPrecosOdontoButton } from "@/components/odontologia/tabela-precos-odonto-button";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia/orcamentos")({
   component: OrcamentosOdontoPage,
@@ -65,7 +66,10 @@ function OrcamentosOdontoPage() {
         </div>
       </div>
 
-      <OdontoSubnav />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <OdontoSubnav />
+        <TabelaPrecosOdontoButton especialidadeId={especialidadeOdontoId} />
+      </div>
 
       <Card>
         <CardContent className="pt-6 space-y-3">
