@@ -1899,10 +1899,39 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
       .select("id, evento, user_id, motivo, detalhes, created_at")
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId)
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .order("created_at", { ascending: true })
+      .limit(200);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const lista = rows ?? [];
+    // Nome de quem agiu: o banner da timeline diz "resolvida por Fulano", não
+    // um UUID. Uma consulta só para todos os responsáveis dos eventos.
+    const ids = Array.from(
+      new Set(
+        lista.flatMap((r) => {
+          const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+          return [r.user_id, det?.para_user_id ?? null];
+        }).filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    );
+    const nomes = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      (profs ?? []).forEach((p: { id: string; nome: string | null }) => {
+        if (p.nome) nomes.set(p.id, p.nome);
+      });
+    }
+    return lista.map((r) => {
+      const det = (r.detalhes ?? null) as { para_user_id?: string | null } | null;
+      const paraId = det?.para_user_id ?? null;
+      return {
+        ...r,
+        user_nome: r.user_id ? (nomes.get(r.user_id) ?? null) : null,
+        para_nome: paraId ? (nomes.get(paraId) ?? null) : null,
+      };
+    });
   });
 
 /** Presença do atendente (Disponível / Ocupado / Ausente / Offline). */
