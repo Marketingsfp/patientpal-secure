@@ -49,12 +49,17 @@ import {
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import {
+  ConversationSystemEvent,
+  type ConversaEvento,
+} from "@/components/nina/ConversationSystemEvent";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
   listarMensagensConversa,
   enviarMensagemConversa,
   obterDadosContato,
+  listarEventosConversa,
   transferirConversa,
   fecharConversa,
   listarNotas,
@@ -106,6 +111,7 @@ export function AtendInbox() {
   const transferirFn = useServerFn(transferirConversa);
   const fecharFn = useServerFn(fecharConversa);
   const listarNotasFn = useServerFn(listarNotas);
+  const listarEventosFn = useServerFn(listarEventosConversa);
   const criarNotaFn = useServerFn(criarNota);
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
@@ -121,6 +127,7 @@ export function AtendInbox() {
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
   const [msgs, setMsgs] = useState<any[]>([]);
+  const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
   const [notas, setNotas] = useState<any[]>([]);
   const [deptos, setDeptos] = useState<any[]>([]);
@@ -233,10 +240,13 @@ export function AtendInbox() {
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
     try {
-      const [m, c, n] = await Promise.all([
+      const [m, c, n, ev] = await Promise.all([
         listarMsgs({ data: { clinicaId, conversaId: sel.id, limit: 200 } }),
         obterContato({ data: { clinicaId, conversaId: sel.id } }),
         listarNotasFn({ data: { clinicaId, conversaId: sel.id } }),
+        listarEventosFn({ data: { clinicaId, conversaId: sel.id } }).catch(
+          () => [] as ConversaEvento[],
+        ),
       ]);
       if (!c) {
         // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
@@ -244,15 +254,17 @@ export function AtendInbox() {
         setMsgs([]);
         setContato(null);
         setNotas([]);
+        setEventos([]);
         return;
       }
       setMsgs(m);
       setContato(c);
       setNotas(n);
+      setEventos((ev ?? []) as ConversaEvento[]);
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn]);
+  }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
 
   useEffect(() => {
     carregarConvs();
@@ -278,7 +290,7 @@ export function AtendInbox() {
 
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(
-    ["whatsapp_mensagens", "atend_notas_internas"],
+    ["whatsapp_mensagens", "atend_notas_internas", "atend_conversa_eventos"],
     carregarConversa,
     !!clinicaId && !!sel?.id,
   );
