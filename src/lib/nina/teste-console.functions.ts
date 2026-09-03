@@ -177,10 +177,37 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       .order("created_at", { ascending: true })
       .limit(400);
     if (error) throw new Error(error.message);
+
+    // Eventos operacionais (resolvida, memória resetada, atribuição…). O
+    // console mescla com as mensagens por `created_at` — nada de popup.
+    const { data: evs } = await supabaseAdmin
+      .from("atend_conversa_eventos")
+      .select("id, evento, user_id, motivo, detalhes, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .in("conversa_id", ids)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    const lista = (evs ?? []) as any[];
+    const userIds = Array.from(
+      new Set(lista.map((e) => e.user_id).filter((v): v is string => !!v)),
+    );
+    const nomes = new Map<string, string>();
+    if (userIds.length) {
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, nome")
+        .in("id", userIds);
+      for (const p of (profs ?? []) as any[]) if (p.nome) nomes.set(p.id, p.nome);
+    }
+
     return {
       conversaId: lead.conversa_id,
       sessao: lead.sessao_seq,
       mensagens: (msgs ?? []) as any[],
+      eventos: lista.map((e) => ({
+        ...e,
+        user_nome: e.user_id ? (nomes.get(e.user_id) ?? null) : null,
+      })),
     };
   });
 
