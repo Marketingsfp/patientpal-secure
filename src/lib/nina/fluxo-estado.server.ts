@@ -27,6 +27,9 @@ export type EtapaFluxoNina =
   | "IDENTIFYING_PATIENT"
   | "CHOOSING_SLOT"
   | "AWAITING_SLOT_CONFIRMATION"
+  | "AWAITING_PATIENT_DATA"
+  | "REVALIDATING_SLOT"
+  | "APPOINTMENT_FAILED"
   | "BOOKED";
 
 export type EstadoFluxoNina = {
@@ -36,6 +39,16 @@ export type EstadoFluxoNina = {
     first_name: string | null;
     identified: boolean;
     validated: boolean;
+    /**
+     * Dados de identificação já informados, mas ainda incompletos. Existe para
+     * o paciente poder mandar nome numa mensagem e CPF na seguinte sem que a
+     * Nina recomece a coleta.
+     */
+    pending: {
+      nome: string | null;
+      cpf: string | null;
+      data_nascimento: string | null;
+    };
   };
   appointment: {
     doctor_id: string | null;
@@ -47,6 +60,8 @@ export type EstadoFluxoNina = {
     slot_inicio: string | null;
     slot_fim: string | null;
     slot_confirmed_by_patient: boolean;
+    /** Paciente disse "sim/isso/pode marcar" para a vaga oferecida. */
+    intent_confirmed: boolean;
     appointment_id: string | null;
   };
   flow: { stage: EtapaFluxoNina };
@@ -55,7 +70,13 @@ export type EstadoFluxoNina = {
 
 export function estadoVazio(): EstadoFluxoNina {
   return {
-    patient: { id: null, first_name: null, identified: false, validated: false },
+    patient: {
+      id: null,
+      first_name: null,
+      identified: false,
+      validated: false,
+      pending: { nome: null, cpf: null, data_nascimento: null },
+    },
     appointment: {
       doctor_id: null,
       doctor_name: null,
@@ -66,6 +87,7 @@ export function estadoVazio(): EstadoFluxoNina {
       slot_inicio: null,
       slot_fim: null,
       slot_confirmed_by_patient: false,
+      intent_confirmed: false,
       appointment_id: null,
     },
     flow: { stage: "IDLE" },
@@ -73,13 +95,19 @@ export function estadoVazio(): EstadoFluxoNina {
   };
 }
 
+
 /** Normaliza qualquer JSON gravado para o formato atual (tolerante a versões). */
 export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
   const base = estadoVazio();
   if (!bruto || typeof bruto !== "object") return base;
   const o = bruto as Record<string, any>;
   return {
-    patient: { ...base.patient, ...(o["patient"] ?? {}) },
+    patient: {
+      ...base.patient,
+      ...(o["patient"] ?? {}),
+      pending: { ...base.patient.pending, ...(o["patient"]?.pending ?? {}) },
+    },
+
     appointment: { ...base.appointment, ...(o["appointment"] ?? {}) },
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
     updated_at: o["updated_at"] ?? null,
@@ -158,7 +186,11 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
     );
   } else {
     linhas.push(
-      "- Paciente ainda NÃO identificado. Só peça CPF, nome completo e data de nascimento quando houver intenção clara de agendar.",
+      "- Paciente ainda NÃO identificado. Pode conversar, buscar profissional e consultar horários SEM pedir dado pessoal.",
+      "- ORDEM OBRIGATÓRIA do agendamento: oferecer vaga -> paciente confirma -> pedir NOME COMPLETO + CPF + DATA DE NASCIMENTO (os três juntos, numa única mensagem) -> identificar -> revalidar vaga -> gravar -> confirmar.",
+      "- NUNCA chame 'identificar_paciente' com dado faltando e NUNCA chame 'agendar' antes da identificação.",
+      "- Se faltar só um dado, peça apenas o que falta. Não recomece a coleta.",
+      "- Falha de identificação por dados incompletos NÃO é motivo para transferir para atendente humano.",
     );
   }
 
@@ -175,9 +207,15 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
   }
   if (a.slot_inicio && a.slot_fim) {
     linhas.push(
-      `- Último horário OFERECIDO ao paciente: inicio=${a.slot_inicio} fim=${a.slot_fim}. Se ele responder "sim", "pode ser", "confirma" ou equivalente, a intenção é CONFIRMAR ESTE HORÁRIO: chame 'agendar' com exatamente esse inicio/fim — não recomece a identificação.`,
+      `- Vaga em negociação: inicio=${a.slot_inicio} fim=${a.slot_fim}. Mantenha essa vaga durante toda a coleta de dados — não pergunte de novo médico, dia ou hora.`,
     );
   }
+  if (a.intent_confirmed && !p.identified) {
+    linhas.push(
+      "- O paciente JÁ CONFIRMOU que quer esta vaga. A única etapa pendente é a identificação (nome completo, CPF e data de nascimento).",
+    );
+  }
+
   if (a.appointment_id) {
     linhas.push(
       `- Já existe agendamento criado nesta conversa (id interno registrado). Não marque de novo o mesmo horário; se o paciente quiser outro, trate como remarcação.`,

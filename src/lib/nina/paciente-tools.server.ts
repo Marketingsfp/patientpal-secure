@@ -715,8 +715,19 @@ const zDisponibilidade = z.object({
 const zIdentificar = z.object({
   cpf: z.string().min(11).max(20),
   nome: z.string().trim().min(3).max(200),
-  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // Aceita AAAA-MM-DD e também DD/MM/AAAA — o paciente escreve como fala e o
+  // modelo às vezes repassa igual. Normaliza para ISO antes de consultar.
+  data_nascimento: z
+    .string()
+    .trim()
+    .transform((v) => {
+      const br = v.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+      if (!br) return v;
+      return `${br[3]}-${br[2]!.padStart(2, "0")}-${br[1]!.padStart(2, "0")}`;
+    })
+    .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
 });
+
 const zAgendar = z.object({
   // Aceita id ou nome; a resolução acontece no executor (mesma regra das
   // ferramentas de consulta). A gravação continua exigindo um id real.

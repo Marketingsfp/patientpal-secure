@@ -902,11 +902,13 @@ ${procs || "(nenhum)"}`;
   }
   if (pacienteIdEfetivo && !fluxoEstado.patient.identified) {
     fluxoEstado.patient = {
+      ...fluxoEstado.patient,
       id: pacienteIdEfetivo,
       first_name: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
       identified: true,
       validated: true,
     };
+
   }
 
   const systemPromptFinal = [
@@ -952,6 +954,30 @@ ${procs || "(nenhum)"}`;
       teste: opcoes?.teste === true,
     };
   }
+
+  // ---------------------------------------------------------------------
+  // REGRA DE NEGÓCIO (não é prompt): confirmou a vaga -> pedir nome + CPF +
+  // nascimento -> identificar -> revalidar -> gravar -> confirmar. A ordem é
+  // decidida aqui, em código, antes de qualquer chamada ao modelo.
+  // ---------------------------------------------------------------------
+  if (podeAgendar && ctxFerramentas && executar !== null) {
+    const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
+    const respostaGate = await aplicarGateIdentificacao({
+      mensagem: mensagemPaciente,
+      estado: fluxoEstado,
+      ctx: ctxFerramentas,
+      executar,
+    }).catch((e) => {
+      console.error("[NINA_BOOKING_FLOW] gate falhou", e);
+      return null;
+    });
+    if (respostaGate) {
+      await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+      return respostaGate;
+    }
+  }
+
+
 
 
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
