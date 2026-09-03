@@ -367,6 +367,15 @@ export function ConsoleTesteNina() {
                 <Download className="h-4 w-4" />
                 Baixar PDF
               </Button>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-current"
+                  checked={limparAgenda}
+                  onChange={(e) => setLimparAgenda(e.target.checked)}
+                />
+                Remover agendamentos deste teste ao finalizar
+              </label>
               <Button
                 variant="outline"
                 size="sm"
@@ -378,6 +387,27 @@ export function ConsoleTesteNina() {
               </Button>
               </div>
             </div>
+
+            {ferramentas.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Ferramentas usadas pela Nina (visível só aqui)
+                </p>
+                <div className="max-h-40 space-y-1 overflow-y-auto">
+                  {ferramentas.map((f) => (
+                    <div key={f.id} className="font-mono text-[11px] leading-tight">
+                      <span className={f.ok ? "text-emerald-600" : "text-destructive"}>
+                        {f.ok ? "✔" : "✖"}
+                      </span>{" "}
+                      <span className="font-semibold">{f.ferramenta}</span>{" "}
+                      <span className="text-muted-foreground">
+                        {JSON.stringify(f.argumentos)} → {f.erro ?? "OK"} ({f.ms}ms)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
 
             <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
