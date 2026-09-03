@@ -873,6 +873,42 @@ ${procs || "(nenhum)"}`;
   );
   const blocoAprendizado = blocoPromptAprendizados(aprendizados);
 
+  // ------------------------------------------- estado estruturado do fluxo
+  // Recarregado da própria conversa. É isto que faz o paciente já
+  // identificado continuar identificado na mensagem seguinte.
+  const {
+    normalizarEstado,
+    blocoPromptEstado,
+    salvarFluxoEstado,
+  } = await import("@/lib/nina/fluxo-estado.server");
+  const fluxoEstado = normalizarEstado(estadoId.fluxoEstadoBruto);
+  // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
+  // paciente já vinculado à conversa → casamento pelo telefone do remetente.
+  let pacienteIdEfetivo =
+    fluxoEstado.patient.id ??
+    estadoId.pacienteIdConversa ??
+    (telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null);
+  let pacienteNomeEfetivo =
+    telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null;
+  if (pacienteIdEfetivo && !pacienteNomeEfetivo) {
+    const { data: pRow } = await supabaseAdmin
+      .from("pacientes")
+      .select("nome")
+      .eq("id", pacienteIdEfetivo)
+      .eq("clinica_id", clinicaId)
+      .maybeSingle();
+    pacienteNomeEfetivo = (pRow as any)?.nome ?? null;
+    if (!pacienteNomeEfetivo) pacienteIdEfetivo = null; // cadastro sumiu/outra clínica
+  }
+  if (pacienteIdEfetivo && !fluxoEstado.patient.identified) {
+    fluxoEstado.patient = {
+      id: pacienteIdEfetivo,
+      first_name: pacienteNomeEfetivo ? pacienteNomeEfetivo.split(" ")[0]! : null,
+      identified: true,
+      validated: true,
+    };
+  }
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
@@ -884,6 +920,7 @@ ${procs || "(nenhum)"}`;
 
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
+    blocoPromptEstado(fluxoEstado),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -904,16 +941,18 @@ ${procs || "(nenhum)"}`;
     ctxFerramentas = {
       clinicaId,
       telefone: telefoneNorm,
-      // Só entra identificado quem foi casado pelo telefone do próprio
-      // remetente — nome solto nunca identifica ninguém.
-      pacienteId: telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null,
-      pacienteNome: telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null,
+      // Identificação persistente: telefone do remetente OU identificação
+      // feita em qualquer mensagem anterior desta mesma conversa.
+      pacienteId: pacienteIdEfetivo,
+      pacienteNome: pacienteNomeEfetivo,
       conversaId: estadoId.conversaId,
       origem: opcoes?.teste ? "homologacao" : "whatsapp",
       podeAgendar,
+      estado: fluxoEstado,
       teste: opcoes?.teste === true,
     };
   }
+
 
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
   const {
