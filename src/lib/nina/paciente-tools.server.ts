@@ -1086,6 +1086,12 @@ async function executarFerramentaInterna(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
+        const origemMarca = origemAgendamentoNina(ctx);
+        const ehTeste = origemMarca === "nina_homologacao";
+        // Chave de idempotência: mesma conversa + mesmo profissional + mesmo
+        // horário nunca gera dois registros (índice único no banco).
+        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${p.medico_id}|${p.inicio}`;
+
         // --- Idempotência: mesma intenção, mesmo horário, um único registro.
         const { data: jaExiste } = await supabaseAdmin
           .from("agendamentos")
@@ -1124,7 +1130,7 @@ async function executarFerramentaInterna(
               tipo: "integracao",
               api_key_id: "nina-ai",
               clinica_id: ctx.clinicaId,
-              origem_integracao: "nina_ai",
+              origem_integracao: origemMarca,
             },
           },
           {
@@ -1132,14 +1138,23 @@ async function executarFerramentaInterna(
             editing_id: null,
             payload: {
               clinica_id: ctx.clinicaId,
-              paciente_nome: ctx.pacienteNome,
+              // Agendamento de homologação fica visível na agenda com marca
+              // clara — a recepção nunca confunde com paciente real.
+              paciente_nome: ehTeste ? `[TESTE NINA] ${ctx.pacienteNome}` : ctx.pacienteNome,
               paciente_id: ctx.pacienteId,
               medico_id: p.medico_id,
               inicio: p.inicio,
               fim: p.fim,
               procedimento: p.procedimento,
               status: "agendado",
-              observacoes: [`Agendado pela Nina (WhatsApp)`, p.observacoes]
+              observacoes: [
+                ehTeste
+                  ? "TESTE — agendado pela Nina (Homologação)"
+                  : ctx.origem === "whatsapp"
+                    ? "Agendado pela Nina (WhatsApp)"
+                    : "Agendado pela Nina (chat interno)",
+                p.observacoes,
+              ]
                 .filter(Boolean)
                 .join(" — "),
               data_pagamento: null,
@@ -1157,6 +1172,7 @@ async function executarFerramentaInterna(
             // profissional já entra confirmado (choque com o mesmo
             // profissional continua bloqueado).
             confirmacoes: { permitir_conflito_paciente: true },
+            integracao_marca: { origem_integracao: origemMarca, id_externo: idExterno },
           },
         );
 
