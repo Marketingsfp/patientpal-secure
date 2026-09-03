@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { escolherContratoAtivo, compararContratosAtivos } from "./escolher-contrato-ativo";
+import {
+  escolherContratoAtivo,
+  compararContratosAtivos,
+  filtrarTitularesBeneficiarios,
+  titularUsaBeneficio,
+} from "./escolher-contrato-ativo";
 
 const CONV = "11111111-1111-1111-1111-111111111111";
 
@@ -78,5 +83,52 @@ describe("escolherContratoAtivo", () => {
     ];
     const ordenada = [...lista].sort(compararContratosAtivos);
     expect(ordenada.map((c) => c.data_inicio)).toEqual(["2026-08-27", "2025-01-01", "2026-12-31"]);
+  });
+});
+
+describe("titularUsaBeneficio", () => {
+  it("titular comum é beneficiário do próprio contrato", () => {
+    expect(titularUsaBeneficio({ titular_apenas_financeiro: false })).toBe(true);
+    // Contrato antigo, gravado antes de a coluna existir, não traz o campo.
+    expect(titularUsaBeneficio({})).toBe(true);
+  });
+
+  it("titular apenas financeiro NÃO é beneficiário", () => {
+    expect(titularUsaBeneficio({ titular_apenas_financeiro: true })).toBe(false);
+  });
+
+  it("contrato ausente não dá benefício a ninguém", () => {
+    expect(titularUsaBeneficio(null)).toBe(false);
+    expect(titularUsaBeneficio(undefined)).toBe(false);
+  });
+
+  it("caso real: quem paga o cartão dos pais é cobrado como particular", () => {
+    // A paciente comprou o cartão para o pai e a mãe e ficou marcada como
+    // titular apenas financeiro. A consulta de endocrinologia dela saía por
+    // R$ 10,00 (tabela do convênio) em vez dos R$ 120,00 particulares.
+    const cartaoDosPais = {
+      convenio_id: CONV,
+      data_inicio: "2026-09-03",
+      created_at: "2026-09-03T18:52:37Z",
+      titular_apenas_financeiro: true,
+    };
+    expect(filtrarTitularesBeneficiarios([cartaoDosPais])).toEqual([]);
+    expect(escolherContratoAtivo(filtrarTitularesBeneficiarios([cartaoDosPais]))).toBeNull();
+  });
+
+  it("filtra só o titular apenas financeiro e mantém o desempate normal", () => {
+    const soPaga = {
+      convenio_id: CONV,
+      data_inicio: "2026-09-01",
+      created_at: "2026-09-01T10:00:00Z",
+      titular_apenas_financeiro: true,
+    };
+    const proprio = {
+      convenio_id: CONV,
+      data_inicio: "2026-08-01",
+      created_at: "2026-08-01T10:00:00Z",
+      titular_apenas_financeiro: false,
+    };
+    expect(escolherContratoAtivo(filtrarTitularesBeneficiarios([soPaga, proprio]))).toBe(proprio);
   });
 });

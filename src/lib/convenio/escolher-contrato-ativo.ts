@@ -87,3 +87,41 @@ export function escolherContratoAtivo<T extends ContratoOrdenavel>(
  * justamente o contrato mais novo antes de qualquer ordenação.
  */
 export const LIMITE_CONTRATOS_CANDIDATOS = 20;
+
+/**
+ * Titular que só paga: o contrato tem uma marcação
+ * (`titular_apenas_financeiro`) para quem assina e paga a mensalidade do
+ * cartão SEM ser beneficiário — tipicamente o filho que compra o cartão para
+ * o pai e a mãe. Nesse caso os beneficiários são apenas os dependentes ativos.
+ *
+ * O campo já existia e era respeitado na contagem de vidas
+ * (`vidas-contrato.ts`) e na impressão do cartão, mas NÃO nos pontos que
+ * decidem preço. Caso real que motivou a correção: a paciente aparecia como
+ * titular apenas financeiro de um cartão comprado para os pais e, na consulta
+ * dela, a Agenda e o Caixa aplicavam a tabela do convênio — R$ 10,00 numa
+ * consulta de endocrinologia que custa R$ 120,00 particular.
+ *
+ * Regra: ser pagador do plano não estende benefício. Só recebe a tabela do
+ * convênio quem é titular beneficiário OU dependente ativo do contrato.
+ */
+export type ContratoComTitular = { titular_apenas_financeiro?: unknown };
+
+/**
+ * `true` quando o contrato vale como benefício PARA O PRÓPRIO TITULAR.
+ * Não afeta os dependentes: o contrato continua valendo para eles.
+ */
+export function titularUsaBeneficio(contrato: ContratoComTitular | null | undefined): boolean {
+  return !!contrato && contrato.titular_apenas_financeiro !== true;
+}
+
+/**
+ * Descarta, de uma lista de contratos em que o paciente é TITULAR, aqueles em
+ * que ele é apenas o responsável financeiro. Use nas telas que já baixaram os
+ * contratos em lote e não podem filtrar na consulta ao banco.
+ */
+export function filtrarTitularesBeneficiarios<T extends ContratoComTitular>(
+  lista: ReadonlyArray<T | null | undefined>,
+): T[] {
+  return lista.filter((c): c is T => titularUsaBeneficio(c));
+}
+

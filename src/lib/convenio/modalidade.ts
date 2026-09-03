@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   escolherContratoAtivo,
   LIMITE_CONTRATOS_CANDIDATOS,
+  titularUsaBeneficio,
 } from "@/lib/convenio/escolher-contrato-ativo";
 
 export type ModalidadeConvenio = "cartao_consulta" | "cartao_desconto";
@@ -77,7 +78,7 @@ export async function carregarMapaConvenioPacientes(
     supabase
       .from("contratos_assinatura")
       .select(
-        "id, paciente_id, convenio_id, data_inicio, created_at, cb_convenios(nome, modalidade)",
+        "id, paciente_id, convenio_id, data_inicio, created_at, titular_apenas_financeiro, cb_convenios(nome, modalidade)",
       )
       .eq("clinica_id", clinicaId)
       .eq("status", "ativo")
@@ -107,7 +108,11 @@ export async function carregarMapaConvenioPacientes(
     };
     porContrato.set(vinculo.contratoId, vinculo);
     linhaPorContrato.set(vinculo.contratoId, c);
-    if (c.paciente_id) {
+    // O contrato entra no mapa POR TITULAR só quando o titular é de fato
+    // beneficiário. Quem assinou apenas como responsável financeiro paga a
+    // mensalidade e não usa a tabela do convênio (`titularUsaBeneficio`);
+    // o vínculo dos dependentes dele é montado logo abaixo, sem mudança.
+    if (c.paciente_id && titularUsaBeneficio(c)) {
       const pid = String(c.paciente_id);
       const lista = candidatosTitular.get(pid);
       if (lista) lista.push(c);
@@ -171,6 +176,9 @@ export async function buscarVinculoConvenio(
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
+    // Titular apenas financeiro não usa a tabela do convênio
+    // (`titularUsaBeneficio`) — nem para cobrança, nem para repasse.
+    .eq("titular_apenas_financeiro", false)
     .order("data_inicio", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(LIMITE_CONTRATOS_CANDIDATOS);

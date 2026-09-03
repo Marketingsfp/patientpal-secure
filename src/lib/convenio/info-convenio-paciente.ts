@@ -87,11 +87,15 @@ export async function obterInfoConvenioPaciente(params: {
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
     .select(
-      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,cb_convenios(nome)",
+      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,titular_apenas_financeiro,cb_convenios(nome)",
     )
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
+    // Titular que só paga não é beneficiário: ver `titularUsaBeneficio`. O
+    // contrato continua valendo para os dependentes ativos dele — o que sai
+    // daqui é apenas o direito do PRÓPRIO titular à tabela do convênio.
+    .eq("titular_apenas_financeiro", false)
     .order("data_inicio", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(LIMITE_CONTRATOS_CANDIDATOS);

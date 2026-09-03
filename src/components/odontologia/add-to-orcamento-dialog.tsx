@@ -143,7 +143,11 @@ export function AddToOrcamentoDialog({
           )
           .eq("clinica_id", clinicaId)
           .eq("status", "ativo")
-          .eq("paciente_id", pacienteId);
+          .eq("paciente_id", pacienteId)
+          // Titular apenas financeiro paga o cartão mas não é beneficiário
+          // (`titularUsaBeneficio`): o orçamento dele sai particular. O
+          // contrato continua valendo para os dependentes ativos.
+          .eq("titular_apenas_financeiro", false);
         // 2) Contratos como dependente
         const { data: depRows } = await supabase
           .from("contrato_dependentes")

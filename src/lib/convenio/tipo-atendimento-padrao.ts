@@ -95,6 +95,10 @@ async function buscarContratoAtivo(clinicaId: string, pacienteId: string) {
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
+    // Titular apenas financeiro não é beneficiário (`titularUsaBeneficio`):
+    // o atendimento DELE nasce "particular". O contrato continua valendo
+    // para os dependentes ativos.
+    .eq("titular_apenas_financeiro", false)
     .order("data_inicio", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(LIMITE_CONTRATOS_CANDIDATOS);
