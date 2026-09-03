@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Smile, Save, Plus, X } from "lucide-react";
+import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -91,6 +92,7 @@ function OdontologiaPage() {
   >([]);
   const especialidadeOdontoId = useEspecialidadeOdontoId();
   const [addOrcOpen, setAddOrcOpen] = useState(false);
+  const [novoOrcOpen, setNovoOrcOpen] = useState(false);
 
   // Paciente vindo por ?paciente=<uuid>. O ref garante que a pré-seleção
   // aconteça uma única vez por valor: sem ele, trocar de paciente na tela
@@ -352,6 +354,7 @@ function OdontologiaPage() {
             <Tabs defaultValue="odontograma" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="odontograma">Odontograma</TabsTrigger>
+                <TabsTrigger value="orcamentos">Orçamentos</TabsTrigger>
                 <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
                 <TabsTrigger value="evolucao">Evolução</TabsTrigger>
                 <TabsTrigger value="galeria">Galeria</TabsTrigger>
@@ -575,6 +578,44 @@ function OdontologiaPage() {
                         ))}
                       </ul>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/*
+                A tabela de valores fica aqui, ao lado do odontograma: o
+                dentista fecha o plano de tratamento e confere o orçamento do
+                mesmo paciente sem trocar de tela. A tela "Orçamentos de
+                Odonto" continua existindo para a visão da clínica inteira.
+              */}
+              <TabsContent value="orcamentos">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                    <CardTitle className="text-base">
+                      Orçamentos de {pacienteSel?.nome ?? "paciente"}
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      onClick={() => setNovoOrcOpen(true)}
+                      disabled={!podeEscrever || !especialidadeOdontoId || !clinicaAtual}
+                      title={
+                        !especialidadeOdontoId
+                          ? "Especialidade Odontologia não encontrada"
+                          : undefined
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Novo orçamento
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <OrcamentoTab
+                      pacienteId={pacienteId}
+                      pacienteNome={pacienteSel?.nome ?? null}
+                      pacienteTelefone={pacienteSel?.telefone ?? null}
+                      especialidadeOdontoId={especialidadeOdontoId}
+                      novoOpen={novoOrcOpen}
+                      onNovoOpenChange={setNovoOrcOpen}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>

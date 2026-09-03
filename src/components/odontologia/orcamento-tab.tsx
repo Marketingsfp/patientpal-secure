@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Printer, Pencil, Trash2 } from "lucide-react";
+import { Printer, Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
+import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
+import { exportarTabelaDocx, type ColunaDocx } from "@/lib/exportar-docx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -276,8 +278,127 @@ export function OrcamentoTab({
     void load();
   };
 
+  // --- Exportação da tabela -------------------------------------------------
+  // Sai exatamente o que está na tela: mesmas colunas, mesma ordem e o mesmo
+  // filtro de paciente. Se o dentista está olhando um paciente, o arquivo é
+  // daquele paciente; sem filtro, é a lista da clínica.
+  const contextoDaExportacao = () => {
+    const linhas = [`Clínica: ${clinicaAtual?.clinica.nome ?? "—"}`];
+    if (pacienteId) linhas.push(`Paciente: ${pacienteNome ?? list[0]?.paciente_nome ?? "—"}`);
+    else linhas.push("Paciente: todos (lista da clínica)");
+    linhas.push(`${list.length} orçamento(s) · emitido em ${new Date().toLocaleString("pt-BR")}`);
+    return linhas;
+  };
+
+  const nomeDoArquivo = () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const alvo = (pacienteId ? (pacienteNome ?? "paciente") : "clinica")
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase()
+      .slice(0, 40);
+    return `orcamentos-odonto-${alvo}-${hoje}`;
+  };
+
+  const totalDinheiro = list.reduce((s, o) => s + Number(o.total_dinheiro || 0), 0);
+  const totalCartao = list.reduce((s, o) => s + Number(o.total_cartao || 0), 0);
+
+  const baixarExcel = () => {
+    if (list.length === 0) {
+      toast.error("Não há orçamento nesta lista para exportar.");
+      return;
+    }
+    const colunas: ColunaXlsx[] = [
+      { rotulo: "Nº", tipo: "texto", largura: 16 },
+      { rotulo: "Data / hora", tipo: "texto", largura: 18 },
+      { rotulo: "Paciente", tipo: "texto" },
+      { rotulo: "Dentista", tipo: "texto" },
+      { rotulo: "Itens", tipo: "numero", largura: 8 },
+      { rotulo: "Total dinheiro", tipo: "moeda", largura: 16 },
+      { rotulo: "Total cartão/Pix", tipo: "moeda", largura: 16 },
+      { rotulo: "Pagos", tipo: "texto", largura: 10 },
+    ];
+    void exportarRelatorioXlsx({
+      arquivo: nomeDoArquivo(),
+      aba: "Orçamentos Odonto",
+      cabecalho: ["Orçamentos de Odontologia", ...contextoDaExportacao()],
+      colunas,
+      // Valor vai como número puro: é o que deixa o Excel somar a coluna.
+      linhas: list.map((o) => [
+        formatNumeroOrcamento(o.serie, o.numero),
+        dataHora(o.created_at),
+        o.paciente_nome ?? "—",
+        o.medico_nome ?? "—",
+        o.itens_qtd,
+        Number(o.total_dinheiro || 0),
+        Number(o.total_cartao || 0),
+        `${o.itens_pagos}/${o.itens_qtd}`,
+      ]),
+      totais: ["TOTAL", "", "", "", null, totalDinheiro, totalCartao, ""],
+    }).catch((e) => toast.error((e as Error).message));
+  };
+
+  const baixarWord = () => {
+    if (list.length === 0) {
+      toast.error("Não há orçamento nesta lista para exportar.");
+      return;
+    }
+    const colunas: ColunaDocx[] = [
+      { rotulo: "Nº", peso: 1.3 },
+      { rotulo: "Data / hora", peso: 1.5 },
+      { rotulo: "Paciente", peso: 3 },
+      { rotulo: "Dentista", peso: 2.4 },
+      { rotulo: "Itens", alinhamento: "centro", peso: 0.7 },
+      { rotulo: "Total dinheiro", alinhamento: "direita", peso: 1.4 },
+      { rotulo: "Total cartão/Pix", alinhamento: "direita", peso: 1.5 },
+      { rotulo: "Pagos", alinhamento: "centro", peso: 0.8 },
+    ];
+    try {
+      exportarTabelaDocx({
+        arquivo: nomeDoArquivo(),
+        titulo: "Orçamentos de Odontologia",
+        contexto: contextoDaExportacao(),
+        colunas,
+        // No Word o valor já vai formatado em reais: a folha é para imprimir
+        // e assinar, não para recalcular.
+        linhas: list.map((o) => [
+          formatNumeroOrcamento(o.serie, o.numero),
+          dataHora(o.created_at),
+          o.paciente_nome ?? "—",
+          o.medico_nome ?? "—",
+          String(o.itens_qtd),
+          BRL(o.total_dinheiro),
+          BRL(o.total_cartao),
+          `${o.itens_pagos}/${o.itens_qtd}`,
+        ]),
+        totais: ["TOTAL", "", "", "", "", BRL(totalDinheiro), BRL(totalCartao), ""],
+        orientacao: "paisagem",
+      });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {!loading && list.length > 0 && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-xs text-muted-foreground">
+            {list.length} orçamento(s) · dinheiro {BRL(totalDinheiro)} · cartão/Pix{" "}
+            {BRL(totalCartao)}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={baixarExcel}>
+              <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel (.xlsx)
+            </Button>
+            <Button size="sm" variant="outline" onClick={baixarWord}>
+              <FileText className="h-4 w-4 mr-1" /> Word (.docx)
+            </Button>
+          </div>
+        </div>
+      )}
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando…</p>
       ) : list.length === 0 ? (
