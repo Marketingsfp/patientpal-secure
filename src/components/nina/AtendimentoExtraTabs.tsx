@@ -373,7 +373,6 @@ export function AtendInbox() {
       await transferirFn({
         data: { clinicaId, conversaId: sel.id, userId: userId || null, departamentoId, motivo },
       });
-      toast.success("Conversa transferida");
       setTransferOpen(false);
       await carregarConvs();
       await carregarConversa();
@@ -395,7 +394,6 @@ export function AtendInbox() {
           resumo: String(fd.get("resumo") || "") || undefined,
         },
       });
-      toast.success("Conversa encerrada");
       setFecharOpen(false);
       await carregarConvs();
       await carregarConversa();
@@ -630,7 +628,6 @@ export function AtendInbox() {
                               data: { clinicaId, conversaId: sel.id },
                             });
                             if (r?.ok) {
-                              toast.success("Conversa assumida — a Nina parou de responder.");
                               setSel({ ...sel, atribuida_user_id: "me", owner_type: "HUMAN", status: "active" });
                             } else {
                               toast.warning("Outro atendente assumiu primeiro.");
@@ -652,7 +649,6 @@ export function AtendInbox() {
                           if (!clinicaId) return;
                           try {
                             await devolverFn({ data: { clinicaId, conversaId: sel.id } });
-                            toast.success("Conversa devolvida para a Nina.");
                             setSel({ ...sel, atribuida_user_id: null, owner_type: "AI", status: "bot_attending" });
                             await carregarConvs();
                           } catch (e: any) {
