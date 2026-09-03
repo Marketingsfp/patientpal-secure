@@ -144,7 +144,10 @@ export type Database = {
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
           sem_faturamento: boolean
+          sem_faturamento_autorizado_por: string | null
+          sem_faturamento_autorizado_por_nome: string | null
           sem_faturamento_em: string | null
+          sem_faturamento_motivo: string | null
           sem_faturamento_por: string | null
           sem_faturamento_por_nome: string | null
           sinalizado_em: string | null
@@ -201,7 +204,10 @@ export type Database = {
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           sem_faturamento?: boolean
+          sem_faturamento_autorizado_por?: string | null
+          sem_faturamento_autorizado_por_nome?: string | null
           sem_faturamento_em?: string | null
+          sem_faturamento_motivo?: string | null
           sem_faturamento_por?: string | null
           sem_faturamento_por_nome?: string | null
           sinalizado_em?: string | null
@@ -258,7 +264,10 @@ export type Database = {
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
           sem_faturamento?: boolean
+          sem_faturamento_autorizado_por?: string | null
+          sem_faturamento_autorizado_por_nome?: string | null
           sem_faturamento_em?: string | null
+          sem_faturamento_motivo?: string | null
           sem_faturamento_por?: string | null
           sem_faturamento_por_nome?: string | null
           sinalizado_em?: string | null
