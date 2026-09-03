@@ -677,7 +677,9 @@ const zIdentificar = z.object({
   data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 const zAgendar = z.object({
-  medico_id: z.string().uuid(),
+  // Aceita id ou nome; a resolução acontece no executor (mesma regra das
+  // ferramentas de consulta). A gravação continua exigindo um id real.
+  medico_id: z.string().trim().min(2).max(160),
   inicio: z.string().min(10),
   fim: z.string().min(10),
   procedimento: z.string().trim().min(2).max(200),
