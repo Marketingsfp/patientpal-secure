@@ -1040,6 +1040,12 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     }
   }
 
+  // Persiste o estado estruturado: o que as ferramentas descobriram nesta
+  // rodada (paciente identificado, horário oferecido, agendamento criado)
+  // vale para as próximas mensagens da MESMA conversa.
+  await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+
+
   if (!resposta && houveHandoff) {
     resposta =
       "Certo! Já chamei uma atendente da nossa equipe para continuar com você por aqui 💛";
