@@ -158,6 +158,37 @@ export function ConsoleTesteNina() {
     [clinicaId, historico, ferramentasFn],
   );
 
+  /**
+   * Rede de segurança: a resposta da Nina é gravada no banco pelo servidor,
+   * mesmo que a chamada do navegador caia (recarregar a página, HMR, rede).
+   * Depois de enviar, buscamos o histórico algumas vezes até a resposta
+   * aparecer — assim nenhuma mensagem "some" da tela.
+   */
+  const aguardarResposta = useCallback(
+    async (id: string, tentativas = 8) => {
+      if (!clinicaId) return false;
+      for (let i = 0; i < tentativas; i++) {
+        try {
+          const r = (await historico({ data: { clinicaId, leadId: id } })) as {
+            mensagens: Msg[];
+            eventos?: ConversaEvento[];
+            conversaId: string | null;
+          };
+          setMsgs(r.mensagens);
+          setEventosConversa(r.eventos ?? []);
+          setConversaId(r.conversaId);
+          const ultima = r.mensagens[r.mensagens.length - 1];
+          if (ultima && ultima.direction === "out") return true;
+        } catch {
+          /* tenta de novo */
+        }
+        await new Promise((res) => setTimeout(res, 2500));
+      }
+      return false;
+    },
+    [clinicaId, historico],
+  );
+
   useEffect(() => {
     if (leadId) void carregarHistorico(leadId);
     else {
@@ -196,7 +227,12 @@ export function ConsoleTesteNina() {
       if (r.erro) setErro(r.erro);
       else if (!r.reply) setErro("A Nina não retornou resposta para esta mensagem.");
     } catch (e: any) {
-      setErro(String(e?.message ?? e));
+      // A chamada do navegador caiu, mas o servidor pode ter concluído e
+      // gravado a resposta: buscamos até ela aparecer antes de acusar erro.
+      const chegou = await aguardarResposta(leadId);
+      setTexto("");
+      await carregarLeads();
+      if (!chegou) setErro(String(e?.message ?? e));
     } finally {
       setProcessando(false);
     }
