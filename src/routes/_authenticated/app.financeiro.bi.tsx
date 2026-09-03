@@ -49,6 +49,23 @@ const MESES_NO_GRAFICO = 12;
 type RespostaRpc = { data: unknown[] | null; error: { code?: string; message?: string } | null };
 
 /**
+ * Chama uma função do banco.
+ *
+ * `supabase.rpc` NÃO pode ser guardada numa variável e chamada solta: por
+ * dentro ela usa `this.rest`, então uma referência desgarrada estoura em
+ * "undefined is not an object (evaluating 'this.rest')" antes de a consulta
+ * sair do navegador. Foi exatamente isso que deixou o gráfico de atendimentos
+ * preso em "Carregando..." para sempre: a chamada nunca chegava ao banco, e
+ * o erro morria numa promessa que ninguém pegava.
+ */
+const chamarRpc = (fn: string, args: Record<string, unknown>): Promise<RespostaRpc> =>
+  (supabase.rpc as unknown as (f: string, a: Record<string, unknown>) => Promise<RespostaRpc>).call(
+    supabase,
+    fn,
+    args,
+  );
+
+/**
  * Busca a matriz de atendimentos.
  *
  * A versão da função no banco que aceita janela de datas (_ini/_fim) é
@@ -58,23 +75,72 @@ type RespostaRpc = { data: unknown[] | null; error: { code?: string; message?: s
  * zerado. Enquanto o SQL novo não estiver aplicado, cai na função antiga, para
  * a tela não quebrar dependendo da ordem entre aplicar o SQL e publicar.
  */
-async function buscarMatriz(clinica: string, janela?: { from: string; to: string }) {
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<RespostaRpc>;
+async function buscarMatriz(
+  clinica: string,
+  janela?: { from: string; to: string },
+): Promise<RespostaRpc> {
   if (janela) {
-    const r = await rpc("fin_atendimentos_matriz", {
-      _clinica: clinica,
-      _ini: janela.from,
-      _fim: janela.to,
-    });
+    const r = await comLimite(
+      chamarRpc("fin_atendimentos_matriz", {
+        _clinica: clinica,
+        _ini: janela.from,
+        _fim: janela.to,
+      }),
+      LIMITE_JANELA_MS,
+    );
     const semAssinatura =
       r.error?.code === "PGRST202" ||
       /could not find the function|does not exist/i.test(r.error?.message ?? "");
     if (!r.error || !semAssinatura) return r;
   }
-  return rpc("fin_atendimentos_matriz", { _clinica: clinica });
+  return comLimite(
+    chamarRpc("fin_atendimentos_matriz", { _clinica: clinica }),
+    LIMITE_HISTORICO_MS,
+  );
+}
+
+/**
+ * Quanto a tela espera antes de desistir e oferecer "tentar de novo".
+ *
+ * Os dois números vêm do que foi medido no banco em 03/09/2026: a janela de
+ * 12 meses responde em 0,78 s e o histórico inteiro em cerca de 7 s. O limite
+ * é folgado o suficiente para uma internet ruim na clínica, e curto o
+ * suficiente para ninguém ficar olhando para um "Carregando..." que já morreu.
+ */
+const LIMITE_JANELA_MS = 12000;
+const LIMITE_HISTORICO_MS = 35000;
+
+/**
+ * Devolve sempre `{ data, error }`, nunca uma promessa que estoura ou que
+ * nunca termina.
+ *
+ * A primeira versão desta tela confiava em `supabase.rpc` sempre responder.
+ * Quando a requisição caía fora do formato esperado — conexão perdida no meio,
+ * sessão expirada, resposta que nunca chega —, o "Carregando..." ficava girando
+ * para sempre, sem erro e sem dados. Melhor dizer que falhou do que deixar a
+ * funcionária olhando para o gráfico esperando.
+ */
+async function comLimite(p: Promise<RespostaRpc>, limiteMs: number): Promise<RespostaRpc> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<RespostaRpc>((resolve) => {
+        timer = setTimeout(
+          () =>
+            resolve({
+              data: null,
+              error: { message: `o banco não respondeu em ${limiteMs / 1000} segundos` },
+            }),
+          limiteMs,
+        );
+      }),
+    ]);
+  } catch (e) {
+    return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function Page() {
@@ -128,15 +194,17 @@ function Page() {
       }
       setAtendCarregando(true);
       setAtendErro(null);
-      const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id, janela);
-      if (error) {
-        setAtend12([]);
-        setAtendErro(error.message ?? "Falha ao consultar o banco.");
+      try {
+        const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id, janela);
+        if (error) {
+          setAtend12([]);
+          setAtendErro(error.message ?? "Falha ao consultar o banco.");
+          return;
+        }
+        setAtend12(serieAtendimentos(rows as LinhaMatriz[] | null, MESES_NO_GRAFICO));
+      } finally {
         setAtendCarregando(false);
-        return;
       }
-      setAtend12(serieAtendimentos(rows as LinhaMatriz[] | null, MESES_NO_GRAFICO));
-      setAtendCarregando(false);
     })();
   }, [clinicaAtual?.clinica_id, janela, atendTentativa]);
 
@@ -147,10 +215,13 @@ function Page() {
     (async () => {
       setMatrizCarregando(true);
       setMatrizErro(null);
-      const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id);
-      if (error) setMatrizErro(error.message ?? "Falha ao consultar o banco.");
-      else setAtendMatriz(matrizAtendimentos(rows as LinhaMatriz[] | null));
-      setMatrizCarregando(false);
+      try {
+        const { data: rows, error } = await buscarMatriz(clinicaAtual.clinica_id);
+        if (error) setMatrizErro(error.message ?? "Falha ao consultar o banco.");
+        else setAtendMatriz(matrizAtendimentos(rows as LinhaMatriz[] | null));
+      } finally {
+        setMatrizCarregando(false);
+      }
     })();
   }, [atendDrill, clinicaAtual?.clinica_id, atendMatriz, matrizCarregando]);
 
@@ -299,7 +370,10 @@ function Page() {
               formatY={(n) => String(Math.round(n))}
             />
           )}
-          <p className="text-[12px] text-muted-foreground mt-2" hidden={!!atendErro}>
+          <p
+            className="text-[12px] text-muted-foreground mt-2"
+            hidden={!!atendErro || atendCarregando}
+          >
             Total no período exibido:{" "}
             <b>{atend12.reduce((s, r) => s + r.cartao + r.particular + r.exames, 0)}</b>{" "}
             atendimentos (cartão: {atend12.reduce((s, r) => s + r.cartao, 0)}, particular:{" "}
