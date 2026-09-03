@@ -58,11 +58,23 @@ export type CtxNinaPaciente = {
   pacienteId: string | null;
   pacienteNome: string | null;
   conversaId: string | null;
-  /** Origem do disparo — só para auditoria. */
-  origem: "whatsapp" | "chat_interno";
+  /** Origem do disparo — auditoria e marcação do agendamento. */
+  origem: "whatsapp" | "chat_interno" | "homologacao";
   /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
   podeAgendar?: boolean;
+  /**
+   * Conversa do console de Homologação. Tudo que for gravado nasce marcado
+   * como teste (`is_mock_data`), com o nome prefixado por [TESTE NINA] e
+   * removível ao resolver a sessão.
+   */
+  teste?: boolean;
 };
+
+/** Marca gravada em `agendamentos.origem_integracao`. */
+export function origemAgendamentoNina(ctx: CtxNinaPaciente): string {
+  if (ctx.teste || ctx.origem === "homologacao") return "nina_homologacao";
+  return ctx.origem === "whatsapp" ? "nina_whatsapp" : "nina_chat_interno";
+}
 
 /* ------------------------------------------------------------------ auditoria */
 
@@ -90,6 +102,7 @@ async function auditar(
       dados_depois: {
         source: "nina_ai",
         origem: ctx.origem,
+        teste: ctx.teste === true,
         conversa_id: ctx.conversaId,
         paciente_id: ctx.pacienteId,
         ferramenta,
@@ -591,7 +604,34 @@ const zAgendar = z.object({
 
 /* ------------------------------------------------------------------ executor */
 
+/**
+ * Executor público. Toda chamada — inclusive as que já auditam por dentro —
+ * passa por aqui, e o painel de Homologação lê exatamente esse rastro
+ * (`audit_log`, ação `NINA_TOOL`) para mostrar "qual ferramenta a Nina usou,
+ * com quais parâmetros e o que o backend respondeu".
+ */
 export async function executarFerramentaPaciente(
+  ctx: CtxNinaPaciente,
+  nome: string,
+  argsRaw: unknown,
+): Promise<ResultadoFerramenta> {
+  const inicio = Date.now();
+  const resultado = await executarFerramentaInterna(ctx, nome, argsRaw);
+  void auditar(
+    ctx,
+    "tool",
+    {
+      ferramenta: nome,
+      argumentos: argsRaw ?? null,
+      ms: Date.now() - inicio,
+      resposta: JSON.parse(JSON.stringify(resultado)),
+    },
+    { ok: resultado.ok, erro: resultado.ok ? undefined : resultado.erro },
+  );
+  return resultado;
+}
+
+async function executarFerramentaInterna(
   ctx: CtxNinaPaciente,
   nome: string,
   argsRaw: unknown,
@@ -1046,6 +1086,12 @@ export async function executarFerramentaPaciente(
             "Preciso identificar o paciente antes de marcar (CPF, nome completo e data de nascimento).",
           );
 
+        const origemMarca = origemAgendamentoNina(ctx);
+        const ehTeste = origemMarca === "nina_homologacao";
+        // Chave de idempotência: mesma conversa + mesmo profissional + mesmo
+        // horário nunca gera dois registros (índice único no banco).
+        const idExterno = `${ctx.conversaId ?? ctx.telefone ?? "sem-conversa"}|${p.medico_id}|${p.inicio}`;
+
         // --- Idempotência: mesma intenção, mesmo horário, um único registro.
         const { data: jaExiste } = await supabaseAdmin
           .from("agendamentos")
@@ -1084,7 +1130,7 @@ export async function executarFerramentaPaciente(
               tipo: "integracao",
               api_key_id: "nina-ai",
               clinica_id: ctx.clinicaId,
-              origem_integracao: "nina_ai",
+              origem_integracao: origemMarca,
             },
           },
           {
@@ -1092,14 +1138,23 @@ export async function executarFerramentaPaciente(
             editing_id: null,
             payload: {
               clinica_id: ctx.clinicaId,
-              paciente_nome: ctx.pacienteNome,
+              // Agendamento de homologação fica visível na agenda com marca
+              // clara — a recepção nunca confunde com paciente real.
+              paciente_nome: ehTeste ? `[TESTE NINA] ${ctx.pacienteNome}` : ctx.pacienteNome,
               paciente_id: ctx.pacienteId,
               medico_id: p.medico_id,
               inicio: p.inicio,
               fim: p.fim,
               procedimento: p.procedimento,
               status: "agendado",
-              observacoes: [`Agendado pela Nina (WhatsApp)`, p.observacoes]
+              observacoes: [
+                ehTeste
+                  ? "TESTE — agendado pela Nina (Homologação)"
+                  : ctx.origem === "whatsapp"
+                    ? "Agendado pela Nina (WhatsApp)"
+                    : "Agendado pela Nina (chat interno)",
+                p.observacoes,
+              ]
                 .filter(Boolean)
                 .join(" — "),
               data_pagamento: null,
@@ -1117,6 +1172,7 @@ export async function executarFerramentaPaciente(
             // profissional já entra confirmado (choque com o mesmo
             // profissional continua bloqueado).
             confirmacoes: { permitir_conflito_paciente: true },
+            integracao_marca: { origem_integracao: origemMarca, id_externo: idExterno },
           },
         );
 
@@ -1131,9 +1187,20 @@ export async function executarFerramentaPaciente(
           return falha(slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR", msg);
         }
 
+        if (ehTeste) {
+          // Marca de dado de teste: usada pelos filtros/limpeza da homologação.
+          await supabaseAdmin
+            .from("agendamentos")
+            .update({ is_mock_data: true } as never)
+            .eq("id", r.id)
+            .eq("clinica_id", ctx.clinicaId);
+        }
+
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
         return {
           ok: true,
+          agendamento_id: r.id,
+          teste: ehTeste,
           agendamento: {
             data: formatarData(p.inicio),
             hora: formatarHora(p.inicio),

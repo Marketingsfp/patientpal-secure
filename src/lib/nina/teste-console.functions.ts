@@ -287,7 +287,9 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
     try {
       if (textoPaciente) {
         const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
-        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao);
+        reply = await gerarRespostaNina(data.clinicaId, textoPaciente, lead.telefone_sessao, {
+          teste: true,
+        });
       } else if (audioFalhou) {
         reply = RESPOSTA_AUDIO_FALHOU;
       } else {
@@ -401,6 +403,48 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
   });
 
 
+/**
+ * Painel técnico da homologação: quais ferramentas a Nina chamou nesta
+ * conversa, com argumentos e resposta do backend. Lê o rastro do `audit_log`
+ * (ação NINA_TOOL) — nada de novo é gravado só para o painel.
+ */
+export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: linhas } = await supabaseAdmin
+      .from("audit_log")
+      .select("id, created_at, dados_depois")
+      .eq("clinica_id", data.clinicaId)
+      .eq("action", "NINA_TOOL")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    const eventos = ((linhas ?? []) as any[])
+      .filter((l) => l?.dados_depois?.conversa_id === data.conversaId)
+      .map((l) => {
+        const d = l.dados_depois ?? {};
+        const entrada = d.entrada ?? {};
+        return {
+          id: l.id as string,
+          em: l.created_at as string,
+          ferramenta: String(entrada.ferramenta ?? d.ferramenta ?? "?"),
+          argumentos: entrada.argumentos ?? null,
+          ms: Number(entrada.ms ?? 0),
+          ok: Boolean(d.ok),
+          erro: (d.erro as string | null) ?? null,
+          resposta: entrada.resposta ?? null,
+        };
+      })
+      .reverse();
+
+    return { eventos };
+  });
+
 export const resolverConversaTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -409,6 +453,8 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         leadId: z.string().uuid(),
         conversaId: z.string().uuid(),
+        /** Remove da agenda os agendamentos criados nesta sessão de teste. */
+        removerAgendamentos: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -447,6 +493,28 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       texto: `✅ Conversa de teste encerrada (sessão ${lead.sessao_seq}). A memória da Nina foi resetada — a próxima mensagem começa do zero.`,
     }).catch(() => {});
 
+    // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
+    // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
+    let agendamentosRemovidos = 0;
+    if (data.removerAgendamentos) {
+      const { data: apagados } = await supabaseAdmin
+        .from("agendamentos")
+        .delete()
+        .eq("clinica_id", data.clinicaId)
+        .eq("origem_integracao", "nina_homologacao")
+        .eq("is_mock_data", true)
+        .like("id_externo", `${data.conversaId}|%`)
+        .select("id");
+      agendamentosRemovidos = (apagados ?? []).length;
+      if (agendamentosRemovidos > 0) {
+        await registrarMarcadorSistema({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          texto: `🧹 ${agendamentosRemovidos} agendamento(s) de teste removido(s) da agenda.`,
+        }).catch(() => {});
+      }
+    }
+
     // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
@@ -461,5 +529,5 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       })
       .eq("id", lead.id);
 
-    return { ok: true, jaResolvida: false, sessao: proxima };
+    return { ok: true, jaResolvida: false, sessao: proxima, agendamentosRemovidos };
   });

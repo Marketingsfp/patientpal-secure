@@ -478,6 +478,8 @@ export async function gerarRespostaNina(
   clinicaId: string,
   mensagemPaciente: string,
   telefoneRemetente?: string | null,
+  /** Console de Homologação: mesma IA, mas tudo que grava nasce como teste. */
+  opcoes?: { teste?: boolean },
 ): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
@@ -896,8 +898,9 @@ ${procs || "(nenhum)"}`;
       pacienteId: telefoneNorm && pacienteInfo?.id ? String(pacienteInfo.id) : null,
       pacienteNome: telefoneNorm && pacienteInfo?.nome ? String(pacienteInfo.nome) : null,
       conversaId: estadoId.conversaId,
-      origem: "whatsapp",
+      origem: opcoes?.teste ? "homologacao" : "whatsapp",
       podeAgendar,
+      teste: opcoes?.teste === true,
     };
   }
 

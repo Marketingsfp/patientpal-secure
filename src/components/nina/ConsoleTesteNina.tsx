@@ -10,6 +10,7 @@ import {
   historicoLeadTeste,
   enviarMensagemTeste,
   resolverConversaTeste,
+  ferramentasUsadasTeste,
 } from "@/lib/nina/teste-console.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,18 @@ type Msg = {
   created_at: string;
 };
 
+/** Rastro técnico de uma chamada de ferramenta feita pela Nina no teste. */
+type EventoFerramenta = {
+  id: string;
+  em: string;
+  ferramenta: string;
+  argumentos: unknown;
+  ms: number;
+  ok: boolean;
+  erro: string | null;
+  resposta: unknown;
+};
+
 export function ConsoleTesteNina() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
@@ -52,6 +65,7 @@ export function ConsoleTesteNina() {
   const historico = useServerFn(historicoLeadTeste);
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
+  const ferramentasFn = useServerFn(ferramentasUsadasTeste);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
@@ -65,6 +79,9 @@ export function ConsoleTesteNina() {
   const [tipo, setTipo] = useState<"text" | "audio" | "image" | "document" | "sticker">("text");
   const [audio, setAudio] = useState<string | null>(null);
   const fimRef = useRef<HTMLDivElement | null>(null);
+  // Homologação: limpar da agenda o que a Nina marcou nesta sessão.
+  const [limparAgenda, setLimparAgenda] = useState(true);
+  const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
 
   const carregarLeads = useCallback(async () => {
     if (!clinicaId) return;
@@ -94,11 +111,19 @@ export function ConsoleTesteNina() {
         };
         setMsgs(r.mensagens);
         setConversaId(r.conversaId);
+        if (r.conversaId) {
+          const f = (await ferramentasFn({
+            data: { clinicaId, conversaId: r.conversaId },
+          })) as { eventos: EventoFerramenta[] };
+          setFerramentas(f.eventos);
+        } else {
+          setFerramentas([]);
+        }
       } catch (e: any) {
         mostrarErro(e);
       }
     },
-    [clinicaId, historico],
+    [clinicaId, historico, ferramentasFn],
   );
 
   useEffect(() => {
@@ -246,14 +271,22 @@ export function ConsoleTesteNina() {
     if (!clinicaId || !leadId || !conversaId) return;
     setProcessando(true);
     try {
-      await resolver({ data: { clinicaId, leadId, conversaId } });
+      const r = (await resolver({
+        data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
+      })) as { agendamentosRemovidos?: number };
       setConversaId(null);
       setErro(null);
       setAudio(null);
+      setFerramentas([]);
       // O histórico permanece na tela: só entra o marcador de encerramento.
       await carregarHistorico(leadId);
       await carregarLeads();
-      toast.success("Conversa encerrada. A memória da Nina foi resetada.");
+      const n = r?.agendamentosRemovidos ?? 0;
+      toast.success(
+        n > 0
+          ? `Conversa encerrada, memória resetada e ${n} agendamento(s) de teste removido(s).`
+          : "Conversa encerrada. A memória da Nina foi resetada.",
+      );
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -334,6 +367,15 @@ export function ConsoleTesteNina() {
                 <Download className="h-4 w-4" />
                 Baixar PDF
               </Button>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-current"
+                  checked={limparAgenda}
+                  onChange={(e) => setLimparAgenda(e.target.checked)}
+                />
+                Remover agendamentos deste teste ao finalizar
+              </label>
               <Button
                 variant="outline"
                 size="sm"
@@ -345,6 +387,27 @@ export function ConsoleTesteNina() {
               </Button>
               </div>
             </div>
+
+            {ferramentas.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Ferramentas usadas pela Nina (visível só aqui)
+                </p>
+                <div className="max-h-40 space-y-1 overflow-y-auto">
+                  {ferramentas.map((f) => (
+                    <div key={f.id} className="font-mono text-[11px] leading-tight">
+                      <span className={f.ok ? "text-emerald-600" : "text-destructive"}>
+                        {f.ok ? "✔" : "✖"}
+                      </span>{" "}
+                      <span className="font-semibold">{f.ferramenta}</span>{" "}
+                      <span className="text-muted-foreground">
+                        {JSON.stringify(f.argumentos)} → {f.erro ?? "OK"} ({f.ms}ms)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
 
             <ScrollArea className="h-[450px] flex-1 rounded-lg border p-4 md:h-[520px]">
