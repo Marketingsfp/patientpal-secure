@@ -960,7 +960,7 @@ ${procs || "(nenhum)"}`;
   // nascimento -> identificar -> revalidar -> gravar -> confirmar. A ordem é
   // decidida aqui, em código, antes de qualquer chamada ao modelo.
   // ---------------------------------------------------------------------
-  if (podeAgendar && ctxFerramentas && executar) {
+  if (podeAgendar && ctxFerramentas && executar !== null) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
     const respostaGate = await aplicarGateIdentificacao({
       mensagem: mensagemPaciente,
