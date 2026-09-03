@@ -493,6 +493,28 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       texto: `✅ Conversa de teste encerrada (sessão ${lead.sessao_seq}). A memória da Nina foi resetada — a próxima mensagem começa do zero.`,
     }).catch(() => {});
 
+    // Limpeza opcional: apaga da agenda o que a Nina marcou nesta sessão de
+    // teste. Só alcança registros de homologação (is_mock_data) desta conversa.
+    let agendamentosRemovidos = 0;
+    if (data.removerAgendamentos) {
+      const { data: apagados } = await supabaseAdmin
+        .from("agendamentos")
+        .delete()
+        .eq("clinica_id", data.clinicaId)
+        .eq("origem_integracao", "nina_homologacao")
+        .eq("is_mock_data", true)
+        .like("id_externo", `${data.conversaId}|%`)
+        .select("id");
+      agendamentosRemovidos = (apagados ?? []).length;
+      if (agendamentosRemovidos > 0) {
+        await registrarMarcadorSistema({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          texto: `🧹 ${agendamentosRemovidos} agendamento(s) de teste removido(s) da agenda.`,
+        }).catch(() => {});
+      }
+    }
+
     // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico
     // arquivado (que fica só para auditoria).
     const proxima = lead.sessao_seq + 1;
@@ -507,5 +529,5 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       })
       .eq("id", lead.id);
 
-    return { ok: true, jaResolvida: false, sessao: proxima };
+    return { ok: true, jaResolvida: false, sessao: proxima, agendamentosRemovidos };
   });
