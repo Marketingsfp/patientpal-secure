@@ -114,9 +114,11 @@ export function ConsoleTesteNina() {
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
+          eventos?: ConversaEvento[];
           conversaId: string | null;
         };
         setMsgs(r.mensagens);
+        setEventosConversa(r.eventos ?? []);
         setConversaId(r.conversaId);
         if (r.conversaId) {
           const f = (await ferramentasFn({
