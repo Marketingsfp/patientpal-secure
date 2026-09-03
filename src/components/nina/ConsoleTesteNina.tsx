@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Bot, CheckCheck, Download, FlaskConical, Loader2, RefreshCw, Send, User } from "lucide-react";
 import { toast } from "sonner";
