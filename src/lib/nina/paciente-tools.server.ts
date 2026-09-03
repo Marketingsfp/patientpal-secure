@@ -512,10 +512,13 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         type: "object",
         properties: {
           especialidade: { type: "string" },
-          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           data: { type: "string", description: "AAAA-MM-DD, quando o paciente pediu um dia" },
           periodo: { type: "string", description: "manha, tarde ou noite" },
-          dias: { type: "number", description: "Janela de busca em dias (padrão 14)" },
+          dias: { type: "number", description: "Janela de busca em dias (padrão 14, máx 60)" },
         },
       },
     },
@@ -529,7 +532,10 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       parameters: {
         type: "object",
         properties: {
-          medico_id: { type: "string", description: "Id devolvido por buscar_medicos" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
           hora: { type: "string", description: "HH:MM, ex.: 15:00" },
         },
@@ -542,14 +548,23 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use em 'qual o próximo horário?' ou quando o dia pedido estiver cheio.",
+        "Primeira vaga REAL disponível, em ordem cronológica, para um médico ou especialidade. Use SEMPRE que o paciente disser 'a próxima disponível', 'o próximo horário', 'a primeira vaga', 'a quinta-feira mais próxima', 'qualquer horário' — não peça uma data específica antes de chamar.",
       parameters: {
         type: "object",
         properties: {
-          medico_id: { type: "string" },
+          medico_id: {
+            type: "string",
+            description: "Id devolvido por buscar_medicos OU o nome do profissional",
+          },
           especialidade: { type: "string" },
           a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
           periodo: { type: "string", description: "manha, tarde ou noite" },
+          dia_semana: {
+            type: "number",
+            description:
+              "Filtra por dia da semana: 0=domingo, 1=segunda ... 4=quinta, 6=sábado. Use em 'a próxima quinta-feira'.",
+          },
+          dias: { type: "number", description: "Janela de busca em dias (padrão 60)" },
         },
       },
     },
