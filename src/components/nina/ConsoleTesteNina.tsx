@@ -285,22 +285,17 @@ export function ConsoleTesteNina() {
     if (!clinicaId || !leadId || !conversaId) return;
     setProcessando(true);
     try {
-      const r = (await resolver({
+      await resolver({
         data: { clinicaId, leadId, conversaId, removerAgendamentos: limparAgenda },
-      })) as { agendamentosRemovidos?: number };
+      });
       setConversaId(null);
       setErro(null);
       setAudio(null);
       setFerramentas([]);
-      // O histórico permanece na tela: só entra o marcador de encerramento.
+      // Sem popup: a confirmação aparece como evento dentro da própria
+      // conversa (resolvida por… / memória resetada). Toast só para erro.
       await carregarHistorico(leadId);
       await carregarLeads();
-      const n = r?.agendamentosRemovidos ?? 0;
-      toast.success(
-        n > 0
-          ? `Conversa encerrada, memória resetada e ${n} agendamento(s) de teste removido(s).`
-          : "Conversa encerrada. A memória da Nina foi resetada.",
-      );
     } catch (e: any) {
       mostrarErro(e);
     } finally {
