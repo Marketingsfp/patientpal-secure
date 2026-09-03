@@ -43,6 +43,18 @@ type Msg = {
   created_at: string;
 };
 
+/** Rastro técnico de uma chamada de ferramenta feita pela Nina no teste. */
+type EventoFerramenta = {
+  id: string;
+  em: string;
+  ferramenta: string;
+  argumentos: unknown;
+  ms: number;
+  ok: boolean;
+  erro: string | null;
+  resposta: unknown;
+};
+
 export function ConsoleTesteNina() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
