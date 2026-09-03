@@ -1212,7 +1212,21 @@ async function executarFerramentaInterna(
             { medico: medicoNome },
           );
         const primeira = slots[0]!;
+        mutarEstado(ctx, {
+          appointment: {
+            doctor_id: primeira.medico_id,
+            doctor_name: primeira.medico_nome,
+            specialty: primeira.especialidade ?? null,
+            date: primeira.data,
+            time: primeira.hora,
+            slot_inicio: primeira.inicio,
+            slot_fim: primeira.fim,
+            slot_confirmed_by_patient: false,
+          },
+          stage: "AWAITING_SLOT_CONFIRMATION",
+        });
         return {
+
           ok: true,
           proxima: {
             medico_id: primeira.medico_id,
