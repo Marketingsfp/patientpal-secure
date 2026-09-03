@@ -1187,9 +1187,20 @@ async function executarFerramentaInterna(
           return falha(slotOcupado ? "SLOT_UNAVAILABLE" : "VALIDATION_ERROR", msg);
         }
 
+        if (ehTeste) {
+          // Marca de dado de teste: usada pelos filtros/limpeza da homologação.
+          await supabaseAdmin
+            .from("agendamentos")
+            .update({ is_mock_data: true } as never)
+            .eq("id", r.id)
+            .eq("clinica_id", ctx.clinicaId);
+        }
+
         await auditar(ctx, "agendar", p, { ok: true, id: r.id });
         return {
           ok: true,
+          agendamento_id: r.id,
+          teste: ehTeste,
           agendamento: {
             data: formatarData(p.inicio),
             hora: formatarHora(p.inicio),
