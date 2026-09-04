@@ -170,6 +170,24 @@ export function AtendInbox() {
       return nv;
     });
   };
+  // Painel direito (Contato): mesmo comportamento de encolher/expandir/fixar.
+  const [contatoFixado, setContatoFixado] = useState(false);
+  const [contatoHover, setContatoHover] = useState(false);
+  const contatoAberto = contatoFixado || contatoHover;
+  useEffect(() => {
+    try {
+      setContatoFixado(localStorage.getItem("nina.contato.fixado") === "1");
+    } catch {}
+  }, []);
+  const alternarContatoFixado = () => {
+    setContatoFixado((v) => {
+      const nv = !v;
+      try {
+        localStorage.setItem("nina.contato.fixado", nv ? "1" : "0");
+      } catch {}
+      return nv;
+    });
+  };
 
 
   const carregarStatusAgente = useCallback(async () => {
