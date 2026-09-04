@@ -61,8 +61,26 @@ const PAGINA = 1000;
 /** Guarda contra loop infinito de paginação. */
 const MAX_PAGINAS = 100;
 
-export type RateioAgruparPor = "data" | "profissional" | "especialidade";
+export type RateioAgruparPor = "data" | "profissional" | "especialidade" | "servico" | "condicao";
 export type RateioTipo = "sintetico" | "analitico";
+
+/** Rótulo do atendimento sem serviço identificado (agenda gravou em branco). */
+export const SEM_SERVICO = "(SEM SERVIÇO)";
+
+/**
+ * Como cada forma de atendimento aparece na coluna Condição.
+ *
+ * "Consulta Cartão" não é um serviço do cadastro: é a CONSULTA atendida pela
+ * tabela do Cartão Benefícios. Por isso a condição é uma coluna à parte, e não
+ * um serviço duplicado — duplicar quebraria a Tabela de Valores e a grade de
+ * repasse, que casam pelo nome do serviço.
+ */
+const ROTULO_CONDICAO: Record<string, string> = {
+  particular: "PARTICULAR",
+  convenio: "CONVÊNIO",
+  cartao_consulta: "CARTÃO CONSULTA",
+  cartao_desconto: "CARTÃO DESCONTO",
+};
 
 /** Um atendimento já com a receita repartida entre prestador e clínica. */
 export interface RateioLinha {
@@ -74,6 +92,24 @@ export interface RateioLinha {
   especialidade_id: string | null;
   especialidade_nome: string;
   procedimento: string | null;
+  /**
+   * Serviço como está escrito no CADASTRO, sem o sufixo da especialidade.
+   *
+   * A agenda grava o serviço do atendimento como "CONSULTA (CARDIOLOGIA)",
+   * enquanto o cadastro tem só "CONSULTA". É por este campo — resolvido pelas
+   * mesmas variantes que a grade de repasse usa (ver `procVariants`) — que o
+   * relatório agrupa e discrimina cada serviço; usar o texto cru quebraria a
+   * mesma consulta em uma linha por especialidade.
+   */
+  servico_nome: string;
+  /**
+   * Condição do atendimento: PARTICULAR, CARTÃO CONSULTA, CARTÃO DESCONTO.
+   *
+   * É o que separa, no relatório, a "Consulta Cartão" da consulta particular.
+   * Não existe serviço "X Cartão" no cadastro: o Cartão é a tabela/convênio do
+   * paciente aplicada sobre o MESMO serviço.
+   */
+  condicao: string;
   /** Grupo de serviço do cadastro do procedimento (pode não existir). */
   grupo: string | null;
   /**
@@ -181,6 +217,14 @@ export interface RateioContexto {
   grupoPorServico: Map<string, string>;
   /** nome normalizado do serviço -> grupo como está escrito no cadastro. */
   rotuloGrupoPorServico: Map<string, string>;
+  /**
+   * nome normalizado do serviço -> nome como está escrito no cadastro.
+   *
+   * É o que devolve "CONSULTA" para o atendimento gravado como
+   * "CONSULTA (CARDIOLOGIA)", tanto no agrupamento por serviço quanto na
+   * coluna Serviço do analítico.
+   */
+  nomeServicoPorChave: Map<string, string>;
   /** nome normalizado do serviço -> tipo (fallback de repasse por categoria). */
   procTipos: Map<string, string>;
   /**
@@ -322,11 +366,13 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
   const grupoPorServico = new Map<string, string>();
   const rotuloGrupoPorServico = new Map<string, string>();
   const gruposMap = new Map<string, string>();
+  const nomeServicoPorChave = new Map<string, string>();
   const servicos: ServicoOpcao[] = [];
   const vistos = new Set<string>();
   for (const p of procedimentosRaw) {
     if (!p.nome) continue;
     const chave = normRepasse(p.nome);
+    if (!nomeServicoPorChave.has(chave)) nomeServicoPorChave.set(chave, String(p.nome));
     if (p.tipo && !procTipos.has(chave)) procTipos.set(chave, p.tipo);
     const g = chaveGrupo(p.grupo);
     if (g) {
@@ -352,6 +398,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     servicos,
     grupoPorServico,
     rotuloGrupoPorServico,
+    nomeServicoPorChave,
     procTipos,
     categorias: categorias.filter((c) => c.tipo === "receita"),
     categoriaNomePorId: mapaDeCategorias(categorias),
@@ -360,6 +407,28 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     convenioPorNomeCru,
     mapaConvenio,
   };
+}
+
+/**
+ * Chave do serviço no CADASTRO a partir do texto gravado no atendimento.
+ *
+ * A agenda grava "CONSULTA (CARDIOLOGIA)" e o cadastro tem "CONSULTA". Sem
+ * descascar o sufixo, o filtro de Serviço e o de Grupo do relatório não
+ * casavam com quase nada: em produção, 3.507 dos 4.544 atendimentos de agosto
+ * de 2026 estão gravados com o sufixo da especialidade, e nenhum desses nomes
+ * existe no cadastro. As variantes são as mesmas que a grade de repasse já
+ * usava (`procVariants`), então filtro e comissão passam a enxergar o mesmo
+ * serviço.
+ *
+ * Devolve `null` quando o atendimento não tem serviço ou quando nenhuma
+ * variante existe no cadastro.
+ */
+function chaveDoServico(ctx: RateioContexto, procNome: string | null): string | null {
+  if (!procNome) return null;
+  for (const alvo of procVariants(procNome)) {
+    if (ctx.nomeServicoPorChave.has(alvo)) return alvo;
+  }
+  return null;
 }
 
 /** Acha a linha da grade de repasse do serviço (ou da categoria dele). */
@@ -467,6 +536,8 @@ function reparte(
     pacienteId: params.pacienteId,
     mapa: ctx.mapaConvenio,
   });
+  const forma = formaDoAtendimento(params.descricao ?? null, modalidade);
+  const chaveServico = chaveDoServico(ctx, params.procedimento);
   const linha = params.medicoId
     ? linhaDoServico(ctx, params.medicoId, params.procedimento)
     : undefined;
@@ -475,7 +546,7 @@ function reparte(
         linha,
         med: ctx.repasseMedicos.get(params.medicoId) ?? null,
         base: params.valorPago,
-        forma: formaDoAtendimento(params.descricao ?? null, modalidade),
+        forma,
       })
     : { total: params.valorPago, repasse: 0, terceiro: null };
 
@@ -495,9 +566,13 @@ function reparte(
     especialidade_id: medico?.especialidade_id ?? null,
     especialidade_nome: "",
     procedimento: params.procedimento,
-    grupo: params.procedimento
-      ? (ctx.rotuloGrupoPorServico.get(normRepasse(params.procedimento)) ?? null)
-      : null,
+    servico_nome: chaveServico
+      ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
+      : // Serviço que não está (mais) no cadastro continua aparecendo com o
+        // texto que a agenda gravou; some do relatório seria pior.
+        params.procedimento?.trim() || SEM_SERVICO,
+    condicao: ROTULO_CONDICAO[forma] ?? "PARTICULAR",
+    grupo: chaveServico ? (ctx.rotuloGrupoPorServico.get(chaveServico) ?? null) : null,
     // Caixa alta porque é assim que a categoria é comparada e exibida em todo
     // o financeiro (ver `chaveCategoria`): o cadastro tem a mesma conta
     // escrita "Boletos" e "BOLETOS".
@@ -647,7 +722,9 @@ export function filtrarRateio(
     if (filtros.medicoId && l.medico_id !== filtros.medicoId) return false;
     if (filtros.especialidadeId && l.especialidade_id !== filtros.especialidadeId) return false;
     if (servicoAlvo || grupoAlvo) {
-      const chave = l.procedimento ? normRepasse(l.procedimento) : null;
+      // O serviço vem do cadastro (ver `chaveDoServico`): o atendimento gravado
+      // como "CONSULTA (CARDIOLOGIA)" tem que entrar no filtro "CONSULTA".
+      const chave = chaveDoServico(ctx, l.procedimento);
       // Atendimento sem serviço identificado não pertence a grupo nenhum.
       if (!chave) return false;
       if (servicoAlvo && chave !== servicoAlvo) return false;
@@ -682,13 +759,21 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
         ? l.data
         : agruparPor === "profissional"
           ? (l.medico_id ?? "sem-profissional")
-          : (l.especialidade_id ?? "sem-especialidade");
+          : agruparPor === "servico"
+            ? l.servico_nome
+            : agruparPor === "condicao"
+              ? l.condicao
+              : (l.especialidade_id ?? "sem-especialidade");
     const rotulo =
       agruparPor === "data"
         ? l.data
         : agruparPor === "profissional"
           ? l.medico_nome
-          : l.especialidade_nome;
+          : agruparPor === "servico"
+            ? l.servico_nome
+            : agruparPor === "condicao"
+              ? l.condicao
+              : l.especialidade_nome;
     const atual = acc.get(chave) ?? {
       chave,
       rotulo,

@@ -42,6 +42,8 @@ export const ROTULO_AGRUPADOR: Record<RateioAgruparPor, string> = {
   data: "Data",
   profissional: "Profissional",
   especialidade: "Especialidade",
+  servico: "Serviço",
+  condicao: "Condição",
 };
 
 /**
@@ -95,7 +97,14 @@ export function colunasRateio(
     { chave: "data", rotulo: "Data", formato: "data" },
     { chave: "medico_nome", rotulo: "Profissional", formato: "texto" },
     { chave: "especialidade_nome", rotulo: "Especialidade", formato: "texto" },
-    { chave: "procedimento", rotulo: "Serviço", formato: "texto" },
+    // `servico_nome`, e não o texto cru da agenda: o cru sai como
+    // "CONSULTA (CARDIOLOGIA)" e repetiria a especialidade que já está na
+    // coluna ao lado, além de quebrar a mesma consulta em várias linhas na
+    // conferência do financeiro.
+    { chave: "servico_nome", rotulo: "Serviço", formato: "texto" },
+    // Separa a "Consulta Cartão" da consulta particular sem precisar de um
+    // serviço duplicado no cadastro.
+    { chave: "condicao", rotulo: "Condição", formato: "texto" },
     { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
     { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
     { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },

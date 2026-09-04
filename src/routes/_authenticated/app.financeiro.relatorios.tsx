@@ -256,7 +256,11 @@ function ordenarAnalitico(linhas: RateioLinha[], agruparPor: RateioAgruparPor): 
       ? l.medico_nome
       : agruparPor === "especialidade"
         ? l.especialidade_nome
-        : l.data;
+        : agruparPor === "servico"
+          ? l.servico_nome
+          : agruparPor === "condicao"
+            ? l.condicao
+            : l.data;
   return [...linhas].sort(
     (a, b) => chave(a).localeCompare(chave(b), "pt-BR") || a.data.localeCompare(b.data),
   );
@@ -1791,6 +1795,8 @@ function Page() {
                           <SelectItem value="data">DATA</SelectItem>
                           <SelectItem value="profissional">PROFISSIONAL</SelectItem>
                           <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
+                          <SelectItem value="servico">SERVIÇO</SelectItem>
+                          <SelectItem value="condicao">CONDIÇÃO (PARTICULAR/CARTÃO)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

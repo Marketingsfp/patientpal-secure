@@ -19,6 +19,8 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   especialidade_id: "esp-1",
   especialidade_nome: "CARDIOLOGIA",
   procedimento: "CONSULTA",
+  servico_nome: over.servico_nome ?? "CONSULTA",
+  condicao: "PARTICULAR",
   grupo: "Cardiologia",
   categoria_nome: "PARTICULAR",
   receita: 100,
@@ -125,6 +127,10 @@ describe("filtrarRateio", () => {
       ["consulta", chaveGrupo("Cardiologia")!],
       ["raio-x torax", chaveGrupo("RAIO-X")!],
     ]),
+    nomeServicoPorChave: new Map([
+      ["consulta", "CONSULTA"],
+      ["raio-x torax", "RAIO-X TORAX"],
+    ]),
   } as unknown as RateioContexto;
   const base = { clinicaId: "c1", de: "2026-08-01", ate: "2026-08-31" };
   const linhas = [
@@ -150,6 +156,27 @@ describe("filtrarRateio", () => {
 
   it("nao mexe nas linhas quando nenhum filtro foi escolhido", () => {
     expect(filtrarRateio(ctx, linhas, base)).toHaveLength(3);
+  });
+
+  /**
+   * A agenda grava o serviço com a especialidade colada ("CONSULTA
+   * (CARDIOLOGIA)") e o cadastro tem só "CONSULTA". Antes desta correção o
+   * filtro de Serviço e o de Grupo comparavam texto cru e devolviam vazio para
+   * a maior parte dos atendimentos — em produção, 3.507 das 4.544 linhas de
+   * agosto de 2026 estão gravadas com o sufixo.
+   */
+  it("acha o servico mesmo com a especialidade colada no nome", () => {
+    const comSufixo = [
+      linha({ id: "1", procedimento: "CONSULTA (CARDIOLOGIA)" }),
+      linha({ id: "2", procedimento: "CONSULTA (GERIATRIA)" }),
+      linha({ id: "3", procedimento: "RAIO-X TORAX (ORTOPEDIA)" }),
+    ];
+    expect(
+      filtrarRateio(ctx, comSufixo, { ...base, servico: "CONSULTA" }).map((l) => l.id),
+    ).toEqual(["1", "2"]);
+    expect(
+      filtrarRateio(ctx, comSufixo, { ...base, grupo: chaveGrupo("raio-x") }).map((l) => l.id),
+    ).toEqual(["3"]);
   });
 });
 

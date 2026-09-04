@@ -9,7 +9,9 @@ const linha: RateioLinha = {
   medico_nome: "DRA. ANA",
   especialidade_id: "esp-1",
   especialidade_nome: "CARDIOLOGIA",
-  procedimento: "CONSULTA",
+  procedimento: "CONSULTA (CARDIOLOGIA)",
+  servico_nome: "CONSULTA",
+  condicao: "PARTICULAR",
   grupo: "Cardiologia",
   categoria_nome: "PARTICULAR",
   receita: 100,
@@ -31,7 +33,7 @@ const todasAsChavesExistem = (
 ): string[] => colunas.map((c) => c.chave).filter((chave) => !(chave in objeto));
 
 describe("colunas do sintetico", () => {
-  const agrupamentos = ["data", "profissional", "especialidade"] as const;
+  const agrupamentos = ["data", "profissional", "especialidade", "servico", "condicao"] as const;
 
   for (const agruparPor of agrupamentos) {
     it(`agrupado por ${agruparPor}: toda coluna acha o campo na linha`, () => {
@@ -80,6 +82,40 @@ describe("colunas do sintetico", () => {
       "Líquido clínica",
       "% clínica",
     ]);
+  });
+
+  /**
+   * O que o financeiro pediu: uma linha por serviço, com a mesma consulta
+   * somada uma vez só, e não quebrada por especialidade — a agenda grava
+   * "CONSULTA (CARDIOLOGIA)" e "CONSULTA (GERIATRIA)" para o mesmo serviço.
+   */
+  it("agrupado por servico soma o servico do cadastro, sem a especialidade", () => {
+    const grupos = agruparRateio(
+      [
+        linha,
+        { ...linha, id: "2", procedimento: "CONSULTA (GERIATRIA)", receita: 50, liquido: 20 },
+        {
+          ...linha,
+          id: "3",
+          procedimento: "ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)",
+          servico_nome: "ECOCARDIOGRAMA (ADULTO)",
+        },
+      ],
+      "servico",
+    );
+    expect(grupos.map((g) => g.rotulo)).toEqual(["CONSULTA", "ECOCARDIOGRAMA (ADULTO)"]);
+    expect(grupos[0]).toMatchObject({ qtd: 2, receita: 150 });
+    expect(colunasRateio("sintetico", "servico", false)[0].rotulo).toBe("Serviço");
+  });
+
+  /** Separa a consulta do Cartão da consulta particular sem serviço duplicado. */
+  it("agrupado por condicao separa o cartao do particular", () => {
+    const grupos = agruparRateio(
+      [linha, { ...linha, id: "2", condicao: "CARTÃO CONSULTA", receita: 9.99, liquido: 0 }],
+      "condicao",
+    );
+    expect(grupos.map((g) => g.rotulo)).toEqual(["CARTÃO CONSULTA", "PARTICULAR"]);
+    expect(colunasRateio("sintetico", "condicao", false)[0].rotulo).toBe("Condição");
   });
 
   it("a especialidade so entra no agrupamento por profissional", () => {
