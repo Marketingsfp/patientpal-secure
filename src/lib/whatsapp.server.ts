@@ -446,7 +446,7 @@ async function carregarEstadoIdentidade(
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado",
+      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado, resolved_at, closed_at",
     )
     .eq("clinica_id", clinicaId)
     .in("contato_telefone", [digits, `+${digits}`])
@@ -454,6 +454,10 @@ async function carregarEstadoIdentidade(
     .limit(1)
     .maybeSingle();
   if (data) {
+    const fim = [(data as any).resolved_at, (data as any).closed_at]
+      .filter(Boolean)
+      .sort()
+      .pop() as string | undefined;
     return {
       conversaId: (data as any).id,
       confirmada: (data as any).identidade_confirmada === true,
@@ -461,8 +465,10 @@ async function carregarEstadoIdentidade(
       tentativas: Number((data as any).identidade_tentativas ?? 0),
       pacienteIdConversa: (data as any).contato_paciente_id ?? null,
       fluxoEstadoBruto: (data as any).nina_fluxo_estado ?? null,
+      memoriaDesde: fim ?? null,
     };
   }
+
 
   const { data: nova } = await supabaseAdmin
     .from("atend_conversas")
