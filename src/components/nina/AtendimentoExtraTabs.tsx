@@ -152,6 +152,25 @@ export function AtendInbox() {
   const [pauseReasons, setPauseReasons] = useState<any[]>([]);
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
   const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
+  // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
+  const [painelFixado, setPainelFixado] = useState(false);
+  const [painelHover, setPainelHover] = useState(false);
+  const painelAberto = painelFixado || painelHover;
+  useEffect(() => {
+    try {
+      setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
+    } catch {}
+  }, []);
+  const alternarFixado = () => {
+    setPainelFixado((v) => {
+      const nv = !v;
+      try {
+        localStorage.setItem("nina.inbox.fixado", nv ? "1" : "0");
+      } catch {}
+      return nv;
+    });
+  };
+
 
   const carregarStatusAgente = useCallback(async () => {
     if (!clinicaId) return;
