@@ -153,7 +153,12 @@ export function AtendInbox() {
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   const [painelFixado, setPainelFixado] = useState(false);
   const [painelHover, setPainelHover] = useState(false);
-  const painelAberto = painelFixado || painelHover;
+  // Enquanto um menu suspenso da coluna estiver aberto o painel não pode
+  // encolher: o menu é renderizado fora do painel, o mouse "sai" da coluna e
+  // a lista sumia embaixo do menu.
+  const [painelMenuAberto, setPainelMenuAberto] = useState(false);
+  const painelAberto = painelFixado || painelHover || painelMenuAberto;
+
   useEffect(() => {
     try {
       setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
@@ -624,11 +629,15 @@ export function AtendInbox() {
                 placeholder="Buscar nome, telefone, protocolo…"
               />
             </div>
-            <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v as any)}>
+            <Select
+              value={filtroStatus}
+              onValueChange={(v) => setFiltroStatus(v as any)}
+              onOpenChange={setPainelMenuAberto}
+            >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="waiting">Em espera</SelectItem>
                 <SelectItem value="active">Ativas</SelectItem>
@@ -636,6 +645,7 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+
           </CardHeader>
           <div className="flex-1 overflow-auto border-t">
             {convs.length === 0 && (
