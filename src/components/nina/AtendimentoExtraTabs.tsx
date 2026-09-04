@@ -615,11 +615,9 @@ export function AtendInbox() {
             <div className="grid grid-cols-3 gap-1">
               <Button
                 size="sm"
-                variant={!pausaAtiva && filaAberta ? "default" : "outline"}
+                variant={online ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  !pausaAtiva && filaAberta
-                    ? "bg-emerald-600 hover:bg-emerald-600/90 text-white"
-                    : ""
+                  online ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""
                 }`}
                 onClick={() => definirStatus("online")}
               >
@@ -627,14 +625,15 @@ export function AtendInbox() {
               </Button>
               <Button
                 size="sm"
-                variant={pausaAtiva ? "default" : "outline"}
+                variant={pausaAtiva || ausenteAuto ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  pausaAtiva ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
+                  pausaAtiva || ausenteAuto ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
                 }`}
                 onClick={() => definirStatus("pausa")}
               >
                 <Coffee className="h-3 w-3 mr-1" /> Pausa
               </Button>
+
               <Button
                 size="sm"
                 variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
