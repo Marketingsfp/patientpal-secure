@@ -219,7 +219,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
       .order("created_at", { ascending: false })
-      .limit(400);
+      .limit(LIMITE_MENSAGENS_LEAD);
     if (error) throw new Error(error.message);
     const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
 
