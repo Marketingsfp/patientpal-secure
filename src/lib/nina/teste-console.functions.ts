@@ -190,9 +190,10 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       .select("id, evento, user_id, motivo, detalhes, created_at")
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(200);
-    const lista = (evs ?? []) as any[];
+    const lista = ((evs ?? []) as any[]).slice().reverse();
+
     const userIds = Array.from(
       new Set(lista.map((e) => e.user_id).filter((v): v is string => !!v)),
     );
