@@ -7,7 +7,7 @@ import {
   LIMITE_CONTRATOS_CANDIDATOS,
 } from "@/lib/convenio/escolher-contrato-ativo";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   aplicarDesconto,
@@ -151,6 +151,7 @@ import {
   Play,
   FileText,
   Undo2,
+  Check,
   CheckCircle2,
   User,
   Camera,
@@ -318,6 +319,29 @@ const STATUS_COR: Record<Status, string> = {
 };
 
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+
+// Chave do dia LOCAL do agendamento — a MESMA base da coluna "Data" da lista
+// (`fmtData` usa o fuso do navegador). Não dá para usar `inicio.slice(0, 10)`
+// aqui: o `inicio` é gravado em UTC e um horário do fim da tarde cairia no dia
+// seguinte, quebrando a divisória justamente nos últimos atendimentos do dia.
+const chaveDiaLocal = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// "Quinta-feira, 10/09/2026" — rótulo da barra que separa um dia do outro na
+// lista corrida.
+const rotuloDiaExtenso = (iso: string) => {
+  const d = new Date(iso);
+  const semana = d.toLocaleDateString("pt-BR", { weekday: "long" });
+  const data = d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `${semana.charAt(0).toUpperCase()}${semana.slice(1)}, ${data}`;
+};
+
 const PAGE_SIZE = 100;
 
 // Quantos dias À FRENTE do dia selecionado ainda trazemos agendamentos já
@@ -4017,6 +4041,17 @@ function AgendaPage() {
     [filtrados],
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Divisória de dias na lista corrida. A janela padrão ("a partir de") mostra
+  // o dia escolhido INTEIRO e ainda os agendamentos já marcados dos dias
+  // seguintes — sem uma barra separando as datas a recepção lia as linhas de
+  // amanhã como se fossem de hoje. Só entra quando a lista realmente contém
+  // mais de uma data; com "só este dia" ligado a lista tem um dia só e nada
+  // muda visualmente.
+  const listaTemVariosDias = useMemo(
+    () => new Set(filtradosOrdenados.map((a) => chaveDiaLocal(a.inicio))).size > 1,
+    [filtradosOrdenados],
+  );
 
   // ---- "Agora": destaque do horário atual (só hoje). A rolagem acontece apenas
   // quando o usuário clica no botão "Ir para agora" — nunca na abertura da tela.
@@ -8036,12 +8071,33 @@ function AgendaPage() {
                 setApenasData(!apenasData);
               }
             }}
+            aria-pressed={apenasData}
             className={cn(
-              "ml-1 cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-normal normal-case tracking-normal",
-              apenasData ? "bg-indigo-50 text-indigo-700" : "text-slate-400 hover:text-slate-600",
+              // Desenhado como caixa de marcação, não como texto solto: enquanto
+              // era só um rótulo cinza a recepção lia "só este dia" como se
+              // fosse a descrição do filtro (ligado), e estranhava a lista
+              // trazer os dias seguintes.
+              "ml-1 inline-flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-normal normal-case tracking-normal",
+              apenasData
+                ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                : "border-slate-300 bg-white text-slate-500 hover:text-slate-700",
             )}
-            title="Exibir apenas a data selecionada"
+            title={
+              apenasData
+                ? "Exibindo APENAS a data selecionada. Clique para voltar a mostrar também os dias seguintes."
+                : "Exibindo a data selecionada e os agendamentos já marcados dos dias seguintes. Clique para travar só neste dia."
+            }
           >
+            <span
+              className={cn(
+                "flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
+                apenasData
+                  ? "border-indigo-600 bg-indigo-600 text-white"
+                  : "border-slate-400 bg-white",
+              )}
+            >
+              {apenasData && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+            </span>
             só este dia
           </span>
         </Label>
@@ -11390,7 +11446,13 @@ function AgendaPage() {
                   onLimparFiltros={limparFiltros}
                 />
               ) : (
-                paginados.map((a) => {
+                paginados.map((a, idx) => {
+                  // Primeira linha de um dia novo: abre a divisória (ver
+                  // `listaTemVariosDias`).
+                  const abreDia =
+                    listaTemVariosDias &&
+                    (idx === 0 ||
+                      chaveDiaLocal(paginados[idx - 1].inicio) !== chaveDiaLocal(a.inicio));
                   const fichaNum = fichaPorId.get(a.id) ?? "";
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
@@ -11444,250 +11506,256 @@ function AgendaPage() {
                     podeEscrever;
 
                   return (
-                    <div
-                      key={a.id}
-                      className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
-                    >
-                      {/* Linha 1: horário + ficha + situação */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
-                            {fmtHora(a.inicio)}–{fmtHora(a.fim)}
-                          </span>
-                          <span className="text-[12px] text-muted-foreground whitespace-nowrap">
-                            {fmtData(a.inicio)}
-                          </span>
-                          {fichaNum && (
-                            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
-                              #{fichaNum}
+                    <Fragment key={a.id}>
+                      {abreDia && (
+                        <div className="rounded-lg border border-slate-300 bg-slate-200 px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-slate-800">
+                          {rotuloDiaExtenso(a.inicio)}
+                        </div>
+                      )}
+                      <div
+                        className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
+                      >
+                        {/* Linha 1: horário + ficha + situação */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                              {fmtHora(a.inicio)}–{fmtHora(a.fim)}
                             </span>
+                            <span className="text-[12px] text-muted-foreground whitespace-nowrap">
+                              {fmtData(a.inicio)}
+                            </span>
+                            {fichaNum && (
+                              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
+                                #{fichaNum}
+                              </span>
+                            )}
+                          </div>
+                          {ehLivre ? (
+                            <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50">
+                              Livre
+                            </Badge>
+                          ) : estornoPend ? (
+                            <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[11px] shrink-0">
+                              Estorno
+                            </Badge>
+                          ) : (
+                            <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
+                              {STATUS_LABEL[a.status]}
+                            </Badge>
                           )}
                         </div>
-                        {ehLivre ? (
-                          <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50">
-                            Livre
-                          </Badge>
-                        ) : estornoPend ? (
-                          <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[11px] shrink-0">
-                            Estorno
-                          </Badge>
-                        ) : (
-                          <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
-                            {STATUS_LABEL[a.status]}
-                          </Badge>
-                        )}
-                      </div>
 
-                      {/* Linha 2: paciente */}
-                      <div className="mb-1.5">
-                        {ocultarPaciente ? (
-                          <span className="text-xs italic text-rose-600">
-                            — aguardando estorno —
-                          </span>
-                        ) : ehLivre ? (
-                          <span className="text-sm text-muted-foreground italic">
-                            Horário livre
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
-                          >
-                            {sinalizado && (
-                              <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
-                                <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
-                              </span>
-                            )}
-                            {a.status === "confirmado" && (
-                              <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                            )}
-                            {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                              <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                            )}
-                            <span className="truncate">{a.paciente_nome}</span>
-                            {a.orcamento_numero && (
-                              <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
-                                ORÇ
-                              </span>
-                            )}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Linha 3: profissional + serviço */}
-                      <div className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground mb-2 min-w-0">
-                        <span className="truncate" title={profLabel}>
-                          👤 {profLabel}
-                        </span>
-                        <span
-                          className="truncate max-w-[45%] text-right"
-                          title={
-                            procedimentoEfetivo(a.medico_id, a.procedimento) ||
-                            rotuloServicoGrade(a.medico_id, a.procedimento) ||
-                            ""
-                          }
-                        >
-                          {rotuloServicoGrade(a.medico_id, a.procedimento) || "—"}
-                        </span>
-                      </div>
-
-                      {/* Linha 4: ações rápidas */}
-                      <div className="flex items-center gap-1.5 pt-2 border-t">
-                        {ehLivre ? (
-                          (() => {
-                            const lockNome = slotTravadoPorOutro(a);
-                            return lockNome ? (
-                              <div
-                                className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-2 truncate"
-                                title={`Em digitação por ${lockNome}`}
-                              >
-                                ⏳ Em digitação por {lockNome}
-                              </div>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openSlot(a)}
-                                disabled={!podeEscrever}
-                                title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
-                                className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
-                              >
-                                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                                Agendar
-                              </Button>
-                            );
-                          })()
-                        ) : (
-                          <>
-                            {podeCheckin && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => confirmarPresenca(a)}
-                                className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
-                                title="Check-in"
-                              >
-                                <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => cobrarAgendamento(a)}
-                              className={`h-8 flex-1 text-xs ${
-                                semFaturamento
-                                  ? // Cinza, e não o vermelho de "Cobrar": aqui não
-                                    // falta pagamento nenhum — não há cobrança
-                                    // prevista, e a linha não pode parecer pendente.
-                                    "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-100"
-                                  : a.origem_externa
-                                    ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                    : parciaisSet.has(a.id)
-                                      ? "border-amber-400 bg-amber-50 text-amber-700"
-                                      : pagosSet.has(a.id)
-                                        ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                                        : "border-rose-200 text-rose-600 hover:bg-rose-50"
-                              }`}
-                              title={
-                                semFaturamento
-                                  ? rotuloSemFaturamento(a)
-                                  : a.origem_externa
-                                    ? "Atendimento externo — sem lançamento em caixa"
-                                    : parciaisSet.has(a.id)
-                                      ? "Parcialmente pago — clique para receber o saldo"
-                                      : pagosSet.has(a.id)
-                                        ? "Pago"
-                                        : "Cobrar"
-                              }
+                        {/* Linha 2: paciente */}
+                        <div className="mb-1.5">
+                          {ocultarPaciente ? (
+                            <span className="text-xs italic text-rose-600">
+                              — aguardando estorno —
+                            </span>
+                          ) : ehLivre ? (
+                            <span className="text-sm text-muted-foreground italic">
+                              Horário livre
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                              className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
                             >
-                              {semFaturamento ? (
-                                <Ban className="h-3.5 w-3.5 mr-1" />
-                              ) : (
-                                <DollarSign
-                                  className="h-3.5 w-3.5 mr-1"
-                                  strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                                />
+                              {sinalizado && (
+                                <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
+                                  <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                                </span>
                               )}
-                              {semFaturamento
-                                ? "Sem faturamento"
-                                : parciaisSet.has(a.id)
-                                  ? rotuloSaldo(saldoMap.get(a.id)!)
-                                  : pagosSet.has(a.id)
-                                    ? "Pago"
-                                    : "Cobrar"}
-                            </Button>
-                            {podeEscrever && (
+                              {a.status === "confirmado" && (
+                                <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                              )}
+                              {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                                <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                              )}
+                              <span className="truncate">{a.paciente_nome}</span>
+                              {a.orcamento_numero && (
+                                <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
+                                  ORÇ
+                                </span>
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Linha 3: profissional + serviço */}
+                        <div className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground mb-2 min-w-0">
+                          <span className="truncate" title={profLabel}>
+                            👤 {profLabel}
+                          </span>
+                          <span
+                            className="truncate max-w-[45%] text-right"
+                            title={
+                              procedimentoEfetivo(a.medico_id, a.procedimento) ||
+                              rotuloServicoGrade(a.medico_id, a.procedimento) ||
+                              ""
+                            }
+                          >
+                            {rotuloServicoGrade(a.medico_id, a.procedimento) || "—"}
+                          </span>
+                        </div>
+
+                        {/* Linha 4: ações rápidas */}
+                        <div className="flex items-center gap-1.5 pt-2 border-t">
+                          {ehLivre ? (
+                            (() => {
+                              const lockNome = slotTravadoPorOutro(a);
+                              return lockNome ? (
+                                <div
+                                  className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-2 truncate"
+                                  title={`Em digitação por ${lockNome}`}
+                                >
+                                  ⏳ Em digitação por {lockNome}
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openSlot(a)}
+                                  disabled={!podeEscrever}
+                                  title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
+                                  className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                                >
+                                  <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                                  Agendar
+                                </Button>
+                              );
+                            })()
+                          ) : (
+                            <>
+                              {podeCheckin && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => confirmarPresenca(a)}
+                                  className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                                  title="Check-in"
+                                >
+                                  <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => openEdit(a)}
-                                className="h-8 px-2 text-xs"
-                                title="Editar"
+                                onClick={() => cobrarAgendamento(a)}
+                                className={`h-8 flex-1 text-xs ${
+                                  semFaturamento
+                                    ? // Cinza, e não o vermelho de "Cobrar": aqui não
+                                      // falta pagamento nenhum — não há cobrança
+                                      // prevista, e a linha não pode parecer pendente.
+                                      "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-100"
+                                    : a.origem_externa
+                                      ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                      : parciaisSet.has(a.id)
+                                        ? "border-amber-400 bg-amber-50 text-amber-700"
+                                        : pagosSet.has(a.id)
+                                          ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                                          : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                                }`}
+                                title={
+                                  semFaturamento
+                                    ? rotuloSemFaturamento(a)
+                                    : a.origem_externa
+                                      ? "Atendimento externo — sem lançamento em caixa"
+                                      : parciaisSet.has(a.id)
+                                        ? "Parcialmente pago — clique para receber o saldo"
+                                        : pagosSet.has(a.id)
+                                          ? "Pago"
+                                          : "Cobrar"
+                                }
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                {semFaturamento ? (
+                                  <Ban className="h-3.5 w-3.5 mr-1" />
+                                ) : (
+                                  <DollarSign
+                                    className="h-3.5 w-3.5 mr-1"
+                                    strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                                  />
+                                )}
+                                {semFaturamento
+                                  ? "Sem faturamento"
+                                  : parciaisSet.has(a.id)
+                                    ? rotuloSaldo(saldoMap.get(a.id)!)
+                                    : pagosSet.has(a.id)
+                                      ? "Pago"
+                                      : "Cobrar"}
                               </Button>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 px-2">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                {!ehLivre && podeEscrever && (
-                                  <>
-                                    <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
-                                      <Flag className="h-4 w-4 mr-2" />
-                                      {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
-                                      <Ban className="h-4 w-4 mr-2" />
-                                      {semFaturamento
-                                        ? "Voltar a faturar este atendimento"
-                                        : "Sinalizar agenda sem faturamento"}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                  </>
-                                )}
-                                {podeEscrever && (
-                                  <DropdownMenuItem
-                                    onClick={() => iniciarReagendamento(a)}
-                                    disabled={a.status === "realizado"}
-                                  >
-                                    <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={() => imprimirGR(a)}
-                                  disabled={!pagosSet.has(a.id) && !semFaturamento}
+                              {podeEscrever && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEdit(a)}
+                                  className="h-8 px-2 text-xs"
+                                  title="Editar"
                                 >
-                                  <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
-                                  <Printer className="h-4 w-4 mr-2" /> Comprovante
-                                </DropdownMenuItem>
-                                {podeEscrever && !ehLivre && a.status !== "realizado" && (
-                                  <>
-                                    <DropdownMenuSeparator />
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-8 px-2">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  {!ehLivre && podeEscrever && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
+                                        <Flag className="h-4 w-4 mr-2" />
+                                        {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
+                                        <Ban className="h-4 w-4 mr-2" />
+                                        {semFaturamento
+                                          ? "Voltar a faturar este atendimento"
+                                          : "Sinalizar agenda sem faturamento"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+                                  {podeEscrever && (
                                     <DropdownMenuItem
-                                      onClick={() => remove(a)}
-                                      className="text-amber-600"
+                                      onClick={() => iniciarReagendamento(a)}
+                                      disabled={a.status === "realizado"}
                                     >
-                                      <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                      <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                                     </DropdownMenuItem>
-                                  </>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
-                                  <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </>
-                        )}
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => imprimirGR(a)}
+                                    disabled={!pagosSet.has(a.id) && !semFaturamento}
+                                  >
+                                    <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                                    <Printer className="h-4 w-4 mr-2" /> Comprovante
+                                  </DropdownMenuItem>
+                                  {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() => remove(a)}
+                                        className="text-amber-600"
+                                      >
+                                        <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                                    <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </Fragment>
                   );
                 })
               )}
@@ -11800,7 +11868,13 @@ function AgendaPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginados.map((a) => {
+                    paginados.map((a, idx) => {
+                      // Primeira linha de um dia novo: abre a divisória (ver
+                      // `listaTemVariosDias`).
+                      const abreDia =
+                        listaTemVariosDias &&
+                        (idx === 0 ||
+                          chaveDiaLocal(paginados[idx - 1].inicio) !== chaveDiaLocal(a.inicio));
                       const fichaNum = fichaPorId.get(a.id) ?? "";
                       const realizado = a.status === "realizado";
                       const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
@@ -11847,639 +11921,651 @@ function AgendaPage() {
                       if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
 
                       return (
-                        <TableRow
-                          key={a.id}
-                          data-ag-id={a.id}
-                          className={`${bgClass} ${borderLeft}`}
-                        >
-                          {/* Checkbox — horário livre TAMBÉM é selecionável: sem
+                        <Fragment key={a.id}>
+                          {abreDia && (
+                            <TableRow className="hover:bg-transparent">
+                              <TableCell
+                                colSpan={11}
+                                className="border-y-2 border-slate-300 bg-slate-200 px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-slate-800"
+                              >
+                                {rotuloDiaExtenso(a.inicio)}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          <TableRow data-ag-id={a.id} className={`${bgClass} ${borderLeft}`}>
+                            {/* Checkbox — horário livre TAMBÉM é selecionável: sem
                           isso uma grade aberta por engano não tinha como ser
                           apagada pela tela (o "Excluir" só age no que está
                           marcado). Quem protege o paciente é a trava dentro de
                           excluirSelecionados, não a caixinha desabilitada. */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-xs">
-                            <Checkbox
-                              checked={selecionados.has(a.id)}
-                              onCheckedChange={() => toggleSel(a.id)}
-                              disabled={realizado}
-                            />
-                          </TableCell>
+                            <TableCell className="py-1.5 px-1.5 align-middle text-xs">
+                              <Checkbox
+                                checked={selecionados.has(a.id)}
+                                onCheckedChange={() => toggleSel(a.id)}
+                                disabled={realizado}
+                              />
+                            </TableCell>
 
-                          {/* Ficha */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
-                            {fichaNum || "—"}
-                          </TableCell>
+                            {/* Ficha */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
+                              {fichaNum || "—"}
+                            </TableCell>
 
-                          {/* Dia da semana */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
-                            {fmtDiaSemana(a.inicio)}
-                          </TableCell>
+                            {/* Dia da semana */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
+                              {fmtDiaSemana(a.inicio)}
+                            </TableCell>
 
-                          {/* Data */}
-                          <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
-                            {fmtData(a.inicio)}
-                          </TableCell>
+                            {/* Data */}
+                            <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
+                              {fmtData(a.inicio)}
+                            </TableCell>
 
-                          {/* Horário — uma linha só, tabular, 24h */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
-                            {fmtHora(a.inicio)}–{fmtHora(a.fim)}
-                          </TableCell>
+                            {/* Horário — uma linha só, tabular, 24h */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                              {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                            </TableCell>
 
-                          {/* Profissional */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
-                            {(() => {
-                              const label = medicoNomeAgendamento(a);
-                              const m = medicos.find((x) => x.id === a.medico_id);
-                              const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
-                              return (
-                                <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                                  <span className="block truncate text-xs" title={label}>
-                                    {label}
-                                  </span>
-                                  {manual && (
-                                    <span className="shrink-0 text-[10px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
-                                      Papel
+                            {/* Profissional */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                              {(() => {
+                                const label = medicoNomeAgendamento(a);
+                                const m = medicos.find((x) => x.id === a.medico_id);
+                                const manual =
+                                  m && m.usa_sistema === false && !recursoIds.has(m.id);
+                                return (
+                                  <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                                    <span className="block truncate text-xs" title={label}>
+                                      {label}
                                     </span>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </TableCell>
-
-                          {/* Cliente */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
-                            {ocultarPaciente ? (
-                              <span className="block truncate text-xs italic text-rose-600">
-                                — aguardando estorno —
-                              </span>
-                            ) : ehLivre ? (
-                              <span className="block truncate text-xs font-medium text-primary/60">
-                                Nenhum paciente agendado
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                                className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
-                                title={a.paciente_nome}
-                              >
-                                <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
-                                  {sinalizado && (
-                                    <span
-                                      title={rotuloSinalizacao(a)}
-                                      className="shrink-0 inline-flex"
-                                    >
-                                      <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
-                                    </span>
-                                  )}
-                                  {a.status === "confirmado" && (
-                                    <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                                  )}
-                                  <span className="block max-w-full truncate text-xs font-bold text-foreground">
-                                    {a.paciente_nome}
-                                  </span>
-                                </span>
-                                <span className="mt-0.5 flex max-w-full items-center gap-1 overflow-hidden">
-                                  {a.paciente_id && (
-                                    <IdadeIcon
-                                      nascimento={nascMap.get(a.paciente_id) ?? null}
-                                      size={22}
-                                    />
-                                  )}
-                                  {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                                    <span
-                                      title={`Cartão ${convenioMap.get(a.paciente_id)}`}
-                                      className="shrink-0 inline-flex"
-                                    >
-                                      <IdCard className="h-3.5 w-3.5 text-emerald-600" />
-                                    </span>
-                                  )}
-                                  {a.paciente_id && (
-                                    <BadgePacienteDistante
-                                      cidade={cidadeMap.get(a.paciente_id)}
-                                      compact
-                                    />
-                                  )}
-                                  {a.orcamento_numero && (
-                                    <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
-                                      ORÇ
-                                    </span>
-                                  )}
-                                </span>
-                              </button>
-                            )}
-                          </TableCell>
-
-                          {/* Serviço */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
-                            <ProcedimentoCell
-                              valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
-                              rotuloExibicao={
-                                medicoEhLaboratorioFormulario(a.medico_id)
-                                  ? "EXAMES LABORATORIAIS"
-                                  : null
-                              }
-                              opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                              padrao={
-                                procedimentoPadraoDoMedico(a.medico_id) ||
-                                (medicoEhLaboratorioFormulario(a.medico_id)
-                                  ? "EXAMES LABORATORIAIS"
-                                  : "")
-                              }
-                              semFallback={
-                                !!medicos.find((m) => m.id === a.medico_id)
-                                  ?.procedimento_padrao_em_branco
-                              }
-                              disabled={ehLivre}
-                              onChange={(novo) => atualizarProcedimento(a, novo)}
-                            />
-                          </TableCell>
-
-                          {/* Situação */}
-                          <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
-                            {ehLivre ? (
-                              (() => {
-                                const lockNome = slotTravadoPorOutro(a);
-                                return lockNome ? (
-                                  <Badge
-                                    className="bg-amber-100 text-amber-800 border-amber-300 text-[12px] font-medium truncate max-w-full"
-                                    title={`Em digitação por ${lockNome}`}
-                                  >
-                                    ⏳ {lockNome}
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openSlot(a)}
-                                    disabled={!podeEscrever}
-                                    title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
-                                    className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
-                                  >
-                                    <UserPlus className="h-3 w-3 mr-1.5" />
-                                    Agendar
-                                  </Button>
+                                    {manual && (
+                                      <span className="shrink-0 text-[10px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                        Papel
+                                      </span>
+                                    )}
+                                  </div>
                                 );
-                              })()
-                            ) : estornoPend ? (
-                              <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs max-w-full truncate">
-                                Estorno solicitado
-                              </Badge>
-                            ) : (
-                              <Badge
-                                className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`}
-                                title={STATUS_LABEL[a.status]}
-                              >
-                                {STATUS_LABEL[a.status]}
-                              </Badge>
-                            )}
-                            {/* Saldo devedor de um pagamento parcial. Fica logo
+                              })()}
+                            </TableCell>
+
+                            {/* Cliente */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                              {ocultarPaciente ? (
+                                <span className="block truncate text-xs italic text-rose-600">
+                                  — aguardando estorno —
+                                </span>
+                              ) : ehLivre ? (
+                                <span className="block truncate text-xs font-medium text-primary/60">
+                                  Nenhum paciente agendado
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                                  className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
+                                  title={a.paciente_nome}
+                                >
+                                  <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
+                                    {sinalizado && (
+                                      <span
+                                        title={rotuloSinalizacao(a)}
+                                        className="shrink-0 inline-flex"
+                                      >
+                                        <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                                      </span>
+                                    )}
+                                    {a.status === "confirmado" && (
+                                      <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                                    )}
+                                    <span className="block max-w-full truncate text-xs font-bold text-foreground">
+                                      {a.paciente_nome}
+                                    </span>
+                                  </span>
+                                  <span className="mt-0.5 flex max-w-full items-center gap-1 overflow-hidden">
+                                    {a.paciente_id && (
+                                      <IdadeIcon
+                                        nascimento={nascMap.get(a.paciente_id) ?? null}
+                                        size={22}
+                                      />
+                                    )}
+                                    {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                                      <span
+                                        title={`Cartão ${convenioMap.get(a.paciente_id)}`}
+                                        className="shrink-0 inline-flex"
+                                      >
+                                        <IdCard className="h-3.5 w-3.5 text-emerald-600" />
+                                      </span>
+                                    )}
+                                    {a.paciente_id && (
+                                      <BadgePacienteDistante
+                                        cidade={cidadeMap.get(a.paciente_id)}
+                                        compact
+                                      />
+                                    )}
+                                    {a.orcamento_numero && (
+                                      <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                                        ORÇ
+                                      </span>
+                                    )}
+                                  </span>
+                                </button>
+                              )}
+                            </TableCell>
+
+                            {/* Serviço */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                              <ProcedimentoCell
+                                valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
+                                rotuloExibicao={
+                                  medicoEhLaboratorioFormulario(a.medico_id)
+                                    ? "EXAMES LABORATORIAIS"
+                                    : null
+                                }
+                                opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                                padrao={
+                                  procedimentoPadraoDoMedico(a.medico_id) ||
+                                  (medicoEhLaboratorioFormulario(a.medico_id)
+                                    ? "EXAMES LABORATORIAIS"
+                                    : "")
+                                }
+                                semFallback={
+                                  !!medicos.find((m) => m.id === a.medico_id)
+                                    ?.procedimento_padrao_em_branco
+                                }
+                                disabled={ehLivre}
+                                onChange={(novo) => atualizarProcedimento(a, novo)}
+                              />
+                            </TableCell>
+
+                            {/* Situação */}
+                            <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                              {ehLivre ? (
+                                (() => {
+                                  const lockNome = slotTravadoPorOutro(a);
+                                  return lockNome ? (
+                                    <Badge
+                                      className="bg-amber-100 text-amber-800 border-amber-300 text-[12px] font-medium truncate max-w-full"
+                                      title={`Em digitação por ${lockNome}`}
+                                    >
+                                      ⏳ {lockNome}
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openSlot(a)}
+                                      disabled={!podeEscrever}
+                                      title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
+                                      className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+                                    >
+                                      <UserPlus className="h-3 w-3 mr-1.5" />
+                                      Agendar
+                                    </Button>
+                                  );
+                                })()
+                              ) : estornoPend ? (
+                                <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs max-w-full truncate">
+                                  Estorno solicitado
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`}
+                                  title={STATUS_LABEL[a.status]}
+                                >
+                                  {STATUS_LABEL[a.status]}
+                                </Badge>
+                              )}
+                              {/* Saldo devedor de um pagamento parcial. Fica logo
                             abaixo da situação para a recepção ver, na própria
                             linha, que o paciente ainda deve. */}
-                            {(() => {
-                              const saldoLinha = saldoMap.get(a.id);
-                              if (!saldoLinha?.parcial || ehLivre) return null;
-                              return (
-                                <Badge
-                                  className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[11px] text-amber-800"
-                                  title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
-                                    "pt-BR",
-                                    { style: "currency", currency: "BRL" },
-                                  )}, já pago ${saldoLinha.pago.toLocaleString("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  })}`}
-                                >
-                                  {rotuloSaldo(saldoLinha)}
-                                </Badge>
-                              );
-                            })()}
-                          </TableCell>
+                              {(() => {
+                                const saldoLinha = saldoMap.get(a.id);
+                                if (!saldoLinha?.parcial || ehLivre) return null;
+                                return (
+                                  <Badge
+                                    className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[11px] text-amber-800"
+                                    title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
+                                      "pt-BR",
+                                      { style: "currency", currency: "BRL" },
+                                    )}, já pago ${saldoLinha.pago.toLocaleString("pt-BR", {
+                                      style: "currency",
+                                      currency: "BRL",
+                                    })}`}
+                                  >
+                                    {rotuloSaldo(saldoLinha)}
+                                  </Badge>
+                                );
+                              })()}
+                            </TableCell>
 
-                          {/* OBS — indicador compacto. Sem observação a célula fica
+                            {/* OBS — indicador compacto. Sem observação a célula fica
                           vazia (nem o traço, que já custava largura); com
                           observação mostra o balão com a bolinha vermelha,
                           o texto no tooltip e o modal completo no clique. */}
-                          <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1.5 px-1 align-middle text-center">
-                            {(() => {
-                              const obs = (a.observacoes ?? "").trim();
-                              if (ehLivre || ocultarPaciente || !obs) return null;
-                              return (
-                                <TooltipProvider delayDuration={150}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        aria-label="Ver observação do agendamento"
-                                        onClick={() => setObsAg(a)}
-                                        className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1.5 px-1 align-middle text-center">
+                              {(() => {
+                                const obs = (a.observacoes ?? "").trim();
+                                if (ehLivre || ocultarPaciente || !obs) return null;
+                                return (
+                                  <TooltipProvider delayDuration={150}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          aria-label="Ver observação do agendamento"
+                                          onClick={() => setObsAg(a)}
+                                          className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                                        >
+                                          <MessageSquareText className="h-4 w-4" />
+                                          <span
+                                            aria-hidden
+                                            className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-rose-500 ring-1 ring-background"
+                                          />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent
+                                        side="left"
+                                        className="max-w-[320px] whitespace-pre-wrap break-words text-left"
                                       >
-                                        <MessageSquareText className="h-4 w-4" />
-                                        <span
-                                          aria-hidden
-                                          className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-rose-500 ring-1 ring-background"
-                                        />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                      side="left"
-                                      className="max-w-[320px] whitespace-pre-wrap break-words text-left"
-                                    >
-                                      {obs}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            })()}
-                          </TableCell>
+                                        {obs}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                );
+                              })()}
+                            </TableCell>
 
-                          {/* Ações - Botões na linha + Menu */}
-                          <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
-                            <TooltipProvider delayDuration={200}>
-                              <div className="flex items-center justify-end gap-1.5">
-                                {/* Check-in (✅) - aparece apenas para pacientes presentes */}
-                                {!ehLivre &&
-                                  !realizado &&
-                                  (() => {
-                                    const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                                    const pendenteCheckin = [
-                                      "aguardando_recepcao",
-                                      "recepcao",
-                                    ].includes(etapa);
-                                    if (
-                                      (pagosSet.has(a.id) || semFaturamento) &&
-                                      pendenteCheckin &&
-                                      podeEscrever
-                                    ) {
+                            {/* Ações - Botões na linha + Menu */}
+                            <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
+                              <TooltipProvider delayDuration={200}>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Check-in (✅) - aparece apenas para pacientes presentes */}
+                                  {!ehLivre &&
+                                    !realizado &&
+                                    (() => {
+                                      const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                                      const pendenteCheckin = [
+                                        "aguardando_recepcao",
+                                        "recepcao",
+                                      ].includes(etapa);
+                                      if (
+                                        (pagosSet.has(a.id) || semFaturamento) &&
+                                        pendenteCheckin &&
+                                        podeEscrever
+                                      ) {
+                                        return (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label="Confirmar presença (check-in)"
+                                                onClick={() => confirmarPresenca(a)}
+                                                className="h-7 w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                                              >
+                                                <BadgeCheck className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Confirmar presença (check-in)
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        );
+                                      }
+                                      if (!pendenteCheckin && !ehLivre) {
+                                        return (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="inline-flex">
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  disabled
+                                                  aria-label="Check-in já realizado"
+                                                  className="h-7 w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
+                                                >
+                                                  <BadgeCheck className="h-3.5 w-3.5" />
+                                                </Button>
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Check-in já realizado</TooltipContent>
+                                          </Tooltip>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+
+                                  {/* Pagar (💰) */}
+                                  {!ehLivre && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={
+                                            semFaturamento ? "Sem faturamento" : "Pagamento"
+                                          }
+                                          onClick={() => cobrarAgendamento(a)}
+                                          className={`h-7 w-7 shrink-0 rounded-md border-2 ${
+                                            semFaturamento
+                                              ? // Cinza, e não o vermelho de "falta
+                                                // cobrar": não há cobrança prevista, e
+                                                // a linha não pode parecer pendente
+                                                // para quem varre a agenda do dia.
+                                                "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                              : a.origem_externa
+                                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                                : parciaisSet.has(a.id)
+                                                  ? // Parcialmente pago: âmbar, para não
+                                                    // se confundir com o verde de quitado.
+                                                    "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                                  : pagosSet.has(a.id)
+                                                    ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                                    : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                          }`}
+                                        >
+                                          {semFaturamento ? (
+                                            <Ban className="h-3.5 w-3.5" />
+                                          ) : (
+                                            <DollarSign
+                                              className="h-3.5 w-3.5"
+                                              strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                                            />
+                                          )}
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {(() => {
+                                          if (semFaturamento) return rotuloSemFaturamento(a);
+                                          if (a.origem_externa)
+                                            return "Atendimento externo — sem lançamento em caixa";
+                                          const saldoLinha = saldoMap.get(a.id);
+                                          if (saldoLinha?.parcial)
+                                            return `Parcialmente pago — ${rotuloSaldo(saldoLinha)} de ${saldoLinha.total.toLocaleString(
+                                              "pt-BR",
+                                              { style: "currency", currency: "BRL" },
+                                            )}. Clique para receber o saldo.`;
+                                          if (!pagosSet.has(a.id)) return "Registrar pagamento";
+                                          const info = pagoInfoMap.get(a.id);
+                                          if (!info) return "Pago";
+                                          const v = info.valor.toLocaleString("pt-BR", {
+                                            style: "currency",
+                                            currency: "BRL",
+                                          });
+                                          return `Pago • ${v}`;
+                                        })()}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+
+                                  {/* Nota Fiscal (📄) — mostra na própria linha se a
+                                NFS-e do atendimento já saiu. Verde = emitida
+                                (clique abre o PDF); cinza apagado = ainda não
+                                emitida. Some nos horários livres, onde não há
+                                paciente nem o que faturar. */}
+                                  {!ehLivre &&
+                                    (() => {
+                                      const nf = nfseMap.get(a.id);
+                                      const emitida = !!nf;
+                                      const selecionadaLote = nfseSel.has(a.id);
                                       return (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button
                                               variant="ghost"
                                               size="icon"
-                                              aria-label="Confirmar presença (check-in)"
-                                              onClick={() => confirmarPresenca(a)}
-                                              className="h-7 w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                                              aria-label={
+                                                emitida
+                                                  ? `Nota Fiscal emitida${nf?.numero ? ` — nº ${nf.numero}` : ""}`
+                                                  : "Nota Fiscal não emitida"
+                                              }
+                                              onClick={() => verOuEmitirNota(a)}
+                                              className={`h-7 w-7 shrink-0 rounded-md border-2 ${
+                                                emitida
+                                                  ? // Azul é exclusivo da nota emitida. O verde desta
+                                                    // coluna já significa "pago" e "check-in feito" —
+                                                    // reusá-lo aqui faria a recepção ler nota emitida
+                                                    // onde só houve pagamento.
+                                                    "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                                  : selecionadaLote
+                                                    ? // Seleção para nota agrupada é um estado passageiro,
+                                                      // então marca com um anel em vez de outra cor de
+                                                      // preenchimento: o botão continua cinza, porque a
+                                                      // nota ainda não saiu.
+                                                      "border-slate-200 text-slate-400 ring-2 ring-amber-400 ring-offset-1 hover:bg-slate-50"
+                                                    : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
+                                              }`}
                                             >
-                                              <BadgeCheck className="h-3.5 w-3.5" />
+                                              <FileText
+                                                className="h-3.5 w-3.5"
+                                                strokeWidth={emitida ? 3 : 2}
+                                              />
                                             </Button>
                                           </TooltipTrigger>
                                           <TooltipContent>
-                                            Confirmar presença (check-in)
+                                            {(() => {
+                                              if (emitida) {
+                                                const num = nf?.numero ? ` nº ${nf.numero}` : "";
+                                                return nf?.url_pdf
+                                                  ? `Nota Fiscal emitida${num} — clique para abrir o PDF`
+                                                  : `Nota Fiscal emitida${num} — status: ${nf?.status ?? "—"}`;
+                                              }
+                                              if (selecionadaLote)
+                                                return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
+                                              if (semFaturamento)
+                                                return "Sem faturamento — a nota fiscal é emitida pelo parceiro";
+                                              if (!pagosSet.has(a.id))
+                                                return "Nota Fiscal não emitida — registre o pagamento antes";
+                                              return "Nota Fiscal não emitida — clique para emitir";
+                                            })()}
                                           </TooltipContent>
                                         </Tooltip>
                                       );
-                                    }
-                                    if (!pendenteCheckin && !ehLivre) {
-                                      return (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span className="inline-flex">
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                disabled
-                                                aria-label="Check-in já realizado"
-                                                className="h-7 w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
-                                              >
-                                                <BadgeCheck className="h-3.5 w-3.5" />
-                                              </Button>
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Check-in já realizado</TooltipContent>
-                                        </Tooltip>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
+                                    })()}
 
-                                {/* Pagar (💰) */}
-                                {!ehLivre && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
+                                  {/* Menu (⋮) */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={
-                                          semFaturamento ? "Sem faturamento" : "Pagamento"
-                                        }
-                                        onClick={() => cobrarAgendamento(a)}
-                                        className={`h-7 w-7 shrink-0 rounded-md border-2 ${
-                                          semFaturamento
-                                            ? // Cinza, e não o vermelho de "falta
-                                              // cobrar": não há cobrança prevista, e
-                                              // a linha não pode parecer pendente
-                                              // para quem varre a agenda do dia.
-                                              "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                            : a.origem_externa
-                                              ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                              : parciaisSet.has(a.id)
-                                                ? // Parcialmente pago: âmbar, para não
-                                                  // se confundir com o verde de quitado.
-                                                  "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
-                                                : pagosSet.has(a.id)
-                                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                                        }`}
+                                        aria-label="Mais ações"
+                                        className="h-7 w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
                                       >
-                                        {semFaturamento ? (
-                                          <Ban className="h-3.5 w-3.5" />
-                                        ) : (
-                                          <DollarSign
-                                            className="h-3.5 w-3.5"
-                                            strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                                          />
-                                        )}
+                                        <MoreHorizontal className="h-4 w-4" />
                                       </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {(() => {
-                                        if (semFaturamento) return rotuloSemFaturamento(a);
-                                        if (a.origem_externa)
-                                          return "Atendimento externo — sem lançamento em caixa";
-                                        const saldoLinha = saldoMap.get(a.id);
-                                        if (saldoLinha?.parcial)
-                                          return `Parcialmente pago — ${rotuloSaldo(saldoLinha)} de ${saldoLinha.total.toLocaleString(
-                                            "pt-BR",
-                                            { style: "currency", currency: "BRL" },
-                                          )}. Clique para receber o saldo.`;
-                                        if (!pagosSet.has(a.id)) return "Registrar pagamento";
-                                        const info = pagoInfoMap.get(a.id);
-                                        if (!info) return "Pago";
-                                        const v = info.valor.toLocaleString("pt-BR", {
-                                          style: "currency",
-                                          currency: "BRL",
-                                        });
-                                        return `Pago • ${v}`;
-                                      })()}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-
-                                {/* Nota Fiscal (📄) — mostra na própria linha se a
-                                NFS-e do atendimento já saiu. Verde = emitida
-                                (clique abre o PDF); cinza apagado = ainda não
-                                emitida. Some nos horários livres, onde não há
-                                paciente nem o que faturar. */}
-                                {!ehLivre &&
-                                  (() => {
-                                    const nf = nfseMap.get(a.id);
-                                    const emitida = !!nf;
-                                    const selecionadaLote = nfseSel.has(a.id);
-                                    return (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label={
-                                              emitida
-                                                ? `Nota Fiscal emitida${nf?.numero ? ` — nº ${nf.numero}` : ""}`
-                                                : "Nota Fiscal não emitida"
-                                            }
-                                            onClick={() => verOuEmitirNota(a)}
-                                            className={`h-7 w-7 shrink-0 rounded-md border-2 ${
-                                              emitida
-                                                ? // Azul é exclusivo da nota emitida. O verde desta
-                                                  // coluna já significa "pago" e "check-in feito" —
-                                                  // reusá-lo aqui faria a recepção ler nota emitida
-                                                  // onde só houve pagamento.
-                                                  "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                                : selecionadaLote
-                                                  ? // Seleção para nota agrupada é um estado passageiro,
-                                                    // então marca com um anel em vez de outra cor de
-                                                    // preenchimento: o botão continua cinza, porque a
-                                                    // nota ainda não saiu.
-                                                    "border-slate-200 text-slate-400 ring-2 ring-amber-400 ring-offset-1 hover:bg-slate-50"
-                                                  : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
-                                            }`}
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                      {!ehLivre && podeEscrever && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
+                                            <Flag className="h-4 w-4 mr-2" />
+                                            {sinalizado
+                                              ? "Remover sinalização"
+                                              : "Sinalizar paciente"}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => alternarSemFaturamento(a)}
                                           >
-                                            <FileText
-                                              className="h-3.5 w-3.5"
-                                              strokeWidth={emitida ? 3 : 2}
-                                            />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          {(() => {
-                                            if (emitida) {
-                                              const num = nf?.numero ? ` nº ${nf.numero}` : "";
-                                              return nf?.url_pdf
-                                                ? `Nota Fiscal emitida${num} — clique para abrir o PDF`
-                                                : `Nota Fiscal emitida${num} — status: ${nf?.status ?? "—"}`;
-                                            }
-                                            if (selecionadaLote)
-                                              return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
-                                            if (semFaturamento)
-                                              return "Sem faturamento — a nota fiscal é emitida pelo parceiro";
-                                            if (!pagosSet.has(a.id))
-                                              return "Nota Fiscal não emitida — registre o pagamento antes";
-                                            return "Nota Fiscal não emitida — clique para emitir";
-                                          })()}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    );
-                                  })()}
-
-                                {/* Menu (⋮) */}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Mais ações"
-                                      className="h-7 w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-56">
-                                    {!ehLivre && podeEscrever && (
-                                      <>
-                                        <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
-                                          <Flag className="h-4 w-4 mr-2" />
-                                          {sinalizado
-                                            ? "Remover sinalização"
-                                            : "Sinalizar paciente"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
-                                          <Ban className="h-4 w-4 mr-2" />
-                                          {semFaturamento
-                                            ? "Voltar a faturar este atendimento"
-                                            : "Sinalizar agenda sem faturamento"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                      </>
-                                    )}
-                                    {/* NFS-e */}
-                                    {!ehLivre &&
-                                      (() => {
-                                        const nf = nfseMap.get(a.id);
-                                        const emitida = !!nf;
-                                        const podeEmitir = pagosSet.has(a.id) && !semFaturamento;
-                                        if (!emitida && !podeEmitir) return null;
-                                        return (
-                                          <>
-                                            <DropdownMenuItem onClick={() => verOuEmitirNota(a)}>
-                                              <FileText className="h-4 w-4 mr-2" />
-                                              {emitida
-                                                ? `NFS-e ${nf?.numero ?? ""}`
-                                                : "Emitir NFS-e"}
-                                            </DropdownMenuItem>
-                                            {!emitida && podeEmitir && a.paciente_id && (
-                                              <DropdownMenuItem
-                                                onSelect={(e) => {
-                                                  e.preventDefault();
-                                                  setNfseSel((prev) => {
-                                                    const n = new Set(prev);
-                                                    if (n.has(a.id)) n.delete(a.id);
-                                                    else n.add(a.id);
-                                                    return n;
-                                                  });
-                                                }}
-                                              >
+                                            <Ban className="h-4 w-4 mr-2" />
+                                            {semFaturamento
+                                              ? "Voltar a faturar este atendimento"
+                                              : "Sinalizar agenda sem faturamento"}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                        </>
+                                      )}
+                                      {/* NFS-e */}
+                                      {!ehLivre &&
+                                        (() => {
+                                          const nf = nfseMap.get(a.id);
+                                          const emitida = !!nf;
+                                          const podeEmitir = pagosSet.has(a.id) && !semFaturamento;
+                                          if (!emitida && !podeEmitir) return null;
+                                          return (
+                                            <>
+                                              <DropdownMenuItem onClick={() => verOuEmitirNota(a)}>
                                                 <FileText className="h-4 w-4 mr-2" />
-                                                {nfseSel.has(a.id)
-                                                  ? "Remover da NFS-e agrupada"
-                                                  : "Selecionar para NFS-e agrupada"}
+                                                {emitida
+                                                  ? `NFS-e ${nf?.numero ?? ""}`
+                                                  : "Emitir NFS-e"}
                                               </DropdownMenuItem>
-                                            )}
-                                            <DropdownMenuSeparator />
-                                          </>
-                                        );
-                                      })()}
+                                              {!emitida && podeEmitir && a.paciente_id && (
+                                                <DropdownMenuItem
+                                                  onSelect={(e) => {
+                                                    e.preventDefault();
+                                                    setNfseSel((prev) => {
+                                                      const n = new Set(prev);
+                                                      if (n.has(a.id)) n.delete(a.id);
+                                                      else n.add(a.id);
+                                                      return n;
+                                                    });
+                                                  }}
+                                                >
+                                                  <FileText className="h-4 w-4 mr-2" />
+                                                  {nfseSel.has(a.id)
+                                                    ? "Remover da NFS-e agrupada"
+                                                    : "Selecionar para NFS-e agrupada"}
+                                                </DropdownMenuItem>
+                                              )}
+                                              <DropdownMenuSeparator />
+                                            </>
+                                          );
+                                        })()}
 
-                                    {/* Editar */}
-                                    {podeEscrever && (
-                                      <DropdownMenuItem onClick={() => openEdit(a)}>
-                                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                                      </DropdownMenuItem>
-                                    )}
-
-                                    {/* Reagendar */}
-                                    {podeEscrever && (
-                                      <DropdownMenuItem
-                                        onClick={() => iniciarReagendamento(a)}
-                                        disabled={a.status === "realizado"}
-                                      >
-                                        <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
-                                      </DropdownMenuItem>
-                                    )}
-
-                                    <DropdownMenuSeparator />
-
-                                    {/* Imprimir GR */}
-                                    <DropdownMenuItem
-                                      onClick={() => imprimirGR(a)}
-                                      disabled={!pagosSet.has(a.id) && !semFaturamento}
-                                    >
-                                      <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                      {!pagosSet.has(a.id) && !semFaturamento && (
-                                        <span className="ml-2 text-xs text-muted-foreground">
-                                          (pagar)
-                                        </span>
-                                      )}
-                                      {semFaturamento && (
-                                        <span className="ml-2 text-xs text-muted-foreground">
-                                          (zerada)
-                                        </span>
-                                      )}
-                                    </DropdownMenuItem>
-
-                                    {/* Comprovante */}
-                                    <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
-                                      <Printer className="h-4 w-4 mr-2" /> Comprovante
-                                    </DropdownMenuItem>
-
-                                    {/* Desmarcar paciente */}
-                                    {podeEscrever && !ehLivre && a.status !== "realizado" && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          onClick={() => remove(a)}
-                                          className="text-amber-600"
-                                        >
-                                          <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                      {/* Editar */}
+                                      {podeEscrever && (
+                                        <DropdownMenuItem onClick={() => openEdit(a)}>
+                                          <Pencil className="h-4 w-4 mr-2" /> Editar
                                         </DropdownMenuItem>
-                                      </>
-                                    )}
+                                      )}
 
-                                    {/* Mudar status */}
-                                    {podeEscrever && !ehLivre && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        {(a.tipo_atendimento ?? "particular") === "convenio" && (
-                                          <DropdownMenuItem
-                                            onClick={() => alternarAutorizacaoConvenio(a)}
-                                            className={
-                                              a.convenio_autorizado
-                                                ? "text-muted-foreground"
-                                                : "text-emerald-600"
-                                            }
-                                          >
-                                            <ShieldCheck className="h-4 w-4 mr-2" />
-                                            {a.convenio_autorizado
-                                              ? "Remover autorização do convênio"
-                                              : "Autorizar convênio"}
-                                          </DropdownMenuItem>
+                                      {/* Reagendar */}
+                                      {podeEscrever && (
+                                        <DropdownMenuItem
+                                          onClick={() => iniciarReagendamento(a)}
+                                          disabled={a.status === "realizado"}
+                                        >
+                                          <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                                        </DropdownMenuItem>
+                                      )}
+
+                                      <DropdownMenuSeparator />
+
+                                      {/* Imprimir GR */}
+                                      <DropdownMenuItem
+                                        onClick={() => imprimirGR(a)}
+                                        disabled={!pagosSet.has(a.id) && !semFaturamento}
+                                      >
+                                        <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                                        {!pagosSet.has(a.id) && !semFaturamento && (
+                                          <span className="ml-2 text-xs text-muted-foreground">
+                                            (pagar)
+                                          </span>
                                         )}
-                                        {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                                        {semFaturamento && (
+                                          <span className="ml-2 text-xs text-muted-foreground">
+                                            (zerada)
+                                          </span>
+                                        )}
+                                      </DropdownMenuItem>
+
+                                      {/* Comprovante */}
+                                      <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                                        <Printer className="h-4 w-4 mr-2" /> Comprovante
+                                      </DropdownMenuItem>
+
+                                      {/* Desmarcar paciente */}
+                                      {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                                        <>
+                                          <DropdownMenuSeparator />
                                           <DropdownMenuItem
-                                            key={s}
-                                            onClick={() => mudarStatus(a, s)}
+                                            onClick={() => remove(a)}
+                                            className="text-amber-600"
                                           >
-                                            <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                                            <UserMinus className="h-4 w-4 mr-2" /> Desmarcar
+                                            paciente
                                           </DropdownMenuItem>
-                                        ))}
-                                      </>
-                                    )}
+                                        </>
+                                      )}
 
-                                    {/* Auditoria */}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
-                                      <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
-                                    </DropdownMenuItem>
+                                      {/* Mudar status */}
+                                      {podeEscrever && !ehLivre && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          {(a.tipo_atendimento ?? "particular") === "convenio" && (
+                                            <DropdownMenuItem
+                                              onClick={() => alternarAutorizacaoConvenio(a)}
+                                              className={
+                                                a.convenio_autorizado
+                                                  ? "text-muted-foreground"
+                                                  : "text-emerald-600"
+                                              }
+                                            >
+                                              <ShieldCheck className="h-4 w-4 mr-2" />
+                                              {a.convenio_autorizado
+                                                ? "Remover autorização do convênio"
+                                                : "Autorizar convênio"}
+                                            </DropdownMenuItem>
+                                          )}
+                                          {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                                            <DropdownMenuItem
+                                              key={s}
+                                              onClick={() => mudarStatus(a, s)}
+                                            >
+                                              <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                                            </DropdownMenuItem>
+                                          ))}
+                                        </>
+                                      )}
 
-                                    {/* Atendimento externo (faturado em outra clínica) */}
-                                    {podeEscrever && !ehLivre && (
-                                      <DropdownMenuItem
-                                        onClick={() => setExternoAg(a)}
-                                        className="text-orange-600"
-                                      >
-                                        <Building2 className="h-4 w-4 mr-2" /> Atendimento externo
-                                        (outra clínica)
+                                      {/* Auditoria */}
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                                        <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
                                       </DropdownMenuItem>
-                                    )}
 
-                                    {/* Reabrir (apenas realizado) */}
-                                    {podeEscrever && a.status === "realizado" && (
-                                      <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
-                                        <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
-                                      </DropdownMenuItem>
-                                    )}
-
-                                    {/* Excluir */}
-                                    {podeExcluirLinha(a) && (
-                                      <>
-                                        <DropdownMenuSeparator />
+                                      {/* Atendimento externo (faturado em outra clínica) */}
+                                      {podeEscrever && !ehLivre && (
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            slotVago(a) ? excluirSlotVago(a) : remove(a)
-                                          }
-                                          className="text-destructive"
-                                          disabled={pagosSet.has(a.id)}
+                                          onClick={() => setExternoAg(a)}
+                                          className="text-orange-600"
                                         >
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          {slotVago(a) ? "Excluir slot" : "Liberar horário"}
+                                          <Building2 className="h-4 w-4 mr-2" /> Atendimento externo
+                                          (outra clínica)
                                         </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </TooltipProvider>
-                          </TableCell>
-                        </TableRow>
+                                      )}
+
+                                      {/* Reabrir (apenas realizado) */}
+                                      {podeEscrever && a.status === "realizado" && (
+                                        <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
+                                          <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
+                                        </DropdownMenuItem>
+                                      )}
+
+                                      {/* Excluir */}
+                                      {podeExcluirLinha(a) && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() =>
+                                              slotVago(a) ? excluirSlotVago(a) : remove(a)
+                                            }
+                                            className="text-destructive"
+                                            disabled={pagosSet.has(a.id)}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            {slotVago(a) ? "Excluir slot" : "Liberar horário"}
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </TooltipProvider>
+                            </TableCell>
+                          </TableRow>
+                        </Fragment>
                       );
                     })
                   )}
