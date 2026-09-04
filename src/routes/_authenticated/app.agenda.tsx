@@ -4280,6 +4280,45 @@ function AgendaPage() {
 
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
+  // Horário vago é GRADE, não histórico: quem tem edição na Agenda (recepção e
+  // caixa, além de gestão) pode apagar a linha sem chamar ninguém. Ficha com
+  // paciente é outra coisa — mesmo cancelada ela guarda o rastro do
+  // atendimento, então continua exclusiva de admin/gestor; para a recepção o
+  // caminho é "Desmarcar paciente", que libera o horário e fica auditado.
+  //
+  // A regra vale igual no banco (policy `agend_delete`, que chama
+  // `agendamento_slot_vazio`). Aqui é só para a tela não oferecer um botão que
+  // o banco vai recusar.
+  const slotVago = (a: Agendamento) => !a.paciente_id && isSlotLivre(a.paciente_nome);
+  const podeExcluirLinha = (a: Agendamento) => podeEscrever && (isManager || slotVago(a));
+
+  // Apaga de vez um horário vago da grade. Diferente de `remove()`, que para um
+  // slot já vazio apenas reescrevia a mesma linha como DISPONÍVEL — ou seja,
+  // não fazia nada, apesar do menu dizer "Excluir slot".
+  const excluirSlotVago = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      avisoSemPermissaoAgenda();
+      return;
+    }
+    if (!slotVago(a)) {
+      toast.error("Este horário tem paciente. Use 'Desmarcar paciente' para liberá-lo.");
+      return;
+    }
+    if (
+      !(await confirmDialog(
+        "Excluir este horário da grade? Ele deixa de existir na agenda do médico.",
+      ))
+    )
+      return;
+    const { error } = await supabase.from("agendamentos").delete().eq("id", a.id);
+    if (error) {
+      mostrarErro(error as never);
+      return;
+    }
+    toast.success("Horário excluído da grade.");
+    await load();
+  };
+
   const baixarLoteRealizado = async () => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -4420,15 +4459,24 @@ function AgendaPage() {
       return;
     }
     if (!clinicaAtual) return;
-    if (!isManager) {
-      toast.error("Você não tem permissão para excluir horários.");
-      return;
-    }
     const ids = Array.from(selecionados);
     const itens = items.filter((a) => ids.includes(a.id));
     if (itens.length === 0) {
       toast.info("Selecione ao menos um horário.");
       return;
+    }
+    // Trava de perfil: recepção e caixa limpam a grade, mas não apagam ficha de
+    // paciente. Como o "marcar todos" do cabeçalho pega a página inteira, aqui
+    // dizemos exatamente quantas linhas com nome atrapalharam, em vez de só
+    // recusar o lote.
+    if (!isManager) {
+      const comPacienteNaSelecao = itens.filter((i) => !slotVago(i));
+      if (comPacienteNaSelecao.length > 0) {
+        toast.error(
+          `${comPacienteNaSelecao.length} da seleção têm paciente. Desmarque essas linhas (menu ⋯ → "Desmarcar paciente") ou peça a um gestor para excluí-las.`,
+        );
+        return;
+      }
     }
     const bloqueados = itens.filter(
       (i) => pagosSet.has(i.id) || (!isSlotLivre(i.paciente_nome) && i.status !== "agendado"),
@@ -8320,6 +8368,12 @@ function AgendaPage() {
                     <DropdownMenuItem onClick={abrirReagLote}>
                       🔁 Reagendar selecionados
                     </DropdownMenuItem>
+                  </>
+                )}
+                {/* Recepção e caixa também limpam a grade; o filtro de quem tem
+                paciente acontece dentro de `excluirSelecionados`. */}
+                {podeEscrever && (
+                  <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={excluirSelecionados}
@@ -12405,16 +12459,18 @@ function AgendaPage() {
                                     )}
 
                                     {/* Excluir */}
-                                    {podeEscrever && isManager && (
+                                    {podeExcluirLinha(a) && (
                                       <>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
-                                          onClick={() => remove(a)}
+                                          onClick={() =>
+                                            slotVago(a) ? excluirSlotVago(a) : remove(a)
+                                          }
                                           className="text-destructive"
                                           disabled={pagosSet.has(a.id)}
                                         >
                                           <Trash2 className="h-4 w-4 mr-2" />
-                                          {ehLivre ? "Excluir slot" : "Liberar horário"}
+                                          {slotVago(a) ? "Excluir slot" : "Liberar horário"}
                                         </DropdownMenuItem>
                                       </>
                                     )}
