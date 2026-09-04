@@ -587,13 +587,14 @@ export function AtendInbox() {
               </Badge>
               <Circle
                 className={`h-3 w-3 fill-current ${
-                  pausaAtiva
+                  pausaAtiva || ausenteAuto
                     ? "text-amber-500"
                     : filaAberta
                       ? "text-emerald-600"
                       : "text-slate-400"
                 }`}
               />
+
             </div>
           )}
           <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
