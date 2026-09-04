@@ -168,6 +168,36 @@ function Page() {
   });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
+  // Remontar o campo "Até" força o input mascarado a reexibir o valor do
+  // estado. Sem isso, quando a data digitada é recusada e o estado volta para
+  // o valor que já estava lá, o texto inválido continuaria na tela.
+  const [dataFimKey, setDataFimKey] = useState(0);
+
+  // "De" e "Até" andam juntos: quem escolhe a data inicial quase sempre quer
+  // gerar naquele mesmo dia. Sem isso a data final ficava para trás (ex.: De
+  // 10/09 até 03/09), o período dava 0 dias e a recepção precisava abrir dois
+  // seletores de data para uma tarefa só. Quem quiser um intervalo maior muda
+  // a data final à mão depois — por isso o "Até" só é puxado quando está vazio
+  // ou ficaria antes da nova data inicial.
+  function mudarDataInicio(iso: string) {
+    setGerar((g) => {
+      const precisaAcompanhar = !g.data_fim || (!!iso && g.data_fim < iso);
+      return { ...g, data_inicio: iso, data_fim: precisaAcompanhar ? iso : g.data_fim };
+    });
+    setDataFimKey((k) => k + 1);
+  }
+
+  // Trava: a data final nunca fica antes da inicial. Em vez de aceitar um
+  // período impossível, o campo volta para a data inicial e a tela diz por quê.
+  function mudarDataFim(iso: string) {
+    if (iso && gerar.data_inicio && iso < gerar.data_inicio) {
+      toast.error("A data final não pode ser anterior à data inicial.");
+      setGerar((g) => ({ ...g, data_fim: g.data_inicio }));
+      setDataFimKey((k) => k + 1);
+      return;
+    }
+    setGerar((g) => ({ ...g, data_fim: iso }));
+  }
   // Piso por (medico|agenda|data-local) → maior `fim` (HH:MM local) já
   // existente naquela data. Usado para acrescentar novos slots ABAIXO dos
   // já criados, preservando a numeração de fichas.
@@ -1175,15 +1205,16 @@ function Page() {
                     <DateInputBR
                       className="w-full"
                       value={gerar.data_inicio}
-                      onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })}
+                      onChange={(e) => mudarDataInicio(e.target.value)}
                     />
                   </div>
                   <div className="min-w-0">
                     <label className="text-xs text-muted-foreground">Data final (Até)</label>
                     <DateInputBR
+                      key={`gerar-data-fim-${dataFimKey}`}
                       className="w-full"
                       value={gerar.data_fim}
-                      onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })}
+                      onChange={(e) => mudarDataFim(e.target.value)}
                     />
                   </div>
                 </div>
