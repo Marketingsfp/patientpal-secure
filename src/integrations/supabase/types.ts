@@ -9321,6 +9321,32 @@ export type Database = {
         }
         Relationships: []
       }
+      prontuario_sequencia: {
+        Row: {
+          atualizado_em: string
+          clinica_id: string
+          proximo: number
+        }
+        Insert: {
+          atualizado_em?: string
+          clinica_id: string
+          proximo: number
+        }
+        Update: {
+          atualizado_em?: string
+          clinica_id?: string
+          proximo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prontuario_sequencia_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prontuarios: {
         Row: {
           agendamento_id: string | null
@@ -10271,6 +10297,7 @@ export type Database = {
         Args: { _agendamento_id: string }
         Returns: Json
       }
+      agendamento_slot_vazio: { Args: { _id: string }; Returns: boolean }
       agendar_online: {
         Args: {
           _agenda_id?: string
@@ -10619,6 +10646,15 @@ export type Database = {
         Args: { p_clinica: string; p_fim: string; p_ini: string }
         Returns: Json
       }
+      desfazer_baixa_atendimento: {
+        Args: {
+          _clinica_id: string
+          _id: string
+          _motivo?: string
+          _origem: string
+        }
+        Returns: Json
+      }
       each: { Args: { hs: unknown }; Returns: Record<string, unknown>[] }
       emitir_nfse_orcamento: { Args: { p_orcamento_id: string }; Returns: Json }
       emitir_senha: {
@@ -10697,6 +10733,16 @@ export type Database = {
       }
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
+        Returns: Json
+      }
+      estornar_repasse_atendimento: {
+        Args: {
+          _clinica_id: string
+          _id: string
+          _motivo?: string
+          _origem: string
+          _valor_medico?: number
+        }
         Returns: Json
       }
       estornar_sangria: {
