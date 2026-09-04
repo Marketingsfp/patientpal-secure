@@ -466,7 +466,7 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 h-[calc(100vh-120px)] overflow-hidden">
       {/* TOOLBAR — status do agente */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1">
         <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
@@ -527,7 +527,7 @@ export function AtendInbox() {
         }}
       />
 
-      <div className="grid grid-cols-12 gap-2 h-[calc(100vh-150px)] min-h-[640px]">
+      <div className="grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden">
         {/* COLUNA 1 — LISTA */}
         <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
           <CardHeader className="py-2 space-y-2">
