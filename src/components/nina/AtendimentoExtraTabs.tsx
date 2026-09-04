@@ -315,7 +315,9 @@ export function AtendInbox() {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
         await travarFilaFn({ data: { clinicaId, travada: false } });
         setPausaAtiva(null);
+        setAusenteAuto(false);
         setFilaAberta(true);
+
         const r = await presencaFn({
           data: { clinicaId, status: "ONLINE" as const, aceitaNovas: true },
         });
