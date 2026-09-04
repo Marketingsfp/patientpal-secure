@@ -119,6 +119,10 @@ import {
   deveBloquearPorLimitePendente,
 } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
+// O desconto segue no diálogo antigo (e-mail + senha); a isenção de cobrança
+// usa o novo, que pede só o nome na lista e a senha. Ver o comentário em
+// `supervisor-senha-dialog.tsx`.
+import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
 import {
   CalendarDays,
   Plus,
@@ -158,7 +162,6 @@ import {
 import {
   MOTIVOS_SEM_FATURAMENTO,
   MOTIVO_SEM_FATURAMENTO_OUTRO,
-  ROLES_AUTORIZAM_SEM_FATURAMENTO,
   definirSemFaturamento,
   ehSemFaturamento,
   motivoSemFaturamentoFinal,
@@ -10053,7 +10056,7 @@ function AgendaPage() {
         gravado separado de quem operou a tela: no balcão são duas pessoas
         diferentes.
       */}
-      <SupervisorAuthDialog
+      <SupervisorSenhaDialog
         open={semFatSupOpen}
         onOpenChange={(v) => {
           setSemFatSupOpen(v);
@@ -10061,12 +10064,12 @@ function AgendaPage() {
           // marcar, o modal de motivo continua aberto atrás e é ele que limpa.
           if (!v && semFatAcao && !semFatAcao.marcar) setSemFatAcao(null);
         }}
+        clinicaId={clinicaAtual?.clinica_id}
         acao={
           semFatAcao?.marcar
             ? "marcar este atendimento como SEM FATURAMENTO"
             : "voltar a faturar este atendimento"
         }
-        rolesPermitidos={[...ROLES_AUTORIZAM_SEM_FATURAMENTO]}
         onAuthorized={(info) => {
           const alvo = semFatAcao;
           if (!alvo) return;

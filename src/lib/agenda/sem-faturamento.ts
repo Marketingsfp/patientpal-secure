@@ -38,8 +38,14 @@ import { supabase } from "@/integrations/supabase/client";
  * médico e o paciente recebem sai neutro.
  */
 
-/** Papéis que podem marcar (ou desmarcar) um atendimento como sem faturamento. */
-export const ROLES_AUTORIZAM_SEM_FATURAMENTO = ["admin", "gestor", "supervisor"] as const;
+// A lista de papéis com alçada mora em `sem-faturamento-alcada.ts`, sem
+// nenhum import, para que a server function que confere a senha possa lê-la
+// sem arrastar o cliente Supabase do navegador. Reexportada aqui para as telas
+// continuarem importando tudo de um lugar só.
+export {
+  ROLES_AUTORIZAM_SEM_FATURAMENTO,
+  podeAutorizarSemFaturamento,
+} from "./sem-faturamento-alcada";
 
 /**
  * Motivos oferecidos na tela. A lista existe para que a conferência do mês
@@ -75,11 +81,6 @@ export type MarcacaoSemFaturamento = {
 /** true → este atendimento está marcado para não gerar cobrança nenhuma. */
 export function ehSemFaturamento(a: MarcacaoSemFaturamento | null | undefined): boolean {
   return a?.sem_faturamento === true;
-}
-
-/** true → o papel deste usuário pode marcar/desmarcar sozinho, sem pedir senha. */
-export function podeAutorizarSemFaturamento(role: string | null | undefined): boolean {
-  return (ROLES_AUTORIZAM_SEM_FATURAMENTO as readonly string[]).includes(role ?? "");
 }
 
 /**
