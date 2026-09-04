@@ -186,7 +186,6 @@ import {
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
-import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
@@ -2045,20 +2044,18 @@ function AgendaPage() {
   const [faceOpen, setFaceOpen] = useState(false);
   const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
   const [savingPac, setSavingPac] = useState(false);
-  const [equipeList, setEquipeList] = useState<
-    Array<{
-      nome: string | null;
-      email: string | null;
-      user_id: string | null;
-      role: string | null;
-    }>
-  >([]);
+  // Autor de uma linha do histórico, já resolvido pelo banco (nome + papel).
+  // Antes a tela cruzava o e-mail da auditoria com a lista da equipe — que só
+  // carrega para admin/gestor. Para a recepção a lista vinha vazia e todo
+  // nome caía no e-mail cru.
+  type HistAutor = { nome: string; papel: string; origem: "pessoa" | "sistema" };
   type AuditRow = {
     id: string;
     action: string;
     table_name: string;
     user_email: string | null;
     created_at: string;
+    autor: HistAutor | null;
     dados_antes: Record<string, unknown> | null;
     dados_depois: Record<string, unknown> | null;
   };
@@ -2079,122 +2076,109 @@ function AgendaPage() {
     status: string;
     motivo: string | null;
     resposta: string | null;
-    solicitado_por: string | null;
+    valor: number | null;
+    solicitante: HistAutor | null;
     solicitado_em: string;
-    resolvido_por: string | null;
+    resolvedor: HistAutor | null;
     resolvido_em: string | null;
   };
   const [estornosHist, setEstornosHist] = useState<EstornoHist[]>([]);
-  const [nomePorUidExtra, setNomePorUidExtra] = useState<Map<string, string>>(new Map());
+  // Movimento de caixa ligado ao agendamento: quem recebeu, quanto, em que
+  // forma e em qual gaveta. Nunca era consultado pela tela de histórico.
+  type CaixaHist = {
+    id: string;
+    tipo: string;
+    valor: number | null;
+    forma_pagamento: string | null;
+    descricao: string | null;
+    created_at: string;
+    autor: HistAutor | null;
+    caixa_dono: string | null;
+    caixa_status: string | null;
+    destino_nome: string | null;
+  };
+  const [caixaHist, setCaixaHist] = useState<CaixaHist[]>([]);
+  type PagamentoHist = {
+    id: string;
+    valor: number | null;
+    forma_pagamento: string | null;
+    parcelas: number | null;
+    bandeira_cartao: string | null;
+    status: string | null;
+    created_at: string;
+    autor: HistAutor | null;
+  };
+  const [pagamentosHist, setPagamentosHist] = useState<PagamentoHist[]>([]);
+  type MarcacoesHist = {
+    sem_faturamento?: boolean | null;
+    sem_faturamento_em?: string | null;
+    sem_faturamento_motivo?: string | null;
+    sem_faturamento_por?: string | null;
+    sem_faturamento_autorizado_por?: string | null;
+    executado_em?: string | null;
+    executado_por?: HistAutor | null;
+    origem_integracao?: string | null;
+  };
+  const [marcacoesHist, setMarcacoesHist] = useState<MarcacoesHist>({});
   const [notaTexto, setNotaTexto] = useState("");
   const [savingNota, setSavingNota] = useState(false);
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
 
-  const fnListarEquipe = useServerFn(listarEquipe);
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
   const fnCriarAgendamento = useServerFn(criarAgendamento);
   const fnLimparExterno = useServerFn(limparAtendimentoExterno);
-  const carregarEquipe = async () => {
-    if (!clinicaAtual || equipeList.length > 0) return;
-    try {
-      const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
-      setEquipeList(
-        (data as any[]).map((m) => ({
-          nome: m.nome,
-          email: m.email,
-          user_id: m.user_id ?? null,
-          role: m.role ?? null,
-        })),
-      );
-    } catch (_) {
-      /* silencioso */
-    }
-  };
-
+  // Histórico do agendamento — uma chamada só, montada no banco.
+  //
+  // A tela lia `audit_log` direto daqui, mas a RLS dessa tabela só libera
+  // quem administra a clínica: recepção e supervisão abriam a janela e não
+  // viam evento nenhum. E o caixa nunca era consultado, então não havia como
+  // saber quem recebeu, quanto e em que forma. A RPC `agendamento_historico`
+  // resolve os dois: entrega auditoria, caixa, pagamento, estorno, notas e
+  // marcações para qualquer membro da clínica, com o autor já identificado.
   const abrirAuditoria = async (a: Agendamento) => {
     setAuditAg(a);
     setAuditLoading(true);
     setAuditRows([]);
     setNotasHist([]);
     setEstornosHist([]);
-    setNomePorUidExtra(new Map());
+    setCaixaHist([]);
+    setPagamentosHist([]);
+    setMarcacoesHist({});
     setNotaTexto("");
-    void carregarEquipe();
-    // 1) histórico do próprio agendamento
-    const { data: agAudit, error } = await supabase
-      .from("audit_log" as never)
-      .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
-      .eq("record_id", a.id)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) {
-      setAuditLoading(false);
-      mostrarErro(error);
-      return;
-    }
-    // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
-    const { data: lancs } = await supabase
-      .from("fin_lancamentos")
-      .select("id")
-      .eq("agendamento_id", a.id);
-    const lancIds = (lancs ?? []).map((l) => l.id);
-    let lancAudit: AuditRow[] = [];
-    if (lancIds.length > 0) {
-      const { data: la } = await supabase
-        .from("audit_log" as never)
-        .select("id, action, table_name, user_email, created_at, dados_antes, dados_depois")
-        .in("record_id", lancIds)
-        .eq("table_name", "fin_lancamentos")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      lancAudit = (la as unknown as AuditRow[]) ?? [];
-    }
-    const todos = [...((agAudit as unknown as AuditRow[]) ?? []), ...lancAudit].sort((x, y) =>
-      x.created_at < y.created_at ? 1 : -1,
+    const { data, error } = await supabase.rpc(
+      "agendamento_historico" as never,
+      {
+        _agendamento_id: a.id,
+      } as never,
     );
     setAuditLoading(false);
-    setAuditRows(todos);
-    const { data: nts } = await supabase
-      .from("agendamento_historico_notas" as never)
-      .select("id, user_email, user_nome, texto, created_at")
-      .eq("agendamento_id", a.id)
-      .order("created_at", { ascending: false })
-      .limit(500);
-    setNotasHist((nts as unknown as NotaHist[]) ?? []);
-
-    // 3) Solicitações de estorno vinculadas a este agendamento (direta ou via lançamentos)
-    const filtros: string[] = [`agendamento_id.eq.${a.id}`];
-    if (lancIds.length > 0) filtros.push(`lancamento_id.in.(${lancIds.join(",")})`);
-    const { data: ests } = await supabase
-      .from("estorno_solicitacoes")
-      .select(
-        "id, status, motivo, resposta, solicitado_por, solicitado_em, resolvido_por, resolvido_em",
-      )
-      .or(filtros.join(","))
-      .limit(100);
-    const estornos = (ests ?? []) as unknown as EstornoHist[];
-    setEstornosHist(estornos);
-
-    // Resolve nomes de uuids que aparecem em estornos e não estão em equipeList.
-    const uids = new Set<string>();
-    estornos.forEach((e) => {
-      if (e.solicitado_por) uids.add(e.solicitado_por);
-      if (e.resolvido_por) uids.add(e.resolvido_por);
-    });
-    if (uids.size > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, nome")
-        .in("id", Array.from(uids));
-      const m = new Map<string, string>();
-      ((profs ?? []) as Array<{ id: string; nome: string | null }>).forEach((p) => {
-        if (p.nome) m.set(p.id, p.nome);
-      });
-      setNomePorUidExtra(m);
+    if (error) {
+      mostrarErro(error, "falha ao carregar o histórico do agendamento");
+      return;
     }
+    const res = (data ?? {}) as {
+      ok?: boolean;
+      erro?: string;
+      auditoria?: AuditRow[];
+      caixa?: CaixaHist[];
+      pagamentos?: PagamentoHist[];
+      estornos?: EstornoHist[];
+      notas?: NotaHist[];
+      marcacoes?: MarcacoesHist;
+    };
+    if (res.ok === false) {
+      toast.error(res.erro ?? "Não foi possível carregar o histórico.");
+      return;
+    }
+    setAuditRows(res.auditoria ?? []);
+    setCaixaHist(res.caixa ?? []);
+    setPagamentosHist(res.pagamentos ?? []);
+    setEstornosHist(res.estornos ?? []);
+    setNotasHist(res.notas ?? []);
+    setMarcacoesHist(res.marcacoes ?? {});
   };
 
   const adicionarNotaHist = async () => {
@@ -9957,7 +9941,9 @@ function AgendaPage() {
             setAuditRows([]);
             setNotasHist([]);
             setEstornosHist([]);
-            setNomePorUidExtra(new Map());
+            setCaixaHist([]);
+            setPagamentosHist([]);
+            setMarcacoesHist({});
             setNotaTexto("");
           }
         }}
@@ -9972,6 +9958,39 @@ function AgendaPage() {
               <p className="text-sm text-muted-foreground">
                 {auditAg.paciente_nome} — {new Date(auditAg.inicio).toLocaleString("pt-BR")}
               </p>
+            )}
+            {/* Situação atual, lida das colunas do próprio agendamento. Elas
+                sobrevivem à limpeza de 180 dias do audit_log, então continuam
+                provando quem autorizou mesmo em ficha antiga. */}
+            {(marcacoesHist.sem_faturamento ||
+              marcacoesHist.executado_por ||
+              marcacoesHist.origem_integracao) && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {marcacoesHist.sem_faturamento ? (
+                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                    Sem faturamento
+                    {marcacoesHist.sem_faturamento_autorizado_por
+                      ? ` — autorizado por ${marcacoesHist.sem_faturamento_autorizado_por}`
+                      : ""}
+                  </Badge>
+                ) : null}
+                {marcacoesHist.executado_por ? (
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-100 text-emerald-800 border-emerald-200"
+                  >
+                    Realizado por {marcacoesHist.executado_por.nome}
+                  </Badge>
+                ) : null}
+                {marcacoesHist.origem_integracao ? (
+                  <Badge
+                    variant="outline"
+                    className="bg-indigo-100 text-indigo-800 border-indigo-200"
+                  >
+                    Origem: {marcacoesHist.origem_integracao}
+                  </Badge>
+                ) : null}
+              </div>
             )}
           </DialogHeader>
           <div className="space-y-2 border-b pb-3">
@@ -9999,20 +10018,10 @@ function AgendaPage() {
               <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
             ) : (
               (() => {
-                // Mapas de nome/cargo (por email e por user_id).
-                const nomePorEmail = new Map<string, string>();
-                const cargoPorEmail = new Map<string, string>();
-                const nomePorUid = new Map<string, string>();
-                const cargoPorUid = new Map<string, string>();
-                equipeList.forEach((m) => {
-                  if (m.email && m.nome) nomePorEmail.set(m.email, m.nome);
-                  if (m.email && m.role) cargoPorEmail.set(m.email, m.role);
-                  if (m.user_id && m.nome) nomePorUid.set(m.user_id, m.nome);
-                  if (m.user_id && m.role) cargoPorUid.set(m.user_id, m.role);
-                });
-                nomePorUidExtra.forEach((v, k) => {
-                  if (!nomePorUid.has(k)) nomePorUid.set(k, v);
-                });
+                // O nome e o papel de quem agiu vêm prontos do banco
+                // (`agendamento_historico`). Aqui só damos acabamento ao
+                // cargo, sem depender da lista de equipe — que a recepção
+                // não tem permissão para carregar.
                 const cargoBonito = (r: string | undefined) => {
                   if (!r) return "";
                   const map: Record<string, string> = {
@@ -10021,24 +10030,19 @@ function AgendaPage() {
                     financeiro: "financeiro",
                     caixa: "caixa",
                     recepcao: "recepção",
+                    supervisor: "supervisor",
                     medico: "médico",
                     enfermeiro: "enfermeiro",
                     enfermagem: "enfermagem",
                     laboratorio: "laboratório",
+                    sistema: "",
                   };
                   return map[r] ?? r;
                 };
-                const quemPorEmail = (email: string | null | undefined) => {
-                  if (!email) return "—";
-                  const nome = nomePorEmail.get(email) ?? email;
-                  const cargo = cargoBonito(cargoPorEmail.get(email));
-                  return cargo ? `${nome} (${cargo})` : nome;
-                };
-                const quemPorUid = (uid: string | null | undefined) => {
-                  if (!uid) return "—";
-                  const nome = nomePorUid.get(uid) ?? `Usuário …${uid.slice(-6)}`;
-                  const cargo = cargoBonito(cargoPorUid.get(uid));
-                  return cargo ? `${nome} (${cargo})` : nome;
+                const quemDoAutor = (autor: HistAutor | null | undefined, fallback?: string) => {
+                  if (!autor) return fallback?.trim() || "—";
+                  const cargo = cargoBonito(autor.papel);
+                  return cargo ? `${autor.nome} (${cargo})` : autor.nome;
                 };
 
                 // Rótulos e cores por tipo de ação da timeline.
@@ -10052,8 +10056,16 @@ function AgendaPage() {
                   | "confirmou"
                   | "realizou"
                   | "cancelou"
+                  | "faltou"
                   | "pagamento"
                   | "pagamento_removido"
+                  | "caixa_recebimento"
+                  | "caixa_estorno"
+                  | "caixa_registro"
+                  | "repasse"
+                  | "sem_faturamento"
+                  | "sem_faturamento_removido"
+                  | "autorizacao"
                   | "observacao"
                   | "estorno_solicitado"
                   | "estorno_aprovado"
@@ -10073,8 +10085,16 @@ function AgendaPage() {
                   confirmou: "Confirmou",
                   realizou: "Realizado",
                   cancelou: "Cancelou",
+                  faltou: "Faltou",
                   pagamento: "Pagamento",
                   pagamento_removido: "Pagamento removido",
+                  caixa_recebimento: "Recebeu no caixa",
+                  caixa_estorno: "Estorno no caixa",
+                  caixa_registro: "Registro no caixa",
+                  repasse: "Repasse ao médico",
+                  sem_faturamento: "Sem faturamento",
+                  sem_faturamento_removido: "Sem faturamento removido",
+                  autorizacao: "Autorização do convênio",
                   observacao: "Observação alterada",
                   estorno_solicitado: "Estorno solicitado",
                   estorno_aprovado: "Estorno aprovado",
@@ -10100,8 +10120,16 @@ function AgendaPage() {
                   confirmou: green,
                   realizou: green,
                   cancelou: rose,
+                  faltou: rose,
                   pagamento: green,
                   pagamento_removido: rose,
+                  caixa_recebimento: green,
+                  caixa_estorno: rose,
+                  caixa_registro: sky,
+                  repasse: violet,
+                  sem_faturamento: amber,
+                  sem_faturamento_removido: amber,
+                  autorizacao: sky,
                   observacao: amber,
                   estorno_solicitado: violet,
                   estorno_aprovado: green,
@@ -10194,6 +10222,39 @@ function AgendaPage() {
                   }
                   return v == null || v === "" ? "—" : String(v);
                 };
+                // Dinheiro e forma de pagamento em português. As formas
+                // antigas, importadas do sistema anterior, já vêm escritas por
+                // extenso — passam direto.
+                const fmtDinheiro = (v: unknown) => {
+                  const n = Number(v ?? 0);
+                  if (!Number.isFinite(n)) return "—";
+                  return n.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  });
+                };
+                const formaPt: Record<string, string> = {
+                  dinheiro: "Dinheiro",
+                  pix: "PIX",
+                  cartao_credito: "Cartão de crédito",
+                  cartao_debito: "Cartão de débito",
+                  misto: "Pagamento misto",
+                  convenio_gratuidade: "Gratuidade do convênio",
+                  sem_cobranca: "Sem cobrança",
+                  externo: "Atendimento externo",
+                  manual: "Lançamento manual",
+                  boleto: "Boleto",
+                };
+                const fmtForma = (v: unknown) => {
+                  const s = String(v ?? "").trim();
+                  if (!s) return "—";
+                  return formaPt[s.toLowerCase()] ?? s;
+                };
+                // O lançamento vigente do agendamento, usado para completar a
+                // linha de pagamento com valor e forma — a auditoria do INSERT
+                // sozinha não era exibida com esses dados.
+                const pagamentoDoLancamento = (lancId: string) =>
+                  pagamentosHist.find((p) => p.id === lancId) ?? null;
 
                 type Item = {
                   id: string;
@@ -10207,8 +10268,9 @@ function AgendaPage() {
                 for (const r of auditRows) {
                   const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
                   const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
-                  const isLanc = r.table_name === "fin_lancamentos";
-                  const quem = quemPorEmail(r.user_email);
+                  const isLanc =
+                    r.table_name === "fin_lancamentos" || r.table_name === "fin_atendimentos";
+                  const quem = quemDoAutor(r.autor, r.user_email ?? undefined);
 
                   if (isLanc) {
                     const chaves = Array.from(
@@ -10221,11 +10283,37 @@ function AgendaPage() {
                     let body: React.ReactNode = null;
                     if (r.action === "INSERT") {
                       kind = "pagamento";
-                      body = `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`;
+                      // Valor e forma sempre vêm do lançamento atual quando
+                      // ele ainda existe; a auditoria é só o carimbo de quando
+                      // e por quem foi lançado.
+                      const lancId = String(depois.id ?? "");
+                      const pg = pagamentoDoLancamento(lancId);
+                      const valor = pg?.valor ?? depois.valor;
+                      const forma = pg?.forma_pagamento ?? depois.forma_pagamento;
+                      const parcelas = Number(pg?.parcelas ?? depois.parcelas ?? 0);
+                      const bandeira = String(pg?.bandeira_cartao ?? depois.bandeira_cartao ?? "");
+                      body = (
+                        <div className="space-y-0.5">
+                          <div>
+                            Pagamento do atendimento registrado — <b>{fmtDinheiro(valor)}</b> em{" "}
+                            <b>{fmtForma(forma)}</b>
+                            {parcelas > 1 ? ` em ${parcelas}x` : ""}
+                            {bandeira ? ` (${bandeira})` : ""}.
+                          </div>
+                          <div className="text-muted-foreground">
+                            {depois.repasse_pago
+                              ? "Repasse ao médico já pago."
+                              : "Repasse ao médico pendente."}
+                          </div>
+                        </div>
+                      );
                     } else if (r.action === "DELETE") {
                       kind = "pagamento_removido";
-                      body = "Pagamento removido.";
+                      body = `Pagamento removido${
+                        antes.valor != null ? ` (${fmtDinheiro(antes.valor)})` : ""
+                      }.`;
                     } else if (r.action === "UPDATE") {
+                      kind = "repasse";
                       body = (
                         <div className="space-y-0.5">
                           {chaves.map((k) => (
@@ -10358,10 +10446,74 @@ function AgendaPage() {
                         when: r.created_at,
                         quem,
                         kind: "cancelou",
-                        body: "Cancelou o agendamento.",
+                        body: (
+                          <>
+                            Cancelou o agendamento (estava{" "}
+                            <b>
+                              {statusPt[String(antes.status ?? "")] ?? String(antes.status ?? "—")}
+                            </b>
+                            ).
+                          </>
+                        ),
                       });
                       continue;
                     }
+                    if (novo === "faltou") {
+                      items.push({
+                        id: r.id,
+                        when: r.created_at,
+                        quem,
+                        kind: "faltou",
+                        body: "Marcou o paciente como faltoso.",
+                      });
+                      continue;
+                    }
+                  }
+                  // Sem faturamento — o motivo e o supervisor que autorizou
+                  // ficam gravados no próprio agendamento.
+                  if (set.has("sem_faturamento")) {
+                    const marcou = !!depois.sem_faturamento;
+                    const motivo = String(depois.sem_faturamento_motivo ?? "").trim();
+                    const autorizou = String(
+                      depois.sem_faturamento_autorizado_por_nome ?? "",
+                    ).trim();
+                    items.push({
+                      id: r.id,
+                      when: r.created_at,
+                      quem,
+                      kind: marcou ? "sem_faturamento" : "sem_faturamento_removido",
+                      body: (
+                        <div className="space-y-0.5">
+                          <div>
+                            {marcou
+                              ? "Marcou o atendimento como isento de cobrança."
+                              : "Removeu a marcação de sem faturamento — o atendimento volta a ser cobrado."}
+                          </div>
+                          {motivo ? (
+                            <div className="text-muted-foreground whitespace-pre-wrap">
+                              Motivo: {motivo}
+                            </div>
+                          ) : null}
+                          {autorizou ? (
+                            <div className="text-muted-foreground">Autorizado por: {autorizou}</div>
+                          ) : null}
+                        </div>
+                      ),
+                    });
+                    continue;
+                  }
+                  // Autorização do convênio
+                  if (set.has("convenio_autorizado")) {
+                    items.push({
+                      id: r.id,
+                      when: r.created_at,
+                      quem,
+                      kind: "autorizacao",
+                      body: depois.convenio_autorizado
+                        ? "Registrou a autorização do convênio."
+                        : "Retirou a autorização do convênio.",
+                    });
+                    continue;
                   }
                   // Check-in / atendimento pelo fluxo_etapa
                   if (set.has("fluxo_etapa") && !pacienteMudou) {
@@ -10452,16 +10604,57 @@ function AgendaPage() {
                   });
                 }
 
+                // Caixa — quem recebeu o dinheiro, quanto, em que forma e em
+                // qual gaveta. É a parte da auditoria que faltava por
+                // completo: sem ela a supervisão tinha de abrir o Movimento de
+                // Caixa em outra tela para descobrir quem recebeu.
+                for (const c of caixaHist) {
+                  const kind: Kind =
+                    c.tipo === "estorno"
+                      ? "caixa_estorno"
+                      : c.tipo === "recebimento"
+                        ? "caixa_recebimento"
+                        : "caixa_registro";
+                  items.push({
+                    id: `cx-${c.id}`,
+                    when: c.created_at,
+                    quem: quemDoAutor(c.autor),
+                    kind,
+                    body: (
+                      <div className="space-y-0.5">
+                        <div>
+                          {kind === "caixa_estorno"
+                            ? "Estornou no caixa "
+                            : kind === "caixa_recebimento"
+                              ? "Recebeu no caixa "
+                              : "Lançou no caixa "}
+                          <b>{fmtDinheiro(c.valor)}</b> em <b>{fmtForma(c.forma_pagamento)}</b>.
+                        </div>
+                        {c.caixa_dono ? (
+                          <div className="text-muted-foreground">
+                            Caixa de {c.caixa_dono}
+                            {c.caixa_status === "fechado" ? " (já fechado)" : ""}.
+                          </div>
+                        ) : null}
+                        {c.destino_nome ? (
+                          <div className="text-muted-foreground">Destino: {c.destino_nome}</div>
+                        ) : null}
+                      </div>
+                    ),
+                  });
+                }
+
                 // Estornos
                 for (const e of estornosHist) {
                   items.push({
                     id: `est-req-${e.id}`,
                     when: e.solicitado_em,
-                    quem: quemPorUid(e.solicitado_por),
+                    quem: quemDoAutor(e.solicitante),
                     kind: "estorno_solicitado",
                     body: (
                       <div>
-                        Solicitou estorno.
+                        Solicitou estorno
+                        {e.valor != null ? ` de ${fmtDinheiro(e.valor)}` : ""}.
                         {e.motivo ? (
                           <div className="text-muted-foreground whitespace-pre-wrap">
                             Motivo: {e.motivo}
@@ -10480,7 +10673,7 @@ function AgendaPage() {
                     items.push({
                       id: `est-res-${e.id}`,
                       when: e.resolvido_em,
-                      quem: quemPorUid(e.resolvido_por),
+                      quem: quemDoAutor(e.resolvedor),
                       kind: k,
                       body: (
                         <div>
@@ -10502,7 +10695,7 @@ function AgendaPage() {
 
                 // Notas manuais
                 for (const n of notasHist) {
-                  const quem = n.user_nome || quemPorEmail(n.user_email);
+                  const quem = n.user_nome || n.user_email || "Sistema";
                   const origemAuto =
                     !n.user_email && (n.user_nome === "Totem" || n.user_nome === "Autoatendimento");
                   items.push({
