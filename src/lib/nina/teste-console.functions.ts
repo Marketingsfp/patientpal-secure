@@ -112,6 +112,53 @@ async function garantirConversa(admin: any, clinicaId: string, lead: LeadRow): P
   return conversaId;
 }
 
+/** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
+const LIMITE_MENSAGENS_LEAD = 400;
+
+/** IDs de todas as conversas de teste do lead (sessões atuais e anteriores). */
+async function conversasDoLead(admin: any, clinicaId: string, lead: LeadRow): Promise<string[]> {
+  const { data: convs } = await admin
+    .from("atend_conversas")
+    .select("id")
+    .eq("clinica_id", clinicaId)
+    .eq("is_teste", true)
+    .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
+  const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
+  if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
+  return ids;
+}
+
+/**
+ * Mantém no máximo LIMITE_MENSAGENS_LEAD mensagens por lead de teste: ao bater
+ * o teto, as mais antigas são apagadas para dar lugar às novas.
+ */
+async function podarMensagensLead(admin: any, clinicaId: string, lead: LeadRow) {
+  try {
+    const ids = await conversasDoLead(admin, clinicaId, lead);
+    if (ids.length === 0) return;
+    const { count } = await admin
+      .from("whatsapp_mensagens")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", clinicaId)
+      .in("conversa_id", ids);
+    const excedente = (count ?? 0) - LIMITE_MENSAGENS_LEAD;
+    if (excedente <= 0) return;
+    const { data: antigas } = await admin
+      .from("whatsapp_mensagens")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .in("conversa_id", ids)
+      .order("created_at", { ascending: true })
+      .limit(excedente);
+    const alvo = ((antigas ?? []) as any[]).map((m) => m.id as string);
+    if (alvo.length) await admin.from("whatsapp_mensagens").delete().in("id", alvo);
+  } catch (e) {
+    console.error("[NINA_TESTE] falha ao podar mensagens antigas", e);
+  }
+}
+
+
+
 export const listarLeadsTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
