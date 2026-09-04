@@ -80,7 +80,6 @@ import {
   pausaAtual,
   listarPauseReasons,
   meuStatusAgente,
-  assumirConversa,
   devolverParaNina,
   definirPresenca,
 } from "@/lib/atendimento.functions";
@@ -120,7 +119,6 @@ export function AtendInbox() {
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
   const travarFilaFn = useServerFn(travarMinhaFila);
-  const assumirFn = useServerFn(assumirConversa);
   const devolverFn = useServerFn(devolverParaNina);
   const iniciarPausaFn = useServerFn(iniciarPausa);
   const finalizarPausaFn = useServerFn(finalizarPausa);
