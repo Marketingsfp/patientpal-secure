@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
+import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
