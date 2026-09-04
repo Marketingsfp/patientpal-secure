@@ -31,8 +31,8 @@ function espera(desde?: string | null) {
 
 /**
  * Fila de conversas que a Nina encaminhou para atendimento humano.
- * O atendente clica em "Assumir": a trava é feita no banco, então dois
- * cliques simultâneos nunca colocam duas pessoas na mesma conversa.
+ * Não há ação manual: assim que alguém fica online, o sistema distribui
+ * automaticamente as conversas para quem tem menos conversas ativas.
  */
 export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void } = {}) {
   const { clinicaAtual } = useClinica();
