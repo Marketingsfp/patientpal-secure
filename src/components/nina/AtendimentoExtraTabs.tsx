@@ -846,8 +846,18 @@ export function AtendInbox() {
                       Agendamentos
                     </div>
                     {contato.agendamentos.map((a: any) => (
-                      <div key={a.id} className="text-xs border rounded p-2 mb-1">
-                        <div className="font-medium">{a.procedimento}</div>
+                      <div key={a.id} className="text-xs border rounded p-2 mb-1 space-y-0.5">
+                        <div className="font-medium">
+                          {a.procedimento || a.especialidade || "Consulta"}
+                        </div>
+                        {a.especialidade && a.procedimento && (
+                          <div className="text-muted-foreground">
+                            Especialidade: {a.especialidade}
+                          </div>
+                        )}
+                        <div className="text-muted-foreground">
+                          Médico: {a.medico_nome || "não definido"}
+                        </div>
                         <div className="text-muted-foreground">
                           {fmtData(a.inicio)} · {a.status}
                         </div>

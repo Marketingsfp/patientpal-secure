@@ -1348,7 +1348,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .from("agendamentos")
           // O nome do médico não fica em `agendamentos`; vem do vínculo com
           // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
-          .select("id, inicio, procedimento, status, medicos(nome)")
+          .select("id, inicio, procedimento, especialidade, tipo_atendimento, status, medicos(nome)")
 
           .eq("paciente_id", paciente.id)
           .order("inicio", { ascending: false })
