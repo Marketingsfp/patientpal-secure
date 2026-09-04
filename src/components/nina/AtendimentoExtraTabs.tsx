@@ -665,10 +665,11 @@ export function AtendInbox() {
               </button>
             ))}
           </div>
+          </div>
         </Card>
 
         {/* COLUNA 2 — CHAT */}
-        <Card className="col-span-12 md:col-span-8 lg:col-span-7 xl:col-span-8 flex flex-col overflow-hidden">
+        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {!sel ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Selecione uma conversa
