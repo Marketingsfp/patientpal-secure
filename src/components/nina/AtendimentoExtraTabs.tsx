@@ -80,6 +80,7 @@ import {
   meuStatusAgente,
   assumirConversa,
   devolverParaNina,
+  definirPresenca,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 
@@ -124,6 +125,7 @@ export function AtendInbox() {
   const pausaAtualFn = useServerFn(pausaAtual);
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
+  const presencaFn = useServerFn(definirPresenca);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
