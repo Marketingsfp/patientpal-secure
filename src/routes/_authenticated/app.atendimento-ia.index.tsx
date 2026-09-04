@@ -20,7 +20,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
 import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
-import { isMedicoOnlyUser } from "@/lib/medico-only";
+import { cadastroMedicoDoUsuario, isMedicoOnlyUser } from "@/lib/medico-only";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
   component: AtendimentoIaPage,
@@ -166,8 +166,29 @@ function AtendimentoIaPage() {
       // falta o vínculo. Um médico nunca deve cair na fila de outro por acaso.
       const soMedico = user?.id ? await isMedicoOnlyUser(user.id) : false;
       setSoMedico(soMedico);
-      setSemVinculo(!meu && soMedico);
-      if (meu) setMedicoId(meu.id);
+      // A lista acima só traz os médicos ativos (mais os inativos com fila
+      // hoje). Um profissional cujo cadastro está inativo não se encontraria
+      // nela e veria a tela como se não tivesse vínculo nenhum — por isso o
+      // cadastro dele é procurado à parte e entra na lista.
+      let meuCadastro: { id: string; nome: string } | null = meu
+        ? { id: meu.id, nome: meu.nome }
+        : null;
+      if (!meuCadastro && soMedico) {
+        meuCadastro = await cadastroMedicoDoUsuario(cid);
+        if (meuCadastro) {
+          const eu: Medico = {
+            id: meuCadastro.id,
+            nome: meuCadastro.nome,
+            email: null,
+            user_id: user?.id ?? null,
+            especialidade_id: null,
+            ativo: false,
+          };
+          setMedicos([...meds, eu].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+        }
+      }
+      setSemVinculo(!meuCadastro && soMedico);
+      if (meuCadastro) setMedicoId(meuCadastro.id);
       else if (soMedico) setMedicoId("");
       else if (meds.length && !medicoId) {
         const comFila = (
