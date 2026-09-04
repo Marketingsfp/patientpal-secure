@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { ClinicaProvider } from "@/hooks/use-clinica";
+import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { supabase } from "@/integrations/supabase/client";
 import { isMedicoOnlyUser } from "@/lib/medico-only";
 
@@ -25,6 +26,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedApp() {
+  // Aviso de versão nova para TODAS as telas do sistema. Antes só a tela do
+  // Caixa checava: os computadores da recepção ficam com a Agenda aberta o dia
+  // inteiro e nunca souberam de uma publicação nova, então a equipe seguia
+  // usando a versão antiga e relatando como defeito um problema já corrigido.
+  useAutoReloadOnNewBuild(true);
   return (
     <ClinicaProvider>
       <AppShell />

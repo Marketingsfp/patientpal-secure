@@ -76,7 +76,6 @@ import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
-import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 import { blocoAssinaturasRelatorio, CSS_RELATORIO_A4 } from "@/lib/print-relatorio-base";
 import { ResumoFormas } from "@/components/caixa/resumo-formas";
@@ -299,9 +298,8 @@ function CaixaRouteDispatcher() {
   const forcaClassico =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("classico") === "1";
-  // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
-  // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
-  useAutoReloadOnNewBuild(true);
+  // O aviso de versão nova vale para todo o sistema, no layout
+  // `_authenticated` — não precisa mais ser ligado tela a tela.
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
   if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
