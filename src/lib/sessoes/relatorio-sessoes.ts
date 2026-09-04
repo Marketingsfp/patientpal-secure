@@ -162,13 +162,31 @@ export const COLUNAS_SESSOES: Coluna[] = [
   { chave: "pendencia", rotulo: "Situação", formato: "texto" },
 ];
 
+/**
+ * Sessão de pacote e visita de manutenção NÃO se somam.
+ *
+ * Elas parecem a mesma coisa na tabela (as duas caem na coluna "Realizadas"),
+ * mas contá-las juntas produz frases sem sentido, do tipo "30 realizadas de 10
+ * contratadas": as 10 contratadas vêm só dos pacotes, enquanto as 30 incluíam
+ * visitas de manutenção, que não têm total contratado nenhum. Por isso os
+ * campos de pacote e de manutenção vivem separados aqui, e só os campos com
+ * sufixo `Coluna` — usados no rodapé da tabela — somam as duas naturezas, para
+ * bater com o que está impresso na coluna.
+ */
 export interface TotaisSessoes {
   linhas: number;
   pacotes: number;
   ciclos: number;
+  /** Pacotes: total vendido, realizadas, faltas e o que ainda falta fazer. */
   sessoesContratadas: number;
   sessoesRealizadas: number;
-  faltas: number;
+  faltasPacote: number;
+  sessoesRestantes: number;
+  /** Manutenção: comparecimentos e faltas, sem total contratado. */
+  visitasManutencao: number;
+  faltasManutencao: number;
+  /** Soma das duas naturezas — só para o rodapé bater com a coluna. */
+  faltasColuna: number;
   contratado: number;
   recebido: number;
   emAberto: number;
@@ -182,24 +200,33 @@ export function totaisSessoes(linhas: LinhaSessao[]): TotaisSessoes {
     ciclos: 0,
     sessoesContratadas: 0,
     sessoesRealizadas: 0,
-    faltas: 0,
+    faltasPacote: 0,
+    sessoesRestantes: 0,
+    visitasManutencao: 0,
+    faltasManutencao: 0,
+    faltasColuna: 0,
     contratado: 0,
     recebido: 0,
     emAberto: 0,
     buscaAtiva: 0,
   };
   for (const l of linhas) {
-    if (l.origem === "ciclo") t.ciclos += 1;
-    else {
+    if (l.origem === "ciclo") {
+      t.ciclos += 1;
+      t.visitasManutencao += l.realizadas;
+      t.faltasManutencao += l.faltas;
+    } else {
       t.pacotes += 1;
       t.sessoesContratadas += l.total_sessoes;
+      t.sessoesRealizadas += l.realizadas;
+      t.faltasPacote += l.faltas;
+      t.sessoesRestantes += l.restantes;
       t.contratado += l.valor_contratado;
       // Saldo a receber só existe em pacote. No ciclo, o que não foi pago é
       // consulta que não aconteceu — não é saldo devedor de ninguém.
       t.emAberto += Math.max(0, l.valor_contratado - l.valor_pago);
     }
-    t.sessoesRealizadas += l.realizadas;
-    t.faltas += l.faltas;
+    t.faltasColuna += l.faltas;
     t.recebido += l.valor_pago;
     if (precisaBuscaAtiva(l)) t.buscaAtiva += 1;
   }
@@ -212,12 +239,18 @@ export function resumoSessoes(t: TotaisSessoes): { rotulo: string; valor: string
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   return [
     { rotulo: "Pacotes de sessões", valor: n(t.pacotes) },
-    { rotulo: "Pacientes em manutenção", valor: n(t.ciclos) },
     { rotulo: "Sessões contratadas", valor: n(t.sessoesContratadas) },
     { rotulo: "Sessões realizadas", valor: n(t.sessoesRealizadas) },
-    { rotulo: "Faltas", valor: n(t.faltas) },
-    { rotulo: "Recebido", valor: brl(t.recebido) },
-    { rotulo: "Saldo a receber (pacotes)", valor: brl(t.emAberto) },
+    { rotulo: "Sessões a fazer", valor: n(t.sessoesRestantes) },
+    { rotulo: "Faltas em pacote", valor: n(t.faltasPacote) },
+    // Bloco à parte, e não somado ao de cima: visita de manutenção não é
+    // sessão de pacote, e juntar as duas produz "30 realizadas de 10
+    // contratadas".
+    { rotulo: "Pacientes em manutenção", valor: n(t.ciclos) },
+    { rotulo: "Visitas de manutenção", valor: n(t.visitasManutencao) },
+    { rotulo: "Faltas em manutenção", valor: n(t.faltasManutencao) },
+    { rotulo: "Recebido (tudo)", valor: brl(t.recebido) },
+    { rotulo: "Saldo a receber (só pacotes)", valor: brl(t.emAberto) },
     { rotulo: "Sem agendamento (busca ativa)", valor: n(t.buscaAtiva) },
   ];
 }

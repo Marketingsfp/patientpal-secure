@@ -926,10 +926,10 @@ function Page() {
    */
   const rodapeSessoes = (cols: Coluna[], t: TotaisSessoes) =>
     cols.map((c, i) => {
-      if (c.chave === "faltas") return t.faltas.toLocaleString("pt-BR");
-      if (c.chave === "restantes") {
-        return (t.sessoesContratadas - t.sessoesRealizadas - t.faltas).toLocaleString("pt-BR");
-      }
+      // `faltasColuna` e não `faltasPacote`: o rodapé tem que fechar com a
+      // soma do que está impresso na coluna, que traz as duas naturezas.
+      if (c.chave === "faltas") return t.faltasColuna.toLocaleString("pt-BR");
+      if (c.chave === "restantes") return t.sessoesRestantes.toLocaleString("pt-BR");
       if (c.chave === "valor_contratado") return brl(t.contratado);
       if (c.chave === "valor_pago") return brl(t.recebido);
       if (i === 0) return `${t.linhas.toLocaleString("pt-BR")} registro(s)`;
@@ -939,8 +939,8 @@ function Page() {
   /** Mesmo rodapé com números crus, para o Excel conseguir somar a coluna. */
   const rodapeSessoesXlsx = (cols: Coluna[], t: TotaisSessoes) =>
     cols.map((c, i) => {
-      if (c.chave === "faltas") return t.faltas;
-      if (c.chave === "restantes") return t.sessoesContratadas - t.sessoesRealizadas - t.faltas;
+      if (c.chave === "faltas") return t.faltasColuna;
+      if (c.chave === "restantes") return t.sessoesRestantes;
       if (c.chave === "valor_contratado") return t.contratado;
       if (c.chave === "valor_pago") return t.recebido;
       return i === 0 ? `${t.linhas.toLocaleString("pt-BR")} registro(s)` : "";
@@ -1224,7 +1224,13 @@ function Page() {
       linhasCtx.push(descricaoSelecao(categorias));
     }
     if (tipo === "sessoes") {
+      // A primeira linha do cabeçalho já saiu como "Período: X a Y", que aqui
+      // seria enganoso — a folha traz tratamento em andamento de qualquer data.
+      // Estas duas linhas corrigem a leitura antes de o papel sair.
       linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
+      linhasCtx.push(
+        "Tratamento em andamento aparece mesmo tendo começado antes do período; o período só limita os pacotes já encerrados.",
+      );
       // Sem esta linha, quem recebe a folha lê a coluna "Recebido" de uma
       // manutenção como se houvesse saldo a cobrar do resto.
       linhasCtx.push(
@@ -1455,7 +1461,7 @@ function Page() {
       imprimirRelatorio({
         clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
         titulo: TITULOS.sessoes,
-        periodo: `${periodo} · ${ROTULO_FILTRO[sFiltro]}`,
+        periodo: `Posição em ${fmtDate(to)} · ${ROTULO_FILTRO[sFiltro]} · tratamento em andamento entra de qualquer data; o período (${periodo}) só limita os pacotes encerrados`,
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeSessoes(colunas, ts),
@@ -2026,17 +2032,26 @@ function Page() {
             detalhe="pacientes para busca ativa"
             invertido
           />
+          {/* Duas contagens separadas de propósito. Sessão de pacote tem total
+              contratado; visita de manutenção não tem — somar as duas gerava
+              "30 realizadas de 10 contratadas". */}
           <CardResumo
-            titulo="Sessões realizadas"
-            valor={totaisS.sessoesRealizadas.toLocaleString("pt-BR")}
-            detalhe={`de ${totaisS.sessoesContratadas.toLocaleString("pt-BR")} contratadas · ${totaisS.faltas.toLocaleString("pt-BR")} falta(s)`}
+            titulo="Sessões de pacote"
+            valor={`${totaisS.sessoesRealizadas.toLocaleString("pt-BR")} de ${totaisS.sessoesContratadas.toLocaleString("pt-BR")}`}
+            detalhe={`realizadas · ${totaisS.sessoesRestantes.toLocaleString("pt-BR")} a fazer · ${totaisS.faltasPacote.toLocaleString("pt-BR")} falta(s)`}
           />
-          <CardResumo titulo="Recebido" valor={brl(totaisS.recebido)} />
           <CardResumo
-            titulo="Saldo a receber"
-            valor={brl(totaisS.emAberto)}
-            detalhe="só pacotes — manutenção não acumula"
-            invertido
+            titulo="Visitas de manutenção"
+            valor={totaisS.visitasManutencao.toLocaleString("pt-BR")}
+            detalhe={`${totaisS.ciclos.toLocaleString("pt-BR")} paciente(s) em ciclo · sem total contratado`}
+          />
+          {/* Os dois números de dinheiro no mesmo cartão para o quadro caber em
+              quatro colunas. O saldo é sempre "só pacotes": manutenção não
+              acumula, então nunca entra aqui. */}
+          <CardResumo
+            titulo="Recebido"
+            valor={brl(totaisS.recebido)}
+            detalhe={`Saldo a receber ${brl(totaisS.emAberto)} — só pacotes`}
           />
         </div>
       )}
@@ -2046,8 +2061,23 @@ function Page() {
           <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
             <div className="space-y-1">
               <CardTitle>
-                {TITULOS[tipo]} — {fmtDate(from)} a {fmtDate(to)}
+                {TITULOS[tipo]} —{" "}
+                {/* Em Sessões a data NÃO é uma janela: um tratamento em
+                    andamento aparece mesmo tendo começado meses antes, senão a
+                    busca ativa nunca acharia quem sumiu. Escrever "03/09 a
+                    03/09" numa folha cheia de visitas de julho faz a folha
+                    mentir sobre o que está mostrando. */}
+                {tipo === "sessoes"
+                  ? `posição em ${fmtDate(to)}`
+                  : `${fmtDate(from)} a ${fmtDate(to)}`}
               </CardTitle>
+              {tipo === "sessoes" && (
+                <p className="text-xs text-muted-foreground">
+                  Tratamento em andamento aparece sempre, mesmo tendo começado antes desta data — é
+                  por isso que existem visitas antigas na lista. O período escolhido só limita os
+                  pacotes já <strong>encerrados</strong>: {fmtDate(from)} a {fmtDate(to)}.
+                </p>
+              )}
               {comparacaoVisivel && (
                 <p className="text-xs text-muted-foreground">{textoPeriodoComparado}</p>
               )}

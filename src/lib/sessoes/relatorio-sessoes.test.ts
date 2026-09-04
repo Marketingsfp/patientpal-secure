@@ -152,7 +152,35 @@ describe("totais", () => {
     expect(t.contratado).toBe(200);
     expect(t.recebido).toBe(485);
     expect(t.sessoesContratadas).toBe(5);
-    expect(t.sessoesRealizadas).toBe(5);
+  });
+
+  it("NÃO soma visita de manutenção com sessão de pacote", () => {
+    // O defeito que isto trava: com um pacote de 10 sessões (nenhuma feita) e
+    // 30 visitas de manutenção, o cartão exibia "30 realizadas de 10
+    // contratadas". As duas naturezas não se somam — manutenção não tem total
+    // contratado nenhum.
+    const t = totaisSessoes([
+      pacote({ total_sessoes: 10, realizadas: 0, restantes: 10 }),
+      ciclo({ realizadas: 12 }),
+      ciclo({ realizadas: 18 }),
+    ]);
+    expect(t.sessoesContratadas).toBe(10);
+    expect(t.sessoesRealizadas).toBe(0);
+    expect(t.visitasManutencao).toBe(30);
+  });
+
+  it("separa falta de pacote de falta de manutenção, mas soma a coluna", () => {
+    // `faltasColuna` existe para o rodapé fechar com o que está impresso na
+    // coluna Faltas, que traz as duas naturezas.
+    const t = totaisSessoes([pacote({ faltas: 2 }), ciclo({ faltas: 3 })]);
+    expect(t.faltasPacote).toBe(2);
+    expect(t.faltasManutencao).toBe(3);
+    expect(t.faltasColuna).toBe(5);
+  });
+
+  it("sessões a fazer conta só pacote, para bater com a coluna A fazer", () => {
+    const t = totaisSessoes([pacote({ restantes: 3 }), pacote({ restantes: 4 }), ciclo()]);
+    expect(t.sessoesRestantes).toBe(7);
   });
 
   it("saldo a receber ignora a manutenção", () => {
