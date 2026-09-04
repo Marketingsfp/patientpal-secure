@@ -417,6 +417,11 @@ export interface EstadoIdentidade {
   pacienteIdConversa: string | null;
   /** Estado estruturado do fluxo da Nina, gravado na conversa. */
   fluxoEstadoBruto: unknown;
+  /**
+   * Momento em que a conversa foi encerrada por um atendente. Tudo que veio
+   * antes disso NÃO entra no contexto da IA: encerrar = zerar a memória.
+   */
+  memoriaDesde: string | null;
 }
 
 async function carregarEstadoIdentidade(
@@ -430,7 +435,9 @@ async function carregarEstadoIdentidade(
     tentativas: 0,
     pacienteIdConversa: null,
     fluxoEstadoBruto: null,
+    memoriaDesde: null,
   };
+
   if (!telefone) return vazio;
   // Telefone sempre em dígitos: a Meta manda ora "55…", ora "+55…" — sem
   // normalizar, o mesmo contato virava duas conversas.
@@ -439,7 +446,7 @@ async function carregarEstadoIdentidade(
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado",
+      "id, identidade_confirmada, identidade_perguntada_em, identidade_tentativas, contato_paciente_id, nina_fluxo_estado, resolved_at, closed_at",
     )
     .eq("clinica_id", clinicaId)
     .in("contato_telefone", [digits, `+${digits}`])
@@ -447,6 +454,10 @@ async function carregarEstadoIdentidade(
     .limit(1)
     .maybeSingle();
   if (data) {
+    const fim = [(data as any).resolved_at, (data as any).closed_at]
+      .filter(Boolean)
+      .sort()
+      .pop() as string | undefined;
     return {
       conversaId: (data as any).id,
       confirmada: (data as any).identidade_confirmada === true,
@@ -454,8 +465,10 @@ async function carregarEstadoIdentidade(
       tentativas: Number((data as any).identidade_tentativas ?? 0),
       pacienteIdConversa: (data as any).contato_paciente_id ?? null,
       fluxoEstadoBruto: (data as any).nina_fluxo_estado ?? null,
+      memoriaDesde: fim ?? null,
     };
   }
+
 
   const { data: nova } = await supabaseAdmin
     .from("atend_conversas")
@@ -756,7 +769,14 @@ export async function gerarRespostaNina(
       ? `IDENTIDADE: você JÁ perguntou a identidade nesta conversa e não houve confirmação clara. NÃO pergunte de novo — siga o atendimento normalmente. Só pergunte mais uma vez (a última) se for indispensável para a ação pedida (ex.: confirmar um agendamento existente dessa pessoa).`
       : `IDENTIDADE: ainda não perguntada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
 
-  const historico = ((histR as any)?.data ?? [])
+  // Encerrar a conversa zera a memória: só entram mensagens posteriores ao
+  // encerramento (resolved_at/closed_at) da última conversa deste contato.
+  const msgsMemoria = ((histR as any)?.data ?? []).filter((m: any) =>
+    estadoId.memoriaDesde ? String(m.created_at ?? "") > String(estadoId.memoriaDesde) : true,
+  );
+
+  const historico = msgsMemoria
+
     .slice()
     .reverse()
     .map((m: any) => ({
@@ -770,7 +790,7 @@ export async function gerarRespostaNina(
     String(nomeUnidade)
       .split(/\s+[—–-]\s+/)[0]
       ?.trim() || nomeUnidade;
-  const jaSeApresentou = ((histR as any)?.data ?? []).some((m: any) => m.direction === "out");
+  const jaSeApresentou = msgsMemoria.some((m: any) => m.direction === "out");
   const dadosPublicos = [
     `Nome oficial: ${nomeUnidade}`,
     enderecoUnidade ? `Endereço: ${enderecoUnidade}` : null,
