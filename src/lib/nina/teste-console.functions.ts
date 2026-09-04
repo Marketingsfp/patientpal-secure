@@ -205,16 +205,10 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
 
     // O console mostra TODAS as sessões do lead (histórico visual completo).
     // A memória da Nina continua isolada: ela só enxerga o telefone da sessão atual.
-    const { data: convs } = await supabaseAdmin
-      .from("atend_conversas")
-      .select("id")
-      .eq("clinica_id", data.clinicaId)
-      .eq("is_teste", true)
-      .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
-    const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
-    if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
+    const ids = await conversasDoLead(supabaseAdmin, data.clinicaId, lead);
     if (ids.length === 0)
       return { mensagens: [], conversaId: lead.conversa_id, sessao: lead.sessao_seq };
+
 
     // Busca as mensagens MAIS RECENTES (desc) e reordena para exibição: com
     // muitas sessões o lead passa do limite, e ordenar asc esconderia justo as
