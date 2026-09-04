@@ -267,14 +267,15 @@ export const fecharConversa = createServerFn({ method: "POST" })
         resolved_at: new Date().toISOString(),
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
-        // Fim do fluxo: o estado transitório da Nina (paciente identificado,
-        // horário oferecido) morre junto com a conversa resolvida.
+        // Fim do fluxo: apenas o estado transitório do agendamento (vaga
+        // oferecida, etapa) morre com a conversa. A identidade do contato e o
+        // histórico permanecem — no atendimento real a Nina deve continuar
+        // entendendo o contexto das mensagens anteriores. O reset completo de
+        // memória vale somente para o console de testes.
         nina_fluxo_estado: null,
-        identidade_confirmada: false,
-        identidade_perguntada_em: null,
-        identidade_tentativas: 0,
         handoff_resumo: null,
         handoff_motivo: null,
+
 
       })
       .eq("id", data.conversaId)
