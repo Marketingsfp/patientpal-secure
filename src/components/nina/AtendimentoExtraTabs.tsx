@@ -733,48 +733,8 @@ export function AtendInbox() {
                     >
                       <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
                     </Button>
-                    {!sel.atribuida_user_id && sel.status !== "closed" && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={async () => {
-                          if (!clinicaId) return;
-                          try {
-                            const r: any = await assumirFn({
-                              data: { clinicaId, conversaId: sel.id },
-                            });
-                            if (r?.ok) {
-                              setSel({ ...sel, atribuida_user_id: "me", owner_type: "HUMAN", status: "active" });
-                            } else {
-                              toast.warning("Outro atendente assumiu primeiro.");
-                            }
-                            await carregarConvs();
-                          } catch (e: any) {
-                            mostrarErro(e);
-                          }
-                        }}
-                      >
-                        Assumir
-                      </Button>
-                    )}
-                    {sel.owner_type && sel.owner_type !== "AI" && sel.status !== "closed" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={async () => {
-                          if (!clinicaId) return;
-                          try {
-                            await devolverFn({ data: { clinicaId, conversaId: sel.id } });
-                            setSel({ ...sel, atribuida_user_id: null, owner_type: "AI", status: "bot_attending" });
-                            await carregarConvs();
-                          } catch (e: any) {
-                            mostrarErro(e);
-                          }
-                        }}
-                      >
-                        Devolver para Nina
-                      </Button>
-                    )}
+                    {/* Conversas não atribuídas são distribuídas automaticamente
+                        quando alguém fica online — sem botões manuais. */}
                     <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
                       <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
                     </Button>
