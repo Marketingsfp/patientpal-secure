@@ -47,6 +47,8 @@ import {
   Lock,
   Unlock,
   CalendarPlus,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
@@ -150,6 +152,25 @@ export function AtendInbox() {
   const [pauseReasons, setPauseReasons] = useState<any[]>([]);
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
   const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
+  // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
+  const [painelFixado, setPainelFixado] = useState(false);
+  const [painelHover, setPainelHover] = useState(false);
+  const painelAberto = painelFixado || painelHover;
+  useEffect(() => {
+    try {
+      setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
+    } catch {}
+  }, []);
+  const alternarFixado = () => {
+    setPainelFixado((v) => {
+      const nv = !v;
+      try {
+        localStorage.setItem("nina.inbox.fixado", nv ? "1" : "0");
+      } catch {}
+      return nv;
+    });
+  };
+
 
   const carregarStatusAgente = useCallback(async () => {
     if (!clinicaId) return;
@@ -467,11 +488,47 @@ export function AtendInbox() {
 
   return (
     <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
-      <div className="grid h-full grid-cols-12 gap-2 overflow-hidden">
-        {/* COLUNA 1 — LISTA */}
-        <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
+      <div className="flex h-full gap-2 overflow-hidden">
+        {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
+        <Card
+          onMouseEnter={() => setPainelHover(true)}
+          onMouseLeave={() => setPainelHover(false)}
+          className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            painelAberto ? "w-[300px]" : "w-[52px]"
+          }`}
+        >
+          {!painelAberto && (
+            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <Badge variant="outline" className="px-1 text-[10px]">
+                {convs.length}
+              </Badge>
+              <Circle
+                className={`h-3 w-3 fill-current ${
+                  pausaAtiva
+                    ? "text-amber-500"
+                    : filaAberta
+                      ? "text-emerald-600"
+                      : "text-slate-400"
+                }`}
+              />
+            </div>
+          )}
+          <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
           <div className="shrink-0 border-b p-2 space-y-1.5">
-            <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+            <div className="flex items-center gap-1">
+              <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6 w-6 p-0"
+                title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                onClick={alternarFixado}
+              >
+                {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+
             <div className="grid grid-cols-3 gap-1">
               <Button
                 size="sm"
@@ -608,10 +665,11 @@ export function AtendInbox() {
               </button>
             ))}
           </div>
+          </div>
         </Card>
 
         {/* COLUNA 2 — CHAT */}
-        <Card className="col-span-12 md:col-span-8 lg:col-span-7 xl:col-span-8 flex flex-col overflow-hidden">
+        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {!sel ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Selecione uma conversa
@@ -795,7 +853,7 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 3 — CONTATO */}
-        <Card className="hidden lg:flex lg:col-span-2 xl:col-span-2 flex-col overflow-hidden">
+        <Card className="hidden lg:flex w-[260px] xl:w-[300px] shrink-0 flex-col overflow-hidden">
           <CardHeader className="py-2 border-b">
             <CardTitle className="text-base">Contato</CardTitle>
           </CardHeader>
