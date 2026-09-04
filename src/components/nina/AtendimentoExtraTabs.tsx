@@ -883,11 +883,37 @@ export function AtendInbox() {
                     <SelectValue placeholder="Selecione (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {usuarios.map((u: any) => (
-                      <SelectItem key={u.user_id} value={u.user_id}>
-                        {u.nome ?? u.email ?? u.user_id}
-                      </SelectItem>
-                    ))}
+                    <div className="p-1 sticky top-0 bg-popover z-10">
+                      <Input
+                        autoFocus
+                        value={buscaAgente}
+                        onChange={(e) => setBuscaAgente(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder="Digite o nome do agente…"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    {(() => {
+                      const alvo = normalizarNomeBusca(buscaAgente);
+                      const lista = usuarios.filter((u: any) =>
+                        !alvo
+                          ? true
+                          : normalizarNomeBusca(
+                              `${u.nome ?? ""} ${u.email ?? ""}`,
+                            ).includes(alvo),
+                      );
+                      if (lista.length === 0)
+                        return (
+                          <p className="px-3 py-2 text-xs text-muted-foreground">
+                            Nenhum agente encontrado.
+                          </p>
+                        );
+                      return lista.map((u: any) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.nome ?? u.email ?? u.user_id}
+                        </SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
