@@ -466,9 +466,9 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {/* TOOLBAR — status do agente */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
         <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
         <Button
           size="sm"
@@ -527,9 +527,9 @@ export function AtendInbox() {
         }}
       />
 
-      <div className="grid grid-cols-12 gap-3 h-[calc(100vh-320px)] min-h-[520px]">
+      <div className="grid grid-cols-12 gap-2 h-[calc(100vh-230px)] min-h-[560px]">
         {/* COLUNA 1 — LISTA */}
-        <Card className="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col overflow-hidden">
+        <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
           <CardHeader className="py-3 space-y-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -607,7 +607,7 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 2 — CHAT */}
-        <Card className="col-span-12 md:col-span-8 lg:col-span-6 flex flex-col overflow-hidden">
+        <Card className="col-span-12 md:col-span-8 lg:col-span-7 xl:col-span-8 flex flex-col overflow-hidden">
           {!sel ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Selecione uma conversa
@@ -731,7 +731,7 @@ export function AtendInbox() {
                   return (
                     <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
+                        className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                           out
                             ? "bg-emerald-500 text-white rounded-br-sm"
                             : "bg-card border border-border rounded-bl-sm"
@@ -791,7 +791,7 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 3 — CONTATO */}
-        <Card className="hidden lg:flex col-span-3 flex-col overflow-hidden">
+        <Card className="hidden lg:flex lg:col-span-2 xl:col-span-2 flex-col overflow-hidden">
           <CardHeader className="py-3 border-b">
             <CardTitle className="text-base">Contato</CardTitle>
           </CardHeader>

@@ -86,12 +86,30 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
     }
   };
 
+  if (rows.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+        <Inbox className="h-3.5 w-3.5" />
+        <span>Não atribuídas: 0 — tudo distribuído entre os atendentes online.</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto h-6 px-2"
+          onClick={carregar}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Card>
-      <CardHeader className="py-3 flex-row items-center gap-2 space-y-0">
+      <CardHeader className="py-2 flex-row items-center gap-2 space-y-0">
         <Inbox className="h-4 w-4" />
         <CardTitle className="text-base">Não atribuídas</CardTitle>
-        <Badge variant={rows.length > 0 ? "default" : "outline"} className="ml-1">
+        <Badge variant="default" className="ml-1">
           {rows.length}
         </Badge>
         <Button size="sm" variant="ghost" className="ml-auto" onClick={carregar} disabled={loading}>
@@ -99,11 +117,8 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
         </Button>
       </CardHeader>
       <CardContent className="pt-0">
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">
-            Ninguém aguardando — tudo distribuído entre os atendentes online.
-          </p>
-        ) : (
+        {(
+
 
           <div className="space-y-2">
             {rows.map((c) => {
