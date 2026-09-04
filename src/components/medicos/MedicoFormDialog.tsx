@@ -1211,7 +1211,7 @@ export function MedicoFormDialog({
     // Optionally create system user / add to clinic team
     if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
       try {
-        await cadastrarUsuarioFn({
+        const res = await cadastrarUsuarioFn({
           data: {
             clinicaId: activeClinicaId,
             email: form.email,
@@ -1220,6 +1220,22 @@ export function MedicoFormDialog({
             role: form.roleUsuario,
           },
         });
+        // O login sozinho não basta: sem gravar o `user_id` no cadastro do
+        // médico, o sistema não sabe que aquele usuário É este profissional.
+        // A tela "Meus Pacientes — Atendimento" abria com a fila de outro
+        // médico (ou vazia) porque não achava o cadastro do usuário logado.
+        const novoUserId = (res as { userId?: string | null } | null)?.userId ?? null;
+        if (novoUserId && medicoId) {
+          const { error: vincErr } = await supabase
+            .from("medicos")
+            .update({ user_id: novoUserId } as never)
+            .eq("id", medicoId);
+          if (vincErr) {
+            toast.warning(
+              "Login criado, mas não foi possível ligá-lo ao cadastro do médico. Peça a um administrador para refazer o vínculo.",
+            );
+          }
+        }
         toast.success("Usuário do sistema criado e vinculado à equipe!");
       } catch (err: any) {
         mostrarErro(err, "médico salvo, mas erro ao criar usuário");

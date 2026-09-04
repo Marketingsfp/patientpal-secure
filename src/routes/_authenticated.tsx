@@ -9,16 +9,21 @@ export const Route = createFileRoute("/_authenticated")({
   // Gate executado antes de renderizar qualquer rota /app/*.
   // SSR desligado porque a sessão Supabase vive em localStorage.
   ssr: false,
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) {
       throw redirect({ to: "/login" });
     }
-    // Usuários que são apenas médicos vão para a interface simplificada,
-    // sem menu lateral.
+    // Quem só é médico entra direto na fila de atendimento do dia, em vez de
+    // parar no seletor de portais. Antes ele era desviado para a tela
+    // simplificada `/medico`, que não tem menu lateral nenhum — o médico
+    // ficava sem caminho para o prontuário e sem as demais telas do perfil.
+    // Só a raiz "/app" é desviada: qualquer outra tela que ele abrir continua
+    // valendo, com o menu normal filtrado pelas permissões do perfil Médico.
+    const raizDoApp = location.pathname === "/app" || location.pathname === "/app/";
     const uid = data.session.user?.id;
-    if (uid && (await isMedicoOnlyUser(uid))) {
-      throw redirect({ to: "/medico" });
+    if (raizDoApp && uid && (await isMedicoOnlyUser(uid))) {
+      throw redirect({ to: "/app/atendimento-ia" });
     }
   },
   component: AuthenticatedApp,

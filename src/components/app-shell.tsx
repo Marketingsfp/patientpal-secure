@@ -175,10 +175,20 @@ type NavLeaf = {
   icon: typeof LayoutDashboard;
   hash?: string;
   aliases?: ReadonlyArray<string>;
+  /**
+   * Palavras que também encontram este item na busca do menu, além do rótulo.
+   * Serve para os nomes que a equipe usa no dia a dia e que não cabem no
+   * rótulo — o médico procura por "prontuário" e precisa achar a tela de
+   * atendimento, que no menu tem outro nome.
+   */
+  busca?: ReadonlyArray<string>;
 };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
+
+/** Rótulo do item somado aos sinônimos usados pela busca do menu lateral. */
+const textoBuscavel = (it: NavLeaf): string => [it.label, ...(it.busca ?? [])].join(" ");
 
 // Chave estável de um item de menu para a ordem personalizada por usuário
 // (leaf = rota + hash; grupo expansível = prefixo com o rótulo).
@@ -447,7 +457,21 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Inteligência",
     items: [
-      { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Stethoscope },
+      // Tela clínica do médico: fila dos pacientes do dia dele com o botão de
+      // abrir o prontuário. O rótulo começa por "Meus Pacientes" porque é o
+      // nome que os médicos procuram no menu.
+      {
+        to: "/app/atendimento-ia",
+        label: "Meus Pacientes — Atendimento",
+        icon: Stethoscope,
+        busca: [
+          "atendimento medico",
+          "prontuario eletronico",
+          "prontuario",
+          "consultorio",
+          "fila do medico",
+        ],
+      },
       { to: "/app/crm", label: "CRM", icon: Target },
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
@@ -1013,9 +1037,9 @@ function AppShellInner() {
       .map((row) => {
         const items = row.items
           .map((it) => {
-            if (!isParent(it)) return norm(it.label).includes(alvo) ? it : null;
+            if (!isParent(it)) return norm(textoBuscavel(it)).includes(alvo) ? it : null;
             if (norm(it.label).includes(alvo)) return it;
-            const children = it.children.filter((c) => norm(c.label).includes(alvo));
+            const children = it.children.filter((c) => norm(textoBuscavel(c)).includes(alvo));
             return children.length > 0 ? { ...it, children } : null;
           })
           .filter((it): it is NavItem => it !== null);

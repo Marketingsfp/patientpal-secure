@@ -20,6 +20,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
 import { agendamentosStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
+import { isMedicoOnlyUser } from "@/lib/medico-only";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/")({
   component: AtendimentoIaPage,
@@ -76,6 +77,9 @@ function AtendimentoIaPage() {
   const [triagensTick, setTriagensTick] = useState(0);
   const [pagamentos, setPagamentos] = useState<Record<string, StatusPagamento>>({});
   const [pagamentosTick, setPagamentosTick] = useState(0);
+  // Usuário com perfil só de médico cujo login ainda não foi ligado ao
+  // cadastro do profissional na clínica.
+  const [semVinculo, setSemVinculo] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -154,7 +158,13 @@ function AtendimentoIaPage() {
         ? (meds.find((x) => x.user_id === user.id) ??
           (emailLogado ? meds.find((x) => x.email?.toLowerCase() === emailLogado) : null))
         : null;
+      // Conta que é SÓ médico e não achou o próprio cadastro: em vez de abrir
+      // a fila de um colega qualquer (o primeiro da lista), a tela avisa que
+      // falta o vínculo. Um médico nunca deve cair na fila de outro por acaso.
+      const soMedico = user?.id ? await isMedicoOnlyUser(user.id) : false;
+      setSemVinculo(!meu && soMedico);
       if (meu) setMedicoId(meu.id);
+      else if (soMedico) setMedicoId("");
       else if (meds.length && !medicoId) {
         const comFila = (
           (pendAll ?? []) as Array<{ medico_id: string | null; fluxo_etapa: string }>
@@ -317,12 +327,25 @@ function AtendimentoIaPage() {
       <div className="flex items-center gap-3">
         <Brain className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-xl font-semibold">Atendimento médico</h1>
+          <h1 className="text-xl font-semibold">Meus Pacientes — Atendimento</h1>
           <p className="text-sm text-muted-foreground">
-            Selecione um paciente na fila para iniciar o atendimento.
+            Fila dos pacientes agendados para hoje. Clique em Atender para abrir o prontuário.
           </p>
         </div>
       </div>
+
+      {semVinculo && (
+        <Card className="flex items-start gap-3 border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <div className="font-medium">Seu login ainda não está ligado ao seu cadastro.</div>
+            <p className="text-muted-foreground">
+              Por isso a fila abre vazia. Peça à clínica para abrir Cadastros → Médicos, editar o
+              seu cadastro e ligar o seu usuário do sistema a ele.
+            </p>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4 space-y-3">
         <div className="space-y-1">

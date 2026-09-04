@@ -56,7 +56,7 @@ function LoginPage() {
           return;
         }
         const soMedico = await isMedicoOnlyUser(user.id);
-        navigate({ to: soMedico ? "/medico" : "/app", replace: true });
+        navigate({ to: soMedico ? "/app/atendimento-ia" : "/app", replace: true });
       })();
     }
   }, [authLoading, navigate, next, user]);
@@ -77,7 +77,7 @@ function LoginPage() {
     }
     const uid = data.user?.id;
     const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
-    navigate({ to: soMedico ? "/medico" : "/app", replace: true });
+    navigate({ to: soMedico ? "/app/atendimento-ia" : "/app", replace: true });
   };
 
   const handleForgotPassword = async () => {
