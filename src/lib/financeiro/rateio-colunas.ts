@@ -43,6 +43,7 @@ export const ROTULO_AGRUPADOR: Record<RateioAgruparPor, string> = {
   profissional: "Profissional",
   especialidade: "Especialidade",
   servico: "Serviço",
+  tipo: "Tipo de serviço",
   condicao: "Condição",
 };
 
@@ -102,6 +103,11 @@ export function colunasRateio(
     // coluna ao lado, além de quebrar a mesma consulta em várias linhas na
     // conferência do financeiro.
     { chave: "servico_nome", rotulo: "Serviço", formato: "texto" },
+    // Separa consulta de exame do MESMO profissional. Fica ao lado do serviço
+    // porque é dele que o tipo vem, e sai sempre — inclusive quando a listagem
+    // está agrupada por data —, que é o caso em que o financeiro mais precisa
+    // enxergar a separação sem ter que reconhecer serviço por serviço.
+    { chave: "tipo_servico", rotulo: "Tipo de serviço", formato: "texto" },
     // Separa a "Consulta Cartão" da consulta particular sem precisar de um
     // serviço duplicado no cadastro.
     { chave: "condicao", rotulo: "Condição", formato: "texto" },

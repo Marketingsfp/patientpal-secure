@@ -13,7 +13,7 @@
  * O tipo "Rateio da Receita" reproduz o relatório de mesmo nome do sistema
  * anterior (Clínica Total): quanto cada dia/profissional/especialidade rendeu,
  * quanto saiu de repasse e quanto sobrou para a clínica. Ele tem filtros
- * próprios (profissional, especialidade, grupo/serviço), comparação com outro
+ * próprios (profissional, especialidade, grupo/tipo/serviço), comparação com outro
  * período e cards de fechamento. A conta em si vive em
  * `@/lib/financeiro/rateio-receita`; os períodos, em
  * `@/lib/financeiro/periodos`.
@@ -92,6 +92,7 @@ import {
   carregarRateio,
   categoriasDoRateio,
   compararRateio,
+  rotuloTipo,
   totaisRateio,
   type RateioAgruparPor,
   type RateioContexto,
@@ -258,9 +259,11 @@ function ordenarAnalitico(linhas: RateioLinha[], agruparPor: RateioAgruparPor): 
         ? l.especialidade_nome
         : agruparPor === "servico"
           ? l.servico_nome
-          : agruparPor === "condicao"
-            ? l.condicao
-            : l.data;
+          : agruparPor === "tipo"
+            ? l.tipo_servico
+            : agruparPor === "condicao"
+              ? l.condicao
+              : l.data;
   return [...linhas].sort(
     (a, b) => chave(a).localeCompare(chave(b), "pt-BR") || a.data.localeCompare(b.data),
   );
@@ -546,6 +549,11 @@ function Page() {
   const [rMedico, setRMedico] = useState("todos");
   const [rEspecialidade, setREspecialidade] = useState("todas");
   const [rGrupo, setRGrupo] = useState("todos");
+  // Tipo de serviço (CONSULTA / EXAME / PROCEDIMENTO). É o filtro que separa a
+  // consulta do exame de um mesmo profissional — o Grupo de serviço não faz
+  // isso: em oftalmologia, consulta e exames estão todos no grupo
+  // "OFTALMOLOGIA". Não confundir com `rTipo`, que é sintético/analítico.
+  const [rTipoServico, setRTipoServico] = useState("todos");
   const [rServico, setRServico] = useState("todos");
   const [rTipo, setRTipo] = useState<RateioTipo>("sintetico");
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
@@ -622,6 +630,7 @@ function Page() {
             rMedico,
             rEspecialidade,
             rGrupo,
+            rTipoServico,
             rServico,
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
           ].join("|")
@@ -1046,6 +1055,7 @@ function Page() {
       const g = ctxRateio?.grupos.find((x) => x.chave === rGrupo);
       partes.push(`Grupo: ${g?.rotulo ?? rGrupo}`);
     }
+    if (rTipoServico !== "todos") partes.push(`Tipo de serviço: ${rTipoServico}`);
     if (rServico !== "todos") partes.push(`Serviço: ${rServico}`);
     // Sem esta linha, uma folha com o total menor circula sem dizer por que o
     // total é menor — que é exatamente a dúvida de quem confere.
@@ -1104,6 +1114,7 @@ function Page() {
           medicoId: rMedico === "todos" ? null : rMedico,
           especialidadeId: rEspecialidade === "todas" ? null : rEspecialidade,
           grupo: rGrupo === "todos" ? null : rGrupo,
+          tipo: rTipoServico === "todos" ? null : rTipoServico,
           servico: rServico === "todos" ? null : rServico,
         };
         const [atual, anterior] = await Promise.all([
@@ -1532,19 +1543,31 @@ function Page() {
     });
   };
 
-  /** Serviços do combobox: seguem o grupo escolhido e a busca digitada. */
+  /**
+   * Serviços do combobox: seguem o grupo, o tipo escolhido e a busca digitada.
+   *
+   * Sem seguir o tipo, escolher EXAME e depois abrir a lista de serviços
+   * mostraria também as consultas — e escolher uma delas devolveria relatório
+   * vazio, sem dizer por quê.
+   */
   const servicosFiltrados = useMemo(() => {
     if (!ctxRateio) return [];
     const alvo = normRepasse(buscaServico);
     const out: string[] = [];
     for (const s of ctxRateio.servicos) {
       if (rGrupo !== "todos" && s.grupo !== rGrupo) continue;
+      if (
+        rTipoServico !== "todos" &&
+        rotuloTipo(ctxRateio.procTipos.get(normRepasse(s.nome))) !== rTipoServico
+      ) {
+        continue;
+      }
       if (alvo && !normRepasse(s.nome).includes(alvo)) continue;
       out.push(s.nome);
       if (out.length >= SERVICOS_VISIVEIS) break;
     }
     return out;
-  }, [ctxRateio, rGrupo, buscaServico]);
+  }, [ctxRateio, rGrupo, rTipoServico, buscaServico]);
 
   const deltaDe = (atual: number, anterior: number) =>
     comparacaoVisivel ? variacao(atual, anterior).percentual : undefined;
@@ -1631,7 +1654,7 @@ function Page() {
           {tipo === "rateio" && (
             <>
               {/* Bloco 2 — recorte da base: quem atendeu e o que foi feito. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                 <div className="space-y-1.5">
                   <Label className={ROTULO}>Profissional</Label>
                   <Select value={rMedico} onValueChange={setRMedico} disabled={!ctxRateio}>
@@ -1687,6 +1710,30 @@ function Page() {
                       {(ctxRateio?.grupos ?? []).map((g) => (
                         <SelectItem key={g.chave} value={g.chave}>
                           {g.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className={ROTULO}>Tipo de serviço</Label>
+                  <Select
+                    value={rTipoServico}
+                    onValueChange={(v) => {
+                      setRTipoServico(v);
+                      // O serviço escolhido pode não ser do novo tipo.
+                      setRServico("todos");
+                    }}
+                    disabled={!ctxRateio}
+                  >
+                    <SelectTrigger className={CAMPO}>
+                      <SelectValue placeholder={ctxCarregando ? "Carregando..." : "TODOS"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">TODOS</SelectItem>
+                      {(ctxRateio?.tipos ?? []).map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1796,6 +1843,7 @@ function Page() {
                           <SelectItem value="profissional">PROFISSIONAL</SelectItem>
                           <SelectItem value="especialidade">ESPECIALIDADE</SelectItem>
                           <SelectItem value="servico">SERVIÇO</SelectItem>
+                          <SelectItem value="tipo">TIPO DE SERVIÇO (CONSULTA/EXAME)</SelectItem>
                           <SelectItem value="condicao">CONDIÇÃO (PARTICULAR/CARTÃO)</SelectItem>
                         </SelectContent>
                       </Select>

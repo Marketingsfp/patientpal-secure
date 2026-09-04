@@ -12,6 +12,7 @@ const linha: RateioLinha = {
   procedimento: "CONSULTA (CARDIOLOGIA)",
   servico_nome: "CONSULTA",
   condicao: "PARTICULAR",
+  tipo_servico: "CONSULTA",
   grupo: "Cardiologia",
   categoria_nome: "PARTICULAR",
   receita: 100,
@@ -33,7 +34,14 @@ const todasAsChavesExistem = (
 ): string[] => colunas.map((c) => c.chave).filter((chave) => !(chave in objeto));
 
 describe("colunas do sintetico", () => {
-  const agrupamentos = ["data", "profissional", "especialidade", "servico", "condicao"] as const;
+  const agrupamentos = [
+    "data",
+    "profissional",
+    "especialidade",
+    "servico",
+    "tipo",
+    "condicao",
+  ] as const;
 
   for (const agruparPor of agrupamentos) {
     it(`agrupado por ${agruparPor}: toda coluna acha o campo na linha`, () => {
@@ -108,6 +116,36 @@ describe("colunas do sintetico", () => {
     expect(colunasRateio("sintetico", "servico", false)[0].rotulo).toBe("Serviço");
   });
 
+  /**
+   * O caso que motivou o agrupamento por tipo: o financeiro queria dois
+   * cadastros do mesmo médico ("JOAO HELIO (CONSULTA)" e "(EXAMES)") só para
+   * ver os dois repasses separados. Agrupar por tipo entrega a mesma
+   * separação com um cadastro só. Por Grupo de serviço não daria: a consulta e
+   * os exames de oftalmologia estão todos no grupo "OFTALMOLOGIA".
+   */
+  it("agrupado por tipo separa a consulta do exame do mesmo profissional", () => {
+    const grupos = agruparRateio(
+      [
+        linha,
+        { ...linha, id: "2", receita: 50, repasse: 30, liquido: 20 },
+        {
+          ...linha,
+          id: "3",
+          servico_nome: "MAPEAMENTO DE RETINA",
+          tipo_servico: "EXAME",
+          receita: 200,
+          repasse: 84,
+          liquido: 116,
+        },
+      ],
+      "tipo",
+    );
+    expect(grupos.map((g) => g.rotulo)).toEqual(["CONSULTA", "EXAME"]);
+    expect(grupos[0]).toMatchObject({ qtd: 2, receita: 150, repasse: 90 });
+    expect(grupos[1]).toMatchObject({ qtd: 1, receita: 200, repasse: 84 });
+    expect(colunasRateio("sintetico", "tipo", false)[0].rotulo).toBe("Tipo de serviço");
+  });
+
   /** Separa a consulta do Cartão da consulta particular sem serviço duplicado. */
   it("agrupado por condicao separa o cartao do particular", () => {
     const grupos = agruparRateio(
@@ -163,6 +201,18 @@ describe("colunas do analitico", () => {
   it("toda coluna acha o campo na linha do atendimento", () => {
     const colunas = colunasRateio("analitico", "data", false);
     expect(todasAsChavesExistem(colunas, linha as unknown as Record<string, unknown>)).toEqual([]);
+  });
+
+  /**
+   * A coluna sai em toda listagem analítica, e não só quando o agrupamento é
+   * por tipo: agrupado por data, é ela que diz de bate-pronto se aquela linha
+   * é consulta ou exame, sem obrigar quem confere a reconhecer serviço por
+   * serviço. Vale para a tela, o papel, o CSV e o Excel, que leem esta lista.
+   */
+  it("traz o tipo de servico ao lado do servico", () => {
+    const rotulos = colunasRateio("analitico", "data", false).map((c) => c.rotulo);
+    expect(rotulos).toContain("Tipo de serviço");
+    expect(rotulos.indexOf("Tipo de serviço")).toBe(rotulos.indexOf("Serviço") + 1);
   });
 
   it("nao ganha as colunas de comparacao, que so existem no sintetico", () => {

@@ -21,6 +21,7 @@ const linha = (over: Partial<RateioLinha>): RateioLinha => ({
   procedimento: "CONSULTA",
   servico_nome: over.servico_nome ?? "CONSULTA",
   condicao: "PARTICULAR",
+  tipo_servico: "CONSULTA",
   grupo: "Cardiologia",
   categoria_nome: "PARTICULAR",
   receita: 100,
@@ -147,6 +148,36 @@ describe("filtrarRateio", () => {
   it("filtra por servico exato", () => {
     const r = filtrarRateio(ctx, linhas, { ...base, servico: "consulta" });
     expect(r.map((l) => l.id)).toEqual(["1"]);
+  });
+
+  /**
+   * O tipo é o único recorte que separa consulta de exame de um mesmo médico:
+   * em oftalmologia, os dois estão no mesmo Grupo de serviço.
+   */
+  it("filtra por tipo de servico, ignorando caixa", () => {
+    const porTipo = [
+      linha({ id: "1", tipo_servico: "CONSULTA" }),
+      linha({ id: "2", tipo_servico: "EXAME" }),
+      linha({ id: "3", tipo_servico: "EXAME" }),
+    ];
+    expect(filtrarRateio(ctx, porTipo, { ...base, tipo: "exame" }).map((l) => l.id)).toEqual([
+      "2",
+      "3",
+    ]);
+  });
+
+  /**
+   * Atendimento cujo serviço saiu do cadastro não tem tipo de onde herdar.
+   * Continua na listagem sem filtro, mas não pode entrar num recorte de EXAME
+   * — inflaria o fechamento de exames com algo que ninguém classificou.
+   */
+  it("deixa de fora o atendimento sem tipo quando um tipo foi escolhido", () => {
+    const semTipo = [
+      linha({ id: "1", tipo_servico: "EXAME" }),
+      linha({ id: "2", tipo_servico: "(SEM TIPO)" }),
+    ];
+    expect(filtrarRateio(ctx, semTipo, { ...base, tipo: "EXAME" }).map((l) => l.id)).toEqual(["1"]);
+    expect(filtrarRateio(ctx, semTipo, base)).toHaveLength(2);
   });
 
   it("filtra por profissional", () => {

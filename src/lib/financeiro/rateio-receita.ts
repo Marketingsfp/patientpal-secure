@@ -61,11 +61,39 @@ const PAGINA = 1000;
 /** Guarda contra loop infinito de paginação. */
 const MAX_PAGINAS = 100;
 
-export type RateioAgruparPor = "data" | "profissional" | "especialidade" | "servico" | "condicao";
+export type RateioAgruparPor =
+  | "data"
+  | "profissional"
+  | "especialidade"
+  | "servico"
+  | "tipo"
+  | "condicao";
 export type RateioTipo = "sintetico" | "analitico";
 
 /** Rótulo do atendimento sem serviço identificado (agenda gravou em branco). */
 export const SEM_SERVICO = "(SEM SERVIÇO)";
+
+/**
+ * Rótulo do atendimento cujo tipo não dá para saber.
+ *
+ * Acontece quando o serviço gravado no atendimento não existe (mais) no
+ * cadastro de procedimentos: sem cadastro não há campo Tipo de onde tirar a
+ * classificação. A linha continua aparecendo no relatório — sumir seria pior
+ * do que aparecer sem classificação —, só que num balaio à parte.
+ */
+export const SEM_TIPO = "(SEM TIPO)";
+
+/**
+ * Tipo do serviço como ele aparece no relatório.
+ *
+ * O cadastro grava "consulta", "exame", "procedimento" e "outro" em caixa
+ * baixa; o relatório inteiro (filtro, agrupamento, papel e planilha) compara e
+ * exibe em caixa alta, do mesmo jeito que já faz com grupo e categoria.
+ */
+export const rotuloTipo = (t: string | null | undefined): string => {
+  const bruto = String(t ?? "").trim();
+  return bruto === "" ? SEM_TIPO : bruto.toUpperCase();
+};
 
 /**
  * Como cada forma de atendimento aparece na coluna Condição.
@@ -110,6 +138,17 @@ export interface RateioLinha {
    * paciente aplicada sobre o MESMO serviço.
    */
   condicao: string;
+  /**
+   * Tipo do serviço no cadastro, em caixa alta: CONSULTA, EXAME, PROCEDIMENTO.
+   *
+   * É o que separa consulta de exame de um MESMO profissional sem precisar de
+   * dois cadastros do mesmo médico. O Grupo de serviço não serve para isso: em
+   * produção, a consulta e todos os exames de oftalmologia estão no mesmo
+   * grupo ("OFTALMOLOGIA"), e é o Tipo que os distingue.
+   *
+   * Sai `SEM_TIPO` quando o serviço do atendimento não está no cadastro.
+   */
+  tipo_servico: string;
   /** Grupo de serviço do cadastro do procedimento (pode não existir). */
   grupo: string | null;
   /**
@@ -185,6 +224,8 @@ export interface RateioFiltros {
   grupo?: string | null;
   /** Nome do serviço como está no cadastro. `null` = todos. */
   servico?: string | null;
+  /** Tipo do serviço em caixa alta (CONSULTA/EXAME/...). `null` = todos. */
+  tipo?: string | null;
 }
 
 /** Médico como aparece no seletor do relatório. */
@@ -212,6 +253,14 @@ export interface RateioContexto {
   especialidades: Array<{ id: string; nome: string }>;
   /** Chave normalizada -> rótulo exibido do grupo de serviço. */
   grupos: Array<{ chave: string; rotulo: string }>;
+  /**
+   * Tipos de serviço que existem no cadastro, para o seletor da tela.
+   *
+   * Sai do próprio cadastro em vez de uma lista fixa "Consulta/Exame/
+   * Procedimento": a clínica também usa "Outro" em dois serviços, e uma lista
+   * fixa deixaria esse dinheiro invisível no filtro.
+   */
+  tipos: string[];
   servicos: ServicoOpcao[];
   /** nome normalizado do serviço -> chave do grupo. */
   grupoPorServico: Map<string, string>;
@@ -363,6 +412,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
   }
 
   const procTipos = new Map<string, string>();
+  const tiposVistos = new Set<string>();
   const grupoPorServico = new Map<string, string>();
   const rotuloGrupoPorServico = new Map<string, string>();
   const gruposMap = new Map<string, string>();
@@ -374,6 +424,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     const chave = normRepasse(p.nome);
     if (!nomeServicoPorChave.has(chave)) nomeServicoPorChave.set(chave, String(p.nome));
     if (p.tipo && !procTipos.has(chave)) procTipos.set(chave, p.tipo);
+    if (p.tipo) tiposVistos.add(rotuloTipo(p.tipo));
     const g = chaveGrupo(p.grupo);
     if (g) {
       if (!grupoPorServico.has(chave)) grupoPorServico.set(chave, g);
@@ -395,6 +446,7 @@ export async function carregarContextoRateio(clinicaId: string): Promise<RateioC
     grupos: Array.from(gruposMap, ([chave, rotulo]) => ({ chave, rotulo })).sort((a, b) =>
       a.rotulo.localeCompare(b.rotulo, "pt-BR"),
     ),
+    tipos: Array.from(tiposVistos).sort((a, b) => a.localeCompare(b, "pt-BR")),
     servicos,
     grupoPorServico,
     rotuloGrupoPorServico,
@@ -572,6 +624,10 @@ function reparte(
         // texto que a agenda gravou; some do relatório seria pior.
         params.procedimento?.trim() || SEM_SERVICO,
     condicao: ROTULO_CONDICAO[forma] ?? "PARTICULAR",
+    // Mesma chave de serviço que resolve o grupo e a grade de repasse: o
+    // atendimento gravado como "CONSULTA OFTALMO (OFTALMOLOGIA)" acha o tipo
+    // do cadastro "CONSULTA OFTALMO".
+    tipo_servico: chaveServico ? rotuloTipo(ctx.procTipos.get(chaveServico)) : SEM_TIPO,
     grupo: chaveServico ? (ctx.rotuloGrupoPorServico.get(chaveServico) ?? null) : null,
     // Caixa alta porque é assim que a categoria é comparada e exibida em todo
     // o financeiro (ver `chaveCategoria`): o cadastro tem a mesma conta
@@ -718,9 +774,14 @@ export function filtrarRateio(
 ): RateioLinha[] {
   const servicoAlvo = filtros.servico ? normRepasse(filtros.servico) : null;
   const grupoAlvo = filtros.grupo ?? null;
+  const tipoAlvo = filtros.tipo ? rotuloTipo(filtros.tipo) : null;
   return linhas.filter((l) => {
     if (filtros.medicoId && l.medico_id !== filtros.medicoId) return false;
     if (filtros.especialidadeId && l.especialidade_id !== filtros.especialidadeId) return false;
+    // O tipo já foi resolvido na linha (ver `tipo_servico`): escolher EXAME
+    // deixa de fora tanto a consulta quanto o atendimento cujo serviço saiu do
+    // cadastro, do mesmo jeito que o filtro de Grupo já faz.
+    if (tipoAlvo && l.tipo_servico !== tipoAlvo) return false;
     if (servicoAlvo || grupoAlvo) {
       // O serviço vem do cadastro (ver `chaveDoServico`): o atendimento gravado
       // como "CONSULTA (CARDIOLOGIA)" tem que entrar no filtro "CONSULTA".
@@ -761,9 +822,11 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
           ? (l.medico_id ?? "sem-profissional")
           : agruparPor === "servico"
             ? l.servico_nome
-            : agruparPor === "condicao"
-              ? l.condicao
-              : (l.especialidade_id ?? "sem-especialidade");
+            : agruparPor === "tipo"
+              ? l.tipo_servico
+              : agruparPor === "condicao"
+                ? l.condicao
+                : (l.especialidade_id ?? "sem-especialidade");
     const rotulo =
       agruparPor === "data"
         ? l.data
@@ -771,9 +834,11 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
           ? l.medico_nome
           : agruparPor === "servico"
             ? l.servico_nome
-            : agruparPor === "condicao"
-              ? l.condicao
-              : l.especialidade_nome;
+            : agruparPor === "tipo"
+              ? l.tipo_servico
+              : agruparPor === "condicao"
+                ? l.condicao
+                : l.especialidade_nome;
     const atual = acc.get(chave) ?? {
       chave,
       rotulo,
