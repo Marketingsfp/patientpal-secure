@@ -270,6 +270,12 @@ export const fecharConversa = createServerFn({ method: "POST" })
         // Fim do fluxo: o estado transitório da Nina (paciente identificado,
         // horário oferecido) morre junto com a conversa resolvida.
         nina_fluxo_estado: null,
+        identidade_confirmada: false,
+        identidade_perguntada_em: null,
+        identidade_tentativas: 0,
+        handoff_resumo: null,
+        handoff_motivo: null,
+
       })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
