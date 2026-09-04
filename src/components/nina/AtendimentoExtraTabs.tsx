@@ -213,17 +213,66 @@ export function AtendInbox() {
     carregarStatusAgente();
   }, [carregarStatusAgente]);
 
-  // Presença real: enquanto a pessoa está online (e não em pausa), o sistema
-  // avisa o servidor a cada minuto. Sem esse sinal por 5 minutos, ela deixa de
-  // receber conversas automaticamente — nada cai para quem fechou o sistema.
-  const online = !pausaAtiva && filaAberta;
+  // Presença real + automática:
+  //  - sem mexer no mouse/teclado por 5 min, ou com o sistema em segundo plano
+  //    (outra aba/janela minimizada), o atendente entra em pausa automática e
+  //    para de receber conversas novas;
+  //  - qualquer interação traz de volta para online;
+  //  - ao fechar a página, avisa offline na hora (e, se o aviso não chegar, o
+  //    servidor derruba a presença sozinho depois de 5 minutos sem sinal).
+  // A pausa manual e o offline manual continuam mandando: a automação nunca
+  // "reabre" quem escolheu ficar offline.
+  const OCIOSO_MS = 5 * 60 * 1000;
+  const [ausenteAuto, setAusenteAuto] = useState(false);
+  const manualOffline = !pausaAtiva && !filaAberta;
+  const online = !pausaAtiva && filaAberta && !ausenteAuto;
+
+  useEffect(() => {
+    if (manualOffline || pausaAtiva) {
+      setAusenteAuto(false);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const armar = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setAusenteAuto(true), OCIOSO_MS);
+    };
+    const acordar = () => {
+      if (document.visibilityState === "hidden") return;
+      setAusenteAuto(false);
+      armar();
+    };
+    const aoTrocarVisibilidade = () => {
+      if (document.visibilityState === "hidden") {
+        clearTimeout(timer);
+        setAusenteAuto(true);
+      } else {
+        acordar();
+      }
+    };
+    const eventos = ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "focus"] as const;
+    eventos.forEach((e) => window.addEventListener(e, acordar, { passive: true }));
+    document.addEventListener("visibilitychange", aoTrocarVisibilidade);
+    if (document.visibilityState === "hidden") setAusenteAuto(true);
+    else armar();
+    return () => {
+      clearTimeout(timer);
+      eventos.forEach((e) => window.removeEventListener(e, acordar));
+      document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
+    };
+  }, [manualOffline, pausaAtiva, OCIOSO_MS]);
+
   useEffect(() => {
     if (!clinicaId) return;
     const bater = () => {
       presencaFn({
         data: {
           clinicaId,
-          status: online ? ("ONLINE" as const) : pausaAtiva ? ("AWAY" as const) : ("OFFLINE" as const),
+          status: online
+            ? ("ONLINE" as const)
+            : manualOffline
+              ? ("OFFLINE" as const)
+              : ("AWAY" as const),
           aceitaNovas: online,
         },
       }).catch(() => {
@@ -231,10 +280,22 @@ export function AtendInbox() {
       });
     };
     bater();
-    if (!online) return;
+    const sair = () => {
+      presencaFn({
+        data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", sair);
+    if (!online) {
+      return () => window.removeEventListener("pagehide", sair);
+    }
     const t = setInterval(bater, 60_000);
-    return () => clearInterval(t);
-  }, [clinicaId, online, pausaAtiva, presencaFn]);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("pagehide", sair);
+    };
+  }, [clinicaId, online, manualOffline, presencaFn]);
+
 
   const alternarFila = async (abrir: boolean) => {
     if (!clinicaId) return;
@@ -254,7 +315,9 @@ export function AtendInbox() {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
         await travarFilaFn({ data: { clinicaId, travada: false } });
         setPausaAtiva(null);
+        setAusenteAuto(false);
         setFilaAberta(true);
+
         const r = await presencaFn({
           data: { clinicaId, status: "ONLINE" as const, aceitaNovas: true },
         });
@@ -526,13 +589,14 @@ export function AtendInbox() {
               </Badge>
               <Circle
                 className={`h-3 w-3 fill-current ${
-                  pausaAtiva
+                  pausaAtiva || ausenteAuto
                     ? "text-amber-500"
                     : filaAberta
                       ? "text-emerald-600"
                       : "text-slate-400"
                 }`}
               />
+
             </div>
           )}
           <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
@@ -553,11 +617,9 @@ export function AtendInbox() {
             <div className="grid grid-cols-3 gap-1">
               <Button
                 size="sm"
-                variant={!pausaAtiva && filaAberta ? "default" : "outline"}
+                variant={online ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  !pausaAtiva && filaAberta
-                    ? "bg-emerald-600 hover:bg-emerald-600/90 text-white"
-                    : ""
+                  online ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""
                 }`}
                 onClick={() => definirStatus("online")}
               >
@@ -565,14 +627,15 @@ export function AtendInbox() {
               </Button>
               <Button
                 size="sm"
-                variant={pausaAtiva ? "default" : "outline"}
+                variant={pausaAtiva || ausenteAuto ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  pausaAtiva ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
+                  pausaAtiva || ausenteAuto ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
                 }`}
                 onClick={() => definirStatus("pausa")}
               >
                 <Coffee className="h-3 w-3 mr-1" /> Pausa
               </Button>
+
               <Button
                 size="sm"
                 variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
@@ -586,7 +649,13 @@ export function AtendInbox() {
                 <PowerOff className="h-3 w-3 mr-1" /> Offline
               </Button>
             </div>
+            {ausenteAuto && !pausaAtiva && (
+              <p className="text-[11px] text-amber-600">
+                Pausa automática por inatividade — mexa na tela para voltar a receber conversas.
+              </p>
+            )}
             {pausaAtiva?.atend_pause_reasons?.nome && (
+
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <span className="truncate flex-1">Em pausa · {pausaAtiva.atend_pause_reasons.nome}</span>
                 <Button
