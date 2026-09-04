@@ -965,12 +965,17 @@ function AgendaPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [dataFim, setDataFim] = useState<string | null>(null);
-  // Padrão: filtro de data é "a partir de" — traz o dia selecionado em
-  // diante, para que a recepção veja os próximos agendamentos do paciente
-  // sem precisar ampliar a janela manualmente. Marcando o checkbox
-  // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
-  // escolhido (comportamento antigo).
-  const [apenasData, setApenasData] = useState(false);
+  // Padrão: filtro de data é ESTRITAMENTE o dia escolhido.
+  //
+  // Já foi "a partir de" (dia selecionado + agendamentos marcados dos dias
+  // seguintes), com o "só este dia" desmarcado por padrão. Na prática a
+  // recepção não marcava a caixinha no dia a dia e lia as linhas de 11/09 e
+  // 15/09 como se fossem do dia escolhido — o que gerava erro de agendamento
+  // no balcão. Como o padrão é o que vale em quase 100% dos atendimentos, ele
+  // passou a ser o dia único; quem precisar enxergar os próximos dias
+  // desmarca a caixinha (ou escolhe "Período" no calendário, que desmarca
+  // sozinho — ver o `setDataFim` passado ao DataRefField).
+  const [apenasData, setApenasData] = useState(true);
   // Diagnóstico do estado vazio quando "Exibir apenas a data selecionada"
   // está marcado. Diferencia:
   //  - 'sem_slots'       → nenhum horário cadastrado nesse dia (nem com filtros)
@@ -2549,15 +2554,18 @@ function AgendaPage() {
       q = q.ilike("paciente_nome", `%${normalizarNomeBusca(termoCli)}%`);
     }
     if (apenasData) {
-      // "Exibir apenas a data selecionada" — restringe estritamente ao dia
-      // escolhido em `dataRef`, IGNORANDO qualquer `dataFim` do picker de
-      // intervalo. Os demais filtros (profissional, status, cliente etc.)
-      // seguem sendo aplicados normalmente.
+      // PADRÃO da tela: restringe estritamente ao dia escolhido em `dataRef`,
+      // IGNORANDO qualquer `dataFim` do picker de intervalo (escolher um
+      // período no calendário desliga este modo, então os dois nunca brigam).
+      // Os demais filtros (profissional, status, cliente etc.) seguem sendo
+      // aplicados normalmente — inclusive a busca por nome/CPF, que aqui
+      // enxerga só o dia selecionado.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
-      // Padrão "a partir de": mostra o dia selecionado em diante.
+      // Modo "a partir de" (só quando a recepção DESMARCA o "só este dia" ou
+      // escolhe um período): mostra o dia selecionado em diante.
       //
       // Antes não havia limite superior e o `.range(0, 9999)` do PostgREST
       // era o único freio — na prática a Agenda baixava as 10.000 linhas do
@@ -4102,6 +4110,12 @@ function AgendaPage() {
     setFiltroStatus("todos");
     setFiltroCliente("");
     setFiltroFicha("");
+    // Volta também a janela de datas ao padrão: só o dia selecionado. Sem
+    // isso, "Limpar filtros" deixava a lista continuar mostrando os dias
+    // seguintes (ou o período escolhido) e o contador de filtros ativos
+    // travado em 1, sem nada visível para desfazer.
+    setApenasData(true);
+    setDataFim(null);
   };
 
   const toggleSel = (id: string) => {
@@ -7969,7 +7983,10 @@ function AgendaPage() {
     (filtroStatus !== "todos" ? 1 : 0) +
     (filtroEspecialidade !== "todos" ? 1 : 0) +
     (filtroCliente.trim() ? 1 : 0) +
-    (apenasData ? 1 : 0);
+    // Conta como filtro ATIVO o desvio do padrão. Desde que o padrão passou a
+    // ser o dia único, o que destoa é a lista estar mostrando os dias
+    // seguintes — é isso que o contador precisa denunciar no celular.
+    (!apenasData ? 1 : 0);
   const renderFiltros = (variante: "desktop" | "sheet" = "desktop") => (
     <div
       className={
@@ -8108,7 +8125,15 @@ function AgendaPage() {
           dataRef={dataRef}
           dataFim={dataFim}
           setDataRef={setDataRef}
-          setDataFim={setDataFim}
+          setDataFim={(v) => {
+            setDataFim(v);
+            // Escolher um PERÍODO no calendário é um pedido explícito de ver
+            // mais de um dia, então destrava o "só este dia" — senão o
+            // intervalo seria simplesmente ignorado pela consulta. Voltar
+            // para um dia único (aba "Dia", "Hoje", "Limpar") recoloca o
+            // padrão de dia estrito.
+            setApenasData(v === null);
+          }}
           compact
         />
       </div>
