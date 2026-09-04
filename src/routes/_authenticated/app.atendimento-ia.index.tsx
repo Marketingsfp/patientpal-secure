@@ -80,6 +80,9 @@ function AtendimentoIaPage() {
   // Usuário com perfil só de médico cujo login ainda não foi ligado ao
   // cadastro do profissional na clínica.
   const [semVinculo, setSemVinculo] = useState(false);
+  // Conta cujo único papel é "médico": vê apenas a própria fila, sem poder
+  // trocar de profissional.
+  const [soMedico, setSoMedico] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -162,6 +165,7 @@ function AtendimentoIaPage() {
       // a fila de um colega qualquer (o primeiro da lista), a tela avisa que
       // falta o vínculo. Um médico nunca deve cair na fila de outro por acaso.
       const soMedico = user?.id ? await isMedicoOnlyUser(user.id) : false;
+      setSoMedico(soMedico);
       setSemVinculo(!meu && soMedico);
       if (meu) setMedicoId(meu.id);
       else if (soMedico) setMedicoId("");
@@ -350,9 +354,11 @@ function AtendimentoIaPage() {
       <Card className="p-4 space-y-3">
         <div className="space-y-1">
           <Label>Profissional</Label>
-          {medicoLogado && medicoSelecionado ? (
+          {soMedico || (medicoLogado && medicoSelecionado) ? (
+            // Perfil só de médico não escolhe profissional: a tela fica presa
+            // no cadastro dele, para ninguém abrir a fila de um colega.
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
-              {medicoSelecionado.nome}
+              {medicoSelecionado?.nome ?? "—"}
             </div>
           ) : (
             <SearchableSelect

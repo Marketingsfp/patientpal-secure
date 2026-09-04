@@ -53,6 +53,7 @@ import {
   resumirHistoricoPaciente,
 } from "@/lib/atendimento-ai.functions";
 import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
+import { cadastroMedicoDoUsuario, currentUserIsMedicoOnly } from "@/lib/medico-only";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
@@ -219,6 +220,17 @@ function AtendimentoEditorPage() {
       toast.error("Este atendimento foi cancelado.");
       navigate({ to: "/app/atendimento-ia" });
       return;
+    }
+    // Quem só tem perfil de médico atende apenas os próprios pacientes. Sem
+    // esta checagem bastava trocar o número do agendamento no endereço para
+    // abrir o prontuário de um paciente de outro profissional.
+    if (await currentUserIsMedicoOnly()) {
+      const meu = await cadastroMedicoDoUsuario(clinicaAtual.clinica_id);
+      if (!meu || meu.id !== ag.medico_id) {
+        toast.error("Este atendimento é de outro profissional.");
+        navigate({ to: "/app/atendimento-ia" });
+        return;
+      }
     }
     setAgendamento(ag as never);
 
