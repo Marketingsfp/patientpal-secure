@@ -1210,8 +1210,9 @@ const horaClinica = (iso: string) =>
  * Separa o procedimento na especialidade do SERVIÇO e no nome limpo.
  *
  * O nome do procedimento carrega a especialidade entre parênteses no fim
- * ("CONSULTA (CARDIOLOGIA)"), e é ela que vale para a guia — a mesma leitura
- * que a GR impressa faz em `formatServicoLinha` (src/lib/print-gr.ts). Sem
+ * ("CONSULTA (CARDIOLOGIA)"), e é ela que vale aqui. (A GR impressa faz a
+ * separação pelo mesmo critério, mas descarta a especialidade: a guia mostra
+ * só o serviço, para o arquivo separar as fichas.) Sem
  * isso, a lista mostraria a especialidade principal do médico: um cardiologista
  * cadastrado como geriatra apareceria atendendo "GERIATRIA · CONSULTA
  * (CARDIOLOGIA)". Na base da clínica isso não é exceção — `especialidade_id` do

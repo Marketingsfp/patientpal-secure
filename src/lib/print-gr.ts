@@ -24,33 +24,71 @@ function nomeCategoriaLancamento(l: { categoria?: unknown }): string | null {
   return c.nome ?? null;
 }
 
+const normalizarEsp = (s: string) =>
+  (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
 /**
- * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
- * (o "(XXX)" que vem colado no nome do procedimento) na frente, e a
- * especialidade principal do médico entre parênteses no fim.
+ * Nomes das especialidades cadastradas, normalizados, para reconhecer o
+ * sufixo de especialidade colado no nome do serviço.
  *
- *   procNomeBase="CONSULTA (CARDIOLOGIA)", espMedico="GERIATRIA"
- *     → "CARDIOLOGIA - CONSULTA (GERIATRIA)"
- *
- * Fallbacks: sem "(XXX)" no procedimento, mantém a ordem antiga
- * (`${espMedico} - ${procNomeBase}`). Especialidades iguais colapsam.
+ * Cache de 5 minutos: a lista quase nunca muda e a GR é impressa dezenas de
+ * vezes por dia — não vale uma consulta por guia.
  */
-function formatServicoLinha(procNomeBase: string, espMedicoRaw: string | null | undefined): string {
-  const base = (procNomeBase ?? "").toUpperCase().trim();
-  const espMedico = (espMedicoRaw ?? "").toUpperCase().trim();
-  const m = base.match(/^(.*)\s*\(([^()]+)\)\s*$/);
-  if (m) {
-    const procLimpo = m[1].trim();
-    const espServico = m[2].trim();
-    if (espServico && espMedico && espServico !== espMedico) {
-      return `${espServico} - ${procLimpo} (${espMedico})`;
-    }
-    if (espServico) {
-      return `${espServico} - ${procLimpo}`;
-    }
+let especialidadesCache: { nomes: Set<string>; em: number } | null = null;
+const ESPECIALIDADES_TTL_MS = 5 * 60 * 1000;
+
+async function nomesEspecialidades(): Promise<ReadonlySet<string>> {
+  const agora = Date.now();
+  if (especialidadesCache && agora - especialidadesCache.em < ESPECIALIDADES_TTL_MS) {
+    return especialidadesCache.nomes;
   }
-  if (espMedico && !base.includes(espMedico)) {
-    return `${espMedico} - ${base}`;
+  try {
+    const { data } = await supabase.from("especialidades").select("nome");
+    const nomes = new Set<string>();
+    for (const r of (data ?? []) as Array<{ nome: string | null }>) {
+      const n = normalizarEsp(r.nome ?? "");
+      if (n) nomes.add(n);
+    }
+    // Só troca o cache quando a consulta trouxe algo: uma falha momentânea da
+    // rede não pode fazer a guia voltar a imprimir a especialidade.
+    if (nomes.size > 0) especialidadesCache = { nomes, em: agora };
+  } catch {
+    /* mantém o cache anterior, se houver */
+  }
+  return especialidadesCache?.nomes ?? new Set<string>();
+}
+
+/**
+ * Discriminação do atendimento na GR = ESTRITAMENTE o nome do SERVIÇO.
+ *
+ * O cadastro traz a especialidade colada no fim do nome do procedimento
+ * ("ECO DOPPLER VENOSO (CADA) (CARDIOLOGIA)") e a guia ainda repetia a
+ * especialidade principal do médico, imprimindo
+ * "CARDIOLOGIA - ECO DOPPLER VENOSO (CADA) (ULTRASSONOGRAFIA)". O arquivo
+ * separa as fichas físicas pelo serviço, e essa duplicidade de termos
+ * atrapalhava a separação. Agora sai só "ECO DOPPLER VENOSO (CADA)".
+ *
+ * Cai fora apenas o parêntese final cujo conteúdo é o nome de uma
+ * especialidade cadastrada. Parênteses que fazem parte do próprio serviço —
+ * "(CADA)", "(ECG)", "(POR OLHO)", "(CAMPO VISUAL COMPUTADORIZADO)" —
+ * continuam impressos, porque são eles que distinguem um serviço do outro.
+ */
+function formatServicoLinha(procNomeBase: string, especialidades: ReadonlySet<string>): string {
+  let base = (procNomeBase ?? "").toUpperCase().trim();
+  // Há nomes com mais de um sufixo colado; o laço tira todos.
+  for (let i = 0; i < 3; i++) {
+    const m = base.match(/^(.*)\(([^()]+)\)\s*$/);
+    if (!m) break;
+    const semSufixo = m[1].trim();
+    // Serviço que é SÓ o nome da especialidade ("ULTRASSONOGRAFIA") continua
+    // inteiro: ali a especialidade é o próprio serviço escolhido na agenda.
+    if (!semSufixo || !especialidades.has(normalizarEsp(m[2]))) break;
+    base = semSufixo;
   }
   return base;
 }
@@ -713,6 +751,9 @@ async function printGuiaAtendimentoCore({
   // repasse, dados do cartão de benefícios do médico e o vínculo de convênio do
   // paciente: tudo depende apenas do agendamento, então tudo sai junto. Antes
   // eram cinco etapas em série.
+  // A lista de especialidades entra junto na onda: ela só é lida na hora de
+  // montar a linha do serviço, e assim não custa uma ida a mais em série.
+  const espsPromise = nomesEspecialidades();
   const [pac, med, proc, profRes, sensRes, mcbRes, vinculoConv] = await Promise.all([
     a.paciente_id
       ? supabase
@@ -724,11 +765,7 @@ async function printGuiaAtendimentoCore({
           .maybeSingle()
       : Promise.resolve({ data: null }),
     medicoIdEfetivo
-      ? supabase
-          .from("medicos")
-          .select("nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
-          .eq("id", medicoIdEfetivo)
-          .maybeSingle()
+      ? supabase.from("medicos").select("nome").eq("id", medicoIdEfetivo).maybeSingle()
       : Promise.resolve({ data: null }),
     a.procedimento
       ? supabase
@@ -786,12 +823,8 @@ async function printGuiaAtendimentoCore({
     codigo_prontuario_anterior: string | null;
     numero_pasta: string | null;
   } | null;
-  const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
+  const medicoBasic = med.data as { nome: string } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
-  // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
-  // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
-  // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
-  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: {
     tipo_repasse: string | null;
     percentual_repasse_padrao: number | null;
@@ -876,43 +909,9 @@ async function printGuiaAtendimentoCore({
     if (achado) procData = achado as unknown as typeof procData;
   }
 
-  // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
-  // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
-  // do cadastro do médico. Só assim a guia sai coerente com o atendimento quando o
-  // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
-  if (medicoIdEfetivo && procData?.id) {
-    try {
-      // O nome da especialidade vem junto pela chave estrangeira
-      // (medico_procedimentos.especialidade_id → especialidades.id), em vez de
-      // uma segunda consulta em série só para traduzir o id em nome.
-      const { data: mps } = await supabase
-        .from("medico_procedimentos")
-        .select(
-          "especialidade_id, esp:especialidades!medico_procedimentos_especialidade_id_fkey(nome)",
-        )
-        .eq("medico_id", medicoIdEfetivo)
-        .eq("procedimento_id", procData.id)
-        .not("especialidade_id", "is", null);
-      const vinculos = new Map<string, string | null>();
-      for (const r of (mps ?? []) as Array<{
-        especialidade_id: string | null;
-        esp: { nome: string | null } | null;
-      }>) {
-        if (!r.especialidade_id) continue;
-        vinculos.set(r.especialidade_id, r.esp?.nome ?? null);
-      }
-      // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
-      // mesmo serviço estiver vinculado a várias especialidades para este médico
-      // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
-      // mantém a especialidade principal do médico (fallback acima).
-      if (vinculos.size === 1) {
-        const nomeVinculo = Array.from(vinculos.values())[0];
-        if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
-      }
-    } catch {
-      /* mantém o fallback da especialidade principal do médico */
-    }
-  }
+  // A guia não busca mais a especialidade do serviço (medico_procedimentos) nem
+  // a principal do médico: a linha do atendimento imprime só o nome do serviço,
+  // para o arquivo separar as fichas sem termos concorrentes.
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
@@ -1050,7 +1049,7 @@ async function printGuiaAtendimentoCore({
     }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
-  const procNome = formatServicoLinha(procNomeBase, espNome);
+  const procNome = formatServicoLinha(procNomeBase, await espsPromise);
 
   // Ficha = POSIÇÃO da linha na fila do PROFISSIONAL no dia (mesma regra da
   // lista da agenda — app.agenda.tsx > fichaPorId): cada médico/agenda tem sua
@@ -1856,6 +1855,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   // paciente, médicos, convênios, repasses, procedimentos da guia, vínculo de
   // convênio do paciente e as fichas. Antes isso era feito em quatro etapas
   // sequenciais espalhadas pelo resto da função.
+  // Mesma ideia da guia individual: a lista de especialidades sai junto com o
+  // resto e só é aguardada na hora de montar a linha do serviço.
+  const espsPromise = nomesEspecialidades();
   const [profRes, pacienteRes, medsRes, convsRes, repRes, procByNome, vinculoConv, fichaByGrupo] =
     await Promise.all([
       criadoPor
@@ -1874,12 +1876,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
             .maybeSingle()
         : Promise.resolve({ data: null }),
       medicoIds.length > 0
-        ? supabase
-            .from("medicos")
-            .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
-            .in("id", medicoIds)
+        ? supabase.from("medicos").select("id, nome").in("id", medicoIds)
         : Promise.resolve({
-            data: [] as Array<{ id: string; nome: string; especialidade: { nome: string } | null }>,
+            data: [] as Array<{ id: string; nome: string }>,
           }),
       medicoIds.length > 0
         ? supabase
@@ -1957,20 +1956,13 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     repMap.set(r.id, r);
   }
   const medById = new Map(
-    (
-      (medsRes.data ?? []) as Array<{
-        id: string;
-        nome: string;
-        especialidade: { nome: string } | null;
-      }>
-    ).map((m) => {
+    ((medsRes.data ?? []) as Array<{ id: string; nome: string }>).map((m) => {
       const r = repMap.get(m.id);
       return [
         m.id,
         {
           id: m.id,
           nome: m.nome,
-          especialidadeNome: m.especialidade?.nome ?? null,
           tipo_repasse: r?.tipo_repasse ?? null,
           percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null,
           valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
@@ -2026,11 +2018,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   };
   const grupos = new Map<string, Grupo>();
 
+  const espsConhecidas = await espsPromise;
+
   for (const a of ags) {
     const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
     const proc = procByNome.get(normalizar(procNomeBase));
-    const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
-    const procNome = formatServicoLinha(procNomeBase, espNome);
+    const procNome = formatServicoLinha(procNomeBase, espsConhecidas);
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de
     // procedimentos. Retorno e cortesia nunca caem na tabela: já foram
     // fechados por R$ 0,00 e não dividem nada. Numa gratuidade de convênio a
