@@ -14,47 +14,50 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
+import { listaDePapeis, type EscopoAutorizacao } from "@/lib/autorizacao-supervisor";
 import {
-  autorizarSemFaturamento,
-  listarAutorizadoresSemFaturamento,
+  autorizarComSenha,
+  listarAutorizadores,
   type Autorizador,
-} from "@/lib/agenda/sem-faturamento.functions";
+} from "@/lib/autorizacao-supervisor.functions";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   clinicaId: string | null | undefined;
+  /** Qual alçada é exigida: cada ação tem a sua. */
+  escopo: EscopoAutorizacao;
   /** Qual ação está sendo autorizada, para o texto do cabeçalho. */
   acao?: string;
-  onAuthorized: (info: { userId: string; nome: string }) => void;
+  onAuthorized: (info: { userId: string; nome: string; role: string }) => void;
 }
 
 /**
  * Autorização da supervisão sem digitar e-mail.
  *
- * O diálogo antigo (`supervisor-auth-dialog`) pede e-mail e senha e faz o
- * login dentro do navegador da recepcionista, trocando a sessão dela por um
- * instante. No balcão isso segurava a fila: o e-mail inteiro do supervisor,
- * digitado a cada isenção, com o paciente esperando.
+ * A funcionária escolhe o nome numa lista com busca e digita só a senha. A
+ * conferência acontece no servidor (`autorizacao-supervisor.functions.ts`),
+ * então a sessão de quem opera a tela não é trocada no meio do atendimento e o
+ * e-mail da pessoa que autoriza nunca vem para o navegador.
  *
- * Aqui a funcionária escolhe o nome numa lista com busca e digita só a senha.
- * A conferência acontece no servidor (`sem-faturamento.functions.ts`), então a
- * sessão de quem opera a tela não é tocada e o e-mail do supervisor nunca vem
- * para o navegador.
+ * Substituiu o `supervisor-auth-dialog` (e-mail + senha) em todas as telas: no
+ * balcão, digitar um e-mail corporativo completo a cada desconto ou isenção
+ * segurava a fila.
  *
  * A lista é carregada toda vez que o diálogo abre, e não uma vez só: uma
- * mudança de equipe no meio do expediente (alguém promovido a supervisor, ou
- * desligado) precisa valer na autorização seguinte.
+ * mudança de equipe no meio do expediente (alguém promovido, ou desligado)
+ * precisa valer na autorização seguinte.
  */
 export function SupervisorSenhaDialog({
   open,
   onOpenChange,
   clinicaId,
+  escopo,
   acao = "esta ação",
   onAuthorized,
 }: Props) {
-  const listarFn = useServerFn(listarAutorizadoresSemFaturamento);
-  const autorizarFn = useServerFn(autorizarSemFaturamento);
+  const listarFn = useServerFn(listarAutorizadores);
+  const autorizarFn = useServerFn(autorizarComSenha);
   const [lista, setLista] = useState<Autorizador[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [supervisorId, setSupervisorId] = useState("");
@@ -71,16 +74,16 @@ export function SupervisorSenhaDialog({
     if (!clinicaId) return;
     let cancelado = false;
     setCarregando(true);
-    listarFn({ data: { clinicaId } })
+    listarFn({ data: { clinicaId, escopo } })
       .then((r) => {
         if (cancelado) return;
         setLista(r);
-        // Um único supervisor cadastrado: já vem escolhido, e a funcionária só
-        // digita a senha. É o caso mais comum fora do horário administrativo.
+        // Uma única pessoa com alçada: já vem escolhida, e a funcionária só
+        // digita a senha. É o caso comum fora do horário administrativo.
         if (r.length === 1) setSupervisorId(r[0].id);
       })
       .catch(() => {
-        if (!cancelado) toast.error("Não foi possível carregar a lista de supervisores.");
+        if (!cancelado) toast.error("Não foi possível carregar a lista de quem pode autorizar.");
       })
       .finally(() => {
         if (!cancelado) setCarregando(false);
@@ -88,7 +91,7 @@ export function SupervisorSenhaDialog({
     return () => {
       cancelado = true;
     };
-  }, [open, clinicaId, listarFn]);
+  }, [open, clinicaId, escopo, listarFn]);
 
   async function validar() {
     if (!clinicaId) return toast.error("Sem clínica selecionada.");
@@ -97,21 +100,21 @@ export function SupervisorSenhaDialog({
     setValidando(true);
     let res: Awaited<ReturnType<typeof autorizarFn>>;
     try {
-      res = await autorizarFn({ data: { clinicaId, supervisorId, senha } });
+      res = await autorizarFn({ data: { clinicaId, escopo, supervisorId, senha } });
     } catch (_) {
       setValidando(false);
       return toast.error("Não foi possível conferir a senha. Tente de novo.");
     }
     setValidando(false);
     if (!res.ok) {
-      // A senha continua na tela de propósito quando o erro é de permissão:
-      // trocar só o nome escolhido é mais rápido do que redigitar tudo.
+      // Senha errada limpa o campo; erro de permissão mantém o que foi
+      // digitado, porque trocar só o nome escolhido é mais rápido.
       if (res.message === "Senha incorreta.") setSenha("");
       return toast.error(res.message);
     }
     toast.success(`Autorizado por ${res.nome}`);
     setSenha("");
-    onAuthorized({ userId: res.supervisorId, nome: res.nome });
+    onAuthorized({ userId: res.supervisorId, nome: res.nome, role: res.role });
     onOpenChange(false);
   }
 
@@ -133,14 +136,14 @@ export function SupervisorSenhaDialog({
               options={lista.map((a) => ({ value: a.id, label: a.nome }))}
               value={supervisorId}
               onChange={(v) => setSupervisorId(v)}
-              placeholder={carregando ? "Carregando…" : "Escolha o supervisor"}
+              placeholder={carregando ? "Carregando…" : "Escolha quem autoriza"}
               searchPlaceholder="Buscar pelo nome…"
-              emptyText="Nenhum supervisor encontrado."
+              emptyText="Nenhum nome encontrado."
               disabled={carregando || validando}
             />
             {!carregando && lista.length === 0 && (
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                Nenhum administrador, gestor ou supervisor com nome cadastrado nesta clínica.
+                Nenhum {listaDePapeis(escopo)} com nome cadastrado nesta clínica.
               </p>
             )}
           </div>

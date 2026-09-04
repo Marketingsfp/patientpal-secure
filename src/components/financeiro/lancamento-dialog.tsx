@@ -27,7 +27,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
+import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
+import { podeAutorizar } from "@/lib/autorizacao-supervisor";
 import {
   categoriaEhRetorno,
   categoriaEhSemCobranca,
@@ -191,7 +192,9 @@ export function LancamentoDialog({
   // Qualquer atendente pode SOLICITAR desconto, mas a aplicação exige
   // autorização (e-mail + senha) de admin, gestor ou financeiro.
   // Quando o próprio usuário já é supervisor, dispensamos o segundo login.
-  const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
+  // Alçada lida da tabela única (`@/lib/autorizacao-supervisor`), a mesma que
+  // a server function confere ao validar a senha.
+  const ehSupervisor = podeAutorizar("desconto", role);
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   /** Sessão de pacote já paga na venda; `null` quando não há cobertura. */
@@ -2645,9 +2648,11 @@ export function LancamentoDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <SupervisorAuthDialog
+      <SupervisorSenhaDialog
         open={supervisorOpen}
         onOpenChange={setSupervisorOpen}
+        clinicaId={clinicaAtual?.clinica_id}
+        escopo="desconto"
         acao={authIntent === "cortesia" ? "aplicar cortesia" : "aplicar desconto"}
         onAuthorized={(info) => {
           setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });

@@ -4,31 +4,41 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabasePublicEnv } from "@/integrations/supabase/env";
-import { ROLES_AUTORIZAM_SEM_FATURAMENTO } from "./sem-faturamento-alcada";
+import type { Database } from "@/integrations/supabase/types";
+import {
+  ESCOPOS_AUTORIZACAO,
+  rolesDoEscopo,
+  type EscopoAutorizacao,
+} from "./autorizacao-supervisor";
 
 /**
- * Autorização da supervisão para "sem faturamento", feita NO SERVIDOR.
+ * Autorização da supervisão feita NO SERVIDOR — desconto, cortesia e isenção
+ * de cobrança usam este mesmo caminho.
  *
- * O primeiro desenho reaproveitava o diálogo de senha do desconto, que pede
- * e-mail + senha e faz um login temporário dentro do navegador da
- * recepcionista, trocando a sessão dela e restaurando depois. No balcão isso
- * mostrou dois problemas: digitar o e-mail inteiro do supervisor a cada
- * autorização segura a fila, e a troca de sessão é frágil justamente no
- * momento em que o paciente está esperando.
+ * O desenho anterior pedia e-mail + senha e fazia o login do supervisor dentro
+ * do navegador de quem estava no balcão, trocando a sessão e restaurando
+ * depois. Isso trazia três problemas, todos resolvidos aqui:
  *
- * Aqui a funcionária só escolhe o nome numa lista e digita a senha. A
- * conferência acontece no servidor, num cliente Supabase descartável — a
- * sessão de quem está operando a tela nunca é tocada, e o e-mail do supervisor
- * nunca chega ao navegador.
+ *   1. digitar o e-mail inteiro a cada autorização segurava a fila;
+ *   2. uma oscilação de rede no meio da troca de sessão podia deslogar a
+ *      funcionária com o paciente na frente;
+ *   3. para escolher o nome, a tela precisaria receber os e-mails da equipe —
+ *      uma relação pronta de alvos para tentativa de senha.
+ *
+ * Agora a tela manda o id da pessoa escolhida e a senha; o e-mail é resolvido
+ * aqui dentro e a conferência acontece num cliente Supabase descartável.
  *
  * SOBRE FORÇA BRUTA: quem tentar adivinhar a senha esbarra no limite de
  * tentativas de login do próprio Supabase Auth. Como estas conferências saem
- * do servidor da aplicação, e não do computador da recepção, elas dividem esse
- * limite entre si — o que é seguro no volume real desta clínica (poucas
- * isenções por dia). Se um dia isso virar rotina de minuto a minuto, o certo é
- * criar um contador de tentativas por usuário antes de afrouxar qualquer coisa
- * aqui.
+ * do servidor da aplicação, e não do computador da recepção, dividem esse
+ * limite entre si — seguro no volume real desta clínica (poucas autorizações
+ * por dia). Se um dia isso virar rotina de minuto a minuto, o certo é criar um
+ * contador de tentativas por usuário antes de afrouxar qualquer coisa aqui.
  */
+
+const escopoSchema = z.enum(
+  Object.keys(ESCOPOS_AUTORIZACAO) as [EscopoAutorizacao, ...EscopoAutorizacao[]],
+);
 
 /** Confere se quem chamou pertence de fato à clínica informada. */
 async function assertMembroAtivo(
@@ -49,15 +59,16 @@ async function assertMembroAtivo(
 export type Autorizador = { id: string; nome: string; role: string };
 
 /**
- * Lista os nomes que podem autorizar a isenção, para o seletor do modal.
+ * Lista os nomes que podem autorizar a ação, para o seletor do modal.
  *
- * Devolve APENAS id, nome e papel. O e-mail fica no servidor de propósito:
- * ele não é necessário para escolher o nome e, publicado na tela, viraria uma
- * lista pronta de alvos para quem quisesse tentar senhas.
+ * Devolve APENAS id, nome e papel — nunca o e-mail, que não é necessário para
+ * escolher um nome numa lista.
  */
-export const listarAutorizadoresSemFaturamento = createServerFn({ method: "POST" })
+export const listarAutorizadores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), escopo: escopoSchema }).parse(input),
+  )
   .handler(async ({ data, context }): Promise<Autorizador[]> => {
     await assertMembroAtivo(context.supabase, context.userId, data.clinicaId);
 
@@ -69,7 +80,9 @@ export const listarAutorizadoresSemFaturamento = createServerFn({ method: "POST"
       .select("user_id, role")
       .eq("clinica_id", data.clinicaId)
       .eq("ativo", true)
-      .in("role", [...ROLES_AUTORIZAM_SEM_FATURAMENTO]);
+      // O cast só reconcilia o tipo: a tabela de escopos é escrita à mão com
+      // os mesmos valores do enum `app_role` do banco.
+      .in("role", [...rolesDoEscopo(data.escopo)] as Database["public"]["Enums"]["app_role"][]);
     const ids = (mems ?? []).map((m: { user_id: string }) => m.user_id);
     if (ids.length === 0) return [];
 
@@ -93,23 +106,22 @@ export const listarAutorizadoresSemFaturamento = createServerFn({ method: "POST"
   });
 
 export type ResultadoAutorizacao =
-  | { ok: true; supervisorId: string; nome: string }
+  | { ok: true; supervisorId: string; nome: string; role: string }
   | { ok: false; message: string };
 
 /**
- * Confere a senha do supervisor escolhido e devolve o nome de quem autorizou.
+ * Confere a senha da pessoa escolhida e devolve o nome de quem autorizou.
  *
- * Não grava nada: quem grava a marcação continua sendo a tela, com a sessão da
- * própria funcionária, de modo que o banco registra corretamente quem operou —
- * e o gatilho do banco confere, por conta própria, se o autorizador informado
- * tem mesmo alçada.
+ * Não grava nada: quem grava continua sendo a tela, com a sessão da própria
+ * funcionária, de modo que o registro mostre corretamente quem operou.
  */
-export const autorizarSemFaturamento = createServerFn({ method: "POST" })
+export const autorizarComSenha = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
         clinicaId: z.string().uuid(),
+        escopo: escopoSchema,
         supervisorId: z.string().uuid(),
         senha: z.string().min(1).max(200),
       })
@@ -126,17 +138,17 @@ export const autorizarSemFaturamento = createServerFn({ method: "POST" })
       .eq("ativo", true)
       .maybeSingle();
     const role = (mem as { role?: string } | null)?.role ?? null;
-    if (!role || !(ROLES_AUTORIZAM_SEM_FATURAMENTO as readonly string[]).includes(role)) {
+    if (!role || !rolesDoEscopo(data.escopo).includes(role)) {
       return {
         ok: false,
-        message: "Esta pessoa não tem permissão para autorizar isenções nesta clínica.",
+        message: "Esta pessoa não tem permissão para autorizar esta ação nesta clínica.",
       };
     }
 
     const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.supervisorId);
     const email = u?.user?.email ?? null;
     if (!email) {
-      return { ok: false, message: "Cadastro do supervisor sem e-mail de acesso." };
+      return { ok: false, message: "Cadastro sem e-mail de acesso." };
     }
 
     // Cliente descartável, com a chave pública: valida a senha sem encostar na
@@ -150,21 +162,20 @@ export const autorizarSemFaturamento = createServerFn({ method: "POST" })
       email,
       password: data.senha,
     });
-    if (error || login?.user?.id !== data.supervisorId) {
+    const encerrarSessaoTemporaria = async () => {
       try {
-        // `scope: "local"` é obrigatório: o padrão derruba TODAS as sessões do
-        // supervisor, o que o deslogaria do próprio computador dele.
+        // `scope: "local"` é obrigatório: o padrão derruba TODAS as sessões da
+        // pessoa, o que a deslogaria do próprio computador dela.
         await temp.auth.signOut({ scope: "local" });
       } catch (_) {
         /* nada a fazer: a sessão temporária expira sozinha */
       }
+    };
+    if (error || login?.user?.id !== data.supervisorId) {
+      await encerrarSessaoTemporaria();
       return { ok: false, message: "Senha incorreta." };
     }
-    try {
-      await temp.auth.signOut({ scope: "local" });
-    } catch (_) {
-      /* idem */
-    }
+    await encerrarSessaoTemporaria();
 
     const { data: prof } = await supabaseAdmin
       .from("profiles")
@@ -172,5 +183,5 @@ export const autorizarSemFaturamento = createServerFn({ method: "POST" })
       .eq("id", data.supervisorId)
       .maybeSingle();
     const nome = ((prof as { nome?: string } | null)?.nome ?? "").trim() || email;
-    return { ok: true, supervisorId: data.supervisorId, nome };
+    return { ok: true, supervisorId: data.supervisorId, nome, role };
   });

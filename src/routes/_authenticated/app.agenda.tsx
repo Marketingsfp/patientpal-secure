@@ -118,11 +118,11 @@ import {
   calcularAvisoLimitePendentes,
   deveBloquearPorLimitePendente,
 } from "@/lib/agenda/aviso-limite-pendentes";
-import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
-// O desconto segue no diálogo antigo (e-mail + senha); a isenção de cobrança
-// usa o novo, que pede só o nome na lista e a senha. Ver o comentário em
-// `supervisor-senha-dialog.tsx`.
+// Desconto e isenção de cobrança usam o MESMO diálogo, mudando só a alçada
+// exigida (`escopo`): escolher o nome numa lista e digitar a senha. Manter dois
+// formatos diferentes de autorização confundiria a equipe no balcão.
 import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
+import { podeAutorizar } from "@/lib/autorizacao-supervisor";
 import {
   CalendarDays,
   Plus,
@@ -1743,7 +1743,10 @@ function AgendaPage() {
     motivo: string;
     autorizadoPor: string;
   }>({ tipo: "valor", input: "", motivo: "", autorizadoPor: "" });
-  const ehSupervisorDesc = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  // Lê a alçada da tabela única (`@/lib/autorizacao-supervisor`) em vez de
+  // repetir a lista aqui: uma cópia solta acabaria divergindo do que a server
+  // function e o diálogo de senha aceitam.
+  const ehSupervisorDesc = podeAutorizar("desconto", clinicaAtual?.role);
 
   // --- Sem faturamento: motivo obrigatório + autorização da supervisão ------
   // Marcar um atendimento como sem faturamento apaga uma receita da clínica
@@ -9941,9 +9944,11 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      <SupervisorAuthDialog
+      <SupervisorSenhaDialog
         open={supervisorOpen}
         onOpenChange={setSupervisorOpen}
+        clinicaId={clinicaAtual?.clinica_id}
+        escopo="desconto"
         acao="aplicar desconto"
         onAuthorized={(info) => {
           setDescontoPendente({
@@ -10065,6 +10070,7 @@ function AgendaPage() {
           if (!v && semFatAcao && !semFatAcao.marcar) setSemFatAcao(null);
         }}
         clinicaId={clinicaAtual?.clinica_id}
+        escopo="sem_faturamento"
         acao={
           semFatAcao?.marcar
             ? "marcar este atendimento como SEM FATURAMENTO"

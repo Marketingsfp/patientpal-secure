@@ -222,7 +222,6 @@ import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
-import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 

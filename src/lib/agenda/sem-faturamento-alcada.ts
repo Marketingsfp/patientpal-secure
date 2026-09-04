@@ -1,15 +1,20 @@
+import { podeAutorizar, rolesDoEscopo } from "@/lib/autorizacao-supervisor";
+
 /**
  * Quem pode isentar um atendimento de cobrança.
  *
- * Vive num arquivo próprio, sem nenhum import, porque a mesma lista é lida em
- * três lugares que não podem divergir: a tela da Agenda, a server function que
- * confere a senha do supervisor e o gatilho do banco. Se ela morasse em
- * `sem-faturamento.ts`, o código de servidor arrastaria junto o cliente
- * Supabase do navegador só para ler um array de três palavras.
+ * A lista em si mora em `@/lib/autorizacao-supervisor`, junto com a alçada das
+ * outras ações privilegiadas do sistema, para que exista uma tabela única de
+ * "quem autoriza o quê" — lida pela tela, pela server function que confere a
+ * senha e, no caso do sem faturamento, também pelo gatilho do banco.
+ *
+ * Este arquivo continua existindo como o nome que a Agenda já usa, e por não
+ * ter nenhum import de cliente Supabase: código de servidor consegue ler a
+ * alçada sem arrastar junto o cliente do navegador.
  */
-export const ROLES_AUTORIZAM_SEM_FATURAMENTO = ["admin", "gestor", "supervisor"] as const;
+export const ROLES_AUTORIZAM_SEM_FATURAMENTO = rolesDoEscopo("sem_faturamento");
 
 /** true → o papel deste usuário pode marcar/desmarcar sozinho, sem pedir senha. */
 export function podeAutorizarSemFaturamento(role: string | null | undefined): boolean {
-  return (ROLES_AUTORIZAM_SEM_FATURAMENTO as readonly string[]).includes(role ?? "");
+  return podeAutorizar("sem_faturamento", role);
 }
