@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Inbox, Hand, RefreshCw, AlertTriangle } from "lucide-react";
+import { Inbox, RefreshCw, AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { listarFilaHumana, assumirConversa } from "@/lib/atendimento.functions";
+import { listarFilaHumana } from "@/lib/atendimento.functions";
 
 type ConversaFila = {
   id: string;
