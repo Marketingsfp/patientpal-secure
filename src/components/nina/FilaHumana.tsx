@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Inbox, Hand, RefreshCw, AlertTriangle } from "lucide-react";
+import { Inbox, RefreshCw, AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { listarFilaHumana, assumirConversa } from "@/lib/atendimento.functions";
+import { listarFilaHumana } from "@/lib/atendimento.functions";
 
 type ConversaFila = {
   id: string;
@@ -31,17 +31,15 @@ function espera(desde?: string | null) {
 
 /**
  * Fila de conversas que a Nina encaminhou para atendimento humano.
- * O atendente clica em "Assumir": a trava é feita no banco, então dois
- * cliques simultâneos nunca colocam duas pessoas na mesma conversa.
+ * Não há ação manual: assim que alguém fica online, o sistema distribui
+ * automaticamente as conversas para quem tem menos conversas ativas.
  */
-export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) => void }) {
+export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void } = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const listarFn = useServerFn(listarFilaHumana);
-  const assumirFn = useServerFn(assumirConversa);
   const [rows, setRows] = useState<ConversaFila[]>([]);
   const [loading, setLoading] = useState(false);
-  const [claiming, setClaiming] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -63,28 +61,6 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
   }, [carregar]);
 
   useRealtimeRefresh(["atend_conversas"], carregar);
-
-  const assumir = async (c: ConversaFila) => {
-    if (!clinicaId) return;
-    setClaiming(c.id);
-    try {
-      const r = (await assumirFn({ data: { clinicaId, conversaId: c.id } })) as {
-        ok: boolean;
-        motivo: string | null;
-      };
-      if (!r.ok) {
-        toast.warning("Outro atendente assumiu esta conversa primeiro.");
-      } else {
-        toast.success("Conversa assumida — a Nina parou de responder.");
-        onAssumida?.(c.id);
-      }
-      await carregar();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao assumir");
-    } finally {
-      setClaiming(null);
-    }
-  };
 
   if (rows.length === 0) {
     return (
@@ -157,10 +133,6 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
                       </p>
                     )}
                   </div>
-                  <Button size="sm" onClick={() => assumir(c)} disabled={claiming === c.id}>
-                    <Hand className="h-3.5 w-3.5 mr-1" />
-                    {claiming === c.id ? "Assumindo…" : "Assumir"}
-                  </Button>
                 </div>
               );
             })}
