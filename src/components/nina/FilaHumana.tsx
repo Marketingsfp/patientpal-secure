@@ -90,7 +90,7 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
     <Card>
       <CardHeader className="py-3 flex-row items-center gap-2 space-y-0">
         <Inbox className="h-4 w-4" />
-        <CardTitle className="text-base">Fila de atendimento humano</CardTitle>
+        <CardTitle className="text-base">Não atribuídas</CardTitle>
         <Badge variant={rows.length > 0 ? "default" : "outline"} className="ml-1">
           {rows.length}
         </Badge>
@@ -101,9 +101,10 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
       <CardContent className="pt-0">
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            Ninguém aguardando. A Nina está atendendo tudo no 1º nível.
+            Ninguém aguardando — tudo distribuído entre os atendentes online.
           </p>
         ) : (
+
           <div className="space-y-2">
             {rows.map((c) => {
               const urgente = (c.prioridade ?? 0) >= 2;

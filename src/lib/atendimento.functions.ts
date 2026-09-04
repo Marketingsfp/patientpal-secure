@@ -1802,8 +1802,11 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
         "id, contato_nome, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count",
       )
       .eq("clinica_id", data.clinicaId)
-      .eq("status", "waiting")
+      // Fila global "Não atribuídas": tudo que aguarda uma pessoa e ainda não
+      // tem responsável, independente de já ter sido aberta antes.
+      .in("status", ["waiting", "active", "in_progress"])
       .is("atribuida_user_id", null)
+      .eq("is_teste", false)
       .order("prioridade", { ascending: false })
       .order("aguardando_desde", { ascending: true })
       .limit(data.limit);
@@ -1832,6 +1835,11 @@ export const assumirConversa = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     if (!ok) return { ok: false, motivo: "JA_ASSUMIDA" as const };
+    await context.supabase
+      .from("atend_conversas")
+      .update({ atribuicao_origem: "manual_assignment" })
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId);
     const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
     await registrarEvento({
       clinicaId: data.clinicaId,
@@ -1841,6 +1849,7 @@ export const assumirConversa = createServerFn({ method: "POST" })
     });
     return { ok: true, motivo: null };
   });
+
 
 /** Devolve a conversa para a Nina (reativa a IA). */
 export const devolverParaNina = createServerFn({ method: "POST" })
@@ -1969,8 +1978,39 @@ export const definirPresenca = createServerFn({ method: "POST" })
       { onConflict: "clinica_id,user_id" },
     );
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    // Ao ficar online, o que estava parado na fila "Não atribuídas" é
+    // distribuído na hora (da conversa que espera há mais tempo para a mais
+    // recente), sempre para quem tem menos conversas ativas.
+    let distribuidas = 0;
+    if (data.status === "ONLINE" && (data.aceitaNovas ?? true)) {
+      const { data: n, error: e2 } = await context.supabase.rpc("atend_distribuir_fila", {
+        _clinica_id: data.clinicaId,
+        _max: 20,
+      } as never);
+      if (e2) console.error("[atendimento] falha ao distribuir fila:", e2.message);
+      else distribuidas = Number(n ?? 0);
+    }
+    return { ok: true, distribuidas };
   });
+
+/**
+ * Distribui manualmente o que está parado na fila "Não atribuídas".
+ * Usado pelo botão "Distribuir agora" e após o heartbeat de presença.
+ */
+export const distribuirFilaPendentes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: n, error } = await context.supabase.rpc("atend_distribuir_fila", {
+      _clinica_id: data.clinicaId,
+      _max: 50,
+    } as never);
+    if (error) throw new Error(error.message);
+    return { distribuidas: Number(n ?? 0) };
+  });
+
 
 export const listarPresenca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

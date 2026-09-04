@@ -279,6 +279,32 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     audioFalhou ||
                     ["image", "document", "sticker"].includes(tipo));
 
+                // Se a conversa é de gente (Nina desligada ou já encaminhada) e
+                // ainda não tem responsável, distribui na hora para quem está
+                // online com menos conversas. Sem ninguém online, ela fica na
+                // fila "Não atribuídas".
+                const convId = (convEstado as { id?: string | null } | null)?.id ?? null;
+                const jaTemDono =
+                  (convEstado as { atribuida_user_id?: string | null } | null)
+                    ?.atribuida_user_id ?? null;
+                if (!deveResponder && convId && !jaTemDono) {
+                  try {
+                    const { atribuirAtendenteOnline } = await import(
+                      "@/lib/atendimento/handoff.server"
+                    );
+                    await atribuirAtendenteOnline({
+                      clinicaId: params.clinicaId,
+                      conversaId: convId,
+                      departamentoId:
+                        (convEstado as { departamento_id?: string | null } | null)
+                          ?.departamento_id ?? null,
+                    });
+                  } catch (e) {
+                    console.error("[whatsapp] auto-atribuição falhou", e);
+                  }
+                }
+
+
                 if (deveResponder) {
                   try {
                     if (!phoneNumberId) {

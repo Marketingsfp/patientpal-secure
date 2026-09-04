@@ -80,6 +80,7 @@ import {
   meuStatusAgente,
   assumirConversa,
   devolverParaNina,
+  definirPresenca,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 
@@ -124,6 +125,7 @@ export function AtendInbox() {
   const pausaAtualFn = useServerFn(pausaAtual);
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
+  const presencaFn = useServerFn(definirPresenca);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
@@ -169,6 +171,29 @@ export function AtendInbox() {
     carregarStatusAgente();
   }, [carregarStatusAgente]);
 
+  // Presença real: enquanto a pessoa está online (e não em pausa), o sistema
+  // avisa o servidor a cada minuto. Sem esse sinal por 5 minutos, ela deixa de
+  // receber conversas automaticamente — nada cai para quem fechou o sistema.
+  const online = !pausaAtiva && filaAberta;
+  useEffect(() => {
+    if (!clinicaId) return;
+    const bater = () => {
+      presencaFn({
+        data: {
+          clinicaId,
+          status: online ? ("ONLINE" as const) : pausaAtiva ? ("AWAY" as const) : ("OFFLINE" as const),
+          aceitaNovas: online,
+        },
+      }).catch(() => {
+        /* heartbeat: falha isolada não atrapalha o atendimento */
+      });
+    };
+    bater();
+    if (!online) return;
+    const t = setInterval(bater, 60_000);
+    return () => clearInterval(t);
+  }, [clinicaId, online, pausaAtiva, presencaFn]);
+
   const alternarFila = async (abrir: boolean) => {
     if (!clinicaId) return;
     try {
@@ -188,12 +213,24 @@ export function AtendInbox() {
         await travarFilaFn({ data: { clinicaId, travada: false } });
         setPausaAtiva(null);
         setFilaAberta(true);
-        toast.success("Você está online");
+        const r = await presencaFn({
+          data: { clinicaId, status: "ONLINE" as const, aceitaNovas: true },
+        });
+        const n = (r as { distribuidas?: number } | null)?.distribuidas ?? 0;
+        toast.success(
+          n > 0
+            ? `Você está online — ${n} conversa(s) da fila vieram para os atendentes`
+            : "Você está online",
+        );
+        await carregarConvs();
       } else if (status === "offline") {
         if (pausaAtiva) await finalizarPausaFn({ data: { clinicaId } });
         await travarFilaFn({ data: { clinicaId, travada: true } });
         setPausaAtiva(null);
         setFilaAberta(false);
+        await presencaFn({
+          data: { clinicaId, status: "OFFLINE" as const, aceitaNovas: false },
+        });
         toast.success("Você está offline");
       } else {
         if (!pauseReasons.length) {
@@ -207,6 +244,7 @@ export function AtendInbox() {
       mostrarErro(e);
     }
   };
+
 
   const confirmarPausa = async () => {
     if (!clinicaId || !pausaReasonSel) return;
