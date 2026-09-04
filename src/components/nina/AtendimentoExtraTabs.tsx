@@ -274,6 +274,15 @@ export function AtendInbox() {
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
+  // Mantém mensagens/contato sincronizados enquanto a conversa está aberta.
+  useEffect(() => {
+    if (!sel?.id) return;
+    const t = setInterval(() => {
+      carregarConversa();
+    }, 8000);
+    return () => clearInterval(t);
+  }, [sel?.id, carregarConversa]);
+
   useEffect(() => {
     if (!clinicaId) return;
     (async () => {
