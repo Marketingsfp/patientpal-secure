@@ -466,70 +466,74 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 h-[calc(100vh-96px)] overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 -mt-2 px-2 sm:px-3 lg:px-3 pt-1">
-      {/* TOOLBAR — status do agente */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1">
-        <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
-        <Button
-          size="sm"
-          variant={!pausaAtiva && filaAberta ? "default" : "outline"}
-          className={
-            !pausaAtiva && filaAberta ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""
-          }
-          onClick={() => definirStatus("online")}
-        >
-          <Circle className="h-3 w-3 mr-1 fill-current" /> Online
-        </Button>
-        <Button
-          size="sm"
-          variant={pausaAtiva ? "default" : "outline"}
-          className={pausaAtiva ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""}
-          onClick={() => definirStatus("pausa")}
-        >
-          <Coffee className="h-3.5 w-3.5 mr-1" /> Em pausa
-          {pausaAtiva?.atend_pause_reasons?.nome && (
-            <span className="ml-1 text-[11px] opacity-90">
-              · {pausaAtiva.atend_pause_reasons.nome}
-            </span>
-          )}
-        </Button>
-        <Button
-          size="sm"
-          variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
-          className={
-            !pausaAtiva && !filaAberta ? "bg-slate-600 hover:bg-slate-600/90 text-white" : ""
-          }
-          onClick={() => definirStatus("offline")}
-        >
-          <PowerOff className="h-3.5 w-3.5 mr-1" /> Offline
-        </Button>
-        {pausaAtiva && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={async () => {
-              if (!clinicaId) return;
-              await finalizarPausaFn({ data: { clinicaId } });
-              await carregarStatusAgente();
-              toast.success("Pausa finalizada");
-            }}
-          >
-            Encerrar pausa
-          </Button>
-        )}
-      </div>
-
-      <FilaHumana
-        onAssumida={(id) => {
-          const c = convs.find((x: any) => x.id === id);
-          if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
-          void carregarConvs();
-        }}
-      />
-
-      <div className="grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden">
+    <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
+      <div className="grid h-full grid-cols-12 gap-2 overflow-hidden">
         {/* COLUNA 1 — LISTA */}
         <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
+          <div className="shrink-0 border-b p-2 space-y-1.5">
+            <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+            <div className="grid grid-cols-3 gap-1">
+              <Button
+                size="sm"
+                variant={!pausaAtiva && filaAberta ? "default" : "outline"}
+                className={`h-7 px-1 text-[11px] ${
+                  !pausaAtiva && filaAberta
+                    ? "bg-emerald-600 hover:bg-emerald-600/90 text-white"
+                    : ""
+                }`}
+                onClick={() => definirStatus("online")}
+              >
+                <Circle className="h-2.5 w-2.5 mr-1 fill-current" /> Online
+              </Button>
+              <Button
+                size="sm"
+                variant={pausaAtiva ? "default" : "outline"}
+                className={`h-7 px-1 text-[11px] ${
+                  pausaAtiva ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
+                }`}
+                onClick={() => definirStatus("pausa")}
+              >
+                <Coffee className="h-3 w-3 mr-1" /> Pausa
+              </Button>
+              <Button
+                size="sm"
+                variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
+                className={`h-7 px-1 text-[11px] ${
+                  !pausaAtiva && !filaAberta
+                    ? "bg-slate-600 hover:bg-slate-600/90 text-white"
+                    : ""
+                }`}
+                onClick={() => definirStatus("offline")}
+              >
+                <PowerOff className="h-3 w-3 mr-1" /> Offline
+              </Button>
+            </div>
+            {pausaAtiva?.atend_pause_reasons?.nome && (
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="truncate flex-1">Em pausa · {pausaAtiva.atend_pause_reasons.nome}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-[11px]"
+                  onClick={async () => {
+                    if (!clinicaId) return;
+                    await finalizarPausaFn({ data: { clinicaId } });
+                    await carregarStatusAgente();
+                    toast.success("Pausa finalizada");
+                  }}
+                >
+                  Encerrar
+                </Button>
+              </div>
+            )}
+            <FilaHumana
+              onAssumida={(id) => {
+                const c = convs.find((x: any) => x.id === id);
+                if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
+                void carregarConvs();
+              }}
+            />
+          </div>
           <CardHeader className="py-2 space-y-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />

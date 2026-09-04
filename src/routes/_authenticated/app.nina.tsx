@@ -423,8 +423,12 @@ function NinaPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-4">
+    <div className={abaAtiva === "atend-inbox" ? "h-full" : "space-y-6"}>
+      <Tabs
+        value={abaAtiva}
+        onValueChange={setAbaAtiva}
+        className={abaAtiva === "atend-inbox" ? "h-full" : "space-y-4"}
+      >
         {/* ============ NINA TREINADA ============ */}
         <TabsContent value="treinada">
           <NinaTreinada />
@@ -514,7 +518,7 @@ function NinaPage() {
         <TabsContent value="atend-pausas">
           <AtendPausas />
         </TabsContent>
-        <TabsContent value="atend-inbox">
+        <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
         </TabsContent>
         <TabsContent value="atend-supervisor">
