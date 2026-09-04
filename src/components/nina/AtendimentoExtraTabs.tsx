@@ -140,6 +140,7 @@ export function AtendInbox() {
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [buscaAgente, setBuscaAgente] = useState("");
   const [fecharOpen, setFecharOpen] = useState(false);
   const [filaAberta, setFilaAberta] = useState<boolean>(true);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
