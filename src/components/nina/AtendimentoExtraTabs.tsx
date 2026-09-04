@@ -47,6 +47,8 @@ import {
   Lock,
   Unlock,
   CalendarPlus,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
