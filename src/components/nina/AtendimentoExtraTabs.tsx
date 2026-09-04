@@ -1034,6 +1034,7 @@ export function AtendInbox() {
               </>
             )}
           </div>
+          </div>
         </Card>
 
         {/* DIALOGS */}
