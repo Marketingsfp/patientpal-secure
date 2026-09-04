@@ -27,6 +27,7 @@ import {
   Printer,
   MoreHorizontal,
   Undo2,
+  RotateCcw,
   CalendarIcon,
 } from "lucide-react";
 import { History } from "lucide-react";
@@ -247,6 +248,13 @@ function AtendimentosPage() {
   // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
   // pode estornar.
   const podeEstornar = podeEscrever;
+  // Estornar um repasse JÁ PAGO é mais sério do que desfazer a baixa: desfaz o
+  // pagamento do médico e mexe na despesa/comprovante. Fica restrito a
+  // Financeiro e Administração. A mesma regra é reforçada no banco pela função
+  // `estornar_repasse_atendimento` — aqui é só para não exibir um botão que
+  // certamente falharia.
+  const podeEstornarRepasse =
+    podeEscrever && ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
@@ -1980,6 +1988,45 @@ function AtendimentosPage() {
     }
   };
 
+  /**
+   * Desfaz a baixa de UM atendimento no banco.
+   *
+   * Vai por RPC (`desfazer_baixa_atendimento`, SECURITY DEFINER) e não mais por
+   * UPDATE direto nas tabelas. Motivo: a política de segurança `agend_update`
+   * libera o UPDATE em `agendamentos` para admin, gestor, supervisor, recepção,
+   * caixa, médico e enfermeiro — o perfil `financeiro` ficou de fora. Um UPDATE
+   * barrado por RLS não devolve erro nenhum: ele simplesmente não altera linha
+   * alguma. O resultado era a tela avisar "Baixa desfeita." sem nada mudar, que
+   * é o "o botão não responde" relatado pelo financeiro. O mesmo valia para o
+   * DELETE do lançamento-sombra de R$ 0,00 (`fin_lanc_delete` só aceita
+   * admin/gestor).
+   *
+   * A RPC também grava a auditoria (quem, quando, motivo) e a nota no histórico
+   * do agendamento.
+   */
+  const desfazerBaixaNoBanco = async (
+    a: Atend,
+    motivo?: string | null,
+  ): Promise<{ ok: boolean; jaDesfeito: boolean; erro?: string }> => {
+    if (!clinicaAtual) return { ok: false, jaDesfeito: false, erro: "Clínica não identificada." };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)("desfazer_baixa_atendimento", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _origem: a.origem === "agenda" ? "agenda" : "manual",
+      _id: a.id,
+      _motivo: motivo ?? null,
+    });
+    if (error) {
+      return {
+        ok: false,
+        jaDesfeito: false,
+        erro: (error as { message?: string }).message ?? "erro desconhecido",
+      };
+    }
+    const r = (data ?? {}) as { ja_desfeito?: boolean };
+    return { ok: true, jaDesfeito: !!r.ja_desfeito };
+  };
+
   const desfazerBaixa = async (a: Atend) => {
     if (!podeEstornar) {
       toast.error("Sem permissão para desfazer a baixa.");
@@ -2002,70 +2049,12 @@ function AtendimentosPage() {
     )
       return;
     try {
-      // Verifica lançamento(s) em caixa vinculados. Só apagamos os R$ 0,00
-      // (lançamento-sombra "SEM COBRANÇA"). Lançamentos pagos (valor > 0)
-      // permanecem — o pagamento do paciente é trilha independente do
-      // status médico do atendimento.
-      let sombraIds: string[] = [];
-      if (a.origem === "agenda" && a.agendamento_id) {
-        const { data: lancs } = await supabase
-          .from("fin_lancamentos")
-          .select("id, valor")
-          .eq("agendamento_id", a.agendamento_id);
-        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
-        sombraIds = rows.filter((l) => Number(l.valor) === 0).map((l) => l.id);
-      } else if (a.origem !== "agenda") {
-        const { data: fa } = await supabase
-          .from("fin_atendimentos")
-          .select("lancamento_id")
-          .eq("id", a.id)
-          .maybeSingle();
-        const lancId = (fa as { lancamento_id: string | null } | null)?.lancamento_id ?? null;
-        if (lancId) {
-          const { data: l } = await supabase
-            .from("fin_lancamentos")
-            .select("id, valor")
-            .eq("id", lancId)
-            .maybeSingle();
-          const row = l as { id: string; valor: number | string | null } | null;
-          if (row && Number(row.valor) === 0) sombraIds = [row.id];
-        }
+      const r = await desfazerBaixaNoBanco(a);
+      if (!r.ok) {
+        mostrarErro({ message: r.erro });
+        return;
       }
-
-      if (a.origem === "agenda") {
-        if (!a.agendamento_id) {
-          toast.error("Atendimento sem agendamento vinculado.");
-          return;
-        }
-        const { error } = await supabase
-          .from("agendamentos")
-          .update({ status: "confirmado" })
-          .eq("id", a.agendamento_id);
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
-      } else {
-        const { error } = await supabase
-          .from("fin_atendimentos")
-          .update({ status: "confirmado" })
-          .eq("id", a.id);
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
-      }
-      if (sombraIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from("fin_lancamentos")
-          .delete()
-          .in("id", sombraIds);
-        if (delErr) {
-          mostrarErro(delErr);
-          return;
-        }
-      }
-      toast.success("Baixa desfeita.");
+      toast.success(r.jaDesfeito ? "Este atendimento já não estava baixado." : "Baixa desfeita.");
       await load();
     } catch (err) {
       mostrarErro(err);
@@ -2135,74 +2124,111 @@ function AtendimentosPage() {
     )
       return;
     try {
-      const agIds = alvos
-        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
-        .map((a) => a.agendamento_id as string);
-      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
-
-      // Coleta lançamentos-sombra (R$ 0,00) para apagar.
-      const sombraIds: string[] = [];
-      if (agIds.length) {
-        const { data: lancs } = await supabase
-          .from("fin_lancamentos")
-          .select("id, valor, agendamento_id")
-          .in("agendamento_id", agIds);
-        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
-        sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
-      }
-      if (manualIds.length) {
-        const { data: fas } = await supabase
-          .from("fin_atendimentos")
-          .select("lancamento_id")
-          .in("id", manualIds);
-        const lancIds = ((fas ?? []) as Array<{ lancamento_id: string | null }>)
-          .map((r) => r.lancamento_id)
-          .filter((x): x is string => !!x);
-        if (lancIds.length) {
-          const { data: lancs } = await supabase
-            .from("fin_lancamentos")
-            .select("id, valor")
-            .in("id", lancIds);
-          const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
-          sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+      // Um a um, pela mesma RPC do botão da linha. Sequencial de propósito: os
+      // atendimentos do lote podem dividir o mesmo agendamento/lançamento, e em
+      // paralelo eles disputariam a trava da linha no banco.
+      let ok = 0;
+      let jaDesfeitos = 0;
+      const erros: string[] = [];
+      for (const a of alvos) {
+        const r = await desfazerBaixaNoBanco(a);
+        if (!r.ok) erros.push(r.erro ?? "erro desconhecido");
+        else {
+          ok += 1;
+          if (r.jaDesfeito) jaDesfeitos += 1;
         }
       }
-
-      if (agIds.length) {
-        const { error } = await supabase
-          .from("agendamentos")
-          .update({ status: "confirmado" })
-          .in("id", agIds);
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
+      if (ok > 0) {
+        toast.success(
+          `Baixa desfeita em ${ok} atendimento(s).` +
+            (jaDesfeitos > 0 ? ` ${jaDesfeitos} já não estava(m) baixado(s).` : ""),
+        );
       }
-      if (manualIds.length) {
-        const { error } = await supabase
-          .from("fin_atendimentos")
-          .update({ status: "confirmado" })
-          .in("id", manualIds);
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
+      if (erros.length > 0) {
+        toast.error(`${erros.length} atendimento(s) não puderam ser desfeitos: ${erros[0]}`);
       }
-      if (sombraIds.length) {
-        const { error: delErr } = await supabase
-          .from("fin_lancamentos")
-          .delete()
-          .in("id", sombraIds);
-        if (delErr) {
-          mostrarErro(delErr);
-          return;
-        }
-      }
-      toast.success(`Baixa desfeita em ${alvos.length} atendimento(s).`);
       await load();
     } catch (err) {
       mostrarErro(err);
     }
+  };
+
+  // ------------------------------------------------------------------------
+  // ESTORNO DO REPASSE — volta um atendimento de "Pago" para "A receber".
+  //
+  // É a ação que faltava: até aqui, um repasse pago por engano não tinha volta
+  // pela tela. Roda pela RPC `estornar_repasse_atendimento`, que num único
+  // COMMIT desvincula o comprovante (a despesa de repasse), abate o valor dela
+  // (ou apaga a despesa, se aquele era o último atendimento dela), desfaz o
+  // repasse do terceiro dono do equipamento, limpa as marcas de pago e grava a
+  // auditoria com usuário, data/hora e motivo.
+  //
+  // O pagamento do PACIENTE e a gaveta do caixa não são tocados — a despesa de
+  // repasse nunca entra em caixa_movimentos.
+  // ------------------------------------------------------------------------
+  const [estornoRepasse, setEstornoRepasse] = useState<{
+    open: boolean;
+    alvos: Atend[];
+    motivo: string;
+    saving: boolean;
+  }>({ open: false, alvos: [], motivo: "", saving: false });
+
+  const abrirEstornoRepasse = (candidatos: Atend[]) => {
+    if (!podeEstornarRepasse) {
+      toast.error("Somente os perfis Financeiro e Administrador podem estornar um repasse pago.");
+      return;
+    }
+    const pagos = candidatos.filter((a) => a.repasse_pago);
+    if (pagos.length === 0) {
+      toast.info("Selecione atendimentos que estejam com o repasse Pago.");
+      return;
+    }
+    setEstornoRepasse({ open: true, alvos: pagos, motivo: "", saving: false });
+  };
+
+  const confirmarEstornoRepasse = async () => {
+    if (!clinicaAtual) return;
+    const motivo = estornoRepasse.motivo.trim();
+    if (motivo.length < 3) {
+      toast.error("Escreva o motivo do estorno (no mínimo 3 letras).");
+      return;
+    }
+    setEstornoRepasse((s) => ({ ...s, saving: true }));
+    let ok = 0;
+    let jaEstornados = 0;
+    const erros: string[] = [];
+    try {
+      for (const a of estornoRepasse.alvos) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase.rpc as any)("estornar_repasse_atendimento", {
+          _clinica_id: clinicaAtual.clinica_id,
+          _origem: a.origem === "agenda" ? "agenda" : "manual",
+          _id: a.id,
+          _valor_medico: Number(a.valor_medico) || 0,
+          _motivo: motivo,
+        });
+        if (error) {
+          erros.push((error as { message?: string }).message ?? "erro desconhecido");
+        } else {
+          ok += 1;
+          if (((data ?? {}) as { ja_estornado?: boolean }).ja_estornado) jaEstornados += 1;
+        }
+      }
+    } catch (err) {
+      mostrarErro(err);
+    }
+    setEstornoRepasse({ open: false, alvos: [], motivo: "", saving: false });
+    if (ok > 0) {
+      toast.success(
+        `Repasse estornado em ${ok} atendimento(s) — voltaram para "A receber".` +
+          (jaEstornados > 0 ? ` ${jaEstornados} já não estava(m) pago(s).` : ""),
+      );
+    }
+    if (erros.length > 0) {
+      toast.error(`${erros.length} atendimento(s) não puderam ser estornados: ${erros[0]}`);
+    }
+    setSel(new Set());
+    await load();
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
@@ -2783,6 +2809,17 @@ function AtendimentosPage() {
                       <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
                       Desfazer baixa
                       {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={selectedPagos.length === 0 || !podeEstornarRepasse}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedPagos.length > 0) abrirEstornoRepasse(selectedPagos);
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2 text-rose-600" />
+                      Estornar repasse (volta para A receber)
+                      {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -3437,6 +3474,17 @@ function AtendimentosPage() {
                                       <Printer className="h-3.5 w-3.5 text-primary" />
                                     </Button>
                                   )}
+                                  {a.repasse_pago && podeEstornarRepasse && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Estornar o repasse — o atendimento volta para 'A receber'"
+                                      onClick={() => abrirEstornoRepasse([a])}
+                                    >
+                                      <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                                    </Button>
+                                  )}
                                   {a.repasse_pago || a.agendamento_status === "realizado" ? (
                                     <Button
                                       size="sm"
@@ -3444,7 +3492,9 @@ function AtendimentosPage() {
                                       className="h-6 px-2 text-[11px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                       title={
                                         a.repasse_pago
-                                          ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                          ? podeEstornarRepasse
+                                            ? "Repasse já pago — clique na seta ao lado para estornar o repasse (volta para 'A receber') e só então desfaça a baixa"
+                                            : "Repasse já pago — só os perfis Financeiro e Administrador podem estornar o repasse"
                                           : podeEstornar
                                             ? "Clique para desfazer a baixa"
                                             : "Repasse já baixado"
@@ -3550,6 +3600,17 @@ function AtendimentosPage() {
                                       <Printer className="h-3.5 w-3.5 text-primary" />
                                     </Button>
                                   )}
+                                  {a.repasse_pago && podeEstornarRepasse && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Estornar o repasse — o atendimento volta para 'A receber'"
+                                      onClick={() => abrirEstornoRepasse([a])}
+                                    >
+                                      <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                                    </Button>
+                                  )}
                                   {a.repasse_pago || a.status === "realizado" ? (
                                     <Button
                                       size="sm"
@@ -3557,7 +3618,9 @@ function AtendimentosPage() {
                                       className="h-6 px-2 text-[11px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                       title={
                                         a.repasse_pago
-                                          ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
+                                          ? podeEstornarRepasse
+                                            ? "Repasse já pago — clique na seta ao lado para estornar o repasse (volta para 'A receber') e só então desfaça a baixa"
+                                            : "Repasse já pago — só os perfis Financeiro e Administrador podem estornar o repasse"
                                           : podeEstornar
                                             ? "Clique para desfazer a baixa"
                                             : "Repasse já baixado"
@@ -3709,6 +3772,17 @@ function AtendimentosPage() {
                       <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
                       Desfazer baixa
                       {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={selectedPagos.length === 0 || !podeEstornarRepasse}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (selectedPagos.length > 0) abrirEstornoRepasse(selectedPagos);
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2 text-rose-600" />
+                      Estornar repasse (volta para A receber)
+                      {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
@@ -4346,6 +4420,88 @@ function AtendimentosPage() {
                     </>
                   ) : (
                     "Salvar"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Estorno do repasse já pago — volta o atendimento para "A receber" */}
+          <Dialog
+            open={estornoRepasse.open}
+            onOpenChange={(o) =>
+              setEstornoRepasse((s) =>
+                s.saving ? s : { ...s, open: o, motivo: o ? s.motivo : "" },
+              )
+            }
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Estornar repasse pago</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[12px] p-2 leading-snug space-y-1">
+                  <p>
+                    <strong>
+                      {estornoRepasse.alvos.length === 1
+                        ? "1 atendimento"
+                        : `${estornoRepasse.alvos.length} atendimentos`}
+                    </strong>{" "}
+                    voltará(ão) de <strong>Pago</strong> para <strong>A receber</strong>, no total
+                    de{" "}
+                    <strong>
+                      {fmt(
+                        estornoRepasse.alvos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0),
+                      )}
+                    </strong>
+                    .
+                  </p>
+                  <p>
+                    O comprovante de repasse é desvinculado e a despesa do médico é abatida nesse
+                    valor — se este era o último atendimento dela, a despesa é apagada.
+                  </p>
+                  <p>
+                    O pagamento do paciente e o caixa <strong>não são alterados</strong>. A ação
+                    fica registrada na auditoria com o seu nome, a data e a hora.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Motivo do estorno</Label>
+                  <Textarea
+                    rows={3}
+                    autoFocus
+                    placeholder="Ex.: repasse pago em duplicidade; atendimento lançado no médico errado."
+                    value={estornoRepasse.motivo}
+                    onChange={(e) =>
+                      setEstornoRepasse((s) => ({ ...s, motivo: e.target.value.slice(0, 500) }))
+                    }
+                  />
+                  <p className="text-[12px] text-muted-foreground">
+                    Obrigatório. Fica gravado na auditoria e no histórico do atendimento.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setEstornoRepasse({ open: false, alvos: [], motivo: "", saving: false })
+                  }
+                  disabled={estornoRepasse.saving}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => void confirmarEstornoRepasse()}
+                  disabled={estornoRepasse.saving || estornoRepasse.motivo.trim().length < 3}
+                >
+                  {estornoRepasse.saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Estornando...
+                    </>
+                  ) : (
+                    "Confirmar estorno"
                   )}
                 </Button>
               </DialogFooter>
