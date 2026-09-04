@@ -153,7 +153,12 @@ export function AtendInbox() {
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   const [painelFixado, setPainelFixado] = useState(false);
   const [painelHover, setPainelHover] = useState(false);
-  const painelAberto = painelFixado || painelHover;
+  // Enquanto um menu suspenso da coluna estiver aberto o painel não pode
+  // encolher: o menu é renderizado fora do painel, o mouse "sai" da coluna e
+  // a lista sumia embaixo do menu.
+  const [painelMenuAberto, setPainelMenuAberto] = useState(false);
+  const painelAberto = painelFixado || painelHover || painelMenuAberto;
+
   useEffect(() => {
     try {
       setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
