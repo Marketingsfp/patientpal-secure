@@ -415,14 +415,28 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   )?.profile?.name ?? (value?.contacts ?? [])[0]?.profile?.name,
                 );
                 if (perfilNome && fromDigits) {
-                  await supabaseAdmin
-                    .from("atend_conversas")
-                    .update({ contato_nome: perfilNome.slice(0, 120) })
-                    .eq("clinica_id", params.clinicaId)
-                    .in("contato_telefone", [fromDigits, `+${fromDigits}`])
-                    .or(
-                      `contato_nome.is.null,contato_nome.eq.,contato_nome.eq.${fromDigits},contato_nome.eq.+${fromDigits}`,
-                    );
+                  try {
+                    const { data: convs } = await supabaseAdmin
+                      .from("atend_conversas")
+                      .select("id, contato_nome, contato_telefone")
+                      .eq("clinica_id", params.clinicaId)
+                      .in("contato_telefone", [fromDigits, `+${fromDigits}`]);
+                    for (const c of (convs ?? []) as Array<{
+                      id: string;
+                      contato_nome: string | null;
+                    }>) {
+                      const atual = (c.contato_nome ?? "").trim();
+                      // vazio ou apenas dígitos/“+” = ainda está mostrando o número
+                      const soNumero = atual === "" || /^\+?\d+$/.test(atual);
+                      if (!soNumero) continue;
+                      await supabaseAdmin
+                        .from("atend_conversas")
+                        .update({ contato_nome: perfilNome.slice(0, 120) })
+                        .eq("id", c.id);
+                    }
+                  } catch (e) {
+                    console.error("whatsapp perfil nome error", e);
+                  }
                 }
               }
             }
