@@ -404,6 +404,26 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     );
                   }
                 }
+
+                // Nome do perfil do WhatsApp (vem em value.contacts[].profile.name).
+                // Só preenche quando a conversa ainda não tem nome ou está
+                // mostrando o próprio número — nunca sobrescreve um nome que a
+                // recepção digitou nem o nome do paciente já vinculado.
+                const perfilNome = textoLimpo(
+                  (value?.contacts ?? []).find(
+                    (c: any) => String(c?.wa_id ?? "").replace(/\D/g, "") === fromDigits,
+                  )?.profile?.name ?? (value?.contacts ?? [])[0]?.profile?.name,
+                );
+                if (perfilNome && fromDigits) {
+                  await supabaseAdmin
+                    .from("atend_conversas")
+                    .update({ contato_nome: perfilNome.slice(0, 120) })
+                    .eq("clinica_id", params.clinicaId)
+                    .in("contato_telefone", [fromDigits, `+${fromDigits}`])
+                    .or(
+                      `contato_nome.is.null,contato_nome.eq.,contato_nome.eq.${fromDigits},contato_nome.eq.+${fromDigits}`,
+                    );
+                }
               }
             }
           }
