@@ -466,7 +466,7 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 h-[calc(100vh-120px)] overflow-hidden">
+    <div className="flex flex-col gap-1.5 h-[calc(100vh-96px)] overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 -mt-2 px-2 sm:px-3 lg:px-3 pt-1">
       {/* TOOLBAR — status do agente */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1">
         <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
