@@ -107,6 +107,7 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
           let arquivos = 0;
           let bytes = 0;
           const tabelasFeitas: string[] = [];
+          const falhas: string[] = [];
 
           for (const tabela of tabelas) {
             if (processadas >= MAX_TABELAS_POR_RUN) break;
@@ -120,22 +121,30 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
               continue;
             }
 
-            const { pages, rows, size } = await dumpTabela(
-              supabaseAdmin,
-              tabela,
-              clinicaId,
-              hoje,
-              bucket,
-              PAGE_SIZE,
-            );
-            processadas += 1;
-            arquivos += pages;
-            bytes += size;
-            tabelasFeitas.push(`${tabela}(${rows})`);
+            // Uma tabela problemática não pode abortar o backup inteiro:
+            // registramos a falha e seguimos para as próximas tabelas.
+            try {
+              const { pages, rows, size } = await dumpTabela(
+                supabaseAdmin,
+                tabela,
+                clinicaId,
+                hoje,
+                bucket,
+                PAGE_SIZE,
+              );
+              processadas += 1;
+              arquivos += pages;
+              bytes += size;
+              tabelasFeitas.push(`${tabela}(${rows})`);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.error("[BACKUP_DIARIO] falha ao exportar tabela", tabela, msg);
+              falhas.push(`${tabela}: ${msg}`);
+            }
           }
 
           const totalTabelas = tabelas.length;
-          const feito = processadas >= totalTabelas;
+          const feito = processadas + falhas.length >= totalTabelas;
 
           await supabaseAdmin
             .from("backup_execucoes")
@@ -153,6 +162,7 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
             tabelas_processadas: processadas,
             arquivos,
             bytes,
+            falhas,
             status: feito ? "concluido" : "em_andamento",
           });
         }
@@ -311,18 +321,15 @@ const TABELAS_COM_CLINICA_ARR = [
   "cargos",
   "cartoes_convenio",
   "cb_beneficios",
-  "cb_convenio_faixas",
   "cb_convenio_regras",
   "cb_convenios",
   "chat_canais",
   "chat_mensagens",
-  "contrato_dependentes",
   "contrato_mensalidades",
   "contratos_assinatura",
   "crm_etapas",
   "crm_oportunidades",
   "documentos_emitidos",
-  "especialidades",
   "estoque_movimentos",
   "estoque_produtos",
   "estorno_solicitacoes",
@@ -343,40 +350,29 @@ const TABELAS_COM_CLINICA_ARR = [
   "hr_ferias",
   "hr_holerites",
   "hr_pontos",
-  "lgpd_consentimentos",
   "lgpd_solicitacoes",
   "lms_certificados",
   "lms_cursos",
-  "lms_licoes",
-  "lms_modulos",
-  "lms_progresso",
-  "lms_quizzes",
   "lms_trilhas_cargo",
   "medico_agenda_procedimentos",
   "medico_agendas",
   "medico_biometria",
-  "medico_convenios",
   "medico_disponibilidades",
-  "medico_especialidades",
   "medico_expediente_encerramento",
-  "medico_procedimentos",
   "medicos",
   "mkt_envios",
   "mkt_landing_pages",
   "mkt_leads",
-  "mkt_segmentos",
   "modelos_documentos",
   "nfse",
   "nfse_emitentes",
   "odonto_dentes",
   "odonto_prontuarios",
-  "orcamento_itens",
   "orcamentos",
   "paciente_biometria",
   "pacientes",
   "pagamento_splits",
   "pagamentos",
-  "perfil_permissoes",
   "perfis_acesso",
   "prestadores",
   "procedimento_cb_convenio_valores",
@@ -389,7 +385,6 @@ const TABELAS_COM_CLINICA_ARR = [
   "regras_rateio",
   "senhas",
   "setores",
-  "tipos_servico",
   "triagens_enfermagem",
   "unidades",
   "whatsapp_configs",
