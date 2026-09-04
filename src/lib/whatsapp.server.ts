@@ -769,7 +769,14 @@ export async function gerarRespostaNina(
       ? `IDENTIDADE: você JÁ perguntou a identidade nesta conversa e não houve confirmação clara. NÃO pergunte de novo — siga o atendimento normalmente. Só pergunte mais uma vez (a última) se for indispensável para a ação pedida (ex.: confirmar um agendamento existente dessa pessoa).`
       : `IDENTIDADE: ainda não perguntada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
 
-  const historico = ((histR as any)?.data ?? [])
+  // Encerrar a conversa zera a memória: só entram mensagens posteriores ao
+  // encerramento (resolved_at/closed_at) da última conversa deste contato.
+  const msgsMemoria = ((histR as any)?.data ?? []).filter((m: any) =>
+    estadoId.memoriaDesde ? String(m.created_at ?? "") > String(estadoId.memoriaDesde) : true,
+  );
+
+  const historico = msgsMemoria
+
     .slice()
     .reverse()
     .map((m: any) => ({
