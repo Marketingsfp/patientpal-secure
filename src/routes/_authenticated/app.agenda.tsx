@@ -41,7 +41,7 @@ import { normalizarNomeBusca, normalizarTermoBusca } from "@/lib/busca-texto";
 import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
-import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, formatarIdadeCurta, hojeBR } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1785,6 +1785,12 @@ function AgendaPage() {
       (k) => (pacEdit[k] ?? "").trim() !== (orig[k] ?? "").trim(),
     );
   }, [pacInfo, pacEdit]);
+  // Idade mostrada em "Informações do cliente". Sai do campo Nascimento que
+  // está na tela (e não do que veio do banco), então se a recepção corrigir a
+  // data ali mesmo a idade se ajusta na hora, antes de salvar.
+  const pacIdadeTexto = formatarIdadeCurta(
+    pacEdit.data_nascimento || (pacInfo?.data_nascimento as string | null | undefined),
+  );
   const salvarPacEditRapido = async () => {
     if (!pacInfo?.id || !pacEditDirty) return;
     setPacEditSaving(true);
@@ -12333,7 +12339,14 @@ function AgendaPage() {
                   ) : null}
                 </button>
                 <div className="min-w-0">
-                  <div className="font-semibold uppercase">{pacInfo.nome}</div>
+                  <div className="flex flex-wrap items-center gap-x-2">
+                    <span className="font-semibold uppercase">{pacInfo.nome}</span>
+                    {pacIdadeTexto && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground/80">
+                        {pacIdadeTexto}
+                      </span>
+                    )}
+                  </div>
                   {pacInfo.numero_pasta && (
                     <div className="text-xs text-muted-foreground">
                       Serviço nº {pacInfo.numero_pasta}

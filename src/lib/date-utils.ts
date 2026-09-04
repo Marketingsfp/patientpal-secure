@@ -36,6 +36,37 @@ export function calcularIdade(nascimento: string | null | undefined): number | n
   return idade;
 }
 
+/**
+ * Idade em texto curto, para exibir ao lado do nome do paciente.
+ *
+ * Bebê aparece em meses (e em dias no primeiro mês) porque "0 anos" não
+ * distingue um recém-nascido de uma criança de 11 meses — e é justamente
+ * nessa faixa que a recepção precisa conferir se o médico/procedimento
+ * escolhido é pediátrico. Data de nascimento futura (erro de digitação)
+ * devolve null, para não estampar idade negativa na tela.
+ */
+export function formatarIdadeCurta(nascimento: string | null | undefined): string | null {
+  if (!nascimento) return null;
+  const nasc = new Date(`${nascimento}T00:00:00Z`);
+  if (Number.isNaN(nasc.getTime())) return null;
+  // "Hoje" pelo calendário local da clínica, comparado em UTC contra a data
+  // pura de nascimento — assim a idade não vira/volta um dia por causa do fuso.
+  const agora = new Date();
+  const hoje = new Date(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate()));
+  if (nasc.getTime() > hoje.getTime()) return null;
+  let meses =
+    (hoje.getUTCFullYear() - nasc.getUTCFullYear()) * 12 +
+    (hoje.getUTCMonth() - nasc.getUTCMonth());
+  if (hoje.getUTCDate() < nasc.getUTCDate()) meses--;
+  if (meses < 1) {
+    const dias = Math.floor((hoje.getTime() - nasc.getTime()) / 86_400_000);
+    return dias === 1 ? "1 dia" : `${dias} dias`;
+  }
+  if (meses < 24) return meses === 1 ? "1 mês" : `${meses} meses`;
+  const anos = Math.floor(meses / 12);
+  return anos === 1 ? "1 ano" : `${anos} anos`;
+}
+
 /** Formata timestamp (ISO com hora) como dd/MM/yyyy HH:mm no fuso local. */
 export function formatDateTime(value: string | Date | null | undefined): string {
   if (!value) return "";

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { VoiceInput } from "@/components/voice-input";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { normalizarTermoBusca } from "@/lib/busca-texto";
+import { formatarIdadeCurta } from "@/lib/date-utils";
 
 export interface PatientOption {
   id: string;
@@ -257,71 +258,83 @@ export function PatientSearchInput({
             </div>
           )}
           {!loading &&
-            options.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  onSelect(p);
-                  setQuery(p.nome);
-                  setOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2"
-              >
-                <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                    <span className="font-medium truncate">{p.nome}</span>
-                    {prontuarioExibicao(p) && (
-                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
-                        Prontuário {prontuarioExibicao(p)}
+            options.map((p) => {
+              // Idade colada no nome: é o que separa mãe e filha homônimas
+              // e mostra na hora se o paciente é de faixa pediátrica.
+              const idade = formatarIdadeCurta(p.data_nascimento);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(p);
+                    setQuery(p.nome);
+                    setOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2"
+                >
+                  <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <span className="font-medium truncate">
+                        {p.nome}
+                        {idade && (
+                          <span className="ml-1 font-semibold text-muted-foreground">
+                            — {idade}
+                          </span>
+                        )}
                       </span>
-                    )}
-                    {/* O número da pasta agora é o próprio prontuário exibido
+                      {prontuarioExibicao(p) && (
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                          Prontuário {prontuarioExibicao(p)}
+                        </span>
+                      )}
+                      {/* O número da pasta agora é o próprio prontuário exibido
                         quando existe. Repetir o mesmo número em dois selos
                         confundiria a recepção, então só mostramos a pasta
                         quando ela for diferente. */}
-                    {p.numero_pasta && p.numero_pasta.trim() !== prontuarioExibicao(p) && (
-                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
-                        Pasta {p.numero_pasta}
-                      </span>
-                    )}
-                    {p.associado_convenio ? (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                        Associado - {p.associado_tipo === "dependente" ? "dependente" : "titular"} —{" "}
-                        {p.associado_convenio}
-                      </span>
-                    ) : (
-                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        Particular
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      CPF: {formatCPFMasked(p.cpf) ?? "—"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Nasc.:{" "}
-                      {p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "—"}
-                    </span>
-                    {p.ultima_consulta && (
+                      {p.numero_pasta && p.numero_pasta.trim() !== prontuarioExibicao(p) && (
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                          Pasta {p.numero_pasta}
+                        </span>
+                      )}
+                      {p.associado_convenio ? (
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                          Associado - {p.associado_tipo === "dependente" ? "dependente" : "titular"}{" "}
+                          — {p.associado_convenio}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          Particular
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
-                        Última: {p.ultima_consulta.split("-").reverse().join("/")}
+                        CPF: {formatCPFMasked(p.cpf) ?? "—"}
                       </span>
+                      <span className="text-xs text-muted-foreground">
+                        Nasc.:{" "}
+                        {p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "—"}
+                      </span>
+                      {p.ultima_consulta && (
+                        <span className="text-xs text-muted-foreground">
+                          Última: {p.ultima_consulta.split("-").reverse().join("/")}
+                        </span>
+                      )}
+                    </div>
+                    {p.telefone && (
+                      <div className="text-xs text-muted-foreground truncate">
+                        {formatTelMasked(p.telefone)}
+                      </div>
+                    )}
+                    {p.cadastro_incompleto && (
+                      <div className="text-[12px] mt-0.5 text-amber-700 dark:text-amber-400">
+                        ⚠ Cadastro incompleto — clique para completar
+                      </div>
                     )}
                   </div>
-                  {p.telefone && (
-                    <div className="text-xs text-muted-foreground truncate">
-                      {formatTelMasked(p.telefone)}
-                    </div>
-                  )}
-                  {p.cadastro_incompleto && (
-                    <div className="text-[12px] mt-0.5 text-amber-700 dark:text-amber-400">
-                      ⚠ Cadastro incompleto — clique para completar
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
         </div>
       )}
     </div>
