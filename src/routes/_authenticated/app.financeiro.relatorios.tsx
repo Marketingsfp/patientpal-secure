@@ -74,7 +74,8 @@ import { carregarCategorias, type CategoriaFinanceira } from "@/lib/financeiro/c
 // manutenção de virar dívida acumulada) vive no módulo puro `relatorio-sessoes`;
 // o acesso ao banco, em `carregar-sessoes`.
 import {
-  COLUNAS_SESSOES,
+  colunasSessoes,
+  modoDoFiltro,
   linhasSessoes,
   resumoSessoes,
   ROTULO_FILTRO,
@@ -602,19 +603,25 @@ function Page() {
   // resultado, então ficam fora da chave: trocar qualquer um deles reorganiza a
   // tabela na hora, sem ir ao banco de novo. O período de comparação, não: ele
   // é outra consulta.
+  // "Movimento do período" é a única opção do seletor de Sessões que muda a
+  // CONSULTA, e não o recorte: ela responde outra pergunta, com outra janela de
+  // datas. Por isso entra na chave — sem isso, alternar entre posição e
+  // movimento reaproveitaria o resultado já carregado, que é do outro modo.
   const chaveAtual =
-    tipo === "rateio"
-      ? [
-          "rateio",
-          from,
-          to,
-          rMedico,
-          rEspecialidade,
-          rGrupo,
-          rServico,
-          comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
-        ].join("|")
-      : `${tipo}|${from}|${to}`;
+    tipo === "sessoes"
+      ? `sessoes|${from}|${to}|${modoDoFiltro(sFiltro)}`
+      : tipo === "rateio"
+        ? [
+            "rateio",
+            from,
+            to,
+            rMedico,
+            rEspecialidade,
+            rGrupo,
+            rServico,
+            comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
+          ].join("|")
+        : `${tipo}|${from}|${to}`;
   const atualizado = resultado !== null && resultado.chave === chaveAtual;
 
   // O `ref` marca que o cadastro já foi pedido. Sem ele, uma falha de rede
@@ -829,9 +836,9 @@ function Page() {
         : tipo === "movimentacao"
           ? colunasExtrato(rTipo)
           : tipo === "sessoes"
-            ? COLUNAS_SESSOES
+            ? colunasSessoes(modoDoFiltro(sFiltro))
             : COLUNAS[tipo],
-    [tipo, rTipo, rAgrupar, comparacaoVisivel],
+    [tipo, rTipo, rAgrupar, comparacaoVisivel, sFiltro],
   );
 
   // A troca de agrupamento (ou de categoria) pode encurtar a lista; voltar para
@@ -1135,6 +1142,7 @@ function Page() {
           clinicaId: clinicaAtual.clinica_id,
           de: from,
           ate: to,
+          modo: modoDoFiltro(sFiltro),
         });
         data = linhasSessoes(sessoes, sFiltro);
       } else if (tipo === "lancamentos") {
@@ -1227,10 +1235,17 @@ function Page() {
       // A primeira linha do cabeçalho já saiu como "Período: X a Y", que aqui
       // seria enganoso — a folha traz tratamento em andamento de qualquer data.
       // Estas duas linhas corrigem a leitura antes de o papel sair.
-      linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
-      linhasCtx.push(
-        "Tratamento em andamento aparece mesmo tendo começado antes do período; o período só limita os pacotes já encerrados.",
-      );
+      if (modoDoFiltro(sFiltro) === "movimento") {
+        linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · ${fmtDate(from)} a ${fmtDate(to)}`);
+        linhasCtx.push(
+          "Só o que foi realizado dentro do período. Esta visão fecha com o caixa da janela.",
+        );
+      } else {
+        linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
+        linhasCtx.push(
+          "Tratamento em andamento aparece mesmo tendo começado antes do período; o período só limita os pacotes já encerrados.",
+        );
+      }
       // Sem esta linha, quem recebe a folha lê a coluna "Recebido" de uma
       // manutenção como se houvesse saldo a cobrar do resto.
       linhasCtx.push(
@@ -1338,7 +1353,7 @@ function Page() {
                   // Vai como texto: o quadro mistura contagem ("18 pacotes")
                   // com dinheiro, e forçar tudo a número faria o Excel exibir
                   // "R$ 18,00" onde são dezoito pacotes.
-                  itens: resumoSessoes(ts).map((i) => ({
+                  itens: resumoSessoes(ts, modoDoFiltro(sFiltro)).map((i) => ({
                     rotulo: i.rotulo,
                     valor: i.valor,
                     tipo: "texto" as const,
@@ -1461,11 +1476,14 @@ function Page() {
       imprimirRelatorio({
         clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
         titulo: TITULOS.sessoes,
-        periodo: `Posição em ${fmtDate(to)} · ${ROTULO_FILTRO[sFiltro]} · tratamento em andamento entra de qualquer data; o período (${periodo}) só limita os pacotes encerrados`,
+        periodo:
+          modoDoFiltro(sFiltro) === "movimento"
+            ? `${periodo} · ${ROTULO_FILTRO[sFiltro]} · só o que foi realizado dentro do período`
+            : `Posição em ${fmtDate(to)} · ${ROTULO_FILTRO[sFiltro]} · tratamento em andamento entra de qualquer data; o período (${periodo}) só limita os pacotes encerrados`,
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeSessoes(colunas, ts),
-        resumo: resumoSessoes(ts),
+        resumo: resumoSessoes(ts, modoDoFiltro(sFiltro)),
         assinaturas: ASSINATURAS_PADRAO,
       });
       return;
@@ -1890,13 +1908,27 @@ function Page() {
                     </SelectContent>
                   </Select>
                 </div>
-                <p className="text-xs text-muted-foreground sm:flex-1 sm:pb-2.5">
-                  Pacotes de fisioterapia entram com{" "}
-                  <strong>sessões contratadas x realizadas</strong> e situação de pagamento.
-                  Manutenção de aparelho é cobrada <strong>por comparecimento</strong>: falta não
-                  vira dívida, entra como paciente a buscar. A coluna <em>Dias parado</em> conta a
-                  partir de {fmtDate(to)}.
-                </p>
+                {/* As duas primeiras opções respondem "onde cada paciente
+                    está"; a última responde "o que foi feito no período". Como
+                    são perguntas diferentes, a explicação também muda — e é ela
+                    que evita alguém conferir produção na folha errada. */}
+                {modoDoFiltro(sFiltro) === "movimento" ? (
+                  <p className="text-xs text-muted-foreground sm:flex-1 sm:pb-2.5">
+                    <strong>Produção do período</strong>: só sessões e manutenções realizadas entre{" "}
+                    {fmtDate(from)} e {fmtDate(to)}, para conferir contra o caixa e bater metas.
+                    Aqui a data é janela de verdade — quem não foi atendido no período não aparece.
+                    As colunas de pacote (contratado, a fazer, saldo) somem, porque descrevem o
+                    tratamento inteiro e não o mês.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground sm:flex-1 sm:pb-2.5">
+                    Pacotes de fisioterapia entram com{" "}
+                    <strong>sessões contratadas x realizadas</strong> e situação de pagamento.
+                    Manutenção de aparelho é cobrada <strong>por comparecimento</strong>: falta não
+                    vira dívida, entra como paciente a buscar. A coluna <em>Dias parado</em> conta a
+                    partir de {fmtDate(to)}.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -2024,37 +2056,71 @@ function Page() {
 
       {/* Cards de Sessões. O primeiro é o que a recepção usa todo dia: quantos
           pacientes estão em tratamento e não têm data marcada. */}
-      {tipo === "sessoes" && atualizado && linhas.length > 0 && (
+      {/* Modo movimento: a pergunta é produção do período, então "sem
+          agendamento" e "saldo a receber" saem do quadro — o primeiro não se
+          aplica a uma janela fechada, e o segundo é do pacote inteiro, não do
+          mês. Ficam as quatro contagens que o financeiro concilia contra o
+          caixa. */}
+      {tipo === "sessoes" && modoDoFiltro(sFiltro) === "movimento" && atualizado && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <CardResumo
-            titulo="Sem agendamento"
-            valor={totaisS.buscaAtiva.toLocaleString("pt-BR")}
-            detalhe="pacientes para busca ativa"
-            invertido
-          />
-          {/* Duas contagens separadas de propósito. Sessão de pacote tem total
-              contratado; visita de manutenção não tem — somar as duas gerava
-              "30 realizadas de 10 contratadas". */}
-          <CardResumo
             titulo="Sessões de pacote"
-            valor={`${totaisS.sessoesRealizadas.toLocaleString("pt-BR")} de ${totaisS.sessoesContratadas.toLocaleString("pt-BR")}`}
-            detalhe={`realizadas · ${totaisS.sessoesRestantes.toLocaleString("pt-BR")} a fazer · ${totaisS.faltasPacote.toLocaleString("pt-BR")} falta(s)`}
+            valor={totaisS.sessoesRealizadas.toLocaleString("pt-BR")}
+            detalhe="realizadas no período"
           />
           <CardResumo
             titulo="Visitas de manutenção"
             valor={totaisS.visitasManutencao.toLocaleString("pt-BR")}
-            detalhe={`${totaisS.ciclos.toLocaleString("pt-BR")} paciente(s) em ciclo · sem total contratado`}
+            detalhe="comparecimentos no período"
           />
-          {/* Os dois números de dinheiro no mesmo cartão para o quadro caber em
-              quatro colunas. O saldo é sempre "só pacotes": manutenção não
-              acumula, então nunca entra aqui. */}
           <CardResumo
-            titulo="Recebido"
+            titulo="Faltas"
+            valor={totaisS.faltasColuna.toLocaleString("pt-BR")}
+            detalhe="pacote e manutenção somados"
+            invertido
+          />
+          <CardResumo
+            titulo="Recebido no período"
             valor={brl(totaisS.recebido)}
-            detalhe={`Saldo a receber ${brl(totaisS.emAberto)} — só pacotes`}
+            detalhe="confere com o caixa da janela"
           />
         </div>
       )}
+
+      {tipo === "sessoes" &&
+        modoDoFiltro(sFiltro) === "posicao" &&
+        atualizado &&
+        linhas.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <CardResumo
+              titulo="Sem agendamento"
+              valor={totaisS.buscaAtiva.toLocaleString("pt-BR")}
+              detalhe="pacientes para busca ativa"
+              invertido
+            />
+            {/* Duas contagens separadas de propósito. Sessão de pacote tem total
+              contratado; visita de manutenção não tem — somar as duas gerava
+              "30 realizadas de 10 contratadas". */}
+            <CardResumo
+              titulo="Sessões de pacote"
+              valor={`${totaisS.sessoesRealizadas.toLocaleString("pt-BR")} de ${totaisS.sessoesContratadas.toLocaleString("pt-BR")}`}
+              detalhe={`realizadas · ${totaisS.sessoesRestantes.toLocaleString("pt-BR")} a fazer · ${totaisS.faltasPacote.toLocaleString("pt-BR")} falta(s)`}
+            />
+            <CardResumo
+              titulo="Visitas de manutenção"
+              valor={totaisS.visitasManutencao.toLocaleString("pt-BR")}
+              detalhe={`${totaisS.ciclos.toLocaleString("pt-BR")} paciente(s) em ciclo · sem total contratado`}
+            />
+            {/* Os dois números de dinheiro no mesmo cartão para o quadro caber em
+              quatro colunas. O saldo é sempre "só pacotes": manutenção não
+              acumula, então nunca entra aqui. */}
+            <CardResumo
+              titulo="Recebido"
+              valor={brl(totaisS.recebido)}
+              detalhe={`Saldo a receber ${brl(totaisS.emAberto)} — só pacotes`}
+            />
+          </div>
+        )}
 
       {atualizado && (
         <Card>
@@ -2068,14 +2134,22 @@ function Page() {
                     03/09" numa folha cheia de visitas de julho faz a folha
                     mentir sobre o que está mostrando. */}
                 {tipo === "sessoes"
-                  ? `posição em ${fmtDate(to)}`
+                  ? modoDoFiltro(sFiltro) === "movimento"
+                    ? `${fmtDate(from)} a ${fmtDate(to)}`
+                    : `posição em ${fmtDate(to)}`
                   : `${fmtDate(from)} a ${fmtDate(to)}`}
               </CardTitle>
-              {tipo === "sessoes" && (
+              {tipo === "sessoes" && modoDoFiltro(sFiltro) === "posicao" && (
                 <p className="text-xs text-muted-foreground">
                   Tratamento em andamento aparece sempre, mesmo tendo começado antes desta data — é
                   por isso que existem visitas antigas na lista. O período escolhido só limita os
                   pacotes já <strong>encerrados</strong>: {fmtDate(from)} a {fmtDate(to)}.
+                </p>
+              )}
+              {tipo === "sessoes" && modoDoFiltro(sFiltro) === "movimento" && (
+                <p className="text-xs text-muted-foreground">
+                  Só o que foi <strong>realizado dentro do período</strong>. Aqui a data é janela de
+                  verdade — é esta visão que fecha com o caixa e serve para conferir produção.
                 </p>
               )}
               {comparacaoVisivel && (

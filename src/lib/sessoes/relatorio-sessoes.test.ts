@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
   COLUNAS_SESSOES,
+  colunasSessoes,
+  modoDoFiltro,
+  resumoSessoes,
   filtrarSessoes,
   linhaExibida,
   linhasSessoes,
@@ -201,5 +204,45 @@ describe("totais", () => {
   it("conta quem precisa de busca ativa", () => {
     const t = totaisSessoes([pacote({ proxima_data: null }), pacote(), ciclo()]);
     expect(t.buscaAtiva).toBe(2);
+  });
+});
+
+describe("modo movimento", () => {
+  it("o seletor só troca de modo na opção de movimento", () => {
+    // As outras opções são recorte em memória da mesma lista; movimento é
+    // outra consulta. Se isto quebrar, alternar entre as visões passa a
+    // reaproveitar o resultado do modo errado.
+    expect(modoDoFiltro("movimento")).toBe("movimento");
+    for (const f of ["todos", "pacotes", "ciclos", "faltosos", "financeiro"] as const) {
+      expect(modoDoFiltro(f)).toBe("posicao");
+    }
+  });
+
+  it("não escreve '3/5' num pacote quando a folha é do período", () => {
+    // "3/5" leria como se o pacote inteiro coubesse no mês consultado.
+    const l = pacote({ realizadas: 3, total_sessoes: 5 });
+    expect(rotuloSessoes(l, "posicao")).toBe("3/5");
+    expect(rotuloSessoes(l, "movimento")).toBe("3 sessões");
+    expect(rotuloSessoes(pacote({ realizadas: 1 }), "movimento")).toBe("1 sessão");
+  });
+
+  it("as colunas do período largam o que descreve o pacote inteiro", () => {
+    const chaves = colunasSessoes("movimento").map((c) => c.chave);
+    for (const fora of ["valor_contratado", "restantes", "situacao", "dias_parado"]) {
+      expect(chaves).not.toContain(fora);
+    }
+    expect(chaves).toContain("valor_pago");
+    expect(chaves).toContain("sessoes");
+  });
+
+  it("o quadro do período não mostra contratadas nem saldo zerados", () => {
+    // No movimento esses campos vêm 0 do banco de propósito; exibi-los faria a
+    // folha dizer "0 a fazer" e "nada a receber", que não é verdade.
+    const t = totaisSessoes([pacote({ total_sessoes: 0, restantes: 0, valor_contratado: 0 })]);
+    const rotulos = resumoSessoes(t, "movimento").map((i) => i.rotulo);
+    expect(rotulos).not.toContain("Sessões contratadas");
+    expect(rotulos).not.toContain("Sessões a fazer");
+    expect(rotulos.some((r) => r.includes("Saldo"))).toBe(false);
+    expect(rotulos).toContain("Recebido no período");
   });
 });

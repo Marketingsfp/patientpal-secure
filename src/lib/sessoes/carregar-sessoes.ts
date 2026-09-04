@@ -14,26 +14,34 @@
  * puro e coberto por teste.
  */
 import { supabase } from "@/integrations/supabase/client";
-import type { LinhaSessao, OrigemSessao, SituacaoFinanceira } from "./relatorio-sessoes";
+import type {
+  LinhaSessao,
+  ModoSessoes,
+  OrigemSessao,
+  SituacaoFinanceira,
+} from "./relatorio-sessoes";
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 const txt = (v: unknown) => String(v ?? "");
 const dia = (v: unknown) => (v ? String(v).slice(0, 10) : null);
 
 /**
- * `_ate` não é só o fim da janela: é a data de referência dos dias parados.
- * Para os ciclos de manutenção ela responde "quantos dias este paciente está
- * sem aparecer, olhando desta data".
+ * No modo `posicao`, `_ate` não é só o fim da janela: é a data de referência
+ * dos dias parados — para os ciclos de manutenção ela responde "quantos dias
+ * este paciente está sem aparecer, olhando desta data". No modo `movimento` o
+ * par `_de`/`_ate` é janela de verdade, e só entra o que aconteceu dentro dela.
  */
 export async function carregarSessoes(filtros: {
   clinicaId: string;
   de: string;
   ate: string;
+  modo?: ModoSessoes;
 }): Promise<LinhaSessao[]> {
   const { data, error } = await supabase.rpc("fn_relatorio_sessoes", {
     _clinica_id: filtros.clinicaId,
     _de: filtros.de,
     _ate: filtros.ate,
+    _modo: filtros.modo ?? "posicao",
   });
   if (error) throw error;
 

@@ -10823,7 +10823,7 @@ export type Database = {
         Returns: Json
       }
       fn_relatorio_sessoes: {
-        Args: { _ate: string; _clinica_id: string; _de: string }
+        Args: { _ate: string; _clinica_id: string; _de: string; _modo?: string }
         Returns: {
           dias_parado: number
           faltas: number
