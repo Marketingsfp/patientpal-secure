@@ -6,6 +6,13 @@
  * automático quando o campo chega vazio num cadastro novo — é a trigger
  * `pacientes_set_codigo_prontuario`, que serve apenas de rede de segurança
  * para nenhum paciente ficar sem prontuário.
+ *
+ * Esse número automático sai de um contador próprio (tabela
+ * `prontuario_sequencia`), que aponta para o próximo número livre do arquivo
+ * físico da clínica e anda junto com o que a recepção digita. Ele não é mais
+ * "o maior número da clínica + 1": a importação do sistema antigo trouxe
+ * cadastros numerados muito acima da estante em uso, e usar o maior deles
+ * jogava todo cadastro novo centenas de milhares de números à frente.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { LIMITES, limparLinha } from "@/lib/seguranca/sanitizar";
@@ -27,10 +34,14 @@ export function normalizarCodigoProntuario(valor: string | null | undefined): st
  * Maior quantidade de dígitos aceita num número de prontuário.
  *
  * A régua vem do sistema antigo, que numerava com até 7 dígitos. O limite não
- * é estético: o número automático de um paciente novo é calculado como "maior
- * número da clínica + 1". Em 19/08/2026 alguém digitou 24378101 (o prontuário
- * 2437810 de outra paciente com um dígito a mais) e, a partir dali, todos os
- * cadastros novos passaram a nascer com 8 dígitos, fora da régua.
+ * é estético: enquanto o número automático era "maior número da clínica + 1",
+ * uma digitação errada contaminava toda a numeração seguinte. Em 19/08/2026
+ * alguém digitou 24378101 (o prontuário 2437810 de outra paciente com um
+ * dígito a mais) e, a partir dali, 415 cadastros nasceram com 8 dígitos.
+ *
+ * O contador `prontuario_sequencia` já protege a numeração desse tipo de erro,
+ * mas a régua continua valendo na tela: é a primeira barreira, e ela avisa a
+ * recepção na hora, antes de o cadastro ser gravado.
  */
 export const MAX_DIGITOS_PRONTUARIO = 7;
 
