@@ -112,6 +112,53 @@ async function garantirConversa(admin: any, clinicaId: string, lead: LeadRow): P
   return conversaId;
 }
 
+/** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
+const LIMITE_MENSAGENS_LEAD = 400;
+
+/** IDs de todas as conversas de teste do lead (sessões atuais e anteriores). */
+async function conversasDoLead(admin: any, clinicaId: string, lead: LeadRow): Promise<string[]> {
+  const { data: convs } = await admin
+    .from("atend_conversas")
+    .select("id")
+    .eq("clinica_id", clinicaId)
+    .eq("is_teste", true)
+    .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
+  const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
+  if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
+  return ids;
+}
+
+/**
+ * Mantém no máximo LIMITE_MENSAGENS_LEAD mensagens por lead de teste: ao bater
+ * o teto, as mais antigas são apagadas para dar lugar às novas.
+ */
+async function podarMensagensLead(admin: any, clinicaId: string, lead: LeadRow) {
+  try {
+    const ids = await conversasDoLead(admin, clinicaId, lead);
+    if (ids.length === 0) return;
+    const { count } = await admin
+      .from("whatsapp_mensagens")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", clinicaId)
+      .in("conversa_id", ids);
+    const excedente = (count ?? 0) - LIMITE_MENSAGENS_LEAD;
+    if (excedente <= 0) return;
+    const { data: antigas } = await admin
+      .from("whatsapp_mensagens")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .in("conversa_id", ids)
+      .order("created_at", { ascending: true })
+      .limit(excedente);
+    const alvo = ((antigas ?? []) as any[]).map((m) => m.id as string);
+    if (alvo.length) await admin.from("whatsapp_mensagens").delete().in("id", alvo);
+  } catch (e) {
+    console.error("[NINA_TESTE] falha ao podar mensagens antigas", e);
+  }
+}
+
+
+
 export const listarLeadsTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
@@ -158,16 +205,10 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
 
     // O console mostra TODAS as sessões do lead (histórico visual completo).
     // A memória da Nina continua isolada: ela só enxerga o telefone da sessão atual.
-    const { data: convs } = await supabaseAdmin
-      .from("atend_conversas")
-      .select("id")
-      .eq("clinica_id", data.clinicaId)
-      .eq("is_teste", true)
-      .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`);
-    const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
-    if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
+    const ids = await conversasDoLead(supabaseAdmin, data.clinicaId, lead);
     if (ids.length === 0)
       return { mensagens: [], conversaId: lead.conversa_id, sessao: lead.sessao_seq };
+
 
     // Busca as mensagens MAIS RECENTES (desc) e reordena para exibição: com
     // muitas sessões o lead passa do limite, e ordenar asc esconderia justo as
@@ -178,7 +219,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
       .order("created_at", { ascending: false })
-      .limit(400);
+      .limit(LIMITE_MENSAGENS_LEAD);
     if (error) throw new Error(error.message);
     const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
 
@@ -285,6 +326,10 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
       .eq("id", conversaId);
+    // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
+    await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
+
+
 
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
     const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
