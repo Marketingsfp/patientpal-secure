@@ -466,9 +466,9 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       {/* TOOLBAR — status do agente */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-1">
         <span className="text-xs font-medium text-muted-foreground mr-1">Meu status:</span>
         <Button
           size="sm"
@@ -527,10 +527,10 @@ export function AtendInbox() {
         }}
       />
 
-      <div className="grid grid-cols-12 gap-2 h-[calc(100vh-230px)] min-h-[560px]">
+      <div className="grid grid-cols-12 gap-2 h-[calc(100vh-150px)] min-h-[640px]">
         {/* COLUNA 1 — LISTA */}
         <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
-          <CardHeader className="py-3 space-y-2">
+          <CardHeader className="py-2 space-y-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
               <CardTitle className="text-base">Inbox</CardTitle>
@@ -614,7 +614,7 @@ export function AtendInbox() {
             </div>
           ) : (
             <>
-              <CardHeader className="py-3 border-b">
+              <CardHeader className="py-2 border-b">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <CardTitle className="text-base flex items-center gap-2 truncate">
@@ -792,7 +792,7 @@ export function AtendInbox() {
 
         {/* COLUNA 3 — CONTATO */}
         <Card className="hidden lg:flex lg:col-span-2 xl:col-span-2 flex-col overflow-hidden">
-          <CardHeader className="py-3 border-b">
+          <CardHeader className="py-2 border-b">
             <CardTitle className="text-base">Contato</CardTitle>
           </CardHeader>
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
