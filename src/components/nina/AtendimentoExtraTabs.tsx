@@ -466,7 +466,7 @@ export function AtendInbox() {
   };
 
   return (
-    <div className="h-[calc(100vh-96px)] overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 -mt-2 px-2 sm:px-3 lg:px-3 pt-1">
+    <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
       <div className="grid h-full grid-cols-12 gap-2 overflow-hidden">
         {/* COLUNA 1 — LISTA */}
         <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
