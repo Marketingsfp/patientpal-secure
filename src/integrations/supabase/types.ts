@@ -746,6 +746,7 @@ export type Database = {
           ai_enabled: boolean
           ai_tentativas: number
           assigned_at: string | null
+          atribuicao_origem: string | null
           atribuida_user_id: string | null
           canal: string
           clinica_id: string
@@ -785,6 +786,7 @@ export type Database = {
           ai_enabled?: boolean
           ai_tentativas?: number
           assigned_at?: string | null
+          atribuicao_origem?: string | null
           atribuida_user_id?: string | null
           canal?: string
           clinica_id: string
@@ -824,6 +826,7 @@ export type Database = {
           ai_enabled?: boolean
           ai_tentativas?: number
           assigned_at?: string | null
+          atribuicao_origem?: string | null
           atribuida_user_id?: string | null
           canal?: string
           clinica_id?: string
@@ -10333,9 +10336,22 @@ export type Database = {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
       }
+      atend_auto_assign_conversa: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _departamento_id?: string
+          _origem?: string
+        }
+        Returns: string
+      }
       atend_claim_conversa: {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
+      }
+      atend_distribuir_fila: {
+        Args: { _clinica_id: string; _max?: number }
+        Returns: number
       }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       buscar_contratos: {
