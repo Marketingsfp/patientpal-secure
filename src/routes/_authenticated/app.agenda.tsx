@@ -8156,14 +8156,6 @@ function AgendaPage() {
             >
               <CreditCard className="h-4 w-4" />
             </button>
-            <Link
-              to="/app/disponibilidades"
-              title="Cadastrar horários semanais e gerar slots da agenda"
-              aria-label="Criar/gerar horários"
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            >
-              <Clock className="h-4 w-4" />
-            </Link>
           </div>
           {podeEscrever && (
             <DropdownMenu>
@@ -8217,6 +8209,13 @@ function AgendaPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <Link
+            to="/app/disponibilidades"
+            title="Cadastrar horários semanais e gerar slots da agenda"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
+          >
+            <Clock className="h-3.5 w-3.5" /> Criar horário médico
+          </Link>
           <button
             type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
@@ -8240,7 +8239,7 @@ function AgendaPage() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/app/disponibilidades">
-                  <Clock className="h-4 w-4 mr-2" /> Criar/gerar horários
+                  <Clock className="h-4 w-4 mr-2" /> Criar horário médico
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
