@@ -34,14 +34,12 @@ function espera(desde?: string | null) {
  * O atendente clica em "Assumir": a trava é feita no banco, então dois
  * cliques simultâneos nunca colocam duas pessoas na mesma conversa.
  */
-export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) => void }) {
+export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void } = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const listarFn = useServerFn(listarFilaHumana);
-  const assumirFn = useServerFn(assumirConversa);
   const [rows, setRows] = useState<ConversaFila[]>([]);
   const [loading, setLoading] = useState(false);
-  const [claiming, setClaiming] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -63,28 +61,6 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
   }, [carregar]);
 
   useRealtimeRefresh(["atend_conversas"], carregar);
-
-  const assumir = async (c: ConversaFila) => {
-    if (!clinicaId) return;
-    setClaiming(c.id);
-    try {
-      const r = (await assumirFn({ data: { clinicaId, conversaId: c.id } })) as {
-        ok: boolean;
-        motivo: string | null;
-      };
-      if (!r.ok) {
-        toast.warning("Outro atendente assumiu esta conversa primeiro.");
-      } else {
-        toast.success("Conversa assumida — a Nina parou de responder.");
-        onAssumida?.(c.id);
-      }
-      await carregar();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao assumir");
-    } finally {
-      setClaiming(null);
-    }
-  };
 
   if (rows.length === 0) {
     return (
@@ -157,10 +133,6 @@ export function FilaHumana({ onAssumida }: { onAssumida?: (conversaId: string) =
                       </p>
                     )}
                   </div>
-                  <Button size="sm" onClick={() => assumir(c)} disabled={claiming === c.id}>
-                    <Hand className="h-3.5 w-3.5 mr-1" />
-                    {claiming === c.id ? "Assumindo…" : "Assumir"}
-                  </Button>
                 </div>
               );
             })}
