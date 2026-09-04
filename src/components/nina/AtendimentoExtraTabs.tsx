@@ -274,6 +274,15 @@ export function AtendInbox() {
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
+  // Mantém mensagens/contato sincronizados enquanto a conversa está aberta.
+  useEffect(() => {
+    if (!sel?.id) return;
+    const t = setInterval(() => {
+      carregarConversa();
+    }, 8000);
+    return () => clearInterval(t);
+  }, [sel?.id, carregarConversa]);
+
   useEffect(() => {
     if (!clinicaId) return;
     (async () => {
@@ -753,27 +762,45 @@ export function AtendInbox() {
               <p className="text-muted-foreground">—</p>
             ) : (
               <>
-                {contato.paciente ? (
-                  <section>
-                    <div className="font-medium">{contato.paciente.nome}</div>
-                    <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                      {contato.paciente.telefone && <div>📱 {contato.paciente.telefone}</div>}
-                      {contato.paciente.email && <div>✉️ {contato.paciente.email}</div>}
-                      {contato.paciente.cpf && <div>CPF: {contato.paciente.cpf}</div>}
-                      {contato.paciente.cidade && (
-                        <div>
-                          📍 {contato.paciente.cidade}/{contato.paciente.estado}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                ) : (
-                  <section>
-                    <div className="text-xs text-muted-foreground">
+                <section>
+                  <div className="font-medium">
+                    {contato.paciente?.nome ||
+                      contato.conversa?.contato_nome ||
+                      contato.conversa?.contato_telefone ||
+                      "Sem nome"}
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                    {(contato.conversa?.contato_telefone || contato.paciente?.telefone) && (
+                      <div>
+                        📱 {contato.conversa?.contato_telefone || contato.paciente?.telefone}
+                      </div>
+                    )}
+                    {contato.paciente?.email && <div>✉️ {contato.paciente.email}</div>}
+                    {contato.paciente?.cpf && <div>CPF: {contato.paciente.cpf}</div>}
+                    {contato.paciente?.cidade && (
+                      <div>
+                        📍 {contato.paciente.cidade}/{contato.paciente.estado}
+                      </div>
+                    )}
+                    {contato.conversa?.protocolo && (
+                      <div>Protocolo: {contato.conversa.protocolo}</div>
+                    )}
+                    {contato.conversa?.canal && <div>Canal: {contato.conversa.canal}</div>}
+                    {contato.conversa?.status && <div>Status: {contato.conversa.status}</div>}
+                    {contato.conversa?.atend_departamentos?.nome && (
+                      <div>Depto: {contato.conversa.atend_departamentos.nome}</div>
+                    )}
+                    {contato.conversa?.ultima_mensagem_em && (
+                      <div>Última mensagem: {fmtData(contato.conversa.ultima_mensagem_em)}</div>
+                    )}
+                  </div>
+                  {!contato.paciente && (
+                    <div className="text-xs text-muted-foreground mt-2">
                       Não vinculado a paciente cadastrado.
                     </div>
-                  </section>
-                )}
+                  )}
+                </section>
+
 
                 {contato.agendamentos?.length > 0 && (
                   <section>
