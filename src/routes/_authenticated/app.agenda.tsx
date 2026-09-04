@@ -312,7 +312,10 @@ const STATUS_LABEL: Record<Status, string> = {
 // 🔥 CORES ATUALIZADAS - Mais suaves e acessíveis
 const STATUS_COR: Record<Status, string> = {
   agendado: "bg-blue-50 text-blue-700 border border-blue-200",
-  confirmado: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  // Azul CHEIO (e nao o -50 claro do "agendado"): a recepcao precisa bater o
+  // olho na grade e separar num relance quem ja confirmou presenca. Dois tons
+  // claros de azul lado a lado ficariam iguais a um metro de distancia.
+  confirmado: "bg-blue-600 text-white border border-blue-700",
   realizado: "bg-green-600 text-white border border-green-700",
   cancelado: "bg-rose-50 text-rose-700 border border-rose-200",
   faltou: "bg-amber-50 text-amber-700 border border-amber-200",
@@ -11492,6 +11495,9 @@ function AgendaPage() {
                   } else if (presente) {
                     bgClass = "bg-blue-500/10";
                     borderLeft = "border-l-4 border-blue-400";
+                  } else if (!ehLivre && a.status === "confirmado") {
+                    bgClass = "bg-blue-500/10";
+                    borderLeft = "border-l-4 border-blue-300";
                   }
 
                   const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
@@ -11914,6 +11920,13 @@ function AgendaPage() {
                       } else if (presente) {
                         bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
                         borderLeft = "border-l-4 border-blue-400";
+                      } else if (!ehLivre && a.status === "confirmado") {
+                        // Confirmou por telefone/WhatsApp que vem: MESMO azul de quem
+                        // ja chegou, com a barra lateral mais clara. Quem fez check-in
+                        // cai no ramo `presente` acima e fica com a barra blue-400 —
+                        // presenca continua sendo so o clique manual da recepcao.
+                        bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
+                        borderLeft = "border-l-4 border-blue-300";
                       }
 
                       const ehAgora = a.id === agoraAgId;
