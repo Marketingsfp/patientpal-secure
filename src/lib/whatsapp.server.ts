@@ -790,7 +790,7 @@ export async function gerarRespostaNina(
     String(nomeUnidade)
       .split(/\s+[—–-]\s+/)[0]
       ?.trim() || nomeUnidade;
-  const jaSeApresentou = ((histR as any)?.data ?? []).some((m: any) => m.direction === "out");
+  const jaSeApresentou = msgsMemoria.some((m: any) => m.direction === "out");
   const dadosPublicos = [
     `Nome oficial: ${nomeUnidade}`,
     enderecoUnidade ? `Endereço: ${enderecoUnidade}` : null,
