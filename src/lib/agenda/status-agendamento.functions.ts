@@ -24,6 +24,9 @@ const schema = z.object({
   agendamento_ids: z.array(z.string().uuid()).min(1),
   novo_status: z.enum(STATUS_AGENDAMENTO),
   cascatear_pacote: z.boolean().optional().default(false),
+  // Justificativa do cancelamento, informada pela recepção no modal. Só é
+  // usada quando `novo_status` é "cancelado"; os demais status ignoram.
+  motivo: z.string().trim().max(300).optional().nullable(),
 });
 
 export type AtualizarStatusInput = z.infer<typeof schema>;

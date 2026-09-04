@@ -116,27 +116,23 @@ async function handleAvailability(
   }
 
   const slots = ((data ?? []) as Array<Record<string, unknown>>)
-    .filter((s) => Number(s['ocupados'] ?? 0) < Number(s['capacidade'] ?? 0))
+    .filter((s) => Number(s["ocupados"] ?? 0) < Number(s["capacidade"] ?? 0))
     .map((s) => ({
-      medico_id: s['medico_id'],
-      medico_nome: s['medico_nome'],
-      especialidade_id: s['especialidade_id'],
-      especialidade_nome: s['especialidade_nome'],
-      agenda_id: s['agenda_id'],
-      agenda_nome: s['agenda_nome'],
-      inicio: s['inicio'],
-      fim: s['fim'],
-      vagas: Number(s['capacidade'] ?? 0) - Number(s['ocupados'] ?? 0),
+      medico_id: s["medico_id"],
+      medico_nome: s["medico_nome"],
+      especialidade_id: s["especialidade_id"],
+      especialidade_nome: s["especialidade_nome"],
+      agenda_id: s["agenda_id"],
+      agenda_nome: s["agenda_nome"],
+      inicio: s["inicio"],
+      fim: s["fim"],
+      vagas: Number(s["capacidade"] ?? 0) - Number(s["ocupados"] ?? 0),
     }));
 
   return ok(200, { slots, total: slots.length });
 }
 
-async function buscarAgendamento(
-  db: SupabaseClient<Database>,
-  ctx: ApiKeyContexto,
-  ref: string,
-) {
+async function buscarAgendamento(db: SupabaseClient<Database>, ctx: ApiKeyContexto, ref: string) {
   const query = db.from("agendamentos").select(CAMPOS_AGENDAMENTO).eq("clinica_id", ctx.clinica_id);
   const r = ref.startsWith("ext:")
     ? await query
@@ -209,8 +205,7 @@ async function handleCriar(
       throw new ApiError({
         status: 422,
         code: "idempotency_key_required",
-        message:
-          "Envie o cabeçalho 'Idempotency-Key' quando o corpo trouxer o objeto 'paciente'.",
+        message: "Envie o cabeçalho 'Idempotency-Key' quando o corpo trouxer o objeto 'paciente'.",
       });
     }
   }
@@ -377,7 +372,11 @@ async function handleEspecialidades(
     .in("id", espIds as string[])
     .order("nome");
   if (error) {
-    throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler especialidades." });
+    throw new ApiError({
+      status: 500,
+      code: "read_failed",
+      message: "Falha ao ler especialidades.",
+    });
   }
   return { status: 200, body: { data: data ?? [] } };
 }
@@ -450,17 +449,29 @@ async function handleCancelar(
     return { status: 200, body: { data: { ...atual, replay: true } } };
   }
 
+  const motivo = parsed.data?.motivo?.trim();
+
   await atualizarStatusAgendamentoCore(
     { db, ator },
-    { agendamento_ids: [atual.id], novo_status: "cancelado", cascatear_pacote: false },
+    {
+      agendamento_ids: [atual.id],
+      novo_status: "cancelado",
+      cascatear_pacote: false,
+      // O motivo do parceiro vai para a coluna de cancelamento, junto do
+      // status, para aparecer no Histórico. Quando ele não manda nada, o
+      // núcleo grava "Cancelado pela integração <nome>".
+      motivo: motivo ?? null,
+    },
   );
 
-  const motivo = parsed.data?.motivo?.trim();
   if (motivo) {
     const obs = [atual.observacoes, `Cancelado via integração: ${motivo}`]
       .filter(Boolean)
       .join(" | ");
-    await db.from("agendamentos").update({ observacoes: obs } as never).eq("id", atual.id);
+    await db
+      .from("agendamentos")
+      .update({ observacoes: obs } as never)
+      .eq("id", atual.id);
   }
 
   return { status: 200, body: { data: await buscarAgendamento(db, ctx, atual.id) } };
@@ -567,7 +578,12 @@ async function handleListar(
   if (error) {
     throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao listar." });
   }
-  return ok(200, { appointments: data ?? [], total: count ?? 0, limite: f.limite, offset: f.offset });
+  return ok(200, {
+    appointments: data ?? [],
+    total: count ?? 0,
+    limite: f.limite,
+    offset: f.offset,
+  });
 }
 
 // ------------------------------------------------------------------ roteador

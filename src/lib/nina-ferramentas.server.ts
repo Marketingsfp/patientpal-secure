@@ -46,7 +46,8 @@ const LIMITE_MAX = 200;
 
 function checarTabela(tabela: string, escrita: boolean) {
   if (!/^[a-z0-9_]+$/.test(tabela)) throw new Error(`Tabela inválida: ${tabela}`);
-  if (BLOQUEADAS.has(tabela)) throw new Error(`Sem acesso à tabela ${tabela} por política interna.`);
+  if (BLOQUEADAS.has(tabela))
+    throw new Error(`Sem acesso à tabela ${tabela} por política interna.`);
   if (escrita && SOMENTE_LEITURA.has(tabela))
     throw new Error(
       `A tabela ${tabela} é somente leitura para a Nina. Use as ferramentas específicas de agenda.`,
@@ -106,7 +107,10 @@ export const FERRAMENTAS_NINA = [
       parameters: {
         type: "object",
         properties: {
-          tabela: { type: "string", description: "Nome da tabela, ex.: pacientes, agendamentos, fin_lancamentos" },
+          tabela: {
+            type: "string",
+            description: "Nome da tabela, ex.: pacientes, agendamentos, fin_lancamentos",
+          },
           colunas: { type: "string", description: "Colunas separadas por vírgula. Padrão: *" },
           filtros: {
             type: "array",
@@ -217,7 +221,8 @@ export const FERRAMENTAS_NINA = [
     type: "function",
     function: {
       name: "reagendar_agendamento",
-      description: "Move um agendamento existente para outro horário (e opcionalmente outro médico).",
+      description:
+        "Move um agendamento existente para outro horário (e opcionalmente outro médico).",
       parameters: {
         type: "object",
         properties: {
@@ -225,6 +230,11 @@ export const FERRAMENTAS_NINA = [
           novo_inicio: { type: "string" },
           novo_fim: { type: "string" },
           novo_medico_id: { type: "string" },
+          motivo: {
+            type: "string",
+            description:
+              "Por que o horário está sendo mudado (ex.: paciente pediu outro horário). Fica no histórico do agendamento.",
+          },
         },
         required: ["agendamento_id", "novo_inicio", "novo_fim"],
       },
@@ -241,6 +251,11 @@ export const FERRAMENTAS_NINA = [
         properties: {
           agendamento_ids: { type: "string", description: "IDs separados por vírgula" },
           novo_status: { type: "string" },
+          motivo: {
+            type: "string",
+            description:
+              "Obrigatório ao cancelar: por que o atendimento está sendo cancelado. Fica no histórico do agendamento.",
+          },
         },
         required: ["agendamento_ids", "novo_status"],
       },
@@ -283,7 +298,6 @@ export const FERRAMENTAS_NINA = [
   },
 ] as const;
 
-
 function parseJson(txt: unknown, campo: string): Record<string, unknown> {
   if (typeof txt === "object" && txt) return txt as Record<string, unknown>;
   try {
@@ -308,13 +322,17 @@ export async function executarFerramentaNina(
   nome: string,
   argsRaw: unknown,
 ): Promise<unknown> {
-  const args = (typeof argsRaw === "string" ? parseJson(argsRaw, "arguments") : (argsRaw ?? {})) as any;
+  const args = (
+    typeof argsRaw === "string" ? parseJson(argsRaw, "arguments") : (argsRaw ?? {})
+  ) as any;
 
   switch (nome) {
     case "consultar_base_conhecimento": {
       const { consultarBase, registrarConsultaKb } = await import("@/lib/nina/kb.server");
       const { expandirTermos } = await import("@/lib/nina/kb-parser");
-      const termo = String(args.termo ?? "").trim().slice(0, 200);
+      const termo = String(args.termo ?? "")
+        .trim()
+        .slice(0, 200);
       if (termo.length < 2) throw new Error("Informe o assunto da consulta.");
       const achado = await consultarBase({
         clinicaId,
@@ -339,9 +357,11 @@ export async function executarFerramentaNina(
             consolidado_por_profissional: achado.consolidado ?? [],
             registros: achado.registros,
           }
-        : { encontrado: false, instrucao: "Nada na base oficial. Não invente; diga que não encontrou." };
+        : {
+            encontrado: false,
+            instrucao: "Nada na base oficial. Não invente; diga que não encontrou.",
+          };
     }
-
 
     case "consultar_dados": {
       const tabela = String(args.tabela ?? "");
@@ -431,9 +451,8 @@ export async function executarFerramentaNina(
     }
 
     case "reagendar_agendamento": {
-      const { reagendarAgendamentoCore } = await import(
-        "@/lib/agenda/reagendar-agendamento.core.server"
-      );
+      const { reagendarAgendamentoCore } =
+        await import("@/lib/agenda/reagendar-agendamento.core.server");
       return await reagendarAgendamentoCore(
         { db: supabase, ator: { tipo: "usuario", userId } } as any,
         {
@@ -442,14 +461,18 @@ export async function executarFerramentaNina(
           novo_inicio: String(args.novo_inicio),
           novo_fim: String(args.novo_fim),
           novo_medico_id: args.novo_medico_id ? String(args.novo_medico_id) : null,
+          // A Nina age em nome de um usuário, então o núcleo não gera motivo
+          // automático — quem identifica a origem aqui somos nós.
+          motivo: args.motivo
+            ? `Assistente Nina: ${String(args.motivo)}`
+            : "Reagendado pela assistente Nina",
         },
       );
     }
 
     case "alterar_status_agendamento": {
-      const { atualizarStatusAgendamentoCore } = await import(
-        "@/lib/agenda/status-agendamento.core.server"
-      );
+      const { atualizarStatusAgendamentoCore } =
+        await import("@/lib/agenda/status-agendamento.core.server");
       const ids = String(args.agendamento_ids ?? "")
         .split(",")
         .map((s) => s.trim())
@@ -457,7 +480,13 @@ export async function executarFerramentaNina(
       if (ids.length === 0) throw new Error("Informe pelo menos um agendamento_id.");
       return await atualizarStatusAgendamentoCore(
         { db: supabase, ator: { tipo: "usuario", userId } } as any,
-        { agendamento_ids: ids, novo_status: String(args.novo_status) as any },
+        {
+          agendamento_ids: ids,
+          novo_status: String(args.novo_status) as any,
+          motivo: args.motivo
+            ? `Assistente Nina: ${String(args.motivo)}`
+            : "Cancelado pela assistente Nina",
+        },
       );
     }
 
@@ -496,7 +525,6 @@ export async function executarFerramentaNina(
       });
       return { horarios: slots.slice(0, 20), total: slots.length };
     }
-
 
     default:
       throw new Error(`Ferramenta desconhecida: ${nome}`);

@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { reagendarAgendamento } from "@/lib/agenda/reagendar-agendamento.functions";
+import { Textarea } from "@/components/ui/textarea";
+import { MOTIVOS_REAGENDAMENTO } from "@/lib/motivo";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 /**
@@ -71,6 +73,9 @@ export function ReagendarModal({
   const [novaData, setNovaData] = useState<string>("");
   const [novaHora, setNovaHora] = useState<string>("");
   const [novoMedicoId, setNovoMedicoId] = useState<string>("");
+  // Justificativa obrigatória: sem ela o histórico registrava a mudança de
+  // horário mas nunca o porquê, e a coordenação não tinha como cobrar.
+  const [motivo, setMotivo] = useState<string>("");
 
   // Reseta os campos ao (re)abrir com uma nova sessão.
   useMemo(() => {
@@ -78,6 +83,7 @@ export function ReagendarModal({
       setNovaData(toDateInputValue(sessao.inicio));
       setNovaHora(toTimeInputValue(sessao.inicio));
       setNovoMedicoId(sessao.medico_id ?? "");
+      setMotivo("");
     }
   }, [open, sessao]);
 
@@ -89,9 +95,16 @@ export function ReagendarModal({
   );
   const trocouMedico = novoMedicoId && novoMedicoId !== sessao.medico_id;
 
+  const motivoLimpo = motivo.trim();
+  const motivoOk = motivoLimpo.length >= 4;
+
   const handleConfirmar = async () => {
     if (!novaData || !novaHora) {
       notify.error("Escolha data e hora.");
+      return;
+    }
+    if (!motivoOk) {
+      notify.error("Informe o motivo do reagendamento.");
       return;
     }
     const [hh, mm] = novaHora.split(":").map((x) => Number(x));
@@ -111,6 +124,7 @@ export function ReagendarModal({
           novo_inicio: novoInicio.toISOString(),
           novo_fim: novoFim.toISOString(),
           novo_medico_id: trocouMedico ? novoMedicoId : null,
+          motivo: motivoLimpo,
         },
       });
       if (!res.ok) {
@@ -188,6 +202,36 @@ export function ReagendarModal({
               emptyText="Nenhum médico encontrado."
             />
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="reag-motivo" className="text-xs">
+              Motivo do reagendamento <span className="text-rose-600">*</span>
+            </Label>
+            <div className="flex flex-wrap gap-1.5">
+              {MOTIVOS_REAGENDAMENTO.map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  variant={motivoLimpo === s ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 rounded-full px-3 text-xs"
+                  onClick={() => setMotivo(s)}
+                >
+                  {s}
+                </Button>
+              ))}
+            </div>
+            <Textarea
+              id="reag-motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value.slice(0, 300))}
+              placeholder="Escolha um motivo acima ou escreva o que aconteceu…"
+              rows={2}
+              className="resize-none"
+            />
+            <p className="text-[11px] text-slate-500">
+              Fica registrado no histórico do agendamento.
+            </p>
+          </div>
           <p className="text-[12px] text-slate-500">
             Apenas ESTA sessão será movida. Se pertencer a um pacote, os demais itens permanecem no
             horário original.
@@ -203,7 +247,7 @@ export function ReagendarModal({
           >
             Cancelar
           </Button>
-          <Button type="button" onClick={handleConfirmar} disabled={saving}>
+          <Button type="button" onClick={handleConfirmar} disabled={saving || !motivoOk}>
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> Reagendando…

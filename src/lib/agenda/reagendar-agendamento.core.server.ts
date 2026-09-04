@@ -13,6 +13,7 @@
 // executado_por, executado_em.
 
 import { assertEscopoRegistro, type CtxAgenda } from "./ator.server";
+import { motivoFinal } from "./motivo-final";
 import type { PgErrorLike } from "./criar-agendamento.types";
 
 const TMP_MARKER = "DISPONÍVEL_REAGENDADO_TMP";
@@ -33,6 +34,12 @@ export type ReagendarAgendamentoCoreInput = {
   novo_inicio: string;
   novo_fim: string;
   novo_medico_id?: string | null;
+  /**
+   * Justificativa do reagendamento. Obrigatória no modal da Agenda V2; para
+   * a integração externa é preenchida automaticamente, para que o histórico
+   * nunca fique sem explicar por que o horário mudou.
+   */
+  motivo?: string | null;
 };
 
 export type ReagendarAgendamentoResult =
@@ -71,7 +78,10 @@ export async function reagendarAgendamentoCore(
     return { ok: false, validation_error: { message: "Agendamento pertence a outra clínica." } };
   }
   // Escopo obrigatório sob service role (no-op para funcionário logado).
-  assertEscopoRegistro(ctx.ator, origem as { clinica_id: string; origem_integracao: string | null });
+  assertEscopoRegistro(
+    ctx.ator,
+    origem as { clinica_id: string; origem_integracao: string | null },
+  );
 
   // Guard de status — paridade com o reagendar clássico.
   if (
@@ -174,8 +184,14 @@ export async function reagendarAgendamentoCore(
 
   try {
     // Passo 4 — origem assume o novo intervalo/médico.
-    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(antigo.inicio).toLocaleString("pt-BR")} para ${new Date(novo_inicio).toLocaleString("pt-BR")}`;
+    const motivo = motivoFinal(data.motivo, ctx.ator, "reagendamento");
+    const trilha =
+      `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(antigo.inicio).toLocaleString("pt-BR")} para ${new Date(novo_inicio).toLocaleString("pt-BR")}` +
+      (motivo ? ` — Motivo: ${motivo}` : "");
     const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
+    // O motivo entra no MESMO update que muda o horário: assim o gatilho de
+    // auditoria grava os dois na mesma linha e o histórico consegue mostrar a
+    // justificativa colada no evento de reagendamento.
     const { error: e4 } = await supabase
       .from("agendamentos")
       .update({
@@ -184,6 +200,9 @@ export async function reagendarAgendamentoCore(
         medico_id: novoMedicoId,
         agenda_id: destSlot.agenda_id,
         observacoes: novasObs,
+        reagendamento_motivo: motivo,
+        reagendamento_em: motivo ? new Date().toISOString() : null,
+        reagendamento_por: motivo && ctx.ator.tipo === "usuario" ? ctx.ator.userId : null,
       } as never)
       .eq("id", agendamento_id);
     if (e4) return { ok: false, pg_error: toPgErrorLike(e4) };

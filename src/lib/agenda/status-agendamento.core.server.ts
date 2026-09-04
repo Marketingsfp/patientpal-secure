@@ -16,6 +16,7 @@
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { limparExternoCore } from "./atendimento-externo.server";
 import { assertEscopoRegistro, type CtxAgenda } from "./ator.server";
+import { motivoFinal } from "./motivo-final";
 
 export const STATUS_AGENDAMENTO = [
   "agendado",
@@ -31,6 +32,14 @@ export type AtualizarStatusCoreInput = {
   agendamento_ids: string[];
   novo_status: StatusAgendamento;
   cascatear_pacote?: boolean;
+  /**
+   * Justificativa do cancelamento. Obrigatória nas telas de Agenda (a
+   * recepção informa num modal antes de confirmar) e ignorada nos demais
+   * status. Quando o cancelamento vem de uma integração externa — que não
+   * tem como abrir modal nenhum — o motivo é preenchido automaticamente
+   * abaixo, para que o histórico nunca fique sem explicação.
+   */
+  motivo?: string | null;
 };
 
 export async function atualizarStatusAgendamentoCore(
@@ -44,9 +53,7 @@ export async function atualizarStatusAgendamentoCore(
 
   const { data: ag, error: e0 } = await supabase
     .from("agendamentos")
-    .select(
-      "id,clinica_id,inicio,status,pacote_id,orcamento_id,paciente_nome,origem_integracao",
-    )
+    .select("id,clinica_id,inicio,status,pacote_id,orcamento_id,paciente_nome,origem_integracao")
     .eq("id", primaryId)
     .maybeSingle();
   if (e0) throw new Error(e0.message);
@@ -85,9 +92,21 @@ export async function atualizarStatusAgendamentoCore(
     orcamento_id?: null;
     executado_por?: string;
     executado_em?: string;
+    cancelamento_motivo?: string | null;
+    cancelamento_em?: string | null;
+    cancelamento_por?: string | null;
   } = { status: novo_status };
   if (novo_status === "cancelado" && ag.orcamento_id) {
     payload.orcamento_id = null;
+  }
+  // Regra 6 — o cancelamento nunca fica sem justificativa. Ela entra no mesmo
+  // UPDATE do status, de modo que o gatilho de auditoria grave motivo e status
+  // na mesma linha e o histórico consiga exibir os dois juntos.
+  if (novo_status === "cancelado") {
+    const motivo = motivoFinal(input.motivo, ctx.ator, "cancelamento");
+    payload.cancelamento_motivo = motivo;
+    payload.cancelamento_em = motivo ? new Date().toISOString() : null;
+    payload.cancelamento_por = motivo && ctx.ator.tipo === "usuario" ? ctx.ator.userId : null;
   }
   if (novo_status === "realizado" && ctx.ator.tipo === "usuario") {
     payload.executado_por = ctx.ator.userId;

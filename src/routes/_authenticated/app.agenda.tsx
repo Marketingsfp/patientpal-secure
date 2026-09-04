@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
+import { pedirMotivo } from "@/lib/motivo";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
 import {
   escolherContratoAtivo,
@@ -1547,8 +1548,16 @@ function AgendaPage() {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
     }
+    // Reagendar também exige justificativa — é pedida antes de qualquer
+    // gravação, para que o horário só se mexa depois de explicado.
+    const motivo = await pedirMotivo({
+      tone: "reagendar",
+      titulo: "Por que este atendimento está sendo reagendado?",
+      descricao: `${origem.paciente_nome} — de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`,
+    });
+    if (!motivo) return;
     setReagSalvando(true);
-    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
+    const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")} — Motivo: ${motivo}`;
     // Libera origem + ocupa destino + transfere lançamentos financeiros numa
     // única transação (RPC) — se qualquer etapa falhar, o Postgres desfaz
     // tudo. Antes eram 3 updates client-side separados: se o 2º falhasse, a
@@ -1557,6 +1566,7 @@ function AgendaPage() {
       _origem_id: origem.id,
       _destino_id: slot.id,
       _trilha_msg: trilha,
+      _motivo: motivo,
     } as never);
     if (error) {
       setReagSalvando(false);
@@ -2115,6 +2125,12 @@ function AgendaPage() {
     sem_faturamento_motivo?: string | null;
     sem_faturamento_por?: string | null;
     sem_faturamento_autorizado_por?: string | null;
+    cancelamento_motivo?: string | null;
+    cancelamento_em?: string | null;
+    cancelamento_por?: HistAutor | null;
+    reagendamento_motivo?: string | null;
+    reagendamento_em?: string | null;
+    reagendamento_por?: HistAutor | null;
     executado_em?: string | null;
     executado_por?: HistAutor | null;
     origem_integracao?: string | null;
@@ -4502,6 +4518,18 @@ function AgendaPage() {
     }
     const alvos = livres.slice(0, fontes.length);
 
+    // Um motivo só para o lote inteiro: quem move 20 pacientes de uma vez o
+    // faz pela mesma razão (médico faltou, agenda remarcada). Pedir um a um
+    // travaria a tela sem acrescentar informação.
+    const motivo = await pedirMotivo({
+      tone: "reagendar",
+      titulo: `Por que estes ${fontes.length} atendimentos estão sendo reagendados?`,
+      descricao:
+        "A mesma justificativa será registrada no histórico de todos os pacientes movidos.",
+      confirmText: `Reagendar ${fontes.length} paciente(s)`,
+    });
+    if (!motivo) return;
+
     setReagLoteSalvando(true);
     const agora = new Date().toLocaleString("pt-BR");
     // Cada par (origem → alvo) é independente, então continuam em paralelo —
@@ -4512,11 +4540,12 @@ function AgendaPage() {
     const resultados = await Promise.all(
       fontes.map(async (origem, i) => {
         const alvo = alvos[i];
-        const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
+        const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")} — Motivo: ${motivo}`;
         const { error } = await supabase.rpc("reagendar_atendimento", {
           _origem_id: origem.id,
           _destino_id: alvo.id,
           _trilha_msg: trilha,
+          _motivo: motivo,
         } as never);
         if (error) {
           mostrarErro(error, `mover ${origem.paciente_nome}`);
@@ -5923,10 +5952,33 @@ function AgendaPage() {
         return;
       }
     }
+    // Cancelar exige justificativa. Ela é pedida ANTES de qualquer gravação,
+    // e entra no mesmo UPDATE do status para que a auditoria registre motivo e
+    // status na mesma linha — é assim que o Histórico consegue mostrar o
+    // porquê colado no evento de cancelamento.
+    let motivoCancelamento: string | null = null;
+    if (status === "cancelado") {
+      motivoCancelamento = await pedirMotivo({
+        titulo: "Por que este atendimento está sendo cancelado?",
+        descricao: `${a.paciente_nome} — ${new Date(a.inicio).toLocaleString("pt-BR")}. A justificativa fica registrada no histórico.`,
+      });
+      if (!motivoCancelamento) return;
+    }
     // Ao cancelar, libera o vínculo com o orçamento para que ele possa ser
     // re-agendado em outro horário sem ficar preso a este slot.
-    const payload: { status: Status; orcamento_id?: null } = { status };
+    const payload: {
+      status: Status;
+      orcamento_id?: null;
+      cancelamento_motivo?: string | null;
+      cancelamento_em?: string | null;
+      cancelamento_por?: string | null;
+    } = { status };
     if (status === "cancelado" && a.orcamento_id) payload.orcamento_id = null;
+    if (status === "cancelado") {
+      payload.cancelamento_motivo = motivoCancelamento;
+      payload.cancelamento_em = new Date().toISOString();
+      payload.cancelamento_por = user?.id ?? null;
+    }
     // Cancelamento em cascata: se o agendamento faz parte de um pacote (orçamento dividido),
     // pergunta se deve cancelar todos os agendamentos vinculados.
     let idsParaAtualizar: string[] = [a.id];
@@ -5952,7 +6004,9 @@ function AgendaPage() {
     }
     const { error } = await supabase
       .from("agendamentos")
-      .update(payload)
+      // `as never`: as colunas de cancelamento são novas e ainda não estão nos
+      // tipos gerados do Supabase (mesmo padrão já usado no resto do arquivo).
+      .update(payload as never)
       .in("id", idsParaAtualizar);
     if (error) mostrarErro(error);
     else {
@@ -9964,8 +10018,14 @@ function AgendaPage() {
                 provando quem autorizou mesmo em ficha antiga. */}
             {(marcacoesHist.sem_faturamento ||
               marcacoesHist.executado_por ||
+              marcacoesHist.cancelamento_motivo ||
               marcacoesHist.origem_integracao) && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
+                {marcacoesHist.cancelamento_motivo ? (
+                  <Badge variant="outline" className="bg-rose-100 text-rose-800 border-rose-200">
+                    Cancelado: {marcacoesHist.cancelamento_motivo}
+                  </Badge>
+                ) : null}
                 {marcacoesHist.sem_faturamento ? (
                   <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
                     Sem faturamento
@@ -10370,6 +10430,42 @@ function AgendaPage() {
                   const antesLivre = isSlot(antes.paciente_nome);
                   const depoisLivre = isSlot(depois.paciente_nome);
 
+                  // Reagendamento com justificativa. Precisa vir antes de
+                  // "Agendou": na Agenda clássica o reagendamento MOVE o
+                  // paciente para o registro de destino, então nele o nome sai
+                  // de DISPONÍVEL para o paciente e a linha seria lida como um
+                  // agendamento novo. O motivo preenchido é o que distingue.
+                  const motivoReag = String(depois.reagendamento_motivo ?? "").trim();
+                  if (set.has("reagendamento_motivo") && motivoReag) {
+                    items.push({
+                      id: r.id,
+                      when: r.created_at,
+                      quem,
+                      kind: "reagendou",
+                      body: (
+                        <div className="space-y-0.5">
+                          <div>
+                            {set.has("inicio") && antes.inicio ? (
+                              <>
+                                Reagendou de <b>{fmtDateTime(antes.inicio)}</b> para{" "}
+                                <b>{fmtDateTime(depois.inicio)}</b>.
+                              </>
+                            ) : (
+                              <>
+                                Recebeu o paciente <b>{String(depois.paciente_nome ?? "—")}</b> por
+                                reagendamento.
+                              </>
+                            )}
+                          </div>
+                          <div className="text-muted-foreground whitespace-pre-wrap">
+                            Motivo: {motivoReag}
+                          </div>
+                        </div>
+                      ),
+                    });
+                    continue;
+                  }
+
                   // Agendou paciente (slot → alocado)
                   if (pacienteMudou && antesLivre && !depoisLivre) {
                     items.push({
@@ -10441,19 +10537,35 @@ function AgendaPage() {
                       continue;
                     }
                     if (novo === "cancelado") {
+                      // O motivo é gravado no mesmo UPDATE do status, então
+                      // vem nesta mesma linha da auditoria.
+                      const motivo = String(depois.cancelamento_motivo ?? "").trim();
                       items.push({
                         id: r.id,
                         when: r.created_at,
                         quem,
                         kind: "cancelou",
                         body: (
-                          <>
-                            Cancelou o agendamento (estava{" "}
-                            <b>
-                              {statusPt[String(antes.status ?? "")] ?? String(antes.status ?? "—")}
-                            </b>
-                            ).
-                          </>
+                          <div className="space-y-0.5">
+                            <div>
+                              Cancelou o agendamento (estava{" "}
+                              <b>
+                                {statusPt[String(antes.status ?? "")] ??
+                                  String(antes.status ?? "—")}
+                              </b>
+                              ).
+                            </div>
+                            {motivo ? (
+                              <div className="text-muted-foreground whitespace-pre-wrap">
+                                Motivo: {motivo}
+                              </div>
+                            ) : (
+                              <div className="text-muted-foreground">
+                                Sem motivo registrado (cancelamento anterior à exigência de
+                                justificativa).
+                              </div>
+                            )}
+                          </div>
                         ),
                       });
                       continue;

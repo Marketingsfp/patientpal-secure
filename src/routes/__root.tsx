@@ -12,6 +12,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmDialogHost } from "@/lib/confirm";
+import { MotivoDialogHost } from "@/lib/motivo";
 // ThemeSwitcher removido a pedido do usuário
 
 function NotFoundComponent() {
@@ -179,6 +180,7 @@ function RootComponent() {
         </div>
         <Toaster richColors position="top-right" />
         <ConfirmDialogHost />
+        <MotivoDialogHost />
       </AuthProvider>
     </QueryClientProvider>
   );

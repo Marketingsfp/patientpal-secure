@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
+import { pedirMotivo } from "@/lib/motivo";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -751,6 +752,17 @@ export function AgendaV2Shell() {
     pacoteContexto?: { pacote_id?: string | null; primeiro_id: string },
   ) => {
     if (agendamentoIds.length === 0) return;
+    // Cancelar exige justificativa, igual à Agenda clássica. É pedida antes de
+    // qualquer gravação — inclusive antes da pergunta sobre a cascata de
+    // pacote, para que desistir aqui não deixe nada pela metade.
+    let motivo: string | null = null;
+    if (novoStatus === "cancelado") {
+      motivo = await pedirMotivo({
+        titulo: "Por que este atendimento está sendo cancelado?",
+        descricao: "A justificativa fica registrada no histórico do agendamento.",
+      });
+      if (!motivo) return;
+    }
     let cascatear = false;
     if (novoStatus === "cancelado" && pacoteContexto?.pacote_id) {
       try {
@@ -776,6 +788,7 @@ export function AgendaV2Shell() {
           agendamento_ids: agendamentoIds,
           novo_status: novoStatus,
           cascatear_pacote: cascatear,
+          motivo,
         },
       });
       if (cascatear && result.count > 1) {

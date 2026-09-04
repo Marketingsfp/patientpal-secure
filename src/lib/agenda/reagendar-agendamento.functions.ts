@@ -15,6 +15,9 @@ const schema = z.object({
   novo_inicio: z.string().min(1),
   novo_fim: z.string().min(1),
   novo_medico_id: z.string().uuid().nullable().optional(),
+  // Justificativa obrigatória na tela; validada aqui só quanto ao tamanho,
+  // porque a integração externa usa o mesmo núcleo com motivo automático.
+  motivo: z.string().trim().max(300).optional().nullable(),
 });
 
 export type ReagendarAgendamentoInput = z.infer<typeof schema>;
