@@ -104,6 +104,9 @@ export type Database = {
         Row: {
           agenda_id: string | null
           atendimento_grupo_id: string | null
+          cancelamento_em: string | null
+          cancelamento_motivo: string | null
+          cancelamento_por: string | null
           clinica_id: string
           convenio_autorizado: boolean
           convenio_autorizado_em: string | null
@@ -143,6 +146,9 @@ export type Database = {
           pacote_id: string | null
           prioridade: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento: string | null
+          reagendamento_em: string | null
+          reagendamento_motivo: string | null
+          reagendamento_por: string | null
           sem_faturamento: boolean
           sem_faturamento_autorizado_por: string | null
           sem_faturamento_autorizado_por_nome: string | null
@@ -164,6 +170,9 @@ export type Database = {
         Insert: {
           agenda_id?: string | null
           atendimento_grupo_id?: string | null
+          cancelamento_em?: string | null
+          cancelamento_motivo?: string | null
+          cancelamento_por?: string | null
           clinica_id: string
           convenio_autorizado?: boolean
           convenio_autorizado_em?: string | null
@@ -203,6 +212,9 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          reagendamento_em?: string | null
+          reagendamento_motivo?: string | null
+          reagendamento_por?: string | null
           sem_faturamento?: boolean
           sem_faturamento_autorizado_por?: string | null
           sem_faturamento_autorizado_por_nome?: string | null
@@ -224,6 +236,9 @@ export type Database = {
         Update: {
           agenda_id?: string | null
           atendimento_grupo_id?: string | null
+          cancelamento_em?: string | null
+          cancelamento_motivo?: string | null
+          cancelamento_por?: string | null
           clinica_id?: string
           convenio_autorizado?: boolean
           convenio_autorizado_em?: string | null
@@ -263,6 +278,9 @@ export type Database = {
           pacote_id?: string | null
           prioridade?: Database["public"]["Enums"]["agendamento_prioridade"]
           procedimento?: string | null
+          reagendamento_em?: string | null
+          reagendamento_motivo?: string | null
+          reagendamento_por?: string | null
           sem_faturamento?: boolean
           sem_faturamento_autorizado_por?: string | null
           sem_faturamento_autorizado_por_nome?: string | null
@@ -10249,6 +10267,10 @@ export type Database = {
       }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
+      agendamento_historico: {
+        Args: { _agendamento_id: string }
+        Returns: Json
+      }
       agendar_online: {
         Args: {
           _agenda_id?: string
@@ -10790,6 +10812,10 @@ export type Database = {
           total: number
           valor_pago: number
         }[]
+      }
+      fn_hist_quem: {
+        Args: { _clinica: string; _email: string; _user_id: string }
+        Returns: Json
       }
       fn_norm_proc: { Args: { _t: string }; Returns: string }
       fn_pacotes_do_paciente: {
@@ -11730,7 +11756,12 @@ export type Database = {
         }[]
       }
       reagendar_atendimento: {
-        Args: { _destino_id: string; _origem_id: string; _trilha_msg: string }
+        Args: {
+          _destino_id: string
+          _motivo?: string
+          _origem_id: string
+          _trilha_msg: string
+        }
         Returns: Json
       }
       rechamar_senha: {

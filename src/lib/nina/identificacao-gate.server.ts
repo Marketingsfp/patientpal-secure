@@ -37,9 +37,21 @@ export function ehConfirmacaoDeAgendamento(texto: string): boolean {
   return CONFIRMACAO.test(t);
 }
 
-const NEGACAO = /^\s*(n[ãa]o|nao|outro|outra|prefiro|ainda\s*n[ãa]o)\b/i;
+const NEGACAO =
+  /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)\b/i;
 export function ehNegacao(texto: string): boolean {
   return NEGACAO.test((texto ?? "").trim());
+}
+
+/**
+ * A mensagem parece uma pergunta/assunto paralelo (preço, endereço, convênio)?
+ * Nesse caso a coleta de dados NÃO deve engolir a mensagem: ela segue para o
+ * modelo responder, e a Nina volta a pedir os dados depois.
+ */
+const PERGUNTA =
+  /\?|\b(quanto|qual|quais|quando|onde|como|por\s*que|porque|pode\s+ser|tem\s+|aceita|valor|pre[çc]o|custa|convênio|convenio|endere[çc]o|hor[áa]rio\s+de\s+funcionamento|exame|espera)\b/i;
+export function pareceAssuntoParalelo(texto: string): boolean {
+  return PERGUNTA.test((texto ?? "").trim());
 }
 
 /* -------------------------------------------------- extração dos 3 campos */
@@ -192,8 +204,16 @@ export async function aplicarGateIdentificacao(params: {
       return null; // volta para o modelo oferecer outras opções
     }
     const novo = extrairDadosIdentificacao(mensagem);
+    const assuntoParalelo = pareceAssuntoParalelo(mensagem);
+    // Uma pergunta solta ("quanto custa a consulta?") não é dado de cadastro:
+    // não vira nome e não é engolida pela coleta — o modelo responde e a Nina
+    // retoma o pedido dos dados no turno seguinte.
+    if (assuntoParalelo && !novo.cpf && !novo.data_nascimento) {
+      log("assunto_paralelo_na_coleta", { conversa: ctx.conversaId });
+      return null;
+    }
     p.pending = {
-      nome: novo.nome ?? p.pending.nome,
+      nome: (assuntoParalelo ? null : novo.nome) ?? p.pending.nome,
       cpf: novo.cpf ?? p.pending.cpf,
       data_nascimento: novo.data_nascimento ?? p.pending.data_nascimento,
     };
