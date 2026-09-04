@@ -853,7 +853,7 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 3 — CONTATO */}
-        <Card className="hidden lg:flex lg:col-span-2 xl:col-span-2 flex-col overflow-hidden">
+        <Card className="hidden lg:flex w-[260px] xl:w-[300px] shrink-0 flex-col overflow-hidden">
           <CardHeader className="py-2 border-b">
             <CardTitle className="text-base">Contato</CardTitle>
           </CardHeader>
