@@ -488,11 +488,47 @@ export function AtendInbox() {
 
   return (
     <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
-      <div className="grid h-full grid-cols-12 gap-2 overflow-hidden">
-        {/* COLUNA 1 — LISTA */}
-        <Card className="col-span-12 md:col-span-4 lg:col-span-3 xl:col-span-2 flex flex-col overflow-hidden">
+      <div className="flex h-full gap-2 overflow-hidden">
+        {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
+        <Card
+          onMouseEnter={() => setPainelHover(true)}
+          onMouseLeave={() => setPainelHover(false)}
+          className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            painelAberto ? "w-[300px]" : "w-[52px]"
+          }`}
+        >
+          {!painelAberto && (
+            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <Badge variant="outline" className="px-1 text-[10px]">
+                {convs.length}
+              </Badge>
+              <Circle
+                className={`h-3 w-3 fill-current ${
+                  pausaAtiva
+                    ? "text-amber-500"
+                    : filaAberta
+                      ? "text-emerald-600"
+                      : "text-slate-400"
+                }`}
+              />
+            </div>
+          )}
+          <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
           <div className="shrink-0 border-b p-2 space-y-1.5">
-            <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+            <div className="flex items-center gap-1">
+              <span className="block text-[11px] font-medium text-muted-foreground">Meu status</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6 w-6 p-0"
+                title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                onClick={alternarFixado}
+              >
+                {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+
             <div className="grid grid-cols-3 gap-1">
               <Button
                 size="sm"
