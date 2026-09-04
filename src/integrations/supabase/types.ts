@@ -11801,6 +11801,20 @@ export type Database = {
           total: number
         }[]
       }
+      prontuario_sequencia_ajustar: {
+        Args: { _clinica_id: string; _ultima_pasta: number }
+        Returns: {
+          proximo: number
+          pulados: number
+        }[]
+      }
+      prontuario_sequencia_ver: {
+        Args: { _clinica_id: string }
+        Returns: {
+          atualizado_em: string
+          proximo: number
+        }[]
+      }
       reagendar_atendimento: {
         Args: {
           _destino_id: string
