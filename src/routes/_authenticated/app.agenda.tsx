@@ -356,6 +356,28 @@ const chaveNomeAgenda = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/**
+ * Chave de comparação de procedimento, usada pela trava de agendamento
+ * duplicado. Tira acento, caixa e o sufixo "(ESPECIALIDADE)" que a tela
+ * acrescenta ao rótulo — assim "CONSULTA" e "CONSULTA (ORTOPEDIA)" contam
+ * como o mesmo atendimento, que é como a recepção enxerga.
+ */
+const chaveProcedimento = (s: string | null | undefined) =>
+  normalizar(s ?? "")
+    .replace(/\s*\([^()]*\)\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Procedimento cobrado por unidade — "(CADA)", "(CADA LADO)". Repetir no mesmo
+ * dia é o uso normal dele (infiltração por articulação, RX por lado), então
+ * esses nunca acionam a trava de duplicado. Conferido na produção: só a
+ * infiltração do Dr. Paulo Roberto responde por 75 dos casos de repetição em
+ * 20 dias, todos legítimos.
+ */
+const procedimentoPorUnidade = (s: string | null | undefined) =>
+  /\(cada\b/.test(normalizar(s ?? ""));
+
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
   return nome === "disponivel" || nome === "bloqueio";
@@ -1337,6 +1359,91 @@ function AgendaPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
+
+  /**
+   * Trava de agendamento duplicado.
+   *
+   * A equipe do telefone marca o paciente com antecedência; quando ele chega à
+   * clínica, a recepção costumava abrir uma ficha nova do zero, criando uma
+   * segunda vaga para o mesmo paciente no mesmo dia e bagunçando a fila.
+   *
+   * Assim que o paciente é escolhido no modal, procuramos o que ele já tem
+   * marcado naquela data (qualquer profissional — a recepção precisa ver o
+   * horário e o médico para julgar se é a mesma consulta) e oferecemos abrir a
+   * ficha original em vez de criar outra. Cancelado e falta ficam de fora:
+   * nesses casos remarcar é o certo.
+   */
+  const [dupDoDia, setDupDoDia] = useState<Agendamento[]>([]);
+  /** A recepção confirmou que é outro atendimento — o aviso para de aparecer. */
+  const [dupDispensado, setDupDispensado] = useState(false);
+  const dupReqId = useRef(0);
+  const diaDoForm = form.inicio ? form.inicio.slice(0, 10) : "";
+  useEffect(() => {
+    setDupDispensado(false);
+  }, [open, form.paciente_id, diaDoForm]);
+  useEffect(() => {
+    if (!open || !clinicaAtual || !form.paciente_id || !diaDoForm) {
+      setDupDoDia([]);
+      return;
+    }
+    const reqId = ++dupReqId.current;
+    const pacId = form.paciente_id;
+    const clinicaId = clinicaAtual.clinica_id;
+    // A própria ficha que está aberta (edição ou slot livre reservado) nunca
+    // pode se acusar de duplicada.
+    const editandoId = editing?.id ?? null;
+    (async () => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select(AGENDA_SELECT)
+        .eq("clinica_id", clinicaId)
+        .eq("paciente_id", pacId)
+        .gte("inicio", new Date(`${diaDoForm}T00:00:00`).toISOString())
+        .lte("inicio", new Date(`${diaDoForm}T23:59:59`).toISOString())
+        .in("status", ["agendado", "confirmado", "realizado"])
+        .order("inicio", { ascending: true })
+        .limit(10);
+      if (reqId !== dupReqId.current) return;
+      if (error) {
+        setDupDoDia([]);
+        return;
+      }
+      setDupDoDia(
+        mapAgendaRows((data ?? []) as unknown as AgendaRowBruta[]).filter(
+          (a) => a.id !== editandoId && !isSlotLivre(a.paciente_nome),
+        ),
+      );
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form.paciente_id, diaDoForm, editing?.id, clinicaAtual?.clinica_id]);
+
+  /**
+   * Duplicata PROVÁVEL: mesmo profissional e mesmo procedimento no mesmo dia.
+   * É o caso que a trava precisa pegar — a telefonista marcou a consulta e a
+   * recepção abriu outra igual quando o paciente chegou.
+   *
+   * A regra é estreita de propósito. Na produção, 1 em cada 4 pacientes-dia
+   * tem mais de um agendamento no dia, e a maioria é legítima: consulta +
+   * preventivo com a mesma ginecologista, consulta + infiltração com o
+   * ortopedista, vários exames de imagem. Avisar em todos esses casos viraria
+   * ruído e a recepção passaria a clicar em "continuar" no automático.
+   */
+  const dupProvavel = useMemo(() => {
+    if (!form.medico_id) return [];
+    if (procedimentoPorUnidade(form.procedimento)) return [];
+    const chave = chaveProcedimento(form.procedimento);
+    return dupDoDia.filter(
+      (d) =>
+        d.medico_id === form.medico_id &&
+        !procedimentoPorUnidade(d.procedimento) &&
+        chaveProcedimento(d.procedimento) === chave,
+    );
+  }, [dupDoDia, form.medico_id, form.procedimento]);
+  /** Demais atendimentos do paciente no dia — informativo, não trava nada. */
+  const dupOutros = useMemo(
+    () => dupDoDia.filter((d) => !dupProvavel.some((p) => p.id === d.id)),
+    [dupDoDia, dupProvavel],
+  );
 
   /**
    * Prévia do valor do atendimento, calculada na própria tela do agendamento
@@ -5333,6 +5440,16 @@ function AgendaPage() {
       toast.error("Defina início e fim");
       return;
     }
+    // Trava do agendamento duplicado: enquanto o aviso estiver na tela sem
+    // resposta, salvar criaria a segunda vaga do mesmo paciente no dia. A
+    // recepção precisa abrir a ficha existente ou dizer que é outro
+    // atendimento.
+    if (!dupDispensado && dupProvavel.length > 0) {
+      toast.error(
+        "Este paciente já tem este mesmo atendimento marcado no dia. Abra o agendamento existente ou confirme que é outro atendimento.",
+      );
+      return;
+    }
     if (new Date(form.fim) <= new Date(form.inicio)) {
       toast.error("O horário final deve ser após o inicial");
       return;
@@ -8427,6 +8544,106 @@ function AgendaPage() {
                           salvar.
                         </p>
                       )}
+                      {/* Aviso de agendamento duplicado: o paciente já tem ficha
+                          nesta data. O caminho principal é ABRIR a ficha que já
+                          existe; criar outra continua possível, mas exige que a
+                          recepção diga que é outro atendimento. */}
+                      {!dupDispensado && dupProvavel.length > 0 && (
+                        <div className="space-y-2 rounded-xl border-2 border-amber-400 bg-amber-50 p-3">
+                          <p className="text-sm font-bold text-amber-900">
+                            ⚠️ Este paciente já possui agendamento para{" "}
+                            {diaDoForm === hojeBR()
+                              ? "hoje"
+                              : new Intl.DateTimeFormat("pt-BR", {
+                                  timeZone: "UTC",
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                }).format(new Date(`${diaDoForm}T00:00:00Z`))}
+                            .
+                          </p>
+                          <ul className="space-y-1.5">
+                            {dupProvavel.map((d) => {
+                              const espec =
+                                medicos.find((m) => m.id === d.medico_id)?.especialidade_nome ?? "";
+                              return (
+                                <li
+                                  key={d.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2"
+                                >
+                                  <span className="min-w-0 text-xs text-amber-900">
+                                    Às <strong>{fmtHora(d.inicio)}</strong> com{" "}
+                                    <strong>{d.medico_nome || "profissional não informado"}</strong>
+                                    {espec ? ` — ${espec}` : ""}
+                                    {d.procedimento ? ` (${d.procedimento})` : ""}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-7 shrink-0 text-xs"
+                                    onClick={() => {
+                                      fecharDialogoAgenda();
+                                      void openEdit(d);
+                                    }}
+                                  >
+                                    Abrir este agendamento
+                                  </Button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-[11px] font-medium text-amber-800">
+                              Abrir o que já existe evita criar uma segunda vaga para o mesmo
+                              paciente.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 shrink-0 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                              onClick={() => setDupDispensado(true)}
+                            >
+                              É outro atendimento — continuar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Demais atendimentos do paciente no mesmo dia. Só
+                          informa (não trava): consulta + preventivo, consulta +
+                          exame e vários exames de imagem no mesmo dia são
+                          rotina. Serve para a recepção enxergar o que a
+                          telefonista já marcou antes de abrir mais uma ficha. */}
+                      {dupOutros.length > 0 && (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            Este paciente já tem no dia
+                          </p>
+                          <ul className="mt-1 space-y-1">
+                            {dupOutros.map((d) => (
+                              <li
+                                key={d.id}
+                                className="flex flex-wrap items-center justify-between gap-2"
+                              >
+                                <span className="min-w-0 text-xs text-slate-700">
+                                  <strong>{fmtHora(d.inicio)}</strong> —{" "}
+                                  {d.medico_nome || "profissional não informado"}
+                                  {d.procedimento ? ` · ${d.procedimento}` : ""}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="shrink-0 text-xs font-semibold text-primary hover:underline"
+                                  onClick={() => {
+                                    fecharDialogoAgenda();
+                                    void openEdit(d);
+                                  }}
+                                >
+                                  Abrir
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       {form.paciente_id && clinicaAtual && (
                         <>
                           <PacienteResumoBar
@@ -11080,628 +11297,190 @@ function AgendaPage() {
             </div>
           </div>
         )}
-        {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
-        <div className="lg:hidden space-y-2">
-          {loading && items.length === 0 ? (
-            <ListSkeleton
-              rows={6}
-              fallback={
-                <div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>
-              }
-            />
-          ) : !clinicaAtual ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">
-              Selecione uma clínica.
-            </div>
-          ) : paginados.length === 0 ? (
-            <AgendaEmptyState
-              apenasData={apenasData}
-              dataRef={dataRef}
-              info={emptyInfo}
-              onIrProxima={(d) => setDataRef(d)}
-              onDesmarcarApenas={() => setApenasData(false)}
-              onLimparFiltros={limparFiltros}
-            />
-          ) : (
-            paginados.map((a) => {
-              const fichaNum = fichaPorId.get(a.id) ?? "";
-              const realizado = a.status === "realizado";
-              const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-              // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
-              // do `fluxo_etapa`, que avança quando a recepção clica em
-              // "Confirmar chegada / Check-in". Já existir lançamento quitado
-              // NÃO pinta a linha: quem pagava adiantado (ex.: paga dia 20 a
-              // consulta do dia 30) aparecia azul no dia 30 sem ter chegado.
-              const presente =
-                !realizado &&
-                !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
-              const estornoPend = estornoPendAgs.has(a.id);
-              const ocultarPaciente = estornoPend && isMedicoOnly;
-              const ehLivre = isSlotLivre(a.paciente_nome);
-              const profLabel = medicoNomeAgendamento(a);
-
-              // Overlay translúcido (bg-{cor}-500/10) em vez de tom sólido -50:
-              // o sólido fica quase branco e, no modo escuro, o texto claro
-              // (--foreground) perde contraste sobre ele. O overlay se mistura
-              // com o fundo real da linha e funciona nos dois temas.
-              const sinalizado = !!a.sinalizado_em;
-              const semFaturamento = ehSemFaturamento(a);
-              let bgClass = "bg-card";
-              let borderLeft = "border-l-4 border-transparent";
-              if (estornoPend) {
-                bgClass = "bg-rose-500/10";
-                borderLeft = "border-l-4 border-rose-500";
-              } else if (sinalizado) {
-                bgClass = "bg-amber-500/10";
-                borderLeft = "border-l-4 border-amber-500";
-              } else if (a.origem_externa) {
-                bgClass = "bg-violet-500/10";
-                borderLeft = "border-l-4 border-violet-400";
-              } else if (realizado) {
-                bgClass = "bg-emerald-500/10";
-                borderLeft = "border-l-4 border-emerald-500";
-              } else if (presente) {
-                bgClass = "bg-blue-500/10";
-                borderLeft = "border-l-4 border-blue-400";
-              }
-
-              const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
-              const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
-              // Sem faturamento também faz check-in: o paciente comparece e é
-              // atendido normalmente — o que não existe é a cobrança.
-              const podeCheckin =
-                !ehLivre &&
-                !realizado &&
-                (pagosSet.has(a.id) || semFaturamento) &&
-                pendenteCheckin &&
-                podeEscrever;
-
-              return (
-                <div
-                  key={a.id}
-                  className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
-                >
-                  {/* Linha 1: horário + ficha + situação */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
-                        {fmtHora(a.inicio)}–{fmtHora(a.fim)}
-                      </span>
-                      <span className="text-[12px] text-muted-foreground whitespace-nowrap">
-                        {fmtData(a.inicio)}
-                      </span>
-                      {fichaNum && (
-                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
-                          #{fichaNum}
-                        </span>
-                      )}
-                    </div>
-                    {ehLivre ? (
-                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50">
-                        Livre
-                      </Badge>
-                    ) : estornoPend ? (
-                      <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[11px] shrink-0">
-                        Estorno
-                      </Badge>
-                    ) : (
-                      <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
-                        {STATUS_LABEL[a.status]}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Linha 2: paciente */}
-                  <div className="mb-1.5">
-                    {ocultarPaciente ? (
-                      <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
-                    ) : ehLivre ? (
-                      <span className="text-sm text-muted-foreground italic">Horário livre</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                        className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
-                      >
-                        {sinalizado && (
-                          <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
-                            <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
-                          </span>
-                        )}
-                        {a.status === "confirmado" && (
-                          <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                        )}
-                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                          <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        )}
-                        <span className="truncate">{a.paciente_nome}</span>
-                        {a.orcamento_numero && (
-                          <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
-                            ORÇ
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Linha 3: profissional + serviço */}
-                  <div className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground mb-2 min-w-0">
-                    <span className="truncate" title={profLabel}>
-                      👤 {profLabel}
-                    </span>
-                    <span
-                      className="truncate max-w-[45%] text-right"
-                      title={
-                        procedimentoEfetivo(a.medico_id, a.procedimento) ||
-                        rotuloServicoGrade(a.medico_id, a.procedimento) ||
-                        ""
-                      }
-                    >
-                      {rotuloServicoGrade(a.medico_id, a.procedimento) || "—"}
-                    </span>
-                  </div>
-
-                  {/* Linha 4: ações rápidas */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t">
-                    {ehLivre ? (
-                      (() => {
-                        const lockNome = slotTravadoPorOutro(a);
-                        return lockNome ? (
-                          <div
-                            className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-2 truncate"
-                            title={`Em digitação por ${lockNome}`}
-                          >
-                            ⏳ Em digitação por {lockNome}
-                          </div>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openSlot(a)}
-                            disabled={!podeEscrever}
-                            title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
-                            className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
-                          >
-                            <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                            Agendar
-                          </Button>
-                        );
-                      })()
-                    ) : (
-                      <>
-                        {podeCheckin && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => confirmarPresenca(a)}
-                            className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
-                            title="Check-in"
-                          >
-                            <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => cobrarAgendamento(a)}
-                          className={`h-8 flex-1 text-xs ${
-                            semFaturamento
-                              ? // Cinza, e não o vermelho de "Cobrar": aqui não
-                                // falta pagamento nenhum — não há cobrança
-                                // prevista, e a linha não pode parecer pendente.
-                                "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-100"
-                              : a.origem_externa
-                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                : parciaisSet.has(a.id)
-                                  ? "border-amber-400 bg-amber-50 text-amber-700"
-                                  : pagosSet.has(a.id)
-                                    ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                                    : "border-rose-200 text-rose-600 hover:bg-rose-50"
-                          }`}
-                          title={
-                            semFaturamento
-                              ? rotuloSemFaturamento(a)
-                              : a.origem_externa
-                                ? "Atendimento externo — sem lançamento em caixa"
-                                : parciaisSet.has(a.id)
-                                  ? "Parcialmente pago — clique para receber o saldo"
-                                  : pagosSet.has(a.id)
-                                    ? "Pago"
-                                    : "Cobrar"
-                          }
-                        >
-                          {semFaturamento ? (
-                            <Ban className="h-3.5 w-3.5 mr-1" />
-                          ) : (
-                            <DollarSign
-                              className="h-3.5 w-3.5 mr-1"
-                              strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                            />
-                          )}
-                          {semFaturamento
-                            ? "Sem faturamento"
-                            : parciaisSet.has(a.id)
-                              ? rotuloSaldo(saldoMap.get(a.id)!)
-                              : pagosSet.has(a.id)
-                                ? "Pago"
-                                : "Cobrar"}
-                        </Button>
-                        {podeEscrever && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEdit(a)}
-                            className="h-8 px-2 text-xs"
-                            title="Editar"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 px-2">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            {!ehLivre && podeEscrever && (
-                              <>
-                                <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
-                                  <Flag className="h-4 w-4 mr-2" />
-                                  {sinalizado ? "Remover sinalização" : "Sinalizar paciente"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
-                                  <Ban className="h-4 w-4 mr-2" />
-                                  {semFaturamento
-                                    ? "Voltar a faturar este atendimento"
-                                    : "Sinalizar agenda sem faturamento"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                              </>
-                            )}
-                            {podeEscrever && (
-                              <DropdownMenuItem
-                                onClick={() => iniciarReagendamento(a)}
-                                disabled={a.status === "realizado"}
-                              >
-                                <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => imprimirGR(a)}
-                              disabled={!pagosSet.has(a.id) && !semFaturamento}
-                            >
-                              <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
-                              <Printer className="h-4 w-4 mr-2" /> Comprovante
-                            </DropdownMenuItem>
-                            {podeEscrever && !ehLivre && a.status !== "realizado" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => remove(a)}
-                                  className="text-amber-600"
-                                >
-                                  <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
-                              <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* ============ TABELA DESKTOP (lg+) ============ */}
-        {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
-            o contexto de scroll do sticky, e como este div nunca rola
-            internamente (quem rola é o <main> do app-shell), o cabeçalho
-            "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="hidden lg:block w-full max-w-full overflow-x-hidden rounded-lg border border-border bg-card">
-          <Table className="w-full max-w-full table-auto">
-            <TableHeader className="sticky top-0 z-20">
-              <TableRow className="bg-muted">
-                <TableHead
-                  className="w-8 rounded-tl-lg px-1.5"
-                  title="Marcar todas as linhas desta página, do jeito que estão filtradas"
-                >
-                  <Checkbox
-                    aria-label={
-                      todosDaPaginaMarcados
-                        ? "Desmarcar todos os atendimentos da página"
-                        : "Selecionar todos os atendimentos da página"
-                    }
-                    checked={
-                      todosDaPaginaMarcados ? true : marcadosNaPagina > 0 ? "indeterminate" : false
-                    }
-                    onCheckedChange={toggleAll}
-                  />
-                </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Ficha
-                </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Dia
-                </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Data
-                </TableHead>
-                <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Horário
-                </TableHead>
-                {/* As três colunas de texto livre dividem a sobra da linha em
-                    proporção fixa. Sem isso um nome comprido de médico ou de
-                    procedimento estica a coluna e empurra as ações para fora
-                    da tela em notebook. O conteúdo delas trunca com "…". */}
-                <TableHead className="w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Profissional
-                </TableHead>
-                <TableHead className="w-[22%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Cliente
-                </TableHead>
-                <TableHead className="w-[18%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Serviço
-                </TableHead>
-                <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Situação
-                </TableHead>
-                {/* OBS — coluna-ícone de largura fixa. O texto da observação
-                    saiu da grade (comia ~180px em telas de notebook e empurrava
-                    as ações para fora); agora só um indicador aparece quando o
-                    agendamento tem observação, e o texto abre em tooltip/modal. */}
-                <TableHead
-                  className="w-[34px] min-w-[34px] max-w-[34px] px-1 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground"
-                  title="Observação do agendamento"
-                >
-                  Obs
-                </TableHead>
-                <TableHead className="w-[170px] px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
-                  Ações
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        {/* O seletor "Lista / Por médico" troca o conteúdo desta área. Antes a
+            lista corrida ficava sempre montada e a grade por profissional era
+            desenhada depois dela, então as duas opções pareciam iguais. */}
+        {viewMode === "dia" && (
+          <>
+            {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
+            <div className="lg:hidden space-y-2">
               {loading && items.length === 0 ? (
-                <TableSkeletonRows
-                  cols={11}
+                <ListSkeleton
+                  rows={6}
                   fallback={
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                        Carregando…
-                      </TableCell>
-                    </TableRow>
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Carregando…
+                    </div>
                   }
                 />
               ) : !clinicaAtual ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                    Selecione uma clínica.
-                  </TableCell>
-                </TableRow>
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Selecione uma clínica.
+                </div>
               ) : paginados.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                    <AgendaEmptyState
-                      apenasData={apenasData}
-                      dataRef={dataRef}
-                      info={emptyInfo}
-                      onIrProxima={(d) => setDataRef(d)}
-                      onDesmarcarApenas={() => setApenasData(false)}
-                      onLimparFiltros={limparFiltros}
-                    />
-                  </TableCell>
-                </TableRow>
+                <AgendaEmptyState
+                  apenasData={apenasData}
+                  dataRef={dataRef}
+                  info={emptyInfo}
+                  onIrProxima={(d) => setDataRef(d)}
+                  onDesmarcarApenas={() => setApenasData(false)}
+                  onLimparFiltros={limparFiltros}
+                />
               ) : (
                 paginados.map((a) => {
                   const fichaNum = fichaPorId.get(a.id) ?? "";
                   const realizado = a.status === "realizado";
                   const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                  // PRESENÇA ≠ PAGAMENTO — mesma regra da visão em cartões: o
-                  // azul vem só do check-in manual da recepção (`fluxo_etapa`),
-                  // nunca da existência de um pagamento antecipado.
+                  // PRESENÇA ≠ PAGAMENTO. O azul de "o paciente está aqui" sai só
+                  // do `fluxo_etapa`, que avança quando a recepção clica em
+                  // "Confirmar chegada / Check-in". Já existir lançamento quitado
+                  // NÃO pinta a linha: quem pagava adiantado (ex.: paga dia 20 a
+                  // consulta do dia 30) aparecia azul no dia 30 sem ter chegado.
                   const presente =
                     !realizado &&
                     !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
                   const estornoPend = estornoPendAgs.has(a.id);
                   const ocultarPaciente = estornoPend && isMedicoOnly;
                   const ehLivre = isSlotLivre(a.paciente_nome);
+                  const profLabel = medicoNomeAgendamento(a);
 
-                  // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
-                  // em vez de tom sólido -50/-100: o sólido fica quase branco e,
-                  // no modo escuro, o texto claro (--foreground) perde contraste
-                  // sobre ele. O overlay se mistura com o fundo real da linha e
-                  // funciona nos dois temas.
-                  // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
-                  // estorno (mais crítico) e acima das demais cores.
+                  // Overlay translúcido (bg-{cor}-500/10) em vez de tom sólido -50:
+                  // o sólido fica quase branco e, no modo escuro, o texto claro
+                  // (--foreground) perde contraste sobre ele. O overlay se mistura
+                  // com o fundo real da linha e funciona nos dois temas.
                   const sinalizado = !!a.sinalizado_em;
                   const semFaturamento = ehSemFaturamento(a);
-                  let bgClass = "";
-                  let borderLeft = "";
+                  let bgClass = "bg-card";
+                  let borderLeft = "border-l-4 border-transparent";
                   if (estornoPend) {
-                    bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
+                    bgClass = "bg-rose-500/10";
                     borderLeft = "border-l-4 border-rose-500";
                   } else if (sinalizado) {
-                    bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
+                    bgClass = "bg-amber-500/10";
                     borderLeft = "border-l-4 border-amber-500";
                   } else if (a.origem_externa) {
-                    bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
+                    bgClass = "bg-violet-500/10";
                     borderLeft = "border-l-4 border-violet-400";
                   } else if (realizado) {
-                    bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
+                    bgClass = "bg-emerald-500/10";
                     borderLeft = "border-l-4 border-emerald-500";
                   } else if (presente) {
-                    bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
+                    bgClass = "bg-blue-500/10";
                     borderLeft = "border-l-4 border-blue-400";
                   }
 
-                  const ehAgora = a.id === agoraAgId;
-                  if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
-                  if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
+                  const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                  const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
+                  // Sem faturamento também faz check-in: o paciente comparece e é
+                  // atendido normalmente — o que não existe é a cobrança.
+                  const podeCheckin =
+                    !ehLivre &&
+                    !realizado &&
+                    (pagosSet.has(a.id) || semFaturamento) &&
+                    pendenteCheckin &&
+                    podeEscrever;
 
                   return (
-                    <TableRow key={a.id} data-ag-id={a.id} className={`${bgClass} ${borderLeft}`}>
-                      {/* Checkbox — horário livre TAMBÉM é selecionável: sem
-                          isso uma grade aberta por engano não tinha como ser
-                          apagada pela tela (o "Excluir" só age no que está
-                          marcado). Quem protege o paciente é a trava dentro de
-                          excluirSelecionados, não a caixinha desabilitada. */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs">
-                        <Checkbox
-                          checked={selecionados.has(a.id)}
-                          onCheckedChange={() => toggleSel(a.id)}
-                          disabled={realizado}
-                        />
-                      </TableCell>
+                    <div
+                      key={a.id}
+                      className={`rounded-2xl border border-slate-100 ${bgClass} ${borderLeft} p-4 shadow-sm`}
+                    >
+                      {/* Linha 1: horário + ficha + situação */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                            {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                          </span>
+                          <span className="text-[12px] text-muted-foreground whitespace-nowrap">
+                            {fmtData(a.inicio)}
+                          </span>
+                          {fichaNum && (
+                            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
+                              #{fichaNum}
+                            </span>
+                          )}
+                        </div>
+                        {ehLivre ? (
+                          <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50">
+                            Livre
+                          </Badge>
+                        ) : estornoPend ? (
+                          <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[11px] shrink-0">
+                            Estorno
+                          </Badge>
+                        ) : (
+                          <Badge className={`${STATUS_COR[a.status]} text-[11px] shrink-0`}>
+                            {STATUS_LABEL[a.status]}
+                          </Badge>
+                        )}
+                      </div>
 
-                      {/* Ficha */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
-                        {fichaNum || "—"}
-                      </TableCell>
-
-                      {/* Dia da semana */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
-                        {fmtDiaSemana(a.inicio)}
-                      </TableCell>
-
-                      {/* Data */}
-                      <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
-                        {fmtData(a.inicio)}
-                      </TableCell>
-
-                      {/* Horário — uma linha só, tabular, 24h */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
-                        {fmtHora(a.inicio)}–{fmtHora(a.fim)}
-                      </TableCell>
-
-                      {/* Profissional */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
-                        {(() => {
-                          const label = medicoNomeAgendamento(a);
-                          const m = medicos.find((x) => x.id === a.medico_id);
-                          const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
-                          return (
-                            <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                              <span className="block truncate text-xs" title={label}>
-                                {label}
-                              </span>
-                              {manual && (
-                                <span className="shrink-0 text-[10px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
-                                  Papel
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </TableCell>
-
-                      {/* Cliente */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                      {/* Linha 2: paciente */}
+                      <div className="mb-1.5">
                         {ocultarPaciente ? (
-                          <span className="block truncate text-xs italic text-rose-600">
+                          <span className="text-xs italic text-rose-600">
                             — aguardando estorno —
                           </span>
                         ) : ehLivre ? (
-                          <span className="block truncate text-xs font-medium text-primary/60">
-                            Nenhum paciente agendado
+                          <span className="text-sm text-muted-foreground italic">
+                            Horário livre
                           </span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                            className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
-                            title={a.paciente_nome}
+                            className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
                           >
-                            <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
-                              {sinalizado && (
-                                <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
-                                  <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
-                                </span>
-                              )}
-                              {a.status === "confirmado" && (
-                                <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                              )}
-                              <span className="block max-w-full truncate text-xs font-bold text-foreground">
-                                {a.paciente_nome}
+                            {sinalizado && (
+                              <span title={rotuloSinalizacao(a)} className="shrink-0 inline-flex">
+                                <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
                               </span>
-                            </span>
-                            <span className="mt-0.5 flex max-w-full items-center gap-1 overflow-hidden">
-                              {a.paciente_id && (
-                                <IdadeIcon
-                                  nascimento={nascMap.get(a.paciente_id) ?? null}
-                                  size={22}
-                                />
-                              )}
-                              {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                                <span
-                                  title={`Cartão ${convenioMap.get(a.paciente_id)}`}
-                                  className="shrink-0 inline-flex"
-                                >
-                                  <IdCard className="h-3.5 w-3.5 text-emerald-600" />
-                                </span>
-                              )}
-                              {a.paciente_id && (
-                                <BadgePacienteDistante
-                                  cidade={cidadeMap.get(a.paciente_id)}
-                                  compact
-                                />
-                              )}
-                              {a.orcamento_numero && (
-                                <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
-                                  ORÇ
-                                </span>
-                              )}
-                            </span>
+                            )}
+                            {a.status === "confirmado" && (
+                              <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                            )}
+                            {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                              <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            )}
+                            <span className="truncate">{a.paciente_nome}</span>
+                            {a.orcamento_numero && (
+                              <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
+                                ORÇ
+                              </span>
+                            )}
                           </button>
                         )}
-                      </TableCell>
+                      </div>
 
-                      {/* Serviço */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
-                        <ProcedimentoCell
-                          valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
-                          rotuloExibicao={
-                            medicoEhLaboratorioFormulario(a.medico_id)
-                              ? "EXAMES LABORATORIAIS"
-                              : null
+                      {/* Linha 3: profissional + serviço */}
+                      <div className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground mb-2 min-w-0">
+                        <span className="truncate" title={profLabel}>
+                          👤 {profLabel}
+                        </span>
+                        <span
+                          className="truncate max-w-[45%] text-right"
+                          title={
+                            procedimentoEfetivo(a.medico_id, a.procedimento) ||
+                            rotuloServicoGrade(a.medico_id, a.procedimento) ||
+                            ""
                           }
-                          opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                          padrao={
-                            procedimentoPadraoDoMedico(a.medico_id) ||
-                            (medicoEhLaboratorioFormulario(a.medico_id)
-                              ? "EXAMES LABORATORIAIS"
-                              : "")
-                          }
-                          semFallback={
-                            !!medicos.find((m) => m.id === a.medico_id)
-                              ?.procedimento_padrao_em_branco
-                          }
-                          disabled={ehLivre}
-                          onChange={(novo) => atualizarProcedimento(a, novo)}
-                        />
-                      </TableCell>
+                        >
+                          {rotuloServicoGrade(a.medico_id, a.procedimento) || "—"}
+                        </span>
+                      </div>
 
-                      {/* Situação */}
-                      <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                      {/* Linha 4: ações rápidas */}
+                      <div className="flex items-center gap-1.5 pt-2 border-t">
                         {ehLivre ? (
                           (() => {
                             const lockNome = slotTravadoPorOutro(a);
                             return lockNome ? (
-                              <Badge
-                                className="bg-amber-100 text-amber-800 border-amber-300 text-[12px] font-medium truncate max-w-full"
+                              <div
+                                className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-2 truncate"
                                 title={`Em digitação por ${lockNome}`}
                               >
-                                ⏳ {lockNome}
-                              </Badge>
+                                ⏳ Em digitação por {lockNome}
+                              </div>
                             ) : (
                               <Button
                                 variant="outline"
@@ -11709,278 +11488,86 @@ function AgendaPage() {
                                 onClick={() => openSlot(a)}
                                 disabled={!podeEscrever}
                                 title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
-                                className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+                                className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
                               >
-                                <UserPlus className="h-3 w-3 mr-1.5" />
+                                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
                                 Agendar
                               </Button>
                             );
                           })()
-                        ) : estornoPend ? (
-                          <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs max-w-full truncate">
-                            Estorno solicitado
-                          </Badge>
                         ) : (
-                          <Badge
-                            className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`}
-                            title={STATUS_LABEL[a.status]}
-                          >
-                            {STATUS_LABEL[a.status]}
-                          </Badge>
-                        )}
-                        {/* Saldo devedor de um pagamento parcial. Fica logo
-                            abaixo da situação para a recepção ver, na própria
-                            linha, que o paciente ainda deve. */}
-                        {(() => {
-                          const saldoLinha = saldoMap.get(a.id);
-                          if (!saldoLinha?.parcial || ehLivre) return null;
-                          return (
-                            <Badge
-                              className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[11px] text-amber-800"
-                              title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
-                                "pt-BR",
-                                { style: "currency", currency: "BRL" },
-                              )}, já pago ${saldoLinha.pago.toLocaleString("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              })}`}
-                            >
-                              {rotuloSaldo(saldoLinha)}
-                            </Badge>
-                          );
-                        })()}
-                      </TableCell>
-
-                      {/* OBS — indicador compacto. Sem observação a célula fica
-                          vazia (nem o traço, que já custava largura); com
-                          observação mostra o balão com a bolinha vermelha,
-                          o texto no tooltip e o modal completo no clique. */}
-                      <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1.5 px-1 align-middle text-center">
-                        {(() => {
-                          const obs = (a.observacoes ?? "").trim();
-                          if (ehLivre || ocultarPaciente || !obs) return null;
-                          return (
-                            <TooltipProvider delayDuration={150}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    aria-label="Ver observação do agendamento"
-                                    onClick={() => setObsAg(a)}
-                                    className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
-                                  >
-                                    <MessageSquareText className="h-4 w-4" />
-                                    <span
-                                      aria-hidden
-                                      className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-rose-500 ring-1 ring-background"
-                                    />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="left"
-                                  className="max-w-[320px] whitespace-pre-wrap break-words text-left"
-                                >
-                                  {obs}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          );
-                        })()}
-                      </TableCell>
-
-                      {/* Ações - Botões na linha + Menu */}
-                      <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
-                        <TooltipProvider delayDuration={200}>
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Check-in (✅) - aparece apenas para pacientes presentes */}
-                            {!ehLivre &&
-                              !realizado &&
-                              (() => {
-                                const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                                const pendenteCheckin = [
-                                  "aguardando_recepcao",
-                                  "recepcao",
-                                ].includes(etapa);
-                                if (
-                                  (pagosSet.has(a.id) || semFaturamento) &&
-                                  pendenteCheckin &&
-                                  podeEscrever
-                                ) {
-                                  return (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          aria-label="Confirmar presença (check-in)"
-                                          onClick={() => confirmarPresenca(a)}
-                                          className="h-7 w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
-                                        >
-                                          <BadgeCheck className="h-3.5 w-3.5" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Confirmar presença (check-in)</TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
-                                if (!pendenteCheckin && !ehLivre) {
-                                  return (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="inline-flex">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            disabled
-                                            aria-label="Check-in já realizado"
-                                            className="h-7 w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
-                                          >
-                                            <BadgeCheck className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Check-in já realizado</TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
-                                return null;
-                              })()}
-
-                            {/* Pagar (💰) */}
-                            {!ehLivre && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={semFaturamento ? "Sem faturamento" : "Pagamento"}
-                                    onClick={() => cobrarAgendamento(a)}
-                                    className={`h-7 w-7 shrink-0 rounded-md border-2 ${
-                                      semFaturamento
-                                        ? // Cinza, e não o vermelho de "falta
-                                          // cobrar": não há cobrança prevista, e
-                                          // a linha não pode parecer pendente
-                                          // para quem varre a agenda do dia.
-                                          "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                        : a.origem_externa
-                                          ? "border-violet-400 text-violet-600 hover:bg-violet-50"
-                                          : parciaisSet.has(a.id)
-                                            ? // Parcialmente pago: âmbar, para não
-                                              // se confundir com o verde de quitado.
-                                              "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
-                                            : pagosSet.has(a.id)
-                                              ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                              : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                                    }`}
-                                  >
-                                    {semFaturamento ? (
-                                      <Ban className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <DollarSign
-                                        className="h-3.5 w-3.5"
-                                        strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                                      />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {(() => {
-                                    if (semFaturamento) return rotuloSemFaturamento(a);
-                                    if (a.origem_externa)
-                                      return "Atendimento externo — sem lançamento em caixa";
-                                    const saldoLinha = saldoMap.get(a.id);
-                                    if (saldoLinha?.parcial)
-                                      return `Parcialmente pago — ${rotuloSaldo(saldoLinha)} de ${saldoLinha.total.toLocaleString(
-                                        "pt-BR",
-                                        { style: "currency", currency: "BRL" },
-                                      )}. Clique para receber o saldo.`;
-                                    if (!pagosSet.has(a.id)) return "Registrar pagamento";
-                                    const info = pagoInfoMap.get(a.id);
-                                    if (!info) return "Pago";
-                                    const v = info.valor.toLocaleString("pt-BR", {
-                                      style: "currency",
-                                      currency: "BRL",
-                                    });
-                                    return `Pago • ${v}`;
-                                  })()}
-                                </TooltipContent>
-                              </Tooltip>
+                          <>
+                            {podeCheckin && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => confirmarPresenca(a)}
+                                className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                                title="Check-in"
+                              >
+                                <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
+                              </Button>
                             )}
-
-                            {/* Nota Fiscal (📄) — mostra na própria linha se a
-                                NFS-e do atendimento já saiu. Verde = emitida
-                                (clique abre o PDF); cinza apagado = ainda não
-                                emitida. Some nos horários livres, onde não há
-                                paciente nem o que faturar. */}
-                            {!ehLivre &&
-                              (() => {
-                                const nf = nfseMap.get(a.id);
-                                const emitida = !!nf;
-                                const selecionadaLote = nfseSel.has(a.id);
-                                return (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label={
-                                          emitida
-                                            ? `Nota Fiscal emitida${nf?.numero ? ` — nº ${nf.numero}` : ""}`
-                                            : "Nota Fiscal não emitida"
-                                        }
-                                        onClick={() => verOuEmitirNota(a)}
-                                        className={`h-7 w-7 shrink-0 rounded-md border-2 ${
-                                          emitida
-                                            ? // Azul é exclusivo da nota emitida. O verde desta
-                                              // coluna já significa "pago" e "check-in feito" —
-                                              // reusá-lo aqui faria a recepção ler nota emitida
-                                              // onde só houve pagamento.
-                                              "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                            : selecionadaLote
-                                              ? // Seleção para nota agrupada é um estado passageiro,
-                                                // então marca com um anel em vez de outra cor de
-                                                // preenchimento: o botão continua cinza, porque a
-                                                // nota ainda não saiu.
-                                                "border-slate-200 text-slate-400 ring-2 ring-amber-400 ring-offset-1 hover:bg-slate-50"
-                                              : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
-                                        }`}
-                                      >
-                                        <FileText
-                                          className="h-3.5 w-3.5"
-                                          strokeWidth={emitida ? 3 : 2}
-                                        />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {(() => {
-                                        if (emitida) {
-                                          const num = nf?.numero ? ` nº ${nf.numero}` : "";
-                                          return nf?.url_pdf
-                                            ? `Nota Fiscal emitida${num} — clique para abrir o PDF`
-                                            : `Nota Fiscal emitida${num} — status: ${nf?.status ?? "—"}`;
-                                        }
-                                        if (selecionadaLote)
-                                          return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
-                                        if (semFaturamento)
-                                          return "Sem faturamento — a nota fiscal é emitida pelo parceiro";
-                                        if (!pagosSet.has(a.id))
-                                          return "Nota Fiscal não emitida — registre o pagamento antes";
-                                        return "Nota Fiscal não emitida — clique para emitir";
-                                      })()}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                );
-                              })()}
-
-                            {/* Menu (⋮) */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => cobrarAgendamento(a)}
+                              className={`h-8 flex-1 text-xs ${
+                                semFaturamento
+                                  ? // Cinza, e não o vermelho de "Cobrar": aqui não
+                                    // falta pagamento nenhum — não há cobrança
+                                    // prevista, e a linha não pode parecer pendente.
+                                    "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-100"
+                                  : a.origem_externa
+                                    ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                    : parciaisSet.has(a.id)
+                                      ? "border-amber-400 bg-amber-50 text-amber-700"
+                                      : pagosSet.has(a.id)
+                                        ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                                        : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                              }`}
+                              title={
+                                semFaturamento
+                                  ? rotuloSemFaturamento(a)
+                                  : a.origem_externa
+                                    ? "Atendimento externo — sem lançamento em caixa"
+                                    : parciaisSet.has(a.id)
+                                      ? "Parcialmente pago — clique para receber o saldo"
+                                      : pagosSet.has(a.id)
+                                        ? "Pago"
+                                        : "Cobrar"
+                              }
+                            >
+                              {semFaturamento ? (
+                                <Ban className="h-3.5 w-3.5 mr-1" />
+                              ) : (
+                                <DollarSign
+                                  className="h-3.5 w-3.5 mr-1"
+                                  strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                                />
+                              )}
+                              {semFaturamento
+                                ? "Sem faturamento"
+                                : parciaisSet.has(a.id)
+                                  ? rotuloSaldo(saldoMap.get(a.id)!)
+                                  : pagosSet.has(a.id)
+                                    ? "Pago"
+                                    : "Cobrar"}
+                            </Button>
+                            {podeEscrever && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEdit(a)}
+                                className="h-8 px-2 text-xs"
+                                title="Editar"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  aria-label="Mais ações"
-                                  className="h-7 w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
-                                >
+                                <Button variant="outline" size="sm" className="h-8 px-2">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -12000,50 +11587,6 @@ function AgendaPage() {
                                     <DropdownMenuSeparator />
                                   </>
                                 )}
-                                {/* NFS-e */}
-                                {!ehLivre &&
-                                  (() => {
-                                    const nf = nfseMap.get(a.id);
-                                    const emitida = !!nf;
-                                    const podeEmitir = pagosSet.has(a.id) && !semFaturamento;
-                                    if (!emitida && !podeEmitir) return null;
-                                    return (
-                                      <>
-                                        <DropdownMenuItem onClick={() => verOuEmitirNota(a)}>
-                                          <FileText className="h-4 w-4 mr-2" />
-                                          {emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                                        </DropdownMenuItem>
-                                        {!emitida && podeEmitir && a.paciente_id && (
-                                          <DropdownMenuItem
-                                            onSelect={(e) => {
-                                              e.preventDefault();
-                                              setNfseSel((prev) => {
-                                                const n = new Set(prev);
-                                                if (n.has(a.id)) n.delete(a.id);
-                                                else n.add(a.id);
-                                                return n;
-                                              });
-                                            }}
-                                          >
-                                            <FileText className="h-4 w-4 mr-2" />
-                                            {nfseSel.has(a.id)
-                                              ? "Remover da NFS-e agrupada"
-                                              : "Selecionar para NFS-e agrupada"}
-                                          </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuSeparator />
-                                      </>
-                                    );
-                                  })()}
-
-                                {/* Editar */}
-                                {podeEscrever && (
-                                  <DropdownMenuItem onClick={() => openEdit(a)}>
-                                    <Pencil className="h-4 w-4 mr-2" /> Editar
-                                  </DropdownMenuItem>
-                                )}
-
-                                {/* Reagendar */}
                                 {podeEscrever && (
                                   <DropdownMenuItem
                                     onClick={() => iniciarReagendamento(a)}
@@ -12052,33 +11595,15 @@ function AgendaPage() {
                                     <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                                   </DropdownMenuItem>
                                 )}
-
-                                <DropdownMenuSeparator />
-
-                                {/* Imprimir GR */}
                                 <DropdownMenuItem
                                   onClick={() => imprimirGR(a)}
                                   disabled={!pagosSet.has(a.id) && !semFaturamento}
                                 >
                                   <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                  {!pagosSet.has(a.id) && !semFaturamento && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      (pagar)
-                                    </span>
-                                  )}
-                                  {semFaturamento && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      (zerada)
-                                    </span>
-                                  )}
                                 </DropdownMenuItem>
-
-                                {/* Comprovante */}
                                 <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
                                   <Printer className="h-4 w-4 mr-2" /> Comprovante
                                 </DropdownMenuItem>
-
-                                {/* Desmarcar paciente */}
                                 {podeEscrever && !ehLivre && a.status !== "realizado" && (
                                   <>
                                     <DropdownMenuSeparator />
@@ -12090,164 +11615,894 @@ function AgendaPage() {
                                     </DropdownMenuItem>
                                   </>
                                 )}
-
-                                {/* Mudar status */}
-                                {podeEscrever && !ehLivre && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    {(a.tipo_atendimento ?? "particular") === "convenio" && (
-                                      <DropdownMenuItem
-                                        onClick={() => alternarAutorizacaoConvenio(a)}
-                                        className={
-                                          a.convenio_autorizado
-                                            ? "text-muted-foreground"
-                                            : "text-emerald-600"
-                                        }
-                                      >
-                                        <ShieldCheck className="h-4 w-4 mr-2" />
-                                        {a.convenio_autorizado
-                                          ? "Remover autorização do convênio"
-                                          : "Autorizar convênio"}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                                      <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
-                                        <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </>
-                                )}
-
-                                {/* Auditoria */}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                                   <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
                                 </DropdownMenuItem>
-
-                                {/* Atendimento externo (faturado em outra clínica) */}
-                                {podeEscrever && !ehLivre && (
-                                  <DropdownMenuItem
-                                    onClick={() => setExternoAg(a)}
-                                    className="text-orange-600"
-                                  >
-                                    <Building2 className="h-4 w-4 mr-2" /> Atendimento externo
-                                    (outra clínica)
-                                  </DropdownMenuItem>
-                                )}
-
-                                {/* Reabrir (apenas realizado) */}
-                                {podeEscrever && a.status === "realizado" && (
-                                  <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
-                                    <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
-                                  </DropdownMenuItem>
-                                )}
-
-                                {/* Excluir */}
-                                {podeEscrever && isManager && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() => remove(a)}
-                                      className="text-destructive"
-                                      disabled={pagosSet.has(a.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      {ehLivre ? "Excluir slot" : "Liberar horário"}
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </div>
-                        </TooltipProvider>
-                      </TableCell>
-                    </TableRow>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   );
                 })
               )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex justify-center">
-          <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
-        </div>
-        <div className="rounded-lg border bg-muted/30 p-4">
-          <h3 className="text-center font-semibold mb-3">Legenda</h3>
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
-              { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
-              { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
-              { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
-              { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
-              { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
-              { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
-              { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
-              { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
-              { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center gap-2 text-sm">
-                <span
-                  className="inline-block h-6 w-10 rounded border"
-                  style={{ background: s.cor, borderColor: s.borda }}
-                />
-                <span>{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      {viewMode === "medico" && (
-        <AgendaPorMedicoDia
-          dataRef={dataRef}
-          medicos={(filtroMedico === "todos"
-            ? medicos
-            : medicos.filter((m) => m.id === filtroMedico)
-          ).map((m) => ({
-            id: m.id,
-            nome: m.nome,
-            especialidade_nome: m.especialidade_nome ?? null,
-          }))}
-          items={items
-            .filter(
-              (a) =>
-                a.inicio.slice(0, 10) === dataRef &&
-                (filtroMedico === "todos" || a.medico_id === filtroMedico) &&
-                // Mesma regra da visão em lista: médico com expediente
-                // encerrado no dia não exibe mais horário livre. A grade por
-                // médico usa `items` cru, então a regra é repetida aqui.
-                !(
-                  !mostrarEncerrados &&
-                  isSlotLivre(a.paciente_nome) &&
-                  !!a.medico_id &&
-                  expedientes.has(chaveExpediente(a.medico_id, dataLocalDoInicio(a.inicio)))
-                ),
-            )
-            .map((a) => ({
-              id: a.id,
-              paciente_nome: a.paciente_nome,
-              medico_id: a.medico_id,
-              inicio: a.inicio,
-              fim: a.fim,
-              procedimento: medicoEhLaboratorioFormulario(a.medico_id)
-                ? "EXAMES LABORATORIAIS"
-                : a.procedimento,
-              status: a.status,
-              livre: isSlotLivre(a.paciente_nome),
+            {/* ============ TABELA DESKTOP (lg+) ============ */}
+            {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
+            o contexto de scroll do sticky, e como este div nunca rola
+            internamente (quem rola é o <main> do app-shell), o cabeçalho
+            "sticky top-0" parava de acompanhar o scroll da página. */}
+            <div className="hidden lg:block w-full max-w-full overflow-x-hidden rounded-lg border border-border bg-card">
+              <Table className="w-full max-w-full table-auto">
+                <TableHeader className="sticky top-0 z-20">
+                  <TableRow className="bg-muted">
+                    <TableHead
+                      className="w-8 rounded-tl-lg px-1.5"
+                      title="Marcar todas as linhas desta página, do jeito que estão filtradas"
+                    >
+                      <Checkbox
+                        aria-label={
+                          todosDaPaginaMarcados
+                            ? "Desmarcar todos os atendimentos da página"
+                            : "Selecionar todos os atendimentos da página"
+                        }
+                        checked={
+                          todosDaPaginaMarcados
+                            ? true
+                            : marcadosNaPagina > 0
+                              ? "indeterminate"
+                              : false
+                        }
+                        onCheckedChange={toggleAll}
+                      />
+                    </TableHead>
+                    <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Ficha
+                    </TableHead>
+                    <TableHead className="w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Dia
+                    </TableHead>
+                    <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Data
+                    </TableHead>
+                    <TableHead className="w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Horário
+                    </TableHead>
+                    {/* As três colunas de texto livre dividem a sobra da linha em
+                    proporção fixa. Sem isso um nome comprido de médico ou de
+                    procedimento estica a coluna e empurra as ações para fora
+                    da tela em notebook. O conteúdo delas trunca com "…". */}
+                    <TableHead className="w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Profissional
+                    </TableHead>
+                    <TableHead className="w-[22%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Cliente
+                    </TableHead>
+                    <TableHead className="w-[18%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Serviço
+                    </TableHead>
+                    <TableHead className="w-[110px] px-1.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Situação
+                    </TableHead>
+                    {/* OBS — coluna-ícone de largura fixa. O texto da observação
+                    saiu da grade (comia ~180px em telas de notebook e empurrava
+                    as ações para fora); agora só um indicador aparece quando o
+                    agendamento tem observação, e o texto abre em tooltip/modal. */}
+                    <TableHead
+                      className="w-[34px] min-w-[34px] max-w-[34px] px-1 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground"
+                      title="Observação do agendamento"
+                    >
+                      Obs
+                    </TableHead>
+                    <TableHead className="w-[170px] px-1 text-right text-[12px] font-semibold uppercase tracking-wider text-muted-foreground rounded-tr-lg">
+                      Ações
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading && items.length === 0 ? (
+                    <TableSkeletonRows
+                      cols={11}
+                      fallback={
+                        <TableRow>
+                          <TableCell
+                            colSpan={11}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            Carregando…
+                          </TableCell>
+                        </TableRow>
+                      }
+                    />
+                  ) : !clinicaAtual ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        Selecione uma clínica.
+                      </TableCell>
+                    </TableRow>
+                  ) : paginados.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        <AgendaEmptyState
+                          apenasData={apenasData}
+                          dataRef={dataRef}
+                          info={emptyInfo}
+                          onIrProxima={(d) => setDataRef(d)}
+                          onDesmarcarApenas={() => setApenasData(false)}
+                          onLimparFiltros={limparFiltros}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginados.map((a) => {
+                      const fichaNum = fichaPorId.get(a.id) ?? "";
+                      const realizado = a.status === "realizado";
+                      const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                      // PRESENÇA ≠ PAGAMENTO — mesma regra da visão em cartões: o
+                      // azul vem só do check-in manual da recepção (`fluxo_etapa`),
+                      // nunca da existência de um pagamento antecipado.
+                      const presente =
+                        !realizado &&
+                        !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow);
+                      const estornoPend = estornoPendAgs.has(a.id);
+                      const ocultarPaciente = estornoPend && isMedicoOnly;
+                      const ehLivre = isSlotLivre(a.paciente_nome);
+
+                      // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
+                      // em vez de tom sólido -50/-100: o sólido fica quase branco e,
+                      // no modo escuro, o texto claro (--foreground) perde contraste
+                      // sobre ele. O overlay se mistura com o fundo real da linha e
+                      // funciona nos dois temas.
+                      // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
+                      // estorno (mais crítico) e acima das demais cores.
+                      const sinalizado = !!a.sinalizado_em;
+                      const semFaturamento = ehSemFaturamento(a);
+                      let bgClass = "";
+                      let borderLeft = "";
+                      if (estornoPend) {
+                        bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
+                        borderLeft = "border-l-4 border-rose-500";
+                      } else if (sinalizado) {
+                        bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
+                        borderLeft = "border-l-4 border-amber-500";
+                      } else if (a.origem_externa) {
+                        bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
+                        borderLeft = "border-l-4 border-violet-400";
+                      } else if (realizado) {
+                        bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
+                        borderLeft = "border-l-4 border-emerald-500";
+                      } else if (presente) {
+                        bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
+                        borderLeft = "border-l-4 border-blue-400";
+                      }
+
+                      const ehAgora = a.id === agoraAgId;
+                      if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
+                      if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
+
+                      return (
+                        <TableRow
+                          key={a.id}
+                          data-ag-id={a.id}
+                          className={`${bgClass} ${borderLeft}`}
+                        >
+                          {/* Checkbox — horário livre TAMBÉM é selecionável: sem
+                          isso uma grade aberta por engano não tinha como ser
+                          apagada pela tela (o "Excluir" só age no que está
+                          marcado). Quem protege o paciente é a trava dentro de
+                          excluirSelecionados, não a caixinha desabilitada. */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-xs">
+                            <Checkbox
+                              checked={selecionados.has(a.id)}
+                              onCheckedChange={() => toggleSel(a.id)}
+                              disabled={realizado}
+                            />
+                          </TableCell>
+
+                          {/* Ficha */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
+                            {fichaNum || "—"}
+                          </TableCell>
+
+                          {/* Dia da semana */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
+                            {fmtDiaSemana(a.inicio)}
+                          </TableCell>
+
+                          {/* Data */}
+                          <TableCell className="py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
+                            {fmtData(a.inicio)}
+                          </TableCell>
+
+                          {/* Horário — uma linha só, tabular, 24h */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                            {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                          </TableCell>
+
+                          {/* Profissional */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            {(() => {
+                              const label = medicoNomeAgendamento(a);
+                              const m = medicos.find((x) => x.id === a.medico_id);
+                              const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                              return (
+                                <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                                  <span className="block truncate text-xs" title={label}>
+                                    {label}
+                                  </span>
+                                  {manual && (
+                                    <span className="shrink-0 text-[10px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                      Papel
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
+
+                          {/* Cliente */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            {ocultarPaciente ? (
+                              <span className="block truncate text-xs italic text-rose-600">
+                                — aguardando estorno —
+                              </span>
+                            ) : ehLivre ? (
+                              <span className="block truncate text-xs font-medium text-primary/60">
+                                Nenhum paciente agendado
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                                className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
+                                title={a.paciente_nome}
+                              >
+                                <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
+                                  {sinalizado && (
+                                    <span
+                                      title={rotuloSinalizacao(a)}
+                                      className="shrink-0 inline-flex"
+                                    >
+                                      <Flag className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                                    </span>
+                                  )}
+                                  {a.status === "confirmado" && (
+                                    <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                                  )}
+                                  <span className="block max-w-full truncate text-xs font-bold text-foreground">
+                                    {a.paciente_nome}
+                                  </span>
+                                </span>
+                                <span className="mt-0.5 flex max-w-full items-center gap-1 overflow-hidden">
+                                  {a.paciente_id && (
+                                    <IdadeIcon
+                                      nascimento={nascMap.get(a.paciente_id) ?? null}
+                                      size={22}
+                                    />
+                                  )}
+                                  {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                                    <span
+                                      title={`Cartão ${convenioMap.get(a.paciente_id)}`}
+                                      className="shrink-0 inline-flex"
+                                    >
+                                      <IdCard className="h-3.5 w-3.5 text-emerald-600" />
+                                    </span>
+                                  )}
+                                  {a.paciente_id && (
+                                    <BadgePacienteDistante
+                                      cidade={cidadeMap.get(a.paciente_id)}
+                                      compact
+                                    />
+                                  )}
+                                  {a.orcamento_numero && (
+                                    <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                                      ORÇ
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            )}
+                          </TableCell>
+
+                          {/* Serviço */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <ProcedimentoCell
+                              valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
+                              rotuloExibicao={
+                                medicoEhLaboratorioFormulario(a.medico_id)
+                                  ? "EXAMES LABORATORIAIS"
+                                  : null
+                              }
+                              opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                              padrao={
+                                procedimentoPadraoDoMedico(a.medico_id) ||
+                                (medicoEhLaboratorioFormulario(a.medico_id)
+                                  ? "EXAMES LABORATORIAIS"
+                                  : "")
+                              }
+                              semFallback={
+                                !!medicos.find((m) => m.id === a.medico_id)
+                                  ?.procedimento_padrao_em_branco
+                              }
+                              disabled={ehLivre}
+                              onChange={(novo) => atualizarProcedimento(a, novo)}
+                            />
+                          </TableCell>
+
+                          {/* Situação */}
+                          <TableCell className="py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                            {ehLivre ? (
+                              (() => {
+                                const lockNome = slotTravadoPorOutro(a);
+                                return lockNome ? (
+                                  <Badge
+                                    className="bg-amber-100 text-amber-800 border-amber-300 text-[12px] font-medium truncate max-w-full"
+                                    title={`Em digitação por ${lockNome}`}
+                                  >
+                                    ⏳ {lockNome}
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openSlot(a)}
+                                    disabled={!podeEscrever}
+                                    title={podeEscrever ? undefined : SEM_PERMISSAO_MSG}
+                                    className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+                                  >
+                                    <UserPlus className="h-3 w-3 mr-1.5" />
+                                    Agendar
+                                  </Button>
+                                );
+                              })()
+                            ) : estornoPend ? (
+                              <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs max-w-full truncate">
+                                Estorno solicitado
+                              </Badge>
+                            ) : (
+                              <Badge
+                                className={`${STATUS_COR[a.status]} text-xs max-w-full truncate`}
+                                title={STATUS_LABEL[a.status]}
+                              >
+                                {STATUS_LABEL[a.status]}
+                              </Badge>
+                            )}
+                            {/* Saldo devedor de um pagamento parcial. Fica logo
+                            abaixo da situação para a recepção ver, na própria
+                            linha, que o paciente ainda deve. */}
+                            {(() => {
+                              const saldoLinha = saldoMap.get(a.id);
+                              if (!saldoLinha?.parcial || ehLivre) return null;
+                              return (
+                                <Badge
+                                  className="mt-1 block w-fit border-amber-300 bg-amber-100 text-[11px] text-amber-800"
+                                  title={`Parcialmente pago — total ${saldoLinha.total.toLocaleString(
+                                    "pt-BR",
+                                    { style: "currency", currency: "BRL" },
+                                  )}, já pago ${saldoLinha.pago.toLocaleString("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  })}`}
+                                >
+                                  {rotuloSaldo(saldoLinha)}
+                                </Badge>
+                              );
+                            })()}
+                          </TableCell>
+
+                          {/* OBS — indicador compacto. Sem observação a célula fica
+                          vazia (nem o traço, que já custava largura); com
+                          observação mostra o balão com a bolinha vermelha,
+                          o texto no tooltip e o modal completo no clique. */}
+                          <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1.5 px-1 align-middle text-center">
+                            {(() => {
+                              const obs = (a.observacoes ?? "").trim();
+                              if (ehLivre || ocultarPaciente || !obs) return null;
+                              return (
+                                <TooltipProvider delayDuration={150}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        aria-label="Ver observação do agendamento"
+                                        onClick={() => setObsAg(a)}
+                                        className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                                      >
+                                        <MessageSquareText className="h-4 w-4" />
+                                        <span
+                                          aria-hidden
+                                          className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-rose-500 ring-1 ring-background"
+                                        />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="left"
+                                      className="max-w-[320px] whitespace-pre-wrap break-words text-left"
+                                    >
+                                      {obs}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })()}
+                          </TableCell>
+
+                          {/* Ações - Botões na linha + Menu */}
+                          <TableCell className="w-[170px] min-w-[170px] py-1.5 px-2 text-right whitespace-nowrap">
+                            <TooltipProvider delayDuration={200}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Check-in (✅) - aparece apenas para pacientes presentes */}
+                                {!ehLivre &&
+                                  !realizado &&
+                                  (() => {
+                                    const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                                    const pendenteCheckin = [
+                                      "aguardando_recepcao",
+                                      "recepcao",
+                                    ].includes(etapa);
+                                    if (
+                                      (pagosSet.has(a.id) || semFaturamento) &&
+                                      pendenteCheckin &&
+                                      podeEscrever
+                                    ) {
+                                      return (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              aria-label="Confirmar presença (check-in)"
+                                              onClick={() => confirmarPresenca(a)}
+                                              className="h-7 w-7 shrink-0 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                                            >
+                                              <BadgeCheck className="h-3.5 w-3.5" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Confirmar presença (check-in)
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      );
+                                    }
+                                    if (!pendenteCheckin && !ehLivre) {
+                                      return (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled
+                                                aria-label="Check-in já realizado"
+                                                className="h-7 w-7 shrink-0 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
+                                              >
+                                                <BadgeCheck className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Check-in já realizado</TooltipContent>
+                                        </Tooltip>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
+                                {/* Pagar (💰) */}
+                                {!ehLivre && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={
+                                          semFaturamento ? "Sem faturamento" : "Pagamento"
+                                        }
+                                        onClick={() => cobrarAgendamento(a)}
+                                        className={`h-7 w-7 shrink-0 rounded-md border-2 ${
+                                          semFaturamento
+                                            ? // Cinza, e não o vermelho de "falta
+                                              // cobrar": não há cobrança prevista, e
+                                              // a linha não pode parecer pendente
+                                              // para quem varre a agenda do dia.
+                                              "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                            : a.origem_externa
+                                              ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                              : parciaisSet.has(a.id)
+                                                ? // Parcialmente pago: âmbar, para não
+                                                  // se confundir com o verde de quitado.
+                                                  "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                                : pagosSet.has(a.id)
+                                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                        }`}
+                                      >
+                                        {semFaturamento ? (
+                                          <Ban className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <DollarSign
+                                            className="h-3.5 w-3.5"
+                                            strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
+                                          />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {(() => {
+                                        if (semFaturamento) return rotuloSemFaturamento(a);
+                                        if (a.origem_externa)
+                                          return "Atendimento externo — sem lançamento em caixa";
+                                        const saldoLinha = saldoMap.get(a.id);
+                                        if (saldoLinha?.parcial)
+                                          return `Parcialmente pago — ${rotuloSaldo(saldoLinha)} de ${saldoLinha.total.toLocaleString(
+                                            "pt-BR",
+                                            { style: "currency", currency: "BRL" },
+                                          )}. Clique para receber o saldo.`;
+                                        if (!pagosSet.has(a.id)) return "Registrar pagamento";
+                                        const info = pagoInfoMap.get(a.id);
+                                        if (!info) return "Pago";
+                                        const v = info.valor.toLocaleString("pt-BR", {
+                                          style: "currency",
+                                          currency: "BRL",
+                                        });
+                                        return `Pago • ${v}`;
+                                      })()}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+
+                                {/* Nota Fiscal (📄) — mostra na própria linha se a
+                                NFS-e do atendimento já saiu. Verde = emitida
+                                (clique abre o PDF); cinza apagado = ainda não
+                                emitida. Some nos horários livres, onde não há
+                                paciente nem o que faturar. */}
+                                {!ehLivre &&
+                                  (() => {
+                                    const nf = nfseMap.get(a.id);
+                                    const emitida = !!nf;
+                                    const selecionadaLote = nfseSel.has(a.id);
+                                    return (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={
+                                              emitida
+                                                ? `Nota Fiscal emitida${nf?.numero ? ` — nº ${nf.numero}` : ""}`
+                                                : "Nota Fiscal não emitida"
+                                            }
+                                            onClick={() => verOuEmitirNota(a)}
+                                            className={`h-7 w-7 shrink-0 rounded-md border-2 ${
+                                              emitida
+                                                ? // Azul é exclusivo da nota emitida. O verde desta
+                                                  // coluna já significa "pago" e "check-in feito" —
+                                                  // reusá-lo aqui faria a recepção ler nota emitida
+                                                  // onde só houve pagamento.
+                                                  "border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                                : selecionadaLote
+                                                  ? // Seleção para nota agrupada é um estado passageiro,
+                                                    // então marca com um anel em vez de outra cor de
+                                                    // preenchimento: o botão continua cinza, porque a
+                                                    // nota ainda não saiu.
+                                                    "border-slate-200 text-slate-400 ring-2 ring-amber-400 ring-offset-1 hover:bg-slate-50"
+                                                  : "border-slate-200 text-slate-400 hover:border-slate-400 hover:bg-slate-50"
+                                            }`}
+                                          >
+                                            <FileText
+                                              className="h-3.5 w-3.5"
+                                              strokeWidth={emitida ? 3 : 2}
+                                            />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {(() => {
+                                            if (emitida) {
+                                              const num = nf?.numero ? ` nº ${nf.numero}` : "";
+                                              return nf?.url_pdf
+                                                ? `Nota Fiscal emitida${num} — clique para abrir o PDF`
+                                                : `Nota Fiscal emitida${num} — status: ${nf?.status ?? "—"}`;
+                                            }
+                                            if (selecionadaLote)
+                                              return "Nota Fiscal não emitida — selecionado para NFS-e agrupada";
+                                            if (semFaturamento)
+                                              return "Sem faturamento — a nota fiscal é emitida pelo parceiro";
+                                            if (!pagosSet.has(a.id))
+                                              return "Nota Fiscal não emitida — registre o pagamento antes";
+                                            return "Nota Fiscal não emitida — clique para emitir";
+                                          })()}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })()}
+
+                                {/* Menu (⋮) */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      aria-label="Mais ações"
+                                      className="h-7 w-7 shrink-0 rounded-md hover:bg-slate-100 text-slate-600 dark:text-slate-400"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    {!ehLivre && podeEscrever && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => alternarSinalizacao(a)}>
+                                          <Flag className="h-4 w-4 mr-2" />
+                                          {sinalizado
+                                            ? "Remover sinalização"
+                                            : "Sinalizar paciente"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => alternarSemFaturamento(a)}>
+                                          <Ban className="h-4 w-4 mr-2" />
+                                          {semFaturamento
+                                            ? "Voltar a faturar este atendimento"
+                                            : "Sinalizar agenda sem faturamento"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                      </>
+                                    )}
+                                    {/* NFS-e */}
+                                    {!ehLivre &&
+                                      (() => {
+                                        const nf = nfseMap.get(a.id);
+                                        const emitida = !!nf;
+                                        const podeEmitir = pagosSet.has(a.id) && !semFaturamento;
+                                        if (!emitida && !podeEmitir) return null;
+                                        return (
+                                          <>
+                                            <DropdownMenuItem onClick={() => verOuEmitirNota(a)}>
+                                              <FileText className="h-4 w-4 mr-2" />
+                                              {emitida
+                                                ? `NFS-e ${nf?.numero ?? ""}`
+                                                : "Emitir NFS-e"}
+                                            </DropdownMenuItem>
+                                            {!emitida && podeEmitir && a.paciente_id && (
+                                              <DropdownMenuItem
+                                                onSelect={(e) => {
+                                                  e.preventDefault();
+                                                  setNfseSel((prev) => {
+                                                    const n = new Set(prev);
+                                                    if (n.has(a.id)) n.delete(a.id);
+                                                    else n.add(a.id);
+                                                    return n;
+                                                  });
+                                                }}
+                                              >
+                                                <FileText className="h-4 w-4 mr-2" />
+                                                {nfseSel.has(a.id)
+                                                  ? "Remover da NFS-e agrupada"
+                                                  : "Selecionar para NFS-e agrupada"}
+                                              </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuSeparator />
+                                          </>
+                                        );
+                                      })()}
+
+                                    {/* Editar */}
+                                    {podeEscrever && (
+                                      <DropdownMenuItem onClick={() => openEdit(a)}>
+                                        <Pencil className="h-4 w-4 mr-2" /> Editar
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {/* Reagendar */}
+                                    {podeEscrever && (
+                                      <DropdownMenuItem
+                                        onClick={() => iniciarReagendamento(a)}
+                                        disabled={a.status === "realizado"}
+                                      >
+                                        <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuSeparator />
+
+                                    {/* Imprimir GR */}
+                                    <DropdownMenuItem
+                                      onClick={() => imprimirGR(a)}
+                                      disabled={!pagosSet.has(a.id) && !semFaturamento}
+                                    >
+                                      <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                                      {!pagosSet.has(a.id) && !semFaturamento && (
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                          (pagar)
+                                        </span>
+                                      )}
+                                      {semFaturamento && (
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                          (zerada)
+                                        </span>
+                                      )}
+                                    </DropdownMenuItem>
+
+                                    {/* Comprovante */}
+                                    <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                                      <Printer className="h-4 w-4 mr-2" /> Comprovante
+                                    </DropdownMenuItem>
+
+                                    {/* Desmarcar paciente */}
+                                    {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => remove(a)}
+                                          className="text-amber-600"
+                                        >
+                                          <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+
+                                    {/* Mudar status */}
+                                    {podeEscrever && !ehLivre && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        {(a.tipo_atendimento ?? "particular") === "convenio" && (
+                                          <DropdownMenuItem
+                                            onClick={() => alternarAutorizacaoConvenio(a)}
+                                            className={
+                                              a.convenio_autorizado
+                                                ? "text-muted-foreground"
+                                                : "text-emerald-600"
+                                            }
+                                          >
+                                            <ShieldCheck className="h-4 w-4 mr-2" />
+                                            {a.convenio_autorizado
+                                              ? "Remover autorização do convênio"
+                                              : "Autorizar convênio"}
+                                          </DropdownMenuItem>
+                                        )}
+                                        {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                                          <DropdownMenuItem
+                                            key={s}
+                                            onClick={() => mudarStatus(a, s)}
+                                          >
+                                            <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </>
+                                    )}
+
+                                    {/* Auditoria */}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                                      <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
+                                    </DropdownMenuItem>
+
+                                    {/* Atendimento externo (faturado em outra clínica) */}
+                                    {podeEscrever && !ehLivre && (
+                                      <DropdownMenuItem
+                                        onClick={() => setExternoAg(a)}
+                                        className="text-orange-600"
+                                      >
+                                        <Building2 className="h-4 w-4 mr-2" /> Atendimento externo
+                                        (outra clínica)
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {/* Reabrir (apenas realizado) */}
+                                    {podeEscrever && a.status === "realizado" && (
+                                      <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
+                                        <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {/* Excluir */}
+                                    {podeEscrever && isManager && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => remove(a)}
+                                          className="text-destructive"
+                                          disabled={pagosSet.has(a.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          {ehLivre ? "Excluir slot" : "Liberar horário"}
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-center">
+              <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <h3 className="text-center font-semibold mb-3">Legenda</h3>
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
+                  { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
+                  { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
+                  { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
+                  { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
+                  { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
+                  { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
+                  { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
+                  { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+                  { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
+                ].map((s) => (
+                  <div key={s.label} className="flex items-center gap-2 text-sm">
+                    <span
+                      className="inline-block h-6 w-10 rounded border"
+                      style={{ background: s.cor, borderColor: s.borda }}
+                    />
+                    <span>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {viewMode === "medico" && (
+          <AgendaPorMedicoDia
+            dataRef={dataRef}
+            medicos={(filtroMedico === "todos"
+              ? medicos
+              : medicos.filter((m) => m.id === filtroMedico)
+            ).map((m) => ({
+              id: m.id,
+              nome: m.nome,
+              especialidade_nome: m.especialidade_nome ?? null,
             }))}
-          fmtHora={fmtHora}
-          onAgClick={(a) => {
-            const orig = items.find((i) => i.id === a.id);
-            if (orig) openEdit(orig);
-          }}
-          onSlotClick={(a) => {
-            const orig = items.find((i) => i.id === a.id);
-            if (orig) openSlot(orig);
-          }}
-          ocultarPaciente={isMedicoOnly}
-        />
-      )}
+            items={items
+              .filter(
+                (a) =>
+                  a.inicio.slice(0, 10) === dataRef &&
+                  (filtroMedico === "todos" || a.medico_id === filtroMedico) &&
+                  // Mesma regra da visão em lista: médico com expediente
+                  // encerrado no dia não exibe mais horário livre. A grade por
+                  // médico usa `items` cru, então a regra é repetida aqui.
+                  !(
+                    !mostrarEncerrados &&
+                    isSlotLivre(a.paciente_nome) &&
+                    !!a.medico_id &&
+                    expedientes.has(chaveExpediente(a.medico_id, dataLocalDoInicio(a.inicio)))
+                  ),
+              )
+              .map((a) => ({
+                id: a.id,
+                paciente_nome: a.paciente_nome,
+                medico_id: a.medico_id,
+                inicio: a.inicio,
+                fim: a.fim,
+                procedimento: medicoEhLaboratorioFormulario(a.medico_id)
+                  ? "EXAMES LABORATORIAIS"
+                  : a.procedimento,
+                status: a.status,
+                livre: isSlotLivre(a.paciente_nome),
+              }))}
+            fmtHora={fmtHora}
+            onAgClick={(a) => {
+              const orig = items.find((i) => i.id === a.id);
+              if (orig) openEdit(orig);
+            }}
+            onSlotClick={(a) => {
+              const orig = items.find((i) => i.id === a.id);
+              if (orig) openSlot(orig);
+            }}
+            ocultarPaciente={isMedicoOnly}
+          />
+        )}
+      </div>
 
       {fotoPreviewOpen && pacInfoFoto && (
         <div
