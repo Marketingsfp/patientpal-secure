@@ -470,19 +470,6 @@ export function AtendInbox() {
             Encerrar pausa
           </Button>
         )}
-        <div className="mx-2 h-5 w-px bg-border" />
-        <span className="text-xs font-medium text-muted-foreground">Fila:</span>
-        <Button size="sm" variant="outline" onClick={() => alternarFila(!filaAberta)}>
-          {filaAberta ? (
-            <>
-              <Unlock className="h-3.5 w-3.5 mr-1 text-emerald-600" /> Aberta — clique para fechar
-            </>
-          ) : (
-            <>
-              <Lock className="h-3.5 w-3.5 mr-1 text-rose-600" /> Fechada — clique para abrir
-            </>
-          )}
-        </Button>
       </div>
 
       <FilaHumana
