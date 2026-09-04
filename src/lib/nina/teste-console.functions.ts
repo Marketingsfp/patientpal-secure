@@ -326,6 +326,10 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       .from("atend_conversas")
       .update({ ultima_msg_em: agora, ultima_msg_preview: body.slice(0, 160) })
       .eq("id", conversaId);
+    // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
+    await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
+
+
 
     // Nina desligada na clínica → mesmo comportamento do WhatsApp: não responde.
     const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
