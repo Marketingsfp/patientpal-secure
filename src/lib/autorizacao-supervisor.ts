@@ -24,6 +24,8 @@ export const ESCOPOS_AUTORIZACAO = {
   sem_faturamento: ["admin", "gestor", "supervisor"],
   /** Abater valor ou lançar cortesia (Agenda e Financeiro). */
   desconto: ["admin", "gestor", "financeiro"],
+  /** Atender um paciente apesar de débito em atraso. */
+  liberar_debito: ["admin", "gestor", "financeiro"],
 } as const;
 
 export type EscopoAutorizacao = keyof typeof ESCOPOS_AUTORIZACAO;

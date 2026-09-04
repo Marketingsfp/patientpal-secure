@@ -8,12 +8,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { useClinica } from "@/hooks/use-clinica";
+import { SupervisorSenhaDialog } from "@/components/supervisor-senha-dialog";
 
 interface Mensalidade {
   id: string;
@@ -49,10 +49,10 @@ interface Props {
 }
 
 export function PendenciasAlert({ pacienteId, pacienteNome, open, onClose, onLiberar }: Props) {
+  const { clinicaAtual } = useClinica();
   const [data, setData] = useState<Pendencias | null>(null);
   const [loading, setLoading] = useState(false);
-  const [senhaGestor, setSenhaGestor] = useState("");
-  const [overriding, setOverriding] = useState(false);
+  const [autorizacaoAberta, setAutorizacaoAberta] = useState(false);
 
   useEffect(() => {
     if (!open || !pacienteId) return;
@@ -71,23 +71,17 @@ export function PendenciasAlert({ pacienteId, pacienteNome, open, onClose, onLib
   const fmtDt = (d: string | null) =>
     d ? new Date(d + "T00:00:00").toLocaleDateString("pt-BR") : "—";
 
-  async function overrideGestor() {
-    if (!senhaGestor) return toast.error("Informe a senha do gestor");
-    setOverriding(true);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user?.email) {
-      setOverriding(false);
-      return toast.error("Sem sessão");
-    }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: session.user.email,
-      password: senhaGestor,
-    });
-    setOverriding(false);
-    if (error) return toast.error("Senha incorreta");
-    toast.success("Atendimento liberado pelo gestor");
+  /**
+   * Liberação do atendimento apesar do débito.
+   *
+   * A versão anterior pedia "a senha do gestor" mas conferia a senha do
+   * usuário JÁ LOGADO: na prática, a recepcionista digitava a própria senha e
+   * liberava sozinha o que a tela dizia depender de um gestor. Agora usa o
+   * mesmo diálogo das outras autorizações do sistema — escolhe-se quem está
+   * autorizando e digita-se a senha dessa pessoa, conferida no servidor.
+   */
+  function liberarComAutorizacao(info: { nome: string }) {
+    toast.success(`Atendimento liberado por ${info.nome}`);
     onLiberar();
     onClose();
   }
@@ -176,25 +170,12 @@ export function PendenciasAlert({ pacienteId, pacienteNome, open, onClose, onLib
                   <ShieldCheck className="h-3.5 w-3.5" /> Liberação do gestor
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Para atender mesmo com débito em atraso, o gestor logado deve confirmar a senha.
+                  Para atender mesmo com débito em atraso, é preciso a autorização de um
+                  administrador, gestor ou do financeiro.
                 </p>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="sg" className="sr-only">
-                      Senha do gestor
-                    </Label>
-                    <Input
-                      id="sg"
-                      type="password"
-                      value={senhaGestor}
-                      onChange={(e) => setSenhaGestor(e.target.value)}
-                      placeholder="Senha do gestor"
-                    />
-                  </div>
-                  <Button onClick={overrideGestor} disabled={overriding} variant="destructive">
-                    {overriding ? "..." : "Liberar"}
-                  </Button>
-                </div>
+                <Button onClick={() => setAutorizacaoAberta(true)} variant="destructive" size="sm">
+                  Pedir liberação
+                </Button>
               </div>
             )}
           </div>
@@ -216,6 +197,15 @@ export function PendenciasAlert({ pacienteId, pacienteNome, open, onClose, onLib
           )}
         </DialogFooter>
       </DialogContent>
+
+      <SupervisorSenhaDialog
+        open={autorizacaoAberta}
+        onOpenChange={setAutorizacaoAberta}
+        clinicaId={clinicaAtual?.clinica_id}
+        escopo="liberar_debito"
+        acao="atender este paciente mesmo com débito em atraso"
+        onAuthorized={liberarComAutorizacao}
+      />
     </Dialog>
   );
 }

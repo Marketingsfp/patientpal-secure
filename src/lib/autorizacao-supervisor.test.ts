@@ -36,6 +36,16 @@ describe("alçada por escopo", () => {
   it("a lista de papéis do escopo é a mesma consultada pela tela", () => {
     expect([...rolesDoEscopo("sem_faturamento")]).toEqual(["admin", "gestor", "supervisor"]);
     expect([...rolesDoEscopo("desconto")]).toEqual(["admin", "gestor", "financeiro"]);
+    expect([...rolesDoEscopo("liberar_debito")]).toEqual(["admin", "gestor", "financeiro"]);
+  });
+
+  it("ninguém libera atendimento com débito com a própria senha de recepção", () => {
+    // A tela de pendências pedia "a senha do gestor" e conferia a senha de
+    // quem estava logado — a recepcionista liberava sozinha o que a tela
+    // dizia depender de um gestor.
+    expect(podeAutorizar("liberar_debito", "recepcao")).toBe(false);
+    expect(podeAutorizar("liberar_debito", "caixa")).toBe(false);
+    expect(podeAutorizar("liberar_debito", "financeiro")).toBe(true);
   });
 });
 
