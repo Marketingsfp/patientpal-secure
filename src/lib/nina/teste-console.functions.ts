@@ -169,14 +169,19 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     if (ids.length === 0)
       return { mensagens: [], conversaId: lead.conversa_id, sessao: lead.sessao_seq };
 
-    const { data: msgs, error } = await supabaseAdmin
+    // Busca as mensagens MAIS RECENTES (desc) e reordena para exibição: com
+    // muitas sessões o lead passa do limite, e ordenar asc esconderia justo as
+    // mensagens novas enviadas depois do reset.
+    const { data: msgsDesc, error } = await supabaseAdmin
       .from("whatsapp_mensagens")
       .select("id, direction, body, enviada_por, created_at")
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(400);
     if (error) throw new Error(error.message);
+    const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
+
 
     // Eventos operacionais (resolvida, memória resetada, atribuição…). O
     // console mescla com as mensagens por `created_at` — nada de popup.
@@ -185,9 +190,10 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       .select("id, evento, user_id, motivo, detalhes, created_at")
       .eq("clinica_id", data.clinicaId)
       .in("conversa_id", ids)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(200);
-    const lista = (evs ?? []) as any[];
+    const lista = ((evs ?? []) as any[]).slice().reverse();
+
     const userIds = Array.from(
       new Set(lista.map((e) => e.user_id).filter((v): v is string => !!v)),
     );
