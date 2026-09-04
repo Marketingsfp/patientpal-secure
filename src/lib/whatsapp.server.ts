@@ -417,6 +417,11 @@ export interface EstadoIdentidade {
   pacienteIdConversa: string | null;
   /** Estado estruturado do fluxo da Nina, gravado na conversa. */
   fluxoEstadoBruto: unknown;
+  /**
+   * Momento em que a conversa foi encerrada por um atendente. Tudo que veio
+   * antes disso NÃO entra no contexto da IA: encerrar = zerar a memória.
+   */
+  memoriaDesde: string | null;
 }
 
 async function carregarEstadoIdentidade(
@@ -430,7 +435,9 @@ async function carregarEstadoIdentidade(
     tentativas: 0,
     pacienteIdConversa: null,
     fluxoEstadoBruto: null,
+    memoriaDesde: null,
   };
+
   if (!telefone) return vazio;
   // Telefone sempre em dígitos: a Meta manda ora "55…", ora "+55…" — sem
   // normalizar, o mesmo contato virava duas conversas.
