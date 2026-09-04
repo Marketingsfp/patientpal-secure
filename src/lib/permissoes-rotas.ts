@@ -127,6 +127,11 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // Antes usava a chave "clinicas": quem podia ver o cadastro de clínicas
   // enxergava também a configuração do painel/totem, sem como separar.
   "/app/configuracoes/painel-totem": "painel-totem",
+  // Numeração de prontuário acompanha o módulo de clientes, e não uma chave
+  // própria: quem acerta o ponteiro da estante é a mesma recepção que cadastra
+  // o paciente. Uma chave nova deixaria a tela invisível até o gestor
+  // configurar permissão, justo no dia em que ela é necessária.
+  "/app/configuracoes/prontuario": "clientes",
   "/app/nfse": "nfse",
   "/app/relatorios": "relatorios",
   "/app/auditoria": "auditoria",
