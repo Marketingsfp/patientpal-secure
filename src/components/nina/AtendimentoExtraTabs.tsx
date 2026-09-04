@@ -870,11 +870,40 @@ export function AtendInbox() {
           )}
         </Card>
 
-        {/* COLUNA 3 — CONTATO */}
-        <Card className="hidden lg:flex w-[260px] xl:w-[300px] shrink-0 flex-col overflow-hidden">
+        {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
+        <Card
+          onMouseEnter={() => setContatoHover(true)}
+          onMouseLeave={() => setContatoHover(false)}
+          className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
+          }`}
+        >
+          {!contatoAberto && (
+            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground [writing-mode:vertical-rl]">
+                Contato
+              </span>
+            </div>
+          )}
+          <div
+            className={`${contatoAberto ? "flex" : "hidden"} w-[260px] xl:w-[300px] flex-1 flex-col overflow-hidden`}
+          >
           <CardHeader className="py-2 border-b">
-            <CardTitle className="text-base">Contato</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Contato</CardTitle>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6 w-6 p-0"
+                title={contatoFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                onClick={alternarContatoFixado}
+              >
+                {contatoFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
           </CardHeader>
+
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
             {!contato ? (
               <p className="text-muted-foreground">—</p>
