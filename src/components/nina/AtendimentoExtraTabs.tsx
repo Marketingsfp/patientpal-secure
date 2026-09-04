@@ -629,11 +629,15 @@ export function AtendInbox() {
                 placeholder="Buscar nome, telefone, protocolo…"
               />
             </div>
-            <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v as any)}>
+            <Select
+              value={filtroStatus}
+              onValueChange={(v) => setFiltroStatus(v as any)}
+              onOpenChange={setPainelMenuAberto}
+            >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="waiting">Em espera</SelectItem>
                 <SelectItem value="active">Ativas</SelectItem>
@@ -641,6 +645,7 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+
           </CardHeader>
           <div className="flex-1 overflow-auto border-t">
             {convs.length === 0 && (
