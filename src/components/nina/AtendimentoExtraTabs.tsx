@@ -106,6 +106,7 @@ import {
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
+  souGestorAtendimento,
   listarMensagensConversa,
   enviarMensagemConversa,
   obterDadosContato,
@@ -160,6 +161,7 @@ import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -235,8 +237,12 @@ export function AtendInbox() {
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
-  // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
-  const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
+  // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
+  // atendente logado). O filtro é aplicado no backend.
+  const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
+  const [souGestor, setSouGestor] = useState(false);
+  const soNaoAtribuidas = escopo === "nao_atribuidas";
+  const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
   // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
@@ -266,7 +272,7 @@ export function AtendInbox() {
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
-    let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    let base = convs;
     if (soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -566,6 +572,7 @@ export function AtendInbox() {
           status: filtroStatus,
           busca: busca || undefined,
           canal: "todos",
+          escopo,
           limit: 200,
         },
       }));
@@ -591,7 +598,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, listarConvs, sel]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
