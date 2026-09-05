@@ -808,7 +808,18 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
+        // Guarda o valor OFICIAL da planilha para ele aparecer também no
+        // resumo final antes da confirmação. Nunca estimado.
+        const preco = (resultado as { price?: string | null } | null)?.price ?? null;
+        if (preco) {
+          try {
+            mutarEstado(ctx, { appointment: { price: preco } });
+          } catch {
+            /* estado é acessório aqui: não pode derrubar a consulta */
+          }
+        }
         return { ok: true, ...resultado };
+
       }
 
       case "listar_especialidades": {
@@ -1042,7 +1053,12 @@ async function executarFerramentaInterna(
             fim: s.fim,
           })),
           total: slots.length,
+          // Estes são os ÚNICOS horários realmente livres. A escala da planilha
+          // (ex.: 09h-18h) não é vaga.
+          instrucao:
+            "Ao apresentar estes horários, inclua também o valor oficial da consulta vindo de consultar_base_conhecimento (se ainda não consultou, consulte antes de responder). Se não houver valor cadastrado, não estime nem cite preço. Mostre de 3 a 5 opções, agrupadas por médico, com data, horário e unidade.",
         };
+
       }
 
       case "verificar_horario": {

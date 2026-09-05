@@ -80,6 +80,8 @@ export function textoResumo(estado: EstadoFluxoNina, nomeUnidade: string): strin
   const linhas = [
     `Paciente: ${estado.patient.first_name ?? "<nome completo do paciente>"}`,
     `Atendimento: ${a.procedure ?? a.specialty ?? "<procedimento>"}`,
+    // Valor só aparece quando existe na planilha. Nunca estimar.
+    ...(a.price ? [`Valor: ${a.price}`] : []),
     a.doctor_name ? `Médico: ${a.doctor_name}` : "Médico: <profissional>",
     `Data: ${a.date ?? "<data>"}`,
     `Horário: ${a.time ?? "<horário>"}`,
@@ -87,6 +89,7 @@ export function textoResumo(estado: EstadoFluxoNina, nomeUnidade: string): strin
   ];
   return linhas.join("\n");
 }
+
 
 export function blocoPromptFase4({ mensagem, estado, nomeUnidade }: EntradaFase4): string {
   const leitura = lerMensagemFase4(mensagem);

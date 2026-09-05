@@ -1095,6 +1095,24 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
+  // OFERTA COMPLETA: valor (planilha) + médicos + datas/horários reais
+  // (agenda) + unidade na mesma resposta, sem misturar as fontes.
+  const blocoOferta = await (async () => {
+    try {
+      const { flagOfertaCompletaAtiva } = await import("@/lib/nina/oferta-completa.server");
+      if (!(await flagOfertaCompletaAtiva(clinicaId))) return "";
+      const { blocoPromptOfertaCompleta } = await import("@/lib/nina/oferta-completa");
+      return blocoPromptOfertaCompleta({
+        mensagem: mensagemPaciente,
+        estado: fluxoEstado,
+        nomeUnidade,
+        baseAtiva: Boolean(blocoKb),
+      });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
@@ -1104,7 +1122,9 @@ ${procs || "(nenhum)"}`;
     blocoFase4,
     blocoFase5,
     blocoFase6,
+    blocoOferta,
     podeAgendar ? blocoPromptAgenda() : "",
+
 
 
     blocoAprendizado,
