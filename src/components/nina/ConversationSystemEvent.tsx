@@ -45,6 +45,8 @@ export function textoEvento(ev: ConversaEvento): string {
       return "Memória da Nina foi resetada";
     case "ATENDIMENTO_ENCERRADO":
       return "Atendimento encerrado — a Nina reassumirá caso o paciente envie uma nova mensagem";
+    case "TIMEOUT_NINA":
+      return "Timeout da Nina: paciente não respondeu em 30 minutos. Conversa encaminhada para atendimento humano";
     case "HANDOFF_SOLICITADO":
       return "Nina solicitou atendimento humano";
     case "ENTROU_NA_FILA":

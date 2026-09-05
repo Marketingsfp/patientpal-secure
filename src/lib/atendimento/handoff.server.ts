@@ -80,7 +80,8 @@ export type EventoConversa =
   | "FINALIZADA"
   | "IA_SILENCIADA"
   | "IA_MEMORIA_RESETADA"
-  | "ATENDIMENTO_ENCERRADO";
+  | "ATENDIMENTO_ENCERRADO"
+  | "TIMEOUT_NINA";
 
 export async function registrarEvento(args: {
   clinicaId: string;
