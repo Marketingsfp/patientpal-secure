@@ -10353,6 +10353,13 @@ export type Database = {
         Args: { _clinica_id: string; _max?: number }
         Returns: number
       }
+      atend_espera_por_conversa: {
+        Args: { _clinica_id: string; _is_teste?: boolean }
+        Returns: {
+          aguardando_desde: string
+          conversa_id: string
+        }[]
+      }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       buscar_contratos: {
         Args: {
