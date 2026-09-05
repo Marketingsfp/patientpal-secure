@@ -332,7 +332,24 @@ export const fecharConversa = createServerFn({ method: "POST" })
       },
     });
 
+    // Desfecho relevante: o resumo interno é regerado para refletir o estado
+    // FINAL do atendimento. O resumo anterior fica como histórico (superado).
+    try {
+      const { registrarDesfechoResumo } = await import(
+        "@/lib/atendimento/handoff-resumo.server"
+      );
+      await registrarDesfechoResumo({
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        desfecho: "conversa_resolvida",
+        resolvidoPor: context.userId,
+      });
+    } catch (e) {
+      console.error("[fecharConversa] falha ao atualizar resumo", e);
+    }
+
     return { ok: true, protocol: prot as string };
+
   });
 
 export const marcarLida = createServerFn({ method: "POST" })
