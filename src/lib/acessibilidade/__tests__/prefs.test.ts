@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   A11Y_DEFAULTS,
