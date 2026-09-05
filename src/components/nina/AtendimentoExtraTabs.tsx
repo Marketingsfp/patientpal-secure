@@ -70,6 +70,7 @@ import {
   CalendarPlus,
   Pin,
   PinOff,
+  Zap,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
