@@ -716,6 +716,7 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
+    marcarTroca("T1_selecao");
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
