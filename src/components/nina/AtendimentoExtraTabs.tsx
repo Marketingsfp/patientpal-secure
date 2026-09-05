@@ -56,6 +56,8 @@ import {
   PinOff,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
   ConversationSystemEvent,
@@ -88,6 +90,7 @@ import {
   devolverParaNina,
   definirPresenca,
   esperaConversas,
+  assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
@@ -136,6 +139,10 @@ export function AtendInbox() {
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
   const esperaFn = useServerFn(esperaConversas);
+  const assumirFn = useServerFn(assumirConversa);
+  const { user } = useAuth();
+  const meuId = user?.id ?? null;
+  const podeAtender = usePodeEscrever("nina");
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
