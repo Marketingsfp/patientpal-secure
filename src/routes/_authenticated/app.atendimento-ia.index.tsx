@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Stethoscope, AlertTriangle, Users, Check, X, DollarSign } from "lucide-react";
+import { Stethoscope, AlertTriangle, Users, Check, X, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -402,7 +402,7 @@ function AtendimentoIaPage() {
   return (
     <div className="space-y-4 p-1">
       <div className="flex items-center gap-3">
-        <Brain className="h-6 w-6 text-primary" />
+        <Stethoscope className="h-6 w-6 text-primary" />
         <div>
           <h1 className="text-xl font-semibold">Meus Pacientes — Atendimento</h1>
           <p className="text-sm text-muted-foreground">

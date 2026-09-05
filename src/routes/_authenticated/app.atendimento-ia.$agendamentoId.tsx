@@ -1,13 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ClipboardCheck,
-  ListChecks,
-  MessagesSquare,
   FileHeart,
   Stethoscope,
   Loader2,
-  History,
   ArrowLeft,
   HeartPulse,
   CheckCircle2,
@@ -20,7 +16,6 @@ import {
   Cloud,
   CloudOff,
 } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -29,10 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { VoiceInput } from "@/components/voice-input";
 import { Cid10Autocomplete } from "@/components/prontuario/cid10-autocomplete";
 import { PrescricaoBuilder } from "@/components/prontuario/prescricao-builder";
 import {
@@ -41,17 +34,10 @@ import {
   type ItemPrescricao,
 } from "@/lib/prontuario/prescricao";
 import { macrosPorCampo, type Macro } from "@/lib/prontuario/macros";
-import { ApoioClinico } from "@/components/prontuario/apoio-clinico";
-import { comTempoLimite } from "@/lib/tempo-limite";
 import { imprimirDocumentoA4, type DadosClinicaA4 } from "@/lib/print-a4-medico";
 import type { Cid10 } from "@/data/cid10";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import {
-  gerarAnamneseEstruturada,
-  sugerirCondutaClinica,
-  resumirHistoricoPaciente,
-} from "@/lib/atendimento-ai.functions";
 import { agendamentoStatusPagamento, type StatusPagamento } from "@/lib/pagamento-status";
 import { cadastroMedicoDoUsuario, currentUserIsMedicoOnly } from "@/lib/medico-only";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
@@ -123,6 +109,49 @@ const EMPTY: Soap = {
   prescricao: "",
 };
 
+/**
+ * Preferência de tela do prontuário, guardada no navegador de quem atende.
+ *
+ * O padrão é o modo simplificado: uma folha em branco só com os dados do
+ * paciente e um campo de anotação, que é como o médico escreve no papel. O
+ * modo completo (abas do prontuário, CID-10, prescrição e impressões)
+ * continua inteiro, a um clique de distância, e a escolha fica gravada por
+ * computador. Nenhuma das duas telas usa inteligência artificial: tudo o que
+ * entra no prontuário é digitado por quem atende.
+ */
+const MODO_KEY = "pep:modo";
+
+function lerModoSimples(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(MODO_KEY) !== "completo";
+  } catch {
+    return true;
+  }
+}
+
+function gravarModoSimples(simples: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MODO_KEY, simples ? "simples" : "completo");
+  } catch {
+    /* sem armazenamento: a escolha vale só nesta sessão */
+  }
+}
+
+/** Idade em anos completos, ou null quando a data de nascimento não veio. */
+function idadeEmAnos(nascimento: string | null | undefined): number | null {
+  if (!nascimento) return null;
+  const [a, m, d] = nascimento.slice(0, 10).split("-").map(Number);
+  if (!a || !m || !d) return null;
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - a;
+  const aniversarioPassou =
+    hoje.getMonth() + 1 > m || (hoje.getMonth() + 1 === m && hoje.getDate() >= d);
+  if (!aniversarioPassou) anos -= 1;
+  return anos >= 0 && anos < 130 ? anos : null;
+}
+
 function AtendimentoEditorPage() {
   const { agendamentoId } = Route.useParams();
   const { from } = Route.useSearch();
@@ -132,15 +161,6 @@ function AtendimentoEditorPage() {
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("atendimento-ia");
-  // O apoio à decisão usa o módulo "consulta-ia", que tem permissão própria na
-  // tela de Perfis de Acesso. Quem tem o atendimento liberado não tem
-  // necessariamente este — e a função de servidor recusa. Consultamos aqui para
-  // avisar em vez de deixar o médico clicar e receber erro.
-  const podeApoioClinico = usePodeEscrever("consulta-ia");
-  const estruturar = useServerFn(gerarAnamneseEstruturada);
-  const sugerir = useServerFn(sugerirCondutaClinica);
-  const resumir = useServerFn(resumirHistoricoPaciente);
-
   const [agendamento, setAgendamento] = useState<{
     id: string;
     paciente_id: string | null;
@@ -149,6 +169,7 @@ function AtendimentoEditorPage() {
     procedimento: string | null;
     fluxo_etapa: string;
     status: string;
+    tipo_atendimento: string | null;
   } | null>(null);
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
@@ -160,18 +181,8 @@ function AtendimentoEditorPage() {
   const [triagemIndisponivel, setTriagemIndisponivel] = useState(false);
   const [pagamento, setPagamento] = useState<StatusPagamento | null>(null);
 
-  const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
-  const [sugestoes, setSugestoes] = useState<{
-    cids: { codigo: string; descricao: string }[];
-    exames: string[];
-    prescricao: string;
-  } | null>(null);
-  const [resumo, setResumo] = useState<string>("");
-  const [resumoOpen, setResumoOpen] = useState(false);
-  const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(
-    null,
-  );
+  const [loading, setLoading] = useState<"salvar" | null>(null);
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
   // PEP estruturado
@@ -195,13 +206,21 @@ function AtendimentoEditorPage() {
   const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
   const rascunhoRestaurado = useRef(false);
   const draftKey = `pep:rascunho:${agendamentoId}`;
+  // Tela enxuta (padrão) x prontuário completo. Ver MODO_KEY acima.
+  const [modoSimples, setModoSimples] = useState<boolean>(lerModoSimples);
+  function trocarModo(simples: boolean) {
+    setModoSimples(simples);
+    gravarModoSimples(simples);
+  }
 
   // Carrega agendamento + médico + pagamento (usado no mount e no realtime).
   const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
     const { data: ag, error } = await supabase
       .from("agendamentos")
-      .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status")
+      .select(
+        "id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status, tipo_atendimento",
+      )
       .eq("id", agendamentoId)
       .maybeSingle();
     if (error || !ag) {
@@ -483,14 +502,12 @@ function AtendimentoEditorPage() {
       if (!raw) return;
       const d = JSON.parse(raw) as {
         soap?: Soap;
-        transcricao?: string;
         cids?: Cid10[];
         presc?: ItemPrescricao[];
         exames?: string;
         em?: string;
       };
       if (d.soap) setSoap((s) => ({ ...s, ...d.soap }));
-      if (d.transcricao) setTranscricao(d.transcricao);
       if (d.cids) setCids(d.cids);
       if (d.presc) setPrescItens(d.presc);
       if (d.exames) setExamesTexto(d.exames);
@@ -505,7 +522,6 @@ function AtendimentoEditorPage() {
   useEffect(() => {
     if (!agendamentoId || !rascunhoRestaurado.current) return;
     const vazio =
-      !transcricao &&
       !examesTexto &&
       cids.length === 0 &&
       prescItens.length === 0 &&
@@ -518,7 +534,6 @@ function AtendimentoEditorPage() {
           draftKey,
           JSON.stringify({
             soap,
-            transcricao,
             cids,
             presc: prescItens,
             exames: examesTexto,
@@ -531,7 +546,7 @@ function AtendimentoEditorPage() {
       }
     }, 1200);
     return () => clearTimeout(t);
-  }, [soap, transcricao, cids, prescItens, examesTexto, agendamentoId, draftKey]);
+  }, [soap, cids, prescItens, examesTexto, agendamentoId, draftKey]);
 
   // Prescrição estruturada -> texto do prontuário.
   useEffect(() => {
@@ -591,137 +606,16 @@ function AtendimentoEditorPage() {
   const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
   const pacienteId = agendamento?.paciente_id ?? "";
   const pacienteNome = agendamento?.paciente_nome ?? "";
-
-  /**
-   * Reúne, num texto corrido, tudo que já está preenchido nesta tela para
-   * alimentar o apoio à decisão: sinais vitais da triagem, transcrição da
-   * consulta e os campos do prontuário.
-   *
-   * Não inclui nome, CPF nem data de nascimento do paciente — nada disso muda a
-   * análise clínica, e esse texto sai da clínica rumo ao provedor do modelo.
-   * Mandar identificação seria expor dado pessoal sem necessidade.
-   */
-  const montarContextoClinico = useCallback(() => {
-    const partes: string[] = [];
-    if (especialidade) partes.push(`Especialidade: ${especialidade}`);
-
-    if (triagem) {
-      const vitais = [
-        triagem.pa_sistolica && triagem.pa_diastolica
-          ? `PA ${triagem.pa_sistolica}/${triagem.pa_diastolica} mmHg`
-          : null,
-        triagem.freq_cardiaca ? `FC ${triagem.freq_cardiaca} bpm` : null,
-        triagem.temperatura ? `Tax ${triagem.temperatura} °C` : null,
-        triagem.saturacao ? `SatO2 ${triagem.saturacao}%` : null,
-        triagem.glicemia ? `Glicemia ${triagem.glicemia} mg/dL` : null,
-        triagem.peso_kg ? `Peso ${triagem.peso_kg} kg` : null,
-        triagem.altura_cm ? `Altura ${triagem.altura_cm} cm` : null,
-        triagem.imc ? `IMC ${triagem.imc}` : null,
-      ].filter(Boolean);
-      if (vitais.length) partes.push(`Triagem: ${vitais.join(", ")}`);
-      if (triagem.alergias) partes.push(`Alergias: ${triagem.alergias}`);
-      if (triagem.doencas?.length) partes.push(`Comorbidades: ${triagem.doencas.join(", ")}`);
-      if (triagem.medicamentos) partes.push(`Medicamentos em uso: ${triagem.medicamentos}`);
-    }
-
-    for (const [chave, rotulo] of SOAP_KEYS) {
-      const valor = soap[chave]?.trim();
-      if (valor) partes.push(`${rotulo}: ${valor}`);
-    }
-
-    const transcrito = transcricao.trim();
-    if (transcrito) partes.push(`Transcrição da consulta:\n${transcrito}`);
-
-    return partes.join("\n");
-  }, [especialidade, triagem, soap, transcricao]);
-
-  async function handleEstruturar(textoOverride?: string) {
-    const texto = (textoOverride ?? transcricao).trim();
-    if (!texto) {
-      toast.error("Grave ou cole a transcrição primeiro");
-      return;
-    }
-    setLoading("estruturar");
-    try {
-      const out = await comTempoLimite(
-        (signal) =>
-          estruturar({
-            data: {
-              transcricao: texto,
-              especialidade,
-              promptExtra: modelo?.prompt_ia ?? undefined,
-            },
-            signal,
-          }),
-        "A estruturação do prontuário",
-      );
-      const nextSoap = {
-        queixa_principal: out.queixa_principal || soap.queixa_principal,
-        historia_doenca: out.historia_doenca || soap.historia_doenca,
-        exame_fisico: out.exame_fisico || soap.exame_fisico,
-        hipotese_diagnostica: out.hipotese_diagnostica || soap.hipotese_diagnostica,
-        conduta: out.conduta || soap.conduta,
-        prescricao: out.prescricao || soap.prescricao,
-      };
-      setSoap(nextSoap);
-      if (out.prescricao) setPrescItens(textoParaPrescricao(out.prescricao));
-      toast.success("Prontuário preenchido como sugestão — revise antes de finalizar");
-      // Gera CIDs/exames/prescrição sugerida na sequência. Falha aqui não
-      // derruba o preenchimento que já deu certo — mas avisa, em vez de morrer
-      // só no console: sem isso o médico ficava sem as sugestões e sem motivo.
-      try {
-        const sug = await comTempoLimite(
-          (signal) => sugerir({ data: { ...nextSoap, especialidade }, signal }),
-          "A geração de sugestões",
-        );
-        setSugestoes(sug);
-      } catch (err) {
-        console.error("sugerir falhou", err);
-        toast.warning("Prontuário preenchido, mas não foi possível gerar as sugestões de CID.");
-      }
-    } catch (e) {
-      mostrarErro(e);
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function handleSugerir() {
-    setLoading("sugerir");
-    try {
-      const out = await comTempoLimite(
-        (signal) => sugerir({ data: { ...soap, especialidade }, signal }),
-        "A geração de sugestões",
-      );
-      setSugestoes(out);
-      toast.success("Sugestões geradas");
-    } catch (e) {
-      mostrarErro(e);
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function handleResumir() {
-    if (!pacienteId) {
-      toast.error("Paciente não identificado");
-      return;
-    }
-    setLoading("resumir");
-    try {
-      const out = await comTempoLimite(
-        (signal) => resumir({ data: { pacienteId }, signal }),
-        "O resumo do histórico",
-      );
-      setResumo(out.resumo);
-      setResumoOpen(true);
-      if (out.total === 0) toast.info("Sem prontuários anteriores");
-    } catch (e) {
-      mostrarErro(e);
-    } finally {
-      setLoading(null);
-    }
-  }
+  // Só usa a data de nascimento quando ela é comprovadamente deste paciente —
+  // a mesma trava dos documentos impressos.
+  const idadePaciente = paciente?.id === pacienteId ? idadeEmAnos(paciente?.data_nascimento) : null;
+  const formaAtendimento =
+    (agendamento?.tipo_atendimento ?? "").toLowerCase() === "convenio" ? "Convênio" : "Particular";
+  // Texto único do modo simplificado. Guardado no mesmo campo de história da
+  // doença atual do prontuário, que é onde a evolução da consulta é lida
+  // depois nas telas de histórico e no prontuário completo.
+  const evolucao = soap.historia_doenca;
+  const setEvolucao = (v: string) => setSoap((s) => ({ ...s, historia_doenca: v }));
 
   async function handleSalvar() {
     if (!podeEscrever) {
@@ -746,9 +640,27 @@ function AtendimentoEditorPage() {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
       return;
     }
+    // No modo simplificado nada é obrigatório — nem CID, nem prescrição —
+    // exceto a própria anotação. Concluir um atendimento sem uma linha sequer
+    // grava um prontuário em branco no histórico do paciente.
+    if (modoSimples && !soap.historia_doenca.trim()) {
+      toast.error("Escreva a evolução do atendimento antes de concluir.");
+      return;
+    }
     setLoading("salvar");
     try {
       const cid = clinicaAtual.clinica_id;
+      // As listas de prontuários mostram a queixa principal como resumo da
+      // consulta. No modo simplificado esse campo não é preenchido, e a
+      // consulta apareceria como "—" no histórico do paciente; então a
+      // primeira linha da anotação vira o resumo. Nada é sobrescrito: só
+      // entra quando o campo está vazio.
+      const primeiraLinha =
+        soap.historia_doenca
+          .split("\n")
+          .map((l) => l.trim())
+          .find(Boolean)
+          ?.slice(0, 120) ?? "";
       const campos = {
         clinica_id: cid,
         paciente_id: pacienteId,
@@ -757,13 +669,13 @@ function AtendimentoEditorPage() {
         // não tinham como ser distinguidas — nenhum campo ligava o
         // prontuário de volta ao agendamento que o originou.
         agendamento_id: agendamentoId,
-        queixa_principal: soap.queixa_principal || null,
+        queixa_principal: soap.queixa_principal || primeiraLinha || null,
         historia_doenca: soap.historia_doenca || null,
         exame_fisico: soap.exame_fisico || null,
         hipotese_diagnostica: soap.hipotese_diagnostica || null,
         conduta: soap.conduta || null,
         prescricao: soap.prescricao || null,
-        observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
+        observacoes: null,
       };
       // Uma consulta = um prontuário. Salvar de novo corrige o que já existe
       // em vez de criar outra linha: antes, cada clique gerava um registro
@@ -1030,6 +942,160 @@ function AtendimentoEditorPage() {
     );
   }
 
+  // ------------------------------------------------------------------
+  // Modo simplificado (padrão): a tela do atendimento cabe numa folha só —
+  // quem é o paciente, um campo de texto livre e o botão de concluir. Foi
+  // pedido por quem atende: dividir a consulta em queixa, história, exame
+  // físico, hipótese, CID e conduta é vocabulário de prontuário eletrônico,
+  // não de quem escreve a evolução como escrevia no papel. Nada some do
+  // sistema — "Prontuário completo" abre a versão com todos os blocos.
+  // ------------------------------------------------------------------
+  if (modoSimples) {
+    return (
+      <div className="space-y-4 p-1 max-w-3xl mx-auto">
+        {triagemIndisponivel && (
+          <Card className="border-destructive/50 bg-destructive/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <div className="font-semibold text-destructive">
+                  Triagem da enfermagem não carregou
+                </div>
+                <p className="text-sm text-foreground/80">
+                  Alergias e sinais vitais podem não estar sendo exibidos. Não considere que o
+                  paciente não tem alergias — recarregue a página antes de prescrever.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {pagamento && !pagamento.pago && (
+          <Card className="p-4 border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
+            <div className="flex items-start gap-3">
+              <HeartPulse className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-semibold text-amber-900 dark:text-amber-200">
+                  Pagamento pendente
+                </div>
+                <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                  Envie o paciente ao caixa. O atendimento só pode ser concluído depois da
+                  confirmação do pagamento.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Stethoscope className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold">Atendimento</h1>
+          </div>
+          <Button variant="outline" asChild>
+            <Link to={backTo}>
+              <ArrowLeft className="h-4 w-4" /> {backLabel}
+            </Link>
+          </Button>
+        </div>
+
+        {/* a) Dados do paciente */}
+        <Card className="p-4">
+          <div className="text-2xl font-semibold uppercase leading-tight">
+            {pacienteNome || "…"}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="secondary" className="text-[13px]">
+              {idadePaciente !== null ? `${idadePaciente} anos` : "Idade não informada"}
+            </Badge>
+            <Badge variant="secondary" className="text-[13px]">
+              {formaAtendimento}
+            </Badge>
+            {agendamento?.procedimento && (
+              <Badge variant="outline" className="text-[13px]">
+                {agendamento.procedimento}
+              </Badge>
+            )}
+          </div>
+          {medico?.nome && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              Profissional: <b className="text-foreground uppercase">{medico.nome}</b>
+            </div>
+          )}
+        </Card>
+
+        {/* Alergia é a única informação da triagem que não pode ficar escondida
+            atrás de nenhuma simplificação. */}
+        {triagem?.alergias && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <span className="font-semibold text-destructive uppercase text-[12px] tracking-wide">
+                Alergias (triagem)
+              </span>
+              <div className="text-foreground">{triagem.alergias}</div>
+            </div>
+          </div>
+        )}
+
+        {/* b) Campo único */}
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Label className="text-base">Evolução / Anotações do Atendimento</Label>
+            <span className="text-[12px] text-muted-foreground flex items-center gap-1">
+              {rascunhoEm ? (
+                <>
+                  <Cloud className="h-3.5 w-3.5 text-emerald-500" /> Rascunho salvo{" "}
+                  {rascunhoEm.toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </>
+              ) : (
+                <>
+                  <CloudOff className="h-3.5 w-3.5" /> Salvando rascunho sozinho
+                </>
+              )}
+            </span>
+          </div>
+          <Textarea
+            rows={16}
+            value={evolucao}
+            onChange={(e) => setEvolucao(e.target.value)}
+            placeholder="Escreva aqui o atendimento: o que o paciente relatou, o que foi examinado, o que foi orientado e o que foi prescrito."
+            className="text-base leading-relaxed"
+          />
+        </Card>
+
+        {/* c) Botão de concluir */}
+        <Button
+          size="lg"
+          className="w-full h-14 text-base"
+          onClick={handleSalvar}
+          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+        >
+          {loading === "salvar" ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" />
+          )}
+          Salvar e Concluir Atendimento
+        </Button>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => trocarModo(false)}
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Prontuário completo (receita, exames, atestado e CID)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 p-1">
       {/* Aviso fixo, não um toast: some da tela é justamente o que não pode
@@ -1096,45 +1162,17 @@ function AtendimentoEditorPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <Link to={backTo}>
-            <ArrowLeft className="h-4 w-4" /> {backLabel}
-          </Link>
-        </Button>
-      </div>
-
-      <Card className="p-4">
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResumir}
-            disabled={loading === "resumir" || !pacienteId}
-          >
-            {loading === "resumir" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <History className="h-4 w-4" />
-            )}
-            Resumir histórico
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => trocarModo(true)}>
+            Modo simplificado
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={backTo}>
+              <ArrowLeft className="h-4 w-4" /> {backLabel}
+            </Link>
           </Button>
         </div>
-        {resumo && (
-          <Collapsible open={resumoOpen} onOpenChange={setResumoOpen} className="mt-3">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2 text-primary" />
-                Resumo do histórico {resumoOpen ? "▲" : "▼"}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-                {resumo}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-      </Card>
+      </div>
 
       {triagem && (
         <Card className="p-4 space-y-3 border-rose-200/60 dark:border-rose-900/40">
@@ -1243,45 +1281,7 @@ function AtendimentoEditorPage() {
         </Card>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Stethoscope className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold">Transcrição da consulta</h2>
-            </div>
-            <VoiceInput
-              size="sm"
-              currentValue={transcricao}
-              onTranscript={(t) => {
-                setTranscricao(t);
-                void handleEstruturar(t);
-              }}
-              append
-              prompt="Transcreva fielmente a conversa entre médico e paciente em português do Brasil. Retorne apenas o texto, sem rótulos."
-              title="Gravar conversa — preenche o prontuário automaticamente"
-            />
-          </div>
-          <Textarea
-            rows={14}
-            value={transcricao}
-            onChange={(e) => setTranscricao(e.target.value)}
-            placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
-          />
-          <Button
-            onClick={() => handleEstruturar()}
-            disabled={loading === "estruturar"}
-            className="w-full"
-          >
-            {loading === "estruturar" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ListChecks className="h-4 w-4" />
-            )}
-            Estruturar prontuário
-          </Button>
-        </Card>
-
+      <div className="space-y-4">
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
@@ -1493,132 +1493,6 @@ function AtendimentoEditorPage() {
           </Tabs>
         </Card>
       </div>
-
-      <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <ClipboardCheck className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Apoio Clínico</h2>
-          <span className="text-[12px] text-muted-foreground">Sugestões sob julgamento médico</span>
-        </div>
-
-        {/* Duas frentes do mesmo apoio à decisão, lado a lado em vez de
-            espalhadas pela tela: sugestões estruturadas a partir do prontuário
-            já preenchido, e análise conversacional sobre a anamnese livre. */}
-        <Tabs defaultValue="sugestoes">
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="sugestoes" className="gap-1.5">
-              <ListChecks className="h-3.5 w-3.5" />
-              Sugestões estruturadas
-            </TabsTrigger>
-            <TabsTrigger value="analise" className="gap-1.5">
-              <MessagesSquare className="h-3.5 w-3.5" />
-              Análise do caso
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="sugestoes" className="space-y-3 pt-3">
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSugerir}
-                disabled={loading === "sugerir"}
-              >
-                {loading === "sugerir" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ListChecks className="h-4 w-4" />
-                )}
-                Sugerir CID, exames e prescrição
-              </Button>
-            </div>
-            {!sugestoes ? (
-              <p className="text-sm text-muted-foreground">
-                Preencha o prontuário e clique em "Sugerir" para receber propostas de CID, exames e
-                prescrição.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-xs uppercase text-muted-foreground">
-                    CIDs sugeridos (clique para adicionar)
-                  </Label>
-                  <div className="flex gap-2 flex-wrap mt-1">
-                    {sugestoes.cids.length === 0 && (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                    {sugestoes.cids.map((c, i) => (
-                      <Badge
-                        key={i}
-                        variant="secondary"
-                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                        onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}
-                      >
-                        {c.codigo} · {c.descricao}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs uppercase text-muted-foreground">
-                    Exames sugeridos
-                  </Label>
-                  <ul className="list-disc pl-5 text-sm space-y-0.5 mt-1">
-                    {sugestoes.exames.map((e, i) => (
-                      <li key={i}>{e}</li>
-                    ))}
-                  </ul>
-                  {sugestoes.exames.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() =>
-                        setSoap((s) => ({
-                          ...s,
-                          conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.`,
-                        }))
-                      }
-                    >
-                      Adicionar à conduta
-                    </Button>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs uppercase text-muted-foreground">
-                    Prescrição sugerida
-                  </Label>
-                  <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">
-                    {sugestoes.prescricao || "—"}
-                  </pre>
-                  {sugestoes.prescricao && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}
-                    >
-                      Usar como prescrição
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* forceMount: sem ele o Radix desmonta a aba inativa, e o médico
-              perderia a análise inteira só de olhar as sugestões estruturadas.
-              O `hidden` do próprio Radix cuida de esconder. */}
-          <TabsContent value="analise" forceMount className="pt-3 data-[state=inactive]:hidden">
-            <ApoioClinico
-              clinicaId={clinicaAtual?.clinica_id ?? null}
-              especialidade={especialidade}
-              montarContexto={montarContextoClinico}
-              habilitado={podeApoioClinico}
-            />
-          </TabsContent>
-        </Tabs>
-      </Card>
 
       <div className="flex justify-end gap-2 flex-wrap">
         <Button

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { lerSessaoEmCache } from "@/lib/sessao-cache";
 
 interface AuthContextValue {
   user: User | null;
@@ -11,22 +12,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Sessão guardada no navegador, já descartando token vencido — ver
+ * `src/lib/sessao-cache.ts`.
+ */
 function readCachedSession(): Session | null {
-  if (typeof window === "undefined") return null;
-  try {
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i);
-      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const cached = parsed?.currentSession ?? parsed;
-      if (cached?.access_token && cached?.user) return cached as Session;
-    }
-  } catch {
-    return null;
-  }
-  return null;
+  return lerSessaoEmCache();
 }
 
 /**

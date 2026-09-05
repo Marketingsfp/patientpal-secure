@@ -157,7 +157,11 @@ const GRUPOS_BASE: Grupo[] = [
   {
     label: "Inteligência",
     modulos: [
-      { key: "atendimento-ia", nome: "Atendimento médico", descricao: "Atendimento com IA" },
+      {
+        key: "atendimento-ia",
+        nome: "Atendimento médico",
+        descricao: "Fila do médico e prontuário",
+      },
       { key: "crm", nome: "CRM", descricao: "Oportunidades e leads" },
       {
         key: "alertas-enfermagem",

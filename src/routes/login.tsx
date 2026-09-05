@@ -6,6 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isMedicoOnlyUser } from "@/lib/medico-only";
+import { setSubsystem } from "@/lib/subsystem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,34 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
+/**
+ * O usuário só tem papel de médico?
+ *
+ * Falha de rede aqui não pode travar a entrada: em caso de erro respondemos
+ * "não sei" (false) e o usuário segue pelo caminho comum, em vez de ficar
+ * preso numa tela em branco.
+ */
+async function soMedicoSeguro(uid: string): Promise<boolean> {
+  try {
+    return await isMedicoOnlyUser(uid);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Manda o médico para a fila de atendimento e apaga o "portal" que estivesse
+ * escolhido no navegador daquele computador.
+ *
+ * O portal fica guardado por máquina, não por pessoa: se a última pessoa a
+ * usar aquele computador tinha entrado em "Funcionários / RH", o médico
+ * herdava esse contexto administrativo e o menu dele abria vazio.
+ */
+function entrarComoMedico() {
+  setSubsystem(null);
+  window.location.replace("/app/atendimento-ia");
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const { next } = Route.useSearch();
@@ -51,14 +80,14 @@ function LoginPage() {
   useEffect(() => {
     if (!authLoading && user) {
       (async () => {
-        const soMedico = await isMedicoOnlyUser(user.id);
+        const soMedico = await soMedicoSeguro(user.id);
         // Médico vai SEMPRE para a fila de atendimento, mesmo que a barra de
         // endereços trouxesse outro destino: o `next` costuma ser a última
         // tela aberta naquele computador (o RH, por exemplo), e o médico caía
         // direto num "Acesso negado" ao entrar. `replace` troca a página, sem
         // deixar o endereço antigo no histórico do navegador.
         if (soMedico) {
-          window.location.replace("/app/atendimento-ia");
+          entrarComoMedico();
           return;
         }
         if (next) {
@@ -81,10 +110,10 @@ function LoginPage() {
     }
     toast.success("Bem-vindo!");
     const uid = data.user?.id;
-    const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
+    const soMedico = uid ? await soMedicoSeguro(uid) : false;
     // Ver o comentário do efeito acima: o destino do médico não é negociável.
     if (soMedico) {
-      window.location.replace("/app/atendimento-ia");
+      entrarComoMedico();
       return;
     }
     if (next) {

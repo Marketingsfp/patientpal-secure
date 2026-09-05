@@ -31,7 +31,7 @@ export function usePermissoes(): {
   configured: Set<string> | null;
   loading: boolean;
 } {
-  const { clinicaAtual } = useClinica();
+  const { clinicaAtual, loading: clinicaCarregando } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const role = clinicaAtual?.role ?? null;
   // Começa fechado. `null` é reservado exclusivamente ao admin já identificado.
@@ -41,6 +41,15 @@ export function usePermissoes(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Enquanto a lista de clínicas do usuário não chegou, não existe perfil
+    // para consultar — e responder "nenhum módulo liberado" nesse instante
+    // fazia a tela mostrar "Acesso negado" a quem tem acesso. Em máquina que
+    // entra pela primeira vez (sem nada guardado no navegador) essa espera é
+    // justamente o começo do login, que é quando o médico reclamava do erro.
+    if (clinicaCarregando) {
+      setLoading(true);
+      return;
+    }
     if (!clinicaId || !role) {
       setAllowed(new Set());
       setNivel(new Map());
@@ -137,9 +146,9 @@ export function usePermissoes(): {
     return () => {
       cancelled = true;
     };
-  }, [clinicaId, role]);
+  }, [clinicaId, role, clinicaCarregando]);
 
-  return { allowed, nivel, configured, loading };
+  return { allowed, nivel, configured, loading: loading || clinicaCarregando };
 }
 
 /**
