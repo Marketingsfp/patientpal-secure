@@ -106,6 +106,7 @@ import {
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
+  obterConversa,
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
@@ -164,6 +165,7 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
@@ -224,6 +226,7 @@ export function AtendInbox() {
   const presencaFn = useServerFn(definirPresenca);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
+  const obterConversaFn = useServerFn(obterConversa);
   const { user } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
@@ -284,6 +287,16 @@ export function AtendInbox() {
     },
     [navigate],
   );
+  // Leitura do endereço dentro de callbacks, sem recriá-los a cada navegação.
+  const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
+  useEffect(() => {
+    conversaIdUrlRef.current = conversaIdUrl;
+  }, [conversaIdUrl]);
+  // Conversas já buscadas por link direto (evita repetir a busca em loop).
+  const deepLinkTentado = useRef<Set<string>>(new Set());
+  // Conversa aberta por link enquanto o filtro correspondente ainda carrega:
+  // ela não pode ser removida da tela por uma resposta do filtro antigo.
+  const deepLinkPendente = useRef<string | null>(null);
 
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
@@ -676,13 +689,19 @@ export function AtendInbox() {
       // A conversa aberta deixou de pertencer a este filtro (transferida,
       // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
       // hora — inclusive durante uma busca, onde a lista vem reduzida.
+      if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
+        deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
         selecionada: (sel as any) ?? null,
         linhas: rows as any,
         buscando: !!busca,
         ctx: ctxEscopo,
       });
-      if (removeu) {
+      if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
+        deepLinkPendente.current = null;
+      if (removeu && selIdRef.current === deepLinkPendente.current) {
+        // Link direto: aguarda a lista do filtro certo antes de decidir.
+      } else if (removeu) {
         const idFora = selIdRef.current!;
         cacheConversas.current.invalidar(idFora);
         setSel(null);
@@ -717,7 +736,20 @@ export function AtendInbox() {
       });
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
-      if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] as LinhaInbox }))
+      // Com uma conversa no endereço (F5, link colado, Voltar/Avançar), a
+      // tela nunca escolhe outra sozinha.
+      if (
+        devoAutoSelecionarComUrl({
+          conversaIdUrl: conversaIdUrlRef.current,
+          temSelecao: !!sel,
+          removeuAgora: removeu,
+          temPrimeiraLinha: devoAutoSelecionar({
+            temSelecao: !!sel,
+            removeuAgora: removeu,
+            primeiraLinha: rows[0] as LinhaInbox,
+          }),
+        })
+      )
         // A seleção automática também passa pela URL, para não existirem dois
         // estados divergentes (endereço x conversa aberta).
         abrirPelaUrl((rows[0] as any)?.id ?? null, true);
@@ -746,8 +778,46 @@ export function AtendInbox() {
     }
     if (selIdRef.current === conversaIdUrl) return;
     const c = convs.find((x: any) => x.id === conversaIdUrl);
-    if (c) setSel(c);
-  }, [conversaIdUrl, convs]);
+    if (c) {
+      setSel(c);
+      return;
+    }
+    // FASE 2 — F5 / link colado / Voltar-Avançar: a conversa do endereço pode
+    // não estar na lista do filtro atual. Buscamos ela pelo id e, se o usuário
+    // puder vê-la, o filtro acompanha. Sem permissão, volta para /app/nina.
+    if (!clinicaId || !meuId) return;
+    if (deepLinkTentado.current.has(conversaIdUrl)) return;
+    deepLinkTentado.current.add(conversaIdUrl);
+    const idPedido = conversaIdUrl;
+    void (async () => {
+      try {
+        const row: any = await obterConversaFn({ data: { clinicaId, conversaId: idPedido } });
+        if (conversaIdUrlRef.current !== idPedido) return;
+        if (!row) {
+          toast.error("Conversa não encontrada.");
+          abrirPelaUrl(null, true);
+          return;
+        }
+        const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
+        if (!destino) {
+          toast.error("Você não tem acesso a esta conversa.");
+          abrirPelaUrl(null, true);
+          return;
+        }
+        deepLinkTentado.current.delete(idPedido);
+        deepLinkPendente.current = destino !== escopo ? idPedido : null;
+        setSel(row);
+        setConvs((prev: any[]) =>
+          prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
+        );
+        if (destino !== escopo) setEscopo(destino);
+      } catch (e: any) {
+        if (conversaIdUrlRef.current !== idPedido) return;
+        mostrarErro(e);
+        abrirPelaUrl(null, true);
+      }
+    })();
+  }, [conversaIdUrl, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirPelaUrl]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
