@@ -121,6 +121,7 @@ import {
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
+import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
