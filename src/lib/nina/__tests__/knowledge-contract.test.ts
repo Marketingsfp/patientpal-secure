@@ -92,3 +92,14 @@ describe("Nível de raciocínio não muda a fonte", () => {
     expect(r.instrucao).toMatch(/pedido médico/i);
   });
 });
+
+describe("Preço vindo como texto da planilha", () => {
+  it("detecta conflito mesmo quando o valor chega como texto", () => {
+    const registros = [
+      reg({ id: "a", preco_dinheiro: "250,00" as unknown as number }),
+      reg({ id: "b", preco_dinheiro: "R$ 1.320,00" as unknown as number }),
+    ];
+    const r = montarResultadoConhecimento({ registros });
+    expect(r.knowledge_status).toBe("conflict");
+  });
+});

@@ -14,7 +14,7 @@ import { chaveIdempotencia, validarResultado } from "../src/lib/nina/tool-broker
 import { classificarErro, decidirRetry } from "../src/lib/nina/erros";
 
 const MODELO = process.env["NINA_MODELO_HOMOLOG"] ?? "google/gemini-3.7-flash";
-const CLINICA = "homologacao";
+const CLINICA: string | null = null; // homologação: fora de qualquer clínica real
 
 type Caso = { id: string; msg: string; esperado: NivelRaciocinio };
 
