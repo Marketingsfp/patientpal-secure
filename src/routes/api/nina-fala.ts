@@ -162,8 +162,19 @@ export const Route = createFileRoute("/api/nina-fala")({
               );
               const { modeloNinaParaClinica } = await import("@/lib/nina/modelo-flag.server");
               const { modelo } = await modeloNinaParaClinica(body.clinicaId, "voz");
+              // Reasoning Router (Fase 2): a voz também escolhe o nível por
+              // requisição — política única, sem `if` novo aqui.
+              const { selectThinkingLevel, rotuloDebug } = await import(
+                "@/lib/nina/reasoning-router"
+              );
+              const ultimaFala =
+                [...body.messages].reverse().find((m: { role: string }) => m.role === "user")
+                  ?.content ?? "";
+              const { nivel } = selectThinkingLevel({ mensagem: String(ultimaFala) });
+              console.info("[nina-ai-gateway]", rotuloDebug(modelo, nivel), "| voz");
               const stream0 = await chamarModeloGeminiStream({
                 modelo,
+                reasoning: nivel,
                 maxTokens: 220,
                 messages: [{ role: "system", content: systemPrompt }, ...body.messages],
               });
