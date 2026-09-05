@@ -19,6 +19,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Stethoscope,
+  Wrench,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,17 @@ import {
   consultarBaseFeedbackNina,
   salvarDiagnosticoFeedbackNina,
 } from "@/lib/nina/feedback-diagnostico.functions";
+import {
+  ROTULO_ACAO,
+  ROTULO_CAMADA,
+  type PlanoCorrecao,
+} from "@/lib/nina/feedback-aplicacao";
+import {
+  aplicarFeedbackNina,
+  concluirAcaoFeedbackNina,
+  listarAcoesFeedbackNina,
+  prepararAplicacaoFeedbackNina,
+} from "@/lib/nina/feedback-aplicacao.functions";
 
 export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
   head: () => ({
@@ -134,7 +146,41 @@ const ABAS = [
   { valor: "under_review", rotulo: "Em revisão" },
   { valor: "approved", rotulo: "Aprovados" },
   { valor: "rejected", rotulo: "Rejeitados" },
+  { valor: "applied", rotulo: "Aplicados" },
 ] as const;
+
+type Preparo = {
+  plano: PlanoCorrecao;
+  atual: string | null;
+  novo: string;
+  knowledge_status: string;
+  base_version: number | null;
+  ja_na_base: boolean;
+  status: string;
+  acoes: {
+    id: string;
+    tipo: string;
+    camada: string;
+    titulo: string;
+    instrucao: string;
+    status: string;
+    created_at: string;
+    concluido_em: string | null;
+  }[];
+};
+
+type AcaoTecnica = {
+  id: string;
+  feedback_id: string;
+  camada: string;
+  tipo: string;
+  titulo: string;
+  instrucao: string;
+  valor_atual: string | null;
+  valor_novo: string | null;
+  status: string;
+  created_at: string;
+};
 
 function fmtData(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -171,6 +217,13 @@ function Pagina() {
   const [causaEscolhida, setCausaEscolhida] = useState("");
   const [prioridadeEscolhida, setPrioridadeEscolhida] = useState("");
   const [assunto, setAssunto] = useState("");
+  const [aplicando, setAplicando] = useState<Item | null>(null);
+  const [preparo, setPreparo] = useState<Preparo | null>(null);
+  const [preparando, setPreparando] = useState(false);
+  const [confirmado, setConfirmado] = useState(false);
+  const [reindexar, setReindexar] = useState(false);
+  const [obsAplicacao, setObsAplicacao] = useState("");
+  const [acoesAbertas, setAcoesAbertas] = useState<AcaoTecnica[]>([]);
 
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
@@ -180,6 +233,10 @@ function Pagina() {
   const lerConversa = useServerFn(lerConversaFeedbackNina);
   const consultarBase = useServerFn(consultarBaseFeedbackNina);
   const salvarDiagnostico = useServerFn(salvarDiagnosticoFeedbackNina);
+  const prepararAplicacao = useServerFn(prepararAplicacaoFeedbackNina);
+  const aplicarCorrecao = useServerFn(aplicarFeedbackNina);
+  const concluirAcao = useServerFn(concluirAcaoFeedbackNina);
+  const listarAcoes = useServerFn(listarAcoesFeedbackNina);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -359,6 +416,79 @@ function Pagina() {
       );
       setDiagnosticando(null);
       await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const carregarAcoes = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const r = await listarAcoes({ data: { clinicaId, status: "open" } });
+      setAcoesAbertas(r as unknown as AcaoTecnica[]);
+    } catch {
+      /* silencioso: painel auxiliar */
+    }
+  }, [clinicaId, listarAcoes]);
+
+  useEffect(() => {
+    void carregarAcoes();
+  }, [carregarAcoes]);
+
+  const abrirAplicacao = async (item: Item) => {
+    if (!clinicaId) return;
+    setAplicando(item);
+    setPreparo(null);
+    setConfirmado(false);
+    setReindexar(false);
+    setObsAplicacao("");
+    setPreparando(true);
+    try {
+      const r = await prepararAplicacao({ data: { id: item.id, clinicaId } });
+      setPreparo(r as unknown as Preparo);
+    } catch (e) {
+      mostrarErro(e);
+      setAplicando(null);
+    } finally {
+      setPreparando(false);
+    }
+  };
+
+  const confirmarAplicacao = async () => {
+    if (!aplicando || !clinicaId || !confirmado) return;
+    setSalvando(true);
+    try {
+      const r = await aplicarCorrecao({
+        data: {
+          id: aplicando.id,
+          clinicaId,
+          confirmado: true,
+          observacao: obsAplicacao.trim() || null,
+          reindexar,
+        },
+      });
+      if (r.aplicado) toast.success("Correção aplicada e verificada na Base.");
+      else toast.info(r.pendencia ?? "Ação registrada.");
+      setAplicando(null);
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const finalizarAcao = async (acaoId: string, resultado: "done" | "canceled") => {
+    if (!clinicaId) return;
+    setSalvando(true);
+    try {
+      await concluirAcao({ data: { acaoId, clinicaId, resultado, observacao: null } });
+      toast.success(
+        resultado === "done" ? "Ação concluída. Feedback marcado como aplicado." : "Ação cancelada.",
+      );
+      await Promise.all([carregar(), carregarAcoes()]);
     } catch (e) {
       mostrarErro(e);
     } finally {
@@ -642,6 +772,21 @@ function Pagina() {
                         >
                           <X className="mr-1 h-4 w-4" aria-hidden="true" /> Rejeitar
                         </Button>
+                        {it.status === "approved" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={salvando || !it.root_cause}
+                            title={
+                              it.root_cause
+                                ? "Aplicar na camada responsável"
+                                : "Diagnostique a causa antes de aplicar"
+                            }
+                            onClick={() => void abrirAplicacao(it)}
+                          >
+                            <Wrench className="mr-1 h-4 w-4" aria-hidden="true" /> Aplicar correção
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
@@ -651,6 +796,169 @@ function Pagina() {
           ))}
         </ul>
       )}
+
+      {/* Ações técnicas em aberto */}
+      {podeRevisar && acoesAbertas.length > 0 && (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-sm font-semibold">
+              Ações de correção em aberto ({acoesAbertas.length})
+            </h2>
+            <ul className="space-y-2">
+              {acoesAbertas.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">
+                        {ROTULO_CAMADA[a.camada as keyof typeof ROTULO_CAMADA] ?? a.camada}
+                      </Badge>
+                      <Badge variant="secondary">
+                        {ROTULO_ACAO[a.tipo as keyof typeof ROTULO_ACAO] ?? a.tipo}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{fmtData(a.created_at)}</span>
+                    </div>
+                    <p className="mt-1 text-sm font-medium">{a.titulo}</p>
+                    <p className="text-xs text-muted-foreground">{a.instrucao}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={salvando}
+                      onClick={() => void finalizarAcao(a.id, "done")}
+                    >
+                      Concluir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={salvando}
+                      onClick={() => void finalizarAcao(a.id, "canceled")}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Aplicar correção */}
+      <Dialog open={!!aplicando} onOpenChange={(o) => !o && setAplicando(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Aplicar a correção aprovada</DialogTitle>
+            <DialogDescription>
+              A correção é direcionada para a camada responsável pelo erro. Confira{" "}
+              <strong>Atual</strong> e <strong>Novo</strong> antes de confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {preparando || !preparo ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Consultando a Base…
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{ROTULO_CAMADA[preparo.plano.camada]}</Badge>
+                <Badge variant="secondary">{ROTULO_ACAO[preparo.plano.tipo]}</Badge>
+                {preparo.base_version ? (
+                  <Badge variant="outline">Base versão {preparo.base_version}</Badge>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium">{preparo.plano.titulo}</p>
+                <p className="text-xs text-muted-foreground">{preparo.plano.instrucao}</p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Atual (na Base hoje)</Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                    {preparo.atual ?? "Nada encontrado na Base para esta pergunta."}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Novo (correção aprovada)</Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-primary/40 bg-primary/5 p-2 text-xs">
+                    {preparo.novo}
+                  </div>
+                </div>
+              </div>
+
+              <ul className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                {preparo.plano.avisos.map((av) => (
+                  <li key={av} className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>{av}</span>
+                  </li>
+                ))}
+                {preparo.plano.exigeReenvioPlanilha && !preparo.ja_na_base && (
+                  <li className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>
+                      A versão ativa ainda não contém esta informação. Ao confirmar, fica registrada
+                      a pendência de corrigir o arquivo oficial e reenviar pela Base de
+                      Conhecimentos — o registro só será marcado como aplicado depois disso.
+                    </span>
+                  </li>
+                )}
+              </ul>
+
+              {preparo.plano.permiteReindexar && (
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={reindexar}
+                    onChange={(e) => setReindexar(e.target.checked)}
+                  />
+                  Reprocessar a versão ativa (chunks, embeddings, índices e cache) a partir do
+                  arquivo oficial.
+                </label>
+              )}
+
+              <div>
+                <Label htmlFor="obs-aplicacao">Observação interna (opcional)</Label>
+                <Textarea
+                  id="obs-aplicacao"
+                  className="mt-1"
+                  rows={2}
+                  value={obsAplicacao}
+                  onChange={(e) => setObsAplicacao(e.target.value)}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={confirmado}
+                  onChange={(e) => setConfirmado(e.target.checked)}
+                />
+                Confirmo a mudança de <strong>Atual</strong> para <strong>Novo</strong> na camada
+                indicada.
+              </label>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAplicando(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvando || preparando || !preparo || !confirmado}
+              onClick={() => void confirmarAplicacao()}
+            >
+              Confirmar aplicação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diagnosticar causa */}
       <Dialog open={!!diagnosticando} onOpenChange={(o) => !o && setDiagnosticando(null)}>
