@@ -69,16 +69,13 @@ export function textoEvento(ev: ConversaEvento): string {
 }
 
 export function ConversationSystemEvent({ evento }: { evento: ConversaEvento }) {
-  const hora = new Date(evento.created_at).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const hora = formatarDataHoraMensagem(evento.created_at);
   return (
     <div className="my-2 flex justify-center px-2">
       <div className="max-w-[90%] rounded-full border border-border/60 bg-muted/60 px-3 py-1 text-center text-[11px] leading-tight text-muted-foreground sm:text-xs">
         <span>{textoEvento(evento)}</span>
         {evento.motivo ? <span className="opacity-80"> — {evento.motivo}</span> : null}
-        <span className="ml-1 opacity-60">{hora}</span>
+        {hora ? <span className="ml-1 whitespace-nowrap opacity-60">{hora}</span> : null}
       </div>
     </div>
   );
