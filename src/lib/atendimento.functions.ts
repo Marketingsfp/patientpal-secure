@@ -1616,6 +1616,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       agendamentos,
       contratos,
       atribuido_nome: atribuidoProfile?.nome ?? null,
+      contato_via: contatoVia,
     };
   });
 
