@@ -1273,7 +1273,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
-      .select("id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id")
+      .select(
+        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status",
+      )
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
@@ -1282,6 +1284,43 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
+    // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
+    if (conv.status === "closed")
+      throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
+    if (conv.atribuida_user_id && conv.atribuida_user_id !== context.userId)
+      throw new Error(
+        "Esta conversa está sendo atendida por outra pessoa. Use “Assumir conversa” para responder.",
+      );
+    if (!conv.atribuida_user_id) {
+      // Conversa livre: quem responde primeiro vira responsável, de forma atômica.
+      const { data: claim, error: claimErr } = await context.supabase
+        .from("atend_conversas")
+        .update({
+          atribuida_user_id: context.userId,
+          status: "active",
+          owner_type: "HUMAN",
+          ai_enabled: false,
+          assigned_at: new Date().toISOString(),
+          atribuicao_origem: "resposta_direta",
+        })
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId)
+        .is("atribuida_user_id", null)
+        .neq("status", "closed")
+        .select("id");
+      if (claimErr) throw new Error(claimErr.message);
+      if (!claim || claim.length === 0)
+        throw new Error(
+          "Outra pessoa assumiu esta conversa agora. Sua mensagem não foi enviada.",
+        );
+      await registrarEventoConversa(context.supabase, {
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        evento: "ASSUMIDA",
+        userId: context.userId,
+      });
+    }
+
 
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
