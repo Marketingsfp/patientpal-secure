@@ -1296,6 +1296,9 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         conversaId: z.string().uuid(),
         limit: z.number().int().min(1).max(500).default(200),
+        // Cursor da paginação: busca apenas mensagens ANTERIORES a este
+        // instante (usado ao rolar para cima em conversas longas).
+        antesDe: z.string().min(1).optional(),
       })
       .parse(i),
   )
@@ -1303,18 +1306,21 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     // Pega as mensagens MAIS RECENTES (descendente) e reordena para exibição.
     // Antes o limite cortava pelo começo e a conversa ficava parada no passado.
-    const { data: rows, error } = await context.supabase
+    let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
         "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status",
       )
       .eq("clinica_id", data.clinicaId)
-      .eq("conversa_id", data.conversaId)
+      .eq("conversa_id", data.conversaId);
+    if (data.antesDe) q = q.lt("recebida_em", data.antesDe);
+    const { data: rows, error } = await q
       .order("recebida_em", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
     return (rows ?? []).slice().reverse();
   });
+
 
 export const enviarMensagemConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
