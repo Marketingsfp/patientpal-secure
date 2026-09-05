@@ -268,7 +268,7 @@ export const fecharConversa = createServerFn({ method: "POST" })
     // Só o responsável atual encerra (evita encerrar atendimento de outra pessoa).
     const { data: dono } = await context.supabase
       .from("atend_conversas")
-      .select("atribuida_user_id, nina_fluxo_estado")
+      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
@@ -289,6 +289,14 @@ export const fecharConversa = createServerFn({ method: "POST" })
     const estadoEncerrado = encerrarEstadosTransacionais(
       normalizarEstado((dono as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null),
     );
+    const agoraISO = new Date().toISOString();
+    // Histórico: guarda quem atendeu por último, mas SEM manter essa pessoa
+    // como responsável ativo da próxima sessão (atribuida_user_id = null).
+    const ultimoAtendente =
+      (dono as { atribuida_user_id?: string | null; last_assigned_user_id?: string | null } | null)
+        ?.atribuida_user_id ??
+      (dono as { last_assigned_user_id?: string | null } | null)?.last_assigned_user_id ??
+      context.userId;
     const { error } = await context.supabase
       .from("atend_conversas")
       .update({
@@ -296,19 +304,18 @@ export const fecharConversa = createServerFn({ method: "POST" })
         owner_type: "AI",
         ai_enabled: true,
         atribuida_user_id: null,
-        resolved_at: new Date().toISOString(),
-        closed_at: new Date().toISOString(),
+        last_assigned_user_id: ultimoAtendente,
+        resolved_by: context.userId,
+        resolved_at: agoraISO,
+        closed_at: agoraISO,
         protocol_number: prot as string,
         nina_fluxo_estado: {
           ...estadoEncerrado,
-          updated_at: new Date().toISOString(),
+          updated_at: agoraISO,
         } as never,
         handoff_resumo: null,
         handoff_motivo: null,
-
-
-
-      })
+      } as never)
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
@@ -317,8 +324,14 @@ export const fecharConversa = createServerFn({ method: "POST" })
       conversaId: data.conversaId,
       evento: "FINALIZADA",
       userId: context.userId,
-      detalhes: { protocolo: prot as string },
+      detalhes: {
+        protocolo: prot as string,
+        resolvido_por: context.userId,
+        resolvido_em: agoraISO,
+        ultimo_atendente: ultimoAtendente,
+      },
     });
+
     return { ok: true, protocol: prot as string };
   });
 
