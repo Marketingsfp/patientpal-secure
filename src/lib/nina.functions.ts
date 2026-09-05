@@ -190,6 +190,10 @@ export const chatNina = createServerFn({ method: "POST" })
 
     // Até 6 rodadas: a Nina consulta/executa ferramentas e volta com a resposta.
     const MAX_RODADAS = data.modoVoz ? 3 : 6;
+    // Estado do turno para o Reasoning Router (Fase 2).
+    const nomesFerramentas: string[] = [];
+    let houveConflito = false;
+    let nivelAnterior: "low" | "medium" | "high" | undefined;
     for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
       // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
       const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
@@ -199,7 +203,17 @@ export const chatNina = createServerFn({ method: "POST" })
         messages: historico as any,
         tools: FERRAMENTAS_NINA,
         ...(data.modoVoz ? { maxTokens: 220 } : {}),
+        raciocinio: {
+          mensagem: ultimaPergunta,
+          rodada,
+          temFerramentas: true,
+          ferramentasExecutadas: nomesFerramentas.length,
+          nomesFerramentas,
+          houveConflito,
+          ...(nivelAnterior ? { nivelAnterior } : {}),
+        },
       });
+      nivelAnterior = resposta.nivel;
 
       if (!resposta.ok) {
         return { reply: "", error: resposta.erro ?? "Falha na resposta da Nina" };
@@ -224,6 +238,11 @@ export const chatNina = createServerFn({ method: "POST" })
           );
         } catch (e) {
           resultado = { erro: e instanceof Error ? e.message : "falha na ferramenta" };
+          houveConflito = true;
+        }
+        nomesFerramentas.push(c.function?.name ?? "");
+        if (resultado && typeof resultado === "object" && "erro" in (resultado as object)) {
+          houveConflito = true;
         }
         historico.push({
           role: "tool",
