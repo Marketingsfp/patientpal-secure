@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { mensagemErroGateway } from "../adapters/gemini-adapter.server";
 import {
-  FLAG_NINA_GEMINI_38,
+  FLAG_NINA_GEMINI,
   MODELO_ALVO_DISPONIVEL,
   MODELO_ATUAL,
   MODELO_NINA_ALVO,
@@ -9,15 +9,15 @@ import {
 
 describe("Nina AI Gateway — modelo e flag", () => {
   it("mantém o nome da flag combinada com o time", () => {
-    expect(FLAG_NINA_GEMINI_38).toBe("nina_gemini_38_enabled");
+    expect(FLAG_NINA_GEMINI).toBe("nina_gemini_37_enabled");
   });
 
   it("não inventa model id: usa exatamente o pedido", () => {
-    expect(MODELO_NINA_ALVO).toBe("google/gemini-3.8-flash");
+    expect(MODELO_NINA_ALVO).toBe("google/gemini-3.7-flash");
   });
 
-  it("registra que o modelo alvo ainda não está publicado pelo provedor", () => {
-    expect(MODELO_ALVO_DISPONIVEL).toBe(false);
+  it("registra que o modelo alvo está publicado pelo provedor", () => {
+    expect(MODELO_ALVO_DISPONIVEL).toBe(true);
   });
 
   it("preserva os modelos atuais por perfil (rollback imediato)", () => {
