@@ -801,7 +801,30 @@ export async function gerarRespostaNina(
     String(nomeUnidade)
       .split(/\s+[—–-]\s+/)[0]
       ?.trim() || nomeUnidade;
-  const jaSeApresentou = msgsMemoria.some((m: any) => m.direction === "out");
+  // REGRA ESTRUTURAL: a apresentação completa da Nina é obrigatória na
+  // PRIMEIRA resposta de cada sessão operacional (conversa nova, sessão
+  // expirada por TTL ou conversa resolvida que voltou a receber mensagem).
+  // Não depende do modelo lembrar: o estado manda.
+  const { garantirSessaoAtiva, aplicarSaudacaoObrigatoria, marcarSaudacaoConcluida } =
+    await import("@/lib/nina/saudacao-sessao");
+  const inicioSessaoTs = Date.parse(String(sessaoNina.estado.session_started_at ?? ""));
+  const jaRespondeuNestaSessao = msgsMemoria.some((m: any) => {
+    if (m.direction !== "out") return false;
+    const t = Date.parse(String(m?.created_at ?? ""));
+    if (!Number.isFinite(inicioSessaoTs)) return true;
+    return Number.isFinite(t) ? t >= inicioSessaoTs : false;
+  });
+  const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado, { jaRespondeuNestaSessao });
+  sessaoNina.estado = sessaoSaudacao.estado;
+  const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
+  const jaSeApresentou = !saudacaoObrigatoria;
+  console.info("[NINA_SESSION]", {
+    conversa_id: estadoId.conversaId,
+    nina_session_id: sessaoNina.estado.session_id,
+    new_session: sessaoSaudacao.novaSessao || sessaoNina.expirou,
+    greeting_required: saudacaoObrigatoria,
+    greeting_completed: sessaoNina.estado.greeting_completed === true,
+  });
   const dadosPublicos = [
     `Nome oficial: ${nomeUnidade}`,
     enderecoUnidade ? `Endereço: ${enderecoUnidade}` : null,
@@ -1325,6 +1348,22 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   if (!resposta) {
     resposta =
       "Consegui iniciar aqui, mas preciso de um instante — vou pedir para uma atendente concluir com você.";
+  }
+
+  // Validação estrutural da saudação: se esta é a primeira resposta da sessão
+  // e o texto gerado não trouxe todos os elementos obrigatórios (saudação +
+  // Nina + assistente virtual + unidade + abertura), a apresentação é
+  // acrescentada aqui, antes de a mensagem sair.
+  if (saudacaoObrigatoria) {
+    resposta = aplicarSaudacaoObrigatoria(resposta, nomeCurtoUnidade);
+    const estadoComSaudacao = marcarSaudacaoConcluida(fluxoEstado);
+    fluxoEstado.greeting_completed = true;
+    await salvarFluxoEstado(
+      supabaseAdmin as never,
+      clinicaId,
+      estadoId.conversaId,
+      estadoComSaudacao,
+    );
   }
 
   // Se a resposta pediu confirmação de identidade, marca na conversa para não repetir.

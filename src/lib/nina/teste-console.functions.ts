@@ -579,6 +579,12 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
       slot_confirmed_by_patient: estado.appointment.slot_confirmed_by_patient,
       appointment_id: estado.appointment.appointment_id,
       current_flow_stage: estado.flow.stage,
+      // Sessão da Nina (QA): permite ver por que a apresentação ocorreu ou não.
+      nina_session_id: estado.session_id ?? null,
+      new_session: !estado.session_id,
+      greeting_required: estado.greeting_completed !== true,
+      greeting_completed: estado.greeting_completed === true,
+      conversation_state: estado.flow.stage,
       tool_called: ultima?.ferramenta ?? null,
       tool_result: ultima ? (ultima.ok ? "ok" : (ultima.erro ?? "erro")) : null,
       updated_at: estado.updated_at,
