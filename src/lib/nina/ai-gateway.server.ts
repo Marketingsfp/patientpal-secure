@@ -22,6 +22,13 @@ import {
   type OpcoesChamada,
 } from "./adapters/gemini-adapter.server";
 import { modeloNinaParaClinica, type ResolucaoModelo } from "./modelo-flag.server";
+import {
+  selectThinkingLevel,
+  nivelNaoRegride,
+  rotuloDebug,
+  type ContextoRaciocinio,
+  type NivelRaciocinio,
+} from "./reasoning-router";
 
 export type { ChatMensagem, RespostaChat };
 
@@ -36,9 +43,23 @@ export type PedidoNina = {
   maxTokens?: number;
   /** Sobrescreve o modelo (uso pontual, ex.: rotinas administrativas). */
   modeloForcado?: string;
+  /**
+   * Fase 2 — contexto desta REQUISIÇÃO/ETAPA para o Reasoning Router decidir
+   * entre LOW/MEDIUM/HIGH. Sem isso, o gateway usa LOW (padrão econômico).
+   */
+  raciocinio?: ContextoRaciocinio;
+  /** Força o nível (uso interno de teste). Ignora o router. */
+  nivelForcado?: NivelRaciocinio;
 };
 
-export type RespostaNina = RespostaChat & { modelo: string; resolucao: ResolucaoModelo };
+export type RespostaNina = RespostaChat & {
+  modelo: string;
+  resolucao: ResolucaoModelo;
+  /** Nível efetivamente usado nesta etapa. */
+  nivel: NivelRaciocinio;
+  /** Etiqueta interna de homologação. NUNCA enviar ao paciente. */
+  debug: string;
+};
 
 /**
  * Ponto ÚNICO de chamada do modelo pela Nina.
@@ -49,13 +70,26 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
     ? ({ modelo: pedido.modeloForcado, origem: "forcado", flagAtiva: false } as ResolucaoModelo)
     : await modeloNinaParaClinica(pedido.clinicaId, pedido.perfil);
 
+  // ---- Reasoning Router: política única, decidida por requisição/etapa.
+  const decisao = pedido.raciocinio
+    ? selectThinkingLevel(pedido.raciocinio)
+    : { nivel: "low" as NivelRaciocinio, motivo: "sem contexto: padrão LOW" };
+  const nivel =
+    pedido.nivelForcado ??
+    nivelNaoRegride(decisao.nivel, pedido.raciocinio?.nivelAnterior);
+
   const opcoes: OpcoesChamada = {
     modelo: resolucao.modelo,
     messages: pedido.messages,
     tools: pedido.tools,
     maxTokens: pedido.maxTokens,
+    reasoning: nivel,
   };
 
+  const debug = rotuloDebug(resolucao.modelo, nivel);
+  // Visível só no log do servidor (homologação/produção interna).
+  console.info("[nina-ai-gateway]", debug, "|", decisao.motivo);
+
   const resposta = await chamarModeloGemini(opcoes);
-  return { ...resposta, modelo: resolucao.modelo, resolucao };
+  return { ...resposta, modelo: resolucao.modelo, resolucao, nivel, debug };
 }
