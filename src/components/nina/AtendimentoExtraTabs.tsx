@@ -185,6 +185,13 @@ export function AtendInbox() {
   const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
   const [notas, setNotas] = useState<any[]>([]);
+  // Id da conversa a que o conteúdo carregado pertence. A tela central só
+  // renderiza mensagens/contato/notas/eventos quando este id é exatamente o
+  // da conversa selecionada.
+  const [conversaCarregadaId, setConversaCarregadaId] = useState<string | null>(null);
+  const selIdRef = useRef<string | null>(null);
+  selIdRef.current = sel?.id ?? null;
+  const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
@@ -583,6 +590,15 @@ export function AtendInbox() {
       setSel((s: any) => ({ ...s, ...atual }));
     }
   }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
+  // Troca de conversa: o conteúdo do lead anterior sai da tela na mesma hora.
+  useEffect(() => {
+    setConversaCarregadaId(null);
+    setMsgs([]);
+    setEventos([]);
+    setContato(null);
+    setNotas([]);
+  }, [sel?.id]);
+
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
