@@ -1549,23 +1549,26 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     let contratos: any[] = [];
     const pendencias: any = null;
 
-    if (conv.contato_paciente_id) {
-      const { data: p } = await context.supabase
-        .from("pacientes")
-        .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
-        .eq("id", conv.contato_paciente_id)
-        .single();
-      paciente = p;
-    } else if (conv.contato_telefone) {
-      const digits = conv.contato_telefone.replace(/\D/g, "");
-      const { data: p } = await context.supabase
-        .from("pacientes")
-        .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
-        .eq("clinica_id", data.clinicaId)
-        .ilike("telefone", `%${digits.slice(-8)}%`)
-        .limit(1)
-        .maybeSingle();
-      paciente = p;
+    // Fase 2: o vínculo direto (`contato_paciente_id`) é a referência
+    // principal. Só quando ele não existe é que buscamos pelo telefone
+    // normalizado — e, achando, gravamos o vínculo para não repetir.
+    {
+      const { resolverContatoConversa } = await import("./atendimento/vinculo-contato.server");
+      const resolvido = await resolverContatoConversa(context.supabase, {
+        clinicaId: data.clinicaId,
+        conversaId: data.conversaId,
+        contatoPacienteId: conv.contato_paciente_id ?? null,
+        contatoTelefone: conv.contato_telefone ?? null,
+      });
+      if (resolvido.pacienteId) {
+        const { data: p } = await context.supabase
+          .from("pacientes")
+          .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
+          .eq("id", resolvido.pacienteId)
+          .maybeSingle();
+        paciente = p;
+        if (resolvido.vinculado) (conv as any).contato_paciente_id = resolvido.pacienteId;
+      }
     }
 
     if (paciente?.id) {
