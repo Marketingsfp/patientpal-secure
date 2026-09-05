@@ -998,12 +998,30 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
+  // FASE 4: vaga vem só da agenda real; escolha de horário não confirma;
+  // resumo final obrigatório antes de gravar o agendamento.
+  const blocoFase4 = await (async () => {
+    try {
+      const { flagFluxoFase4Ativa } = await import("@/lib/nina/atendimento-fase4.server");
+      if (!(await flagFluxoFase4Ativa(clinicaId))) return "";
+      const { blocoPromptFase4 } = await import("@/lib/nina/atendimento-fase4");
+      return blocoPromptFase4({
+        mensagem: mensagemPaciente,
+        estado: fluxoEstado,
+        nomeUnidade,
+      });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
     blocoKb,
     blocoFase2,
     blocoFase3,
+    blocoFase4,
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
