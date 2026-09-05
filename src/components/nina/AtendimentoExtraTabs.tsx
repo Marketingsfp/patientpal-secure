@@ -90,6 +90,7 @@ import {
   esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
@@ -181,6 +182,7 @@ export function AtendInbox() {
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [agendaOpen, setAgendaOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
   const [fecharOpen, setFecharOpen] = useState(false);
   // Começa fechada: só entra em "online" depois de ler o status real gravado,
@@ -918,20 +920,11 @@ export function AtendInbox() {
                       size="sm"
                       variant="default"
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
-                      onClick={() => {
-                        const params = new URLSearchParams();
-                        params.set("novo", "1");
-                        const pacId = contato?.paciente?.id;
-                        const pacNome = contato?.paciente?.nome || sel.contato_nome || "";
-                        const tel = sel.contato_telefone || contato?.paciente?.telefone || "";
-                        if (pacId) params.set("novoPacId", pacId);
-                        if (pacNome) params.set("novoPacNome", pacNome);
-                        if (tel) params.set("novoTelefone", tel);
-                        window.location.assign(`/app/agenda?${params.toString()}`);
-                      }}
+                      onClick={() => setAgendaOpen(true)}
                     >
                       <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
                     </Button>
+
                     {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
                     <Button
@@ -1211,7 +1204,22 @@ export function AtendInbox() {
           </div>
         </Card>
 
+        {/* Agenda dentro da conversa: não troca de tela nem perde o rascunho. */}
+        {clinicaId && sel && (
+          <AgendaConversaDrawer
+            open={agendaOpen}
+            onOpenChange={setAgendaOpen}
+            clinicaId={clinicaId}
+            conversaId={sel.id}
+            contatoNome={sel.contato_nome ?? null}
+            contatoTelefone={sel.contato_telefone ?? null}
+            pacienteIdVinculado={contato?.paciente?.id ?? null}
+            onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
+          />
+        )}
+
         {/* DIALOGS */}
+
         <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
           <DialogContent>
             <DialogHeader>
