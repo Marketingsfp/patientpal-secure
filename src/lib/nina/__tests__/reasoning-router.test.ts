@@ -16,7 +16,7 @@ describe("Reasoning Router — LOW", () => {
   it("documentos é LOW", () => expect(nivel("Quais documentos preciso levar?")).toBe("low"));
   it("pagamento é LOW", () => expect(nivel("Aceitam pix ou cartão?")).toBe("low"));
   it("mensagem longa sem agenda continua LOW", () =>
-    expect(nivel("Boa tarde, ".repeat(40) + "qual o endereço da clínica?")).toBe("low"));
+    expect(nivel("Olá, ".repeat(40) + "qual o endereço da clínica?")).toBe("low"));
 });
 
 describe("Reasoning Router — MEDIUM", () => {

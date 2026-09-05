@@ -44,7 +44,7 @@ const PADRAO_LOW =
 
 /** Agenda, disponibilidade e alterações que exigem consulta de dados → MEDIUM. */
 const PADRAO_MEDIUM =
-  /\b(agend|marcar|marca[rç]|remarc|reagend|cancel|desmarcar|disponibilidade|dispon[íi]vel|vaga|hor[áa]rio|encaixe|consulta com|exame|dr\.?|dra\.?|doutor|doutora|m[ée]dic[oa]|especialista|cardiolog|dermatolog|ortoped|ginecolog|pediatr|ultrassom|raio[- ]?x|laborat[óo]rio|manh[ãa]|tarde|noite|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|amanh[ãa]|hoje|semana que vem|pr[óo]xima semana)\b/i;
+  /\b(?:agend|marcar|remarc|reagend|cancel|desmarc|disponibilidade|dispon[íi]ve|vaga|hor[áa]rio livre|encaixe|consulta com|exame|dr\.|dra\.|doutor|doutora|m[ée]dic|especialista|cardiolog|dermatolog|ortoped|ginecolog|pediatr|ultrassom|raio[- ]?x|laborat[óo]rio|de manh[ãa]|[àa] tarde|de tarde|[àa] noite|segunda-?feira|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|amanh[ãa]|semana que vem|pr[óo]xima semana)/i;
 
 /** Sinais de caso realmente complexo → HIGH (deve ser raro). */
 const PADRAO_ALTERNATIVAS = /\b(ou|alternativ|caso n[ãa]o|se n[ãa]o (der|puder|tiver)|qualquer um dos)\b/i;
