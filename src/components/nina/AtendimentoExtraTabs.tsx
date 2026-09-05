@@ -1340,8 +1340,21 @@ export function AtendInbox() {
                     </div>
                   );
                 })}
-
+                {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
+                <div ref={chat.ancoraRef} />
               </div>
+              {chat.novas > 0 && (
+                <button
+                  type="button"
+                  onClick={() => chat.irParaFim(true)}
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-atd-border bg-atd-surface px-3 py-1.5 text-xs font-medium text-atd-ink shadow-md hover:bg-atd-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  aria-live="polite"
+                >
+                  ↓ {rotuloNovasMensagens(chat.novas)}
+                </button>
+              )}
+              </div>
+
               <div className="border-t p-3 space-y-2">
                 {motivoBloqueio && (
                   <div className="flex items-start gap-1.5 rounded-md border border-atd-warn bg-atd-warn-bg px-2 py-1.5 text-xs text-atd-warn-ink">
