@@ -423,6 +423,79 @@ function Pagina() {
     }
   };
 
+  const carregarAcoes = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const r = await listarAcoes({ data: { clinicaId, status: "open" } });
+      setAcoesAbertas(r as unknown as AcaoTecnica[]);
+    } catch {
+      /* silencioso: painel auxiliar */
+    }
+  }, [clinicaId, listarAcoes]);
+
+  useEffect(() => {
+    void carregarAcoes();
+  }, [carregarAcoes]);
+
+  const abrirAplicacao = async (item: Item) => {
+    if (!clinicaId) return;
+    setAplicando(item);
+    setPreparo(null);
+    setConfirmado(false);
+    setReindexar(false);
+    setObsAplicacao("");
+    setPreparando(true);
+    try {
+      const r = await prepararAplicacao({ data: { id: item.id, clinicaId } });
+      setPreparo(r as unknown as Preparo);
+    } catch (e) {
+      mostrarErro(e);
+      setAplicando(null);
+    } finally {
+      setPreparando(false);
+    }
+  };
+
+  const confirmarAplicacao = async () => {
+    if (!aplicando || !clinicaId || !confirmado) return;
+    setSalvando(true);
+    try {
+      const r = await aplicarCorrecao({
+        data: {
+          id: aplicando.id,
+          clinicaId,
+          confirmado: true,
+          observacao: obsAplicacao.trim() || null,
+          reindexar,
+        },
+      });
+      if (r.aplicado) toast.success("Correção aplicada e verificada na Base.");
+      else toast.info(r.pendencia ?? "Ação registrada.");
+      setAplicando(null);
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const finalizarAcao = async (acaoId: string, resultado: "done" | "canceled") => {
+    if (!clinicaId) return;
+    setSalvando(true);
+    try {
+      await concluirAcao({ data: { acaoId, clinicaId, resultado, observacao: null } });
+      toast.success(
+        resultado === "done" ? "Ação concluída. Feedback marcado como aplicado." : "Ação cancelada.",
+      );
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const itensFiltrados = useMemo(
     () =>
       itens.filter(
