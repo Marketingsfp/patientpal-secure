@@ -61,12 +61,17 @@ export async function estadoConversaPorTelefone(
   return (data as EstadoConversa | null) ?? null;
 }
 
-/** A Nina pode falar nesta conversa? Conversa inexistente ainda = sim (é nova). */
+/**
+ * A Nina pode falar nesta conversa? Conversa inexistente ainda = sim (é nova),
+ * conversa resolvida = sim (nova sessão). Regra única em
+ * `@/lib/atendimento/ciclo-responsabilidade`.
+ */
 export function ninaPodeResponder(conv: EstadoConversa | null): boolean {
-  if (!conv) return true;
-  if (conv.status === "closed" || conv.status === "finished") return true;
-  return conv.owner_type === "AI" && conv.ai_enabled !== false;
+  return ninaResponde(conv);
 }
+
+export { derivarResponsavel, conversaResolvida, inconsistenciasCiclo } from "./ciclo-responsabilidade";
+export type { Responsavel } from "./ciclo-responsabilidade";
 
 export type EventoConversa =
   | "HANDOFF_SOLICITADO"
