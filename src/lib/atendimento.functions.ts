@@ -183,7 +183,109 @@ export const atribuirConversa = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Assume a conversa de forma exclusiva.
+ *
+ * Regra de negócio: só existe UM responsável por conversa, gravado em
+ * `atend_conversas.atribuida_user_id`. A troca é feita por uma única UPDATE
+ * condicional — o próprio banco garante que, em disputa entre duas abas ou
+ * dois atendentes, apenas um vence (o outro recebe `motivo: "corrida"`).
+ *
+ * `forcar = false` só assume conversa livre. `forcar = true` é a tomada
+ * consciente ("Assumir mesmo assim"), que registra transferência e evento.
+ */
+export const assumirConversa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        forcar: z.boolean().default(false),
+        motivo: z.string().trim().max(500).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: conv, error: e1 } = await context.supabase
+      .from("atend_conversas")
+      .select("id, atribuida_user_id, status, departamento_id")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (e1) throw new Error(e1.message);
+    if (!conv) return { ok: false as const, motivo: "nao_encontrada" as const };
+    if (conv.status === "closed") return { ok: false as const, motivo: "encerrada" as const };
+    // Idempotente: quem já é responsável apenas confirma.
+    if (conv.atribuida_user_id === context.userId)
+      return { ok: true as const, atribuidaUserId: context.userId, jaEra: true };
+    if (conv.atribuida_user_id && !data.forcar)
+      return {
+        ok: false as const,
+        motivo: "ocupada" as const,
+        atribuidaUserId: conv.atribuida_user_id,
+      };
+
+    const patch = {
+      atribuida_user_id: context.userId,
+      status: "active" as const,
+      owner_type: "HUMAN" as const,
+      ai_enabled: false,
+      assigned_at: new Date().toISOString(),
+      atribuicao_origem: conv.atribuida_user_id ? "TOMADA" : "MANUAL",
+    };
+    let q = context.supabase
+      .from("atend_conversas")
+      .update(patch)
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .neq("status", "closed");
+    q = conv.atribuida_user_id
+      ? q.eq("atribuida_user_id", conv.atribuida_user_id)
+      : q.is("atribuida_user_id", null);
+    const { data: rows, error: e2 } = await q.select("id");
+    if (e2) throw new Error(e2.message);
+    if (!rows || rows.length === 0) {
+      const { data: atual } = await context.supabase
+        .from("atend_conversas")
+        .select("atribuida_user_id")
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle();
+      return {
+        ok: false as const,
+        motivo: "corrida" as const,
+        atribuidaUserId: atual?.atribuida_user_id ?? null,
+      };
+    }
+
+    if (conv.atribuida_user_id) {
+      // Tomada de atendimento entra no histórico como transferência.
+      await context.supabase.from("atend_transferencias").insert({
+        clinica_id: data.clinicaId,
+        conversa_id: data.conversaId,
+        de_user_id: conv.atribuida_user_id,
+        para_user_id: context.userId,
+        de_departamento_id: conv.departamento_id,
+        para_departamento_id: conv.departamento_id,
+        motivo: data.motivo ?? "Tomada de atendimento",
+      });
+    }
+    await registrarEventoConversa(context.supabase, {
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      evento: "ASSUMIDA",
+      userId: context.userId,
+      departamentoId: conv.departamento_id,
+      motivo: data.motivo ?? null,
+      detalhes: { de_user_id: conv.atribuida_user_id, tomada: !!conv.atribuida_user_id },
+    });
+    return { ok: true as const, atribuidaUserId: context.userId, jaEra: false };
+  });
+
 export const transferirConversa = createServerFn({ method: "POST" })
+
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
     z
