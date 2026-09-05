@@ -151,6 +151,7 @@ import {
 } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
 import { iniciarTroca, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -268,6 +269,22 @@ export function AtendInbox() {
   });
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
+  // FASE 1 — a URL manda: /app/nina/<conversation_id> define qual conversa
+  // está aberta. O clique só navega; a seleção vem sempre do endereço.
+  const navigate = useNavigate();
+  const rotaParams = useParams({ strict: false }) as { conversationId?: string };
+  const conversaIdUrl = rotaParams?.conversationId ?? null;
+  const abrirPelaUrl = useCallback(
+    (id: string | null, replace = false) => {
+      if (!id) {
+        void navigate({ to: "/app/nina", replace });
+        return;
+      }
+      void navigate({ to: "/app/nina/$conversationId", params: { conversationId: id }, replace });
+    },
+    [navigate],
+  );
+
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
   // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
@@ -676,6 +693,8 @@ export function AtendInbox() {
         setNotas([]);
         setEventos([]);
         toast.info(avisoSaidaEscopo(escopo));
+        // O endereço acompanha: sem conversa aberta, volta para /app/nina.
+        abrirPelaUrl(null, true);
       }
       setConvs((prev: any[]) => {
         // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
@@ -699,24 +718,45 @@ export function AtendInbox() {
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
       if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] as LinhaInbox }))
-        setSel(rows[0]);
+        // A seleção automática também passa pela URL, para não existirem dois
+        // estados divergentes (endereço x conversa aberta).
+        abrirPelaUrl((rows[0] as any)?.id ?? null, true);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores, meuId, souGestor]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores, meuId, souGestor, abrirPelaUrl]);
 
-
+  // FASE 1 — a conversa aberta é sempre a do endereço. Quando o
+  // conversationId da URL muda (clique, voltar/avançar do navegador, link
+  // colado), a seleção acompanha; sem id na URL, nada fica aberto.
+  useEffect(() => {
+    if (!conversaIdUrl) {
+      if (selIdRef.current) {
+        setSel(null);
+        setConversaCarregadaId(null);
+        setSecundariosCarregadosId(null);
+        setMsgs([]);
+        setContato(null);
+        setNotas([]);
+        setEventos([]);
+      }
+      return;
+    }
+    if (selIdRef.current === conversaIdUrl) return;
+    const c = convs.find((x: any) => x.id === conversaIdUrl);
+    if (c) setSel(c);
+  }, [conversaIdUrl, convs]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
   useEffect(() => {
     const abrir = (id: string | null) => {
       if (!id) return;
-      const c = convs.find((x: any) => x.id === id);
-      if (c) setSel(c);
+      abrirPelaUrl(id);
     };
+
     const handler = (e: Event) => abrir((e as CustomEvent).detail?.id ?? null);
     try {
       const pendente = window.sessionStorage.getItem(ABRIR_CONVERSA_KEY);
@@ -729,7 +769,7 @@ export function AtendInbox() {
     }
     window.addEventListener(EVENTO_ABRIR_CONVERSA, handler);
     return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
-  }, [convs]);
+  }, [abrirPelaUrl]);
 
 
 
@@ -1542,6 +1582,7 @@ export function AtendInbox() {
               onAssumida={(id) => {
                 const c = convs.find((x: any) => x.id === id);
                 if (c) setSel({ ...c, owner_type: "HUMAN", status: "active" });
+                abrirPelaUrl(id);
                 void carregarConvs();
               }}
             />
@@ -1636,7 +1677,8 @@ export function AtendInbox() {
                   iniciarTroca(c.id);
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
-                  setSel(c);
+                  // Só muda o endereço: a conversa aberta vem da URL.
+                  abrirPelaUrl(c.id);
                 }}
                 onMouseEnter={() => agendarPrefetch(c.id)}
                 onMouseLeave={() => cancelarPrefetch(c.id)}

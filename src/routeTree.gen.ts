@@ -131,6 +131,7 @@ import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/pub
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as ApiIntegrationsV1SplatRouteImport } from './routes/api/integrations/v1/$'
 import { Route as AuthenticatedAppOdontologiaOrcamentosRouteImport } from './routes/_authenticated/app.odontologia.orcamentos'
+import { Route as AuthenticatedAppNinaConversationIdRouteImport } from './routes/_authenticated/app.nina.$conversationId'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
@@ -846,6 +847,12 @@ const AuthenticatedAppOdontologiaOrcamentosRoute =
     path: '/odontologia/orcamentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppNinaConversationIdRoute =
+  AuthenticatedAppNinaConversationIdRouteImport.update({
+    id: '/$conversationId',
+    path: '/$conversationId',
+    getParentRoute: () => AuthenticatedAppNinaRoute,
+  } as any)
 const AuthenticatedAppNfseTestarRoute =
   AuthenticatedAppNfseTestarRouteImport.update({
     id: '/nfse/testar',
@@ -1165,7 +1172,7 @@ export interface FileRoutesByFullPath {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nina': typeof AuthenticatedAppNinaRoute
+  '/app/nina': typeof AuthenticatedAppNinaRouteWithChildren
   '/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/app/nina-metricas': typeof AuthenticatedAppNinaMetricasRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -1231,6 +1238,7 @@ export interface FileRoutesByFullPath {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
@@ -1324,7 +1332,7 @@ export interface FileRoutesByTo {
   '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/app/nina': typeof AuthenticatedAppNinaRoute
+  '/app/nina': typeof AuthenticatedAppNinaRouteWithChildren
   '/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/app/nina-metricas': typeof AuthenticatedAppNinaMetricasRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -1390,6 +1398,7 @@ export interface FileRoutesByTo {
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
@@ -1489,7 +1498,7 @@ export interface FileRoutesById {
   '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
   '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
-  '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
+  '/_authenticated/app/nina': typeof AuthenticatedAppNinaRouteWithChildren
   '/_authenticated/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/_authenticated/app/nina-metricas': typeof AuthenticatedAppNinaMetricasRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
@@ -1555,6 +1564,7 @@ export interface FileRoutesById {
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
+  '/_authenticated/app/nina/$conversationId': typeof AuthenticatedAppNinaConversationIdRoute
   '/_authenticated/app/odontologia/orcamentos': typeof AuthenticatedAppOdontologiaOrcamentosRoute
   '/api/integrations/v1/$': typeof ApiIntegrationsV1SplatRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
@@ -1720,6 +1730,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/app/nina/$conversationId'
     | '/app/odontologia/orcamentos'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
@@ -1879,6 +1890,7 @@ export interface FileRouteTypes {
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
+    | '/app/nina/$conversationId'
     | '/app/odontologia/orcamentos'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
@@ -2043,6 +2055,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
+    | '/_authenticated/app/nina/$conversationId'
     | '/_authenticated/app/odontologia/orcamentos'
     | '/api/integrations/v1/$'
     | '/api/public/focusnfe/webhook'
@@ -2965,6 +2978,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppOdontologiaOrcamentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/nina/$conversationId': {
+      id: '/_authenticated/app/nina/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/app/nina/$conversationId'
+      preLoaderRoute: typeof AuthenticatedAppNinaConversationIdRouteImport
+      parentRoute: typeof AuthenticatedAppNinaRoute
+    }
     '/_authenticated/app/nfse/testar': {
       id: '/_authenticated/app/nfse/testar'
       path: '/nfse/testar'
@@ -3379,6 +3399,18 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
     AuthenticatedAppFinanceiroRouteChildren,
   )
 
+interface AuthenticatedAppNinaRouteChildren {
+  AuthenticatedAppNinaConversationIdRoute: typeof AuthenticatedAppNinaConversationIdRoute
+}
+
+const AuthenticatedAppNinaRouteChildren: AuthenticatedAppNinaRouteChildren = {
+  AuthenticatedAppNinaConversationIdRoute:
+    AuthenticatedAppNinaConversationIdRoute,
+}
+
+const AuthenticatedAppNinaRouteWithChildren =
+  AuthenticatedAppNinaRoute._addFileChildren(AuthenticatedAppNinaRouteChildren)
+
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAgendaMedicosRoute: typeof AuthenticatedAppAgendaMedicosRoute
@@ -3427,7 +3459,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
   AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
-  AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
+  AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRouteWithChildren
   AuthenticatedAppNinaAprendizadoRoute: typeof AuthenticatedAppNinaAprendizadoRoute
   AuthenticatedAppNinaMetricasRoute: typeof AuthenticatedAppNinaMetricasRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
@@ -3525,7 +3557,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
-  AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
+  AuthenticatedAppNinaRoute: AuthenticatedAppNinaRouteWithChildren,
   AuthenticatedAppNinaAprendizadoRoute: AuthenticatedAppNinaAprendizadoRoute,
   AuthenticatedAppNinaMetricasRoute: AuthenticatedAppNinaMetricasRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
