@@ -545,7 +545,7 @@ export function AtendInbox() {
           canal: "todos",
           limit: 200,
         },
-      });
+      }));
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
