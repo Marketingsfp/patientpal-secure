@@ -174,7 +174,7 @@ export const Route = createFileRoute("/api/nina-fala")({
               }
               const res = stream0.res;
 
-              const leitor = res.body.pipeThrough(new TextDecoderStream()).getReader();
+              const leitor = res.body!.pipeThrough(new TextDecoderStream()).getReader();
               let buf = "";
               let pendente = "";
               let primeira = true;
