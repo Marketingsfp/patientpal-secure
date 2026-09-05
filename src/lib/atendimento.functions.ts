@@ -271,6 +271,9 @@ export const fecharConversa = createServerFn({ method: "POST" })
     // confirmação, criação de agendamento), mas mantém o contexto recente:
     // se o paciente voltar dentro do TTL da sessão, a Nina ainda entende do
     // que se falava. Histórico, CRM, agendamentos e Base não são tocados.
+    // Conversa resolvida cancela qualquer prazo de espera pendente.
+    const { limparEsperaPaciente } = await import("@/lib/nina/espera-paciente.server");
+    await limparEsperaPaciente(data.clinicaId, data.conversaId);
     const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
     const { normalizarEstado } = await import("@/lib/nina/fluxo-estado-normalizar");
     const estadoEncerrado = encerrarEstadosTransacionais(

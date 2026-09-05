@@ -252,6 +252,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     clinicaId: params.clinicaId,
                     telefone: fromDigits,
                   });
+                  // O paciente respondeu: qualquer prazo de espera cai.
+                  const { limparEsperaPorTelefone } = await import(
+                    "@/lib/nina/espera-paciente.server"
+                  );
+                  await limparEsperaPorTelefone(params.clinicaId, fromDigits);
                 }
 
 
