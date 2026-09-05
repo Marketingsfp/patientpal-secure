@@ -102,3 +102,26 @@ export async function limparEsperaPorTelefone(
     console.error("[nina-espera] falha ao limpar prazo por telefone", e);
   }
 }
+
+/** Versão por telefone: o webhook conhece o número, não o id da conversa. */
+export async function registrarEsperaPorTelefone(args: {
+  clinicaId: string;
+  telefone: string;
+  resposta: string;
+}): Promise<ResultadoEspera> {
+  const digits = String(args.telefone ?? "").replace(/\D/g, "");
+  if (!digits) return { aguardando: false, motivo: null, deadline: null };
+  const { data } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("id")
+    .eq("clinica_id", args.clinicaId)
+    .in("contato_telefone", [digits, `+${digits}`])
+    .order("ultima_msg_em", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  return registrarEsperaAposRespostaNina({
+    clinicaId: args.clinicaId,
+    conversaId: (data as { id?: string } | null)?.id ?? null,
+    resposta: args.resposta,
+  });
+}
