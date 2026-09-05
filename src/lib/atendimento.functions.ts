@@ -2024,6 +2024,8 @@ export const assumirConversa = createServerFn({ method: "POST" })
       });
     }
 
+    await limparEsperaAoAssumir(data.clinicaId, data.conversaId);
+
     const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
     await registrarEvento({
       clinicaId: data.clinicaId,

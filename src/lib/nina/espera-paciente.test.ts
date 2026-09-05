@@ -4,6 +4,7 @@ import {
   avaliarEsperaPaciente,
   calcularPrazoEspera,
   prazoVencido,
+  timeoutAindaValido,
   timeoutRespostaPacienteMinutos,
 } from "./espera-paciente";
 
@@ -77,5 +78,60 @@ describe("quando a Nina realmente aguarda o paciente", () => {
     expect(avaliarEsperaPaciente("Você já realizou esse exame antes?").motivo).toBe(
       "PERGUNTA_DIRETA",
     );
+  });
+});
+
+describe("FASE 2 — resposta do paciente cancela o prazo", () => {
+  const dez = (m: number) => new Date(`2026-09-05T10:${String(m).padStart(2, "0")}:00Z`);
+  const prazo = calcularPrazoEspera(dez(0), 30).patient_response_deadline; // 10:30
+
+  it("resposta em 5 minutos: prazo já foi limpo, nenhum timeout", () => {
+    expect(
+      timeoutAindaValido({ deadlineAtual: null, deadlineEsperado: prazo, agora: dez(5) }),
+    ).toBe(false);
+  });
+
+  it("resposta em 29 minutos: nenhum timeout", () => {
+    expect(
+      timeoutAindaValido({ deadlineAtual: null, deadlineEsperado: prazo, agora: dez(29) }),
+    ).toBe(false);
+  });
+
+  it("corrida 10:29:59 x 10:30:00 — resposta chegou primeiro, sem timeout", () => {
+    expect(
+      timeoutAindaValido({
+        deadlineAtual: null,
+        deadlineEsperado: prazo,
+        agora: new Date("2026-09-05T10:30:00Z"),
+      }),
+    ).toBe(false);
+  });
+
+  it("ninguém respondeu: timeout válido no vencimento", () => {
+    expect(
+      timeoutAindaValido({ deadlineAtual: prazo, deadlineEsperado: prazo, agora: dez(30) }),
+    ).toBe(true);
+    expect(
+      timeoutAindaValido({ deadlineAtual: prazo, deadlineEsperado: prazo, agora: dez(29) }),
+    ).toBe(false);
+  });
+
+  it("nova pergunta cria novo ciclo e invalida o prazo antigo", () => {
+    const novo = calcularPrazoEspera(dez(15), 30); // 10:15 -> 10:45
+    expect(novo.awaiting_patient_since).toBe("2026-09-05T10:15:00.000Z");
+    expect(novo.patient_response_deadline).toBe("2026-09-05T10:45:00.000Z");
+    expect(
+      timeoutAindaValido({
+        deadlineAtual: novo.patient_response_deadline,
+        deadlineEsperado: prazo,
+        agora: dez(31),
+      }),
+    ).toBe(false);
+  });
+
+  it("eventos duplicados não geram dois estados", () => {
+    const a = calcularPrazoEspera(dez(15), 30);
+    const b = calcularPrazoEspera(dez(15), 30);
+    expect(a).toEqual(b);
   });
 });
