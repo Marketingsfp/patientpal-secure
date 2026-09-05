@@ -60,12 +60,29 @@ export function filtroEscopoInbox(args: {
   }
 }
 
+/** Conversa encerrada (resolvida/finalizada). */
+export function conversaEstaFechada(conversa: ConversaEscopo): boolean {
+  return STATUS_FECHADOS.includes((conversa.status ?? "") as (typeof STATUS_FECHADOS)[number]);
+}
+
+/**
+ * Filtros operacionais (Minhas, Nina, Não atribuídas) mostram apenas conversas
+ * em andamento; o histórico encerrado vive no filtro "Fechadas".
+ */
+export function escopoEscondeFechadas(escopo: EscopoInbox, gestor: boolean): boolean {
+  const efetivo = escopoEfetivo(escopo, gestor);
+  return efetivo === "minhas" || efetivo === "nina" || efetivo === "nao_atribuidas";
+}
+
 /** Mesma regra em forma pura, usada nos testes e em conferências locais. */
 export function conversaVisivelNoEscopo(
   conversa: ConversaEscopo,
   args: { escopo: EscopoInbox; userId: string; gestor: boolean },
 ): boolean {
   const filtro = filtroEscopoInbox(args);
+  if (escopoEscondeFechadas(args.escopo, args.gestor) && conversaEstaFechada(conversa)) {
+    return false;
+  }
   switch (filtro.tipo) {
     case "todas":
       return true;

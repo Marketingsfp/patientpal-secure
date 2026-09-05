@@ -4,7 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
-import { filtroEscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  STATUS_FECHADOS,
+  escopoEscondeFechadas,
+  filtroEscopoInbox,
+} from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 
 /* =========================================================
@@ -78,7 +82,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         canal: z.enum(["whatsapp", "instagram", "facebook", "webchat", "todos"]).default("todos"),
         // Escopo de visibilidade: por padrão o atendente vê só o que está
         // atribuído a ele agora. "todas" é privilégio de gestor/admin.
-        escopo: z.enum(["minhas", "nao_atribuidas", "nina", "todas"]).default("minhas"),
+        escopo: z.enum(["minhas", "nina", "nao_atribuidas", "fechadas", "todas"]).default("minhas"),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
@@ -125,6 +129,14 @@ export const listarConversas = createServerFn({ method: "POST" })
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
+    else if (filtroEscopo.tipo === "fechadas") {
+      q = q.in("status", [...STATUS_FECHADOS]);
+      if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
+    }
+    // Filtros operacionais mostram só conversas em andamento.
+    if (escopoEscondeFechadas(data.escopo, gestor)) {
+      q = q.not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
+    }
     if (data.status !== "all") q = q.eq("status", data.status);
     if (data.canal !== "todos") q = q.eq("canal", data.canal);
     if (data.busca) {
