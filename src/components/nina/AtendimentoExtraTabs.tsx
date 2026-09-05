@@ -129,6 +129,7 @@ import {
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
+import { criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -213,6 +214,10 @@ export function AtendInbox() {
   // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
   // nova dispara vários eventos de Realtime quase ao mesmo tempo).
   const seqConvs = useRef(0);
+  // Um pedido por conversa: respostas superadas ou de conversa anterior são
+  // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
+  const seqConversa = useRef(0);
+  const cacheConversas = useRef(criarCacheConversas(10));
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
@@ -543,21 +548,31 @@ export function AtendInbox() {
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
     // Alvo desta carga. Se a atendente trocar de conversa no meio do caminho,
-    // a resposta atrasada é descartada — nunca mostrar conteúdo do lead
-    // anterior dentro do lead atual.
+    // ou um pedido mais novo for disparado, a resposta atrasada é descartada.
     const alvo: string = sel.id;
+    const pedido = ++seqConversa.current;
     try {
       const [m, c, n, ev] = await Promise.all([
-        listarMsgs({ data: { clinicaId, conversaId: sel.id, limit: 200 } }),
-        obterContato({ data: { clinicaId, conversaId: sel.id } }),
-        listarNotasFn({ data: { clinicaId, conversaId: sel.id } }),
-        listarEventosFn({ data: { clinicaId, conversaId: sel.id } }).catch(
+        listarMsgs({ data: { clinicaId, conversaId: alvo, limit: 200 } }),
+        obterContato({ data: { clinicaId, conversaId: alvo } }),
+        listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
+        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
           () => [] as ConversaEvento[],
         ),
       ]);
-      if (alvo !== selIdRef.current) return;
+      if (
+        !respostaAindaVale({
+          alvo,
+          selecionadaAgora: selIdRef.current,
+          pedido,
+          pedidoAtual: seqConversa.current,
+        })
+      ) {
+        return;
+      }
       if (!c) {
         // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
+        cacheConversas.current.invalidar(alvo);
         setSel(null);
         setConversaCarregadaId(null);
         setMsgs([]);
@@ -566,10 +581,17 @@ export function AtendInbox() {
         setEventos([]);
         return;
       }
+      const eventosLista = (ev ?? []) as ConversaEvento[];
+      cacheConversas.current.guardar(alvo, {
+        msgs: m,
+        contato: c,
+        notas: n,
+        eventos: eventosLista,
+      });
       setMsgs(m);
       setContato(c);
       setNotas(n);
-      setEventos((ev ?? []) as ConversaEvento[]);
+      setEventos(eventosLista);
       setConversaCarregadaId(alvo);
     } catch (e: any) {
       mostrarErro(e);
@@ -595,7 +617,19 @@ export function AtendInbox() {
     }
   }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
   // Troca de conversa: o conteúdo do lead anterior sai da tela na mesma hora.
+  // Se a nova conversa já estiver em cache, o conteúdo dela aparece na hora e
+  // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
+    const id = sel?.id;
+    const emCache = id ? cacheConversas.current.obter(id) : undefined;
+    if (id && emCache) {
+      setMsgs(emCache.msgs);
+      setContato(emCache.contato);
+      setNotas(emCache.notas);
+      setEventos(emCache.eventos);
+      setConversaCarregadaId(id);
+      return;
+    }
     setConversaCarregadaId(null);
     setMsgs([]);
     setEventos([]);
