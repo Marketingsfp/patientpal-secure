@@ -486,6 +486,30 @@ export function AtendInbox() {
     }
   }, [clinicaId, filtroStatus, busca, listarConvs, sel]);
 
+  // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
+  // e sem mexer em filtros/rascunho de quem já estava atendendo.
+  useEffect(() => {
+    const abrir = (id: string | null) => {
+      if (!id) return;
+      const c = convs.find((x: any) => x.id === id);
+      if (c) setSel(c);
+    };
+    const handler = (e: Event) => abrir((e as CustomEvent).detail?.id ?? null);
+    try {
+      const pendente = window.sessionStorage.getItem(ABRIR_CONVERSA_KEY);
+      if (pendente) {
+        window.sessionStorage.removeItem(ABRIR_CONVERSA_KEY);
+        abrir(pendente);
+      }
+    } catch {
+      /* sem armazenamento: só o evento abaixo abre a conversa */
+    }
+    window.addEventListener(EVENTO_ABRIR_CONVERSA, handler);
+    return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
+  }, [convs]);
+
+
+
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
     try {
