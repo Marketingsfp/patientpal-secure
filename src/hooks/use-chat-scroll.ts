@@ -139,6 +139,11 @@ export function useChatScroll(args: {
     };
   }, [args.conversaId]);
 
+  // Usado ao carregar histórico antigo: a partir daí a posição é da atendente.
+  const encerrarAbertura = useCallback(() => {
+    emAbertura.current = false;
+  }, []);
 
-  return { containerRef, ancoraRef, novas, irParaFim };
+  return { containerRef, ancoraRef, novas, irParaFim, encerrarAbertura };
 }
+
