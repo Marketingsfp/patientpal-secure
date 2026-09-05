@@ -767,6 +767,7 @@ export type Database = {
           identidade_tentativas: number
           is_teste: boolean
           janela_24h_em: string | null
+          last_assigned_user_id: string | null
           nina_fluxo_estado: Json | null
           owner_type: string
           patient_response_deadline: string | null
@@ -774,6 +775,7 @@ export type Database = {
           prioridade: number
           protocol_number: string | null
           resolved_at: string | null
+          resolved_by: string | null
           sentimento: string | null
           sentimento_score: number | null
           sla_first_response_seg: number | null
@@ -809,6 +811,7 @@ export type Database = {
           identidade_tentativas?: number
           is_teste?: boolean
           janela_24h_em?: string | null
+          last_assigned_user_id?: string | null
           nina_fluxo_estado?: Json | null
           owner_type?: string
           patient_response_deadline?: string | null
@@ -816,6 +819,7 @@ export type Database = {
           prioridade?: number
           protocol_number?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
@@ -851,6 +855,7 @@ export type Database = {
           identidade_tentativas?: number
           is_teste?: boolean
           janela_24h_em?: string | null
+          last_assigned_user_id?: string | null
           nina_fluxo_estado?: Json | null
           owner_type?: string
           patient_response_deadline?: string | null
@@ -858,6 +863,7 @@ export type Database = {
           prioridade?: number
           protocol_number?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
           sentimento?: string | null
           sentimento_score?: number | null
           sla_first_response_seg?: number | null
