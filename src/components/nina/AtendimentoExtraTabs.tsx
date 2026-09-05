@@ -107,6 +107,7 @@ import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
   souGestorAtendimento,
+  contarConversasInbox,
   listarMensagensConversa,
   enviarMensagemConversa,
   obterDadosContato,
@@ -187,6 +188,7 @@ export function AtendInbox() {
 
   const listarConvs = useServerFn(listarConversas);
   const souGestorFn = useServerFn(souGestorAtendimento);
+  const contarInboxFn = useServerFn(contarConversasInbox);
   const listarMsgs = useServerFn(listarMensagensConversa);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
@@ -242,6 +244,14 @@ export function AtendInbox() {
   // atendente logado). O filtro é aplicado no backend.
   const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
   const [souGestor, setSouGestor] = useState(false);
+  // Contagem própria de cada filtro (nunca reaproveita o número de outro).
+  const [contadores, setContadores] = useState<Record<string, number>>({
+    minhas: 0,
+    nina: 0,
+    nao_atribuidas: 0,
+    fechadas: 0,
+    todas: 0,
+  });
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
@@ -578,6 +588,26 @@ export function AtendInbox() {
       vivo = false;
     };
   }, [clinicaId, souGestorFn]);
+
+  const carregarContadores = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const r: any = await contarInboxFn({ data: { clinicaId } });
+      setContadores({
+        minhas: r?.minhas ?? 0,
+        nina: r?.nina ?? 0,
+        nao_atribuidas: r?.nao_atribuidas ?? 0,
+        fechadas: r?.fechadas ?? 0,
+        todas: r?.todas ?? 0,
+      });
+    } catch {
+      /* contadores são informativos; falha não bloqueia a lista */
+    }
+  }, [clinicaId, contarInboxFn]);
+
+  useEffect(() => {
+    void carregarContadores();
+  }, [carregarContadores, convs.length, escopo]);
 
   // Trocar de escopo recomeça a lista: nada de mesclar conversas de escopos
   // diferentes (uma conversa de outro atendente jamais "sobra" na tela).
@@ -1466,7 +1496,7 @@ export function AtendInbox() {
               <MessageSquare className="h-4 w-4" />
               <CardTitle className="text-base">Inbox</CardTitle>
               <Badge variant="outline" className="ml-auto">
-                {convs.length}
+                {convsVisiveis.length}
               </Badge>
             </div>
             <div className="relative">
@@ -1487,10 +1517,15 @@ export function AtendInbox() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                <SelectItem value="minhas">Minhas conversas</SelectItem>
-                <SelectItem value="nao_atribuidas">Não atribuídas</SelectItem>
-                <SelectItem value="nina">Nina</SelectItem>
-                {souGestor && <SelectItem value="todas">Todas da clínica (gestor)</SelectItem>}
+                <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
+                <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
+                <SelectItem value="nao_atribuidas">
+                  Não atribuídas ({contadores.nao_atribuidas})
+                </SelectItem>
+                <SelectItem value="fechadas">Fechadas ({contadores.fechadas})</SelectItem>
+                {souGestor && (
+                  <SelectItem value="todas">Todas da clínica ({contadores.todas})</SelectItem>
+                )}
               </SelectContent>
             </Select>
             <Select
