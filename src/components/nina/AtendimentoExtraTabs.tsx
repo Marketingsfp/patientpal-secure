@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import {
   ListaRespostasRapidas,
   useRespostasFiltradas,
@@ -247,7 +248,9 @@ export function AtendInbox() {
   };
   // Painel direito (Contato): mesmo comportamento de encolher/expandir/fixar.
   const [contatoFixado, setContatoFixado] = useState(false);
-  const [contatoHover, setContatoHover] = useState(false);
+  const { ref: contatoRef, dentro: contatoHover } = useHoverTolerante<HTMLDivElement>({
+    ativo: !contatoFixado,
+  });
   const contatoAberto = contatoFixado || contatoHover;
   useEffect(() => {
     try {
@@ -842,8 +845,7 @@ export function AtendInbox() {
         {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
         <Card
           data-a11y-secundario="true"
-          onMouseEnter={() => setPainelHover(true)}
-          onMouseLeave={() => setPainelHover(false)}
+          ref={painelRef}
           className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
             painelAberto ? "w-[300px]" : "w-[52px]"
           }`}
@@ -1334,8 +1336,7 @@ export function AtendInbox() {
         {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
         <Card
           data-a11y-secundario="true"
-          onMouseEnter={() => setContatoHover(true)}
-          onMouseLeave={() => setContatoHover(false)}
+          ref={contatoRef}
           className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
             contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
           }`}
