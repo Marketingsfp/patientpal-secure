@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
+import { filtroEscopoInbox } from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 
 /* =========================================================
@@ -75,6 +76,9 @@ export const listarConversas = createServerFn({ method: "POST" })
           .default("all"),
         busca: z.string().trim().max(120).optional(),
         canal: z.enum(["whatsapp", "instagram", "facebook", "webchat", "todos"]).default("todos"),
+        // Escopo de visibilidade: por padrão o atendente vê só o que está
+        // atribuído a ele agora. "todas" é privilégio de gestor/admin.
+        escopo: z.enum(["minhas", "nao_atribuidas", "nina", "todas"]).default("minhas"),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
@@ -91,6 +95,23 @@ export const listarConversas = createServerFn({ method: "POST" })
       console.error("[nina-timeout] varredura na listagem falhou", e);
     }
 
+    // Gestor/admin da clínica pode escolher ver tudo; atendente comum, não.
+    let gestor = false;
+    try {
+      const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      });
+      gestor = !!podeGerir;
+    } catch {
+      gestor = false;
+    }
+    const filtroEscopo = filtroEscopoInbox({
+      escopo: data.escopo,
+      userId: context.userId,
+      gestor,
+    });
+
     let q = context.supabase
       .from("atend_conversas")
       .select("*")
@@ -99,6 +120,11 @@ export const listarConversas = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .order("ultima_msg_em", { ascending: false })
       .limit(data.limit);
+    // Escopo aplicado na própria consulta (nunca filtrado só no frontend).
+    if (filtroEscopo.tipo === "atribuida") q = q.eq("atribuida_user_id", filtroEscopo.userId);
+    else if (filtroEscopo.tipo === "sem_responsavel")
+      q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
+    else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
     if (data.status !== "all") q = q.eq("status", data.status);
     if (data.canal !== "todos") q = q.eq("canal", data.canal);
     if (data.busca) {
