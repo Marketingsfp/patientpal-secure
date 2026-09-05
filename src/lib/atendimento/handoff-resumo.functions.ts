@@ -27,12 +27,22 @@ export const obterResumoHandoff = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!conv) throw new Error("Conversa não encontrada");
-    if (!conv.handoff_em) return null;
+
+    // O resumo deixou de ser exclusivo do handoff: qualquer desfecho relevante
+    // (agendamento concluído, conversa resolvida, timeout) gera uma versão.
+    const { count } = await context.supabase
+      .from("atend_handoff_resumos")
+      .select("id", { count: "exact", head: true })
+      .eq("conversa_id", data.conversaId);
+    const temResumo = (count ?? 0) > 0;
+    if (!conv.handoff_em && !temResumo) return null;
 
     const { garantirResumoHandoff } = await import("./handoff-resumo.server");
     return await garantirResumoHandoff({
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
       forcar: data.forcar === true,
+      ignorarHandoff: !conv.handoff_em,
     });
   });
+
