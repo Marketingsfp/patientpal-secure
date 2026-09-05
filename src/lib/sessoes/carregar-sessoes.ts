@@ -65,5 +65,8 @@ export async function carregarSessoes(filtros: {
     // significa "tem data marcada, não está parado".
     dias_parado: r.dias_parado === null || r.dias_parado === undefined ? null : num(r.dias_parado),
     pendencia: txt(r.pendencia),
+    // Também `null` significa "não se aplica": o tratamento não tem ciclo de
+    // retorno cadastrado. Zero seria "retorna no mesmo dia", que não existe.
+    ciclo_dias: r.ciclo_dias === null || r.ciclo_dias === undefined ? null : num(r.ciclo_dias),
   }));
 }

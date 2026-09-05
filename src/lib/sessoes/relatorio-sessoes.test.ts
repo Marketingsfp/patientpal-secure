@@ -14,6 +14,11 @@ import {
   precisaBuscaAtiva,
   rotuloSessoes,
   situacaoCurta,
+  statusRetorno,
+  contarStatus,
+  filtrarPorStatus,
+  AVISO_DIAS,
+  JANELA_PADRAO_DIAS,
   temPendenciaFinanceira,
   tomDaSituacao,
   totaisSessoes,
@@ -39,6 +44,7 @@ const pacote = (over: Partial<LinhaSessao> = {}): LinhaSessao => ({
   proxima_data: "2026-09-10",
   dias_parado: 0,
   pendencia: "Próxima em 10/09/2026",
+  ciclo_dias: null,
   ...over,
 });
 
@@ -61,6 +67,7 @@ const ciclo = (over: Partial<LinhaSessao> = {}): LinhaSessao => ({
   proxima_data: null,
   dias_parado: 56,
   pendencia: "Atrasado — 56 dias sem manutenção",
+  ciclo_dias: 30,
   ...over,
 });
 
@@ -275,6 +282,7 @@ describe("visão compacta da tela", () => {
     proxima_data: null,
     dias_parado: 16,
     pendencia: "Sem agendamento",
+    ciclo_dias: null,
     ...over,
   });
 
@@ -407,6 +415,104 @@ describe("visão compacta da tela", () => {
       expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("faltas");
       expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("restantes");
       expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("valor_contratado");
+    });
+  });
+});
+
+// ============================================================================
+// Status de retorno — os três cards
+// ============================================================================
+describe("status de retorno", () => {
+  const manutencao = (over: Partial<LinhaSessao> = {}) =>
+    ciclo({ proxima_data: null, ciclo_dias: 30, ...over });
+
+  it("quem tem data marcada está em dia, sem exceção", () => {
+    // Mesma regra da coluna Situação: o paciente já voltou para a agenda.
+    expect(statusRetorno(manutencao({ proxima_data: "2026-10-01", dias_parado: 0 }))).toBe(
+      "em_dia",
+    );
+    // Vale mesmo com o prazo estourado: ele foi remarcado, o resgate deu certo.
+    expect(statusRetorno(manutencao({ proxima_data: "2026-10-01", dias_parado: 200 }))).toBe(
+      "em_dia",
+    );
+  });
+
+  it("vence só DEPOIS de passar do ciclo, igual à coluna Situação", () => {
+    // O banco escreve "Atrasado" quando dias > ciclo_dias. Os dois têm que
+    // concordar: "Vencido" no card e "Em dia" na coluna, na mesma linha,
+    // destruiria a confiança na lista.
+    expect(statusRetorno(manutencao({ dias_parado: 30 }))).not.toBe("vencido");
+    expect(statusRetorno(manutencao({ dias_parado: 31 }))).toBe("vencido");
+    expect(statusRetorno(manutencao({ dias_parado: 58 }))).toBe("vencido");
+  });
+
+  it("avisa nos sete dias que antecedem o vencimento", () => {
+    expect(statusRetorno(manutencao({ dias_parado: 22 }))).toBe("em_dia");
+    expect(statusRetorno(manutencao({ dias_parado: 23 }))).toBe("a_vencer");
+    expect(statusRetorno(manutencao({ dias_parado: 30 }))).toBe("a_vencer");
+  });
+
+  it("respeita o ciclo cadastrado, e não um prazo fixo de 30 dias", () => {
+    // É a razão de o `ciclo_dias` ter sido exposto pelo banco: com 30 chumbado,
+    // um retorno de 60 dias apareceria como vencido no dia 31.
+    expect(statusRetorno(manutencao({ ciclo_dias: 60, dias_parado: 40 }))).toBe("em_dia");
+    expect(statusRetorno(manutencao({ ciclo_dias: 60, dias_parado: 55 }))).toBe("a_vencer");
+    expect(statusRetorno(manutencao({ ciclo_dias: 60, dias_parado: 61 }))).toBe("vencido");
+  });
+
+  it("cai na janela padrão quando o tratamento não tem ciclo cadastrado", () => {
+    const semCiclo = pacote({ proxima_data: null, restantes: 3, ciclo_dias: null });
+    expect(statusRetorno({ ...semCiclo, dias_parado: JANELA_PADRAO_DIAS + 1 })).toBe("vencido");
+    expect(statusRetorno({ ...semCiclo, dias_parado: JANELA_PADRAO_DIAS - AVISO_DIAS })).toBe(
+      "a_vencer",
+    );
+    expect(statusRetorno({ ...semCiclo, dias_parado: 1 })).toBe("em_dia");
+  });
+
+  it("pacote concluído fica fora dos cards", () => {
+    // Não há retorno a acompanhar; contá-lo como "em dia" incharia o card verde
+    // com tratamento que já acabou.
+    expect(statusRetorno(pacote({ restantes: 0, proxima_data: null, dias_parado: null }))).toBe(
+      "sem_prazo",
+    );
+  });
+
+  describe("contarStatus", () => {
+    const lista = [
+      manutencao({ paciente_id: "a", dias_parado: 58 }),
+      manutencao({ paciente_id: "b", dias_parado: 41 }),
+      manutencao({ paciente_id: "c", dias_parado: 25 }),
+      manutencao({ paciente_id: "d", dias_parado: 3 }),
+      pacote({ paciente_id: "e", restantes: 0, proxima_data: null, dias_parado: null }),
+    ];
+
+    it("distribui cada linha em um só card", () => {
+      const c = contarStatus(lista);
+      expect(c).toEqual({ vencido: 2, aVencer: 1, emDia: 1, semPrazo: 1 });
+    });
+
+    it("a soma dos quatro fecha com o total de linhas", () => {
+      // Se este teste cair, algum paciente sumiu do quadro — e a coordenação
+      // passa a acompanhar um resgate menor do que o real.
+      const c = contarStatus(lista);
+      expect(c.vencido + c.aVencer + c.emDia + c.semPrazo).toBe(lista.length);
+    });
+  });
+
+  describe("filtrarPorStatus", () => {
+    const lista = [
+      manutencao({ paciente_id: "a", dias_parado: 58 }),
+      manutencao({ paciente_id: "b", dias_parado: 25 }),
+      manutencao({ paciente_id: "c", dias_parado: 3 }),
+    ];
+
+    it("recorta pelo card clicado", () => {
+      expect(filtrarPorStatus(lista, "vencido").map((l) => l.paciente_id)).toEqual(["a"]);
+      expect(filtrarPorStatus(lista, "a_vencer").map((l) => l.paciente_id)).toEqual(["b"]);
+    });
+
+    it("sem card clicado devolve a lista inteira", () => {
+      expect(filtrarPorStatus(lista, null)).toHaveLength(3);
     });
   });
 });

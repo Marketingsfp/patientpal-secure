@@ -55,6 +55,14 @@ export interface LinhaSessao {
   proxima_data: string | null;
   dias_parado: number | null;
   pendencia: string;
+  /**
+   * Janela de retorno cadastrada no procedimento, em dias.
+   *
+   * Nula quando o tratamento não tem ciclo cadastrado — é o caso dos pacotes de
+   * fisioterapia — e no modo movimento, onde a folha é uma janela fechada de
+   * produção e um prazo de retorno não descreveria nada.
+   */
+  ciclo_dias: number | null;
 }
 
 export type FiltroSessoes =
@@ -484,4 +492,102 @@ export function resumoSessoes(
     { rotulo: "Saldo a receber (só pacotes)", valor: brl(t.emAberto) },
     { rotulo: "Sem agendamento (busca ativa)", valor: n(t.buscaAtiva) },
   ];
+}
+
+// ============================================================================
+// STATUS DE RETORNO — os três cards de acompanhamento
+// ============================================================================
+//
+// A coordenação acompanha o resgate por três números: quantos já venceram,
+// quantos vencem nos próximos dias e quantos estão em dia. É a mesma régua da
+// coluna Situação, só que contada — e é de propósito que as duas usem a mesma
+// conta: dois números discordando na mesma linha ("Vencido" no card, "Em dia"
+// na coluna) destruiria a confiança na lista inteira.
+//
+// A janela de cada linha é o `ciclo_dias` do procedimento, que vem do banco.
+// Quem não tem ciclo cadastrado cai na janela padrão abaixo.
+// ============================================================================
+
+/**
+ * Janela usada quando o tratamento não tem ciclo cadastrado.
+ *
+ * Hoje só os pacotes de fisioterapia caem aqui: o cadastro de procedimentos tem
+ * `ciclo_dias` preenchido nas quatro manutenções de aparelho, e vazio no resto.
+ * Trinta dias é o mesmo prazo das manutenções — é um palpite explícito, e não
+ * uma regra da clínica. No dia em que a fisioterapia tiver um prazo próprio de
+ * retorno, basta cadastrá-lo no procedimento: os cards passam a segui-lo sem
+ * mudar uma linha de código.
+ */
+export const JANELA_PADRAO_DIAS = 30;
+
+/** Quantos dias antes do vencimento a linha entra em "A vencer". */
+export const AVISO_DIAS = 7;
+
+export type StatusRetorno = "vencido" | "a_vencer" | "em_dia" | "sem_prazo";
+
+export const ROTULO_STATUS: Record<StatusRetorno, string> = {
+  vencido: "Vencido",
+  a_vencer: "A vencer",
+  em_dia: "Em dia",
+  sem_prazo: "Sem prazo",
+};
+
+/**
+ * Em que ponto do prazo de retorno esta linha está.
+ *
+ * A ordem das perguntas importa:
+ *
+ *  1. pacote concluído sai da conta — não há retorno a acompanhar, e contá-lo
+ *     como "em dia" incharia o card verde com tratamento que acabou;
+ *  2. quem TEM data marcada está em dia, por definição e sem exceção. É a mesma
+ *     regra da coluna Situação, e a única leitura possível: o paciente já
+ *     voltou para a agenda;
+ *  3. o resto se mede pelos dias parados contra a janela do procedimento.
+ */
+export function statusRetorno(l: LinhaSessao): StatusRetorno {
+  if (l.origem === "pacote" && l.restantes === 0) return "sem_prazo";
+  if (l.proxima_data) return "em_dia";
+  const janela = l.ciclo_dias && l.ciclo_dias > 0 ? l.ciclo_dias : JANELA_PADRAO_DIAS;
+  const parado = l.dias_parado ?? 0;
+  // `>` e não `>=`, para bater exatamente com o "Atrasado" que o banco escreve
+  // na coluna Situação: no trigésimo dia do ciclo de trinta o paciente ainda
+  // está dentro do prazo.
+  if (parado > janela) return "vencido";
+  if (parado >= janela - AVISO_DIAS) return "a_vencer";
+  return "em_dia";
+}
+
+export interface ContagemStatus {
+  vencido: number;
+  aVencer: number;
+  emDia: number;
+  /** Pacotes concluídos: aparecem na tabela, mas não em card nenhum. */
+  semPrazo: number;
+}
+
+export function contarStatus(linhas: LinhaSessao[]): ContagemStatus {
+  const c: ContagemStatus = { vencido: 0, aVencer: 0, emDia: 0, semPrazo: 0 };
+  for (const l of linhas) {
+    const s = statusRetorno(l);
+    if (s === "vencido") c.vencido += 1;
+    else if (s === "a_vencer") c.aVencer += 1;
+    else if (s === "em_dia") c.emDia += 1;
+    else c.semPrazo += 1;
+  }
+  return c;
+}
+
+/**
+ * Recorte por status, aplicado DEPOIS do filtro do seletor.
+ *
+ * São duas perguntas empilhadas, e não uma só: "quero ver as manutenções" e,
+ * dentro delas, "só as vencidas". Por isso o clique no card não substitui o
+ * seletor — ele estreita o que o seletor já escolheu.
+ */
+export function filtrarPorStatus(
+  linhas: LinhaSessao[],
+  status: StatusRetorno | null,
+): LinhaSessao[] {
+  if (!status) return linhas;
+  return linhas.filter((l) => statusRetorno(l) === status);
 }

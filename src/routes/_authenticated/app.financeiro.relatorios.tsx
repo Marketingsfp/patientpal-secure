@@ -35,6 +35,7 @@ import {
   PhoneCall,
   Printer,
   Search,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -84,11 +85,19 @@ import {
   linhaTela,
   tomDaSituacao,
   modoDoFiltro,
-  linhasSessoes,
+  linhaExibida,
   resumoSessoes,
   ROTULO_FILTRO,
   filtrarSessoes,
   totaisSessoes,
+  // Os três cards de acompanhamento — Vencido, A vencer, Em dia — e o recorte
+  // que o clique neles aplica.
+  contarStatus,
+  filtrarPorStatus,
+  ROTULO_STATUS,
+  AVISO_DIAS,
+  JANELA_PADRAO_DIAS,
+  type StatusRetorno,
   type FiltroSessoes,
   type LinhaSessao,
   type ModoSessoes,
@@ -567,6 +576,80 @@ function CardResumo({
 }
 
 /**
+ * Card de status do retorno — Vencido, A vencer, Em dia.
+ *
+ * É um botão de verdade, e não um cartão com `onClick`: a recepção navega esta
+ * tela pelo teclado entre um atendimento e outro, e um `div` clicável não
+ * recebe foco nem responde ao Enter.
+ *
+ * O estado ligado tem anel e sombra além da cor, porque a diferença entre
+ * "vermelho claro" e "vermelho claro selecionado" precisa aparecer para quem
+ * não distingue bem as duas — e num monitor de balcão, quase sempre com o
+ * brilho no mínimo.
+ */
+function CardStatus({
+  titulo,
+  valor,
+  detalhe,
+  cor,
+  ativo,
+  onClick,
+}: {
+  titulo: string;
+  valor: number;
+  detalhe: string;
+  cor: "vermelho" | "ambar" | "verde";
+  ativo: boolean;
+  onClick: () => void;
+}) {
+  const tons = {
+    vermelho: {
+      base: "border-rose-200 bg-rose-50/70 hover:bg-rose-50",
+      numero: "text-rose-700",
+      titulo: "text-rose-700",
+      anel: "ring-rose-400",
+    },
+    ambar: {
+      base: "border-amber-200 bg-amber-50/70 hover:bg-amber-50",
+      numero: "text-amber-700",
+      titulo: "text-amber-700",
+      anel: "ring-amber-400",
+    },
+    verde: {
+      base: "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50",
+      numero: "text-emerald-700",
+      titulo: "text-emerald-700",
+      anel: "ring-emerald-400",
+    },
+  }[cor];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={cn(
+        "rounded-lg border p-3 text-left transition-shadow",
+        tons.base,
+        ativo && `ring-2 ring-offset-1 shadow-sm ${tons.anel}`,
+      )}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={cn("text-xs font-semibold uppercase tracking-wide", tons.titulo)}>
+          {titulo}
+        </span>
+        <span className={cn("text-2xl font-bold tabular-nums", tons.numero)}>
+          {valor.toLocaleString("pt-BR")}
+        </span>
+      </div>
+      <p className="mt-0.5 text-xs text-slate-600">{detalhe}</p>
+      <p className="mt-1 text-[11px] font-medium text-slate-500">
+        {ativo ? "Filtrando por este status — clique para mostrar todos" : "Clique para filtrar"}
+      </p>
+    </button>
+  );
+}
+
+/**
  * Cor da etiqueta de situação na visão compacta de Sessões.
  *
  * "Atrasado" e "Sem agendamento" dividem o mesmo âmbar porque, para a recepção,
@@ -634,6 +717,11 @@ function Page() {
   // Recorte da MESMA lista carregada, como o sintético/analítico do extrato:
   // trocar de "Tudo" para "Busca ativa" não vai ao banco de novo.
   const [sFiltro, setSFiltro] = useState<FiltroSessoes>("todos");
+  /**
+   * Recorte pelo card de status clicado, empilhado sobre o seletor acima.
+   * `null` é "todos os status" — o estado normal da tela.
+   */
+  const [filtroStatus, setFiltroStatus] = useState<StatusRetorno | null>(null);
 
   // --- Busca ativa: contato, agendamento e histórico -----------------------
   // Registrar contato é ato de recepção, mas a tela mora no Financeiro. Vale a
@@ -842,24 +930,39 @@ function Page() {
    * "Busca ativa" é escolher outro conjunto de pacientes, e um rodapé com o
    * total geral em cima de 12 linhas visíveis confundiria quem confere.
    */
-  const totaisS = useMemo(
-    () => totaisSessoes(filtrarSessoes(sessoesCruas, sFiltro)),
+  /** Linhas do seletor, ANTES do recorte por status do clique no card. */
+  const sessoesDoSeletor = useMemo(
+    () => filtrarSessoes(sessoesCruas, sFiltro),
     [sessoesCruas, sFiltro],
   );
+
+  /**
+   * Contagem dos três cards.
+   *
+   * Sai de `sessoesDoSeletor`, e NÃO da lista já recortada pelo card clicado.
+   * Se saísse da recortada, clicar em "Vencido" zeraria os outros dois cards e
+   * tiraria do usuário justamente o que ele precisa para voltar — o quadro
+   * inteiro tem que continuar de pé enquanto se olha uma fatia dele.
+   */
+  const statusS = useMemo(() => contarStatus(sessoesDoSeletor), [sessoesDoSeletor]);
+
   /**
    * As mesmas linhas da tabela, mas CRUAS.
    *
    * A tabela é genérica e trabalha com registros já formatados, que não
    * carregam `paciente_id` — e não podem carregar: o CSV é montado a partir das
    * chaves do primeiro registro, então qualquer campo extra vira uma coluna de
-   * ids na planilha do financeiro. Como `linhasSessoes` aplica exatamente este
-   * mesmo filtro e nesta mesma ordem, a linha `i` da tabela é a linha `i` daqui,
-   * e é assim que o clique no nome sabe de qual paciente se trata.
+   * ids na planilha do financeiro. As linhas exibidas são geradas a partir
+   * DESTA lista, na mesma ordem, e é isso que faz a linha `i` da tabela ser a
+   * linha `i` daqui — que é como o clique no nome sabe de qual paciente se
+   * trata.
    */
   const sessoesFiltradas = useMemo(
-    () => filtrarSessoes(sessoesCruas, sFiltro),
-    [sessoesCruas, sFiltro],
+    () => filtrarPorStatus(sessoesDoSeletor, filtroStatus),
+    [sessoesDoSeletor, filtroStatus],
   );
+
+  const totaisS = useMemo(() => totaisSessoes(sessoesFiltradas), [sessoesFiltradas]);
 
   /**
    * Histórico de contato dos pacientes que estão na lista.
@@ -1014,8 +1117,14 @@ function Page() {
     // As duas visões do extrato saem da mesma lista carregada: trocar de
     // sintético para analítico reorganiza a tabela na hora, sem ir ao banco.
     if (resultado.tipo === "movimentacao") return linhasExtrato(movsExtrato, rTipo);
-    // Mesmo princípio: o filtro de sessões recorta a lista já carregada.
-    if (resultado.tipo === "sessoes") return linhasSessoes(sessoesCruas, sFiltro);
+    // Mesmo princípio: os filtros de sessões recortam a lista já carregada.
+    // Sai de `sessoesFiltradas` para que a exportação e a tabela mostrem
+    // exatamente as mesmas linhas — inclusive quando um card de status está
+    // clicado. Uma planilha com mais linhas do que a tela é a forma mais rápida
+    // de alguém conferir o número errado.
+    if (resultado.tipo === "sessoes") {
+      return sessoesFiltradas.map((l) => linhaExibida(l, modoDoFiltro(sFiltro)));
+    }
     if (resultado.tipo !== "rateio") return resultado.linhas;
     // No analítico o "Agrupar por" não soma nada: ele manda na ORDEM em que os
     // atendimentos aparecem, para a folha sair na sequência que o usuário pediu.
@@ -1039,7 +1148,7 @@ function Page() {
     linhasRateio,
     linhasRateioComp,
     movsExtrato,
-    sessoesCruas,
+    sessoesFiltradas,
     sFiltro,
     rTipo,
     rAgrupar,
@@ -1080,7 +1189,14 @@ function Page() {
   // a primeira página evita a tela em branco de uma página que não existe mais.
   useEffect(() => {
     setPagina(1);
-  }, [rTipo, rAgrupar, sFiltro, categorias]);
+  }, [rTipo, rAgrupar, sFiltro, filtroStatus, categorias]);
+
+  // Trocar de relatório ou de recorte solta o card de status: "Vencido" dentro
+  // de "Só pacotes" pode não existir, e a tela ficaria vazia sem explicar por
+  // quê — com o card aceso lá em cima, fora do campo de visão de quem rolou.
+  useEffect(() => {
+    setFiltroStatus(null);
+  }, [tipo, sFiltro]);
 
   // Ao escolher "Intervalo personalizado" os campos abrem preenchidos com o
   // período anterior — em branco, o comparativo nasceria comparando o período
@@ -1447,7 +1563,12 @@ function Page() {
           ate: ateSessoes,
           modo: modoDoFiltro(sFiltro),
         });
-        data = linhasSessoes(sessoes, sFiltro);
+        // Mesma pilha de filtros da tela: o seletor e, sobre ele, o card de
+        // status clicado. A planilha e a folha impressa saem com as mesmas
+        // linhas que estao a vista.
+        data = filtrarPorStatus(filtrarSessoes(sessoes, sFiltro), filtroStatus).map((l) =>
+          linhaExibida(l, modoDoFiltro(sFiltro)),
+        );
       } else if (tipo === "lancamentos") {
         data = await fetchAll(() =>
           supabase
@@ -1622,7 +1743,7 @@ function Page() {
       }
       return;
     }
-    const ts = totaisSessoes(filtrarSessoes(res.sessoes, sFiltro));
+    const ts = totaisSessoes(filtrarPorStatus(filtrarSessoes(res.sessoes, sFiltro), filtroStatus));
     try {
       await exportarRelatorioXlsx({
         arquivo: `${tipo === "rateio" ? "rateio_receita" : `relatorio_${tipo}`}_${from}_${to}`,
@@ -1782,7 +1903,9 @@ function Page() {
       // Mesmo cuidado do rateio e do extrato: imprimir pode ser o primeiro
       // clique, então os totais são recalculados aqui a partir das linhas
       // cruas, e não lidos do `useMemo`, que só roda no render seguinte.
-      const ts = totaisSessoes(filtrarSessoes(res.sessoes, sFiltro));
+      const ts = totaisSessoes(
+        filtrarPorStatus(filtrarSessoes(res.sessoes, sFiltro), filtroStatus),
+      );
       imprimirRelatorio({
         clinicaNome: clinicaAtual?.clinica.nome ?? "Clínica",
         titulo: TITULOS.sessoes,
@@ -2474,10 +2597,13 @@ function Page() {
         </div>
       )}
 
+      {/* O gatilho é `sessoesDoSeletor`, e não `linhas`: com um card de status
+          clicado a tabela pode ficar vazia, e sumir com os cards nesse momento
+          tiraria da tela justamente o botão que desfaz o filtro. */}
       {tipo === "sessoes" &&
         modoDoFiltro(sFiltro) === "posicao" &&
         atualizado &&
-        linhas.length > 0 && (
+        sessoesDoSeletor.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <CardResumo
               titulo="Sem agendamento"
@@ -2506,6 +2632,60 @@ function Page() {
               valor={brl(totaisS.recebido)}
               detalhe={`Saldo a receber ${brl(totaisS.emAberto)} — só pacotes`}
             />
+          </div>
+        )}
+
+      {/* Segunda fileira: a situação do retorno de cada paciente.
+          A fileira de cima responde "quanto de tratamento e de dinheiro existe
+          nesta lista"; esta responde "quem eu preciso chamar, e com que
+          urgência". São perguntas diferentes, por isso duas fileiras e não uma
+          de sete cards. */}
+      {tipo === "sessoes" &&
+        modoDoFiltro(sFiltro) === "posicao" &&
+        atualizado &&
+        sessoesDoSeletor.length > 0 && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <CardStatus
+                titulo="Vencido"
+                valor={statusS.vencido}
+                detalhe="Passou do prazo de retorno e não tem data marcada"
+                cor="vermelho"
+                ativo={filtroStatus === "vencido"}
+                // Clicar de novo no card aceso desfaz o filtro. É o caminho de
+                // volta que a recepção acha sozinha, sem procurar um "limpar".
+                onClick={() => setFiltroStatus((s) => (s === "vencido" ? null : "vencido"))}
+              />
+              <CardStatus
+                titulo="A vencer"
+                valor={statusS.aVencer}
+                detalhe={`Vence nos próximos ${AVISO_DIAS} dias — ligar antes de atrasar`}
+                cor="ambar"
+                ativo={filtroStatus === "a_vencer"}
+                onClick={() => setFiltroStatus((s) => (s === "a_vencer" ? null : "a_vencer"))}
+              />
+              <CardStatus
+                titulo="Em dia"
+                valor={statusS.emDia}
+                detalhe="Dentro do prazo ou com a próxima consulta já marcada"
+                cor="verde"
+                ativo={filtroStatus === "em_dia"}
+                onClick={() => setFiltroStatus((s) => (s === "em_dia" ? null : "em_dia"))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O prazo de cada linha é o <strong>ciclo de retorno cadastrado no procedimento</strong>{" "}
+              — 30 dias nas manutenções de aparelho. É a mesma conta da coluna <em>Situação</em> da
+              tabela, então os dois nunca se contradizem. Tratamento sem ciclo cadastrado (os
+              pacotes de fisioterapia) usa {JANELA_PADRAO_DIAS} dias como referência.
+              {statusS.semPrazo > 0 && (
+                <>
+                  {" "}
+                  {statusS.semPrazo.toLocaleString("pt-BR")} pacote(s) já concluído(s) aparecem na
+                  tabela e <strong>não entram em card nenhum</strong> — não há retorno a acompanhar.
+                </>
+              )}
+            </p>
           </div>
         )}
 
@@ -2543,15 +2723,51 @@ function Page() {
                 <p className="text-xs text-muted-foreground">{textoPeriodoComparado}</p>
               )}
             </div>
-            <span className="text-sm text-muted-foreground">
-              {linhas.length.toLocaleString("pt-BR")} registro(s)
-            </span>
+            <div className="flex items-center gap-2">
+              {/* Etiqueta do card clicado, ao lado da contagem. Quem rolou até a
+                  tabela não vê mais os cards, e precisa saber por que a lista
+                  encolheu — e conseguir desfazer sem subir. */}
+              {filtroStatus && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 border-slate-200 text-xs"
+                  onClick={() => setFiltroStatus(null)}
+                >
+                  Só: {ROTULO_STATUS[filtroStatus]}
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground">
+                {linhas.length.toLocaleString("pt-BR")} registro(s)
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {linhas.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                Nenhum registro no período selecionado.
-              </p>
+              // Com um card de status clicado, "nenhum registro no período"
+              // seria mentira: existem registros, o filtro é que os escondeu. E
+              // o card aceso pode estar fora da tela para quem rolou até aqui.
+              filtroStatus ? (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum paciente com a situação <strong>{ROTULO_STATUS[filtroStatus]}</strong>{" "}
+                    dentro deste recorte.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setFiltroStatus(null)}
+                  >
+                    Mostrar todos os status
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Nenhum registro no período selecionado.
+                </p>
+              )
             ) : (
               <>
                 {/* A tabela do rateio comparado passa de dez colunas: em tela
