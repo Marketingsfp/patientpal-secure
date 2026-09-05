@@ -511,6 +511,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             label: "Revisão de Aprendizados",
             icon: ShieldCheck,
           },
+          {
+            to: "/app/nina-metricas",
+            label: "Métricas de Aprendizado",
+            icon: BarChart3,
+          },
         ],
       },
       {
