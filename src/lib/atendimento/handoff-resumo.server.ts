@@ -264,13 +264,15 @@ async function chamarModelo(prompt: string): Promise<unknown> {
 }
 
 /**
- * Devolve o resumo da última transferência, gerando-o quando ainda não existe
- * (ou quando `forcar` pede nova tentativa). Nunca lança: erro vira status.
+ * Devolve o resumo VIGENTE da conversa, gerando-o quando ainda não existe (ou
+ * quando `forcar` pede nova tentativa). Nunca lança: erro vira status.
  */
 export async function garantirResumoHandoff(args: {
   clinicaId: string;
   conversaId: string;
   forcar?: boolean;
+  /** Desfecho já teve a linha reservada por `registrarDesfechoResumo`. */
+  ignorarHandoff?: boolean;
   /** Contexto real do fluxo (não vem da IA): última pergunta, etapa, pendências. */
   extras?: {
     ultimaPergunta?: string | null;
@@ -292,19 +294,23 @@ export async function garantirResumoHandoff(args: {
     contato_paciente_id?: string | null;
     contato_nome?: string | null;
   } | null;
-  if (!conv?.handoff_em) return null; // conversa nunca passou por handoff
+  if (!conv) return null;
+  if (!conv.handoff_em && !args.ignorarHandoff) return null; // nunca passou por handoff
 
-  await reservarResumoHandoff({
-    clinicaId,
-    conversaId,
-    handoffEm: conv.handoff_em,
-    motivo: conv.handoff_motivo ?? null,
-  });
+  if (conv.handoff_em && !args.ignorarHandoff) {
+    await reservarResumoHandoff({
+      clinicaId,
+      conversaId,
+      handoffEm: conv.handoff_em,
+      motivo: conv.handoff_motivo ?? null,
+    });
+  }
 
   let linha = await ultimaLinha(clinicaId, conversaId);
   if (!linha) return null;
   if (linha.status === "ok" && !args.forcar) return linha;
 
+  const desfecho = (linha.desfecho ?? "handoff_humano") as DesfechoConversa;
   try {
     const [texto, agendado] = await Promise.all([
       transcricao(clinicaId, conversaId),
@@ -313,14 +319,20 @@ export async function garantirResumoHandoff(args: {
     if (!texto.trim()) throw new Error("Conversa sem mensagens para resumir");
     const bruto = await chamarModelo(
       `Contato: ${conv.contato_nome ?? "não informado"}\n` +
-        `Motivo registrado da transferência: ${conv.handoff_motivo ?? "não informado"}\n\n` +
+        `Motivo registrado da transferência: ${conv.handoff_motivo ?? "não informado"}\n` +
+        `Desfecho registrado pelo sistema (fato, não inferência): ${
+          ROTULO_DESFECHO[desfecho] ?? "Atualização do atendimento"
+        }\n\n` +
         `Conversa:\n${texto}`,
     );
-    const payload = normalizarResumo(bruto, {
-      motivoHandoff: conv.handoff_motivo ?? null,
-      agendamentoReal: agendado,
-      ...(args.extras ?? {}),
-    });
+    const payload = ajustarResumoPorDesfecho(
+      normalizarResumo(bruto, {
+        motivoHandoff: conv.handoff_motivo ?? null,
+        agendamentoReal: agendado,
+        ...(args.extras ?? {}),
+      }),
+      desfecho,
+    );
     const { data } = await supabaseAdmin
       .from(TABELA as never)
       .update({ status: "ok", payload: payload as never, erro: null } as never)
@@ -328,6 +340,7 @@ export async function garantirResumoHandoff(args: {
       .select("*")
       .maybeSingle();
     linha = (data as LinhaResumo | null) ?? { ...linha, status: "ok", payload };
+
     await registrarEvento({
       clinicaId,
       conversaId,
