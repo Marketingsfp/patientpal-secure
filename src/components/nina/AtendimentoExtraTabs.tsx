@@ -12,6 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
+  FILTRO_NAO_ATRIBUIDAS_KEY,
+} from "@/components/nina/BannerNaoAtribuidas";
+
+import {
   Dialog,
   DialogContent,
   DialogHeader,
