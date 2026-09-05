@@ -633,67 +633,85 @@ export function AtendInbox() {
     const janela = janelaRef.current;
     medidor.current?.marcar("request");
     marcarTroca("T2_requests");
-    try {
-      const [m, c, n, ev] = await Promise.all([
-        medirRequest(
-          "listarMensagensConversa",
-          listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
-        ).then((r) => {
-          marcarTroca("T4_mensagens");
-          return r;
-        }),
-        medirRequest(
-          "obterDadosContato",
-          obterContato({ data: { clinicaId, conversaId: alvo } }),
-        ).then((r) => {
-          marcarTroca("T3_conversa");
-          marcarTroca("T8_contato");
-          return r;
-        }),
-        medirRequest("listarNotas", listarNotasFn({ data: { clinicaId, conversaId: alvo } })),
-        medirRequest(
-          "listarEventosConversa",
-          listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
-        ).catch(() => [] as ConversaEvento[]),
-      ]);
-      if (
-        !respostaAindaVale({
-          alvo,
-          selecionadaAgora: selIdRef.current,
-          pedido,
-          pedidoAtual: seqConversa.current,
-        })
-      ) {
-        return;
-      }
-      medidor.current?.marcar("dados");
-      if (!c) {
-        // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
-        cacheConversas.current.invalidar(alvo);
-        setSel(null);
-        setConversaCarregadaId(null);
-        setMsgs([]);
-        setContato(null);
-        setNotas([]);
-        setEventos([]);
-        return;
-      }
-      const eventosLista = (ev ?? []) as ConversaEvento[];
-      cacheConversas.current.guardar(alvo, {
-        msgs: m,
-        contato: c,
-        notas: n,
-        eventos: eventosLista,
+    // Todas as buscas saem juntas (sem fila). A diferença é o que cada uma
+    // libera na tela: só as mensagens abrem o chat.
+    const aindaVale = () =>
+      respostaAindaVale({
+        alvo,
+        selecionadaAgora: selIdRef.current,
+        pedido,
+        pedidoAtual: seqConversa.current,
       });
-      setMsgs(m);
-      setContato(c);
-      setNotas(n);
-      setEventos(eventosLista);
-      setTemMaisAntigas(podeCarregarMais(m.length, janela));
-      setConversaCarregadaId(alvo);
-    } catch (e: any) {
-      mostrarErro(e);
-    }
+
+    const pMensagens = medirRequest(
+      "listarMensagensConversa",
+      listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+    );
+    const pContato = medirRequest(
+      "obterDadosContato",
+      obterContato({ data: { clinicaId, conversaId: alvo } }),
+    );
+    const pNotas = medirRequest(
+      "listarNotas",
+      listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
+    ).catch(() => [] as any[]);
+    const pEventos = medirRequest(
+      "listarEventosConversa",
+      listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
+    ).catch(() => [] as ConversaEvento[]);
+
+    // 1) Caminho crítico — mensagens recentes abrem o chat e o campo de envio.
+    const critico = (async () => {
+      try {
+        const m = await pMensagens;
+        marcarTroca("T4_mensagens");
+        if (!aindaVale()) return;
+        medidor.current?.marcar("dados");
+        setMsgs(m);
+        setTemMaisAntigas(podeCarregarMais(m.length, janela));
+        setConversaCarregadaId(alvo);
+      } catch (e: any) {
+        mostrarErro(e);
+      }
+    })();
+
+    // 2) Segundo plano — contato, notas e eventos entram quando chegarem.
+    const secundarios = (async () => {
+      try {
+        const [c, n, ev] = await Promise.all([pContato, pNotas, pEventos]);
+        marcarTroca("T3_conversa");
+        marcarTroca("T8_contato");
+        if (!aindaVale()) return;
+        if (!c) {
+          // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
+          cacheConversas.current.invalidar(alvo);
+          setSel(null);
+          setConversaCarregadaId(null);
+          setSecundariosCarregadosId(null);
+          setMsgs([]);
+          setContato(null);
+          setNotas([]);
+          setEventos([]);
+          return;
+        }
+        const eventosLista = (ev ?? []) as ConversaEvento[];
+        cacheConversas.current.guardar(alvo, {
+          msgs: await pMensagens.catch(() => [] as any[]),
+          contato: c,
+          notas: n,
+          eventos: eventosLista,
+        });
+        setContato(c);
+        setNotas(n);
+        setEventos(eventosLista);
+        setSecundariosCarregadosId(alvo);
+      } catch (e: any) {
+        // Dados de apoio não podem derrubar o atendimento em andamento.
+        console.warn("[atendimento] dados secundários:", e?.message ?? e);
+      }
+    })();
+
+    await Promise.all([critico, secundarios]);
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
 
 
