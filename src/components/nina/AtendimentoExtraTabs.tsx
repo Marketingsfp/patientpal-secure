@@ -34,6 +34,7 @@ import {
   Send,
   Search,
   Loader2,
+  UserCheck,
   Eye,
   ArrowRightLeft,
   CheckCircle2,
@@ -56,6 +57,8 @@ import {
   PinOff,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
   ConversationSystemEvent,
@@ -88,6 +91,7 @@ import {
   devolverParaNina,
   definirPresenca,
   esperaConversas,
+  assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
@@ -136,6 +140,10 @@ export function AtendInbox() {
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
   const esperaFn = useServerFn(esperaConversas);
+  const assumirFn = useServerFn(assumirConversa);
+  const { user } = useAuth();
+  const meuId = user?.id ?? null;
+  const podeAtender = usePodeEscrever("nina");
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
@@ -458,6 +466,21 @@ export function AtendInbox() {
   useEffect(() => {
     carregarConvs();
   }, [carregarConvs]);
+  // O responsável pode mudar a qualquer momento (transferência, distribuição
+  // automática, tomada por outra pessoa). A lista chega por Realtime, então a
+  // conversa aberta sempre acompanha o que está gravado no banco.
+  useEffect(() => {
+    if (!sel?.id) return;
+    const atual = convs.find((c: any) => c.id === sel.id);
+    if (!atual) return;
+    if (
+      atual.atribuida_user_id !== sel.atribuida_user_id ||
+      atual.status !== sel.status ||
+      atual.owner_type !== sel.owner_type
+    ) {
+      setSel((s: any) => ({ ...s, ...atual }));
+    }
+  }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
@@ -542,15 +565,68 @@ export function AtendInbox() {
     if (!j) return true;
     return Date.now() - j > 24 * 60 * 60 * 1000;
   })();
+  const nomeUsuario = useCallback(
+    (id?: string | null) => {
+      if (!id) return null;
+      const u = usuarios.find((x: any) => x.user_id === id);
+      return u?.nome ?? u?.email ?? "outro atendente";
+    },
+    [usuarios],
+  );
+  const responsavelId: string | null = sel?.atribuida_user_id ?? null;
+  const souResponsavel = !!meuId && responsavelId === meuId;
+  const conversaEncerrada = sel?.status === "closed" || sel?.status === "finished";
+  const [assumindo, setAssumindo] = useState(false);
+  const [assumirOpen, setAssumirOpen] = useState(false);
+
   const motivoBloqueio = !sel
     ? null
-    : pausaAtiva
+    : conversaEncerrada
+      ? "Conversa encerrada. Não é possível enviar mensagens."
+      : responsavelId && !souResponsavel
+        ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
+        : !podeAtender
+          ? "Você tem acesso somente de leitura no atendimento."
+          : pausaAtiva
       ? "Você está em pausa. Encerre a pausa para enviar mensagens."
       : !filaAberta
         ? "Você está offline. Fique online para enviar mensagens."
         : janela24hExpirada
           ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
           : null;
+
+  /**
+   * Assume a conversa. O servidor decide de forma atômica: se outra pessoa
+   * assumir no mesmo instante, o clique não vence e a tela é atualizada com o
+   * responsável real.
+   */
+  const assumir = async (forcar: boolean, motivo?: string) => {
+    if (!sel || !clinicaId || assumindo) return;
+    setAssumindo(true);
+    try {
+      const r: any = await assumirFn({
+        data: { clinicaId, conversaId: sel.id, forcar, motivo: motivo || undefined },
+      });
+      if (r?.ok) {
+        toast.success("Você agora é responsável por esta conversa.");
+        setAssumirOpen(false);
+      } else if (r?.motivo === "ENCERRADA") {
+        toast.error("Conversa encerrada. Não é possível assumir.");
+      } else if (r?.motivo === "NAO_ENCONTRADA") {
+        toast.error("Conversa não encontrada nesta clínica.");
+      } else {
+        toast.error(
+          `Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`,
+        );
+      }
+      await carregarConvs();
+      await carregarConversa();
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setAssumindo(false);
+    }
+  };
 
   const enviar = async () => {
     const t = draft.trim();
@@ -860,6 +936,17 @@ export function AtendInbox() {
                   {c.owner_type === "AI" && (
                     <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
                   )}
+                  {c.atribuida_user_id && (
+                    <Badge
+                      className={`text-[11px] ${
+                        c.atribuida_user_id === meuId
+                          ? "bg-atd-go/15 text-atd-ink border border-atd-go/30"
+                          : "bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
+                      }`}
+                    >
+                      {c.atribuida_user_id === meuId ? "Você" : nomeUsuario(c.atribuida_user_id)}
+                    </Badge>
+                  )}
                   {c.protocol_number && (
                     <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
                   )}
@@ -916,9 +1003,26 @@ export function AtendInbox() {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0">
+                    {!conversaEncerrada && !souResponsavel && podeAtender && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        disabled={assumindo}
+                        className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
+                        onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
+                      >
+                        {assumindo ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UserCheck className="mr-1 h-3.5 w-3.5" />
+                        )}
+                        Assumir conversa
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="default"
+                      disabled={!souResponsavel || conversaEncerrada}
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
                       onClick={() => setAgendaOpen(true)}
                     >
@@ -930,6 +1034,7 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={!!responsavelId && !souResponsavel}
                       className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                       onClick={() => setTransferOpen(true)}
                     >
@@ -939,6 +1044,7 @@ export function AtendInbox() {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={!souResponsavel}
                         className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
                         onClick={() => setFecharOpen(true)}
                       >
@@ -948,6 +1054,25 @@ export function AtendInbox() {
                   </div>
                 </div>
               </CardHeader>
+              <div
+                aria-live="polite"
+                className={`flex items-center gap-2 border-b px-3 py-1.5 text-xs ${
+                  souResponsavel
+                    ? "border-atd-go/30 bg-atd-go/10 text-atd-ink"
+                    : responsavelId
+                      ? "border-atd-warn bg-atd-warn-bg text-atd-warn-ink"
+                      : "border-atd-border bg-atd-idle-bg text-atd-ink-soft"
+                }`}
+              >
+                <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">
+                  {souResponsavel
+                    ? "Você é o responsável por esta conversa."
+                    : responsavelId
+                      ? `Em atendimento por ${nomeUsuario(responsavelId)} — modo somente leitura.`
+                      : "Sem responsável. Assuma para responder."}
+                </span>
+              </div>
               <div className="flex-1 overflow-auto p-4 space-y-2 bg-atd-bg">
                 {clinicaId && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
@@ -1219,6 +1344,41 @@ export function AtendInbox() {
         )}
 
         {/* DIALOGS */}
+
+        <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assumir conversa</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                void assumir(true, String(fd.get("motivo") || ""));
+              }}
+              className="space-y-3"
+            >
+              <p className="text-sm text-muted-foreground">
+                Esta conversa está sendo atendida por{" "}
+                <strong>{nomeUsuario(responsavelId)}</strong>. Ao assumir, essa pessoa passa a
+                somente leitura e a troca fica registrada no histórico.
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="motivo-assumir">Motivo (opcional)</Label>
+                <Textarea id="motivo-assumir" name="motivo" rows={2} maxLength={500} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAssumirOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={assumindo}>
+                  {assumindo && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Assumir mesmo assim
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
           <DialogContent>
