@@ -163,6 +163,12 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  avisoSaidaEscopo,
+  devoAutoSelecionar,
+  selecaoSaiuDoEscopo,
+  type LinhaInbox,
+} from "@/lib/atendimento/inbox-realtime";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
