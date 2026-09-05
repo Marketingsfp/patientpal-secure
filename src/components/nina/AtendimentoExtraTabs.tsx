@@ -749,9 +749,11 @@ export function AtendInbox() {
       setNotas(emCache.notas);
       setEventos(emCache.eventos);
       setConversaCarregadaId(id);
+      setSecundariosCarregadosId(id);
       return;
     }
     setConversaCarregadaId(null);
+    setSecundariosCarregadosId(null);
     setMsgs([]);
     setEventos([]);
     setContato(null);
