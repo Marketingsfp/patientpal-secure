@@ -176,12 +176,19 @@ export function AtendInbox() {
   >("all");
   // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
   const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
+  // Filtro "somente espera crítica" — acionado pela Central de Atenção.
+  const [soCriticas, setSoCriticas] = useState(false);
   // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
   const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
   const convsVisiveis: any[] = (() => {
-    const base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    if (soCriticas) {
+      base = base.filter(
+        (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
+      );
+    }
     if (ordem !== "espera") return base;
     return [...base].sort((a: any, b: any) => {
       const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
@@ -191,17 +198,30 @@ export function AtendInbox() {
   })();
   useEffect(() => {
     const ativar = () => setSoNaoAtribuidas(true);
+    const ativarCriticas = () => {
+      setSoCriticas(true);
+      setOrdem("espera");
+    };
     try {
       if (window.sessionStorage.getItem(FILTRO_NAO_ATRIBUIDAS_KEY) === "1") {
         window.sessionStorage.removeItem(FILTRO_NAO_ATRIBUIDAS_KEY);
         setSoNaoAtribuidas(true);
       }
+      if (window.sessionStorage.getItem(FILTRO_ESPERA_CRITICA_KEY) === "1") {
+        window.sessionStorage.removeItem(FILTRO_ESPERA_CRITICA_KEY);
+        ativarCriticas();
+      }
     } catch {
       /* sem armazenamento: só o evento abaixo aciona o filtro */
     }
     window.addEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
-    return () => window.removeEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+    window.addEventListener(EVENTO_FILTRAR_ESPERA_CRITICA, ativarCriticas);
+    return () => {
+      window.removeEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+      window.removeEventListener(EVENTO_FILTRAR_ESPERA_CRITICA, ativarCriticas);
+    };
   }, []);
+
 
   const [draft, setDraft] = useState("");
   const [enviando, setEnviando] = useState(false);
