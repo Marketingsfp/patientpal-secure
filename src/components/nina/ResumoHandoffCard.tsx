@@ -64,7 +64,10 @@ export function ResumoHandoffCard({
   }, [carregar]);
 
   // Resumo gerado pelo servidor (inclusive no timeout) aparece sem refresh.
-  useRealtimeRefresh(["atend_handoff_resumos", "atend_conversas"], () => void carregar(false));
+  // Só o próprio resumo dispara recarga. Antes, qualquer alteração em
+  // "atend_conversas" (toda mensagem nova atualiza a conversa) pedia o resumo
+  // de novo — era uma requisição repetida a cada mensagem.
+  useRealtimeRefresh(["atend_handoff_resumos"], () => void carregar(false));
 
   if (!linha) return null;
 
