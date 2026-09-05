@@ -2,14 +2,20 @@ import { describe, expect, it } from "bun:test";
 import {
   COLUNAS_SESSOES,
   colunasSessoes,
+  colunasSessoesTela,
+  linhaTela,
   modoDoFiltro,
+  resumoAtendimentos,
+  resumoFinanceiro,
   resumoSessoes,
   filtrarSessoes,
   linhaExibida,
   linhasSessoes,
   precisaBuscaAtiva,
   rotuloSessoes,
+  situacaoCurta,
   temPendenciaFinanceira,
+  tomDaSituacao,
   totaisSessoes,
   type LinhaSessao,
 } from "./relatorio-sessoes";
@@ -244,5 +250,163 @@ describe("modo movimento", () => {
     expect(rotulos).not.toContain("Sessões a fazer");
     expect(rotulos.some((r) => r.includes("Saldo"))).toBe(false);
     expect(rotulos).toContain("Recebido no período");
+  });
+});
+
+// ============================================================================
+// Visão compacta — a que aparece na tela
+// ============================================================================
+describe("visão compacta da tela", () => {
+  const pacote = (over: Partial<LinhaSessao> = {}): LinhaSessao => ({
+    origem: "pacote",
+    paciente_id: "p1",
+    paciente_nome: "ANA MARIA",
+    prontuario: "0001234",
+    procedimento: "FISIOTERAPIA",
+    profissional: "DRA. MARINA",
+    total_sessoes: 5,
+    realizadas: 3,
+    faltas: 0,
+    restantes: 2,
+    valor_contratado: 300,
+    valor_pago: 300,
+    situacao_financeira: "pago",
+    ultima_data: "2026-08-20",
+    proxima_data: null,
+    dias_parado: 16,
+    pendencia: "Sem agendamento",
+    ...over,
+  });
+
+  const ciclo = (over: Partial<LinhaSessao> = {}): LinhaSessao =>
+    pacote({
+      origem: "ciclo",
+      procedimento: "MANUTENCAO",
+      total_sessoes: 0,
+      realizadas: 2,
+      restantes: 0,
+      valor_contratado: 0,
+      valor_pago: 190,
+      situacao_financeira: "por_visita",
+      ...over,
+    });
+
+  describe("resumoAtendimentos", () => {
+    it("junta realizadas, a fazer e faltas numa frase só", () => {
+      expect(resumoAtendimentos(pacote({ faltas: 1 }))).toBe("3/5 · 2 a fazer · 1 falta");
+    });
+
+    it("omite falta quando não houve nenhuma", () => {
+      // "0 faltas" repetido em vinte e oito linhas esconde a linha que tem
+      // falta de verdade.
+      expect(resumoAtendimentos(pacote())).toBe("3/5 · 2 a fazer");
+    });
+
+    it("omite 'a fazer' no pacote concluído", () => {
+      expect(resumoAtendimentos(pacote({ realizadas: 5, restantes: 0 }))).toBe("5/5");
+    });
+
+    it("conta visita, e não sessão, na manutenção", () => {
+      expect(resumoAtendimentos(ciclo({ faltas: 2 }))).toBe("2 visitas · 2 faltas");
+    });
+
+    it("no movimento não escreve 'a fazer', que é do pacote inteiro", () => {
+      expect(resumoAtendimentos(pacote({ realizadas: 3 }), "movimento")).toBe("3 sessões");
+    });
+  });
+
+  describe("resumoFinanceiro", () => {
+    it("mostra só o rótulo quando não há saldo", () => {
+      expect(resumoFinanceiro(pacote())).toBe("Pago");
+    });
+
+    it("mostra quanto ainda falta receber no parcial", () => {
+      expect(
+        resumoFinanceiro(pacote({ valor_pago: 100, situacao_financeira: "parcial" })),
+      ).toContain("Parcial");
+      expect(
+        resumoFinanceiro(pacote({ valor_pago: 100, situacao_financeira: "parcial" })),
+      ).toContain("200,00");
+    });
+
+    it("mostra o valor devido no que está em aberto", () => {
+      const texto = resumoFinanceiro(pacote({ valor_pago: 0, situacao_financeira: "aberto" }));
+      expect(texto).toContain("Em aberto");
+      expect(texto).toContain("300,00");
+    });
+
+    it("manutenção nunca exibe valor devido", () => {
+      // Faltar à manutenção não gera dívida — ver o cabeçalho do módulo.
+      expect(resumoFinanceiro(ciclo())).toBe("Por visita");
+    });
+  });
+
+  describe("situacaoCurta", () => {
+    it("tira os dias da etiqueta, que já têm coluna própria ao lado", () => {
+      expect(situacaoCurta("Abandono — 83 dias sem manutenção")).toBe("Abandono");
+      expect(situacaoCurta("Atrasado — 41 dias sem manutenção")).toBe("Atrasado");
+    });
+
+    it("encurta a próxima data para dia e mês", () => {
+      expect(situacaoCurta("Próxima em 20/09/2026")).toBe("Próxima 20/09");
+    });
+
+    it("mantém o que já é curto", () => {
+      expect(situacaoCurta("Em dia")).toBe("Em dia");
+      expect(situacaoCurta("Sem agendamento")).toBe("Sem agendamento");
+      expect(situacaoCurta("Pacote concluído")).toBe("Concluído");
+    });
+  });
+
+  describe("tomDaSituacao", () => {
+    it("pinta de âmbar o que exige uma ligação hoje", () => {
+      expect(tomDaSituacao("Atrasado")).toBe("ambar");
+      expect(tomDaSituacao("Sem agendamento")).toBe("ambar");
+    });
+
+    it("separa o abandono, o que está em dia e o já remarcado", () => {
+      expect(tomDaSituacao("Abandono")).toBe("vermelho");
+      expect(tomDaSituacao("Em dia")).toBe("verde");
+      expect(tomDaSituacao("Próxima 20/09")).toBe("azul");
+      expect(tomDaSituacao("Concluído")).toBe("neutro");
+    });
+  });
+
+  describe("colunas e linha da tela", () => {
+    it("cabe em menos colunas que a folha de conferência", () => {
+      // É a razão de a visão compacta existir: quinze colunas pediam rolagem
+      // lateral em 1366x768.
+      expect(colunasSessoesTela("posicao").length).toBeLessThan(COLUNAS_SESSOES.length);
+      expect(colunasSessoesTela("posicao").length).toBe(7);
+      expect(colunasSessoesTela("movimento").length).toBe(6);
+    });
+
+    it("toda coluna da tela encontra um campo na linha", () => {
+      // O erro que este teste pega já aconteceu no Rateio: uma coluna apontando
+      // para um campo inexistente desenha um traço em todas as linhas.
+      const linha = linhaTela(pacote(), "posicao");
+      for (const c of colunasSessoesTela("posicao")) {
+        expect(Object.keys(linha)).toContain(c.chave);
+      }
+      const linhaMov = linhaTela(pacote(), "movimento");
+      for (const c of colunasSessoesTela("movimento")) {
+        expect(Object.keys(linhaMov)).toContain(c.chave);
+      }
+    });
+
+    it("carrega prontuário, tipo e profissional, que perderam coluna própria", () => {
+      const linha = linhaTela(ciclo(), "posicao");
+      expect(linha.prontuario).toBe("0001234");
+      expect(linha.origem).toBe("Manutenção");
+      expect(linha.profissional).toBe("DRA. MARINA");
+    });
+
+    it("não altera a folha exportada", () => {
+      // A visão compacta é só da tela: o Excel, o CSV e o papel continuam com
+      // uma coluna por número.
+      expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("faltas");
+      expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("restantes");
+      expect(COLUNAS_SESSOES.map((c) => c.chave)).toContain("valor_contratado");
+    });
   });
 });

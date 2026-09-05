@@ -77,6 +77,12 @@ import { carregarCategorias, type CategoriaFinanceira } from "@/lib/financeiro/c
 // o acesso ao banco, em `carregar-sessoes`.
 import {
   colunasSessoes,
+  // A TELA usa um conjunto compacto de colunas; o Excel, o CSV e o papel
+  // continuam com as quinze de conferência. Ver o bloco "VISÃO COMPACTA" em
+  // `relatorio-sessoes`.
+  colunasSessoesTela,
+  linhaTela,
+  tomDaSituacao,
   modoDoFiltro,
   linhasSessoes,
   resumoSessoes,
@@ -85,6 +91,8 @@ import {
   totaisSessoes,
   type FiltroSessoes,
   type LinhaSessao,
+  type ModoSessoes,
+  type TomSituacao,
   type TotaisSessoes,
 } from "@/lib/sessoes/relatorio-sessoes";
 import { carregarSessoes } from "@/lib/sessoes/carregar-sessoes";
@@ -558,6 +566,35 @@ function CardResumo({
   );
 }
 
+/**
+ * Cor da etiqueta de situação na visão compacta de Sessões.
+ *
+ * "Atrasado" e "Sem agendamento" dividem o mesmo âmbar porque, para a recepção,
+ * são o mesmo trabalho: ligar hoje. A separação entre eles interessa ao
+ * relatório impresso, não a quem está com o telefone na mão.
+ */
+const COR_SITUACAO: Record<TomSituacao, string> = {
+  verde: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  azul: "border-sky-200 bg-sky-50 text-sky-700",
+  ambar: "border-amber-200 bg-amber-50 text-amber-700",
+  vermelho: "border-rose-200 bg-rose-50 text-rose-700",
+  neutro: "border-slate-200 bg-slate-50 text-slate-600",
+};
+
+/**
+ * Largura das duas colunas de texto livre da visão compacta.
+ *
+ * O `min` impede que o navegador esprema o nome do paciente até ele quebrar em
+ * quatro linhas quando a tabela está cheia; o `max` impede que um procedimento
+ * de nome comprido roube a largura de todas as outras colunas. Sem os dois, a
+ * tabela oscila de largura conforme a página, e a recepção perde a referência
+ * visual de onde cada coisa fica.
+ */
+const LARGURA_COMPACTA: Record<string, string> = {
+  paciente: "min-w-[168px] max-w-[240px]",
+  procedimento: "min-w-[148px] max-w-[220px]",
+};
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [tipo, setTipo] = useState<Tipo>("lancamentos");
@@ -861,6 +898,15 @@ function Page() {
   /** A tabela ganha as colunas de ação só na visão de posição, que é a da recepção. */
   const mostrarAcoes = tipo === "sessoes" && modoDoFiltro(sFiltro) === "posicao";
 
+  /**
+   * Modo compacto: fonte menor, célula baixa e as células de duas linhas.
+   *
+   * Vale em Sessões nas duas visões — a de movimento também é longa demais para
+   * a linha padrão da tabela. Nos outros relatórios nada muda: eles têm poucas
+   * colunas e são lidos parados, não no meio de um atendimento.
+   */
+  const compacto = tipo === "sessoes";
+
   /** Uma linha do relatório traduzida para o que os painéis de contato pedem. */
   const pacienteDaLinha = (i: number): PacienteDaLista | null => {
     const l = sessoesFiltradas[i];
@@ -1013,6 +1059,23 @@ function Page() {
     [tipo, rTipo, rAgrupar, comparacaoVisivel, sFiltro],
   );
 
+  /**
+   * Colunas e linhas da TABELA NA TELA.
+   *
+   * Em tudo que não é Sessões são as mesmas do `colunas` acima. Em Sessões a
+   * tela usa a visão compacta: quinze colunas pediam rolagem lateral em
+   * 1366x768 e quebravam o nome do paciente em três e quatro linhas, o que
+   * inutiliza justamente a lista que a recepção lê correndo o olho.
+   *
+   * `colunas` continua sendo a fonte do CSV, do Excel e do papel — que são
+   * folhas de conferência e precisam de uma coluna por número. Por isso as duas
+   * variáveis convivem: mexer numa não pode mexer na outra.
+   */
+  const colunasTabela = useMemo(
+    () => (tipo === "sessoes" ? colunasSessoesTela(modoDoFiltro(sFiltro)) : colunas),
+    [tipo, sFiltro, colunas],
+  );
+
   // A troca de agrupamento (ou de categoria) pode encurtar a lista; voltar para
   // a primeira página evita a tela em branco de uma página que não existe mais.
   useEffect(() => {
@@ -1045,10 +1108,26 @@ function Page() {
     return { somas, receitas, despesas, saldo: receitas - despesas };
   }, [linhas, colunas, tipo]);
 
+  /**
+   * As linhas desenhadas na tela.
+   *
+   * Em Sessões vêm de `linhaTela`, a versão compacta, montada a partir das
+   * MESMAS linhas cruas e na mesma ordem de `linhas` — é isso que mantém a
+   * página, a contagem de registros e o índice do clique no nome batendo entre
+   * as duas listas.
+   */
+  const linhasNaTela = useMemo(
+    () =>
+      tipo === "sessoes"
+        ? sessoesFiltradas.map((l) => linhaTela(l, modoDoFiltro(sFiltro)))
+        : linhas,
+    [tipo, sessoesFiltradas, sFiltro, linhas],
+  );
+
   const totalPaginas = Math.max(1, Math.ceil(linhas.length / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
   const inicio = (paginaAtual - 1) * POR_PAGINA;
-  const linhasDaPagina = linhas.slice(inicio, inicio + POR_PAGINA);
+  const linhasDaPagina = linhasNaTela.slice(inicio, inicio + POR_PAGINA);
 
   /**
    * Rodapé do Rateio. A margem NÃO é a soma das margens das linhas: é a margem
@@ -1115,6 +1194,34 @@ function Page() {
       return i === 1 ? `${t.buscaAtiva.toLocaleString("pt-BR")} sem agendamento` : "";
     });
 
+  /**
+   * Rodapé da versão compacta, a que aparece na tela.
+   *
+   * As colunas "A fazer" e "Faltas" deixaram de existir sozinhas, mas os dois
+   * totais continuam na folha — reunidos embaixo de "Atendimentos", que é onde
+   * os números foram parar. O saldo a receber fica embaixo de "Financeiro",
+   * pela mesma razão.
+   */
+  const rodapeSessoesTela = (cols: Coluna[], t: TotaisSessoes, modo: ModoSessoes) =>
+    cols.map((c, i) => {
+      if (c.chave === "atendimentos") {
+        return modo === "movimento"
+          ? `${t.faltasColuna.toLocaleString("pt-BR")} falta(s)`
+          : `${t.sessoesRestantes.toLocaleString("pt-BR")} a fazer · ${t.faltasColuna.toLocaleString(
+              "pt-BR",
+            )} falta(s)`;
+      }
+      if (c.chave === "financeiro") return `${brl(t.emAberto)} a receber`;
+      if (c.chave === "valor_pago") return brl(t.recebido);
+      if (i === 0) return `${t.linhas.toLocaleString("pt-BR")} registro(s)`;
+      // "Sem agendamento" não se aplica ao movimento: lá a folha é uma janela
+      // fechada de produção, não a posição de ninguém.
+      if (i === 1 && modo === "posicao") {
+        return `${t.buscaAtiva.toLocaleString("pt-BR")} sem agendamento`;
+      }
+      return "";
+    });
+
   /** Mesmo rodapé com números crus, para o Excel conseguir somar a coluna. */
   const rodapeSessoesXlsx = (cols: Coluna[], t: TotaisSessoes) =>
     cols.map((c, i) => {
@@ -1156,12 +1263,12 @@ function Page() {
   /** Rodapé da tabela: contagem na 1ª coluna e a soma em cada coluna de dinheiro. */
   const rodape =
     tipo === "rateio"
-      ? rodapeRateio(colunas, totaisR, totaisComp)
+      ? rodapeRateio(colunasTabela, totaisR, totaisComp)
       : tipo === "movimentacao"
-        ? rodapeExtrato(colunas, totaisM)
+        ? rodapeExtrato(colunasTabela, totaisM)
         : tipo === "sessoes"
-          ? rodapeSessoes(colunas, totaisS)
-          : colunas.map((c, i) => {
+          ? rodapeSessoesTela(colunasTabela, totaisS, modoDoFiltro(sFiltro))
+          : colunasTabela.map((c, i) => {
               if (c.somar) {
                 // Em Lançamentos, somar receita com despesa não daria dinheiro nenhum:
                 // o consolidado da coluna é o saldo do período.
@@ -2179,10 +2286,13 @@ function Page() {
               {modoDoFiltro(sFiltro) === "posicao" && (
                 <p className="mt-3 border-t border-slate-200 pt-2.5 text-xs text-muted-foreground">
                   <strong>Para a recepção:</strong> clique no <strong>nome do paciente</strong> para
-                  ver telefone, WhatsApp e CPF. Use <strong>Agendar</strong> para abrir a Agenda já
-                  com o paciente e o serviço preenchidos, e <strong>Contato</strong> para anotar o
-                  que aconteceu na ligação — a anotação fica no histórico do paciente e aparece na
-                  coluna <em>Último contato</em>.
+                  ver telefone, WhatsApp e CPF. Na coluna <em>Ação</em>, o botão de{" "}
+                  <strong>calendário</strong> abre a Agenda já com o paciente e o serviço
+                  preenchidos, e o de <strong>telefone</strong> anota o que aconteceu na ligação — a
+                  anotação fica no histórico do paciente e aparece na coluna <em>Último contato</em>
+                  . A tela mostra a lista resumida; o{" "}
+                  <strong>Excel, o CSV e a impressão continuam com todas as colunas</strong> de
+                  conferência.
                 </p>
               )}
             </div>
@@ -2450,10 +2560,17 @@ function Page() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {colunas.map((c) => (
+                        {colunasTabela.map((c) => (
                           <TableHead
                             key={c.chave}
-                            className={alinhaDireita(c) ? "text-right" : undefined}
+                            className={cn(
+                              alinhaDireita(c) && "text-right",
+                              // Modo compacto: cabeçalho mais baixo e menor, para
+                              // a linha do título não ocupar o dobro da linha de
+                              // dado.
+                              compacto && "h-9 px-2 text-[11px]",
+                              compacto && LARGURA_COMPACTA[c.chave],
+                            )}
                           >
                             {c.rotulo}
                           </TableHead>
@@ -2462,8 +2579,12 @@ function Page() {
                             entram em `colunas` de propósito: aquela lista é a
                             fonte do CSV, do Excel e do papel, e botão não se
                             imprime. */}
-                        {mostrarAcoes && <TableHead>Último contato</TableHead>}
-                        {mostrarAcoes && <TableHead className="text-right">Ação</TableHead>}
+                        {mostrarAcoes && (
+                          <TableHead className="h-9 px-2 text-[11px]">Último contato</TableHead>
+                        )}
+                        {mostrarAcoes && (
+                          <TableHead className="h-9 px-2 text-right text-[11px]">Ação</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2472,7 +2593,7 @@ function Page() {
                         const ultimo = pac ? contatoPorPaciente.get(pac.pacienteId) : undefined;
                         return (
                           <TableRow key={inicio + i}>
-                            {colunas.map((c) => (
+                            {colunasTabela.map((c) => (
                               <TableCell
                                 key={c.chave}
                                 className={cn(
@@ -2482,34 +2603,107 @@ function Page() {
                                   // agrupador some do período atual, e o cinza
                                   // evita ler zero como se fosse produção real.
                                   linha.somenteAnterior === true && "text-muted-foreground",
+                                  // Modo compacto: célula baixa, fonte pequena e
+                                  // entrelinha apertada. `align-top` mantém a
+                                  // primeira linha de todas as células alinhada
+                                  // quando uma delas tem duas linhas.
+                                  compacto && "px-2 py-1.5 align-top text-xs leading-tight",
+                                  compacto && LARGURA_COMPACTA[c.chave],
+                                  // Datas e números não quebram nunca: "05/09/2026"
+                                  // partido em duas linhas é ilegível.
+                                  compacto &&
+                                    (c.chave === "atendimentos" || c.chave === "financeiro") &&
+                                    "whitespace-nowrap",
                                 )}
                               >
-                                {/* O nome do paciente abre o painel de contato.
-                                    É o clique mais natural da tela: quem lê a
-                                    lista está procurando com quem falar. */}
-                                {pac && c.chave === "paciente" ? (
-                                  <button
-                                    type="button"
-                                    className="text-left font-medium text-primary underline-offset-2 hover:underline"
-                                    onClick={() => setPacienteAberto(pac)}
+                                {/* Célula do paciente: o nome abre o painel de
+                                    contato — é o clique mais natural da tela,
+                                    porque quem lê a lista está procurando com
+                                    quem falar — e o prontuário desce para a
+                                    segunda linha, no lugar de uma coluna. */}
+                                {compacto && c.chave === "paciente" ? (
+                                  <div className="flex flex-col">
+                                    {pac ? (
+                                      <button
+                                        type="button"
+                                        title={String(linha.paciente ?? "")}
+                                        className="line-clamp-2 text-left font-medium text-primary underline-offset-2 hover:underline"
+                                        onClick={() => setPacienteAberto(pac)}
+                                      >
+                                        {celula(c, linha[c.chave])}
+                                      </button>
+                                    ) : (
+                                      <span className="line-clamp-2 font-medium">
+                                        {celula(c, linha[c.chave])}
+                                      </span>
+                                    )}
+                                    {!!linha.prontuario && (
+                                      <span className="text-[11px] text-muted-foreground">
+                                        Pront. {String(linha.prontuario)}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : compacto && c.chave === "procedimento" ? (
+                                  // O tipo (Pacote/Manutenção) e o profissional
+                                  // eram duas colunas. Viram a legenda do
+                                  // procedimento, que é como se lê a linha.
+                                  <div className="flex flex-col">
+                                    <span
+                                      className="line-clamp-2"
+                                      title={String(linha.procedimento ?? "")}
+                                    >
+                                      {celula(c, linha[c.chave])}
+                                    </span>
+                                    <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                                      {[linha.origem, linha.profissional]
+                                        .map((v) => String(v ?? "").trim())
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                    </span>
+                                  </div>
+                                ) : compacto &&
+                                  c.chave === "dias_parado" &&
+                                  linha.dias_parado === null ? (
+                                  // Nulo aqui não é zero: é "não se aplica"
+                                  // (pacote concluído). Escrever 0 leria como
+                                  // "está em dia", que é o oposto.
+                                  <span className="text-muted-foreground">—</span>
+                                ) : compacto && c.chave === "situacao_curta" ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "font-medium",
+                                      COR_SITUACAO[
+                                        tomDaSituacao(String(linha.situacao_curta ?? ""))
+                                      ],
+                                    )}
                                   >
                                     {celula(c, linha[c.chave])}
-                                  </button>
+                                  </Badge>
                                 ) : (
                                   celula(c, linha[c.chave])
                                 )}
                               </TableCell>
                             ))}
                             {mostrarAcoes && (
-                              <TableCell className="whitespace-nowrap">
+                              <TableCell className="whitespace-nowrap px-2 py-1.5 align-top text-xs">
                                 {ultimo ? (
                                   <Badge
                                     variant="outline"
                                     className={cn("font-medium", COR_RESULTADO[ultimo.resultado])}
-                                    title={ultimo.observacao || undefined}
+                                    // O ano da anotação sai da etiqueta e fica no
+                                    // título: contato de busca ativa é sempre
+                                    // recente, e "05/09/2026" custava largura.
+                                    title={[
+                                      fmtDate(ultimo.criado_em.slice(0, 10)),
+                                      ultimo.registrado_por_nome,
+                                      ultimo.observacao,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" — ")}
                                   >
                                     {ROTULO_RESULTADO_CURTO[ultimo.resultado]} ·{" "}
-                                    {fmtDate(ultimo.criado_em.slice(0, 10))}
+                                    {fmtDate(ultimo.criado_em.slice(0, 10)).slice(0, 5)}
                                   </Badge>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
@@ -2517,24 +2711,24 @@ function Page() {
                               </TableCell>
                             )}
                             {mostrarAcoes && (
-                              <TableCell className="whitespace-nowrap text-right">
-                                <div className={cn("flex justify-end gap-1", !pac && "hidden")}>
+                              <TableCell className="whitespace-nowrap px-2 py-1.5 align-top text-right">
+                                <div className={cn("flex justify-end gap-0.5", !pac && "hidden")}>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 px-2 text-slate-600 hover:text-primary"
+                                    className="h-7 px-1.5 text-xs text-slate-600 hover:text-primary"
                                     title="Agendar próxima"
                                     onClick={() => pac && irParaAgenda(pac)}
                                   >
-                                    <CalendarPlus className="h-4 w-4" />
-                                    <span className="sr-only sm:not-sr-only sm:ml-1.5">
+                                    <CalendarPlus className="h-3.5 w-3.5" />
+                                    <span className="sr-only 2xl:not-sr-only 2xl:ml-1">
                                       Agendar
                                     </span>
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 px-2 text-slate-600 hover:text-primary"
+                                    className="h-7 px-1.5 text-xs text-slate-600 hover:text-primary"
                                     title={
                                       podeRegistrarContato
                                         ? "Registrar contato"
@@ -2551,8 +2745,8 @@ function Page() {
                                       })
                                     }
                                   >
-                                    <PhoneCall className="h-4 w-4" />
-                                    <span className="sr-only sm:not-sr-only sm:ml-1.5">
+                                    <PhoneCall className="h-3.5 w-3.5" />
+                                    <span className="sr-only 2xl:not-sr-only 2xl:ml-1">
                                       Contato
                                     </span>
                                   </Button>
@@ -2565,14 +2759,15 @@ function Page() {
                     </TableBody>
                     <TableFooter>
                       <TableRow>
-                        {colunas.map((c, i) => (
+                        {colunasTabela.map((c, i) => (
                           <TableCell
                             key={c.chave}
-                            className={
+                            className={cn(
                               alinhaDireita(c)
                                 ? "text-right whitespace-nowrap tabular-nums font-bold"
-                                : "font-bold"
-                            }
+                                : "font-bold",
+                              compacto && "px-2 py-1.5 text-xs",
+                            )}
                           >
                             {rodape[i]}
                           </TableCell>

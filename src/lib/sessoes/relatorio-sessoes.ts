@@ -230,6 +230,154 @@ export function colunasSessoes(modo: ModoSessoes): Coluna[] {
   return modo === "movimento" ? COLUNAS_SESSOES_MOVIMENTO : COLUNAS_SESSOES;
 }
 
+// ============================================================================
+// VISÃO COMPACTA — só a tela
+// ============================================================================
+//
+// As quinze colunas acima são a folha de conferência do financeiro, e é assim
+// que elas saem no Excel, no CSV e no papel. Na TELA elas não cabiam: em
+// 1366x768 a tabela pedia rolagem lateral e os nomes dos pacientes quebravam em
+// três e quatro linhas, o que transformava a lista de busca ativa — que a
+// recepção lê correndo o olho, entre uma ligação e outra — numa parede de
+// texto.
+//
+// A saída não foi esconder informação, e sim agrupar o que sempre é lido junto:
+//
+//   - prontuário entra embaixo do nome, profissional embaixo do procedimento;
+//   - "Realizadas", "Faltas" e "A fazer" viram uma frase só;
+//   - "Situação financeira", "Contratado" e "Recebido" viram o saldo, que é o
+//     único número sobre o qual alguém age;
+//   - "Próxima" entra dentro da etiqueta de situação, e a etiqueta perde o
+//     "— 58 dias sem manutenção", que é exatamente a coluna Dias parado ao lado.
+//
+// Nada disso muda o que é exportado: quem confere produção continua recebendo a
+// planilha com uma coluna por número.
+// ============================================================================
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/**
+ * Quantos atendimentos aconteceram, numa frase.
+ *
+ * Falta e "a fazer" só aparecem quando existem. Escrever "0 faltas" em vinte e
+ * oito linhas seguidas é ruído: quem varre a lista procura a linha que tem
+ * falta, e ela some no meio dos zeros.
+ */
+export function resumoAtendimentos(l: LinhaSessao, modo: ModoSessoes = "posicao"): string {
+  const partes: string[] = [rotuloSessoes(l, modo)];
+  if (l.origem === "pacote" && modo === "posicao" && l.restantes > 0) {
+    partes.push(`${l.restantes} a fazer`);
+  }
+  if (l.faltas > 0) partes.push(`${l.faltas} falta${l.faltas === 1 ? "" : "s"}`);
+  return partes.join(" · ");
+}
+
+/**
+ * A situação financeira reduzida ao que exige ação: o saldo a receber.
+ *
+ * Pacote pago e manutenção não têm saldo, então saem só com o rótulo. A
+ * manutenção nunca acumula dívida — ver o cabeçalho deste arquivo —, e por isso
+ * jamais ganha um valor "em aberto" aqui.
+ */
+export function resumoFinanceiro(l: LinhaSessao): string {
+  if (l.origem === "ciclo") return "Por visita";
+  const aberto = Math.max(0, l.valor_contratado - l.valor_pago);
+  if (l.situacao_financeira === "pago" || aberto <= 0.004) return "Pago";
+  if (l.situacao_financeira === "parcial") return `Parcial · ${brl(aberto)} a receber`;
+  return `Em aberto · ${brl(aberto)}`;
+}
+
+/**
+ * A situação em uma etiqueta curta.
+ *
+ * O banco devolve frases completas ("Abandono — 83 dias sem manutenção"), que
+ * são as certas para o papel. Na tela o número de dias já tem coluna própria ao
+ * lado, então repeti-lo dentro da etiqueta só consumia largura. O ano da
+ * próxima data também sai: a recepção está marcando para as próximas semanas.
+ */
+export function situacaoCurta(pendencia: string): string {
+  const p = pendencia.trim();
+  if (p.startsWith("Próxima em ")) return `Próxima ${p.slice("Próxima em ".length, -5)}`;
+  if (p.startsWith("Abandono")) return "Abandono";
+  if (p.startsWith("Atrasado")) return "Atrasado";
+  if (p === "Pacote concluído") return "Concluído";
+  return p;
+}
+
+/** Como a etiqueta de situação deve ser pintada. A cor em si mora na tela. */
+export type TomSituacao = "verde" | "azul" | "ambar" | "vermelho" | "neutro";
+
+export function tomDaSituacao(situacao: string): TomSituacao {
+  if (situacao.startsWith("Próxima")) return "azul";
+  if (situacao === "Em dia") return "verde";
+  if (situacao === "Abandono") return "vermelho";
+  // "Sem agendamento" e "Atrasado" são os dois estados que pedem uma ligação
+  // hoje. Ficam no mesmo tom de propósito: para a recepção são o mesmo trabalho.
+  if (situacao === "Atrasado" || situacao === "Sem agendamento") return "ambar";
+  return "neutro";
+}
+
+/** A linha como a TELA a desenha. Nunca vai para o CSV, o Excel ou o papel. */
+export function linhaTela(l: LinhaSessao, modo: ModoSessoes = "posicao"): Record<string, unknown> {
+  return {
+    paciente: l.paciente_nome,
+    // Campos de apoio das células de duas linhas. Não têm coluna própria: são
+    // desenhados dentro da célula do nome e da do procedimento.
+    prontuario: l.prontuario || "",
+    profissional: l.profissional,
+    origem: ROTULO_ORIGEM[l.origem],
+    procedimento: l.procedimento,
+    atendimentos: resumoAtendimentos(l, modo),
+    financeiro: resumoFinanceiro(l),
+    valor_pago: l.valor_pago,
+    ultima_data: l.ultima_data,
+    proxima_data: l.proxima_data,
+    dias_parado: l.dias_parado,
+    situacao_curta: situacaoCurta(l.pendencia),
+  };
+}
+
+export function linhasTela(
+  linhas: LinhaSessao[],
+  filtro: FiltroSessoes,
+): Record<string, unknown>[] {
+  const modo = modoDoFiltro(filtro);
+  return filtrarSessoes(linhas, filtro).map((l) => linhaTela(l, modo));
+}
+
+/**
+ * Nove colunas em vez de quinze — e duas delas, "Último contato" e "Ação",
+ * ainda são acrescentadas pela tela. É o que faz a lista caber em 1366px sem
+ * rolagem lateral.
+ */
+export const COLUNAS_SESSOES_TELA: Coluna[] = [
+  { chave: "paciente", rotulo: "Paciente", formato: "texto" },
+  { chave: "procedimento", rotulo: "Procedimento", formato: "texto" },
+  { chave: "atendimentos", rotulo: "Atendimentos", formato: "texto" },
+  { chave: "financeiro", rotulo: "Financeiro", formato: "texto" },
+  { chave: "ultima_data", rotulo: "Última", formato: "data" },
+  { chave: "dias_parado", rotulo: "Parado", formato: "numero" },
+  { chave: "situacao_curta", rotulo: "Situação", formato: "texto" },
+];
+
+/**
+ * No movimento não existe busca ativa: a pergunta é produção do período. Some a
+ * situação (que descreve a posição de hoje) e o saldo do pacote, e entra o
+ * dinheiro que entrou na janela — que é o que fecha com o caixa.
+ */
+export const COLUNAS_SESSOES_TELA_MOVIMENTO: Coluna[] = [
+  { chave: "paciente", rotulo: "Paciente", formato: "texto" },
+  { chave: "procedimento", rotulo: "Procedimento", formato: "texto" },
+  { chave: "atendimentos", rotulo: "Realizadas no período", formato: "texto" },
+  { chave: "valor_pago", rotulo: "Recebido", formato: "moeda", somar: true },
+  { chave: "ultima_data", rotulo: "Último atendimento", formato: "data" },
+  { chave: "proxima_data", rotulo: "Próxima marcada", formato: "data" },
+];
+
+export function colunasSessoesTela(modo: ModoSessoes): Coluna[] {
+  return modo === "movimento" ? COLUNAS_SESSOES_TELA_MOVIMENTO : COLUNAS_SESSOES_TELA;
+}
+
 /**
  * Sessão de pacote e visita de manutenção NÃO se somam.
  *
