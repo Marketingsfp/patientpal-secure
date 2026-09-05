@@ -1376,25 +1376,13 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    // FASE 1 — medição temporária: mostra no log do servidor quanto tempo
-    // cada etapa desta busca leva (membro, conversa, paciente, agenda…).
-    const t0 = Date.now();
-    const marcas: Record<string, number> = {};
-    let ultimo = t0;
-    const marcar = (nome: string) => {
-      const agora = Date.now();
-      marcas[nome] = agora - ultimo;
-      ultimo = agora;
-    };
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    marcar("assertMember");
     const { data: conv } = await context.supabase
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    marcar("conversa");
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
@@ -1422,7 +1410,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
         .maybeSingle();
       paciente = p;
     }
-    marcar("paciente");
 
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
@@ -1451,7 +1438,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       });
       contratos = ctR.data ?? [];
     }
-    marcar("agenda_contratos");
 
     const { data: atribuidoProfile } = conv.atribuida_user_id
       ? await context.supabase
@@ -1460,7 +1446,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .eq("id", conv.atribuida_user_id)
           .maybeSingle()
       : { data: null };
-    marcar("responsavel");
 
     return {
       conversa: conv,
