@@ -1060,6 +1060,16 @@ export function AtendInbox() {
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!sel || !clinicaId) return;
+    if (
+      !acaoPermitida({
+        alvo: sel.id,
+        selecionadaAgora: selIdRef.current,
+        carregando: carregandoConversa,
+      })
+    ) {
+      toast.error("Carregando a conversa. Tente novamente em instantes.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
@@ -1079,6 +1089,16 @@ export function AtendInbox() {
   const fechar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!sel || !clinicaId) return;
+    if (
+      !acaoPermitida({
+        alvo: sel.id,
+        selecionadaAgora: selIdRef.current,
+        carregando: carregandoConversa,
+      })
+    ) {
+      toast.error("Carregando a conversa. Tente novamente em instantes.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     try {
       await fecharFn({
