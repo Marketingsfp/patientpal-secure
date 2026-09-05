@@ -37,6 +37,7 @@ export async function resolverContatoConversa(
   const telefoneNorm = normalizarTelefone(params.contatoTelefone);
 
   if (params.contatoPacienteId) {
+    metricasContato.aberturasPorVinculo += 1;
     return {
       pacienteId: params.contatoPacienteId,
       viaVinculo: true,
