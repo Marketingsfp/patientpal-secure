@@ -261,7 +261,10 @@ export async function encaminharParaHumano(args: {
       conversaId: args.conversaId,
       handoffEm: agora,
       motivo: args.motivo,
+      desfecho:
+        args.motivo === "patient_response_timeout" ? "timeout_sem_resposta" : "handoff_humano",
     });
+
   } catch (e) {
     console.error("[handoff] falha ao reservar resumo", e);
   }
