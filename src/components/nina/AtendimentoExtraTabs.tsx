@@ -159,6 +159,7 @@ import {
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
+import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
