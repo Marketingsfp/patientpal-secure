@@ -531,6 +531,10 @@ export function AtendInbox() {
 
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
+    // Alvo desta carga. Se a atendente trocar de conversa no meio do caminho,
+    // a resposta atrasada é descartada — nunca mostrar conteúdo do lead
+    // anterior dentro do lead atual.
+    const alvo: string = sel.id;
     try {
       const [m, c, n, ev] = await Promise.all([
         listarMsgs({ data: { clinicaId, conversaId: sel.id, limit: 200 } }),
@@ -540,9 +544,11 @@ export function AtendInbox() {
           () => [] as ConversaEvento[],
         ),
       ]);
+      if (alvo !== selIdRef.current) return;
       if (!c) {
         // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
         setSel(null);
+        setConversaCarregadaId(null);
         setMsgs([]);
         setContato(null);
         setNotas([]);
@@ -553,6 +559,7 @@ export function AtendInbox() {
       setContato(c);
       setNotas(n);
       setEventos((ev ?? []) as ConversaEvento[]);
+      setConversaCarregadaId(alvo);
     } catch (e: any) {
       mostrarErro(e);
     }
