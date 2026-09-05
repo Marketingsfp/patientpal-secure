@@ -7671,6 +7671,7 @@ export type Database = {
           criado_por: string
           evidencia: Json | null
           feedback_id: string
+          homologado: boolean
           id: string
           instrucao: string
           observacao: string | null
@@ -7691,6 +7692,7 @@ export type Database = {
           criado_por: string
           evidencia?: Json | null
           feedback_id: string
+          homologado?: boolean
           id?: string
           instrucao: string
           observacao?: string | null
@@ -7711,6 +7713,7 @@ export type Database = {
           criado_por?: string
           evidencia?: Json | null
           feedback_id?: string
+          homologado?: boolean
           id?: string
           instrucao?: string
           observacao?: string | null
@@ -7763,16 +7766,22 @@ export type Database = {
           mensagem_id: string | null
           mensagem_texto: string | null
           motivo_rejeicao: string | null
+          motivo_reversao: string | null
           observacao: string | null
           pergunta_texto: string | null
           prioridade: string | null
           reportado_por: string
+          revertido_em: string | null
+          revertido_por: string | null
           revisado_em: string | null
           revisado_por: string | null
           root_cause: string | null
           status: string
           unidade_id: string | null
           updated_at: string
+          validacao_em: string | null
+          validacao_resposta: string | null
+          validacao_status: string | null
         }
         Insert: {
           aplicacao_evidencia?: Json | null
@@ -7797,16 +7806,22 @@ export type Database = {
           mensagem_id?: string | null
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
+          motivo_reversao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
           prioridade?: string | null
           reportado_por: string
+          revertido_em?: string | null
+          revertido_por?: string | null
           revisado_em?: string | null
           revisado_por?: string | null
           root_cause?: string | null
           status?: string
           unidade_id?: string | null
           updated_at?: string
+          validacao_em?: string | null
+          validacao_resposta?: string | null
+          validacao_status?: string | null
         }
         Update: {
           aplicacao_evidencia?: Json | null
@@ -7831,16 +7846,22 @@ export type Database = {
           mensagem_id?: string | null
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
+          motivo_reversao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
           prioridade?: string | null
           reportado_por?: string
+          revertido_em?: string | null
+          revertido_por?: string | null
           revisado_em?: string | null
           revisado_por?: string | null
           root_cause?: string | null
           status?: string
           unidade_id?: string | null
           updated_at?: string
+          validacao_em?: string | null
+          validacao_resposta?: string | null
+          validacao_status?: string | null
         }
         Relationships: [
           {
@@ -7848,6 +7869,124 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_feedback_versoes: {
+        Row: {
+          acao_id: string | null
+          aplicado_por: string
+          aprovado_por: string | null
+          camada: string
+          clinica_id: string
+          created_at: string
+          evidencia: Json
+          feedback_id: string
+          id: string
+          item: string | null
+          kb_base_id_anterior: string | null
+          kb_versao_anterior: number | null
+          kb_versao_nova: number | null
+          motivo: string | null
+          motivo_reversao: string | null
+          reportado_por: string | null
+          revertido_em: string | null
+          revertido_por: string | null
+          root_cause: string | null
+          status: string
+          teste_detalhe: Json | null
+          teste_em: string | null
+          teste_resposta: string | null
+          teste_status: string
+          tipo: string
+          updated_at: string
+          valor_anterior: string | null
+          valor_novo: string | null
+          versao: number
+        }
+        Insert: {
+          acao_id?: string | null
+          aplicado_por: string
+          aprovado_por?: string | null
+          camada: string
+          clinica_id: string
+          created_at?: string
+          evidencia?: Json
+          feedback_id: string
+          id?: string
+          item?: string | null
+          kb_base_id_anterior?: string | null
+          kb_versao_anterior?: number | null
+          kb_versao_nova?: number | null
+          motivo?: string | null
+          motivo_reversao?: string | null
+          reportado_por?: string | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          root_cause?: string | null
+          status?: string
+          teste_detalhe?: Json | null
+          teste_em?: string | null
+          teste_resposta?: string | null
+          teste_status?: string
+          tipo: string
+          updated_at?: string
+          valor_anterior?: string | null
+          valor_novo?: string | null
+          versao?: number
+        }
+        Update: {
+          acao_id?: string | null
+          aplicado_por?: string
+          aprovado_por?: string | null
+          camada?: string
+          clinica_id?: string
+          created_at?: string
+          evidencia?: Json
+          feedback_id?: string
+          id?: string
+          item?: string | null
+          kb_base_id_anterior?: string | null
+          kb_versao_anterior?: number | null
+          kb_versao_nova?: number | null
+          motivo?: string | null
+          motivo_reversao?: string | null
+          reportado_por?: string | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          root_cause?: string | null
+          status?: string
+          teste_detalhe?: Json | null
+          teste_em?: string | null
+          teste_resposta?: string | null
+          teste_status?: string
+          tipo?: string
+          updated_at?: string
+          valor_anterior?: string | null
+          valor_novo?: string | null
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_feedback_versoes_acao_id_fkey"
+            columns: ["acao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_feedback_versoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_feedback_versoes_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "nina_feedback_erros"
             referencedColumns: ["id"]
           },
         ]

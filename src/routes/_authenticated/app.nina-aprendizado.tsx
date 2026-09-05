@@ -79,6 +79,12 @@ import {
   listarAcoesFeedbackNina,
   prepararAplicacaoFeedbackNina,
 } from "@/lib/nina/feedback-aplicacao.functions";
+import {
+  homologarAcaoAprendizadoNina,
+  listarVersoesAprendizadoNina,
+  reverterVersaoAprendizadoNina,
+  testarCorrecaoAprendizadoNina,
+} from "@/lib/nina/feedback-versoes.functions";
 
 export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
   head: () => ({
@@ -147,6 +153,7 @@ const ABAS = [
   { valor: "approved", rotulo: "Aprovados" },
   { valor: "rejected", rotulo: "Rejeitados" },
   { valor: "applied", rotulo: "Aplicados" },
+  { valor: "reverted", rotulo: "Revertidos" },
 ] as const;
 
 type Preparo = {
@@ -179,6 +186,31 @@ type AcaoTecnica = {
   valor_atual: string | null;
   valor_novo: string | null;
   status: string;
+  homologado?: boolean;
+  created_at: string;
+};
+
+type VersaoAprendizado = {
+  id: string;
+  feedback_id: string;
+  versao: number;
+  item: string | null;
+  valor_anterior: string | null;
+  valor_novo: string | null;
+  motivo: string | null;
+  camada: string;
+  tipo: string;
+  reportado_por: string | null;
+  aprovado_por: string | null;
+  aplicado_por: string;
+  kb_versao_anterior: number | null;
+  kb_versao_nova: number | null;
+  teste_status: string;
+  teste_em: string | null;
+  teste_resposta: string | null;
+  status: string;
+  revertido_em: string | null;
+  motivo_reversao: string | null;
   created_at: string;
 };
 
@@ -224,6 +256,12 @@ function Pagina() {
   const [reindexar, setReindexar] = useState(false);
   const [obsAplicacao, setObsAplicacao] = useState("");
   const [acoesAbertas, setAcoesAbertas] = useState<AcaoTecnica[]>([]);
+  const [historico, setHistorico] = useState<{ item: Item; versoes: VersaoAprendizado[] } | null>(
+    null,
+  );
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [revertendo, setRevertendo] = useState<VersaoAprendizado | null>(null);
+  const [motivoReversao, setMotivoReversao] = useState("");
 
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
@@ -237,6 +275,10 @@ function Pagina() {
   const aplicarCorrecao = useServerFn(aplicarFeedbackNina);
   const concluirAcao = useServerFn(concluirAcaoFeedbackNina);
   const listarAcoes = useServerFn(listarAcoesFeedbackNina);
+  const listarVersoes = useServerFn(listarVersoesAprendizadoNina);
+  const testarCorrecao = useServerFn(testarCorrecaoAprendizadoNina);
+  const reverterVersao = useServerFn(reverterVersaoAprendizadoNina);
+  const homologarAcao = useServerFn(homologarAcaoAprendizadoNina);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -489,6 +531,76 @@ function Pagina() {
         resultado === "done" ? "Ação concluída. Feedback marcado como aplicado." : "Ação cancelada.",
       );
       await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirHistorico = async (item: Item) => {
+    if (!clinicaId) return;
+    setHistorico({ item, versoes: [] });
+    setCarregandoHistorico(true);
+    try {
+      const r = await listarVersoes({ data: { clinicaId, feedbackId: item.id } });
+      setHistorico({ item, versoes: r as unknown as VersaoAprendizado[] });
+    } catch (e) {
+      mostrarErro(e);
+      setHistorico(null);
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  };
+
+  const rodarTeste = async (v: VersaoAprendizado) => {
+    if (!clinicaId || !historico) return;
+    setSalvando(true);
+    try {
+      const r = await testarCorrecao({ data: { versaoId: v.id, clinicaId } });
+      if (r.status === "validado") toast.success(r.mensagem);
+      else if (r.status === "falhou") toast.warning(r.mensagem);
+      else toast.info(r.mensagem);
+      await abrirHistorico(historico.item);
+      await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarReversao = async () => {
+    if (!clinicaId || !revertendo || motivoReversao.trim().length < 3) return;
+    setSalvando(true);
+    try {
+      const r = await reverterVersao({
+        data: {
+          versaoId: revertendo.id,
+          clinicaId,
+          motivo: motivoReversao.trim(),
+          confirmado: true,
+        },
+      });
+      toast.success(r.detalheBase ?? "Alteração revertida.");
+      setRevertendo(null);
+      setMotivoReversao("");
+      if (historico) await abrirHistorico(historico.item);
+      await Promise.all([carregar(), carregarAcoes()]);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const homologar = async (acaoId: string) => {
+    if (!clinicaId) return;
+    setSalvando(true);
+    try {
+      await homologarAcao({ data: { acaoId, clinicaId, observacao: null } });
+      toast.success("Mudança marcada como homologada.");
+      await carregarAcoes();
     } catch (e) {
       mostrarErro(e);
     } finally {
@@ -787,6 +899,16 @@ function Pagina() {
                             <Wrench className="mr-1 h-4 w-4" aria-hidden="true" /> Aplicar correção
                           </Button>
                         )}
+                        {(it.status === "applied" || it.status === "reverted") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={salvando}
+                            onClick={() => void abrirHistorico(it)}
+                          >
+                            Histórico e reversão
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
@@ -823,10 +945,30 @@ function Pagina() {
                     <p className="mt-1 text-sm font-medium">{a.titulo}</p>
                     <p className="text-xs text-muted-foreground">{a.instrucao}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {a.camada !== "planilha" && !a.homologado && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={salvando}
+                        onClick={() => void homologar(a.id)}
+                      >
+                        Homologar
+                      </Button>
+                    )}
+                    {a.camada !== "planilha" && a.homologado && (
+                      <Badge variant="secondary" className="self-center">
+                        Homologada
+                      </Badge>
+                    )}
                     <Button
                       size="sm"
-                      disabled={salvando}
+                      disabled={salvando || (a.camada !== "planilha" && !a.homologado)}
+                      title={
+                        a.camada !== "planilha" && !a.homologado
+                          ? "Passe pela homologação antes de concluir"
+                          : "Concluir a ação"
+                      }
                       onClick={() => void finalizarAcao(a.id, "done")}
                     >
                       Concluir
@@ -846,6 +988,130 @@ function Pagina() {
           </CardContent>
         </Card>
       )}
+
+      {/* Histórico de versões e reversão */}
+      <Dialog open={!!historico} onOpenChange={(o) => !o && setHistorico(null)}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Histórico da correção</DialogTitle>
+            <DialogDescription>
+              Cada alteração guarda valor anterior, valor novo, motivo, quem reportou, quem aprovou,
+              quem aplicou e a data. Conhecimento corrigido não garante comportamento corrigido:
+              use o teste para conferir.
+            </DialogDescription>
+          </DialogHeader>
+          {carregandoHistorico ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : !historico?.versoes.length ? (
+            <p className="text-sm text-muted-foreground">Nenhuma versão registrada para este item.</p>
+          ) : (
+            <ul className="space-y-3">
+              {historico.versoes.map((v) => (
+                <li key={v.id} className="rounded-md border border-border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">v{v.versao}</Badge>
+                    <Badge variant="outline">
+                      {ROTULO_CAMADA[v.camada as keyof typeof ROTULO_CAMADA] ?? v.camada}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {ROTULO_ACAO[v.tipo as keyof typeof ROTULO_ACAO] ?? v.tipo}
+                    </Badge>
+                    {v.status === "reverted" ? (
+                      <Badge variant="destructive">Revertida</Badge>
+                    ) : v.teste_status === "validado" ? (
+                      <Badge>✓ Correção validada</Badge>
+                    ) : v.teste_status === "falhou" ? (
+                      <Badge variant="destructive">⚠ Nina continua respondendo incorretamente</Badge>
+                    ) : (
+                      <Badge variant="outline">Teste pendente</Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">{fmtData(v.created_at)}</span>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-md bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-muted-foreground">Valor anterior</p>
+                      <p className="whitespace-pre-wrap text-sm">{v.valor_anterior ?? "—"}</p>
+                    </div>
+                    <div className="rounded-md bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-muted-foreground">Valor novo</p>
+                      <p className="whitespace-pre-wrap text-sm">{v.valor_novo ?? "—"}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Motivo: {v.motivo ?? "—"} · Reportou: {pessoas[v.reportado_por ?? ""] ?? "—"} ·
+                    Aprovou: {pessoas[v.aprovado_por ?? ""] ?? "—"} · Aplicou:{" "}
+                    {pessoas[v.aplicado_por] ?? "—"}
+                    {v.kb_versao_anterior || v.kb_versao_nova
+                      ? ` · Planilha v${v.kb_versao_anterior ?? "?"} → v${v.kb_versao_nova ?? "?"}`
+                      : ""}
+                  </p>
+                  {v.teste_resposta && (
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+                      Resposta encontrada no teste: {v.teste_resposta}
+                    </p>
+                  )}
+                  {v.status === "reverted" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Revertida em {v.revertido_em ? fmtData(v.revertido_em) : "—"} · Motivo:{" "}
+                      {v.motivo_reversao ?? "—"}
+                    </p>
+                  )}
+                  {podeRevisar && v.status !== "reverted" && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" disabled={salvando} onClick={() => void rodarTeste(v)}>
+                        Testar novamente
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={salvando}
+                        onClick={() => {
+                          setRevertendo(v);
+                          setMotivoReversao("");
+                        }}
+                      >
+                        Reverter alteração
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reverter alteração */}
+      <Dialog open={!!revertendo} onOpenChange={(o) => !o && setRevertendo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reverter alteração</DialogTitle>
+            <DialogDescription>
+              A versão anterior volta a valer. Quando a correção era da planilha, a versão anterior
+              do arquivo oficial é reativada e a busca é atualizada (blocos, embeddings, índices e
+              cache). O item volta para investigação.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={motivoReversao}
+            onChange={(e) => setMotivoReversao(e.target.value)}
+            placeholder="Motivo da reversão (obrigatório)"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertendo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={salvando || motivoReversao.trim().length < 3}
+              onClick={() => void confirmarReversao()}
+            >
+              Reverter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Aplicar correção */}
       <Dialog open={!!aplicando} onOpenChange={(o) => !o && setAplicando(null)}>
