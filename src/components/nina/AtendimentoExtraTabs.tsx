@@ -587,14 +587,28 @@ export function AtendInbox() {
   const statusBadge = (s: string) => {
     if (s === "active")
       return (
-        <Badge className="bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20">Ativa</Badge>
+        <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">
+          ● Ativa
+        </Badge>
       );
     if (s === "waiting")
       return (
-        <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/20">Em espera</Badge>
+        <Badge className="bg-atd-warn-bg text-atd-warn-ink hover:bg-atd-warn-bg border border-atd-warn/40">
+          ⏳ Em espera
+        </Badge>
       );
-    if (s === "bot_attending") return <Badge variant="secondary">Bot</Badge>;
-    if (s === "closed" || s === "finished") return <Badge variant="outline">Fechada</Badge>;
+    if (s === "bot_attending")
+      return (
+        <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">
+          ✦ Nina
+        </Badge>
+      );
+    if (s === "closed" || s === "finished")
+      return (
+        <Badge className="bg-atd-idle-bg text-atd-idle-ink hover:bg-atd-idle-bg border border-atd-border">
+          ✓ Fechada
+        </Badge>
+      );
     return <Badge variant="outline">{s}</Badge>;
   };
 
@@ -619,10 +633,10 @@ export function AtendInbox() {
               <Circle
                 className={`h-3 w-3 fill-current ${
                   pausaAtiva || ausenteAuto
-                    ? "text-amber-500"
+                    ? "text-atd-warn"
                     : filaAberta
-                      ? "text-emerald-600"
-                      : "text-slate-400"
+                      ? "text-atd-ok"
+                      : "text-atd-idle"
                 }`}
               />
 
@@ -648,7 +662,7 @@ export function AtendInbox() {
                 size="sm"
                 variant={online ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  online ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : ""
+                  online ? "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong" : "text-atd-ok border-atd-ok/40"
                 }`}
                 onClick={() => definirStatus("online")}
               >
@@ -658,7 +672,9 @@ export function AtendInbox() {
                 size="sm"
                 variant={pausaAtiva || ausenteAuto ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
-                  pausaAtiva || ausenteAuto ? "bg-amber-500 hover:bg-amber-500/90 text-white" : ""
+                  pausaAtiva || ausenteAuto
+                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink"
+                    : "text-atd-warn-ink border-atd-warn/40"
                 }`}
                 onClick={() => definirStatus("pausa")}
               >
@@ -670,8 +686,8 @@ export function AtendInbox() {
                 variant={!pausaAtiva && !filaAberta ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
                   !pausaAtiva && !filaAberta
-                    ? "bg-slate-600 hover:bg-slate-600/90 text-white"
-                    : ""
+                    ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong"
+                    : "text-atd-idle-ink border-atd-border"
                 }`}
                 onClick={() => definirStatus("offline")}
               >
@@ -679,7 +695,7 @@ export function AtendInbox() {
               </Button>
             </div>
             {ausenteAuto && !pausaAtiva && (
-              <p className="text-[11px] text-amber-600">
+              <p className="text-[11px] text-atd-warn-ink">
                 Pausa automática por inatividade — mexa na tela para voltar a receber conversas.
               </p>
             )}
@@ -747,7 +763,7 @@ export function AtendInbox() {
               <button
                 type="button"
                 onClick={() => setSoNaoAtribuidas(false)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white"
+                className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
                 title="Mostrar todas as conversas"
               >
                 Só não atribuídas ({convsVisiveis.length}) ✕
@@ -764,14 +780,18 @@ export function AtendInbox() {
               <button
                 key={c.id}
                 onClick={() => setSel(c)}
-                className={`w-full text-left p-3 border-b hover:bg-muted/50 transition-colors ${sel?.id === c.id ? "bg-muted/60" : ""}`}
+                className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
+                  sel?.id === c.id
+                    ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
+                    : "bg-atd-surface"
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm truncate flex-1">
                     {c.contato_nome || c.contato_telefone || "—"}
                   </span>
                   {c.unread_count > 0 && (
-                    <Badge className="bg-emerald-500 text-white text-xs px-1.5 py-0">
+                    <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
                       {c.unread_count}
                     </Badge>
                   )}
@@ -779,13 +799,13 @@ export function AtendInbox() {
                 <div className="flex items-center gap-1.5 mt-1">
                   {statusBadge(c.status)}
                   {c.owner_type === "NONE" && (
-                    <Badge className="bg-amber-500/15 text-amber-600 text-[11px]">Na fila</Badge>
+                    <Badge className="bg-atd-danger text-atd-on-strong text-[11px]">🔴 Não atribuída</Badge>
                   )}
                   {c.owner_type === "HUMAN" && (
-                    <Badge className="bg-sky-500/15 text-sky-600 text-[11px]">Humano</Badge>
+                    <Badge className="bg-atd-human-bg text-atd-human-ink text-[11px] border border-atd-human-ink/20">👤 Humano</Badge>
                   )}
                   {c.owner_type === "AI" && (
-                    <Badge variant="secondary" className="text-[11px]">Nina</Badge>
+                    <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
                   )}
                   {c.protocol_number && (
                     <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
@@ -838,7 +858,7 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="default"
-                      className="bg-emerald-500 hover:bg-emerald-600"
+                      className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
                       onClick={() => {
                         const params = new URLSearchParams();
                         params.set("novo", "1");
@@ -855,18 +875,28 @@ export function AtendInbox() {
                     </Button>
                     {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
-                    <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
+                      onClick={() => setTransferOpen(true)}
+                    >
                       <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
                     </Button>
                     {sel.status !== "closed" && sel.status !== "finished" && (
-                      <Button size="sm" variant="outline" onClick={() => setFecharOpen(true)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
+                        onClick={() => setFecharOpen(true)}
+                      >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Encerrar
                       </Button>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <div className="flex-1 overflow-auto p-4 space-y-2 bg-muted/20">
+              <div className="flex-1 overflow-auto p-4 space-y-2 bg-atd-bg">
                 {msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
@@ -879,7 +909,7 @@ export function AtendInbox() {
                   if (m.enviada_por === "sistema") {
                     return (
                       <div key={m.id} className="flex justify-center">
-                        <div className="max-w-[85%] rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap text-center">
+                        <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
                           {m.body}
                           <div className="mt-1 text-[10px] opacity-70">
                             {fmtHora(m.recebida_em)}
@@ -893,13 +923,13 @@ export function AtendInbox() {
                       <div
                         className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                           out
-                            ? "bg-emerald-500 text-white rounded-br-sm"
-                            : "bg-card border border-border rounded-bl-sm"
+                            ? "bg-atd-go text-atd-on-strong rounded-br-sm"
+                            : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
                         <div
-                          className={`text-[11px] mt-1 ${out ? "text-emerald-50" : "text-muted-foreground"}`}
+                          className={`text-[11px] mt-1 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
                           {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                         </div>
@@ -910,8 +940,9 @@ export function AtendInbox() {
               </div>
               <div className="border-t p-3 space-y-2">
                 {motivoBloqueio && (
-                  <div className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
-                    {motivoBloqueio}
+                  <div className="flex items-start gap-1.5 rounded-md border border-atd-warn bg-atd-warn-bg px-2 py-1.5 text-xs text-atd-warn-ink">
+                    <span aria-hidden="true">⚠️</span>
+                    <span>{motivoBloqueio}</span>
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -930,13 +961,13 @@ export function AtendInbox() {
                         : "Mensagem… (Enter envia, Shift+Enter quebra linha)"
                     }
                     rows={1}
-                    className="resize-none min-h-9"
+                    className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
                     disabled={enviando || !!motivoBloqueio}
                   />
                   <Button
                     onClick={enviar}
                     disabled={enviando || !draft.trim() || !!motivoBloqueio}
-                    className="bg-emerald-500 hover:bg-emerald-600"
+                    className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                   >
                     {enviando ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1078,7 +1109,7 @@ export function AtendInbox() {
                     {notas.map((n: any) => (
                       <div
                         key={n.id}
-                        className="text-xs bg-amber-500/10 border border-amber-500/20 rounded p-2"
+                        className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
                       >
                         <div className="whitespace-pre-wrap">{n.conteudo}</div>
                         <div className="text-[11px] text-muted-foreground mt-1">
