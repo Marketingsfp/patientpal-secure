@@ -465,6 +465,21 @@ export function AtendInbox() {
   useEffect(() => {
     carregarConvs();
   }, [carregarConvs]);
+  // O responsável pode mudar a qualquer momento (transferência, distribuição
+  // automática, tomada por outra pessoa). A lista chega por Realtime, então a
+  // conversa aberta sempre acompanha o que está gravado no banco.
+  useEffect(() => {
+    if (!sel?.id) return;
+    const atual = convs.find((c: any) => c.id === sel.id);
+    if (!atual) return;
+    if (
+      atual.atribuida_user_id !== sel.atribuida_user_id ||
+      atual.status !== sel.status ||
+      atual.owner_type !== sel.owner_type
+    ) {
+      setSel((s: any) => ({ ...s, ...atual }));
+    }
+  }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
@@ -549,9 +564,29 @@ export function AtendInbox() {
     if (!j) return true;
     return Date.now() - j > 24 * 60 * 60 * 1000;
   })();
+  const nomeUsuario = useCallback(
+    (id?: string | null) => {
+      if (!id) return null;
+      const u = usuarios.find((x: any) => x.user_id === id);
+      return u?.nome ?? u?.email ?? "outro atendente";
+    },
+    [usuarios],
+  );
+  const responsavelId: string | null = sel?.atribuida_user_id ?? null;
+  const souResponsavel = !!meuId && responsavelId === meuId;
+  const conversaEncerrada = sel?.status === "closed" || sel?.status === "finished";
+  const [assumindo, setAssumindo] = useState(false);
+  const [assumirOpen, setAssumirOpen] = useState(false);
+
   const motivoBloqueio = !sel
     ? null
-    : pausaAtiva
+    : conversaEncerrada
+      ? "Conversa encerrada. Não é possível enviar mensagens."
+      : responsavelId && !souResponsavel
+        ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
+        : !podeAtender
+          ? "Você tem acesso somente de leitura no atendimento."
+          : pausaAtiva
       ? "Você está em pausa. Encerre a pausa para enviar mensagens."
       : !filaAberta
         ? "Você está offline. Fique online para enviar mensagens."
