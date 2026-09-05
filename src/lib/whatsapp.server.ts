@@ -1033,6 +1033,31 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
+  // FASE 6: máquina de estados explícita + regras de handoff. Deriva a etapa
+  // atual do estado da conversa e a grava, para a próxima mensagem já chegar
+  // na etapa certa. Não altera dados de agenda nem de cadastro.
+  const blocoFase6 = await (async () => {
+    try {
+      const { flagFluxoFase6Ativa } = await import("@/lib/nina/atendimento-fase6.server");
+      if (!(await flagFluxoFase6Ativa(clinicaId))) return "";
+      const [{ detectarIntencoes }, { blocoPromptFase6, derivarEtapa }] = await Promise.all([
+        import("@/lib/nina/atendimento-fase1"),
+        import("@/lib/nina/atendimento-fase6"),
+      ]);
+      const ctxFase6 = {
+        mensagem: mensagemPaciente,
+        estado: fluxoEstado,
+        primeiraMensagem: !jaSeApresentou,
+        intencoes: detectarIntencoes(mensagemPaciente) as readonly string[],
+      };
+      const etapa = derivarEtapa(ctxFase6);
+      fluxoEstado.flow = { stage: etapa };
+      return blocoPromptFase6({ ...ctxFase6, etapa });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
@@ -1041,7 +1066,9 @@ ${procs || "(nenhum)"}`;
     blocoFase3,
     blocoFase4,
     blocoFase5,
+    blocoFase6,
     podeAgendar ? blocoPromptAgenda() : "",
+
 
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
