@@ -2211,10 +2211,13 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!dadosSecundariosProntos ? (
-              <ContatoSkeleton />
-            ) : !contato ? (
-              <p className="text-muted-foreground">—</p>
+            {!contato ? (
+              // O esqueleto é só deste painel: o chat nunca espera pelo contato.
+              !dadosSecundariosProntos ? (
+                <ContatoSkeleton />
+              ) : (
+                <p className="text-muted-foreground">—</p>
+              )
             ) : (
               <>
                 <section>
