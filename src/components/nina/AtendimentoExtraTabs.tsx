@@ -218,13 +218,18 @@ export function AtendInbox() {
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
   const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
+  // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
+  // barra de rolagem (ver use-hover-tolerante).
   const [painelFixado, setPainelFixado] = useState(false);
-  const [painelHover, setPainelHover] = useState(false);
   // Enquanto um menu suspenso da coluna estiver aberto o painel não pode
   // encolher: o menu é renderizado fora do painel, o mouse "sai" da coluna e
   // a lista sumia embaixo do menu.
   const [painelMenuAberto, setPainelMenuAberto] = useState(false);
+  const { ref: painelRef, dentro: painelHover } = useHoverTolerante<HTMLDivElement>({
+    ativo: !painelFixado,
+  });
   const painelAberto = painelFixado || painelHover || painelMenuAberto;
+
 
   useEffect(() => {
     try {
