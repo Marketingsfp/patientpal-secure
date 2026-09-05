@@ -85,6 +85,12 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import {
+  cursorMaisRecente,
+  mesclarNovas,
+  mesclarEventos,
+  podeAtualizarIncremental,
+} from "@/lib/atendimento/atualizacao-incremental";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 
@@ -251,6 +257,9 @@ export function AtendInbox() {
   // antes de o prefetch terminar) e temporizadores de intenção de abertura.
   const prefetchMsgs = useRef<Map<string, Promise<any[]>>>(new Map());
   const prefetchTimers = useRef<Map<string, number>>(new Map());
+  // Espelho do que está na tela, usado pela atualização incremental.
+  const msgsRef = useRef<any[]>([]);
+  const conversaCarregadaRef = useRef<string | null>(null);
   const medidor = useRef<MedidorConversa | null>(null);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
@@ -770,6 +779,56 @@ export function AtendInbox() {
 
 
 
+  // Atualização incremental (Fase 4): mensagem nova no Realtime traz apenas o
+  // que é novo desta conversa — nada de recarregar contato, notas ou resumo.
+  const sincronizarConversa = useCallback(async () => {
+    const alvo = selIdRef.current;
+    if (!clinicaId || !alvo) return;
+    const cursor = cursorMaisRecente(msgsRef.current);
+    if (
+      !podeAtualizarIncremental({
+        conversaAberta: alvo,
+        conversaCarregada: conversaCarregadaRef.current,
+        cursor,
+      })
+    ) {
+      await carregarConversa();
+      return;
+    }
+    try {
+      const [novas, ev] = await Promise.all([
+        listarMsgs({
+          data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
+        }),
+        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
+          () => null as ConversaEvento[] | null,
+        ),
+      ]);
+      if (selIdRef.current !== alvo) return;
+      if ((novas as any[])?.length) {
+        setMsgs((prev) => {
+          const juntas = mesclarNovas(prev, novas as any[]);
+          const atual = cacheConversas.current.obter(alvo);
+          if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
+          return juntas;
+        });
+      }
+      if (ev) {
+        setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+      }
+    } catch {
+      // Falha na sincronização não derruba o atendimento: a próxima tentativa
+      // (Realtime ou rede de segurança) resolve.
+    }
+  }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
+
+  useEffect(() => {
+    msgsRef.current = msgs;
+  }, [msgs]);
+  useEffect(() => {
+    conversaCarregadaRef.current = conversaCarregadaId;
+  }, [conversaCarregadaId]);
+
   useEffect(() => {
     carregarConvs();
   }, [carregarConvs]);
@@ -829,10 +888,10 @@ export function AtendInbox() {
   useEffect(() => {
     if (!sel?.id) return;
     const t = setInterval(() => {
-      carregarConversa();
+      void sincronizarConversa();
     }, 8000);
     return () => clearInterval(t);
-  }, [sel?.id, carregarConversa]);
+  }, [sel?.id, sincronizarConversa]);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -877,10 +936,12 @@ export function AtendInbox() {
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
-    ["whatsapp_mensagens", "atend_notas_internas", "atend_conversa_eventos"],
-    carregarConversa,
+    ["whatsapp_mensagens", "atend_conversa_eventos"],
+    () => void sincronizarConversa(),
     !!clinicaId && !!sel?.id,
   );
+  // Notas internas são raras: aí sim vale recarregar o painel de apoio.
+  useRealtimeRefresh(["atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   const timeline = useMemo(() => {
