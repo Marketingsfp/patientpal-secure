@@ -101,6 +101,8 @@ import {
   fecharSeletorPortais,
   useSeletorPortaisAberto,
 } from "@/components/portal-launcher";
+import { BannerNaoAtribuidas } from "@/components/nina/BannerNaoAtribuidas";
+
 import logoSaoFranciscoCdn from "@/assets/logo-policlinica-sao-francisco-de-paula.png.asset.json";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
