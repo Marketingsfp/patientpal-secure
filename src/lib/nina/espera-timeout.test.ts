@@ -184,4 +184,41 @@ describe("FASE 5 — cenários do timeout", () => {
     await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
     expect(handoffs).toHaveLength(1);
   });
+
+  it("resposta em 5 min → prazo ainda vigente, nada é transferido", async () => {
+    banco = [conversa()];
+    const cincoMin = new Date("2026-09-05T10:05:00.000Z");
+    const r = await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: cincoMin });
+    expect(r.avaliadas).toBe(0);
+    expect(handoffs).toHaveLength(0);
+    expect(banco[0]!.patient_response_deadline).not.toBeNull();
+  });
+
+  it("resposta em 29 min → ainda dentro do prazo", async () => {
+    banco = [conversa()];
+    const vinteNove = new Date("2026-09-05T10:29:00.000Z");
+    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: vinteNove });
+    expect(handoffs).toHaveLength(0);
+  });
+
+  it("corrida: paciente responde entre a leitura e a reserva → sem transferência", async () => {
+    banco = [conversa()];
+    // Resposta do paciente limpa o prazo; a reserva por prazo exato não casa.
+    const p = processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
+    banco[0]!.patient_response_deadline = null;
+    await p;
+    expect(handoffs).toHaveLength(0);
+  });
+
+  it("após o timeout a Nina fica calada e a conversa segue ativa", async () => {
+    banco = [conversa()];
+    await processarTimeoutsEsperaPaciente({ clinicaId: "cl1", agora: AGORA });
+    const { derivarResponsavel, ninaResponde } = await import(
+      "@/lib/atendimento/ciclo-responsabilidade"
+    );
+    const l = banco[0]!;
+    expect(derivarResponsavel(l)).toBe("FILA_HUMANA");
+    expect(ninaResponde(l)).toBe(false);
+    expect(l.status).toBe("waiting");
+  });
 });
