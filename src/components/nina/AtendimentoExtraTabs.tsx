@@ -185,6 +185,13 @@ export function AtendInbox() {
   const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
   const [notas, setNotas] = useState<any[]>([]);
+  // Id da conversa a que o conteúdo carregado pertence. A tela central só
+  // renderiza mensagens/contato/notas/eventos quando este id é exatamente o
+  // da conversa selecionada.
+  const [conversaCarregadaId, setConversaCarregadaId] = useState<string | null>(null);
+  const selIdRef = useRef<string | null>(null);
+  selIdRef.current = sel?.id ?? null;
+  const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
@@ -531,6 +538,10 @@ export function AtendInbox() {
 
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
+    // Alvo desta carga. Se a atendente trocar de conversa no meio do caminho,
+    // a resposta atrasada é descartada — nunca mostrar conteúdo do lead
+    // anterior dentro do lead atual.
+    const alvo: string = sel.id;
     try {
       const [m, c, n, ev] = await Promise.all([
         listarMsgs({ data: { clinicaId, conversaId: sel.id, limit: 200 } }),
@@ -540,9 +551,11 @@ export function AtendInbox() {
           () => [] as ConversaEvento[],
         ),
       ]);
+      if (alvo !== selIdRef.current) return;
       if (!c) {
         // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
         setSel(null);
+        setConversaCarregadaId(null);
         setMsgs([]);
         setContato(null);
         setNotas([]);
@@ -553,6 +566,7 @@ export function AtendInbox() {
       setContato(c);
       setNotas(n);
       setEventos((ev ?? []) as ConversaEvento[]);
+      setConversaCarregadaId(alvo);
     } catch (e: any) {
       mostrarErro(e);
     }
@@ -576,6 +590,15 @@ export function AtendInbox() {
       setSel((s: any) => ({ ...s, ...atual }));
     }
   }, [convs, sel?.id, sel?.atribuida_user_id, sel?.status, sel?.owner_type]);
+  // Troca de conversa: o conteúdo do lead anterior sai da tela na mesma hora.
+  useEffect(() => {
+    setConversaCarregadaId(null);
+    setMsgs([]);
+    setEventos([]);
+    setContato(null);
+    setNotas([]);
+  }, [sel?.id]);
+
   useEffect(() => {
     carregarConversa();
   }, [carregarConversa]);
@@ -1290,13 +1313,16 @@ export function AtendInbox() {
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
 
-                {clinicaId && (
+                {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
-                {msgs.length === 0 && (
+                {!conteudoDaConversa && (
+                  <p className="text-sm text-muted-foreground text-center">Abrindo conversa…</p>
+                )}
+                {conteudoDaConversa && msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
-                {timeline.map((item, idxTimeline) => {
+                {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
                   }
@@ -1512,7 +1538,7 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contato ? (
+            {!contato || !conteudoDaConversa ? (
               <p className="text-muted-foreground">—</p>
             ) : (
               <>
@@ -1601,7 +1627,7 @@ export function AtendInbox() {
                     {notas.length === 0 && (
                       <p className="text-xs text-muted-foreground">Sem notas.</p>
                     )}
-                    {notas.map((n: any) => (
+                    {(conteudoDaConversa ? notas : []).map((n: any) => (
                       <div
                         key={n.id}
                         className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
