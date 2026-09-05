@@ -73,6 +73,7 @@ import {
   Receipt,
   Menu as MenuIcon,
   Columns3,
+  BarChart3,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
