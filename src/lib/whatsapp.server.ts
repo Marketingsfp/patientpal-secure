@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { agoraNaClinica, blocoDataHoraAgora, somarDiasIso } from "@/lib/nina-agora";
 import {
   detectarEspecialidades,
