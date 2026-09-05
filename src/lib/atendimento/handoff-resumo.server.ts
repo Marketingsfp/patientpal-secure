@@ -89,7 +89,7 @@ async function agendamentoReal(
     .select("data_hora, status, servico_nome, medico_nome")
     .eq("clinica_id", clinicaId)
     .eq("paciente_id", pacienteId)
-    .in("status", ["agendado", "confirmado", "checkin"])
+    .in("status", ["agendado", "confirmado"])
     .gte("data_hora", new Date(Date.now() - 3600_000).toISOString())
     .order("data_hora", { ascending: true })
     .limit(1)
