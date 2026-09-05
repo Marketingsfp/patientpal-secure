@@ -129,7 +129,11 @@ import {
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
-import { criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
+import {
+  conversasDesatualizadas,
+  criarCacheConversas,
+  respostaAindaVale,
+} from "@/lib/atendimento/conversa-cache";
 import {
   JANELA_INICIAL,
   JANELA_ANTERIOR,
@@ -554,9 +558,21 @@ export function AtendInbox() {
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
-      setConvs((prev: any[]) =>
-        ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[],
-      );
+      setConvs((prev: any[]) => {
+        // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
+        // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
+        // Cada conversa é tratada pelo próprio id: uma nunca invalida a outra.
+        const vencidas = conversasDesatualizadas({
+          anteriores: prev as any,
+          atuais: rows as any,
+          emCache: cacheConversas.current.chaves(),
+        });
+        for (const id of vencidas) {
+          if (id === selIdRef.current) continue;
+          cacheConversas.current.invalidar(id);
+        }
+        return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
+      });
       if (!sel && rows[0]) setSel(rows[0]);
     } catch (e: any) {
       mostrarErro(e);
