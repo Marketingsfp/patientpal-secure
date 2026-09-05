@@ -4,6 +4,8 @@
  * mudança de estado (resolvida, reaberta, atribuída, transferida…).
  */
 
+import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+
 export interface ConversaEvento {
   id: string;
   evento: string;
