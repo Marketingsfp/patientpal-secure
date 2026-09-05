@@ -294,6 +294,9 @@ export function AtendInbox() {
   }, [conversaIdUrl]);
   // Conversas já buscadas por link direto (evita repetir a busca em loop).
   const deepLinkTentado = useRef<Set<string>>(new Set());
+  // Conversa aberta por link enquanto o filtro correspondente ainda carrega:
+  // ela não pode ser removida da tela por uma resposta do filtro antigo.
+  const deepLinkPendente = useRef<string | null>(null);
 
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
@@ -686,13 +689,17 @@ export function AtendInbox() {
       // A conversa aberta deixou de pertencer a este filtro (transferida,
       // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
       // hora — inclusive durante uma busca, onde a lista vem reduzida.
+      if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
+        deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
         selecionada: (sel as any) ?? null,
         linhas: rows as any,
         buscando: !!busca,
         ctx: ctxEscopo,
       });
-      if (removeu) {
+      if (removeu && selIdRef.current === deepLinkPendente.current) {
+        // Link direto: aguarda a lista do filtro certo antes de decidir.
+      } else if (removeu) {
         const idFora = selIdRef.current!;
         cacheConversas.current.invalidar(idFora);
         setSel(null);
@@ -795,6 +802,8 @@ export function AtendInbox() {
           abrirPelaUrl(null, true);
           return;
         }
+        deepLinkTentado.current.delete(idPedido);
+        deepLinkPendente.current = destino !== escopo ? idPedido : null;
         setSel(row);
         setConvs((prev: any[]) =>
           prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
