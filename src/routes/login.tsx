@@ -51,21 +51,12 @@ function LoginPage() {
   useEffect(() => {
     if (!authLoading && user) {
       (async () => {
-        const soMedico = await isMedicoOnlyUser(user.id);
-        // Médico vai SEMPRE para a fila de atendimento, mesmo que a barra de
-        // endereços trouxesse outro destino: o `next` costuma ser a última
-        // tela aberta naquele computador (o RH, por exemplo), e o médico caía
-        // direto num "Acesso negado" ao entrar. `replace` troca a página, sem
-        // deixar o endereço antigo no histórico do navegador.
-        if (soMedico) {
-          window.location.replace("/app/atendimento-ia");
-          return;
-        }
         if (next) {
           window.location.replace(next);
           return;
         }
-        navigate({ to: "/app", replace: true });
+        const soMedico = await isMedicoOnlyUser(user.id);
+        navigate({ to: soMedico ? "/app/atendimento-ia" : "/app", replace: true });
       })();
     }
   }, [authLoading, navigate, next, user]);
@@ -80,18 +71,13 @@ function LoginPage() {
       return;
     }
     toast.success("Bem-vindo!");
-    const uid = data.user?.id;
-    const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
-    // Ver o comentário do efeito acima: o destino do médico não é negociável.
-    if (soMedico) {
-      window.location.replace("/app/atendimento-ia");
-      return;
-    }
     if (next) {
       window.location.replace(next);
       return;
     }
-    navigate({ to: "/app", replace: true });
+    const uid = data.user?.id;
+    const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
+    navigate({ to: soMedico ? "/app/atendimento-ia" : "/app", replace: true });
   };
 
   const handleForgotPassword = async () => {
