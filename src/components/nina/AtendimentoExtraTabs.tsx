@@ -1796,9 +1796,9 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {carregandoConversa ? (
+            {!dadosSecundariosProntos ? (
               <ContatoSkeleton />
-            ) : !contato || !conteudoDaConversa ? (
+            ) : !contato ? (
               <p className="text-muted-foreground">—</p>
             ) : (
               <>
@@ -1887,7 +1887,7 @@ export function AtendInbox() {
                     {notas.length === 0 && (
                       <p className="text-xs text-muted-foreground">Sem notas.</p>
                     )}
-                    {(conteudoDaConversa ? notas : []).map((n: any) => (
+                    {(dadosSecundariosProntos ? notas : []).map((n: any) => (
                       <div
                         key={n.id}
                         className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
