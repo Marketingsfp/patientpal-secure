@@ -506,6 +506,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             label: "Homologação (envio de testes)",
             icon: FlaskConical,
           },
+          {
+            to: "/app/nina-aprendizado",
+            label: "Revisão de Aprendizados",
+            icon: ShieldCheck,
+          },
         ],
       },
       {
