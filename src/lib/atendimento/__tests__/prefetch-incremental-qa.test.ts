@@ -1,7 +1,7 @@
 /**
  * Fase 4 — prefetch por intenção, atualização incremental e não duplicação.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   cursorMaisRecente,
   mesclarNovas,
