@@ -952,15 +952,35 @@ ${procs || "(nenhum)"}`;
 
   }
 
+  const blocoKb = await (async () => {
+    const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
+    return await blocoPromptBaseConhecimento(clinicaId).catch(() => "");
+  })();
+
+  // FASE 2 do novo fluxo: respostas factuais fundamentadas na planilha.
+  // Só texto de prompt; a consulta continua na ferramenta já existente.
+  const blocoFase2 = await (async () => {
+    try {
+      const { flagFluxoFase2Ativa } = await import("@/lib/nina/atendimento-fase2.server");
+      if (!(await flagFluxoFase2Ativa(clinicaId))) return "";
+      const [{ detectarIntencoes }, { blocoPromptFase2 }] = await Promise.all([
+        import("@/lib/nina/atendimento-fase1"),
+        import("@/lib/nina/atendimento-fase2"),
+      ]);
+      return blocoPromptFase2({
+        intencoes: detectarIntencoes(mensagemPaciente),
+        baseAtiva: Boolean(blocoKb),
+      });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
-    await (async () => {
-      const { blocoPromptBaseConhecimento } = await import("@/lib/nina/kb.server");
-      return await blocoPromptBaseConhecimento(clinicaId).catch(() => "");
-    })(),
-
-
+    blocoKb,
+    blocoFase2,
     podeAgendar ? blocoPromptAgenda() : "",
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
