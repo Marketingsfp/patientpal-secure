@@ -1006,6 +1006,9 @@ export function AtendInbox() {
           notas: n,
           eventos: eventosLista,
         });
+        // FASE 4 — guarda o contato pelo vínculo direto, para reaproveitar em
+        // outras conversas do mesmo paciente.
+        cacheContatos.current.guardar((c as any)?.paciente?.id, c);
         setContato(c);
         setNotas(n);
         setEventos(eventosLista);
