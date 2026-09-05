@@ -22,7 +22,7 @@ import { z } from "zod";
  * - `{ type: "erro", mensagem }`
  */
 
-const MODELO_TEXTO = "google/gemini-3.1-flash-lite";
+// Modelo de texto agora vem do Nina AI Gateway (src/lib/nina/modelo-flag.server.ts).
 /** TTS mais leve do catálogo = primeiro pedaço de áudio mais rápido. */
 const MODELO_VOZ = "google/gemini-3.1-flash-tts-preview";
 const VOZ = "Leda";
