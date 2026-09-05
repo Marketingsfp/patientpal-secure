@@ -1,0 +1,578 @@
+/**
+ * Nina → Revisão de Aprendizados (FASE 2).
+ *
+ * Central administrativa para revisar os erros reportados pelas atendentes.
+ * Aprovar/rejeitar aqui NÃO altera planilha, Base de Conhecimentos,
+ * embeddings, prompt, modelo, regras ou ferramentas — apenas registra a
+ * decisão. A aplicação real virá em fase posterior.
+ */
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import {
+  AlertTriangle,
+  Check,
+  Eye,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useClinica } from "@/hooks/use-clinica";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import {
+  CATEGORIAS_FEEDBACK_NINA,
+  rotuloCategoriaFeedback,
+} from "@/lib/nina/feedback-erros";
+import {
+  editarSugestaoFeedbackNina,
+  listarAutoresFeedbackNina,
+  listarRevisaoFeedbackNina,
+  podeRevisarFeedbackNina,
+  revisarFeedbackErroNina,
+} from "@/lib/nina/feedback-revisao.functions";
+import { lerConversaFeedbackNina } from "@/lib/nina/feedback-conversa.functions";
+
+export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
+  head: () => ({
+    meta: [
+      { title: "Nina — Revisão de Aprendizados" },
+      {
+        name: "description",
+        content:
+          "Central interna para revisar, aprovar ou rejeitar correções reportadas sobre as respostas da Nina.",
+      },
+      { property: "og:title", content: "Nina — Revisão de Aprendizados" },
+      {
+        property: "og:description",
+        content: "Revisão interna dos erros reportados nas respostas da Nina.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: Pagina,
+});
+
+type Item = {
+  id: string;
+  conversa_id: string | null;
+  mensagem_id: string | null;
+  mensagem_texto: string | null;
+  pergunta_texto: string | null;
+  categoria: string;
+  correcao: string;
+  correcao_original: string | null;
+  observacao: string | null;
+  motivo_rejeicao: string | null;
+  status: string;
+  reportado_por: string;
+  revisado_por: string | null;
+  revisado_em: string | null;
+  created_at: string;
+};
+
+const ABAS = [
+  { valor: "pending", rotulo: "Pendentes" },
+  { valor: "under_review", rotulo: "Em revisão" },
+  { valor: "approved", rotulo: "Aprovados" },
+  { valor: "rejected", rotulo: "Rejeitados" },
+] as const;
+
+function fmtData(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function Pagina() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+
+  const [aba, setAba] = useState<string>("pending");
+  const [categoria, setCategoria] = useState("todas");
+  const [autor, setAutor] = useState("todos");
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [itens, setItens] = useState<Item[]>([]);
+  const [pessoas, setPessoas] = useState<Record<string, string>>({});
+  const [contagens, setContagens] = useState<Record<string, number>>({});
+  const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [podeRevisar, setPodeRevisar] = useState(false);
+
+  const [rejeitando, setRejeitando] = useState<Item | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [editando, setEditando] = useState<Item | null>(null);
+  const [textoEdicao, setTextoEdicao] = useState("");
+  const [conversa, setConversa] = useState<{ item: Item; msgs: any[] } | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const listar = useServerFn(listarRevisaoFeedbackNina);
+  const listarAutores = useServerFn(listarAutoresFeedbackNina);
+  const checarPermissao = useServerFn(podeRevisarFeedbackNina);
+  const revisar = useServerFn(revisarFeedbackErroNina);
+  const editar = useServerFn(editarSugestaoFeedbackNina);
+  const lerConversa = useServerFn(lerConversaFeedbackNina);
+
+  const carregar = useCallback(async () => {
+    if (!clinicaId) return;
+    setCarregando(true);
+    try {
+      const r = await listar({
+        data: {
+          clinicaId,
+          status: aba as any,
+          categoria: categoria === "todas" ? null : (categoria as any),
+          reportadoPor: autor === "todos" ? null : autor,
+          de: de || null,
+          ate: ate || null,
+          limite: 200,
+        },
+      });
+      setItens((r.itens ?? []) as Item[]);
+      setPessoas(r.pessoas ?? {});
+      setContagens(r.contagens ?? {});
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCarregando(false);
+    }
+  }, [clinicaId, aba, categoria, autor, de, ate, listar]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    void (async () => {
+      try {
+        const [p, a] = await Promise.all([
+          checarPermissao({ data: { clinicaId } }),
+          listarAutores({ data: { clinicaId } }),
+        ]);
+        setPodeRevisar(p.podeRevisar);
+        setAutores(a);
+      } catch (e) {
+        mostrarErro(e);
+      }
+    })();
+  }, [clinicaId, checarPermissao, listarAutores]);
+
+  const acao = async (item: Item, novo: "under_review" | "approved" | "pending") => {
+    setSalvando(true);
+    try {
+      await revisar({ data: { id: item.id, clinicaId: clinicaId!, acao: novo, motivo: null } });
+      toast.success(
+        novo === "approved"
+          ? "Correção validada. Nada foi alterado na Base ainda."
+          : "Situação atualizada.",
+      );
+      await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarRejeicao = async () => {
+    if (!rejeitando) return;
+    setSalvando(true);
+    try {
+      await revisar({
+        data: {
+          id: rejeitando.id,
+          clinicaId: clinicaId!,
+          acao: "rejected",
+          motivo: motivo.trim() || null,
+        },
+      });
+      toast.success("Registro rejeitado. Nada foi alterado na Base.");
+      setRejeitando(null);
+      setMotivo("");
+      await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const salvarEdicao = async () => {
+    if (!editando) return;
+    if (textoEdicao.trim().length < 3) {
+      toast.error("Escreva a correção sugerida.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      await editar({
+        data: {
+          id: editando.id,
+          clinicaId: clinicaId!,
+          correcao: textoEdicao.trim(),
+          observacao: editando.observacao,
+        },
+      });
+      toast.success("Sugestão atualizada.");
+      setEditando(null);
+      await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirConversa = async (item: Item) => {
+    if (!item.conversa_id || !clinicaId) {
+      toast.error("Este registro não tem conversa vinculada.");
+      return;
+    }
+    try {
+      const msgs = await lerConversa({
+        data: { clinicaId, conversaId: item.conversa_id },
+      });
+      setConversa({ item, msgs });
+    } catch (e) {
+      mostrarErro(e);
+    }
+  };
+
+  const cabecalho = useMemo(
+    () => ABAS.map((a) => ({ ...a, total: contagens[a.valor] ?? 0 })),
+    [contagens],
+  );
+
+  return (
+    <div className="space-y-4 p-4 md:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Nina — Revisão de Aprendizados</h1>
+          <p className="text-sm text-muted-foreground">
+            Revisão dos erros reportados pela equipe. Aprovar ou rejeitar aqui{" "}
+            <strong>não altera</strong> a Base de Conhecimentos — a aplicação real virá depois.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {podeRevisar ? (
+            <Badge variant="secondary" className="gap-1">
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" /> Pode revisar
+            </Badge>
+          ) : (
+            <Badge variant="outline">Somente leitura</Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={() => void carregar()}>
+            <RefreshCw className="mr-1 h-4 w-4" aria-hidden="true" /> Atualizar
+          </Button>
+        </div>
+      </header>
+
+      <Card>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-4">
+          <div>
+            <Label htmlFor="f-cat">Tipo de erro</Label>
+            <Select value={categoria} onValueChange={setCategoria}>
+              <SelectTrigger id="f-cat" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todos</SelectItem>
+                {CATEGORIAS_FEEDBACK_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="f-autor">Reportado por</Label>
+            <Select value={autor} onValueChange={setAutor}>
+              <SelectTrigger id="f-autor" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {autores.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="f-de">De</Label>
+            <Input
+              id="f-de"
+              type="date"
+              className="mt-1"
+              value={de}
+              onChange={(e) => setDe(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="f-ate">Até</Label>
+            <Input
+              id="f-ate"
+              type="date"
+              className="mt-1"
+              value={ate}
+              onChange={(e) => setAte(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs value={aba} onValueChange={setAba}>
+        <TabsList>
+          {cabecalho.map((a) => (
+            <TabsTrigger key={a.valor} value={a.valor}>
+              {a.rotulo} ({a.total})
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {carregando ? (
+        <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Carregando…
+        </div>
+      ) : itens.length === 0 ? (
+        <p className="p-6 text-sm text-muted-foreground">Nenhum registro nesta aba.</p>
+      ) : (
+        <ul className="space-y-3">
+          {itens.map((it) => (
+            <li key={it.id}>
+              <Card>
+                <CardContent className="space-y-3 p-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="destructive" className="gap-1">
+                      <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                      {rotuloCategoriaFeedback(it.categoria)}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {fmtData(it.created_at)} · reportado por{" "}
+                      {pessoas[it.reportado_por] ?? "—"}
+                      {it.revisado_por
+                        ? ` · revisado por ${pessoas[it.revisado_por] ?? "—"}`
+                        : ""}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">
+                        Pergunta do paciente
+                      </Label>
+                      <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                        {it.pergunta_texto?.trim() || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Resposta da Nina</Label>
+                      <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                        {it.mensagem_texto?.trim() || "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
+                    <div className="mt-1 whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
+                      {it.correcao}
+                    </div>
+                  </div>
+                  {it.observacao && (
+                    <p className="text-xs text-muted-foreground">
+                      Observação interna: {it.observacao}
+                    </p>
+                  )}
+                  {it.motivo_rejeicao && (
+                    <p className="text-xs text-muted-foreground">
+                      Motivo da rejeição: {it.motivo_rejeicao}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void abrirConversa(it)}
+                      disabled={!it.conversa_id}
+                    >
+                      <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
+                    </Button>
+                    {podeRevisar && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditando(it);
+                            setTextoEdicao(it.correcao);
+                          }}
+                        >
+                          <Pencil className="mr-1 h-4 w-4" aria-hidden="true" /> Editar sugestão
+                        </Button>
+                        {it.status !== "under_review" && it.status !== "approved" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={salvando}
+                            onClick={() => void acao(it, "under_review")}
+                          >
+                            Colocar em revisão
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          disabled={salvando || it.status === "approved"}
+                          onClick={() => void acao(it, "approved")}
+                        >
+                          <Check className="mr-1 h-4 w-4" aria-hidden="true" /> Aprovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={salvando || it.status === "rejected"}
+                          onClick={() => {
+                            setRejeitando(it);
+                            setMotivo("");
+                          }}
+                        >
+                          <X className="mr-1 h-4 w-4" aria-hidden="true" /> Rejeitar
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Rejeitar */}
+      <Dialog open={!!rejeitando} onOpenChange={(o) => !o && setRejeitando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar correção</DialogTitle>
+            <DialogDescription>
+              O registro fica marcado como rejeitado. Nada é alterado na Base de Conhecimentos.
+            </DialogDescription>
+          </DialogHeader>
+          <Label htmlFor="motivo">Motivo (opcional)</Label>
+          <Textarea
+            id="motivo"
+            rows={3}
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ex.: a informação da Nina estava correta."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejeitando(null)} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmarRejeicao()} disabled={salvando}>
+              Rejeitar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar sugestão */}
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar correção sugerida</DialogTitle>
+            <DialogDescription>
+              A sugestão original de quem reportou continua guardada no registro.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            rows={5}
+            value={textoEdicao}
+            onChange={(e) => setTextoEdicao(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditando(null)} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvarEdicao()} disabled={salvando}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ver conversa */}
+      <Dialog open={!!conversa} onOpenChange={(o) => !o && setConversa(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Conversa de origem</DialogTitle>
+            <DialogDescription>Somente leitura.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-2 overflow-auto pr-1">
+            {(conversa?.msgs ?? []).map((m: any) => (
+              <div
+                key={m.id}
+                className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[75%] rounded-lg px-3 py-2 text-xs ${
+                    m.id === conversa?.item.mensagem_id
+                      ? "border-2 border-destructive bg-muted"
+                      : m.direction === "out"
+                        ? "bg-primary/10"
+                        : "bg-muted"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">
+                    {m.body || m.transcricao || `[${m.tipo}]`}
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    {fmtData(m.recebida_em)} {m.enviada_por === "nina" ? "· Nina" : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {conversa && conversa.msgs.length === 0 && (
+              <p className="text-sm text-muted-foreground">Sem mensagens vinculadas.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConversa(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
