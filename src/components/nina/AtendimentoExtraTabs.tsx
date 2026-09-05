@@ -1204,7 +1204,22 @@ export function AtendInbox() {
           </div>
         </Card>
 
+        {/* Agenda dentro da conversa: não troca de tela nem perde o rascunho. */}
+        {clinicaId && sel && (
+          <AgendaConversaDrawer
+            open={agendaOpen}
+            onOpenChange={setAgendaOpen}
+            clinicaId={clinicaId}
+            conversaId={sel.id}
+            contatoNome={sel.contato_nome ?? null}
+            contatoTelefone={sel.contato_telefone ?? null}
+            pacienteIdVinculado={contato?.paciente?.id ?? null}
+            onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
+          />
+        )}
+
         {/* DIALOGS */}
+
         <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
           <DialogContent>
             <DialogHeader>
