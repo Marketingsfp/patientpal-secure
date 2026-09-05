@@ -1461,9 +1461,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .maybeSingle()
       : { data: null };
     marcar("responsavel");
-    console.info(
-      `[perf-contato] total=${Date.now() - t0}ms ${JSON.stringify(marcas)}`,
-    );
 
     return {
       conversa: conv,
