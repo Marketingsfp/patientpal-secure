@@ -258,7 +258,7 @@ export const fecharConversa = createServerFn({ method: "POST" })
     // Só o responsável atual encerra (evita encerrar atendimento de outra pessoa).
     const { data: dono } = await context.supabase
       .from("atend_conversas")
-      .select("atribuida_user_id")
+      .select("atribuida_user_id, nina_fluxo_estado")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
@@ -267,6 +267,15 @@ export const fecharConversa = createServerFn({ method: "POST" })
     const { data: prot } = await context.supabase.rpc("atend_gerar_protocolo", {
       _clinica_id: data.clinicaId,
     });
+    // Resolver a conversa encerra a OPERAÇÃO pendente (vaga escolhida,
+    // confirmação, criação de agendamento), mas mantém o contexto recente:
+    // se o paciente voltar dentro do TTL da sessão, a Nina ainda entende do
+    // que se falava. Histórico, CRM, agendamentos e Base não são tocados.
+    const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
+    const { normalizarEstado } = await import("@/lib/nina/fluxo-estado-normalizar");
+    const estadoEncerrado = encerrarEstadosTransacionais(
+      normalizarEstado((dono as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null),
+    );
     const { error } = await context.supabase
       .from("atend_conversas")
       .update({
@@ -277,14 +286,13 @@ export const fecharConversa = createServerFn({ method: "POST" })
         resolved_at: new Date().toISOString(),
         closed_at: new Date().toISOString(),
         protocol_number: prot as string,
-        // Fim do fluxo: apenas o estado transitório do agendamento (vaga
-        // oferecida, etapa) morre com a conversa. A identidade do contato e o
-        // histórico permanecem — no atendimento real a Nina deve continuar
-        // entendendo o contexto das mensagens anteriores. O reset completo de
-        // memória vale somente para o console de testes.
-        nina_fluxo_estado: null,
+        nina_fluxo_estado: {
+          ...estadoEncerrado,
+          updated_at: new Date().toISOString(),
+        } as never,
         handoff_resumo: null,
         handoff_motivo: null,
+
 
 
       })
