@@ -12,6 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
+  FILTRO_NAO_ATRIBUIDAS_KEY,
+} from "@/components/nina/BannerNaoAtribuidas";
+
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -139,6 +144,25 @@ export function AtendInbox() {
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
+  // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
+  const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
+  const convsVisiveis: any[] = soNaoAtribuidas
+    ? convs.filter((c: any) => !c.atribuida_user_id)
+    : convs;
+  useEffect(() => {
+    const ativar = () => setSoNaoAtribuidas(true);
+    try {
+      if (window.sessionStorage.getItem(FILTRO_NAO_ATRIBUIDAS_KEY) === "1") {
+        window.sessionStorage.removeItem(FILTRO_NAO_ATRIBUIDAS_KEY);
+        setSoNaoAtribuidas(true);
+      }
+    } catch {
+      /* sem armazenamento: só o evento abaixo aciona o filtro */
+    }
+    window.addEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+    return () => window.removeEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+  }, []);
+
   const [draft, setDraft] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
@@ -714,13 +738,24 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+            {soNaoAtribuidas && (
+              <button
+                type="button"
+                onClick={() => setSoNaoAtribuidas(false)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white"
+                title="Mostrar todas as conversas"
+              >
+                Só não atribuídas ({convsVisiveis.length}) ✕
+              </button>
+            )}
 
           </CardHeader>
           <div className="flex-1 overflow-auto border-t">
-            {convs.length === 0 && (
+            {convsVisiveis.length === 0 && (
               <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
             )}
-            {convs.map((c) => (
+            {convsVisiveis.map((c) => (
+
               <button
                 key={c.id}
                 onClick={() => setSel(c)}
