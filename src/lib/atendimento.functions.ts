@@ -1234,6 +1234,9 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
         // Cursor da paginação: busca apenas mensagens ANTERIORES a este
         // instante (usado ao rolar para cima em conversas longas).
         antesDe: z.string().min(1).optional(),
+        // Cursor da atualização incremental (Realtime): busca apenas
+        // mensagens POSTERIORES a este instante.
+        depoisDe: z.string().min(1).optional(),
       })
       .parse(i),
   )
@@ -1249,6 +1252,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
     if (data.antesDe) q = q.lt("recebida_em", data.antesDe);
+    if (data.depoisDe) q = q.gt("recebida_em", data.depoisDe);
     const { data: rows, error } = await q
       .order("recebida_em", { ascending: false })
       .limit(data.limit);

@@ -85,6 +85,12 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import {
+  cursorMaisRecente,
+  mesclarNovas,
+  mesclarEventos,
+  podeAtualizarIncremental,
+} from "@/lib/atendimento/atualizacao-incremental";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 
@@ -247,6 +253,13 @@ export function AtendInbox() {
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
   const prefetchEmCurso = useRef<Set<string>>(new Set());
+  // Buscas de prefetch em andamento (reaproveitadas quando o lead é clicado
+  // antes de o prefetch terminar) e temporizadores de intenção de abertura.
+  const prefetchMsgs = useRef<Map<string, Promise<any[]>>>(new Map());
+  const prefetchTimers = useRef<Map<string, number>>(new Map());
+  // Espelho do que está na tela, usado pela atualização incremental.
+  const msgsRef = useRef<any[]>([]);
+  const conversaCarregadaRef = useRef<string | null>(null);
   const medidor = useRef<MedidorConversa | null>(null);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
@@ -612,22 +625,20 @@ export function AtendInbox() {
       if (id === selIdRef.current) return;
       if (cacheConversas.current.obter(id) || prefetchEmCurso.current.has(id)) return;
       prefetchEmCurso.current.add(id);
+      // Só as mensagens recentes: o suficiente para o chat abrir na hora.
+      // Nada de histórico completo nem dados de apoio no prefetch.
+      const p = listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } });
+      prefetchMsgs.current.set(id, p as Promise<any[]>);
       void (async () => {
         try {
-          const [m, c, n, ev] = await Promise.all([
-            listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } }),
-            obterContato({ data: { clinicaId, conversaId: id } }),
-            listarNotasFn({ data: { clinicaId, conversaId: id } }),
-            listarEventosFn({ data: { clinicaId, conversaId: id } }).catch(
-              () => [] as ConversaEvento[],
-            ),
-          ]);
-          if (c) {
+          const m = (await p) as any[];
+          if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m,
-              contato: c,
-              notas: n,
-              eventos: (ev ?? []) as ConversaEvento[],
+              contato: null,
+              notas: [],
+              eventos: [],
+              parcial: true,
             });
           }
         } catch {
@@ -637,7 +648,36 @@ export function AtendInbox() {
         }
       })();
     },
-    [clinicaId, listarMsgs, obterContato, listarNotasFn, listarEventosFn],
+    [clinicaId, listarMsgs],
+  );
+
+  // Intenção de abrir: o prefetch só dispara depois de ~150ms com o mouse (ou
+  // o foco) parado no lead — evita disparar dezenas de buscas ao passar o
+  // mouse pela lista inteira.
+  const agendarPrefetch = useCallback(
+    (id: string) => {
+      if (prefetchTimers.current.has(id)) return;
+      const t = window.setTimeout(() => {
+        prefetchTimers.current.delete(id);
+        prefetchConversa(id);
+      }, 150);
+      prefetchTimers.current.set(id, t);
+    },
+    [prefetchConversa],
+  );
+  const cancelarPrefetch = useCallback((id: string) => {
+    const t = prefetchTimers.current.get(id);
+    if (t !== undefined) {
+      window.clearTimeout(t);
+      prefetchTimers.current.delete(id);
+    }
+  }, []);
+  useEffect(
+    () => () => {
+      for (const t of prefetchTimers.current.values()) window.clearTimeout(t);
+      prefetchTimers.current.clear();
+    },
+    [],
   );
 
   const carregarConversa = useCallback(async () => {
@@ -659,10 +699,17 @@ export function AtendInbox() {
         pedidoAtual: seqConversa.current,
       });
 
-    const pMensagens = medirRequest(
-      "listarMensagensConversa",
-      listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
-    );
+    // Se o prefetch desta conversa já está em andamento (hover → clique),
+    // reaproveitamos a mesma busca em vez de pedir as mensagens duas vezes.
+    const emVoo =
+      janela === JANELA_INICIAL ? prefetchMsgs.current.get(alvo) : undefined;
+    const pMensagens = emVoo
+      ? emVoo
+      : medirRequest(
+          "listarMensagensConversa",
+          listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+        );
+    prefetchMsgs.current.delete(alvo);
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
@@ -732,6 +779,56 @@ export function AtendInbox() {
 
 
 
+  // Atualização incremental (Fase 4): mensagem nova no Realtime traz apenas o
+  // que é novo desta conversa — nada de recarregar contato, notas ou resumo.
+  const sincronizarConversa = useCallback(async () => {
+    const alvo = selIdRef.current;
+    if (!clinicaId || !alvo) return;
+    const cursor = cursorMaisRecente(msgsRef.current);
+    if (
+      !podeAtualizarIncremental({
+        conversaAberta: alvo,
+        conversaCarregada: conversaCarregadaRef.current,
+        cursor,
+      })
+    ) {
+      await carregarConversa();
+      return;
+    }
+    try {
+      const [novas, ev] = await Promise.all([
+        listarMsgs({
+          data: { clinicaId, conversaId: alvo, limit: JANELA_INICIAL, depoisDe: cursor! },
+        }),
+        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
+          () => null as ConversaEvento[] | null,
+        ),
+      ]);
+      if (selIdRef.current !== alvo) return;
+      if ((novas as any[])?.length) {
+        setMsgs((prev) => {
+          const juntas = mesclarNovas(prev, novas as any[]);
+          const atual = cacheConversas.current.obter(alvo);
+          if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
+          return juntas;
+        });
+      }
+      if (ev) {
+        setEventos((prev) => mesclarEventos(prev, ev as ConversaEvento[]));
+      }
+    } catch {
+      // Falha na sincronização não derruba o atendimento: a próxima tentativa
+      // (Realtime ou rede de segurança) resolve.
+    }
+  }, [clinicaId, listarMsgs, listarEventosFn, carregarConversa]);
+
+  useEffect(() => {
+    msgsRef.current = msgs;
+  }, [msgs]);
+  useEffect(() => {
+    conversaCarregadaRef.current = conversaCarregadaId;
+  }, [conversaCarregadaId]);
+
   useEffect(() => {
     carregarConvs();
   }, [carregarConvs]);
@@ -761,11 +858,19 @@ export function AtendInbox() {
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
-      setContato(emCache.contato);
-      setNotas(emCache.notas);
-      setEventos(emCache.eventos);
       setConversaCarregadaId(id);
-      setSecundariosCarregadosId(id);
+      if (emCache.parcial) {
+        // Veio do prefetch: o chat já abre, os dados de apoio carregam agora.
+        setContato(null);
+        setNotas([]);
+        setEventos([]);
+        setSecundariosCarregadosId(null);
+      } else {
+        setContato(emCache.contato);
+        setNotas(emCache.notas);
+        setEventos(emCache.eventos);
+        setSecundariosCarregadosId(id);
+      }
       return;
     }
     setConversaCarregadaId(null);
@@ -783,10 +888,10 @@ export function AtendInbox() {
   useEffect(() => {
     if (!sel?.id) return;
     const t = setInterval(() => {
-      carregarConversa();
+      void sincronizarConversa();
     }, 8000);
     return () => clearInterval(t);
-  }, [sel?.id, carregarConversa]);
+  }, [sel?.id, sincronizarConversa]);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -831,10 +936,12 @@ export function AtendInbox() {
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
   useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
-    ["whatsapp_mensagens", "atend_notas_internas", "atend_conversa_eventos"],
-    carregarConversa,
+    ["whatsapp_mensagens", "atend_conversa_eventos"],
+    () => void sincronizarConversa(),
     !!clinicaId && !!sel?.id,
   );
+  // Notas internas são raras: aí sim vale recarregar o painel de apoio.
+  useRealtimeRefresh(["atend_notas_internas"], carregarConversa, !!clinicaId && !!sel?.id);
 
   // Mensagens e eventos de estado na mesma linha do tempo, em ordem cronológica.
   const timeline = useMemo(() => {
@@ -1391,8 +1498,10 @@ export function AtendInbox() {
                   medidor.current.marcar("click");
                   setSel(c);
                 }}
-                onMouseEnter={() => prefetchConversa(c.id)}
-                onFocus={() => prefetchConversa(c.id)}
+                onMouseEnter={() => agendarPrefetch(c.id)}
+                onMouseLeave={() => cancelarPrefetch(c.id)}
+                onFocus={() => agendarPrefetch(c.id)}
+                onBlur={() => cancelarPrefetch(c.id)}
                 className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
                   sel?.id === c.id
                     ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"

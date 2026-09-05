@@ -16,6 +16,12 @@ export type ConteudoConversa = {
   contato: any;
   notas: any[];
   eventos: any[];
+  /**
+   * Conteúdo parcial (Fase 4): veio do prefetch e tem só as mensagens
+   * recentes. Serve para o chat abrir na hora; contato/notas/eventos ainda
+   * precisam ser carregados quando a conversa for aberta.
+   */
+  parcial?: boolean;
 };
 
 export type CacheConversas = {
