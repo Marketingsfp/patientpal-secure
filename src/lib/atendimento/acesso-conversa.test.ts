@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { usuarioPodeVerConversa } from "./escopo-inbox";
 
 const JEAN = "11111111-1111-1111-1111-111111111111";
