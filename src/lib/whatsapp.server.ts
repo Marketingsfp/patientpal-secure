@@ -367,13 +367,9 @@ function extrairIdentificadores(mensagem: string): {
   };
 }
 
-/** Normaliza telefone do remetente WhatsApp para os últimos 10-11 dígitos (formato BR). */
+/** Normaliza telefone do remetente WhatsApp (regra única do sistema). */
 function normalizarTelefoneRemetente(from: string | null | undefined): string | null {
-  const d = String(from ?? "").replace(/\D/g, "");
-  if (!d) return null;
-  // Remove DDI 55 se presente e retorna os últimos 11 dígitos
-  const semDdi = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
-  return semDdi.slice(-11);
+  return normalizarTelefone(from);
 }
 
 async function identificarPaciente(
