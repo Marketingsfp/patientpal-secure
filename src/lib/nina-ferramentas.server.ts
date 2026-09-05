@@ -328,39 +328,17 @@ export async function executarFerramentaNina(
 
   switch (nome) {
     case "consultar_base_conhecimento": {
-      const { consultarBase, registrarConsultaKb } = await import("@/lib/nina/kb.server");
-      const { expandirTermos } = await import("@/lib/nina/kb-parser");
-      const termo = String(args.termo ?? "")
-        .trim()
-        .slice(0, 200);
+      // FASE 3: única porta de acesso à planilha oficial.
+      const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
+      const termo = String(args.termo ?? "").trim().slice(0, 200);
       if (termo.length < 2) throw new Error("Informe o assunto da consulta.");
-      const achado = await consultarBase({
+      return await searchKnowledgeBase({
         clinicaId,
-        termo,
+        query: termo,
         medico: args.medico ? String(args.medico).slice(0, 160) : null,
         dia: args.dia ? String(args.dia).slice(0, 40) : null,
-      });
-      void registrarConsultaKb({
-        clinicaId,
-        baseId: achado.base?.id ?? null,
-        versao: achado.base?.versao ?? null,
         canal: "interno",
-        pergunta: termo,
-        termos: expandirTermos(termo),
-        encontrados: achado.registros,
       });
-      return achado.encontrado
-        ? {
-            encontrado: true,
-            ambiguo: achado.ambiguo,
-            versao_base: achado.base?.versao ?? null,
-            consolidado_por_profissional: achado.consolidado ?? [],
-            registros: achado.registros,
-          }
-        : {
-            encontrado: false,
-            instrucao: "Nada na base oficial. Não invente; diga que não encontrou.",
-          };
     }
 
     case "consultar_dados": {

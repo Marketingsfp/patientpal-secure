@@ -799,41 +799,16 @@ async function executarFerramentaInterna(
             dia: z.string().trim().max(40).optional(),
           })
           .parse(args);
-        const { consultarBase, registrarConsultaKb } = await import("@/lib/nina/kb.server");
-        const { expandirTermos } = await import("@/lib/nina/kb-parser");
-        const achado = await consultarBase({
+        // FASE 3: mesma camada de retrieval usada pelo painel interno.
+        const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
+        const resultado = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
-          termo: p.termo,
+          query: p.termo,
           medico: p.medico ?? null,
           dia: p.dia ?? null,
-        });
-        void registrarConsultaKb({
-          clinicaId: ctx.clinicaId,
-          baseId: achado.base?.id ?? null,
-          versao: achado.base?.versao ?? null,
           canal: "whatsapp",
-          pergunta: p.termo,
-          termos: expandirTermos(p.termo),
-          encontrados: achado.registros,
         });
-        if (!achado.encontrado)
-          return {
-            ok: true,
-            encontrado: false,
-            instrucao:
-              "Nada encontrado na base oficial. Diga ao paciente que não encontrou a informação na base e encaminhe para a equipe. NÃO invente.",
-          };
-        return {
-          ok: true,
-          encontrado: true,
-          ambiguo: achado.ambiguo,
-          versao_base: achado.base?.versao ?? null,
-          consolidado_por_profissional: achado.consolidado ?? [],
-          instrucao: achado.ambiguo
-            ? "Há mais de uma opção parecida: pergunte ao paciente qual exame está no pedido médico antes de responder."
-            : "Responda usando SOMENTE estes registros. Horário é escala administrativa, não vaga; vaga vem das ferramentas de agenda.",
-          registros: achado.registros,
-        };
+        return { ok: true, ...resultado };
       }
 
       case "listar_especialidades": {
