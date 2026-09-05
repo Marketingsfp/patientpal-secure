@@ -1145,7 +1145,7 @@ export function ContratosPage({
           aria-hidden
         />
         <Input
-          className="h-10 rounded-lg border-gray-300 pl-9 pr-9 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700"
+          className="h-10 rounded-lg border-gray-300 pl-9 pr-9 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring dark:border-gray-700"
           placeholder="Buscar por número ou paciente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -1155,7 +1155,7 @@ export function ContratosPage({
           <button
             type="button"
             onClick={() => setQ("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-gray-800 dark:hover:text-gray-200"
             title="Limpar busca"
             aria-label="Limpar busca"
           >

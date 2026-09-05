@@ -660,7 +660,7 @@ function ClientesPage() {
               colouRef.current = true;
             }}
             placeholder="Buscar por nº serviço, nome, CPF, telefone, e-mail ou nascimento (dd/mm/aaaa)…"
-            className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-indigo-500"
+            className="pl-9 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 h-10 w-full focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
       </div>

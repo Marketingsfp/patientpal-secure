@@ -144,7 +144,7 @@ function ApoioClinicoPage() {
                 value={especialidade}
                 onChange={(e) => setEspecialidade(e.target.value)}
                 placeholder="Especialidade (opcional) — ex.: Cardiologia"
-                className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-slate-800 transition focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-slate-800 transition focus-visible:ring-1 focus-visible:ring-ring dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
               />
               <Textarea
                 value={contexto}
@@ -153,7 +153,7 @@ function ApoioClinicoPage() {
                 placeholder={
                   "Ex.: Paciente feminina, 54 anos, hipertensa, refere cefaleia occipital há 3 dias...\nPA 160/95 mmHg, FC 88 bpm, Tax 36,4 °C, glicemia capilar 132 mg/dL.\nEm uso de losartana 50 mg 1x/dia."
                 }
-                className="min-h-[280px] resize-y rounded-xl border-slate-200 bg-slate-50/60 p-4 text-[1.05rem] leading-relaxed text-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
+                className="min-h-[280px] resize-y rounded-xl border-slate-200 bg-slate-50/60 p-4 text-[1.05rem] leading-relaxed text-slate-700 transition focus-visible:ring-1 focus-visible:ring-ring dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
               />
               <p className="text-xs leading-relaxed text-slate-400">
                 Não inclua dados que não sejam necessários à análise clínica.
@@ -266,7 +266,7 @@ function ApoioClinicoPage() {
                   }}
                   rows={2}
                   placeholder="Escreva sua pergunta… (Enter envia, Shift+Enter quebra linha)"
-                  className="min-h-[56px] resize-none rounded-xl border-slate-200 bg-slate-50/60 leading-relaxed text-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
+                  className="min-h-[56px] resize-none rounded-xl border-slate-200 bg-slate-50/60 leading-relaxed text-slate-700 transition focus-visible:ring-1 focus-visible:ring-ring dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
                   disabled={loading}
                 />
                 <Button
