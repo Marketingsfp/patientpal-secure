@@ -87,8 +87,10 @@ import {
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
+  esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -131,6 +133,7 @@ export function AtendInbox() {
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
+  const esperaFn = useServerFn(esperaConversas);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
@@ -146,9 +149,19 @@ export function AtendInbox() {
   >("all");
   // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
   const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
-  const convsVisiveis: any[] = soNaoAtribuidas
-    ? convs.filter((c: any) => !c.atribuida_user_id)
-    : convs;
+  // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
+  const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
+  // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
+  const [espera, setEspera] = useState<Record<string, string>>({});
+  const convsVisiveis: any[] = (() => {
+    const base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    if (ordem !== "espera") return base;
+    return [...base].sort((a: any, b: any) => {
+      const ta = espera[a.id] ? new Date(espera[a.id]).getTime() : Infinity;
+      const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
+      return ta - tb;
+    });
+  })();
   useEffect(() => {
     const ativar = () => setSoNaoAtribuidas(true);
     try {
@@ -470,7 +483,30 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
+  // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
+  // atualiza o texto sozinho; o banco só é consultado quando algo muda
+  // (realtime) ou a cada 60s como rede de segurança.
+  const carregarEspera = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
+        string,
+        string
+      >;
+      setEspera(m ?? {});
+    } catch {
+      /* indicador auxiliar: falha não pode atrapalhar o atendimento */
+    }
+  }, [clinicaId, esperaFn]);
+
+  useEffect(() => {
+    void carregarEspera();
+    const t = setInterval(() => void carregarEspera(), 60_000);
+    return () => clearInterval(t);
+  }, [carregarEspera]);
+
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
+  useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
     ["whatsapp_mensagens", "atend_notas_internas", "atend_conversa_eventos"],
     carregarConversa,
@@ -613,6 +649,7 @@ export function AtendInbox() {
   };
 
   return (
+    <RelogioEsperaProvider>
     <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
       <div className="flex h-full gap-2 overflow-hidden">
         {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
@@ -759,6 +796,19 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={ordem}
+              onValueChange={(v) => setOrdem(v as "recentes" | "espera")}
+              onOpenChange={setPainelMenuAberto}
+            >
+              <SelectTrigger className="h-8 text-xs" aria-label="Ordenar conversas">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                <SelectItem value="recentes">Ordenar por: mais recentes</SelectItem>
+                <SelectItem value="espera">Ordenar por: mais antigos aguardando</SelectItem>
+              </SelectContent>
+            </Select>
             {soNaoAtribuidas && (
               <button
                 type="button"
@@ -810,6 +860,7 @@ export function AtendInbox() {
                   {c.protocol_number && (
                     <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
                   )}
+                  <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-1">
                   {c.ultima_msg_preview || "—"}
@@ -853,6 +904,13 @@ export function AtendInbox() {
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
                     </p>
+                    {espera[sel.id] && (
+                      <BadgeEspera
+                        desde={espera[sel.id]}
+                        prefixo="Aguardando resposta há"
+                        className="mt-1"
+                      />
+                    )}
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button
@@ -1280,6 +1338,7 @@ export function AtendInbox() {
         </DialogContent>
       </Dialog>
     </div>
+    </RelogioEsperaProvider>
   );
 }
 
