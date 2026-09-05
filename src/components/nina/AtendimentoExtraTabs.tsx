@@ -603,6 +603,7 @@ export function AtendInbox() {
       <div className="flex h-full gap-2 overflow-hidden">
         {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
         <Card
+          data-a11y-secundario="true"
           onMouseEnter={() => setPainelHover(true)}
           onMouseLeave={() => setPainelHover(false)}
           className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
@@ -803,7 +804,10 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 2 — CHAT */}
-        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Card
+          data-a11y-principal="true"
+          className="flex min-w-0 flex-1 flex-col overflow-hidden"
+        >
           {!sel ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Selecione uma conversa
@@ -948,6 +952,7 @@ export function AtendInbox() {
 
         {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
         <Card
+          data-a11y-secundario="true"
           onMouseEnter={() => setContatoHover(true)}
           onMouseLeave={() => setContatoHover(false)}
           className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${

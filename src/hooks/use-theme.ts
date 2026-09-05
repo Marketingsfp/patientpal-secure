@@ -8,9 +8,10 @@ export type ThemePref = "light" | "dark" | "system";
  * garante a remoção da classe `dark` do <html>.
  */
 export function useTheme(_enabled?: boolean) {
-  useEffect(() => {
-    document.documentElement.classList.remove("dark");
-  }, []);
+  // O tema escuro agora é uma preferência de acessibilidade por usuário
+  // (painel ♿). Este hook não mexe mais na classe `dark` para não brigar com
+  // o AcessibilidadeProvider.
+  useEffect(() => {}, []);
 
   const set = useCallback((_v: ThemePref) => {}, []);
 

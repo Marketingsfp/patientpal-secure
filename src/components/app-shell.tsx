@@ -163,6 +163,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { AcessibilidadeProvider } from "@/components/acessibilidade/AcessibilidadeProvider";
+import { AtalhosAcessibilidade } from "@/components/acessibilidade/AtalhosAcessibilidade";
+import { BotaoAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
 
 const VoiceInput = lazy(() =>
   import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })),
@@ -584,7 +587,12 @@ function primeiraRotaVisivel(
 }
 
 export function AppShell() {
-  return <AppShellInner />;
+  return (
+    <AcessibilidadeProvider>
+      <AtalhosAcessibilidade />
+      <AppShellInner />
+    </AcessibilidadeProvider>
+  );
 }
 
 function AppShellInner() {
@@ -1299,6 +1307,7 @@ function AppShellInner() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
+            <BotaoAcessibilidade />
             <div className="flex items-center gap-1.5 [&_button]:text-slate-700 [&_button:hover]:bg-slate-100 [&_button:hover]:text-slate-900">
               <EstornosBell />
               <TTSToggle />
