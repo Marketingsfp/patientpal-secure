@@ -2,7 +2,7 @@
  * Card interno com o resumo automático da Nina no handoff.
  * Uso interno da equipe: nada aqui é enviado ao paciente.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export function ResumoHandoffCard({
   // Regra: cada conversa começa com o resumo RECOLHIDO.
   const [aberto, setAberto] = useState(false);
   const [atualizado, setAtualizado] = useState(false);
+  const jaBuscado = useRef<string | null>(null);
 
   const carregar = useCallback(
     async (forcar = false) => {
@@ -59,9 +60,14 @@ export function ResumoHandoffCard({
     [clinicaId, conversaId, obter],
   );
 
+  // Uma única busca por conversa na abertura. Antes, a função de busca era
+  // recriada em outra renderização e o resumo era pedido duas vezes seguidas.
   useEffect(() => {
+    const chave = `${clinicaId}|${conversaId}`;
+    if (jaBuscado.current === chave) return;
+    jaBuscado.current = chave;
     void carregar(false);
-  }, [carregar]);
+  }, [carregar, clinicaId, conversaId]);
 
   // Resumo gerado pelo servidor (inclusive no timeout) aparece sem refresh.
   // Só o próprio resumo dispara recarga. Antes, qualquer alteração em
