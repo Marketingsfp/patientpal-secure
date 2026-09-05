@@ -623,18 +623,20 @@ export function AtendInbox() {
     void carregarContadores();
   }, [carregarContadores, convs.length, escopo]);
 
-  // Trocar de escopo recomeça a lista: nada de mesclar conversas de escopos
-  // diferentes (uma conversa de outro atendente jamais "sobra" na tela).
+  // Trocar de escopo (ou de usuário/clínica) recomeça a lista: cada filtro tem
+  // a sua própria caixa de dados, nada de sobras de outro filtro na tela.
+  const chaveAtual = chaveInbox({ clinicaId, userId: meuId, escopo });
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
-  }, [escopo]);
+  }, [chaveAtual]);
 
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
+    const chavePedido = chaveInbox({ clinicaId, userId: meuId, escopo });
     try {
-      const rows = await medirRequest("listarConversas", listarConvs({
+      const brutas = await medirRequest("listarConversas", listarConvs({
         data: {
           clinicaId,
           status: filtroStatus,
@@ -647,12 +649,22 @@ export function AtendInbox() {
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
-      // FASE 3 — a conversa aberta deixou de pertencer a este filtro
-      // (transferida, devolvida à fila, resolvida ou reaberta com a Nina)?
-      // Sai da tela na mesma hora, sem recarregar a página. Durante uma busca
-      // a lista está reduzida pelo texto digitado, então nada é removido.
-      const removeu =
-        !busca && selecaoSaiuDoEscopo(selIdRef.current, rows as any as LinhaInbox[]);
+      // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
+      if (chavePedido !== chaveInbox({ clinicaId, userId: meuId, escopo })) return;
+      // FASE 4 — segunda conferência no navegador: só entra na lista o que
+      // realmente pertence a este filtro, mesmo que um evento em tempo real
+      // traga uma conversa que acabou de mudar de responsável.
+      const ctxEscopo = { escopo, userId: meuId, gestor: souGestor };
+      const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
+      // A conversa aberta deixou de pertencer a este filtro (transferida,
+      // devolvida à fila, resolvida ou reaberta com a Nina)? Sai da tela na
+      // hora — inclusive durante uma busca, onde a lista vem reduzida.
+      const removeu = selecaoDeveSair({
+        selecionada: (sel as any) ?? null,
+        linhas: rows as any,
+        buscando: !!busca,
+        ctx: ctxEscopo,
+      });
       if (removeu) {
         const idFora = selIdRef.current!;
         cacheConversas.current.invalidar(idFora);
@@ -678,16 +690,23 @@ export function AtendInbox() {
           if (id === selIdRef.current) continue;
           cacheConversas.current.invalidar(id);
         }
+        // Quem saiu deste filtro não pode continuar guardado em cache.
+        for (const id of idsQueSairam(prev as any, rows as any)) {
+          cacheConversas.current.invalidar(id);
+        }
         return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
       });
-      if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] }))
+      // O número do filtro atual muda na hora; o servidor confirma em seguida.
+      setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
+      if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] as LinhaInbox }))
         setSel(rows[0]);
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores, meuId, souGestor]);
+
 
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
