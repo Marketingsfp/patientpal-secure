@@ -64,7 +64,7 @@ export const catalogoAgendaChat = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
-      context.supabase.from("especialidades").select("id, nome").eq("clinica_id", data.clinicaId),
+      context.supabase.from("especialidades").select("id, nome"),
       context.supabase
         .from("medico_agendas")
         .select("medico_id, ordem_chegada")
