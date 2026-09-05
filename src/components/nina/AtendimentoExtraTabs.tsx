@@ -207,9 +207,14 @@ export function AtendInbox() {
   // renderiza mensagens/contato/notas/eventos quando este id é exatamente o
   // da conversa selecionada.
   const [conversaCarregadaId, setConversaCarregadaId] = useState<string | null>(null);
+  // FASE 2 — caminho crítico: o chat abre assim que as MENSAGENS da conversa
+  // selecionada chegam. Contato, notas e eventos entram depois, cada um com
+  // seu próprio indicador, sem segurar a conversa.
+  const [secundariosCarregadosId, setSecundariosCarregadosId] = useState<string | null>(null);
   const selIdRef = useRef<string | null>(null);
   selIdRef.current = sel?.id ?? null;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
+  const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Enquanto a conversa selecionada não terminou de carregar, todas as ações
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
