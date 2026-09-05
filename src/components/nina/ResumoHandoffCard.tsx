@@ -10,6 +10,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { obterResumoHandoff } from "@/lib/atendimento/handoff-resumo.functions";
 import { blocosVisiveis, ROTULO_INTENCAO, type ResumoHandoff } from "@/lib/atendimento/handoff-resumo";
 import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
+import { marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
 
 
 type Linha = {
