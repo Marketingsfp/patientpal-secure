@@ -115,7 +115,6 @@ function AtendimentoIaPage() {
   // Dia mostrado na fila. Começa em hoje; o médico volta a dias anteriores
   // para reimprimir o que prescreveu num plantão passado.
   const [dia, setDia] = useState<string>(() => diaLocal(new Date()));
-  const [aba, setAba] = useState<"espera" | "atendidos">("espera");
   const hojeLocal = diaLocal(new Date());
 
   useEffect(() => {
@@ -377,7 +376,27 @@ function AtendimentoIaPage() {
     });
   }, [fila]);
 
-  // Quem ainda vai ser chamado x quem já teve o prontuário finalizado no dia.
+  /**
+   * Número fixo de cada paciente no dia.
+   *
+   * Antes a coluna "#" era só a posição na lista que estava sendo exibida: bastava
+   * um paciente ser atendido ou mudar de etapa para o seguinte virar o nº 1, e a
+   * médica perdia a conta de onde estava. Agora o número vem da ordem do horário
+   * marcado, é calculado uma vez sobre o dia inteiro e não muda mais — nem quando
+   * um caso prioritário sobe para o topo da tela, nem quando alguém é atendido.
+   */
+  const numeroNoDia = useMemo(() => {
+    const mapa = new Map<string, number>();
+    [...fila]
+      .sort((a, b) => a.inicio.localeCompare(b.inicio) || a.id.localeCompare(b.id))
+      .forEach((item, i) => mapa.set(item.id, i + 1));
+    return mapa;
+  }, [fila]);
+
+  // Contagens do cabeçalho. A lista em si é UMA só: quem foi atendido continua
+  // na tabela, marcado de verde. Antes havia duas abas, e o paciente sumia da
+  // tela no instante em que o prontuário era finalizado — a médica não
+  // conseguia bater o olho e conferir quem já tinha passado no dia.
   const emEspera = useMemo(
     () => filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado"),
     [filaOrdenada],
@@ -386,14 +405,7 @@ function AtendimentoIaPage() {
     () => filaOrdenada.filter((f) => f.fluxo_etapa === "finalizado"),
     [filaOrdenada],
   );
-  const listaVisivel = aba === "espera" ? emEspera : atendidos;
-
-  // Ao abrir um dia já encerrado (uma consulta de plantão passado), ninguém
-  // está em espera: mostrar a aba vazia faria parecer que aquele dia não teve
-  // atendimento nenhum, então a tela já abre na lista dos atendidos.
-  useEffect(() => {
-    if (emEspera.length === 0 && atendidos.length > 0) setAba("atendidos");
-  }, [emEspera.length, atendidos.length]);
+  const listaVisivel = filaOrdenada;
 
   function atender(item: FilaItem) {
     navigate({ to: "/app/atendimento-ia/$agendamentoId", params: { agendamentoId: item.id } });
@@ -494,36 +506,19 @@ function AtendimentoIaPage() {
             <span className="text-sm font-medium">{dataPorExtenso(dia)}</span>
           </div>
 
-          {/* Atendimento finalizado nao some da tela: fica na aba "Atendidos",
-              de onde o medico reabre o prontuario para tirar uma segunda via
-              de atestado ou receita que o paciente pediu depois. */}
-          <div className="flex items-center gap-1 border-b">
-            {(
-              [
-                ["espera", `Em espera (${emEspera.length})`],
-                ["atendidos", `Atendidos (${atendidos.length})`],
-              ] as const
-            ).map(([id, rotulo]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setAba(id)}
-                className={`-mb-px border-b-2 px-3 py-1.5 text-sm ${
-                  aba === id
-                    ? "border-primary font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {rotulo}
-              </button>
-            ))}
+          {/* Lista única do dia: quem já foi atendido continua aqui, de verde.
+              O contador em cima resume o dia sem esconder ninguém. */}
+          <div className="flex items-center gap-3 border-b pb-2 text-sm">
+            <span className="font-medium">{emEspera.length} em espera</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+              {atendidos.length} atendidos
+            </span>
           </div>
 
           {listaVisivel.length === 0 ? (
             <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
-              {aba === "espera"
-                ? "Nenhum paciente aguardando atendimento nesta data."
-                : "Nenhum atendimento finalizado nesta data."}
+              Nenhum paciente agendado nesta data.
             </div>
           ) : (
             <div className="rounded-md border">
@@ -534,6 +529,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-20">Hora</TableHead>
                     <TableHead>Paciente</TableHead>
                     <TableHead className="hidden md:table-cell">Serviço</TableHead>
+                    <TableHead className="w-28">Situação</TableHead>
                     <TableHead className="w-32">Pagamento</TableHead>
                     <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
@@ -541,7 +537,7 @@ function AtendimentoIaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {listaVisivel.map((it, idx) => {
+                  {listaVisivel.map((it) => {
                     const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -560,15 +556,25 @@ function AtendimentoIaPage() {
                     return (
                       <TableRow
                         key={it.id}
-                        className={`${atendido ? "opacity-60" : ""} ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
+                        className={`${atendido ? "bg-emerald-50/70 dark:bg-emerald-950/20" : ""} ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
                       >
                         <TableCell className="tabular-nums text-xs text-muted-foreground">
-                          {idx + 1}
+                          {numeroNoDia.get(it.id) ?? "—"}
                         </TableCell>
                         <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                         <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                           {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
+                        </TableCell>
+                        <TableCell>
+                          {atendido ? (
+                            <Badge className="border-0 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1">
+                              <Check className="h-3 w-3" />
+                              ATENDIDO
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Em espera</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {!pag ? (
@@ -740,7 +746,7 @@ function AtendimentoIaPage() {
                               title="Reabrir o prontuário para conferir ou imprimir segunda via"
                             >
                               <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
-                              Reabrir
+                              Ver / Reabrir
                             </Button>
                           ) : (
                             <Button

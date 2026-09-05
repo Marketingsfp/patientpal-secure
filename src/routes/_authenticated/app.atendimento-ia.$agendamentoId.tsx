@@ -205,7 +205,11 @@ function AtendimentoEditorPage() {
   const [clinicaDados, setClinicaDados] = useState<DadosClinicaA4 | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
   const rascunhoRestaurado = useRef(false);
-  const draftKey = `pep:rascunho:${agendamentoId}`;
+  // A versao "v2" da chave descarta, de uma vez, os rascunhos gravados na epoca
+  // em que a tela preenchia o prontuario sozinha. Eram eles que reapareciam no
+  // campo de anotacao como texto pronto ("Paciente refere queixa de..."), que a
+  // medica nunca escreveu e nao quer ver.
+  const draftKey = `pep:rascunho:v2:${agendamentoId}`;
   // Tela enxuta (padrão) x prontuário completo. Ver MODO_KEY acima.
   const [modoSimples, setModoSimples] = useState<boolean>(lerModoSimples);
   function trocarModo(simples: boolean) {
@@ -592,15 +596,18 @@ function AtendimentoEditorPage() {
     });
   }
 
-  const triagemAplicadaRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!triagem) return;
-    if (triagemAplicadaRef.current === triagem.id) return;
-    triagemAplicadaRef.current = triagem.id;
-    aplicarTriagemNoSoap(triagem);
-    toast.success("Triagem aplicada ao prontuário");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triagem?.id]);
+  // A triagem NAO e mais copiada para dentro dos campos do prontuario.
+  //
+  // No modo simplificado a copia era invisivel (caia em campos que a tela nao
+  // mostra) e, no modo completo, enchia o prontuario de texto que o medico nao
+  // escreveu. Os dados da enfermagem continuam na tela inteira -- o quadro de
+  // sinais vitais e o alerta vermelho de alergia --, e continuam gravados na
+  // propria ficha de triagem. Quem quiser trazer alguma coisa para a evolucao
+  // digita, que e a regra desta tela: nada entra no prontuario sozinho.
+  //
+  // `aplicarTriagemNoSoap` fica disponivel para um botao futuro de "copiar a
+  // triagem para a evolucao", se a clinica pedir.
+  void aplicarTriagemNoSoap;
 
   const especialidadeMedico = medico?.especialidades?.nome ?? "";
   const especialidade = especialidadeMedico || modelo?.nome || "Clínica Geral";
