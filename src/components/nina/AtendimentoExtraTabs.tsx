@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import {
   ListaRespostasRapidas,
   useRespostasFiltradas,
@@ -218,13 +219,18 @@ export function AtendInbox() {
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
   const [pausaReasonSel, setPausaReasonSel] = useState<string>("");
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
+  // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
+  // barra de rolagem (ver use-hover-tolerante).
   const [painelFixado, setPainelFixado] = useState(false);
-  const [painelHover, setPainelHover] = useState(false);
   // Enquanto um menu suspenso da coluna estiver aberto o painel não pode
   // encolher: o menu é renderizado fora do painel, o mouse "sai" da coluna e
   // a lista sumia embaixo do menu.
   const [painelMenuAberto, setPainelMenuAberto] = useState(false);
+  const { ref: painelRef, dentro: painelHover } = useHoverTolerante<HTMLDivElement>({
+    ativo: !painelFixado,
+  });
   const painelAberto = painelFixado || painelHover || painelMenuAberto;
+
 
   useEffect(() => {
     try {
@@ -242,7 +248,9 @@ export function AtendInbox() {
   };
   // Painel direito (Contato): mesmo comportamento de encolher/expandir/fixar.
   const [contatoFixado, setContatoFixado] = useState(false);
-  const [contatoHover, setContatoHover] = useState(false);
+  const { ref: contatoRef, dentro: contatoHover } = useHoverTolerante<HTMLDivElement>({
+    ativo: !contatoFixado,
+  });
   const contatoAberto = contatoFixado || contatoHover;
   useEffect(() => {
     try {
@@ -837,8 +845,7 @@ export function AtendInbox() {
         {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
         <Card
           data-a11y-secundario="true"
-          onMouseEnter={() => setPainelHover(true)}
-          onMouseLeave={() => setPainelHover(false)}
+          ref={painelRef}
           className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
             painelAberto ? "w-[300px]" : "w-[52px]"
           }`}
@@ -1329,8 +1336,7 @@ export function AtendInbox() {
         {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
         <Card
           data-a11y-secundario="true"
-          onMouseEnter={() => setContatoHover(true)}
-          onMouseLeave={() => setContatoHover(false)}
+          ref={contatoRef}
           className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
             contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
           }`}
