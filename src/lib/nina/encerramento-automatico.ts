@@ -37,12 +37,12 @@ const PADROES_FIM: RegExp[] = [
   /^nao( obrigad[oa])? (era|e|eh) (so|isso)( mesmo)?$/,
 ];
 
-/** Sinais de que ainda existe uma nova solicitação (não encerrar). */
+/** Nova solicitação junto com o agradecimento: NUNCA encerra. */
 const PADROES_NOVA_SOLICITACAO: RegExp[] = [
   /\?/,
-  /\b(mas|porem|so que|entao|aproveitando)\b/,
-  /\b(queria|quero|preciso|gostaria|pode(ria)?|consegue|tem como|qual|quais|quanto|quando|onde|como|endereco|valor|preco|horario|remarcar|cancelar|outro|outra|tambem)\b/,
+  /\b(mas|porem|so que|aproveitando|queria|quero|preciso|gostaria|consegue|tem como|qual|quais|quanto|quando|onde|endereco|valor|preco|horario|remarcar|cancelar|outro|outra|tambem)\b/,
 ];
+
 
 export function pediuEncerramento(mensagem: string): boolean {
   const t = normalizar(mensagem);
