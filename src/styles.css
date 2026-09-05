@@ -967,45 +967,6 @@ html.agenda-sem-animacao .animate-spin {
   [class*="fila-alerta"] { animation: none !important; }
 }
 
-/* =====================================================================
- * Central de Atenção (cabeçalho global).
- * Só transform / background-color / box-shadow: o botão nunca muda de
- * tamanho no fluxo, então nada ao redor do cabeçalho se desloca.
- * ===================================================================== */
-@keyframes central-atencao-n1 {
-  0%, 100% { transform: scale(1); background-color: #dc2626; box-shadow: 0 0 0 0 rgb(239 68 68 / 0.35); }
-  50% { transform: scale(1.05); background-color: #ef4444; box-shadow: 0 0 10px 2px rgb(239 68 68 / 0.35); }
-}
-@keyframes central-atencao-n2 {
-  0%, 100% { transform: scale(1); background-color: #dc2626; box-shadow: 0 0 0 0 rgb(239 68 68 / 0.5); }
-  50% { transform: scale(1.07); background-color: #ef4444; box-shadow: 0 0 14px 4px rgb(239 68 68 / 0.5); }
-}
-@keyframes central-atencao-n3 {
-  0%, 100% { transform: scale(1); background-color: #b91c1c; box-shadow: 0 0 0 0 rgb(248 113 113 / 0.65); }
-  50% { transform: scale(1.08); background-color: #f87171; box-shadow: 0 0 18px 6px rgb(248 113 113 / 0.65); }
-}
-@keyframes central-atencao-novo {
-  0%, 100% { transform: scale(1); }
-  40% { transform: scale(1.12); }
-}
-@keyframes central-atencao-ponto {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(1.35); }
-}
-.central-atencao-n1 { background-color: #dc2626; animation: central-atencao-n1 1.4s ease-in-out infinite; }
-.central-atencao-n2 { background-color: #dc2626; animation: central-atencao-n2 1.2s ease-in-out infinite; }
-.central-atencao-n3 { background-color: #b91c1c; animation: central-atencao-n3 1.05s ease-in-out infinite; }
-/* Surgiu algo novo: um "pulo" mais perceptível por cima da pulsação. */
-.central-atencao-novo { animation: central-atencao-novo 0.8s ease-in-out 2, central-atencao-n2 1.2s ease-in-out infinite; }
-.central-atencao-ponto { animation: central-atencao-ponto 1.2s ease-in-out infinite; }
-:is(.dark) .central-atencao-n1,
-:is(.dark) .central-atencao-n2 { background-color: #ef4444; }
-:is(.dark) .central-atencao-n3 { background-color: #dc2626; }
-/* Vermelho permanece; movimento some. */
-@media (prefers-reduced-motion: reduce) {
-  [class*="central-atencao"] { animation: none !important; }
-}
-html.a11y-reduzir-animacao body [class*="central-atencao"] { animation: none !important; }
 
 
 /* =====================================================================
