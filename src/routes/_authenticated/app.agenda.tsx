@@ -20,10 +20,7 @@ import {
   type ConvenioInfo,
   type DescontoConvenio,
 } from "@/lib/convenio/info-convenio-paciente";
-import {
-  buscarCartaoPagoDaFamilia,
-  type CartaoDaFamilia,
-} from "@/lib/convenio/cartao-da-familia";
+import { buscarCartaoPagoDaFamilia, type CartaoDaFamilia } from "@/lib/convenio/cartao-da-familia";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
@@ -8925,7 +8922,9 @@ function AgendaPage() {
                       <p className="text-xs rounded-md border border-sky-300 bg-sky-50 text-sky-900 px-2 py-1.5 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
                         Existe um cartão <b>pago e em dia</b> na família deste paciente:{" "}
                         <b>{cartaoDaFamilia.convenioNome}</b>
-                        {cartaoDaFamilia.numero != null ? ` (cartão ${cartaoDaFamilia.numero})` : ""}
+                        {cartaoDaFamilia.numero != null
+                          ? ` (cartão ${cartaoDaFamilia.numero})`
+                          : ""}
                         , no nome de <b>{cartaoDaFamilia.titularNome.toUpperCase()}</b>. Este
                         paciente <b>não está incluído</b> nele, por isso a cobrança sai pelo valor
                         cheio. Se ele também deve usar esse cartão, peça ao setor de contratos para

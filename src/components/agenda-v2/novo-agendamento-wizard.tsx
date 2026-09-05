@@ -34,10 +34,7 @@ import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
 import { detectarTipoAtendimentoPadrao } from "@/lib/convenio/tipo-atendimento-padrao";
-import {
-  buscarCartaoPagoDaFamilia,
-  type CartaoDaFamilia,
-} from "@/lib/convenio/cartao-da-familia";
+import { buscarCartaoPagoDaFamilia, type CartaoDaFamilia } from "@/lib/convenio/cartao-da-familia";
 import {
   calcularRepasseExterno,
   listarConveniosClinica,

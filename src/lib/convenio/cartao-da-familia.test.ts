@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  contratoEmDia,
-  escolherCartaoDaFamilia,
-  type CandidatoFamilia,
-} from "./cartao-da-familia";
+import { contratoEmDia, escolherCartaoDaFamilia, type CandidatoFamilia } from "./cartao-da-familia";
 
 const HOJE = "2026-09-05";
 
