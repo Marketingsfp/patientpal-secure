@@ -2052,3 +2052,29 @@ export const listarPresenca = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+/**
+ * Desde quando cada conversa aberta está aguardando resposta.
+ *
+ * Devolve o instante da primeira mensagem do paciente ainda não respondida
+ * (nem pela Nina, nem por atendente). Conversas sem pendência não aparecem.
+ * Leitura pura — não altera nada do fluxo de atendimento.
+ */
+export const esperaConversas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), isTeste: z.boolean().default(false) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: rows, error } = await context.supabase.rpc("atend_espera_por_conversa", {
+      _clinica_id: data.clinicaId,
+      _is_teste: data.isTeste,
+    } as never);
+    if (error) throw new Error(error.message);
+    const mapa: Record<string, string> = {};
+    for (const r of (rows ?? []) as Array<{ conversa_id: string; aguardando_desde: string }>) {
+      if (r?.conversa_id && r?.aguardando_desde) mapa[r.conversa_id] = r.aguardando_desde;
+    }
+    return mapa;
+  });
