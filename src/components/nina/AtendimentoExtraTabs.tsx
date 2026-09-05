@@ -130,6 +130,14 @@ import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
+import {
+  JANELA_INICIAL,
+  JANELA_ANTERIOR,
+  mesclarAnteriores,
+  podeCarregarMais,
+  cursorMaisAntigo,
+} from "@/lib/atendimento/mensagens-janela";
+import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -218,6 +226,13 @@ export function AtendInbox() {
   // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
   const seqConversa = useRef(0);
   const cacheConversas = useRef(criarCacheConversas(10));
+  // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
+  // histórico antigo) + prefetch em andamento + medição de desempenho.
+  const janelaRef = useRef(JANELA_INICIAL);
+  const prefetchEmCurso = useRef<Set<string>>(new Set());
+  const medidor = useRef<MedidorConversa | null>(null);
+  const [temMaisAntigas, setTemMaisAntigas] = useState(false);
+  const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
@@ -545,15 +560,54 @@ export function AtendInbox() {
 
 
 
+  // Prefetch controlado: ao passar o mouse (ou focar pelo teclado) num lead,
+  // o conteúdo dele já vai para o cache. Nunca baixa a lista inteira: só a
+  // conversa apontada e apenas uma vez enquanto estiver em cache.
+  const prefetchConversa = useCallback(
+    (id: string) => {
+      if (!clinicaId || !id) return;
+      if (id === selIdRef.current) return;
+      if (cacheConversas.current.obter(id) || prefetchEmCurso.current.has(id)) return;
+      prefetchEmCurso.current.add(id);
+      void (async () => {
+        try {
+          const [m, c, n, ev] = await Promise.all([
+            listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } }),
+            obterContato({ data: { clinicaId, conversaId: id } }),
+            listarNotasFn({ data: { clinicaId, conversaId: id } }),
+            listarEventosFn({ data: { clinicaId, conversaId: id } }).catch(
+              () => [] as ConversaEvento[],
+            ),
+          ]);
+          if (c) {
+            cacheConversas.current.guardar(id, {
+              msgs: m,
+              contato: c,
+              notas: n,
+              eventos: (ev ?? []) as ConversaEvento[],
+            });
+          }
+        } catch {
+          /* prefetch é oportunista: falha não afeta o atendimento */
+        } finally {
+          prefetchEmCurso.current.delete(id);
+        }
+      })();
+    },
+    [clinicaId, listarMsgs, obterContato, listarNotasFn, listarEventosFn],
+  );
+
   const carregarConversa = useCallback(async () => {
     if (!clinicaId || !sel?.id) return;
     // Alvo desta carga. Se a atendente trocar de conversa no meio do caminho,
     // ou um pedido mais novo for disparado, a resposta atrasada é descartada.
     const alvo: string = sel.id;
     const pedido = ++seqConversa.current;
+    const janela = janelaRef.current;
+    medidor.current?.marcar("request");
     try {
       const [m, c, n, ev] = await Promise.all([
-        listarMsgs({ data: { clinicaId, conversaId: alvo, limit: 200 } }),
+        listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
         obterContato({ data: { clinicaId, conversaId: alvo } }),
         listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
         listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
@@ -570,6 +624,7 @@ export function AtendInbox() {
       ) {
         return;
       }
+      medidor.current?.marcar("dados");
       if (!c) {
         // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
         cacheConversas.current.invalidar(alvo);
@@ -592,11 +647,14 @@ export function AtendInbox() {
       setContato(c);
       setNotas(n);
       setEventos(eventosLista);
+      setTemMaisAntigas(podeCarregarMais(m.length, janela));
       setConversaCarregadaId(alvo);
     } catch (e: any) {
       mostrarErro(e);
     }
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
+
+
 
   useEffect(() => {
     carregarConvs();
@@ -621,6 +679,8 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
+    janelaRef.current = JANELA_INICIAL;
+    setTemMaisAntigas(false);
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
@@ -730,6 +790,56 @@ export function AtendInbox() {
     total: timeline.length,
     ultimoId: ultimoItemId,
   });
+
+  // Medição temporária de desempenho (ligue com localStorage "nina:perf"=1):
+  // marca quando a conversa terminou de desenhar e quando o scroll ficou no fim.
+  useEffect(() => {
+    if (!conteudoDaConversa) return;
+    medidor.current?.marcar("render");
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        medidor.current?.marcar("scroll");
+        medidor.current = null;
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [conteudoDaConversa, conversaCarregadaId]);
+
+  // Histórico antigo sob demanda: só é buscado quando a atendente pede,
+  // preservando a posição de leitura (a tela não "pula" ao carregar).
+  const carregarAntigas = useCallback(async () => {
+    if (!clinicaId || !sel?.id || carregandoAntigas) return;
+    const alvo: string = sel.id;
+    const cursor = cursorMaisAntigo(msgs);
+    if (!cursor) return;
+    setCarregandoAntigas(true);
+    const cont = chat.containerRef.current;
+    const alturaAntes = cont?.scrollHeight ?? 0;
+    const topoAntes = cont?.scrollTop ?? 0;
+    try {
+      const antigas = await listarMsgs({
+        data: { clinicaId, conversaId: alvo, limit: JANELA_ANTERIOR, antesDe: cursor },
+      });
+      if (selIdRef.current !== alvo) return;
+      janelaRef.current += JANELA_ANTERIOR;
+      setMsgs((prev) => {
+        const juntas = mesclarAnteriores(prev, antigas as any[]);
+        const atual = cacheConversas.current.obter(alvo);
+        if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
+        return juntas;
+      });
+      setTemMaisAntigas(podeCarregarMais((antigas as any[]).length, JANELA_ANTERIOR));
+      requestAnimationFrame(() => {
+        const c2 = chat.containerRef.current;
+        if (!c2) return;
+        c2.scrollTop = topoAntes + (c2.scrollHeight - alturaAntes);
+      });
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setCarregandoAntigas(false);
+    }
+  }, [clinicaId, sel?.id, msgs, carregandoAntigas, listarMsgs, chat]);
 
 
   const janela24hExpirada = (() => {
@@ -1169,13 +1279,20 @@ export function AtendInbox() {
 
               <button
                 key={c.id}
-                onClick={() => setSel(c)}
+                onClick={() => {
+                  medidor.current = criarMedidorConversa(`conversa ${c.id}`);
+                  medidor.current.marcar("click");
+                  setSel(c);
+                }}
+                onMouseEnter={() => prefetchConversa(c.id)}
+                onFocus={() => prefetchConversa(c.id)}
                 className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
                   sel?.id === c.id
                     ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
                     : "bg-atd-surface"
                 }`}
               >
+
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm truncate flex-1">
                     {c.contato_nome || c.contato_telefone || "—"}
@@ -1353,6 +1470,18 @@ export function AtendInbox() {
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
 
+                {conteudoDaConversa && temMaisAntigas && (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      type="button"
+                      onClick={() => void carregarAntigas()}
+                      disabled={carregandoAntigas}
+                      className="rounded-full border border-atd-border bg-atd-surface px-3 py-1 text-xs text-atd-ink-soft hover:bg-atd-blue-hover disabled:opacity-60"
+                    >
+                      {carregandoAntigas ? "Carregando…" : "Carregar mensagens anteriores"}
+                    </button>
+                  </div>
+                )}
                 {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
