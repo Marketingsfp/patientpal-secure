@@ -636,6 +636,21 @@ export function AtendInbox() {
     return itens.sort((a, b) => a.at - b.at);
   }, [msgs, eventos]);
 
+  // Scroll do chat: abre sempre na última interação real (mensagem ou evento).
+  const ultimoItemId =
+    timeline.length === 0
+      ? null
+      : (() => {
+          const u = timeline[timeline.length - 1];
+          return u.kind === "msg" ? `m-${u.msg.id}` : `e-${u.ev.id}`;
+        })();
+  const chat = useChatScroll({
+    conversaId: sel?.id ?? null,
+    total: timeline.length,
+    ultimoId: ultimoItemId,
+  });
+
+
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
     const j = sel.janela_24h_em ? new Date(sel.janela_24h_em).getTime() : 0;
