@@ -1150,8 +1150,8 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         content: JSON.stringify(resultado).slice(0, 8000),
       });
     }
-    }
   }
+
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
