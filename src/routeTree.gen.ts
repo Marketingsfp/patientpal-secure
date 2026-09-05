@@ -65,6 +65,7 @@ import { Route as AuthenticatedAppPainelExecutivoRouteImport } from './routes/_a
 import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
 import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_authenticated/app.orcamentos-agenda'
 import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authenticated/app.orcamentos'
+import { Route as AuthenticatedAppNinaAprendizadoRouteImport } from './routes/_authenticated/app.nina-aprendizado'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
@@ -463,6 +464,12 @@ const AuthenticatedAppOrcamentosRoute =
   AuthenticatedAppOrcamentosRouteImport.update({
     id: '/orcamentos',
     path: '/orcamentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppNinaAprendizadoRoute =
+  AuthenticatedAppNinaAprendizadoRouteImport.update({
+    id: '/nina-aprendizado',
+    path: '/nina-aprendizado',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppNinaRoute = AuthenticatedAppNinaRouteImport.update({
@@ -1145,6 +1152,7 @@ export interface FileRoutesByFullPath {
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
+  '/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1301,6 +1309,7 @@ export interface FileRoutesByTo {
   '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
+  '/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1463,6 +1472,7 @@ export interface FileRoutesById {
   '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
+  '/_authenticated/app/nina-aprendizado': typeof AuthenticatedAppNinaAprendizadoRoute
   '/_authenticated/app/orcamentos': typeof AuthenticatedAppOrcamentosRoute
   '/_authenticated/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/_authenticated/app/painel': typeof AuthenticatedAppPainelRoute
@@ -1625,6 +1635,7 @@ export interface FileRouteTypes {
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
+    | '/app/nina-aprendizado'
     | '/app/orcamentos'
     | '/app/orcamentos-agenda'
     | '/app/painel'
@@ -1781,6 +1792,7 @@ export interface FileRouteTypes {
     | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
+    | '/app/nina-aprendizado'
     | '/app/orcamentos'
     | '/app/orcamentos-agenda'
     | '/app/painel'
@@ -1942,6 +1954,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nina'
+    | '/_authenticated/app/nina-aprendizado'
     | '/_authenticated/app/orcamentos'
     | '/_authenticated/app/orcamentos-agenda'
     | '/_authenticated/app/painel'
@@ -2461,6 +2474,13 @@ declare module '@tanstack/react-router' {
       path: '/orcamentos'
       fullPath: '/app/orcamentos'
       preLoaderRoute: typeof AuthenticatedAppOrcamentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/nina-aprendizado': {
+      id: '/_authenticated/app/nina-aprendizado'
+      path: '/nina-aprendizado'
+      fullPath: '/app/nina-aprendizado'
+      preLoaderRoute: typeof AuthenticatedAppNinaAprendizadoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/nina': {
@@ -3367,6 +3387,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
+  AuthenticatedAppNinaAprendizadoRoute: typeof AuthenticatedAppNinaAprendizadoRoute
   AuthenticatedAppOrcamentosRoute: typeof AuthenticatedAppOrcamentosRoute
   AuthenticatedAppOrcamentosAgendaRoute: typeof AuthenticatedAppOrcamentosAgendaRoute
   AuthenticatedAppPainelRoute: typeof AuthenticatedAppPainelRoute
@@ -3463,6 +3484,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
+  AuthenticatedAppNinaAprendizadoRoute: AuthenticatedAppNinaAprendizadoRoute,
   AuthenticatedAppOrcamentosRoute: AuthenticatedAppOrcamentosRoute,
   AuthenticatedAppOrcamentosAgendaRoute: AuthenticatedAppOrcamentosAgendaRoute,
   AuthenticatedAppPainelRoute: AuthenticatedAppPainelRoute,
