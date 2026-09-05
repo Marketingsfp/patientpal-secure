@@ -955,6 +955,9 @@ export function AtendInbox() {
                 </div>
               </CardHeader>
               <div className="flex-1 overflow-auto p-4 space-y-2 bg-atd-bg">
+                {clinicaId && (
+                  <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
+                )}
                 {msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
