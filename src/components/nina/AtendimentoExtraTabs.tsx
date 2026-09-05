@@ -139,6 +139,25 @@ export function AtendInbox() {
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
+  // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
+  const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
+  const convsVisiveis: any[] = soNaoAtribuidas
+    ? convs.filter((c: any) => !c.atribuida_user_id)
+    : convs;
+  useEffect(() => {
+    const ativar = () => setSoNaoAtribuidas(true);
+    try {
+      if (window.sessionStorage.getItem(FILTRO_NAO_ATRIBUIDAS_KEY) === "1") {
+        window.sessionStorage.removeItem(FILTRO_NAO_ATRIBUIDAS_KEY);
+        setSoNaoAtribuidas(true);
+      }
+    } catch {
+      /* sem armazenamento: só o evento abaixo aciona o filtro */
+    }
+    window.addEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+    return () => window.removeEventListener(EVENTO_FILTRAR_NAO_ATRIBUIDAS, ativar);
+  }, []);
+
   const [draft, setDraft] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
