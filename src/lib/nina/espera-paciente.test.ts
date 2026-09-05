@@ -138,7 +138,9 @@ describe("FASE 2 — resposta do paciente cancela o prazo", () => {
 
 describe("FASE 3 — motivo estruturado do timeout", () => {
   it("usa o motivo padronizado e o texto interno com o prazo configurado", async () => {
-    const { MOTIVO_TIMEOUT_PACIENTE } = await import("./espera-timeout-motivo");
+    const { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } = await import(
+      "./espera-timeout-motivo"
+    );
     expect(MOTIVO_TIMEOUT_PACIENTE).toBe("patient_response_timeout");
     expect(textoInternoTimeout(30)).toBe(
       "Paciente sem resposta por 30 minutos — transferido automaticamente pela Nina.",

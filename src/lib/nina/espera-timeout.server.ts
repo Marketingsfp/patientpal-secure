@@ -17,8 +17,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STATUS_ENCERRADOS, encaminharParaHumano } from "@/lib/atendimento/handoff.server";
 import { timeoutRespostaPacienteMinutos } from "./espera-paciente";
+import { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } from "./espera-timeout-motivo";
 
-export const MOTIVO_TIMEOUT_PACIENTE = "patient_response_timeout";
+export { MOTIVO_TIMEOUT_PACIENTE };
 
 /** Lote máximo por execução — o job nunca processa a fila inteira de uma vez. */
 export const LOTE_TIMEOUT_PADRAO = 25;
@@ -108,7 +109,7 @@ export async function processarTimeoutsEsperaPaciente(args?: {
         clinicaId: linha.clinica_id,
         conversaId: linha.id,
         motivo: MOTIVO_TIMEOUT_PACIENTE,
-        resumo: `Paciente sem resposta por ${minutos} minutos — transferido automaticamente pela Nina.`,
+        resumo: textoInternoTimeout(minutos),
         urgencia: "normal",
         solicitadoPor: "SISTEMA",
       });
