@@ -804,7 +804,10 @@ export function AtendInbox() {
         </Card>
 
         {/* COLUNA 2 — CHAT */}
-        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Card
+          data-a11y-principal="true"
+          className="flex min-w-0 flex-1 flex-col overflow-hidden"
+        >
           {!sel ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               Selecione uma conversa
