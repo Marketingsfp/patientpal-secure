@@ -791,6 +791,20 @@ export function AtendInbox() {
     ultimoId: ultimoItemId,
   });
 
+  // Medição temporária de desempenho (ligue com localStorage "nina:perf"=1):
+  // marca quando a conversa terminou de desenhar e quando o scroll ficou no fim.
+  useEffect(() => {
+    if (!conteudoDaConversa) return;
+    medidor.current?.marcar("render");
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        medidor.current?.marcar("scroll");
+        medidor.current = null;
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [conteudoDaConversa, conversaCarregadaId]);
+
   // Histórico antigo sob demanda: só é buscado quando a atendente pede,
   // preservando a posição de leitura (a tela não "pula" ao carregar).
   const carregarAntigas = useCallback(async () => {
