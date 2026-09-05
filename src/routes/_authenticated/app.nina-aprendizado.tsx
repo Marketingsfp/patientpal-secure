@@ -18,6 +18,7 @@ import {
   Pencil,
   RefreshCw,
   ShieldCheck,
+  Stethoscope,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,16 @@ import {
   revisarFeedbackErroNina,
 } from "@/lib/nina/feedback-revisao.functions";
 import { lerConversaFeedbackNina } from "@/lib/nina/feedback-conversa.functions";
+import {
+  CAUSAS_RAIZ_NINA,
+  PRIORIDADES_NINA,
+  rotuloCausaRaiz,
+  rotuloPrioridade,
+} from "@/lib/nina/feedback-diagnostico";
+import {
+  consultarBaseFeedbackNina,
+  salvarDiagnosticoFeedbackNina,
+} from "@/lib/nina/feedback-diagnostico.functions";
 
 export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
   head: () => ({
@@ -94,6 +105,28 @@ type Item = {
   revisado_por: string | null;
   revisado_em: string | null;
   created_at: string;
+  root_cause: string | null;
+  prioridade: string | null;
+  knowledge_status: string | null;
+  grupo_chave: string | null;
+  grupo_titulo: string | null;
+};
+
+type Comparacao = {
+  knowledge_status: "found" | "not_found" | "conflict";
+  base_version: number | null;
+  planilha_atual: string | null;
+  correcao_sugerida: string | null;
+  causa_sugerida: string;
+  prioridade_sugerida: string;
+  assunto_sugerido: string;
+  snapshot: Record<string, unknown>;
+};
+
+const ROTULO_KB: Record<string, string> = {
+  found: "Encontrada na planilha",
+  not_found: "Não encontrada na planilha",
+  conflict: "Conflito na planilha",
 };
 
 const ABAS = [
@@ -129,6 +162,15 @@ function Pagina() {
   const [textoEdicao, setTextoEdicao] = useState("");
   const [conversa, setConversa] = useState<{ item: Item; msgs: any[] } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [ocorrencias, setOcorrencias] = useState<Record<string, number>>({});
+  const [fPrioridade, setFPrioridade] = useState("todas");
+  const [fCausa, setFCausa] = useState("todas");
+  const [diagnosticando, setDiagnosticando] = useState<Item | null>(null);
+  const [comparacao, setComparacao] = useState<Comparacao | null>(null);
+  const [consultandoBase, setConsultandoBase] = useState(false);
+  const [causaEscolhida, setCausaEscolhida] = useState("");
+  const [prioridadeEscolhida, setPrioridadeEscolhida] = useState("");
+  const [assunto, setAssunto] = useState("");
 
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
@@ -136,6 +178,8 @@ function Pagina() {
   const revisar = useServerFn(revisarFeedbackErroNina);
   const editar = useServerFn(editarSugestaoFeedbackNina);
   const lerConversa = useServerFn(lerConversaFeedbackNina);
+  const consultarBase = useServerFn(consultarBaseFeedbackNina);
+  const salvarDiagnostico = useServerFn(salvarDiagnosticoFeedbackNina);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -155,6 +199,7 @@ function Pagina() {
       setItens((r.itens ?? []) as Item[]);
       setPessoas(r.pessoas ?? {});
       setContagens(r.contagens ?? {});
+      setOcorrencias((r as { ocorrencias?: Record<string, number> }).ocorrencias ?? {});
     } catch (e) {
       mostrarErro(e);
     } finally {
@@ -263,6 +308,74 @@ function Pagina() {
     }
   };
 
+  const abrirDiagnostico = async (item: Item) => {
+    if (!clinicaId) return;
+    setDiagnosticando(item);
+    setComparacao(null);
+    setCausaEscolhida(item.root_cause ?? "");
+    setPrioridadeEscolhida(item.prioridade ?? "");
+    setAssunto(item.grupo_titulo ?? "");
+    setConsultandoBase(true);
+    try {
+      const r = (await consultarBase({
+        data: { id: item.id, clinicaId },
+      })) as unknown as Comparacao;
+      setComparacao(r);
+      if (!item.root_cause) setCausaEscolhida(r.causa_sugerida);
+      if (!item.prioridade) setPrioridadeEscolhida(r.prioridade_sugerida);
+      if (!item.grupo_titulo) setAssunto(r.assunto_sugerido);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setConsultandoBase(false);
+    }
+  };
+
+  const confirmarDiagnostico = async () => {
+    if (!diagnosticando || !clinicaId) return;
+    if (!causaEscolhida) {
+      toast.error("Escolha a causa do erro.");
+      return;
+    }
+    if (assunto.trim().length < 2) {
+      toast.error("Informe o assunto para agrupar as ocorrências.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const r = await salvarDiagnostico({
+        data: {
+          id: diagnosticando.id,
+          clinicaId,
+          rootCause: causaEscolhida as never,
+          prioridade: (prioridadeEscolhida || null) as never,
+          assunto: assunto.trim(),
+          knowledgeStatus: (comparacao?.knowledge_status ?? null) as never,
+          snapshot: (comparacao?.snapshot ?? null) as never,
+        },
+      });
+      toast.success(
+        `Diagnóstico salvo (${r.ocorrencias} ocorrência${r.ocorrencias > 1 ? "s" : ""}). Nada foi alterado na planilha.`,
+      );
+      setDiagnosticando(null);
+      await carregar();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const itensFiltrados = useMemo(
+    () =>
+      itens.filter(
+        (i) =>
+          (fPrioridade === "todas" || i.prioridade === fPrioridade) &&
+          (fCausa === "todas" || i.root_cause === fCausa),
+      ),
+    [itens, fPrioridade, fCausa],
+  );
+
   const cabecalho = useMemo(
     () => ABAS.map((a) => ({ ...a, total: contagens[a.valor] ?? 0 })),
     [contagens],
@@ -293,7 +406,7 @@ function Pagina() {
       </header>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-4">
+        <CardContent className="grid gap-3 p-4 md:grid-cols-3 lg:grid-cols-6">
           <div>
             <Label htmlFor="f-cat">Tipo de erro</Label>
             <Select value={categoria} onValueChange={setCategoria}>
@@ -321,6 +434,38 @@ function Pagina() {
                 {autores.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="f-prio">Prioridade</Label>
+            <Select value={fPrioridade} onValueChange={setFPrioridade}>
+              <SelectTrigger id="f-prio" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas</SelectItem>
+                {PRIORIDADES_NINA.map((p) => (
+                  <SelectItem key={p.valor} value={p.valor}>
+                    {p.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="f-causa">Causa</Label>
+            <Select value={fCausa} onValueChange={setFCausa}>
+              <SelectTrigger id="f-causa" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas</SelectItem>
+                {CAUSAS_RAIZ_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -363,11 +508,11 @@ function Pagina() {
         <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Carregando…
         </div>
-      ) : itens.length === 0 ? (
+      ) : itensFiltrados.length === 0 ? (
         <p className="p-6 text-sm text-muted-foreground">Nenhum registro nesta aba.</p>
       ) : (
         <ul className="space-y-3">
-          {itens.map((it) => (
+          {itensFiltrados.map((it) => (
             <li key={it.id}>
               <Card>
                 <CardContent className="space-y-3 p-4 text-sm">
@@ -376,6 +521,27 @@ function Pagina() {
                       <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                       {rotuloCategoriaFeedback(it.categoria)}
                     </Badge>
+                    {it.prioridade && (
+                      <Badge
+                        variant={it.prioridade === "critico" ? "destructive" : "secondary"}
+                        className={it.prioridade === "alto" ? "border-amber-500 text-amber-700 dark:text-amber-400" : ""}
+                      >
+                        Prioridade: {rotuloPrioridade(it.prioridade)}
+                      </Badge>
+                    )}
+                    {it.root_cause && (
+                      <Badge variant="outline">Causa: {rotuloCausaRaiz(it.root_cause)}</Badge>
+                    )}
+                    {it.knowledge_status && (
+                      <Badge variant="outline">
+                        Base: {ROTULO_KB[it.knowledge_status] ?? it.knowledge_status}
+                      </Badge>
+                    )}
+                    {it.grupo_chave && (ocorrencias[it.grupo_chave] ?? 1) > 1 && (
+                      <Badge variant="secondary">
+                        {it.grupo_titulo ?? "Problema"} — {ocorrencias[it.grupo_chave]} ocorrências
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {fmtData(it.created_at)} · reportado por{" "}
                       {pessoas[it.reportado_por] ?? "—"}
@@ -430,6 +596,14 @@ function Pagina() {
                     </Button>
                     {podeRevisar && (
                       <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void abrirDiagnostico(it)}
+                        >
+                          <Stethoscope className="mr-1 h-4 w-4" aria-hidden="true" />{" "}
+                          {it.root_cause ? "Rever diagnóstico" : "Diagnosticar causa"}
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
