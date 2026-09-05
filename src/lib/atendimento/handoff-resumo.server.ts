@@ -18,6 +18,12 @@ import {
   type AgendamentoConfirmado,
   type ResumoHandoff,
 } from "./handoff-resumo";
+import {
+  ajustarResumoPorDesfecho,
+  ROTULO_DESFECHO,
+  type DesfechoConversa,
+  type SituacaoResumo,
+} from "./resumo-desfecho";
 import { registrarEvento } from "./handoff.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -35,9 +41,14 @@ export interface LinhaResumo {
   status: StatusResumo;
   payload: ResumoHandoff | null;
   erro: string | null;
+  situacao: SituacaoResumo;
+  desfecho: DesfechoConversa | null;
+  resolvido_em: string | null;
+  resolvido_por: string | null;
   created_at: string;
   updated_at: string;
 }
+
 
 /** Marca os resumos vigentes desta conversa como superados/arquivados. */
 export async function superarResumos(
