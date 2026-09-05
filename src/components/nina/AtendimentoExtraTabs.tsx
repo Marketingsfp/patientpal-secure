@@ -1345,6 +1345,7 @@ export function AtendInbox() {
               <button
                 key={c.id}
                 onClick={() => {
+                  iniciarTroca(c.id);
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   setSel(c);
