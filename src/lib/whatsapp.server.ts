@@ -1332,7 +1332,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
 
   // DESFECHO: agendamento concluído agora. O resumo interno é regerado para
   // refletir o sucesso; o resumo anterior (tentativa/falha) vira histórico.
-  if (agendamentoConfirmado && !jaTinhaAgendamento) {
+  if (agendamentoConfirmado && !jaTinhaAgendamento && estadoId.conversaId) {
     try {
       const { registrarDesfechoResumo } = await import(
         "@/lib/atendimento/handoff-resumo.server"
@@ -1342,6 +1342,7 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
         conversaId: estadoId.conversaId,
         desfecho: "agendamento_concluido",
       });
+
     } catch (e) {
       console.error("[nina] falha ao atualizar resumo pós-agendamento", e);
     }
