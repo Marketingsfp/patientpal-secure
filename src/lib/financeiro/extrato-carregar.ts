@@ -20,7 +20,8 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { carregarCategorias, mapaDeCategorias } from "./categorias-carregar";
-import { classificarForma, LABEL_FORMA } from "./formas-pagamento";
+import { classificarForma, LABEL_FORMA, type ParteMisto } from "./formas-pagamento";
+import { repartirPorForma } from "./rateio-receita";
 import { ehLancamentoRetroativo, mapaDaGaveta, TIPOS_QUE_PESAM_NA_GAVETA } from "./retroativos";
 import type { MovimentacaoExtrato } from "./extrato-caixa";
 
@@ -52,6 +53,35 @@ async function buscarTudo<T>(montar: () => { range: (de: number, ate: number) =>
     if (lote.length < PAGINA) break;
   }
   return out;
+}
+
+/**
+ * Abre o pagamento misto nas formas reais, quando dá para abrir.
+ *
+ * Usa a MESMA `repartirPorForma` do Rateio da Receita e do Fechamento de
+ * Caixa: a composição gravada pela tela de lançamento manda, o texto da
+ * observação é retaguarda dos lançamentos antigos, e uma composição que não
+ * fecha com o valor pago é descartada inteira — espalhar partes que não somam
+ * seria pior do que admitir que não dá para separar.
+ *
+ * Devolve `undefined` quando não há o que abrir (forma comum) ou quando a
+ * decomposição falhou. Nesse segundo caso a linha continua contando como
+ * "Misto (não decomposto)", que passa a significar exatamente o que diz.
+ */
+function partesDoMisto(
+  canonica: ReturnType<typeof classificarForma>,
+  valor: number,
+  l: Pick<LancamentoBruto, "forma_pagamento" | "observacoes" | "composicao_pagamento">,
+): ParteMisto[] | undefined {
+  if (canonica !== "misto") return undefined;
+  const partes = repartirPorForma(
+    valor,
+    valor,
+    l.forma_pagamento,
+    l.observacoes,
+    l.composicao_pagamento,
+  );
+  return partes.some((p) => p.forma !== "misto") ? partes : undefined;
 }
 
 /** `2026-08-19` deslocado em N dias. Meio-dia UTC para não tropeçar em fuso. */
@@ -99,6 +129,8 @@ type LancamentoBruto = {
   categoria_id: string | null;
   conta_id: string | null;
   forma_pagamento: string | null;
+  /** JSON com as partes do pagamento misto, gravado pela tela de lançamento. */
+  composicao_pagamento: unknown;
   observacoes: string | null;
   criado_por: string | null;
   medico_id: string | null;
@@ -134,7 +166,7 @@ export async function carregarMovimentacao(params: {
       supabase
         .from("fin_lancamentos")
         .select(
-          "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, observacoes, criado_por, medico_id, paciente_id, agendamento_id, created_at",
+          "id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, composicao_pagamento, observacoes, criado_por, medico_id, paciente_id, agendamento_id, created_at",
         )
         .eq("clinica_id", clinicaId)
         .neq("status", "cancelado")
@@ -245,19 +277,22 @@ export async function carregarMovimentacao(params: {
   const saida: MovimentacaoExtrato[] = lancamentos.map((l) => {
     const conta = l.conta_id ? contaMap.get(l.conta_id) : undefined;
     const pacId = pacienteIdDe(l);
+    const valor = Number(l.valor) || 0;
+    const canonica = classificarForma(l.forma_pagamento);
     return {
       data: l.data,
       hora: horaLocal(l.created_at),
       tipo: l.tipo,
       descricao: l.descricao ?? "",
-      valor: Number(l.valor) || 0,
+      valor,
       categoriaNome: l.categoria_id ? (catMap.get(l.categoria_id) ?? null) : null,
       contaNome: conta?.nome ?? null,
       contaBanco: conta?.banco ?? null,
       // O rótulo canônico é o mesmo que a tela de Mov. Caixa mostra, para que
       // "Recebido em PIX" queira dizer a mesma coisa nas duas telas.
-      formaPagamento: LABEL_FORMA[classificarForma(l.forma_pagamento)],
-      formaCanonica: classificarForma(l.forma_pagamento),
+      formaPagamento: LABEL_FORMA[canonica],
+      formaCanonica: canonica,
+      formasPartes: partesDoMisto(canonica, valor, l),
       observacoes: l.observacoes,
       pacienteNome: pacId ? (pacMap.get(pacId) ?? null) : null,
       medicoNome: l.medico_id ? (medMap.get(l.medico_id) ?? null) : null,

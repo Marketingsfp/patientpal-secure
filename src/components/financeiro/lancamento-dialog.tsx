@@ -293,6 +293,38 @@ export function LancamentoDialog({
   // Nome do convênio do contrato ativo (usado para detectar categoria "de convênio").
   const [convenioNome, setConvenioNome] = useState<string | null>(null);
 
+  /**
+   * Última categoria que o SISTEMA escolheu sozinho — não a que o operador
+   * escolheu no seletor.
+   *
+   * Serve para o sugerido poder ser refinado (PARTICULAR primeiro, categoria
+   * do convênio depois que a consulta do contrato volta) sem nunca passar por
+   * cima de uma escolha manual: se o campo está diferente do que o sistema
+   * pôs ali, quem mexeu foi gente, e gente vence.
+   */
+  const categoriaAutomaticaRef = useRef<string>("");
+
+  /**
+   * Grava a categoria sugerida pelo sistema.
+   *
+   * Existe por causa de um defeito real: a sugestão só era aplicada NO FIM de
+   * uma sequência de consultas ao banco (agendamento → contrato de convênio →
+   * checagem de inadimplência do cartão). Quem batia o pagamento antes dessa
+   * fila terminar gravava a receita com `categoria_id` nulo — foram 19
+   * atendimentos, R$ 1.991,00, só em 05/09/2026, e o mesmo padrão todo dia
+   * desde agosto. No relatório de Movimentação Financeira eles caíam em
+   * "(SEM CATEGORIA)".
+   *
+   * A correção é aplicar o padrão PARTICULAR assim que a lista de categorias
+   * chega — junto com a conta padrão, que sempre chegou a tempo — e deixar o
+   * refinamento por convênio acontecer depois, por cima do padrão.
+   */
+  const aplicarCategoriaSugerida = (id: string | null | undefined) => {
+    if (!id) return;
+    setCategoriaId((cur) => (cur && cur !== categoriaAutomaticaRef.current ? cur : id));
+    categoriaAutomaticaRef.current = id;
+  };
+
   useEffect(() => {
     if (!open || !clinicaAtual) return;
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
@@ -371,13 +403,24 @@ export function LancamentoDialog({
       // Categoria fixa tem prioridade absoluta (ex.: pagamento de mensalidade)
       if (categoriaFixaNome) {
         const fixa = lista.find((c) => norm(c.nome) === norm(categoriaFixaNome));
-        if (fixa) setCategoriaId(fixa.id);
+        if (fixa) {
+          setCategoriaId(fixa.id);
+          // Fica registrada como escolha do sistema: assim a próxima abertura
+          // do diálogo (outro atendimento, sem categoria fixa) pode substituí-la
+          // pelo padrão, em vez de herdar a categoria da cobrança anterior.
+          categoriaAutomaticaRef.current = fixa.id;
+        }
         return;
       }
       const particular = lista.find((c) => norm(c.nome) === "particular");
       // Default: paciente comum (sem convênio ativo) → PARTICULAR.
       // Se o agendamento estiver vinculado a um paciente com contrato de
       // convênio ativo, tenta casar a categoria com o nome do convênio.
+      //
+      // O padrão é aplicado JÁ, e não depois das consultas abaixo: elas são
+      // três idas ao banco em fila, e o pagamento salvo nesse intervalo saía
+      // sem categoria nenhuma (ver `aplicarCategoriaSugerida`).
+      aplicarCategoriaSugerida(particular?.id);
       let categoriaEscolhidaId: string | null = particular?.id ?? null;
       if (agendamentoId) {
         try {
@@ -457,7 +500,7 @@ export function LancamentoDialog({
           // silencioso: mantém PARTICULAR como padrão
         }
       }
-      if (categoriaEscolhidaId) setCategoriaId((cur) => cur || categoriaEscolhidaId!);
+      aplicarCategoriaSugerida(categoriaEscolhidaId);
     })();
   }, [open, clinicaAtual, tipo, agendamentoId, categoriaFixaNome]);
 
@@ -1762,6 +1805,7 @@ export function LancamentoDialog({
     setValor("");
     setObservacoes("");
     setCategoriaId("");
+    categoriaAutomaticaRef.current = "";
     setContaId("");
     setFormaPagamento("");
     setBandeiraCartao("");

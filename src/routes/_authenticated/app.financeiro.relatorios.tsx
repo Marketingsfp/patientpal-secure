@@ -754,6 +754,8 @@ function Page() {
    * a apresentação, nunca quanto entrou em cada forma.
    */
   const fatiasDoExtrato = useMemo(() => fatiasDeEntrada(movsExtrato), [movsExtrato]);
+  /** Sangrias + suprimentos do período: o que só trocou de custódia. */
+  const custodiaDoExtrato = totaisM.transferSaida + totaisM.transferEntrada;
   const linhasRateioComp = useMemo(
     () =>
       filtrarPorCategoria(
@@ -969,13 +971,33 @@ function Page() {
       return i === 0 ? `${t.linhas.toLocaleString("pt-BR")} registro(s)` : "";
     });
 
-  /** Quadro de fechamento do extrato, igual na tela, no papel e na planilha. */
-  const resumoDoExtrato = (t: TotaisExtrato) => [
-    { rotulo: "Movimentações", valor: t.qtd.toLocaleString("pt-BR") },
-    { rotulo: "Total recebido (entradas)", valor: brl(t.recebido) },
-    { rotulo: "Total pago (saídas)", valor: brl(t.pago) },
-    { rotulo: "Saldo do período", valor: brl(t.saldo) },
-  ];
+  /**
+   * Quadro de fechamento do extrato, igual na tela, no papel e na planilha.
+   *
+   * Entradas, saídas e saldo são os do RESULTADO — só o dinheiro que de fato
+   * entrou ou saiu da clínica. Sangria e suprimento ganham linha própria,
+   * porque são o mesmo dinheiro trocando de custódia: contá-los como despesa
+   * fazia o saldo do dia despencar sem ninguém ter gasto nada.
+   *
+   * As linhas de custódia só aparecem quando houve alguma, e são elas que
+   * fecham a conta entre este quadro e o TOTAL GERAL do rodapé da tabela, que
+   * soma a coluna inteira (saídas reais MAIS sangrias).
+   */
+  const resumoDoExtrato = (t: TotaisExtrato) => {
+    const itens = [
+      { rotulo: "Movimentações", valor: t.qtd.toLocaleString("pt-BR") },
+      { rotulo: "Total recebido (entradas)", valor: brl(t.receitas) },
+      { rotulo: "Total pago (saídas reais)", valor: brl(t.despesas) },
+      { rotulo: "Saldo do período", valor: brl(t.resultado) },
+    ];
+    if (t.transferSaida) {
+      itens.push({ rotulo: "Sangrias (troca de custódia)", valor: brl(t.transferSaida) });
+    }
+    if (t.transferEntrada) {
+      itens.push({ rotulo: "Suprimentos (troca de custódia)", valor: brl(t.transferEntrada) });
+    }
+    return itens;
+  };
 
   /** Rodapé da tabela: contagem na 1ª coluna e a soma em cada coluna de dinheiro. */
   const rodape =
@@ -2102,19 +2124,41 @@ function Page() {
           então não mudam ao trocar de sintético para analítico — é a mesma
           conferência vista de dois jeitos. */}
       {tipo === "movimentacao" && atualizado && linhas.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div
+          className={cn(
+            "grid grid-cols-1 sm:grid-cols-2 gap-3",
+            custodiaDoExtrato > 0 ? "xl:grid-cols-5" : "xl:grid-cols-4",
+          )}
+        >
           <CardResumo titulo="Movimentações" valor={totaisM.qtd.toLocaleString("pt-BR")} />
           <CardResumo
             titulo="Recebido (entradas)"
-            valor={brl(totaisM.recebido)}
+            valor={brl(totaisM.receitas)}
             composicao={fatiasDoExtrato}
           />
-          <CardResumo titulo="Pago (saídas)" valor={brl(totaisM.pago)} invertido />
+          <CardResumo
+            titulo="Pago (saídas)"
+            valor={brl(totaisM.despesas)}
+            detalhe="Repasse, prestação de serviço e contas a pagar"
+            invertido
+          />
           <CardResumo
             titulo="Saldo do período"
-            valor={brl(totaisM.saldo)}
-            detalhe={totaisM.saldo < 0 ? "Saiu mais do que entrou" : undefined}
+            valor={brl(totaisM.resultado)}
+            detalhe={totaisM.resultado < 0 ? "Saiu mais do que entrou" : undefined}
           />
+          {/* Tesouraria em card próprio: sangria e suprimento passam pelo caixa
+              mas não são gasto nem receita — é o mesmo dinheiro mudando de mão
+              dentro da clínica. Só aparece quando houve movimento. */}
+          {custodiaDoExtrato > 0 && (
+            <CardResumo
+              titulo="Movimentações internas"
+              valor={brl(custodiaDoExtrato)}
+              detalhe={`Sangrias ${brl(totaisM.transferSaida)} · Suprimentos ${brl(
+                totaisM.transferEntrada,
+              )} — troca de custódia, fora do saldo`}
+            />
+          )}
         </div>
       )}
 

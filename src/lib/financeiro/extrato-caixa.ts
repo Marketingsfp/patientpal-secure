@@ -29,7 +29,7 @@
  * inteiras sem subir o Supabase.
  */
 import type { ColunaRateio } from "./rateio-colunas";
-import type { FormaCanonica } from "./formas-pagamento";
+import { LABEL_FORMA, type FormaCanonica, type ParteMisto } from "./formas-pagamento";
 import { receitaPorForma, type FatiaDaReceita } from "./receita-por-forma";
 import { SEM_CATEGORIA } from "./filtro-categoria";
 
@@ -76,6 +76,21 @@ export type MovimentacaoExtrato = {
   /** A mesma forma no balde canônico, para a quebra por forma sair na ordem e
    *  nas cores que o Fechamento de Caixa e o Rateio já usam. */
   formaCanonica?: FormaCanonica | null;
+  /**
+   * Pagamento misto já ABERTO nas formas reais.
+   *
+   * Preenchido só quando o lançamento tem como abrir — pela composição gravada
+   * pela tela de lançamento ou, nos antigos, pelo texto da observação. Quem
+   * monta é `carregarMovimentacao`, com a mesma `repartirPorForma` que o Rateio
+   * e o Fechamento de Caixa usam, e por isso as partes somam exatamente
+   * `valor` — nenhum centavo se perde ao decompor.
+   *
+   * O misto que NÃO abre continua chegando aqui sem partes, e é só ele que o
+   * relatório mostra como "Misto (não decomposto)": era essa linha que juntava
+   * também os mistos abríveis e escondia da conferência da maquininha a parte
+   * paga em cartão.
+   */
+  formasPartes?: ParteMisto[];
   observacoes?: string | null;
   pacienteNome?: string | null;
   medicoNome?: string | null;
@@ -96,6 +111,69 @@ export function ehSaida(m: MovimentacaoExtrato): boolean {
   if (m.tipo === "despesa") return true;
   if (m.tipo === "transferencia") return m.transferSentido === "saida";
   return false;
+}
+
+/**
+ * `true` → a linha é apenas dinheiro TROCANDO DE CUSTÓDIA dentro da clínica.
+ *
+ * Sangria e suprimento movem o mesmo dinheiro entre a gaveta da recepção e o
+ * financeiro: não é despesa da clínica nem receita, e ninguém ficou mais pobre
+ * nem mais rico por causa delas. Elas continuam no extrato — o dinheiro
+ * físico saiu de um lugar e entrou em outro, e a conferência da gaveta precisa
+ * ver isso —, mas ficam FORA do resultado do período.
+ *
+ * Foi o que distorceu o relatório de 05/09/2026: R$ 8.500,00 de sangria
+ * entravam no card "Pago (saídas)" ao lado do repasse médico e do fornecedor,
+ * e derrubavam o saldo do dia como se a clínica tivesse gastado esse valor.
+ */
+export function ehTransferenciaInterna(m: MovimentacaoExtrato): boolean {
+  return m.tipo === "transferencia";
+}
+
+/**
+ * As formas de pagamento da linha, no balde canônico, com o valor de cada uma.
+ *
+ * Quase sempre é uma parte só. O caso que importa é o pagamento misto: com a
+ * composição aberta, os R$ 187,00 de "OLGA MARIA DE OLIVEIRA" viram R$ 100,00
+ * em Dinheiro e R$ 87,00 em Cartão de Crédito, que é como a recepção confere
+ * contra a gaveta e contra a maquininha.
+ */
+export function formasCanonicasDaLinha(m: MovimentacaoExtrato): ParteMisto[] {
+  const partes = (m.formasPartes ?? []).filter((p) => Number(p.valor) > 0);
+  if (partes.length) return partes;
+  return m.formaCanonica ? [{ forma: m.formaCanonica, valor: Number(m.valor) || 0 }] : [];
+}
+
+/**
+ * O mesmo, mas em RÓTULO — é o que a coluna "Forma de Pagamento" e o resumo
+ * abaixo da tabela mostram.
+ *
+ * Sem classificação canônica (lançamento antigo, forma em branco) vale o
+ * rótulo cru da linha, para nenhuma movimentação sumir do resumo.
+ */
+function rotulosDeFormaDaLinha(m: MovimentacaoExtrato): ItemResumoExtrato[] {
+  const partes = (m.formasPartes ?? []).filter((p) => Number(p.valor) > 0);
+  if (partes.length) {
+    return partes.map((p) => ({ rotulo: LABEL_FORMA[p.forma], valor: Number(p.valor) || 0 }));
+  }
+  return [{ rotulo: m.formaPagamento?.trim() || "(sem forma)", valor: Number(m.valor) || 0 }];
+}
+
+/**
+ * Texto da coluna "Forma de Pagamento".
+ *
+ * O misto aberto mostra do que ele é feito — "Misto (Dinheiro + Cartão de
+ * Crédito)" — em vez de esconder as partes atrás da palavra "Misto". Os
+ * valores de cada parte não cabem aqui: quem precisa deles lê o resumo por
+ * forma, abaixo da tabela, onde eles já entram somados no balde certo.
+ */
+export function rotuloFormaDaLinha(m: MovimentacaoExtrato): string {
+  const partes = (m.formasPartes ?? []).filter((p) => Number(p.valor) > 0);
+  if (partes.length) {
+    const nomes = Array.from(new Set(partes.map((p) => LABEL_FORMA[p.forma])));
+    return `Misto (${nomes.join(" + ")})`;
+  }
+  return m.formaPagamento?.trim() || "(sem forma)";
 }
 
 /**
@@ -261,7 +339,7 @@ export function linhasAnaliticas(movs: MovimentacaoExtrato[]): LinhaExtrato[] {
       favorecido: favorecidoDaLinha(m),
       categoria: categoriaDaLinha(m),
       banco_conta: bancoContaDaLinha(m),
-      forma: m.formaPagamento?.trim() || "(sem forma)",
+      forma: rotuloFormaDaLinha(m),
       obs: obsDaLinha(m),
       pago: sai ? valor : null,
       recebido: sai ? null : valor,
@@ -320,9 +398,22 @@ export function linhasExtrato(movs: MovimentacaoExtrato[], visao: VisaoExtrato):
 
 export type TotaisExtrato = {
   qtd: number;
+  /** Soma da coluna "Valor Pago": despesa real MAIS sangria. */
   pago: number;
+  /** Soma da coluna "Valor Recebido": receita MAIS suprimento. */
   recebido: number;
+  /** `recebido - pago` — o saldo de CUSTÓDIA, que é o que a coluna fecha. */
   saldo: number;
+  /** Só receita: o que a clínica faturou no período. */
+  receitas: number;
+  /** Só despesa de verdade: repasse, prestação de serviço, conta a pagar. */
+  despesas: number;
+  /** Sangria: dinheiro que saiu da gaveta para o financeiro. */
+  transferSaida: number;
+  /** Suprimento: dinheiro que voltou do financeiro para a gaveta. */
+  transferEntrada: number;
+  /** `receitas - despesas` — o RESULTADO do período, sem a custódia. */
+  resultado: number;
 };
 
 /**
@@ -331,18 +422,51 @@ export type TotaisExtrato = {
  * Saem das movimentações cruas, e não das linhas da tabela, justamente para
  * que analítica e sintética exibam o mesmo rodapé: é a igualdade dos dois
  * totais que diz à conferência que nenhuma linha ficou de fora.
+ *
+ * Duas leituras do mesmo período, e as duas são necessárias:
+ *
+ *  - **custódia** (`pago`, `recebido`, `saldo`) — tudo que saiu e tudo que
+ *    entrou, sangria e suprimento incluídos. É o que fecha com a soma das
+ *    colunas da tabela, e é o que a conferência da gaveta usa;
+ *  - **resultado** (`receitas`, `despesas`, `resultado`) — só o dinheiro que
+ *    de fato entrou ou saiu da clínica. Sangria não empobrece ninguém: é o
+ *    mesmo dinheiro mudando de mão dentro de casa. Sem essa separação, os
+ *    R$ 8.500,00 de sangria de 05/09/2026 apareciam como despesa do dia e
+ *    derrubavam o saldo do período.
+ *
+ * Os dois convivem porque `pago = despesas + transferSaida` e
+ * `recebido = receitas + transferEntrada`: nada é escondido, só separado.
  */
 export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
-  let pago = 0;
-  let recebido = 0;
+  let receitas = 0;
+  let despesas = 0;
+  let transferEntrada = 0;
+  let transferSaida = 0;
   for (const m of movs) {
     const valor = Number(m.valor) || 0;
-    if (ehSaida(m)) pago += valor;
-    else recebido += valor;
+    if (ehTransferenciaInterna(m)) {
+      if (ehSaida(m)) transferSaida += valor;
+      else transferEntrada += valor;
+    } else if (ehSaida(m)) despesas += valor;
+    else receitas += valor;
   }
-  pago = +pago.toFixed(2);
-  recebido = +recebido.toFixed(2);
-  return { qtd: movs.length, pago, recebido, saldo: +(recebido - pago).toFixed(2) };
+  receitas = +receitas.toFixed(2);
+  despesas = +despesas.toFixed(2);
+  transferEntrada = +transferEntrada.toFixed(2);
+  transferSaida = +transferSaida.toFixed(2);
+  const pago = +(despesas + transferSaida).toFixed(2);
+  const recebido = +(receitas + transferEntrada).toFixed(2);
+  return {
+    qtd: movs.length,
+    pago,
+    recebido,
+    saldo: +(recebido - pago).toFixed(2),
+    receitas,
+    despesas,
+    transferEntrada,
+    transferSaida,
+    resultado: +(receitas - despesas).toFixed(2),
+  };
 }
 
 /** Uma linha do quadro de fechamento (tela, papel e planilha). */
@@ -358,14 +482,19 @@ export type ItemResumoExtrato = { rotulo: string; valor: number };
  *
  * Só entradas: um card chamado "Recebido" com saída somada dentro seria
  * mentira, e as saídas já têm o resumo por forma abaixo da tabela.
+ *
+ * E só RECEITA: o suprimento é dinheiro que a clínica já tinha voltando para a
+ * gaveta, e somá-lo aqui inflaria o "Recebido em Dinheiro" com um valor que
+ * nenhum paciente pagou.
+ *
+ * O pagamento misto entra ABERTO, pela mesma `formasCanonicasDaLinha` que o
+ * resumo abaixo da tabela usa: os R$ 187,00 pagos metade em espécie e metade
+ * no crédito viram R$ 100,00 na linha do Dinheiro e R$ 87,00 na do Crédito,
+ * em vez de uma linha "Misto" que a maquininha não confere.
  */
 export function fatiasDeEntrada(movs: MovimentacaoExtrato[]): FatiaDaReceita[] {
   return receitaPorForma(
-    movs
-      .filter((m) => !ehSaida(m) && m.formaCanonica)
-      .map((m) => ({
-        formas: [{ forma: m.formaCanonica as FormaCanonica, valor: Number(m.valor) || 0 }],
-      })),
+    movs.filter((m) => m.tipo === "receita").map((m) => ({ formas: formasCanonicasDaLinha(m) })),
   );
 }
 
@@ -376,16 +505,21 @@ export function fatiasDeEntrada(movs: MovimentacaoExtrato[]): FatiaDaReceita[] {
  * concilia — as entradas contra o extrato do banco e da adquirente, as saídas
  * contra os comprovantes. Forma que não foi usada num dos sentidos não vira
  * linha de zero.
+ *
+ * O misto entra aberto: uma linha por parte, cada uma no seu balde. A soma do
+ * quadro continua fechando com o total do período, porque as partes somam
+ * exatamente o valor da linha.
  */
 export function resumoPorForma(movs: MovimentacaoExtrato[]): ItemResumoExtrato[] {
   const porForma = new Map<string, { pago: number; recebido: number }>();
   for (const m of movs) {
-    const valor = Number(m.valor) || 0;
-    const forma = m.formaPagamento?.trim() || "(sem forma)";
-    const f = porForma.get(forma) ?? { pago: 0, recebido: 0 };
-    if (ehSaida(m)) f.pago += valor;
-    else f.recebido += valor;
-    porForma.set(forma, f);
+    const sai = ehSaida(m);
+    for (const parte of rotulosDeFormaDaLinha(m)) {
+      const f = porForma.get(parte.rotulo) ?? { pago: 0, recebido: 0 };
+      if (sai) f.pago += parte.valor;
+      else f.recebido += parte.valor;
+      porForma.set(parte.rotulo, f);
+    }
   }
   const ordenadas = Array.from(porForma.entries()).sort((a, b) =>
     a[0].localeCompare(b[0], "pt-BR"),

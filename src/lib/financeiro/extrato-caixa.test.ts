@@ -10,6 +10,7 @@ import {
   linhasAnaliticas,
   linhasExtrato,
   linhasSinteticas,
+  fatiasDeEntrada,
   obsDaLinha,
   ordenarCronologico,
   resumoPorForma,
@@ -322,8 +323,38 @@ describe("totaisExtrato", () => {
     mov({ tipo: "transferencia", transferSentido: "entrada", valor: 10 }),
   ];
 
-  it("separa entradas de saídas e devolve o saldo", () => {
-    expect(totaisExtrato(movs)).toEqual({ qtd: 4, pago: 80, recebido: 130, saldo: 50 });
+  it("separa entradas de saídas e devolve o saldo de custódia", () => {
+    const t = totaisExtrato(movs);
+    expect({ qtd: t.qtd, pago: t.pago, recebido: t.recebido, saldo: t.saldo }).toEqual({
+      qtd: 4,
+      pago: 80,
+      recebido: 130,
+      saldo: 50,
+    });
+  });
+
+  it("sangria não é despesa: fica fora do resultado do período", () => {
+    const t = totaisExtrato(movs);
+    expect(t.despesas).toBe(50);
+    expect(t.receitas).toBe(120);
+    // O saldo de custódia é 50 (leva a sangria); o resultado é 70.
+    expect(t.resultado).toBe(70);
+    expect(t.transferSaida).toBe(30);
+    expect(t.transferEntrada).toBe(10);
+  });
+
+  it("nada some ao separar: custódia + resultado reconstroem as colunas", () => {
+    const t = totaisExtrato(movs);
+    expect(t.despesas + t.transferSaida).toBe(t.pago);
+    expect(t.receitas + t.transferEntrada).toBe(t.recebido);
+  });
+
+  it("dia sem sangria tem resultado igual ao saldo", () => {
+    const t = totaisExtrato([
+      mov({ tipo: "receita", valor: 100 }),
+      mov({ tipo: "despesa", valor: 40 }),
+    ]);
+    expect(t.resultado).toBe(t.saldo);
   });
 
   it("é o MESMO total nas duas visões — é isso que a conferência usa", () => {
@@ -341,7 +372,75 @@ describe("totaisExtrato", () => {
   });
 
   it("lista vazia devolve tudo zerado", () => {
-    expect(totaisExtrato([])).toEqual({ qtd: 0, pago: 0, recebido: 0, saldo: 0 });
+    expect(totaisExtrato([])).toEqual({
+      qtd: 0,
+      pago: 0,
+      recebido: 0,
+      saldo: 0,
+      receitas: 0,
+      despesas: 0,
+      transferEntrada: 0,
+      transferSaida: 0,
+      resultado: 0,
+    });
+  });
+});
+
+describe("pagamento misto aberto", () => {
+  /** O caso real de 05/09/2026: R$ 187,00, metade espécie, metade crédito. */
+  const misto = mov({
+    tipo: "receita",
+    valor: 187,
+    formaPagamento: "Misto (não decomposto)",
+    formaCanonica: "misto",
+    formasPartes: [
+      { forma: "dinheiro", valor: 100 },
+      { forma: "credito", valor: 87 },
+    ],
+  });
+
+  it("o resumo por forma soma cada parte no seu balde", () => {
+    const itens = resumoPorForma([misto]);
+    expect(itens).toEqual([
+      { rotulo: "Recebido em Cartão de Crédito", valor: 87 },
+      { rotulo: "Recebido em Dinheiro", valor: 100 },
+    ]);
+  });
+
+  it("as fatias de entrada também abrem o misto", () => {
+    const fatias = fatiasDeEntrada([misto]);
+    expect(fatias.find((f) => f.forma === "dinheiro")?.valor).toBe(100);
+    expect(fatias.find((f) => f.forma === "credito")?.valor).toBe(87);
+    expect(fatias.some((f) => f.forma === "misto")).toBe(false);
+  });
+
+  it("a coluna Forma de Pagamento diz de que o misto é feito", () => {
+    expect(linhasAnaliticas([misto])[0].forma).toBe("Misto (Dinheiro + Cartão de Crédito)");
+  });
+
+  it("o misto que não abre continua sendo 'não decomposto'", () => {
+    const opaco = mov({ ...misto, formasPartes: undefined });
+    expect(linhasAnaliticas([opaco])[0].forma).toBe("Misto (não decomposto)");
+    expect(resumoPorForma([opaco])).toEqual([
+      { rotulo: "Recebido em Misto (não decomposto)", valor: 187 },
+    ]);
+  });
+
+  it("abrir o misto não muda o total do período", () => {
+    expect(resumoPorForma([misto]).reduce((s, i) => s + i.valor, 0)).toBe(
+      totaisExtrato([misto]).recebido,
+    );
+  });
+
+  it("suprimento não infla o Recebido em Dinheiro do card", () => {
+    const suprimento = mov({
+      tipo: "transferencia",
+      transferSentido: "entrada",
+      valor: 500,
+      formaCanonica: "dinheiro",
+    });
+    const fatias = fatiasDeEntrada([mov({ valor: 100, formaCanonica: "dinheiro" }), suprimento]);
+    expect(fatias.find((f) => f.forma === "dinheiro")?.valor).toBe(100);
   });
 });
 
