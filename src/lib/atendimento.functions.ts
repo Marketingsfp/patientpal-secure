@@ -1846,29 +1846,119 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
   });
 
 /**
- * Assumir conversa da fila. Usa RPC atômica: se dois atendentes clicarem ao
- * mesmo tempo, apenas um recebe `ok: true`.
+ * Assumir conversa (fila ou tomada de atendimento).
+ *
+ * Fonte única de responsável: `atend_conversas.atribuida_user_id`.
+ * - Conversa livre: usa a RPC atômica `atend_claim_conversa` — em disputa,
+ *   apenas um atendente recebe `ok: true`.
+ * - Conversa já atribuída: só troca com `forcar = true`, e mesmo assim por
+ *   UPDATE condicional no responsável atual (protege contra corrida e contra
+ *   sobrescrever uma transferência feita no mesmo instante).
+ * Conversa encerrada nunca é assumida.
  */
 export const assumirConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        forcar: z.boolean().default(false),
+        motivo: z.string().trim().max(500).optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
-    const { data: ok, error } = await context.supabase.rpc("atend_claim_conversa", {
-      _conversa_id: data.conversaId,
-      _clinica_id: data.clinicaId,
-      _user_id: context.userId,
-    });
-    if (error) throw new Error(error.message);
-    if (!ok) return { ok: false, motivo: "JA_ASSUMIDA" as const };
-    await context.supabase
+    const { data: conv, error: eConv } = await context.supabase
       .from("atend_conversas")
-      .update({ atribuicao_origem: "manual_assignment" })
+      .select("id, atribuida_user_id, status, departamento_id")
       .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (eConv) throw new Error(eConv.message);
+    if (!conv) return { ok: false as const, motivo: "NAO_ENCONTRADA" as const };
+    if (conv.status === "closed") return { ok: false as const, motivo: "ENCERRADA" as const };
+    // Idempotente: repetir o clique (ou outra aba) não muda nada.
+    if (conv.atribuida_user_id === context.userId)
+      return { ok: true as const, motivo: null, atribuidaUserId: context.userId, jaEra: true };
+
+    if (conv.atribuida_user_id && !data.forcar)
+      return {
+        ok: false as const,
+        motivo: "JA_ASSUMIDA" as const,
+        atribuidaUserId: conv.atribuida_user_id,
+      };
+
+    if (!conv.atribuida_user_id) {
+      const { data: ok, error } = await context.supabase.rpc("atend_claim_conversa", {
+        _conversa_id: data.conversaId,
+        _clinica_id: data.clinicaId,
+        _user_id: context.userId,
+      });
+      if (error) throw new Error(error.message);
+      if (!ok) {
+        const { data: atual } = await context.supabase
+          .from("atend_conversas")
+          .select("atribuida_user_id")
+          .eq("id", data.conversaId)
+          .eq("clinica_id", data.clinicaId)
+          .maybeSingle();
+        return {
+          ok: false as const,
+          motivo: "JA_ASSUMIDA" as const,
+          atribuidaUserId: atual?.atribuida_user_id ?? null,
+        };
+      }
+      await context.supabase
+        .from("atend_conversas")
+        .update({ atribuicao_origem: "manual_assignment" })
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId);
+    } else {
+      // Tomada consciente: troca condicionada ao responsável que o atendente viu.
+      const { data: rows, error } = await context.supabase
+        .from("atend_conversas")
+        .update({
+          atribuida_user_id: context.userId,
+          status: "active",
+          owner_type: "HUMAN",
+          ai_enabled: false,
+          assigned_at: new Date().toISOString(),
+          atribuicao_origem: "takeover",
+        })
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId)
+        .eq("atribuida_user_id", conv.atribuida_user_id)
+        .neq("status", "closed")
+        .select("id");
+      if (error) throw new Error(error.message);
+      if (!rows || rows.length === 0) {
+        const { data: atual } = await context.supabase
+          .from("atend_conversas")
+          .select("atribuida_user_id")
+          .eq("id", data.conversaId)
+          .eq("clinica_id", data.clinicaId)
+          .maybeSingle();
+        return {
+          ok: false as const,
+          motivo: "CORRIDA" as const,
+          atribuidaUserId: atual?.atribuida_user_id ?? null,
+        };
+      }
+      // Tomada entra no histórico como transferência, com motivo opcional.
+      await context.supabase.from("atend_transferencias").insert({
+        clinica_id: data.clinicaId,
+        conversa_id: data.conversaId,
+        de_user_id: conv.atribuida_user_id,
+        para_user_id: context.userId,
+        de_departamento_id: conv.departamento_id,
+        para_departamento_id: conv.departamento_id,
+        motivo: data.motivo ?? "Tomada de atendimento",
+      });
+    }
+
     const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
     await registrarEvento({
       clinicaId: data.clinicaId,
@@ -1876,8 +1966,14 @@ export const assumirConversa = createServerFn({ method: "POST" })
       evento: "ASSUMIDA",
       userId: context.userId,
     });
-    return { ok: true, motivo: null };
+    return {
+      ok: true as const,
+      motivo: null,
+      atribuidaUserId: context.userId,
+      jaEra: false,
+    };
   });
+
 
 
 /** Devolve a conversa para a Nina (reativa a IA). */
