@@ -86,6 +86,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
+  mesclarEspera,
+  mesclarListaConversas,
+  ordenarPorRecentes,
+} from "@/lib/atendimento/inbox-merge";
+import {
   ConversationSystemEvent,
   type ConversaEvento,
 } from "@/components/nina/ConversationSystemEvent";
@@ -191,6 +196,10 @@ export function AtendInbox() {
   const [ordem, setOrdem] = useState<"recentes" | "espera">("recentes");
   // conversaId -> instante da 1ª mensagem do paciente ainda sem resposta.
   const [espera, setEspera] = useState<Record<string, string>>({});
+  // Sequenciais das recargas: descartam respostas fora de ordem (uma mensagem
+  // nova dispara vários eventos de Realtime quase ao mesmo tempo).
+  const seqConvs = useRef(0);
+  const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
     if (soCriticas) {
@@ -470,6 +479,7 @@ export function AtendInbox() {
 
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
+    const pedido = ++seqConvs.current;
     try {
       const rows = await listarConvs({
         data: {
@@ -480,7 +490,12 @@ export function AtendInbox() {
           limit: 200,
         },
       });
-      setConvs(rows);
+      // Resposta atrasada de uma recarga anterior não pode sobrescrever a
+      // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
+      if (pedido !== seqConvs.current) return;
+      setConvs((prev: any[]) =>
+        ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[],
+      );
       if (!sel && rows[0]) setSel(rows[0]);
     } catch (e: any) {
       mostrarErro(e);
@@ -591,12 +606,14 @@ export function AtendInbox() {
   // (realtime) ou a cada 60s como rede de segurança.
   const carregarEspera = useCallback(async () => {
     if (!clinicaId) return;
+    const pedido = ++seqEspera.current;
     try {
       const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
         string,
         string
       >;
-      setEspera(m ?? {});
+      if (pedido !== seqEspera.current) return;
+      setEspera((prev) => mesclarEspera(prev, m ?? {}));
     } catch {
       /* indicador auxiliar: falha não pode atrapalhar o atendimento */
     }
