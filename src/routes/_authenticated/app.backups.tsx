@@ -193,7 +193,7 @@ function Page() {
         <h2 className="font-semibold mb-2">Últimas execuções</h2>
         <Card className="p-0 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+            <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary">
               <tr>
                 <th className="text-left px-3 py-2">Data</th>
                 <th className="text-left px-3 py-2">Status</th>

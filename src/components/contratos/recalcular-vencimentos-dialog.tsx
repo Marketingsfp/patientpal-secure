@@ -279,12 +279,12 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
         {preview.length > 0 ? (
           <div className="border rounded-md max-h-[300px] overflow-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 sticky top-0">
+              <thead className="bg-muted/50 sticky top-0 text-xs font-bold uppercase tracking-wide text-primary">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Parcela</th>
-                  <th className="text-left px-3 py-2 font-medium">Vencimento atual</th>
-                  <th className="text-left px-3 py-2 font-medium">Novo vencimento</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
+                  <th className="text-left px-3 py-2">Parcela</th>
+                  <th className="text-left px-3 py-2">Vencimento atual</th>
+                  <th className="text-left px-3 py-2">Novo vencimento</th>
+                  <th className="text-left px-3 py-2">Status</th>
                 </tr>
               </thead>
               <tbody>

@@ -195,6 +195,7 @@ function TiposServicoPage() {
             <div className="space-y-1">
               <Label>Nome *</Label>
               <Input
+                uppercase
                 value={form.nome}
                 onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
                 placeholder="Ex: Cirurgia"

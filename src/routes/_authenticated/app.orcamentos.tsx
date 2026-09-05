@@ -789,7 +789,7 @@ function OrcamentosPage() {
         <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
-              <thead className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:border-b [&_th]:border-border/60">
+              <thead className="text-xs font-bold uppercase tracking-wide text-primary [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:border-b [&_th]:border-border/60">
                 <tr className="text-left h-11">
                   <th className="px-3 w-24">Nº</th>
                   <th className="px-3 w-32">Data</th>
@@ -1695,7 +1695,7 @@ function NovoOrcamentoDialog({
                     </div>
                   )}
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary">
                       <tr className="text-left">
                         <th className="px-2 py-1.5">Descrição</th>
                         <th className="px-2 py-1.5 w-20">Qtd</th>

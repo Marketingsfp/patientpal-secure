@@ -244,6 +244,7 @@ export function PatientQuickCompleteSheet({
                   <div className="col-span-2">
                     <Label>Logradouro</Label>
                     <Input
+                      uppercase
                       value={row.logradouro ?? ""}
                       onChange={(e) => set("logradouro", e.target.value)}
                     />
@@ -258,6 +259,7 @@ export function PatientQuickCompleteSheet({
                   <div className="col-span-2">
                     <Label>Complemento</Label>
                     <Input
+                      uppercase
                       value={row.complemento ?? ""}
                       onChange={(e) => set("complemento", e.target.value)}
                     />
@@ -265,6 +267,7 @@ export function PatientQuickCompleteSheet({
                   <div className="col-span-2">
                     <Label>Bairro</Label>
                     <Input
+                      uppercase
                       value={row.bairro ?? ""}
                       onChange={(e) => set("bairro", e.target.value)}
                     />
@@ -280,6 +283,7 @@ export function PatientQuickCompleteSheet({
                   <div className="col-span-3">
                     <Label>Cidade</Label>
                     <Input
+                      uppercase
                       value={row.cidade ?? ""}
                       onChange={(e) => set("cidade", e.target.value)}
                     />

@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { LIMITES, limparLinha, limparTexto, somenteDigitos } from "@/lib/seguranca/sanitizar";
 import { validarCPF } from "@/lib/validators";
+import { maiusculoParaBanco } from "@/lib/texto-maiusculo";
 
 const linha = (max: number) =>
   z
@@ -17,6 +18,20 @@ const linha = (max: number) =>
     .pipe(z.string().max(max, `Máximo de ${max} caracteres`));
 
 const opcional = (max: number) => linha(max).transform((v) => (v === "" ? null : v));
+
+/**
+ * Campo de identificação: sai daqui em CAIXA ALTA, com espaços das pontas
+ * removidos e espaços repetidos reduzidos a um.
+ *
+ * O banco já faz isso sozinho no gatilho `tg_uppercase_text_fields` (que
+ * ainda remove os acentos). Repetir a caixa alta aqui não é redundância
+ * inútil: sem ela, a tela continua exibindo o que foi digitado até alguém
+ * recarregar a lista, e o cadastro parece ter mudado de forma sozinho.
+ */
+const linhaMaiuscula = (max: number) => linha(max).transform(maiusculoParaBanco);
+
+const opcionalMaiusculo = (max: number) =>
+  linhaMaiuscula(max).transform((v) => (v === "" ? null : v));
 
 const cpfOpcional = z
   .string()
@@ -33,7 +48,7 @@ const telefoneOpcional = z
 const SEXOS = ["masculino", "feminino", "outro", "nao_informar"] as const;
 
 export const pacienteSchema = z.object({
-  nome: linha(LIMITES.nome).pipe(z.string().min(2, "Informe o nome do paciente")),
+  nome: linhaMaiuscula(LIMITES.nome).pipe(z.string().min(2, "Informe o nome do paciente")),
   cpf: cpfOpcional,
   telefone: z
     .string()
@@ -66,16 +81,16 @@ export const pacienteSchema = z.object({
     .transform(somenteDigitos)
     .refine((v) => v === "" || v.length === 8, "CEP deve ter 8 dígitos")
     .transform((v) => (v === "" ? null : v)),
-  logradouro: opcional(LIMITES.linha),
+  logradouro: opcionalMaiusculo(LIMITES.linha),
   numero: opcional(LIMITES.codigo),
-  complemento: opcional(LIMITES.linha),
-  bairro: opcional(LIMITES.nome),
-  cidade: opcional(LIMITES.nome),
-  estado: opcional(2),
-  responsavel_nome: opcional(LIMITES.nome),
+  complemento: opcionalMaiusculo(LIMITES.linha),
+  bairro: opcionalMaiusculo(LIMITES.nome),
+  cidade: opcionalMaiusculo(LIMITES.nome),
+  estado: opcionalMaiusculo(2),
+  responsavel_nome: opcionalMaiusculo(LIMITES.nome),
   responsavel_cpf: cpfOpcional,
   responsavel_telefone: telefoneOpcional,
-  responsavel_parentesco: opcional(LIMITES.nome),
+  responsavel_parentesco: opcionalMaiusculo(LIMITES.nome),
   numero_pasta: opcional(LIMITES.codigo),
   /** Pasta física de arquivo da Ortodontia. Não é o prontuário. */
   pasta_ortodontica: opcional(LIMITES.codigo),

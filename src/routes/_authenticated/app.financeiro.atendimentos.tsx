@@ -4088,7 +4088,7 @@ function AtendimentosPage() {
                       </div>
 
                       <table className="w-full text-xs border-collapse">
-                        <thead>
+                        <thead className="text-xs font-bold uppercase tracking-wide text-primary">
                           <tr className="border-b bg-muted/40">
                             <th className="text-left p-2">Data</th>
                             <th className="text-left p-2">Pago em</th>

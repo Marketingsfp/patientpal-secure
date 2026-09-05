@@ -1596,6 +1596,7 @@ function ProcedimentosPage() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label>Nome *</Label>
                   <Input
+                    uppercase
                     value={form.nome}
                     onChange={(e) => setForm({ ...form, nome: e.target.value })}
                     required
@@ -1991,6 +1992,7 @@ function ProcedimentosPage() {
             <div className="space-y-1">
               <Label>Nome *</Label>
               <Input
+                uppercase
                 value={formCartao.nome}
                 onChange={(e) => setFormCartao({ ...formCartao, nome: e.target.value })}
                 required

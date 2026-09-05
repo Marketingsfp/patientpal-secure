@@ -452,6 +452,7 @@ function EnderecoDialog({
           <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Logradouro</Label>
             <Input
+              uppercase
               value={data.logradouro ?? ""}
               onChange={(e) => setData((d) => ({ ...d, logradouro: e.target.value }))}
             />
@@ -466,6 +467,7 @@ function EnderecoDialog({
           <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Complemento</Label>
             <Input
+              uppercase
               value={data.complemento ?? ""}
               onChange={(e) => setData((d) => ({ ...d, complemento: e.target.value }))}
             />
@@ -473,6 +475,7 @@ function EnderecoDialog({
           <div className="sm:col-span-2 space-y-1">
             <Label className="text-xs">Bairro</Label>
             <Input
+              uppercase
               value={data.bairro ?? ""}
               onChange={(e) => setData((d) => ({ ...d, bairro: e.target.value }))}
             />
@@ -488,6 +491,7 @@ function EnderecoDialog({
           <div className="sm:col-span-3 space-y-1">
             <Label className="text-xs">Cidade</Label>
             <Input
+              uppercase
               value={data.cidade ?? ""}
               onChange={(e) => setData((d) => ({ ...d, cidade: e.target.value }))}
             />

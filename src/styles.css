@@ -97,6 +97,28 @@
  *                         xl   20px → 22px
  * De 4xl para cima ficam como estavam (uso decorativo e de telão).
  * ===================================================================== */
+/* =====================================================================
+ * Fonte única do sistema
+ *
+ * O app já carregava Inter (e Inter Tight para títulos) no <head>, mas
+ * nenhuma delas era declarada como padrão: sem `--font-sans`, o Tailwind
+ * cai no `ui-sans-serif/system-ui`, ou seja, cada máquina renderizava as
+ * telas com a fonte do próprio sistema (Segoe UI no Windows da recepção,
+ * outra no notebook da gestão). Declarando os tokens aqui, o app inteiro
+ * passa a usar Inter e os poucos pontos que já pediam Inter Tight à mão
+ * deixam de destoar do resto.
+ *
+ * As fontes dos documentos impressos (contratos em Calibri/Times, GR e
+ * recibos em Arial/Helvetica) NÃO são afetadas: aquelas rotinas geram um
+ * HTML próprio de impressão com o seu font-family declarado, de propósito,
+ * porque documento em papel tem padrão gráfico/jurídico próprio.
+ * ===================================================================== */
+@theme {
+  --font-sans: "Inter", "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter Tight", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 @theme {
   --text-xs: 0.85rem;
   --text-sm: 1rem;
@@ -235,6 +257,10 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    /* Reforço explícito da fonte única: o preflight do Tailwind já herda
+     * `--font-sans`, mas telas antigas que renderizam fora do #root (ex.:
+     * portais de diálogo) passam a herdar daqui também. */
+    font-family: var(--font-sans);
   }
 }
 

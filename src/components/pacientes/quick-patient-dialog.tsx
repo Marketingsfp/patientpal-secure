@@ -172,6 +172,7 @@ export function QuickPatientDialog({
             <Label>Nome completo *</Label>
             <Input
               autoFocus
+              uppercase
               value={nome}
               onChange={(e) => {
                 setErroNome(erroCaractereNome(e.target.value));

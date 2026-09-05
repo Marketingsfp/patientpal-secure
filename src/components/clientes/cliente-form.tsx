@@ -30,6 +30,7 @@ import {
   conflitoCodigoProntuario,
 } from "@/lib/prontuario";
 import { erroCaractereNome, sanitizarNomePessoa, validarNomePessoa } from "@/lib/nome-pessoa";
+import { maiusculoDigitacao } from "@/lib/texto-maiusculo";
 import { mascaraCPF, mascaraTelefone } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -176,6 +177,25 @@ function normalizarFala(field: string, raw: string): string {
     return normalizarFalaDigitos(raw);
   return raw;
 }
+
+/**
+ * Campos de identificação do paciente — os que o banco grava em caixa alta
+ * pelo gatilho `tg_uppercase_text_fields`. A tela usa esta lista para já
+ * mostrar o texto em maiúsculo enquanto ele é digitado ou ditado, em vez de
+ * o cadastro "mudar sozinho" depois de salvo.
+ *
+ * Ficam de fora de propósito: e-mail (é gravado em minúsculo), CPF,
+ * telefones, CEP, datas e o número da casa.
+ */
+const CAMPOS_IDENTIFICACAO = new Set([
+  "nome",
+  "responsavel_nome",
+  "responsavel_parentesco",
+  "logradouro",
+  "complemento",
+  "bairro",
+  "cidade",
+]);
 
 function InputVoz({
   field,
@@ -568,6 +588,11 @@ export function ClienteForm({
           return { ...f, [field]: mascaraCPF(juntos) } as FormState;
         if (field === "telefone" || field === "telefone2" || field === "responsavel_telefone")
           return { ...f, [field]: mascaraTelefone(juntos) } as FormState;
+        // O ditado devolve o texto capitalizado ("João da Silva"). Nos campos
+        // de identificação isso ficaria destoando do que é digitado à mão,
+        // que já sai em caixa alta — e do que o banco vai gravar.
+        if (CAMPOS_IDENTIFICACAO.has(field as string))
+          return { ...f, [field]: maiusculoDigitacao(juntos) } as FormState;
         return { ...f, [field]: juntos } as FormState;
       });
     };
@@ -1068,8 +1093,10 @@ export function ClienteForm({
     const ehCPF = field === "cpf" || field === "responsavel_cpf";
     const ehTelefone =
       field === "telefone" || field === "telefone2" || field === "responsavel_telefone";
+    const ehIdentificacao = CAMPOS_IDENTIFICACAO.has(field as string);
     return {
       field: field as string,
+      ...(ehIdentificacao ? { uppercase: true } : {}),
       value: form[field] as string,
       ...(ehCPF
         ? { inputMode: "numeric" as const, maxLength: 14, placeholder: "000.000.000-00" }
@@ -1573,6 +1600,7 @@ export function ClienteForm({
                 <div className="space-y-1">
                   <Label>Parentesco</Label>
                   <Input
+                    uppercase
                     value={form.responsavel_parentesco}
                     onChange={(e) => setForm({ ...form, responsavel_parentesco: e.target.value })}
                     placeholder="Ex.: Mãe, Pai, Filho(a), Cuidador"
@@ -1921,7 +1949,7 @@ export function ClienteForm({
                     ) : (
                       <div className="rounded-lg border border-border bg-card overflow-x-auto">
                         <table className="w-full text-sm">
-                          <thead className="bg-muted/40">
+                          <thead className="bg-muted/40 text-xs font-bold uppercase tracking-wide text-primary">
                             <tr className="text-left">
                               <th className="px-3 py-2 w-36">Data</th>
                               <th className="px-3 py-2">Especialidade</th>

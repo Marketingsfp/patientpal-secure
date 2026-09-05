@@ -2063,16 +2063,16 @@ export function MedicoFormDialog({
             ) : (
               <div className="border rounded-md overflow-x-auto">
                 <table className="w-full min-w-260 text-sm">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary">
                     <tr className="text-left">
-                      <th className="px-2 py-2 font-medium">Serviço</th>
-                      <th className="px-2 py-2 font-medium w-32">Tipo (particular)</th>
-                      <th className="px-2 py-2 font-medium w-28">Particular</th>
-                      <th className="px-2 py-2 font-medium w-32">Tipo (convênio)</th>
-                      <th className="px-2 py-2 font-medium w-28">Convênio</th>
-                      <th className="px-2 py-2 font-medium w-28">Cartão Consulta</th>
-                      <th className="px-2 py-2 font-medium w-28">Cartão Desconto</th>
-                      <th className="px-2 py-2 font-medium w-32 text-center">Terceiro</th>
+                      <th className="px-2 py-2">Serviço</th>
+                      <th className="px-2 py-2 w-32">Tipo (particular)</th>
+                      <th className="px-2 py-2 w-28">Particular</th>
+                      <th className="px-2 py-2 w-32">Tipo (convênio)</th>
+                      <th className="px-2 py-2 w-28">Convênio</th>
+                      <th className="px-2 py-2 w-28">Cartão Consulta</th>
+                      <th className="px-2 py-2 w-28">Cartão Desconto</th>
+                      <th className="px-2 py-2 w-32 text-center">Terceiro</th>
                       <th className="px-2 py-2 w-10"></th>
                     </tr>
                   </thead>
@@ -2541,12 +2541,12 @@ export function MedicoFormDialog({
               ) : (
                 <div className="border rounded-md overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary">
                       <tr className="text-left">
-                        <th className="px-2 py-2 font-medium">Laudador (Cardiologia)</th>
-                        <th className="px-2 py-2 font-medium w-40">Tipo</th>
-                        <th className="px-2 py-2 font-medium w-36">Valor</th>
-                        <th className="px-2 py-2 font-medium w-12"></th>
+                        <th className="px-2 py-2">Laudador (Cardiologia)</th>
+                        <th className="px-2 py-2 w-40">Tipo</th>
+                        <th className="px-2 py-2 w-36">Valor</th>
+                        <th className="px-2 py-2 w-12"></th>
                       </tr>
                     </thead>
                     <tbody>
