@@ -70,6 +70,14 @@ export interface ResumoHandoff {
   motivo_handoff: string | null;
   /** Preenchido apenas com registro real do sistema. */
   agendamento_confirmado: AgendamentoConfirmado | null;
+  /** Última pergunta que a Nina fez e ficou sem resposta (quando houver). */
+  ultima_pergunta?: string | null;
+  /** Etapa do fluxo em que o atendimento parou (rótulo em português). */
+  etapa_interrompida?: string | null;
+}
+
+function listaBruta(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : typeof v === "string" ? v.split(/\n|;/) : [];
 }
 
 const INTENCOES = new Set<string>(Object.keys(ROTULO_INTENCAO));
@@ -103,7 +111,15 @@ function lista(v: unknown, maxItens = 6): string[] {
  */
 export function normalizarResumo(
   bruto: unknown,
-  extras?: { motivoHandoff?: string | null; agendamentoReal?: AgendamentoConfirmado | null },
+  extras?: {
+    motivoHandoff?: string | null;
+    agendamentoReal?: AgendamentoConfirmado | null;
+    ultimaPergunta?: string | null;
+    etapaInterrompida?: string | null;
+    /** Pendências e informações vindas do estado real do fluxo (não da IA). */
+    pendenciasExtras?: string[];
+    informacoesExtras?: string[];
+  },
 ): ResumoHandoff {
   const o = (bruto ?? {}) as Record<string, unknown>;
   const intencaoBruta = String(o.intencao ?? "").trim();
@@ -111,12 +127,16 @@ export function normalizarResumo(
     ? (intencaoBruta as IntencaoHandoff)
     : "outro";
   const real = extras?.agendamentoReal ?? null;
+  const informacoes = lista([...(extras?.informacoesExtras ?? []), ...listaBruta(o.informacoes)], 8);
+  const pendencias = lista([...(extras?.pendenciasExtras ?? []), ...listaBruta(o.pendencias)], 6);
   return {
     intencao,
     motivo_contato: texto(o.motivo_contato, 300) ?? "Não identificado pela conversa.",
-    informacoes: lista(o.informacoes),
+    informacoes,
     ja_informado: lista(o.ja_informado),
-    pendencias: lista(o.pendencias),
+    pendencias,
+    ultima_pergunta: texto(extras?.ultimaPergunta, 300),
+    etapa_interrompida: texto(extras?.etapaInterrompida, 120),
     proxima_acao: texto(o.proxima_acao, 300),
     situacao: texto(o.situacao, 300),
     motivo_handoff: texto(extras?.motivoHandoff ?? o.motivo_handoff, 240),
@@ -131,6 +151,9 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
   if (r.motivo_contato) b.push({ titulo: "Motivo do contato", itens: [r.motivo_contato] });
   if (r.situacao) b.push({ titulo: "Situação", itens: [r.situacao] });
   if (r.informacoes.length) b.push({ titulo: "Informações coletadas", itens: r.informacoes });
+  if (r.ultima_pergunta) b.push({ titulo: "Última pergunta da Nina", itens: [r.ultima_pergunta] });
+  if (r.etapa_interrompida)
+    b.push({ titulo: "Etapa em que parou", itens: [r.etapa_interrompida] });
   if (r.ja_informado.length) b.push({ titulo: "Já informado pela Nina", itens: r.ja_informado });
   if (r.pendencias.length) b.push({ titulo: "Pendente", itens: r.pendencias });
   if (r.proxima_acao) b.push({ titulo: "Próxima ação sugerida", itens: [r.proxima_acao] });
