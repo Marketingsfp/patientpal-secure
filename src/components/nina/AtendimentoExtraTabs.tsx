@@ -367,7 +367,7 @@ export function AtendInbox() {
         toast.success("Você está offline");
       } else {
         if (!pauseReasons.length) {
-          toast.error("Cadastre motivos de pausa em Atendimento — Pausas");
+          toast.error("Nenhum motivo de pausa configurado");
           return;
         }
         setPausaReasonSel(pauseReasons[0].id);
