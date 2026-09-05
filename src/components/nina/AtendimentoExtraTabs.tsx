@@ -1044,6 +1044,7 @@ export function AtendInbox() {
         ),
       ]);
       if (selIdRef.current !== alvo) return;
+      if (conversaIdUrlRef.current && conversaIdUrlRef.current !== alvo) return;
       if ((novas as any[])?.length) {
         setMsgs((prev) => {
           const juntas = mesclarNovas(prev, novas as any[]);
