@@ -1099,6 +1099,14 @@ export function AtendInbox() {
                   {c.owner_type === "AI" && (
                     <Badge className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30">✦ Nina</Badge>
                   )}
+                  {c.handoff_motivo === "patient_response_timeout" && (
+                    <Badge
+                      title="Transferida automaticamente: o paciente não respondeu no prazo"
+                      className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn"
+                    >
+                      🟡 Timeout da Nina — sem resposta por 30 min
+                    </Badge>
+                  )}
                   {c.atribuida_user_id && (
                     <Badge
                       className={`text-[11px] ${
@@ -1228,6 +1236,11 @@ export function AtendInbox() {
                 }`}
               >
                 <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                {sel.handoff_motivo === "patient_response_timeout" && (
+                  <span className="rounded-full border border-atd-warn bg-atd-warn-bg px-2 py-0.5 text-[11px] text-atd-warn-ink">
+                    🟡 Timeout da Nina — sem resposta por 30 min
+                  </span>
+                )}
                 <span className="truncate">
                   {souResponsavel
                     ? "Você é o responsável por esta conversa."

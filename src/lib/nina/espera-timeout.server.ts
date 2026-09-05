@@ -15,7 +15,11 @@
  * foi apagado e o UPDATE não casa.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { STATUS_ENCERRADOS, encaminharParaHumano } from "@/lib/atendimento/handoff.server";
+import {
+  STATUS_ENCERRADOS,
+  encaminharParaHumano,
+  registrarEvento,
+} from "@/lib/atendimento/handoff.server";
 import { timeoutRespostaPacienteMinutos } from "./espera-paciente";
 import { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } from "./espera-timeout-motivo";
 import { normalizarEstado } from "./fluxo-estado-normalizar";
@@ -118,6 +122,14 @@ export async function processarTimeoutsEsperaPaciente(args?: {
       });
       if (r.ok) {
         resultado.transferidas += 1;
+        // Marcação interna na linha do tempo (nunca enviada ao paciente).
+        await registrarEvento({
+          clinicaId: linha.clinica_id,
+          conversaId: linha.id,
+          evento: "TIMEOUT_NINA",
+          motivo: textoInternoTimeout(minutos),
+          detalhes: { minutos, motivo: MOTIVO_TIMEOUT_PACIENTE },
+        });
         await finalizarContextoTimeout(linha);
       } else resultado.erros += 1;
     } catch (e) {

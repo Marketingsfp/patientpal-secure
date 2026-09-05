@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { obterResumoHandoff } from "@/lib/atendimento/handoff-resumo.functions";
 import { blocosVisiveis, ROTULO_INTENCAO, type ResumoHandoff } from "@/lib/atendimento/handoff-resumo";
 
@@ -51,6 +52,9 @@ export function ResumoHandoffCard({
   useEffect(() => {
     void carregar(false);
   }, [carregar]);
+
+  // Resumo gerado pelo servidor (inclusive no timeout) aparece sem refresh.
+  useRealtimeRefresh(["atend_handoff_resumos", "atend_conversas"], () => void carregar(false));
 
   if (!linha) return null;
 
