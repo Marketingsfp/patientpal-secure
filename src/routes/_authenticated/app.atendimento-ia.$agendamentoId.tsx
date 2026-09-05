@@ -274,8 +274,11 @@ function AtendimentoEditorPage() {
       }
     }
 
-    // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
-    if (status.pago && ag.fluxo_etapa !== "atendimento") {
+    // move para "atendimento" se ainda não estiver (apenas se já estiver pago).
+    // Atendimento já finalizado fica como está: o médico reabre a tela só para
+    // imprimir uma segunda via, e voltar a etapa tiraria o paciente da lista
+    // de atendidos do dia como se a consulta não tivesse acontecido.
+    if (status.pago && ag.fluxo_etapa !== "atendimento" && ag.fluxo_etapa !== "finalizado") {
       void supabase
         .from("agendamentos")
         .update({

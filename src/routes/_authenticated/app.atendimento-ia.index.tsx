@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -65,6 +66,34 @@ type TriagemResumo = {
   observacoes: string | null;
 };
 
+/**
+ * Data no formato "AAAA-MM-DD" pelo relógio da clínica.
+ *
+ * `toISOString()` devolve o horário de Greenwich: depois das 21h no Brasil
+ * ele já responde o dia seguinte, e a fila do plantão da noite aparecia
+ * vazia porque o sistema procurava os pacientes do dia errado.
+ */
+function diaLocal(d: Date): string {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** Soma dias a uma data "AAAA-MM-DD" e devolve no mesmo formato. */
+function somarDias(dia: string, n: number): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  const base = new Date(a, (m ?? 1) - 1, d ?? 1);
+  base.setDate(base.getDate() + n);
+  return diaLocal(base);
+}
+
+/** "Sábado, 05/09/2026" — o dia da semana ajuda a conferir a escala. */
+function dataPorExtenso(dia: string): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  const data = new Date(a, (m ?? 1) - 1, d ?? 1);
+  const semana = data.toLocaleDateString("pt-BR", { weekday: "long" });
+  return `${semana.charAt(0).toUpperCase()}${semana.slice(1)}, ${data.toLocaleDateString("pt-BR")}`;
+}
+
 function AtendimentoIaPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -83,6 +112,11 @@ function AtendimentoIaPage() {
   // Conta cujo único papel é "médico": vê apenas a própria fila, sem poder
   // trocar de profissional.
   const [soMedico, setSoMedico] = useState(false);
+  // Dia mostrado na fila. Começa em hoje; o médico volta a dias anteriores
+  // para reimprimir o que prescreveu num plantão passado.
+  const [dia, setDia] = useState<string>(() => diaLocal(new Date()));
+  const [aba, setAba] = useState<"espera" | "atendidos">("espera");
+  const hojeLocal = diaLocal(new Date());
 
   useEffect(() => {
     (async () => {
@@ -105,7 +139,7 @@ function AtendimentoIaPage() {
 
       // Inclui médicos inativos que ainda têm pacientes na fila do dia,
       // para que nenhum atendimento em andamento fique órfão.
-      const hoje = new Date().toISOString().slice(0, 10);
+      const hoje = dia;
       const { data: pendAll } = await supabase
         .from("agendamentos")
         .select("medico_id, paciente_id, paciente_nome, fluxo_etapa")
@@ -200,7 +234,7 @@ function AtendimentoIaPage() {
         setMedicoId(escolhido);
       }
     })();
-  }, [clinicaAtual?.clinica_id, user?.id, user?.email]);
+  }, [clinicaAtual?.clinica_id, user?.id, user?.email, dia]);
 
   const medicoSelecionado = useMemo(
     () => medicos.find((x) => x.id === medicoId) ?? null,
@@ -219,7 +253,7 @@ function AtendimentoIaPage() {
       setFila([]);
       return;
     }
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = dia;
     const { data } = await supabase
       .from("agendamentos")
       .select("id, paciente_id, paciente_nome, inicio, procedimento, fluxo_etapa, prioridade")
@@ -248,7 +282,7 @@ function AtendimentoIaPage() {
 
   useEffect(() => {
     void carregarFila(medicoId);
-  }, [medicoId, clinicaAtual?.clinica_id]);
+  }, [medicoId, clinicaAtual?.clinica_id, dia]);
 
   const filaIdsKey = fila.map((f) => f.id).join(",");
   useEffect(() => {
@@ -331,7 +365,7 @@ function AtendimentoIaPage() {
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [medicoId, clinicaAtual?.clinica_id]);
+  }, [medicoId, clinicaAtual?.clinica_id, dia]);
 
   const filaOrdenada = useMemo(() => {
     const peso = { urgente: 0, prioritario: 1, normal: 2 } as const;
@@ -342,6 +376,24 @@ function AtendimentoIaPage() {
       return a.inicio.localeCompare(b.inicio);
     });
   }, [fila]);
+
+  // Quem ainda vai ser chamado x quem já teve o prontuário finalizado no dia.
+  const emEspera = useMemo(
+    () => filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado"),
+    [filaOrdenada],
+  );
+  const atendidos = useMemo(
+    () => filaOrdenada.filter((f) => f.fluxo_etapa === "finalizado"),
+    [filaOrdenada],
+  );
+  const listaVisivel = aba === "espera" ? emEspera : atendidos;
+
+  // Ao abrir um dia já encerrado (uma consulta de plantão passado), ninguém
+  // está em espera: mostrar a aba vazia faria parecer que aquele dia não teve
+  // atendimento nenhum, então a tela já abre na lista dos atendidos.
+  useEffect(() => {
+    if (emEspera.length === 0 && atendidos.length > 0) setAba("atendidos");
+  }, [emEspera.length, atendidos.length]);
 
   function atender(item: FilaItem) {
     navigate({ to: "/app/atendimento-ia/$agendamentoId", params: { agendamentoId: item.id } });
@@ -354,7 +406,7 @@ function AtendimentoIaPage() {
         <div>
           <h1 className="text-xl font-semibold">Meus Pacientes — Atendimento</h1>
           <p className="text-sm text-muted-foreground">
-            Fila dos pacientes agendados para hoje. Clique em Atender para abrir o prontuário.
+            Pacientes agendados na data escolhida. Clique em Atender para abrir o prontuário.
           </p>
         </div>
       </div>
@@ -402,19 +454,76 @@ function AtendimentoIaPage() {
         </div>
 
         <div className="space-y-2">
-          <Label className="flex items-center gap-1.5">
-            <Users className="h-4 w-4" /> Fila de atendimento
-            {(() => {
-              const total = filaOrdenada.length;
-              const pendentes = filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado").length;
-              if (total === 0) return " (0)";
-              if (pendentes === total) return ` (${total})`;
-              return ` (${pendentes} pendente${pendentes === 1 ? "" : "s"} de ${total})`;
-            })()}
-          </Label>
-          {filaOrdenada.length === 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" /> Fila de atendimento
+            </Label>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setDia(somarDias(dia, -1))}
+              >
+                Ontem
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={dia === hojeLocal ? "default" : "outline"}
+                onClick={() => setDia(hojeLocal)}
+              >
+                Hoje
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setDia(somarDias(dia, 1))}
+              >
+                Amanhã
+              </Button>
+            </div>
+            <Input
+              type="date"
+              value={dia}
+              onChange={(e) => e.target.value && setDia(e.target.value)}
+              className="h-9 w-42"
+              aria-label="Data da fila"
+            />
+            <span className="text-sm font-medium">{dataPorExtenso(dia)}</span>
+          </div>
+
+          {/* Atendimento finalizado nao some da tela: fica na aba "Atendidos",
+              de onde o medico reabre o prontuario para tirar uma segunda via
+              de atestado ou receita que o paciente pediu depois. */}
+          <div className="flex items-center gap-1 border-b">
+            {(
+              [
+                ["espera", `Em espera (${emEspera.length})`],
+                ["atendidos", `Atendidos (${atendidos.length})`],
+              ] as const
+            ).map(([id, rotulo]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setAba(id)}
+                className={`-mb-px border-b-2 px-3 py-1.5 text-sm ${
+                  aba === id
+                    ? "border-primary font-medium text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+
+          {listaVisivel.length === 0 ? (
             <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
-              Nenhum paciente na fila para hoje.
+              {aba === "espera"
+                ? "Nenhum paciente aguardando atendimento nesta data."
+                : "Nenhum atendimento finalizado nesta data."}
             </div>
           ) : (
             <div className="rounded-md border">
@@ -432,7 +541,7 @@ function AtendimentoIaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filaOrdenada.map((it, idx) => {
+                  {listaVisivel.map((it, idx) => {
                     const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -621,12 +730,18 @@ function AtendimentoIaPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {atendido ? (
-                            <Badge
-                              className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
-                              title="Atendimento finalizado"
+                            // Reabrir o prontuário já finalizado é o caminho da
+                            // segunda via: o paciente volta no balcão pedindo o
+                            // atestado ou a receita que perdeu.
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => atender(it)}
+                              title="Reabrir o prontuário para conferir ou imprimir segunda via"
                             >
-                              <Check className="h-3 w-3" /> ATENDIDO
-                            </Badge>
+                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                              Reabrir
+                            </Button>
                           ) : (
                             <Button
                               size="sm"
