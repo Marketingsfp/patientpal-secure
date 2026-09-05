@@ -4,7 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { z } from "zod";
-import { filtroEscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  STATUS_FECHADOS,
+  escopoEscondeFechadas,
+  filtroEscopoInbox,
+} from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 
 /* =========================================================
@@ -78,7 +82,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         canal: z.enum(["whatsapp", "instagram", "facebook", "webchat", "todos"]).default("todos"),
         // Escopo de visibilidade: por padrão o atendente vê só o que está
         // atribuído a ele agora. "todas" é privilégio de gestor/admin.
-        escopo: z.enum(["minhas", "nao_atribuidas", "nina", "todas"]).default("minhas"),
+        escopo: z.enum(["minhas", "nina", "nao_atribuidas", "fechadas", "todas"]).default("minhas"),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
@@ -125,6 +129,14 @@ export const listarConversas = createServerFn({ method: "POST" })
     else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
+    else if (filtroEscopo.tipo === "fechadas") {
+      q = q.in("status", [...STATUS_FECHADOS]);
+      if (filtroEscopo.userId) q = q.eq("atribuida_user_id", filtroEscopo.userId);
+    }
+    // Filtros operacionais mostram só conversas em andamento.
+    if (escopoEscondeFechadas(data.escopo, gestor)) {
+      q = q.not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
+    }
     if (data.status !== "all") q = q.eq("status", data.status);
     if (data.canal !== "todos") q = q.eq("canal", data.canal);
     if (data.busca) {
@@ -142,6 +154,54 @@ export const listarConversas = createServerFn({ method: "POST" })
     return rows ?? [];
   });
 
+
+/**
+ * Contagem independente de cada filtro da Inbox. Cada número é calculado com
+ * o mesmo critério da listagem, sem misturar escopos.
+ */
+export const contarConversasInbox = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    let gestor = false;
+    try {
+      const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      });
+      gestor = !!podeGerir;
+    } catch {
+      gestor = false;
+    }
+
+    const base = () =>
+      context.supabase
+        .from("atend_conversas")
+        .select("id", { count: "exact", head: true })
+        .eq("is_teste", false)
+        .eq("clinica_id", data.clinicaId);
+    const abertas = () => base().not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
+
+    const [minhas, nina, naoAtribuidas, fechadas, todas] = await Promise.all([
+      abertas().eq("atribuida_user_id", context.userId),
+      abertas().eq("owner_type", "AI"),
+      abertas().is("atribuida_user_id", null).neq("owner_type", "AI"),
+      gestor
+        ? base().in("status", [...STATUS_FECHADOS])
+        : base().in("status", [...STATUS_FECHADOS]).eq("atribuida_user_id", context.userId),
+      gestor ? base() : Promise.resolve({ count: null } as { count: number | null }),
+    ]);
+
+    return {
+      gestor,
+      minhas: minhas.count ?? 0,
+      nina: nina.count ?? 0,
+      nao_atribuidas: naoAtribuidas.count ?? 0,
+      fechadas: fechadas.count ?? 0,
+      todas: todas.count ?? 0,
+    };
+  });
 
 /**
  * Diz se o usuário logado é gestor/admin da clínica — usado pela Inbox para

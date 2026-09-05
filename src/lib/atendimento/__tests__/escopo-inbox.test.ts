@@ -95,3 +95,90 @@ describe("escopo da Inbox", () => {
     });
   });
 });
+
+/* ===== FASE 2 — filtros operacionais ===== */
+
+const fase2 = [
+  { id: "j-aberta", atribuida_user_id: jean, owner_type: "HUMAN", status: "active", nome: "Ana" },
+  {
+    id: "j-maria",
+    atribuida_user_id: jean,
+    owner_type: "HUMAN",
+    status: "active",
+    nome: "Maria Silva",
+  },
+  {
+    id: "nina-maria",
+    atribuida_user_id: null,
+    owner_type: "AI",
+    status: "bot_attending",
+    nome: "Maria Silva",
+  },
+  { id: "sem", atribuida_user_id: null, owner_type: "NONE", status: "waiting", nome: "Bruno" },
+  { id: "j-fechada", atribuida_user_id: jean, owner_type: "HUMAN", status: "closed", nome: "Ana" },
+  {
+    id: "m-fechada",
+    atribuida_user_id: maria,
+    owner_type: "HUMAN",
+    status: "finished",
+    nome: "Carla",
+  },
+];
+
+function lista(escopo: any, userId = jean, gestor = false) {
+  return fase2
+    .filter((c) => conversaVisivelNoEscopo(c, { escopo, userId, gestor }))
+    .map((c) => c.id);
+}
+
+function buscar(termo: string, escopo: any, userId = jean, gestor = false) {
+  return fase2
+    .filter((c) => conversaVisivelNoEscopo(c, { escopo, userId, gestor }))
+    .filter((c) => c.nome.toLowerCase().includes(termo.toLowerCase()))
+    .map((c) => c.id);
+}
+
+describe("filtros operacionais da Inbox", () => {
+  it("Minhas mostra somente as do usuário e sem as encerradas", () => {
+    expect(lista("minhas")).toEqual(["j-aberta", "j-maria"]);
+  });
+
+  it("Nina mostra somente conversas sob a IA", () => {
+    expect(lista("nina")).toEqual(["nina-maria"]);
+  });
+
+  it("Não atribuídas mostra somente sem responsável", () => {
+    expect(lista("nao_atribuidas")).toEqual(["sem"]);
+  });
+
+  it("Fechadas mostra as encerradas do próprio atendente", () => {
+    expect(lista("fechadas")).toEqual(["j-fechada"]);
+  });
+
+  it("Fechadas do gestor inclui o histórico da clínica", () => {
+    expect(lista("fechadas", jean, true)).toEqual(["j-fechada", "m-fechada"]);
+  });
+
+  it("busca respeita o filtro selecionado", () => {
+    expect(buscar("Maria Silva", "minhas")).toEqual(["j-maria"]);
+    expect(buscar("Maria Silva", "nina")).toEqual(["nina-maria"]);
+  });
+
+  it("ordenação acontece depois do filtro de propriedade", () => {
+    const doJean = fase2.filter((c) =>
+      conversaVisivelNoEscopo(c, { escopo: "minhas", userId: jean, gestor: false }),
+    );
+    const ordenado = [...doJean].sort((a, b) => a.nome.localeCompare(b.nome)).map((c) => c.id);
+    expect(ordenado).toEqual(["j-aberta", "j-maria"]);
+    expect(ordenado).not.toContain("nina-maria");
+  });
+
+  it("contadores de cada filtro são independentes", () => {
+    expect({
+      minhas: lista("minhas").length,
+      nina: lista("nina").length,
+      nao_atribuidas: lista("nao_atribuidas").length,
+      fechadas: lista("fechadas").length,
+    }).toEqual({ minhas: 2, nina: 1, nao_atribuidas: 1, fechadas: 1 });
+  });
+});
