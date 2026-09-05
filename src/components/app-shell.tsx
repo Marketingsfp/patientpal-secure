@@ -484,18 +484,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
           {
             to: "/app/nina",
-            hash: "atend-roteamento",
-            label: "Atendimento — Roteamento",
-            icon: ArrowRightLeft,
-          },
-          {
-            to: "/app/nina",
-            hash: "atend-dashboard",
-            label: "Atendimento — Painel",
-            icon: BarChart3,
-          },
-          {
-            to: "/app/nina",
             hash: "atend-status",
             label: "Atendimento — Meu Status (filas + pausa)",
             icon: Play,

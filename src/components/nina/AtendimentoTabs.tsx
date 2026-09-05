@@ -61,60 +61,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
-/* ============================================================
- * DASHBOARD
- * ========================================================== */
-export function AtendDashboard() {
-  const { clinicaAtual } = useClinica();
-  const clinicaId = clinicaAtual?.clinica_id;
-  const dashFn = useServerFn(dashboardAtendimento);
-  const [m, setM] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  const carregar = useCallback(async () => {
-    if (!clinicaId) return;
-    setLoading(true);
-    try {
-      setM(await dashFn({ data: { clinicaId } }));
-    } catch (e: any) {
-      mostrarErro(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [clinicaId, dashFn]);
-  useEffect(() => {
-    carregar();
-    const t = setInterval(carregar, 15000);
-    return () => clearInterval(t);
-  }, [carregar]);
-  useRealtimeRefresh(
-    ["atend_conversas", "atend_pausas_log", "atend_departamento_membros"],
-    carregar,
-    !!clinicaId,
-  );
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" /> Painel de Atendimento — Hoje
-        </CardTitle>
-        <Button size="sm" variant="outline" onClick={carregar} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Metric label="Conversas hoje" value={m?.conversas_hoje ?? "—"} />
-          <Metric label="Ativas" value={m?.ativas ?? "—"} tone="text-emerald-500" />
-          <Metric label="Em espera" value={m?.em_espera ?? "—"} tone="text-amber-500" />
-          <Metric label="Fechadas hoje" value={m?.fechadas_hoje ?? "—"} />
-          <Metric label="CSAT" value={m?.csat_hoje ?? "—"} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 function Metric({ label, value, tone }: { label: string; value: any; tone?: string }) {
   return (
     <div className="rounded-lg border bg-card p-3">
