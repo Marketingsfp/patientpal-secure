@@ -26,14 +26,19 @@ export function ResumoHandoffCard({
   const obter = useServerFn(obterResumoHandoff);
   const [linha, setLinha] = useState<Linha>(null);
   const [carregando, setCarregando] = useState(false);
-  const [aberto, setAberto] = useState(true);
+  // Regra: cada conversa começa com o resumo RECOLHIDO.
+  const [aberto, setAberto] = useState(false);
+  const [atualizado, setAtualizado] = useState(false);
 
   const carregar = useCallback(
     async (forcar = false) => {
       setCarregando(true);
       try {
         const r = (await obter({ data: { clinicaId, conversaId, forcar } })) as Linha;
-        setLinha(r);
+        setLinha((anterior) => {
+          if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
+          return r;
+        });
       } catch {
         setLinha({ status: "erro", payload: null, erro: "Não foi possível gerar o resumo.", versao: 0 });
       } finally {
@@ -51,12 +56,15 @@ export function ResumoHandoffCard({
 
   const r = linha.payload;
   return (
-    <div className="rounded-lg border border-purple-300/70 bg-purple-50 text-purple-950 dark:border-purple-400/30 dark:bg-purple-950/30 dark:text-purple-100">
-      <div className="flex items-center gap-2 px-3 py-2">
+    <div className="sticky top-0 z-20 rounded-lg border border-purple-300/70 bg-purple-50 text-purple-950 shadow-sm dark:border-purple-400/30 dark:bg-purple-950/95 dark:text-purple-100">
+      <div className="flex items-center gap-2 px-3 py-1.5">
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          onClick={() => setAberto((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          onClick={() => {
+            setAberto((v) => !v);
+            setAtualizado(false);
+          }}
           aria-expanded={aberto}
         >
           {aberto ? (
@@ -69,6 +77,11 @@ export function ResumoHandoffCard({
             Resumo da Nina
             {r ? ` · ${ROTULO_INTENCAO[r.intencao]}` : ""}
           </span>
+          {atualizado && !aberto && (
+            <span className="shrink-0 rounded bg-purple-300/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/30">
+              atualizado
+            </span>
+          )}
         </button>
         <span className="shrink-0 rounded bg-purple-200/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/20">
           uso interno
@@ -78,6 +91,7 @@ export function ResumoHandoffCard({
           variant="ghost"
           className="h-7 w-7 shrink-0"
           title="Gerar novamente"
+          aria-label="Gerar resumo novamente"
           disabled={carregando}
           onClick={() => void carregar(true)}
         >
@@ -86,7 +100,8 @@ export function ResumoHandoffCard({
       </div>
 
       {aberto && (
-        <div className="space-y-2 border-t border-purple-200/70 px-3 py-2 text-xs dark:border-purple-400/20">
+        <div className="max-h-[40vh] space-y-2 overflow-y-auto overscroll-contain border-t border-purple-200/70 px-3 py-2 text-xs dark:border-purple-400/20">
+
           {carregando && !r && <p>Gerando resumo da conversa…</p>}
           {linha.status === "erro" && (
             <p className="text-atd-danger-ink">
