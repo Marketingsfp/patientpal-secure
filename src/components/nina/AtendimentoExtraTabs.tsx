@@ -635,6 +635,7 @@ export function AtendInbox() {
   };
 
   return (
+    <RelogioEsperaProvider>
     <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
       <div className="flex h-full gap-2 overflow-hidden">
         {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
@@ -1301,6 +1302,7 @@ export function AtendInbox() {
         </DialogContent>
       </Dialog>
     </div>
+    </RelogioEsperaProvider>
   );
 }
 
