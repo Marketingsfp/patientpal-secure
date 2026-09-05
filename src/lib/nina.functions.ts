@@ -191,44 +191,27 @@ export const chatNina = createServerFn({ method: "POST" })
     // Até 6 rodadas: a Nina consulta/executa ferramentas e volta com a resposta.
     const MAX_RODADAS = data.modoVoz ? 3 : 6;
     for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          // No modo voz usamos um modelo mais rápido/barato para reduzir a espera.
-          model: data.modoVoz ? "google/gemini-3.1-flash-lite" : "google/gemini-2.5-flash",
-          ...(data.modoVoz ? { max_tokens: 220 } : {}),
-          tools: FERRAMENTAS_NINA,
-          messages: historico,
-        }),
+      // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
+      const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+      const resposta = await ninaAIGateway({
+        clinicaId: data.clinicaId,
+        perfil: data.modoVoz ? "voz" : "texto",
+        messages: historico as any,
+        tools: FERRAMENTAS_NINA,
+        ...(data.modoVoz ? { maxTokens: 220 } : {}),
       });
 
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        console.error("Nina AI error", res.status, body);
-        if (res.status === 429)
-          return { reply: "", error: "Limite de uso atingido. Tente em alguns segundos." };
-        if (res.status === 402)
-          return { reply: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
-        return { reply: "", error: `Falha na resposta da Nina (${res.status})` };
+      if (!resposta.ok) {
+        return { reply: "", error: resposta.erro ?? "Falha na resposta da Nina" };
       }
 
-      const json = (await res.json()) as {
-        choices?: Array<{
-          message?: { content?: string; tool_calls?: any[] };
-        }>;
-      };
-      const msg = json.choices?.[0]?.message;
-      const chamadas = msg?.tool_calls ?? [];
+      const chamadas = resposta.toolCalls ?? [];
 
       if (chamadas.length === 0) {
-        return { reply: (msg?.content ?? "").trim(), error: null as string | null };
+        return { reply: resposta.conteudo, error: null as string | null };
       }
 
-      historico.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
+      historico.push({ role: "assistant", content: resposta.conteudo || null, tool_calls: chamadas });
       for (const c of chamadas) {
         let resultado: unknown;
         try {
@@ -236,8 +219,8 @@ export const chatNina = createServerFn({ method: "POST" })
             supabase,
             userId,
             data.clinicaId,
-            c.function?.name,
-            c.function?.arguments,
+            c.function?.name ?? "",
+            c.function?.arguments ?? "{}",
           );
         } catch (e) {
           resultado = { erro: e instanceof Error ? e.message : "falha na ferramenta" };

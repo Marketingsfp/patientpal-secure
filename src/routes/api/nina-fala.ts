@@ -22,7 +22,7 @@ import { z } from "zod";
  * - `{ type: "erro", mensagem }`
  */
 
-const MODELO_TEXTO = "google/gemini-3.1-flash-lite";
+// Modelo de texto agora vem do Nina AI Gateway (src/lib/nina/modelo-flag.server.ts).
 /** TTS mais leve do catálogo = primeiro pedaço de áudio mais rápido. */
 const MODELO_VOZ = "google/gemini-3.1-flash-tts-preview";
 const VOZ = "Leda";
@@ -156,23 +156,25 @@ export const Route = createFileRoute("/api/nina-fala")({
             };
 
             try {
-              const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: MODELO_TEXTO,
-                  stream: true,
-                  max_tokens: 220,
-                  messages: [{ role: "system", content: systemPrompt }, ...body.messages],
-                }),
+              // Streaming também passa pelo adapter do Nina AI Gateway.
+              const { chamarModeloGeminiStream } = await import(
+                "@/lib/nina/adapters/gemini-adapter.server"
+              );
+              const { modeloNinaParaClinica } = await import("@/lib/nina/modelo-flag.server");
+              const { modelo } = await modeloNinaParaClinica(body.clinicaId, "voz");
+              const stream0 = await chamarModeloGeminiStream({
+                modelo,
+                maxTokens: 220,
+                messages: [{ role: "system", content: systemPrompt }, ...body.messages],
               });
-              if (!res.ok || !res.body) {
-                enviar({ type: "erro", mensagem: `Falha na resposta da Nina (${res.status})` });
+              if (!stream0.ok || !stream0.res?.body) {
+                enviar({ type: "erro", mensagem: stream0.erro ?? "Falha na resposta da Nina" });
                 controller.close();
                 return;
               }
+              const res = stream0.res;
 
-              const leitor = res.body.pipeThrough(new TextDecoderStream()).getReader();
+              const leitor = res.body!.pipeThrough(new TextDecoderStream()).getReader();
               let buf = "";
               let pendente = "";
               let primeira = true;

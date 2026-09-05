@@ -1041,29 +1041,20 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
     /(estou|vou|irei)\s+agend|agendando|agendei|agendada|agendado|marcada|marquei|reserv(ei|ada)|confirmad[oa]\s+(seu|sua)\s+(consulta|agendamento|hor[áa]rio)/i;
   const MAX_RODADAS = podeAgendar ? 6 : 3;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        ...(ferramentas ? { tools: ferramentas } : {}),
-        messages: mensagens,
-      }),
+    // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
+    const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
+    const respostaIA = await ninaAIGateway({
+      clinicaId,
+      perfil: "whatsapp",
+      messages: mensagens as never,
+      ...(ferramentas ? { tools: ferramentas as readonly unknown[] } : {}),
     });
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error("Nina WhatsApp AI error", res.status, body);
-      throw new Error(`Falha IA (${res.status})`);
+    if (!respostaIA.ok) {
+      throw new Error(respostaIA.erro ?? "Falha IA");
     }
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string; tool_calls?: MsgIA["tool_calls"] } }>;
-    };
-    const msg = json.choices?.[0]?.message;
-    const chamadas = msg?.tool_calls ?? [];
+    const msg = { content: respostaIA.conteudo, tool_calls: respostaIA.toolCalls };
+    const chamadas = msg.tool_calls ?? [];
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
