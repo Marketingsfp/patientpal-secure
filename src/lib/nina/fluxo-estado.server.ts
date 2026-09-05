@@ -31,7 +31,23 @@ export type EtapaFluxoNina =
   | "AWAITING_PATIENT_DATA"
   | "REVALIDATING_SLOT"
   | "APPOINTMENT_FAILED"
-  | "BOOKED";
+  | "BOOKED"
+  // Fase 6 — máquina de estados explícita do novo fluxo de atendimento.
+  // Os nomes acima continuam válidos (histórico gravado em conversas antigas).
+  | "GREETING"
+  | "INTENT_IDENTIFICATION"
+  | "INFORMATION_RESPONSE"
+  | "BOOKING_INTENT_PENDING"
+  | "COLLECTING_PATIENT_DATA"
+  | "COLLECTING_BOOKING_PREFERENCES"
+  | "CHECKING_AVAILABILITY"
+  | "WAITING_SLOT_SELECTION"
+  | "WAITING_FINAL_CONFIRMATION"
+  | "CREATING_APPOINTMENT"
+  | "APPOINTMENT_CONFIRMED"
+  | "HANDOFF"
+  | "COMPLETED";
+
 
 export type EstadoFluxoNina = {
   patient: {
