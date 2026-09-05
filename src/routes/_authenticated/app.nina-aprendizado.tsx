@@ -988,6 +988,130 @@ function Pagina() {
         </Card>
       )}
 
+      {/* Histórico de versões e reversão */}
+      <Dialog open={!!historico} onOpenChange={(o) => !o && setHistorico(null)}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Histórico da correção</DialogTitle>
+            <DialogDescription>
+              Cada alteração guarda valor anterior, valor novo, motivo, quem reportou, quem aprovou,
+              quem aplicou e a data. Conhecimento corrigido não garante comportamento corrigido:
+              use o teste para conferir.
+            </DialogDescription>
+          </DialogHeader>
+          {carregandoHistorico ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : !historico?.versoes.length ? (
+            <p className="text-sm text-muted-foreground">Nenhuma versão registrada para este item.</p>
+          ) : (
+            <ul className="space-y-3">
+              {historico.versoes.map((v) => (
+                <li key={v.id} className="rounded-md border border-border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">v{v.versao}</Badge>
+                    <Badge variant="outline">
+                      {ROTULO_CAMADA[v.camada as keyof typeof ROTULO_CAMADA] ?? v.camada}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {ROTULO_ACAO[v.tipo as keyof typeof ROTULO_ACAO] ?? v.tipo}
+                    </Badge>
+                    {v.status === "reverted" ? (
+                      <Badge variant="destructive">Revertida</Badge>
+                    ) : v.teste_status === "validado" ? (
+                      <Badge>✓ Correção validada</Badge>
+                    ) : v.teste_status === "falhou" ? (
+                      <Badge variant="destructive">⚠ Nina continua respondendo incorretamente</Badge>
+                    ) : (
+                      <Badge variant="outline">Teste pendente</Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">{fmtData(v.created_at)}</span>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-md bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-muted-foreground">Valor anterior</p>
+                      <p className="whitespace-pre-wrap text-sm">{v.valor_anterior ?? "—"}</p>
+                    </div>
+                    <div className="rounded-md bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-muted-foreground">Valor novo</p>
+                      <p className="whitespace-pre-wrap text-sm">{v.valor_novo ?? "—"}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Motivo: {v.motivo ?? "—"} · Reportou: {pessoas[v.reportado_por ?? ""] ?? "—"} ·
+                    Aprovou: {pessoas[v.aprovado_por ?? ""] ?? "—"} · Aplicou:{" "}
+                    {pessoas[v.aplicado_por] ?? "—"}
+                    {v.kb_versao_anterior || v.kb_versao_nova
+                      ? ` · Planilha v${v.kb_versao_anterior ?? "?"} → v${v.kb_versao_nova ?? "?"}`
+                      : ""}
+                  </p>
+                  {v.teste_resposta && (
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+                      Resposta encontrada no teste: {v.teste_resposta}
+                    </p>
+                  )}
+                  {v.status === "reverted" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Revertida em {v.revertido_em ? fmtData(v.revertido_em) : "—"} · Motivo:{" "}
+                      {v.motivo_reversao ?? "—"}
+                    </p>
+                  )}
+                  {podeRevisar && v.status !== "reverted" && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" disabled={salvando} onClick={() => void rodarTeste(v)}>
+                        Testar novamente
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={salvando}
+                        onClick={() => {
+                          setRevertendo(v);
+                          setMotivoReversao("");
+                        }}
+                      >
+                        Reverter alteração
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reverter alteração */}
+      <Dialog open={!!revertendo} onOpenChange={(o) => !o && setRevertendo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reverter alteração</DialogTitle>
+            <DialogDescription>
+              A versão anterior volta a valer. Quando a correção era da planilha, a versão anterior
+              do arquivo oficial é reativada e a busca é atualizada (blocos, embeddings, índices e
+              cache). O item volta para investigação.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={motivoReversao}
+            onChange={(e) => setMotivoReversao(e.target.value)}
+            placeholder="Motivo da reversão (obrigatório)"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertendo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={salvando || motivoReversao.trim().length < 3}
+              onClick={() => void confirmarReversao()}
+            >
+              Reverter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Aplicar correção */}
       <Dialog open={!!aplicando} onOpenChange={(o) => !o && setAplicando(null)}>
         <DialogContent className="max-w-2xl">
