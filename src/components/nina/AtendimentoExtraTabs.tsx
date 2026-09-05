@@ -1105,7 +1105,7 @@ export function AtendInbox() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
                   {statusBadge(c.status)}
                   {c.owner_type === "NONE" && (
                     <Badge className="bg-atd-danger text-atd-on-strong text-[11px]">🔴 Não atribuída</Badge>
@@ -1140,10 +1140,10 @@ export function AtendInbox() {
                   )}
                   <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
-                <div className="text-xs text-muted-foreground truncate mt-1">
+                <div className="mt-1 min-h-[16px] truncate text-xs text-muted-foreground">
                   {c.ultima_msg_preview || "—"}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
+                <div className="mt-0.5 min-h-[14px] text-[11px] text-muted-foreground">
                   {fmtData(c.ultima_msg_em)}
                 </div>
               </button>
