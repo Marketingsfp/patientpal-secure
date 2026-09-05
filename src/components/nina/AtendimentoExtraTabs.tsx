@@ -291,7 +291,7 @@ export function AtendInbox() {
   }, [manualOffline, pausaAtiva, OCIOSO_MS]);
 
   useEffect(() => {
-    if (!clinicaId) return;
+    if (!clinicaId || !statusCarregado) return;
     const bater = () => {
       presencaFn({
         data: {
