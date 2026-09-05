@@ -8,7 +8,18 @@
  * Os filtros são aplicados no backend; o frontend nunca recebe conversas de
  * outro atendente para depois escondê-las.
  */
-export type EscopoInbox = "minhas" | "nina" | "nao_atribuidas" | "fechadas" | "todas";
+export type EscopoInbox = "minhas" | "nina" | "nao_atribuidas" | "fechadas" | "equipe";
+
+/**
+ * "todas" era o nome antigo da visão de supervisão. Continua aceito na
+ * entrada para não quebrar telas/links antigos, mas o nome oficial é
+ * "equipe" (Todas da equipe).
+ */
+export function normalizarEscopo(valor: string | null | undefined): EscopoInbox {
+  if (valor === "todas") return "equipe";
+  const validos: EscopoInbox[] = ["minhas", "nina", "nao_atribuidas", "fechadas", "equipe"];
+  return validos.includes(valor as EscopoInbox) ? (valor as EscopoInbox) : ESCOPO_INBOX_PADRAO;
+}
 
 /** Estados considerados "conversa encerrada" pelo filtro Fechadas. */
 export const STATUS_FECHADOS = ["closed", "finished"] as const;
@@ -22,7 +33,7 @@ export interface ConversaEscopo {
 }
 
 export type FiltroEscopo =
-  | { tipo: "todas" }
+  | { tipo: "equipe" }
   | { tipo: "atribuida"; userId: string }
   | { tipo: "sem_responsavel" }
   | { tipo: "nina" }
@@ -33,7 +44,9 @@ export type FiltroEscopo =
  * outro usuário cai de volta para "minhas conversas".
  */
 export function escopoEfetivo(escopo: EscopoInbox, gestor: boolean): EscopoInbox {
-  if (escopo === "todas" && !gestor) return "minhas";
+  // "Equipe" é visão de supervisão: sem permissão de gestão, o usuário volta
+  // para a própria Inbox. A checagem vale no backend, não só na tela.
+  if (escopo === "equipe" && !gestor) return "minhas";
   return escopo;
 }
 
@@ -45,8 +58,8 @@ export function filtroEscopoInbox(args: {
 }): FiltroEscopo {
   const efetivo = escopoEfetivo(args.escopo, args.gestor);
   switch (efetivo) {
-    case "todas":
-      return { tipo: "todas" };
+    case "equipe":
+      return { tipo: "equipe" };
     case "nao_atribuidas":
       return { tipo: "sem_responsavel" };
     case "nina":
@@ -71,7 +84,12 @@ export function conversaEstaFechada(conversa: ConversaEscopo): boolean {
  */
 export function escopoEscondeFechadas(escopo: EscopoInbox, gestor: boolean): boolean {
   const efetivo = escopoEfetivo(escopo, gestor);
-  return efetivo === "minhas" || efetivo === "nina" || efetivo === "nao_atribuidas";
+  return (
+    efetivo === "minhas" ||
+    efetivo === "nina" ||
+    efetivo === "nao_atribuidas" ||
+    efetivo === "equipe"
+  );
 }
 
 /** Mesma regra em forma pura, usada nos testes e em conferências locais. */
@@ -84,7 +102,7 @@ export function conversaVisivelNoEscopo(
     return false;
   }
   switch (filtro.tipo) {
-    case "todas":
+    case "equipe":
       return true;
     case "sem_responsavel":
       return !conversa.atribuida_user_id && conversa.owner_type !== "AI";

@@ -71,12 +71,12 @@ describe("escopo da Inbox", () => {
   });
 
   it("atendente comum não consegue ver todas: cai para Minhas conversas", () => {
-    expect(escopoEfetivo("todas", false)).toBe("minhas");
-    expect(visiveis(jean, "todas", false)).toEqual(["j1", "j2"]);
+    expect(escopoEfetivo("equipe", false)).toBe("minhas");
+    expect(visiveis(jean, "equipe", false)).toEqual(["j1", "j2"]);
   });
 
   it("gestor pode ver todas as conversas da clínica", () => {
-    expect(visiveis(jean, "todas", true).length).toBe(conversas.length);
+    expect(visiveis(jean, "equipe", true).length).toBe(conversas.length);
   });
 
   it("descreve o filtro aplicado no banco", () => {
@@ -90,8 +90,8 @@ describe("escopo da Inbox", () => {
     expect(filtroEscopoInbox({ escopo: "nina", userId: jean, gestor: false })).toEqual({
       tipo: "nina",
     });
-    expect(filtroEscopoInbox({ escopo: "todas", userId: jean, gestor: true })).toEqual({
-      tipo: "todas",
+    expect(filtroEscopoInbox({ escopo: "equipe", userId: jean, gestor: true })).toEqual({
+      tipo: "equipe",
     });
   });
 });

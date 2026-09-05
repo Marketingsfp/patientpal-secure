@@ -264,7 +264,7 @@ export function AtendInbox() {
     nina: 0,
     nao_atribuidas: 0,
     fechadas: 0,
-    todas: 0,
+    equipe: 0,
   });
   const soNaoAtribuidas = escopo === "nao_atribuidas";
   const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
@@ -612,7 +612,7 @@ export function AtendInbox() {
         nina: r?.nina ?? 0,
         nao_atribuidas: r?.nao_atribuidas ?? 0,
         fechadas: r?.fechadas ?? 0,
-        todas: r?.todas ?? 0,
+        equipe: r?.equipe ?? 0,
       });
     } catch {
       /* contadores são informativos; falha não bloqueia a lista */
@@ -1579,7 +1579,7 @@ export function AtendInbox() {
                 </SelectItem>
                 <SelectItem value="fechadas">Fechadas ({contadores.fechadas})</SelectItem>
                 {souGestor && (
-                  <SelectItem value="todas">Todas da clínica ({contadores.todas})</SelectItem>
+                  <SelectItem value="equipe">Equipe ({contadores.equipe})</SelectItem>
                 )}
               </SelectContent>
             </Select>
