@@ -180,7 +180,7 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
       .insert({
         clinica_id: data.clinicaId,
         feedback_id: data.id,
-        root_cause: fb.root_cause,
+        root_cause: fb.root_cause as string,
         camada: plano.camada,
         tipo: plano.tipo,
         titulo: plano.titulo,
