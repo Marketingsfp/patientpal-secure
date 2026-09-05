@@ -164,7 +164,7 @@ export function baseJaContem(
   // números costumam ser o dado decisivo (valores, por exemplo)
   const numeros = b.match(/\d+/g);
   if (numeros && numeros.length) {
-    const aNum = a.match(/\d+/g) ?? [];
+    const aNum: string[] = a.match(/\d+/g) ?? [];
     return numeros.every((n) => aNum.includes(n));
   }
   return false;
