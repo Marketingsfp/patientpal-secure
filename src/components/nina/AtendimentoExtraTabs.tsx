@@ -1169,13 +1169,20 @@ export function AtendInbox() {
 
               <button
                 key={c.id}
-                onClick={() => setSel(c)}
+                onClick={() => {
+                  medidor.current = criarMedidorConversa(`conversa ${c.id}`);
+                  medidor.current.marcar("click");
+                  setSel(c);
+                }}
+                onMouseEnter={() => prefetchConversa(c.id)}
+                onFocus={() => prefetchConversa(c.id)}
                 className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
                   sel?.id === c.id
                     ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
                     : "bg-atd-surface"
                 }`}
               >
+
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm truncate flex-1">
                     {c.contato_nome || c.contato_telefone || "—"}
