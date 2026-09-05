@@ -527,6 +527,21 @@ export const travarMinhaFila = createServerFn({ method: "POST" })
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
+    // A presença é a fonte da verdade da distribuição: fechar a fila precisa
+    // derrubar o "ONLINE", senão o atendente continua recebendo conversas
+    // mesmo aparecendo como offline na tela (e quem não está em nenhum
+    // departamento não tinha nenhum bloqueio aplicado).
+    const { error: eP } = await context.supabase.from("atend_agente_presenca").upsert(
+      {
+        clinica_id: data.clinicaId,
+        user_id: context.userId,
+        status: data.travada ? "OFFLINE" : "ONLINE",
+        aceita_novas: !data.travada,
+        visto_em: new Date().toISOString(),
+      },
+      { onConflict: "clinica_id,user_id" },
+    );
+    if (eP) throw new Error(eP.message);
     return { ok: true };
   });
 
@@ -535,16 +550,29 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { data: rows } = await context.supabase
-      .from("atend_departamento_membros")
-      .select("queue_locked")
-      .eq("clinica_id", data.clinicaId)
-      .eq("user_id", context.userId);
-    // se está em algum departamento e em ao menos um a fila está aberta, considera aberta
+    const [{ data: rows }, { data: pres }] = await Promise.all([
+      context.supabase
+        .from("atend_departamento_membros")
+        .select("queue_locked")
+        .eq("clinica_id", data.clinicaId)
+        .eq("user_id", context.userId),
+      context.supabase
+        .from("atend_agente_presenca")
+        .select("status, aceita_novas")
+        .eq("clinica_id", data.clinicaId)
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+    ]);
     const total = rows?.length ?? 0;
-    const abertas = (rows ?? []).filter((r: any) => !r.queue_locked).length;
-    return { isMember: total > 0, filaAberta: abertas > 0, totalDeptos: total };
+    // Fonte da verdade: a presença registrada. Só cai no critério antigo
+    // (departamentos) quando ainda não existe presença gravada.
+    const presencaStatus = (pres?.status as string | undefined) ?? null;
+    const filaAberta = presencaStatus
+      ? presencaStatus === "ONLINE" && pres?.aceita_novas !== false
+      : (rows ?? []).some((r: any) => !r.queue_locked);
+    return { isMember: total > 0, filaAberta, totalDeptos: total, presencaStatus };
   });
+
 
 /* =========================================================
  *  BASE DE CONHECIMENTO
