@@ -67,6 +67,17 @@ import {
   consultarBaseFeedbackNina,
   salvarDiagnosticoFeedbackNina,
 } from "@/lib/nina/feedback-diagnostico.functions";
+import {
+  ROTULO_ACAO,
+  ROTULO_CAMADA,
+  type PlanoCorrecao,
+} from "@/lib/nina/feedback-aplicacao";
+import {
+  aplicarFeedbackNina,
+  concluirAcaoFeedbackNina,
+  listarAcoesFeedbackNina,
+  prepararAplicacaoFeedbackNina,
+} from "@/lib/nina/feedback-aplicacao.functions";
 
 export const Route = createFileRoute("/_authenticated/app/nina-aprendizado")({
   head: () => ({
