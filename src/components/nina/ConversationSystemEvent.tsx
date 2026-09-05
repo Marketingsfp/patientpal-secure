@@ -49,6 +49,8 @@ export function textoEvento(ev: ConversaEvento): string {
       return "Nina solicitou atendimento humano";
     case "ENTROU_NA_FILA":
       return "Conversa entrou na fila de atendimento";
+    case "RESUMO_IA_GERADO":
+      return "Resumo interno da Nina gerado para o atendimento";
     case "IA_SILENCIADA":
       return "IA pausada nesta conversa";
     default:
