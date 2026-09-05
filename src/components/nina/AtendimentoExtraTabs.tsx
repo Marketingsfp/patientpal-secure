@@ -106,6 +106,7 @@ import {
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
+  souGestorAtendimento,
   listarMensagensConversa,
   enviarMensagemConversa,
   obterDadosContato,
@@ -160,6 +161,7 @@ import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -184,6 +186,7 @@ export function AtendInbox() {
   const clinicaId = clinicaAtual?.clinica_id;
 
   const listarConvs = useServerFn(listarConversas);
+  const souGestorFn = useServerFn(souGestorAtendimento);
   const listarMsgs = useServerFn(listarMensagensConversa);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
@@ -235,8 +238,12 @@ export function AtendInbox() {
   const [filtroStatus, setFiltroStatus] = useState<
     "all" | "active" | "waiting" | "closed" | "bot_attending"
   >("all");
-  // Filtro "somente sem atendente" — acionado pelo alerta do cabeçalho.
-  const [soNaoAtribuidas, setSoNaoAtribuidas] = useState(false);
+  // Escopo da Inbox: por padrão "Minhas conversas" (somente as atribuídas ao
+  // atendente logado). O filtro é aplicado no backend.
+  const [escopo, setEscopo] = useState<EscopoInbox>(ESCOPO_INBOX_PADRAO);
+  const [souGestor, setSouGestor] = useState(false);
+  const soNaoAtribuidas = escopo === "nao_atribuidas";
+  const setSoNaoAtribuidas = (v: boolean) => setEscopo(v ? "nao_atribuidas" : ESCOPO_INBOX_PADRAO);
   // Filtro "somente espera crítica" — acionado pela Central de Atenção.
   const [soCriticas, setSoCriticas] = useState(false);
   // Ordenação da lista: recentes (padrão) ou quem espera há mais tempo.
@@ -266,7 +273,7 @@ export function AtendInbox() {
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
-    let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
+    let base = convs;
     if (soCriticas) {
       base = base.filter(
         (c: any) => faixaEsperaAtd(minutosDesde(espera[c.id])) === "critico",
@@ -556,6 +563,29 @@ export function AtendInbox() {
     }
   };
 
+  // Perfil de gestor: só ele enxerga a opção "Todas da clínica".
+  useEffect(() => {
+    let vivo = true;
+    if (!clinicaId) return;
+    souGestorFn({ data: { clinicaId } })
+      .then((r: any) => {
+        if (vivo) setSouGestor(!!r?.gestor);
+      })
+      .catch(() => {
+        if (vivo) setSouGestor(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [clinicaId, souGestorFn]);
+
+  // Trocar de escopo recomeça a lista: nada de mesclar conversas de escopos
+  // diferentes (uma conversa de outro atendente jamais "sobra" na tela).
+  useEffect(() => {
+    seqConvs.current++;
+    setConvs([]);
+  }, [escopo]);
+
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
@@ -566,6 +596,7 @@ export function AtendInbox() {
           status: filtroStatus,
           busca: busca || undefined,
           canal: "todos",
+          escopo,
           limit: 200,
         },
       }));
@@ -591,7 +622,7 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, listarConvs, sel]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel]);
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
@@ -1448,6 +1479,21 @@ export function AtendInbox() {
               />
             </div>
             <Select
+              value={escopo}
+              onValueChange={(v) => setEscopo(v as EscopoInbox)}
+              onOpenChange={setPainelMenuAberto}
+            >
+              <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                <SelectItem value="minhas">Minhas conversas</SelectItem>
+                <SelectItem value="nao_atribuidas">Não atribuídas</SelectItem>
+                <SelectItem value="nina">Nina</SelectItem>
+                {souGestor && <SelectItem value="todas">Todas da clínica (gestor)</SelectItem>}
+              </SelectContent>
+            </Select>
+            <Select
               value={filtroStatus}
               onValueChange={(v) => setFiltroStatus(v as any)}
               onOpenChange={setPainelMenuAberto}
@@ -1483,7 +1529,7 @@ export function AtendInbox() {
                 className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
                 title="Mostrar todas as conversas"
               >
-                Só não atribuídas ({convsVisiveis.length}) ✕
+                Não atribuídas ({convsVisiveis.length}) ✕
               </button>
             )}
 
