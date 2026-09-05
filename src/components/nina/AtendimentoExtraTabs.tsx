@@ -166,9 +166,17 @@ import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
-  selecaoSaiuDoEscopo,
   type LinhaInbox,
 } from "@/lib/atendimento/inbox-realtime";
+import {
+  ajustarContadorAtual,
+  chaveInbox,
+  filtrarPorEscopo,
+  idsQueSairam,
+  selecaoDeveSair,
+  type ContadoresInbox,
+} from "@/lib/atendimento/inbox-cache";
+
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
