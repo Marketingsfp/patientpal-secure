@@ -32,7 +32,7 @@ export type PedidoNina = {
   clinicaId: string | null;
   perfil: PerfilNina;
   messages: ChatMensagem[];
-  tools?: unknown[];
+  tools?: readonly unknown[];
   maxTokens?: number;
   /** Sobrescreve o modelo (uso pontual, ex.: rotinas administrativas). */
   modeloForcado?: string;

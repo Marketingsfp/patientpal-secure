@@ -219,8 +219,8 @@ export const chatNina = createServerFn({ method: "POST" })
             supabase,
             userId,
             data.clinicaId,
-            c.function?.name,
-            c.function?.arguments,
+            c.function?.name ?? "",
+            c.function?.arguments ?? "{}",
           );
         } catch (e) {
           resultado = { erro: e instanceof Error ? e.message : "falha na ferramenta" };

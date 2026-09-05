@@ -21,7 +21,7 @@ export type ChatMensagem = {
 export type OpcoesChamada = {
   modelo: string;
   messages: ChatMensagem[];
-  tools?: unknown[];
+  tools?: readonly unknown[];
   maxTokens?: number;
   /** Reservado para a Fase 2 (LOW/MEDIUM/HIGH). Não usado nesta fase. */
   reasoning?: "none" | "low" | "medium" | "high";
