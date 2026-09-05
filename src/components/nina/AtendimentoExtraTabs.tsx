@@ -138,6 +138,13 @@ import {
   cursorMaisAntigo,
 } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
+import {
+  acaoPermitida,
+  gravarRascunho,
+  lerRascunho,
+  limparRascunho,
+  type Rascunhos,
+} from "@/lib/atendimento/rascunhos-conversa";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -275,7 +282,21 @@ export function AtendInbox() {
   }, []);
 
 
-  const [draft, setDraft] = useState("");
+  // Rascunho por conversa: o texto digitado para um paciente nunca aparece
+  // no campo de outro.
+  const [rascunhos, setRascunhos] = useState<Rascunhos>({});
+  const draft = lerRascunho(rascunhos, sel?.id ?? null);
+  const setDraft = useCallback(
+    (valor: string | ((anterior: string) => string)) => {
+      const id = selIdRef.current;
+      setRascunhos((prev) => {
+        const atual = lerRascunho(prev, id);
+        const texto = typeof valor === "function" ? valor(atual) : valor;
+        return texto ? gravarRascunho(prev, id, texto) : limparRascunho(prev, id);
+      });
+    },
+    [],
+  );
   const [enviando, setEnviando] = useState(false);
   const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
@@ -1003,6 +1024,11 @@ export function AtendInbox() {
   const enviar = async () => {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
+    // A ação só vale para a conversa que está de fato aberta e carregada.
+    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa })) {
+      toast.error("Carregando a conversa. Tente novamente em instantes.");
+      return;
+    }
     if (motivoBloqueio) {
       toast.error(motivoBloqueio);
       return;
@@ -1034,6 +1060,16 @@ export function AtendInbox() {
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!sel || !clinicaId) return;
+    if (
+      !acaoPermitida({
+        alvo: sel.id,
+        selecionadaAgora: selIdRef.current,
+        carregando: carregandoConversa,
+      })
+    ) {
+      toast.error("Carregando a conversa. Tente novamente em instantes.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
@@ -1053,6 +1089,16 @@ export function AtendInbox() {
   const fechar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!sel || !clinicaId) return;
+    if (
+      !acaoPermitida({
+        alvo: sel.id,
+        selecionadaAgora: selIdRef.current,
+        carregando: carregandoConversa,
+      })
+    ) {
+      toast.error("Carregando a conversa. Tente novamente em instantes.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     try {
       await fecharFn({
