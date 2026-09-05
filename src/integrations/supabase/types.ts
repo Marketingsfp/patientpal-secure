@@ -994,11 +994,15 @@ export type Database = {
           clinica_id: string
           conversa_id: string
           created_at: string
+          desfecho: string | null
           erro: string | null
           handoff_em: string
           id: string
           motivo: string | null
           payload: Json | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          situacao: string
           status: string
           updated_at: string
           versao: number
@@ -1007,11 +1011,15 @@ export type Database = {
           clinica_id: string
           conversa_id: string
           created_at?: string
+          desfecho?: string | null
           erro?: string | null
           handoff_em: string
           id?: string
           motivo?: string | null
           payload?: Json | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          situacao?: string
           status?: string
           updated_at?: string
           versao?: number
@@ -1020,11 +1028,15 @@ export type Database = {
           clinica_id?: string
           conversa_id?: string
           created_at?: string
+          desfecho?: string | null
           erro?: string | null
           handoff_em?: string
           id?: string
           motivo?: string | null
           payload?: Json | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          situacao?: string
           status?: string
           updated_at?: string
           versao?: number
