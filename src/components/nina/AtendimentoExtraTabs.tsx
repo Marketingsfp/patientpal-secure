@@ -1034,6 +1034,7 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={!!responsavelId && !souResponsavel}
                       className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                       onClick={() => setTransferOpen(true)}
                     >
@@ -1043,6 +1044,7 @@ export function AtendInbox() {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={!souResponsavel}
                         className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
                         onClick={() => setFecharOpen(true)}
                       >

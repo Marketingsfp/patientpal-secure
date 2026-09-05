@@ -255,6 +255,15 @@ export const fecharConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    // Só o responsável atual encerra (evita encerrar atendimento de outra pessoa).
+    const { data: dono } = await context.supabase
+      .from("atend_conversas")
+      .select("atribuida_user_id")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (dono?.atribuida_user_id && dono.atribuida_user_id !== context.userId)
+      throw new Error("Esta conversa está com outro atendente. Assuma antes de encerrar.");
     const { data: prot } = await context.supabase.rpc("atend_gerar_protocolo", {
       _clinica_id: data.clinicaId,
     });
