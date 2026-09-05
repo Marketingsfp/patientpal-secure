@@ -1267,7 +1267,12 @@ export function AtendInbox() {
                       : "Sem responsável. Assuma para responder."}
                 </span>
               </div>
-              <div className="flex-1 overflow-auto p-4 space-y-2 bg-atd-bg">
+              <div className="relative flex-1 min-h-0">
+              <div
+                ref={chat.containerRef}
+                className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
+              >
+
                 {clinicaId && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
