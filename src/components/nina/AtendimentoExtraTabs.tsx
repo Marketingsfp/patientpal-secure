@@ -806,6 +806,8 @@ export function AtendInbox() {
 
   const motivoBloqueio = !sel
     ? null
+    : carregandoConversa
+      ? "Carregando conversa…"
     : conversaEncerrada
       ? "Conversa encerrada. Não é possível enviar mensagens."
       : responsavelId && !souResponsavel
