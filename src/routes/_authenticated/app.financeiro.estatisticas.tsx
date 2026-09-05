@@ -62,10 +62,10 @@ function Page() {
   const [notasList, setNotasList] = useState<
     Array<{
       id: string;
-      numero: number | null;
-      serie: string | null;
+      numero: string | null;
+      tomador_nome: string | null;
       data_emissao: string;
-      valor: number;
+      valor_servicos: number;
       status: string;
     }>
   >([]);
@@ -100,10 +100,18 @@ function Page() {
           .lte("data", hoje)
           .order("data", { ascending: false })
           .limit(2000),
+        // Notas emitidas saem de `nfse`, que é onde o sistema grava a NFS-e de
+        // verdade. Antes vinham de `fin_notas_pacientes` — um cadastro manual
+        // que nunca foi usado (zero registros em produção), então este card
+        // batia zero mesmo com centenas de notas emitidas no mês.
+        // Conta só o status "emitida": cancelada não faturou e "erro" não
+        // chegou a existir na prefeitura. É o mesmo conjunto que a lista abaixo
+        // mostra, senão o número do card não bateria com o detalhamento.
         supabase
-          .from("fin_notas_pacientes")
+          .from("nfse")
           .select("id", { count: "exact", head: true })
           .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("status", "emitida")
           .gte("data_emissao", since)
           .lte("data_emissao", hoje),
         supabase
@@ -115,12 +123,17 @@ function Page() {
           .order("data", { ascending: false })
           .limit(5000),
         supabase
-          .from("fin_notas_pacientes")
-          .select("id, numero, serie, data_emissao, valor, status")
+          .from("nfse")
+          .select("id, numero, tomador_nome, data_emissao, valor_servicos, status")
           .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("status", "emitida")
           .gte("data_emissao", since)
           .lte("data_emissao", hoje)
-          .order("data_emissao", { ascending: false })
+          // `data_emissao` é uma data sem hora: os empates do mesmo dia voltam
+          // em ordem arbitrária. `created_at` (e o id no desempate) mantém a
+          // lista parada entre uma consulta e outra.
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .limit(1000),
       ]);
       let r = 0,
@@ -405,7 +418,7 @@ function Page() {
                             <TableRow>
                               <TableHead>Data</TableHead>
                               <TableHead>Número</TableHead>
-                              <TableHead>Série</TableHead>
+                              <TableHead>Tomador</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead className="text-right">Valor</TableHead>
                             </TableRow>
@@ -417,9 +430,11 @@ function Page() {
                                   {fmtDt(n.data_emissao)}
                                 </TableCell>
                                 <TableCell>{n.numero ?? "—"}</TableCell>
-                                <TableCell>{n.serie ?? "—"}</TableCell>
+                                <TableCell>{n.tomador_nome ?? "—"}</TableCell>
                                 <TableCell>{n.status}</TableCell>
-                                <TableCell className="text-right">{fmt(Number(n.valor))}</TableCell>
+                                <TableCell className="text-right">
+                                  {fmt(Number(n.valor_servicos))}
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

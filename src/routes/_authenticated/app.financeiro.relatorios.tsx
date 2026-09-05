@@ -208,8 +208,11 @@ const COLUNAS: Record<Exclude<Tipo, "rateio" | "movimentacao" | "sessoes">, Colu
   notas: [
     { chave: "data_emissao", rotulo: "Emissão", formato: "data" },
     { chave: "numero", rotulo: "Número", formato: "texto" },
-    { chave: "serie", rotulo: "Série", formato: "texto" },
-    { chave: "valor", rotulo: "Valor", formato: "moeda", somar: true },
+    // Substituiu "Série": na `nfse` a série vem sempre vazia, então a coluna
+    // saía com um traço em todas as linhas. O tomador é quem está impresso na
+    // nota e é por ele que o financeiro procura quando confere.
+    { chave: "tomador_nome", rotulo: "Tomador", formato: "texto" },
+    { chave: "valor_servicos", rotulo: "Valor", formato: "moeda", somar: true },
     { chave: "status", rotulo: "Status", formato: "texto" },
   ],
 };
@@ -1183,11 +1186,18 @@ function Page() {
             .order("data"),
         );
       } else {
+        // As notas vêm de `nfse`, onde o sistema grava a NFS-e de verdade.
+        // Antes vinham de `fin_notas_pacientes`, um cadastro manual que nunca
+        // foi usado (zero registros em produção): o relatório saía sempre em
+        // branco. Só as emitidas entram, porque a coluna Valor é somada no
+        // rodapé — cancelada não faturou e nota com erro nem chegou a existir
+        // na prefeitura, e as duas inflariam o total do mês.
         data = await fetchAll(() =>
           supabase
-            .from("fin_notas_pacientes")
-            .select("data_emissao, numero, serie, valor, status")
+            .from("nfse")
+            .select("data_emissao, numero, tomador_nome, valor_servicos, status")
             .eq("clinica_id", clinicaAtual.clinica_id)
+            .eq("status", "emitida")
             .gte("data_emissao", from)
             .lte("data_emissao", to)
             .order("data_emissao"),
