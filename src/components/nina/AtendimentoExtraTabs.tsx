@@ -128,6 +128,7 @@ import {
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
+import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -192,6 +193,9 @@ export function AtendInbox() {
   const selIdRef = useRef<string | null>(null);
   selIdRef.current = sel?.id ?? null;
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
+  // Enquanto a conversa selecionada não terminou de carregar, todas as ações
+  // dependentes do conversation_id ficam bloqueadas.
+  const carregandoConversa = !!sel?.id && !conteudoDaConversa;
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
@@ -803,6 +807,8 @@ export function AtendInbox() {
 
   const motivoBloqueio = !sel
     ? null
+    : carregandoConversa
+      ? "Carregando conversa…"
     : conversaEncerrada
       ? "Conversa encerrada. Não é possível enviar mensagens."
       : responsavelId && !souResponsavel
@@ -1236,7 +1242,7 @@ export function AtendInbox() {
                       <Button
                         size="sm"
                         variant="default"
-                        disabled={assumindo}
+                        disabled={assumindo || carregandoConversa}
                         className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
                         onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
                       >
@@ -1251,7 +1257,7 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="default"
-                      disabled={!souResponsavel || conversaEncerrada}
+                      disabled={!souResponsavel || conversaEncerrada || carregandoConversa}
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
                       onClick={() => setAgendaOpen(true)}
                     >
@@ -1263,7 +1269,7 @@ export function AtendInbox() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!!responsavelId && !souResponsavel}
+                      disabled={(!!responsavelId && !souResponsavel) || carregandoConversa}
                       className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                       onClick={() => setTransferOpen(true)}
                     >
@@ -1273,7 +1279,7 @@ export function AtendInbox() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!souResponsavel}
+                        disabled={!souResponsavel || carregandoConversa}
                         className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
                         onClick={() => setFecharOpen(true)}
                       >
@@ -1316,9 +1322,7 @@ export function AtendInbox() {
                 {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
-                {!conteudoDaConversa && (
-                  <p className="text-sm text-muted-foreground text-center">Abrindo conversa…</p>
-                )}
+                {!conteudoDaConversa && <ConversaSkeleton />}
                 {conteudoDaConversa && msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
@@ -1538,7 +1542,9 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contato || !conteudoDaConversa ? (
+            {carregandoConversa ? (
+              <ContatoSkeleton />
+            ) : !contato || !conteudoDaConversa ? (
               <p className="text-muted-foreground">—</p>
             ) : (
               <>
@@ -1651,7 +1657,7 @@ export function AtendInbox() {
                       size="sm"
                       variant="outline"
                       onClick={adicionarNota}
-                      disabled={!novaNota.trim()}
+                      disabled={!novaNota.trim() || carregandoConversa}
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
