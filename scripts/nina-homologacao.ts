@@ -218,13 +218,13 @@ async function main() {
   if (confirmouSemRegistro) alucinacoes.push(`confirmou agendamento sem registro: ${rFalha.texto.slice(0, 140)}`);
   check("Agenda: NÃO confirma sem registro real", !confirmouSemRegistro, rFalha.texto.slice(0, 120));
 
-  const vFalha = validarResultado("criar_agendamento", { ok: false, erro: "horário ocupado" });
+  const vFalha = validarResultado("agendar", { ok: false, erro: "horário ocupado" });
   check("Broker: falha de ferramenta não vira confirmação", vFalha.appointment_confirmed === false && vFalha.success === false);
-  const vOk = validarResultado("criar_agendamento", { ok: true, appointment_id: "ag-123" });
+  const vOk = validarResultado("agendar", { ok: true, appointment_id: "ag-123" });
   check("Broker: só resultado real confirma", vOk.appointment_confirmed === true);
-  const vSemId = validarResultado("criar_agendamento", { ok: true });
+  const vSemId = validarResultado("agendar", { ok: true });
   check("Broker: \"ok\" sem id de agendamento NÃO confirma", vSemId.appointment_confirmed === false);
-  const vDup = validarResultado("criar_agendamento", { ok: true, duplicado: true });
+  const vDup = validarResultado("agendar", { ok: true, duplicado: true });
   check("Broker: duplicado idempotente conta como confirmado", vDup.appointment_confirmed === true);
 
   // ---------- 4. CRM: dados reais, sem inventar paciente
@@ -258,9 +258,9 @@ async function main() {
   );
 
   // ---------- 6. Idempotência
-  const k1 = chaveIdempotencia("criar_agendamento", { paciente: "p1", data: "2026-09-08", hora: "09:20" });
-  const k2 = chaveIdempotencia("criar_agendamento", { hora: "09:20", data: "2026-09-08", paciente: "p1" });
-  const k3 = chaveIdempotencia("criar_agendamento", { paciente: "p1", data: "2026-09-08", hora: "14:40" });
+  const k1 = chaveIdempotencia("agendar", { paciente: "p1", data: "2026-09-08", hora: "09:20" });
+  const k2 = chaveIdempotencia("agendar", { hora: "09:20", data: "2026-09-08", paciente: "p1" });
+  const k3 = chaveIdempotencia("agendar", { paciente: "p1", data: "2026-09-08", hora: "14:40" });
   check("Idempotência: mesma intenção = mesma chave", k1 === k2);
   check("Idempotência: intenção diferente = chave diferente", k1 !== k3);
 
