@@ -62,6 +62,12 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // criar uma permissão nova que precisaria ser liberada perfil por perfil.
   "/app/tabela-valores": "consulta-rapida",
   "/app/nina": "nina",
+  // Telas de aprendizado/métricas da Nina. Sem estas entradas exatas o mapa
+  // devolvia `undefined` (a rota "/app/nina" não casa por prefixo com
+  // "/app/nina-..."), escondendo o menu e mostrando "Acesso negado" para
+  // gestor/supervisor — justamente quem revisa e aprova os erros reportados.
+  "/app/nina-aprendizado": "nina",
+  "/app/nina-metricas": "nina",
   "/app/configuracoes/respostas-rapidas": "nina",
   "/app/odontologia": "odontologia",
   "/app/odontologia/orcamentos": "odontologia",
