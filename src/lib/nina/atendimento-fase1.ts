@@ -38,7 +38,7 @@ const PADROES: Array<{ intencao: IntencaoNina; termos: RegExp }> = [
   { intencao: "documentos", termos: /\b(documento|documentos|rg|carteirinha|pedido medico|encaminhamento|o que levar|preciso levar)\b/ },
   { intencao: "endereco", termos: /\b(endereco|onde fica|localizacao|como chego|rua|bairro|mapa|referencia)\b/ },
   { intencao: "horario", termos: /\b(horario de funcionamento|que horas abre|que horas fecha|abre|fecha|atende ate|funciona)\b/ },
-  { intencao: "medico", termos: /\b(medico|medica|doutor|doutora|dr|dra|profissional|quem atende|quais medicos|especialista|ologista)\b/ },
+  { intencao: "medico", termos: /\b(medico|medica|doutor|doutora|dr|dra|profissional|quem atende|quais medicos|especialista)\b|[a-z]+ologista/ },
   { intencao: "exame", termos: /\b(exame|exames|ultrassom|ultrassonografia|raio ?x|rx|laboratorio|sangue|eletro|tomografia|resultado)\b/ },
   { intencao: "consulta", termos: /\b(consulta|consultar|avaliacao|retorno)\b/ },
   { intencao: "procedimento", termos: /\b(procedimento|cirurgia|curativo|aplicacao|injecao|vacina)\b/ },
