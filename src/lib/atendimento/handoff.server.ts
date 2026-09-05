@@ -424,13 +424,14 @@ export async function reabrirConversaPorMensagemPaciente(args: {
   const { ninaDesativadaNaClinica } = await import("@/lib/nina-desligada.server");
   const ninaOff = await ninaDesativadaNaClinica(args.clinicaId).catch(() => false);
   const { normalizarEstado } = await import("@/lib/nina/fluxo-estado.server");
-  const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
+  const { reabrirSessao } = await import("@/lib/nina/sessao");
 
   const agora = new Date().toISOString();
   const reabertas: Array<{ id: string }> = [];
 
   for (const alvo of alvos as Array<{ id: string; nina_fluxo_estado: unknown }>) {
-    const estado = encerrarEstadosTransacionais(normalizarEstado(alvo.nina_fluxo_estado));
+    // Nova sessão operacional: contexto recente pode continuar, operação antiga não.
+    const estado = reabrirSessao(normalizarEstado(alvo.nina_fluxo_estado), agora);
     const { data: ok } = await supabaseAdmin
       .from("atend_conversas")
       .update({
@@ -442,10 +443,16 @@ export async function reabrirConversaPorMensagemPaciente(args: {
         aguardando_desde: ninaOff ? agora : null,
         resolved_at: null,
         closed_at: null,
+        // Sem responsável humano herdado e sem prazos/resumos da sessão anterior.
+        handoff_resumo: null,
+        handoff_motivo: null,
+        handoff_em: null,
+        awaiting_patient_since: null,
+        patient_response_deadline: null,
         ultima_msg_em: agora,
         updated_at: agora,
         nina_fluxo_estado: { ...estado, updated_at: agora } as never,
-      })
+      } as never)
       .eq("id", alvo.id)
       .eq("clinica_id", args.clinicaId)
       // Trava de idempotência: se outra instância já reabriu, 0 linhas.
