@@ -1943,6 +1943,12 @@ export const assumirConversa = createServerFn({ method: "POST" })
     if (conv.atribuida_user_id === context.userId)
       return { ok: true as const, motivo: null, atribuidaUserId: context.userId, jaEra: true };
 
+    // A conversa passou para uma pessoa: nenhum prazo de espera da Nina
+    // continua valendo a partir daqui.
+    const { limparEsperaPaciente: limparEsperaAoAssumir } = await import(
+      "@/lib/nina/espera-paciente.server"
+    );
+
     if (conv.atribuida_user_id && !data.forcar)
       return {
         ok: false as const,
@@ -2017,6 +2023,8 @@ export const assumirConversa = createServerFn({ method: "POST" })
         motivo: data.motivo ?? "Tomada de atendimento",
       });
     }
+
+    await limparEsperaAoAssumir(data.clinicaId, data.conversaId);
 
     const { registrarEvento } = await import("@/lib/atendimento/handoff.server");
     await registrarEvento({

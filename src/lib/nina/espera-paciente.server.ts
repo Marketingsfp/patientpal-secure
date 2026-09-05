@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   avaliarEsperaPaciente,
   calcularPrazoEspera,
+  timeoutAindaValido,
   timeoutRespostaPacienteMinutos,
   type MotivoEspera,
 } from "./espera-paciente";
@@ -123,5 +124,35 @@ export async function registrarEsperaPorTelefone(args: {
     clinicaId: args.clinicaId,
     conversaId: (data as { id?: string } | null)?.id ?? null,
     resposta: args.resposta,
+  });
+}
+
+/**
+ * Relê o estado da conversa antes de qualquer ação por vencimento.
+ * Se o paciente respondeu (prazo limpo) ou uma pergunta nova criou outro
+ * ciclo, isto devolve `false` e nenhum job antigo mexe na conversa.
+ */
+export async function timeoutPendenteConfirmado(args: {
+  clinicaId: string;
+  conversaId: string;
+  deadlineEsperado?: string | null;
+  agora?: Date;
+}): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("patient_response_deadline, status")
+    .eq("id", args.conversaId)
+    .eq("clinica_id", args.clinicaId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const linha = data as { patient_response_deadline?: string | null; status?: string | null };
+  const encerrada = ["resolvida", "fechada", "closed", "resolved"].includes(
+    String(linha.status ?? "").toLowerCase(),
+  );
+  if (encerrada) return false;
+  return timeoutAindaValido({
+    deadlineAtual: linha.patient_response_deadline ?? null,
+    deadlineEsperado: args.deadlineEsperado ?? null,
+    agora: args.agora ?? new Date(),
   });
 }
