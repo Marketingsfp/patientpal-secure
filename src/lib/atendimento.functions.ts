@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   STATUS_FECHADOS,
   escopoEscondeFechadas,
+  normalizarEscopo,
   filtroEscopoInbox,
 } from "@/lib/atendimento/escopo-inbox";
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
@@ -82,7 +83,10 @@ export const listarConversas = createServerFn({ method: "POST" })
         canal: z.enum(["whatsapp", "instagram", "facebook", "webchat", "todos"]).default("todos"),
         // Escopo de visibilidade: por padrão o atendente vê só o que está
         // atribuído a ele agora. "todas" é privilégio de gestor/admin.
-        escopo: z.enum(["minhas", "nina", "nao_atribuidas", "fechadas", "todas"]).default("minhas"),
+        escopo: z
+          .enum(["minhas", "nina", "nao_atribuidas", "fechadas", "equipe", "todas"])
+          .default("minhas")
+          .transform((v) => normalizarEscopo(v)),
         limit: z.number().int().min(1).max(500).default(200),
       })
       .parse(i),
@@ -190,7 +194,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
       gestor
         ? base().in("status", [...STATUS_FECHADOS])
         : base().in("status", [...STATUS_FECHADOS]).eq("atribuida_user_id", context.userId),
-      gestor ? base() : Promise.resolve({ count: null } as { count: number | null }),
+      gestor ? abertas() : Promise.resolve({ count: null } as { count: number | null }),
     ]);
 
     return {
@@ -199,7 +203,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
       nina: nina.count ?? 0,
       nao_atribuidas: naoAtribuidas.count ?? 0,
       fechadas: fechadas.count ?? 0,
-      todas: todas.count ?? 0,
+      equipe: todas.count ?? 0,
     };
   });
 
