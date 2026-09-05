@@ -1,5 +1,8 @@
 import { normalizarTelefone } from "./telefone";
 
+/** FASE 4 — métrica: quantas aberturas ainda precisaram do lookup por telefone. */
+export const metricasContato = { lookupsTelefone: 0, aberturasPorVinculo: 0 };
+
 type Cliente = {
   from: (t: string) => any;
 };
