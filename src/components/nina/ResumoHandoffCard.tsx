@@ -10,6 +10,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { obterResumoHandoff } from "@/lib/atendimento/handoff-resumo.functions";
 import { blocosVisiveis, ROTULO_INTENCAO, type ResumoHandoff } from "@/lib/atendimento/handoff-resumo";
 import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
+import { marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
 
 
 type Linha = {
@@ -40,7 +41,11 @@ export function ResumoHandoffCard({
     async (forcar = false) => {
       setCarregando(true);
       try {
-        const r = (await obter({ data: { clinicaId, conversaId, forcar } })) as Linha;
+        const r = (await medirRequest(
+          "obterResumoHandoff",
+          obter({ data: { clinicaId, conversaId, forcar } }),
+        )) as Linha;
+        marcarTroca("T7_resumo");
         setLinha((anterior) => {
           if (anterior && r && anterior.versao !== r.versao) setAtualizado(true);
           return r;

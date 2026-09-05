@@ -138,6 +138,7 @@ import {
   cursorMaisAntigo,
 } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
+import { iniciarTroca, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -536,7 +537,7 @@ export function AtendInbox() {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
     try {
-      const rows = await listarConvs({
+      const rows = await medirRequest("listarConversas", listarConvs({
         data: {
           clinicaId,
           status: filtroStatus,
@@ -544,7 +545,7 @@ export function AtendInbox() {
           canal: "todos",
           limit: 200,
         },
-      });
+      }));
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
@@ -626,14 +627,29 @@ export function AtendInbox() {
     const pedido = ++seqConversa.current;
     const janela = janelaRef.current;
     medidor.current?.marcar("request");
+    marcarTroca("T2_requests");
     try {
       const [m, c, n, ev] = await Promise.all([
-        listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
-        obterContato({ data: { clinicaId, conversaId: alvo } }),
-        listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
-        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
-          () => [] as ConversaEvento[],
-        ),
+        medirRequest(
+          "listarMensagensConversa",
+          listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+        ).then((r) => {
+          marcarTroca("T4_mensagens");
+          return r;
+        }),
+        medirRequest(
+          "obterDadosContato",
+          obterContato({ data: { clinicaId, conversaId: alvo } }),
+        ).then((r) => {
+          marcarTroca("T3_conversa");
+          marcarTroca("T8_contato");
+          return r;
+        }),
+        medirRequest("listarNotas", listarNotasFn({ data: { clinicaId, conversaId: alvo } })),
+        medirRequest(
+          "listarEventosConversa",
+          listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
+        ).catch(() => [] as ConversaEvento[]),
       ]);
       if (
         !respostaAindaVale({
@@ -700,6 +716,7 @@ export function AtendInbox() {
   // é revalidado em segundo plano — nunca o conteúdo da conversa anterior.
   useEffect(() => {
     const id = sel?.id;
+    marcarTroca("T1_selecao");
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
@@ -817,9 +834,11 @@ export function AtendInbox() {
   useEffect(() => {
     if (!conteudoDaConversa) return;
     medidor.current?.marcar("render");
+    marcarTroca("T5_render");
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         medidor.current?.marcar("scroll");
+        marcarTroca("T6_scroll");
         medidor.current = null;
       });
     });
@@ -1326,6 +1345,7 @@ export function AtendInbox() {
               <button
                 key={c.id}
                 onClick={() => {
+                  iniciarTroca(c.id);
                   medidor.current = criarMedidorConversa(`conversa ${c.id}`);
                   medidor.current.marcar("click");
                   setSel(c);
