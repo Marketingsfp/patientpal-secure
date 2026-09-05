@@ -154,7 +154,17 @@ export const salvarDiagnosticoFeedbackNina = createServerFn({ method: "POST" })
     const prioridade = data.prioridade ?? prioridadeSugerida(data.rootCause, atual.categoria);
     const grupoChave = chaveAgrupamento(atual.categoria, data.assunto);
 
-    const patch: Record<string, unknown> = {
+    const patch: {
+      root_cause: string;
+      prioridade: string;
+      grupo_chave: string;
+      grupo_titulo: string;
+      diagnosticado_por: string;
+      diagnosticado_em: string;
+      knowledge_status?: string;
+      knowledge_snapshot?: unknown;
+      knowledge_consultado_em?: string;
+    } = {
       root_cause: data.rootCause,
       prioridade,
       grupo_chave: grupoChave,
@@ -162,15 +172,15 @@ export const salvarDiagnosticoFeedbackNina = createServerFn({ method: "POST" })
       diagnosticado_por: context.userId,
       diagnosticado_em: new Date().toISOString(),
     };
-    if (data.knowledgeStatus) patch["knowledge_status"] = data.knowledgeStatus;
+    if (data.knowledgeStatus) patch.knowledge_status = data.knowledgeStatus;
     if (data.snapshot) {
-      patch["knowledge_snapshot"] = data.snapshot;
-      patch["knowledge_consultado_em"] = new Date().toISOString();
+      patch.knowledge_snapshot = data.snapshot;
+      patch.knowledge_consultado_em = new Date().toISOString();
     }
 
     const { error } = await context.supabase
       .from("nina_feedback_erros")
-      .update(patch)
+      .update(patch as never)
       .eq("id", data.id)
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
