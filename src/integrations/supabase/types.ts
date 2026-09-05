@@ -1380,6 +1380,115 @@ export type Database = {
           },
         ]
       }
+      atend_resposta_favoritos: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          resposta_id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          resposta_id: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          resposta_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_resposta_favoritos_resposta_id_fkey"
+            columns: ["resposta_id"]
+            isOneToOne: false
+            referencedRelation: "atend_respostas_rapidas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_resposta_usos: {
+        Row: {
+          clinica_id: string
+          conversa_id: string | null
+          created_at: string
+          id: string
+          resposta_id: string | null
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          resposta_id?: string | null
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          resposta_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_resposta_usos_resposta_id_fkey"
+            columns: ["resposta_id"]
+            isOneToOne: false
+            referencedRelation: "atend_respostas_rapidas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atend_respostas_rapidas: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          clinica_id: string
+          comando: string
+          conteudo: string
+          created_at: string
+          created_by: string | null
+          escopo: string
+          id: string
+          nome: string
+          owner_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          clinica_id: string
+          comando: string
+          conteudo: string
+          created_at?: string
+          created_by?: string | null
+          escopo?: string
+          id?: string
+          nome: string
+          owner_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          clinica_id?: string
+          comando?: string
+          conteudo?: string
+          created_at?: string
+          created_by?: string | null
+          escopo?: string
+          id?: string
+          nome?: string
+          owner_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       atend_routing_rules: {
         Row: {
           ativo: boolean
