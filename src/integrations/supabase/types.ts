@@ -1846,7 +1846,22 @@ export type Database = {
           registrado_por?: string | null
           resultado?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "busca_ativa_contatos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "busca_ativa_contatos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       caixa_movimentos: {
         Row: {
