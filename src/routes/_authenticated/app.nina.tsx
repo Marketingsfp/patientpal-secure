@@ -228,9 +228,7 @@ function NinaPage() {
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
   const abaAtiva = [
-    "treinada",
     "chat",
-    "automacoes",
     "config",
     "templates",
     "homologacao",
@@ -429,60 +427,7 @@ function NinaPage() {
         onValueChange={setAbaAtiva}
         className={abaAtiva === "atend-inbox" ? "h-full" : "space-y-4"}
       >
-        {/* ============ NINA TREINADA ============ */}
-        <TabsContent value="treinada">
-          <NinaTreinada />
-        </TabsContent>
-
         {/* ============ CONVERSAS ============ */}
-
-        {/* ============ AUTOMAÇÕES ============ */}
-        <TabsContent value="automacoes" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <AutoCard
-              icon={Calendar}
-              cor="text-blue-500"
-              titulo="Confirmação de agendamento"
-              desc="Envia mensagem 24h antes da consulta pedindo confirmação. Reagenda se o paciente responder."
-              ativa
-            />
-            <AutoCard
-              icon={FileText}
-              cor="text-purple-500"
-              titulo="Envio da GR / comprovante"
-              desc="Após o pagamento, envia automaticamente a Guia de Recolhimento ou comprovante em PDF."
-              ativa
-            />
-            <AutoCard
-              icon={DollarSign}
-              cor="text-amber-500"
-              titulo="Cobrança de boleto / Pix"
-              desc="Envia o boleto/Pix no dia da emissão e lembretes 3 dias antes e no vencimento."
-              ativa
-            />
-            <AutoCard
-              icon={Cake}
-              cor="text-pink-500"
-              titulo="Aniversários e campanhas"
-              desc="Parabeniza pacientes no aniversário e dispara campanhas segmentadas (ex: revisão anual)."
-              ativa
-            />
-            <AutoCard
-              icon={Mic}
-              cor="text-emerald-500"
-              titulo="Resposta a áudios"
-              desc="Transcreve áudios do paciente com IA (Gemini) e responde por texto ou áudio."
-              ativa
-            />
-            <AutoCard
-              icon={Sparkles}
-              cor="text-primary"
-              titulo="Atendimento inteligente"
-              desc="Nina responde dúvidas frequentes (preços, endereço, horários) e escala para atendente quando necessário."
-              ativa
-            />
-          </div>
-        </TabsContent>
 
         {/* ============ CONFIGURAÇÃO ============ */}
         <TabsContent value="config">
@@ -546,184 +491,9 @@ function NinaPage() {
   );
 }
 
-function AutoCard({
-  icon: Icon,
-  cor,
-  titulo,
-  desc,
-  ativa,
-}: {
-  icon: any;
-  cor: string;
-  titulo: string;
-  desc: string;
-  ativa: boolean;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4 flex items-start gap-3">
-        <div
-          className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 ${cor}`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-medium">{titulo}</h3>
-            <Switch defaultChecked={ativa} />
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 type NinaMsg = { role: "user" | "assistant"; content: string };
 
-function NinaTreinada() {
-  const { clinicaAtual } = useClinica();
-  const ask = useServerFn(chatNina);
-  const [messages, setMessages] = useState<NinaMsg[]>([
-    {
-      role: "assistant",
-      content:
-        "Olá! Sou a Nina 💚. Estou treinada com os médicos, horários e valores de exames desta clínica. Pergunte coisas como:\n• Quais dias atende o Dr. Fulano?\n• Quanto custa um ultrassom no PIX?\n• Tem cardiologista na quinta de manhã?",
-    },
-  ]);
-  const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
-
-  const send = async () => {
-    const text = draft.trim();
-    if (!text || loading || !clinicaAtual) return;
-    const next: NinaMsg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
-    setDraft("");
-    setLoading(true);
-    try {
-      const r = await ask({
-        data: {
-          clinicaId: clinicaAtual.clinica_id,
-          messages: next.slice(-20),
-        },
-      });
-      if (r.error) {
-        toast.error(r.error);
-        setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${r.error}` }]);
-      } else {
-        setMessages((m) => [...m, { role: "assistant", content: r.reply || "(sem resposta)" }]);
-      }
-    } catch (e) {
-      toast.error("Falha ao falar com a Nina");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="grid lg:grid-cols-3 gap-4">
-      <Card className="lg:col-span-2 flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
-        <CardHeader className="py-3 border-b">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="h-5 w-5 text-emerald-500" /> Nina treinada — pergunte qualquer coisa
-          </CardTitle>
-          <CardDescription>
-            Responde em tempo real consultando médicos, horários e valores cadastrados.
-          </CardDescription>
-        </CardHeader>
-        <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-3 bg-muted/20">
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm break-words ${
-                  m.role === "assistant"
-                    ? "bg-card border border-border rounded-bl-sm"
-                    : "bg-emerald-500 text-white rounded-br-sm"
-                }`}
-              >
-                <NinaMessage
-                  content={m.content}
-                  variant={m.role === "assistant" ? "assistant" : "user"}
-                />
-                {m.role === "assistant" && i > 0 && (
-                  <FeedbackResposta
-                    pergunta={messages[i - 1]?.content ?? ""}
-                    resposta={m.content}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground">
-                <TypingDots /> <span>Nina está digitando…</span>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="border-t p-3 flex items-center gap-2">
-          <Input
-            placeholder="Ex.: Quanto custa raio-x no PIX?"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            disabled={loading}
-            className="flex-1"
-          />
-          <Button
-            onClick={send}
-            disabled={loading || !draft.trim()}
-            className="bg-emerald-500 hover:bg-emerald-600"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Sugestões
-          </CardTitle>
-          <CardDescription>Clique para perguntar</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {[
-            "Quais médicos atendem na segunda-feira?",
-            "Quanto custa ultrassom abdominal no PIX?",
-            "Tem cardiologista de manhã?",
-            "Lista todos os tipos de raio-x e os valores",
-            "Em quais dias o Dr. atende à tarde?",
-          ].map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setDraft(s)}
-              disabled={loading}
-              className="w-full text-left text-sm px-3 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors disabled:opacity-50"
-            >
-              {s}
-            </button>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 /* ===================== FEEDBACK DA RESPOSTA (aprendizado) ===================== */
 
