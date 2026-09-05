@@ -537,7 +537,7 @@ export function AtendInbox() {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
     try {
-      const rows = await listarConvs({
+      const rows = await medirRequest("listarConversas", listarConvs({
         data: {
           clinicaId,
           status: filtroStatus,
