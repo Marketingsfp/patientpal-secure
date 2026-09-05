@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { devoAutoSelecionarComUrl, escopoParaConversa } from "./deep-link";
+import { describe, expect, it } from "bun:test";
+import { devoAutoSelecionarComUrl, escopoParaConversa } from "../deep-link";
 
 const JEAN = "11111111-1111-1111-1111-111111111111";
 const MARIA = "22222222-2222-2222-2222-222222222222";
