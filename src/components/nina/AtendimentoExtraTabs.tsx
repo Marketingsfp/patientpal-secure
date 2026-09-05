@@ -163,6 +163,12 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import {
+  avisoSaidaEscopo,
+  devoAutoSelecionar,
+  selecaoSaiuDoEscopo,
+  type LinhaInbox,
+} from "@/lib/atendimento/inbox-realtime";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -633,6 +639,24 @@ export function AtendInbox() {
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
+      // FASE 3 — a conversa aberta deixou de pertencer a este filtro
+      // (transferida, devolvida à fila, resolvida ou reaberta com a Nina)?
+      // Sai da tela na mesma hora, sem recarregar a página. Durante uma busca
+      // a lista está reduzida pelo texto digitado, então nada é removido.
+      const removeu =
+        !busca && selecaoSaiuDoEscopo(selIdRef.current, rows as any as LinhaInbox[]);
+      if (removeu) {
+        const idFora = selIdRef.current!;
+        cacheConversas.current.invalidar(idFora);
+        setSel(null);
+        setConversaCarregadaId(null);
+        setSecundariosCarregadosId(null);
+        setMsgs([]);
+        setContato(null);
+        setNotas([]);
+        setEventos([]);
+        toast.info(avisoSaidaEscopo(escopo));
+      }
       setConvs((prev: any[]) => {
         // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
         // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
@@ -648,11 +672,15 @@ export function AtendInbox() {
         }
         return ordenarPorRecentes(mesclarListaConversas(prev as any, rows as any)) as any[];
       });
-      if (!sel && rows[0]) setSel(rows[0]);
+      if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] }))
+        setSel(rows[0]);
+      // Os números de cada filtro acompanham a movimentação em tempo real.
+      void carregarContadores();
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel]);
+  }, [clinicaId, filtroStatus, busca, escopo, listarConvs, sel, carregarContadores]);
+
 
   // Abrir uma conversa a partir da Central de Atenção, sem trocar de página
   // e sem mexer em filtros/rascunho de quem já estava atendendo.
