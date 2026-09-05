@@ -1313,13 +1313,16 @@ export function AtendInbox() {
                 className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
               >
 
-                {clinicaId && (
+                {clinicaId && conteudoDaConversa && (
                   <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
                 )}
-                {msgs.length === 0 && (
+                {!conteudoDaConversa && (
+                  <p className="text-sm text-muted-foreground text-center">Abrindo conversa…</p>
+                )}
+                {conteudoDaConversa && msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
-                {timeline.map((item, idxTimeline) => {
+                {(conteudoDaConversa ? timeline : []).map((item, idxTimeline) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
                   }
@@ -1535,7 +1538,7 @@ export function AtendInbox() {
           </CardHeader>
 
           <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contato ? (
+            {!contato || !conteudoDaConversa ? (
               <p className="text-muted-foreground">—</p>
             ) : (
               <>
@@ -1624,7 +1627,7 @@ export function AtendInbox() {
                     {notas.length === 0 && (
                       <p className="text-xs text-muted-foreground">Sem notas.</p>
                     )}
-                    {notas.map((n: any) => (
+                    {(conteudoDaConversa ? notas : []).map((n: any) => (
                       <div
                         key={n.id}
                         className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
