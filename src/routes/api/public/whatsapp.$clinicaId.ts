@@ -342,11 +342,39 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // Revalida o dono ANTES de enviar: um atendente pode ter
                     // assumido enquanto o modelo pensava. Nesse caso, a resposta
                     // é descartada para o paciente não receber IA e humano juntos.
+                    // Revalida o dono ANTES de enviar: um atendente pode ter
+                    // assumido enquanto o modelo pensava. Nesse caso, a resposta
+                    // é descartada para o paciente não receber IA e humano juntos.
                     if (reply && from) {
                       const agora = await estadoConversaPorTelefone(params.clinicaId, from);
                       if (!ninaPodeResponder(agora)) reply = "";
                     }
+
+                    // Encerramento automático: decidido ANTES do envio (para
+                    // completar a mensagem final), aplicado SÓ depois que o
+                    // envio for confirmado.
+                    let encerrarConversaId: string | null = null;
+                    if (reply && from && textoPaciente) {
+                      try {
+                        const { avaliarEncerramentoAutomatico } = await import(
+                          "@/lib/nina/encerramento-automatico.server"
+                        );
+                        const av = await avaliarEncerramentoAutomatico({
+                          clinicaId: params.clinicaId,
+                          telefone: from,
+                          mensagemPaciente: textoPaciente,
+                          resposta: reply,
+                        });
+                        if (av.encerrar && av.conversaId) {
+                          reply = av.resposta;
+                          encerrarConversaId = av.conversaId;
+                        }
+                      } catch (e) {
+                        console.error("[nina] avaliação de encerramento falhou", e);
+                      }
+                    }
                     if (reply) {
+
 
                       // Paciente mandou áudio → Nina responde falando (se a
                       // clínica não desligou). Qualquer falha cai para texto.
