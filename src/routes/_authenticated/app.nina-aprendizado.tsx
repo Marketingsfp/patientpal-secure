@@ -652,6 +652,117 @@ function Pagina() {
         </ul>
       )}
 
+      {/* Diagnosticar causa */}
+      <Dialog open={!!diagnosticando} onOpenChange={(o) => !o && setDiagnosticando(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Diagnosticar a causa do erro</DialogTitle>
+            <DialogDescription>
+              Comparação somente leitura com a planilha oficial. Salvar o diagnóstico{" "}
+              <strong>não altera</strong> a planilha nem a Base de Conhecimentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {consultandoBase ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Consultando a
+              planilha…
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    Planilha atual
+                    {comparacao?.base_version ? ` (versão ${comparacao.base_version})` : ""}
+                  </Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
+                    {comparacao?.planilha_atual ?? "Nada encontrado na planilha para esta pergunta."}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Correção sugerida</Label>
+                  <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border p-2 text-xs">
+                    {comparacao?.correcao_sugerida ?? diagnosticando?.correcao ?? "—"}
+                  </div>
+                </div>
+              </div>
+
+              {comparacao && (
+                <Badge variant="outline">
+                  Situação na Base: {ROTULO_KB[comparacao.knowledge_status] ?? comparacao.knowledge_status}
+                </Badge>
+              )}
+
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+                Erro da Nina não é sinônimo de planilha errada. Se a planilha já traz a informação
+                correta, a causa está na busca, na interpretação, na ferramenta ou no fluxo.
+              </p>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="d-causa">Causa raiz</Label>
+                  <Select value={causaEscolhida} onValueChange={setCausaEscolhida}>
+                    <SelectTrigger id="d-causa" className="mt-1">
+                      <SelectValue placeholder="Escolha a causa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAUSAS_RAIZ_NINA.map((c) => (
+                        <SelectItem key={c.valor} value={c.valor}>
+                          {c.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {CAUSAS_RAIZ_NINA.find((c) => c.valor === causaEscolhida)?.descricao ?? ""}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="d-prio">Prioridade</Label>
+                  <Select value={prioridadeEscolhida} onValueChange={setPrioridadeEscolhida}>
+                    <SelectTrigger id="d-prio" className="mt-1">
+                      <SelectValue placeholder="Sugerida automaticamente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORIDADES_NINA.map((pr) => (
+                        <SelectItem key={pr.valor} value={pr.valor}>
+                          {pr.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="d-assunto">Assunto (agrupa ocorrências iguais)</Label>
+                <Input
+                  id="d-assunto"
+                  className="mt-1"
+                  value={assunto}
+                  onChange={(e) => setAssunto(e.target.value)}
+                  placeholder="Ex.: Valor da consulta de Cardiologia"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Registros com o mesmo tipo de erro e o mesmo assunto são contados juntos. Nenhum
+                  registro individual é apagado.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiagnosticando(null)} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void confirmarDiagnostico()} disabled={salvando || consultandoBase}>
+              Salvar diagnóstico
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Rejeitar */}
       <Dialog open={!!rejeitando} onOpenChange={(o) => !o && setRejeitando(null)}>
         <DialogContent>
