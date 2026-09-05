@@ -161,3 +161,26 @@ export function prazoVencido(deadlineISO: string | null | undefined, agora: Date
   if (!Number.isFinite(t)) return false;
   return agora.getTime() >= t;
 }
+
+/**
+ * FASE 2 — proteção contra corrida entre "o paciente respondeu" e
+ * "o job foi verificar o prazo".
+ *
+ * O job leu um prazo (`esperado`) e, quando volta para agir, relê o estado
+ * atual da conversa. Só é timeout de verdade se continuar existindo espera
+ * pendente, com exatamente o mesmo prazo, e ele já ter vencido.
+ */
+export function timeoutAindaValido(args: {
+  /** Prazo lido agora, direto do banco. */
+  deadlineAtual: string | null | undefined;
+  /** Prazo que o job tinha visto quando decidiu agir. */
+  deadlineEsperado: string | null | undefined;
+  agora: Date;
+}): boolean {
+  const { deadlineAtual, deadlineEsperado, agora } = args;
+  // Paciente respondeu, conversa resolvida ou assumida: espera cancelada.
+  if (!deadlineAtual) return false;
+  // Pergunta nova criou outro ciclo: o prazo antigo não vale mais.
+  if (deadlineEsperado && deadlineAtual !== deadlineEsperado) return false;
+  return prazoVencido(deadlineAtual, agora);
+}
