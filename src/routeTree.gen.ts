@@ -150,6 +150,7 @@ import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './ro
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
 import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
+import { Route as AuthenticatedAppConfiguracoesRespostasRapidasRouteImport } from './routes/_authenticated/app.configuracoes.respostas-rapidas'
 import { Route as AuthenticatedAppConfiguracoesProntuarioRouteImport } from './routes/_authenticated/app.configuracoes.prontuario'
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
@@ -956,6 +957,12 @@ const AuthenticatedAppConfiguracoesVozRoute =
     path: '/configuracoes/voz',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppConfiguracoesRespostasRapidasRoute =
+  AuthenticatedAppConfiguracoesRespostasRapidasRouteImport.update({
+    id: '/configuracoes/respostas-rapidas',
+    path: '/configuracoes/respostas-rapidas',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppConfiguracoesProntuarioRoute =
   AuthenticatedAppConfiguracoesProntuarioRouteImport.update({
     id: '/configuracoes/prontuario',
@@ -1178,6 +1185,7 @@ export interface FileRoutesByFullPath {
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
+  '/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -1333,6 +1341,7 @@ export interface FileRoutesByTo {
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
+  '/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -1494,6 +1503,7 @@ export interface FileRoutesById {
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/_authenticated/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
+  '/_authenticated/app/configuracoes/respostas-rapidas': typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   '/_authenticated/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
@@ -1655,6 +1665,7 @@ export interface FileRouteTypes {
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
+    | '/app/configuracoes/respostas-rapidas'
     | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -1810,6 +1821,7 @@ export interface FileRouteTypes {
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
+    | '/app/configuracoes/respostas-rapidas'
     | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
@@ -1970,6 +1982,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/configuracoes/painel-totem'
     | '/_authenticated/app/configuracoes/prontuario'
+    | '/_authenticated/app/configuracoes/respostas-rapidas'
     | '/_authenticated/app/configuracoes/voz'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
@@ -3045,6 +3058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppConfiguracoesVozRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/configuracoes/respostas-rapidas': {
+      id: '/_authenticated/app/configuracoes/respostas-rapidas'
+      path: '/configuracoes/respostas-rapidas'
+      fullPath: '/app/configuracoes/respostas-rapidas'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesRespostasRapidasRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/configuracoes/prontuario': {
       id: '/_authenticated/app/configuracoes/prontuario'
       path: '/configuracoes/prontuario'
@@ -3370,6 +3390,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   AuthenticatedAppConfiguracoesProntuarioRoute: typeof AuthenticatedAppConfiguracoesProntuarioRoute
+  AuthenticatedAppConfiguracoesRespostasRapidasRoute: typeof AuthenticatedAppConfiguracoesRespostasRapidasRoute
   AuthenticatedAppConfiguracoesVozRoute: typeof AuthenticatedAppConfiguracoesVozRoute
   AuthenticatedAppFisioterapiaPacotesRoute: typeof AuthenticatedAppFisioterapiaPacotesRoute
   AuthenticatedAppHrContratosIdRoute: typeof AuthenticatedAppHrContratosIdRoute
@@ -3471,6 +3492,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppConfiguracoesPainelTotemRoute,
   AuthenticatedAppConfiguracoesProntuarioRoute:
     AuthenticatedAppConfiguracoesProntuarioRoute,
+  AuthenticatedAppConfiguracoesRespostasRapidasRoute:
+    AuthenticatedAppConfiguracoesRespostasRapidasRoute,
   AuthenticatedAppConfiguracoesVozRoute: AuthenticatedAppConfiguracoesVozRoute,
   AuthenticatedAppFisioterapiaPacotesRoute:
     AuthenticatedAppFisioterapiaPacotesRoute,
