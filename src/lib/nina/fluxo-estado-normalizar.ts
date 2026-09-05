@@ -64,6 +64,10 @@ export type EstadoFluxoNina = {
   };
   flow: { stage: EtapaFluxoNina };
   updated_at: string | null;
+  /** Identificador da sessão operacional atual (nova sessão = novo id). */
+  session_id?: string | null;
+  /** Início da sessão operacional atual. */
+  session_started_at?: string | null;
 };
 
 export function estadoVazio(): EstadoFluxoNina {
@@ -90,6 +94,8 @@ export function estadoVazio(): EstadoFluxoNina {
     },
     flow: { stage: "IDLE" },
     updated_at: null,
+    session_id: null,
+    session_started_at: null,
   };
 }
 
@@ -109,6 +115,8 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     appointment: { ...base.appointment, ...(o["appointment"] ?? {}) },
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
     updated_at: o["updated_at"] ?? null,
+    session_id: o["session_id"] ?? null,
+    session_started_at: o["session_started_at"] ?? null,
   };
 }
 

@@ -97,8 +97,11 @@ export function sessaoExpirada(
  * Nova sessão após expiração. Só permanece o que é persistente por natureza
  * (identificação do paciente vinda do CRM). Nada de operação antiga.
  */
-export function novaSessao(anterior: EstadoFluxoNina): EstadoFluxoNina {
+export function novaSessao(anterior: EstadoFluxoNina, agoraISO?: string): EstadoFluxoNina {
+  const inicio = agoraISO ?? new Date().toISOString();
   return {
+    session_id: novoSessionId(),
+    session_started_at: inicio,
     patient: { ...anterior.patient },
     appointment: {
       doctor_id: null,
@@ -115,6 +118,28 @@ export function novaSessao(anterior: EstadoFluxoNina): EstadoFluxoNina {
     },
     flow: { stage: "GREETING" },
     updated_at: null,
+  };
+}
+
+/** Gera um identificador de sessão operacional novo. */
+export function novoSessionId(): string {
+  const g = globalThis as { crypto?: { randomUUID?: () => string } };
+  if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+  return `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Reabertura após resolução: o contexto recente pode ser aproveitado, mas a
+ * sessão operacional é nova (novo id) e nenhuma operação antiga sobrevive.
+ */
+export function reabrirSessao(anterior: EstadoFluxoNina, agoraISO?: string): EstadoFluxoNina {
+  const inicio = agoraISO ?? new Date().toISOString();
+  const limpo = encerrarEstadosTransacionais(anterior);
+  return {
+    ...limpo,
+    session_id: novoSessionId(),
+    session_started_at: inicio,
+    updated_at: inicio,
   };
 }
 
