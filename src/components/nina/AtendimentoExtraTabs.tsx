@@ -186,6 +186,7 @@ export function AtendInbox() {
   const clinicaId = clinicaAtual?.clinica_id;
 
   const listarConvs = useServerFn(listarConversas);
+  const souGestorFn = useServerFn(souGestorAtendimento);
   const listarMsgs = useServerFn(listarMensagensConversa);
   const enviarMsg = useServerFn(enviarMensagemConversa);
   const obterContato = useServerFn(obterDadosContato);
@@ -561,6 +562,22 @@ export function AtendInbox() {
       mostrarErro(e);
     }
   };
+
+  // Perfil de gestor: só ele enxerga a opção "Todas da clínica".
+  useEffect(() => {
+    let vivo = true;
+    if (!clinicaId) return;
+    souGestorFn({ data: { clinicaId } })
+      .then((r: any) => {
+        if (vivo) setSouGestor(!!r?.gestor);
+      })
+      .catch(() => {
+        if (vivo) setSouGestor(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [clinicaId, souGestorFn]);
 
   // Trocar de escopo recomeça a lista: nada de mesclar conversas de escopos
   // diferentes (uma conversa de outro atendente jamais "sobra" na tela).
