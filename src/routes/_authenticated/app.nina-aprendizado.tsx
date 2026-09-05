@@ -772,6 +772,21 @@ function Pagina() {
                         >
                           <X className="mr-1 h-4 w-4" aria-hidden="true" /> Rejeitar
                         </Button>
+                        {it.status === "approved" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={salvando || !it.root_cause}
+                            title={
+                              it.root_cause
+                                ? "Aplicar na camada responsável"
+                                : "Diagnostique a causa antes de aplicar"
+                            }
+                            onClick={() => void abrirAplicacao(it)}
+                          >
+                            <Wrench className="mr-1 h-4 w-4" aria-hidden="true" /> Aplicar correção
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
