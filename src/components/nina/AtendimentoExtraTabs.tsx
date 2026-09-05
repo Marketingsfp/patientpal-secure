@@ -90,6 +90,7 @@ import {
   esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
