@@ -14,7 +14,15 @@ import { podeAutorizar, rolesDoEscopo } from "@/lib/autorizacao-supervisor";
  */
 export const ROLES_AUTORIZAM_SEM_FATURAMENTO = rolesDoEscopo("sem_faturamento");
 
-/** true → o papel deste usuário pode marcar/desmarcar sozinho, sem pedir senha. */
-export function podeAutorizarSemFaturamento(role: string | null | undefined): boolean {
-  return podeAutorizar("sem_faturamento", role);
+/**
+ * true → esta pessoa marca/desmarca sozinha, sem pedir senha.
+ *
+ * Depende da permissão individual `pode_autorizar` do vínculo com a clínica,
+ * e não só do perfil: quase toda a equipe tem perfil de administrador.
+ */
+export function podeAutorizarSemFaturamento(
+  role: string | null | undefined,
+  podeAutorizarMarcado: boolean | null | undefined,
+): boolean {
+  return podeAutorizar("sem_faturamento", role, podeAutorizarMarcado);
 }

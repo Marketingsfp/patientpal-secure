@@ -7,6 +7,7 @@ import { requireSupabasePublicEnv } from "@/integrations/supabase/env";
 import type { Database } from "@/integrations/supabase/types";
 import {
   ESCOPOS_AUTORIZACAO,
+  podeAutorizar,
   rolesDoEscopo,
   type EscopoAutorizacao,
 } from "./autorizacao-supervisor";
@@ -80,6 +81,10 @@ export const listarAutorizadores = createServerFn({ method: "POST" })
       .select("user_id, role")
       .eq("clinica_id", data.clinicaId)
       .eq("ativo", true)
+      // Só quem tem a permissão individual de autorizar. Sem este filtro a
+      // lista traria as 30 pessoas com perfil de administrador, que é
+      // exatamente o controle que a diretoria quis apertar.
+      .eq("pode_autorizar", true)
       // O cast só reconcilia o tipo: a tabela de escopos é escrita à mão com
       // os mesmos valores do enum `app_role` do banco.
       .in("role", [...rolesDoEscopo(data.escopo)] as Database["public"]["Enums"]["app_role"][]);
@@ -132,13 +137,16 @@ export const autorizarComSenha = createServerFn({ method: "POST" })
 
     const { data: mem } = await supabaseAdmin
       .from("clinica_memberships")
-      .select("role")
+      .select("role, pode_autorizar")
       .eq("clinica_id", data.clinicaId)
       .eq("user_id", data.supervisorId)
       .eq("ativo", true)
       .maybeSingle();
-    const role = (mem as { role?: string } | null)?.role ?? null;
-    if (!role || !rolesDoEscopo(data.escopo).includes(role)) {
+    const vinculo = mem as { role?: string; pode_autorizar?: boolean } | null;
+    const role = vinculo?.role ?? null;
+    // A mesma regra da tela, conferida de novo aqui: a lista de nomes vem do
+    // servidor, mas nada impede alguém de mandar outro id na chamada.
+    if (!podeAutorizar(data.escopo, role, vinculo?.pode_autorizar)) {
       return {
         ok: false,
         message: "Esta pessoa não tem permissão para autorizar esta ação nesta clínica.",
@@ -183,5 +191,6 @@ export const autorizarComSenha = createServerFn({ method: "POST" })
       .eq("id", data.supervisorId)
       .maybeSingle();
     const nome = ((prof as { nome?: string } | null)?.nome ?? "").trim() || email;
-    return { ok: true, supervisorId: data.supervisorId, nome, role };
+    // `role` já passou por `podeAutorizar` acima, então não é nulo aqui.
+    return { ok: true, supervisorId: data.supervisorId, nome, role: role ?? "" };
   });

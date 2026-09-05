@@ -2632,6 +2632,7 @@ export type Database = {
           clinica_id: string
           created_at: string
           id: string
+          pode_autorizar: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -2640,6 +2641,7 @@ export type Database = {
           clinica_id: string
           created_at?: string
           id?: string
+          pode_autorizar?: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -2648,6 +2650,7 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           id?: string
+          pode_autorizar?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }

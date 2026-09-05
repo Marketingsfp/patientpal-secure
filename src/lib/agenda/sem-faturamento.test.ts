@@ -24,21 +24,30 @@ describe("ehSemFaturamento", () => {
 });
 
 describe("podeAutorizarSemFaturamento", () => {
-  it("libera a supervisão e a diretoria", () => {
-    expect(podeAutorizarSemFaturamento("admin")).toBe(true);
-    expect(podeAutorizarSemFaturamento("gestor")).toBe(true);
-    expect(podeAutorizarSemFaturamento("supervisor")).toBe(true);
+  it("libera quem tem a permissão individual e o perfil certo", () => {
+    expect(podeAutorizarSemFaturamento("admin", true)).toBe(true);
+    expect(podeAutorizarSemFaturamento("gestor", true)).toBe(true);
+    expect(podeAutorizarSemFaturamento("supervisor", true)).toBe(true);
   });
 
-  it("barra quem opera o balcão e o caixa", () => {
-    // A recepcionista continua podendo iniciar a ação na tela — o que ela não
-    // pode é concluir sozinha, sem a senha de um supervisor.
-    expect(podeAutorizarSemFaturamento("recepcao")).toBe(false);
-    expect(podeAutorizarSemFaturamento("caixa")).toBe(false);
-    expect(podeAutorizarSemFaturamento("financeiro")).toBe(false);
-    expect(podeAutorizarSemFaturamento("medico")).toBe(false);
-    expect(podeAutorizarSemFaturamento(null)).toBe(false);
-    expect(podeAutorizarSemFaturamento(undefined)).toBe(false);
+  it("perfil de administrador SEM a permissão individual não autoriza sozinho", () => {
+    // É o caso da maior parte da equipe: 30 pessoas têm perfil de
+    // administrador porque é ele que abre as telas administrativas. Autorizar
+    // isenção é permissão concedida nome a nome pela diretoria.
+    expect(podeAutorizarSemFaturamento("admin", false)).toBe(false);
+    expect(podeAutorizarSemFaturamento("gestor", null)).toBe(false);
+    expect(podeAutorizarSemFaturamento("supervisor", undefined)).toBe(false);
+  });
+
+  it("a permissão individual sozinha não vale para quem opera o balcão", () => {
+    // Marcar uma recepcionista por engano na tela de Equipe não pode
+    // transformá-la em quem isenta cobrança.
+    expect(podeAutorizarSemFaturamento("recepcao", true)).toBe(false);
+    expect(podeAutorizarSemFaturamento("caixa", true)).toBe(false);
+    expect(podeAutorizarSemFaturamento("financeiro", true)).toBe(false);
+    expect(podeAutorizarSemFaturamento("medico", true)).toBe(false);
+    expect(podeAutorizarSemFaturamento(null, true)).toBe(false);
+    expect(podeAutorizarSemFaturamento(undefined, true)).toBe(false);
   });
 });
 

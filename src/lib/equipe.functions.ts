@@ -84,7 +84,7 @@ export const listarEquipe = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: mems, error } = await supabase
       .from("clinica_memberships")
-      .select("id, role, user_id, ativo, created_at")
+      .select("id, role, user_id, ativo, created_at, pode_autorizar")
       .eq("clinica_id", data.clinicaId);
     if (error) throw new Error(error.message);
 
@@ -184,6 +184,13 @@ export const editarMembro = createServerFn({ method: "POST" })
         membershipId: z.string().uuid(),
         role: z.enum(ROLES),
         ativo: z.boolean(),
+        /**
+         * Autoriza isenções e descontos com a própria senha. Só é gravado
+         * quando vem informado: as telas que editam o vínculo por outros
+         * motivos (contrato de RH, troca de perfil) não devem zerar sem
+         * querer uma permissão que a diretoria concedeu.
+         */
+        podeAutorizar: z.boolean().optional(),
         nome: z.string().min(2).max(120).optional(),
         novaSenha: z.string().min(6).max(100).optional().or(z.literal("")),
       })
@@ -202,7 +209,11 @@ export const editarMembro = createServerFn({ method: "POST" })
 
     const { error: upErr } = await supabaseAdmin
       .from("clinica_memberships")
-      .update({ role: data.role, ativo: data.ativo })
+      .update({
+        role: data.role,
+        ativo: data.ativo,
+        ...(data.podeAutorizar === undefined ? {} : { pode_autorizar: data.podeAutorizar }),
+      })
       .eq("id", data.membershipId);
     if (upErr) throw new Error(upErr.message);
 

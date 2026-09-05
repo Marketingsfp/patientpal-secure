@@ -6,6 +6,13 @@ export interface ClinicaMembership {
   id: string;
   clinica_id: string;
   role: string;
+  /**
+   * Autoriza isenções e descontos com a própria senha. É permissão individual,
+   * marcada na tela de Equipe, e NÃO se deduz do perfil: quase toda a equipe
+   * tem perfil de administrador, que é o que dá acesso às telas
+   * administrativas. Ver `@/lib/autorizacao-supervisor`.
+   */
+  pode_autorizar?: boolean | null;
   clinica: {
     id: string;
     nome: string;
@@ -120,7 +127,7 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from("clinica_memberships")
       .select(
-        "id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
+        "id, clinica_id, role, pode_autorizar, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
       )
       .eq("user_id", user.id)
       .eq("ativo", true);

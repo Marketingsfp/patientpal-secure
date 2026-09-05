@@ -1828,7 +1828,11 @@ function AgendaPage() {
   // Lê a alçada da tabela única (`@/lib/autorizacao-supervisor`) em vez de
   // repetir a lista aqui: uma cópia solta acabaria divergindo do que a server
   // function e o diálogo de senha aceitam.
-  const ehSupervisorDesc = podeAutorizar("desconto", clinicaAtual?.role);
+  const ehSupervisorDesc = podeAutorizar(
+    "desconto",
+    clinicaAtual?.role,
+    clinicaAtual?.pode_autorizar,
+  );
 
   // --- Sem faturamento: motivo obrigatório + autorização da supervisão ------
   // Marcar um atendimento como sem faturamento apaga uma receita da clínica
@@ -1837,7 +1841,10 @@ function AgendaPage() {
   // `semFatAcao` guarda o que está pendente enquanto o supervisor digita a
   // senha — sem ele, ao voltar do diálogo de senha não haveria como saber se a
   // intenção era marcar ou remover a marcação.
-  const podeAutorizarSemFat = podeAutorizarSemFaturamento(clinicaAtual?.role);
+  const podeAutorizarSemFat = podeAutorizarSemFaturamento(
+    clinicaAtual?.role,
+    clinicaAtual?.pode_autorizar,
+  );
   const [semFatDlgOpen, setSemFatDlgOpen] = useState(false);
   const [semFatSupOpen, setSemFatSupOpen] = useState(false);
   const [semFatSalvando, setSemFatSalvando] = useState(false);

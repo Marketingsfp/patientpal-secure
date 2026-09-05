@@ -35,9 +35,25 @@ export function rolesDoEscopo(escopo: EscopoAutorizacao): readonly string[] {
   return ESCOPOS_AUTORIZACAO[escopo];
 }
 
-/** true → este papel autoriza sozinho, sem precisar da senha de outra pessoa. */
-export function podeAutorizar(escopo: EscopoAutorizacao, role: string | null | undefined): boolean {
-  return rolesDoEscopo(escopo).includes(role ?? "");
+/**
+ * true → esta pessoa autoriza sozinha, sem precisar da senha de outra.
+ *
+ * São DUAS condições, e a segunda é a que importa no dia a dia desta clínica.
+ * O perfil de acesso não serve como alçada aqui: são 30 pessoas com perfil de
+ * administrador, porque é o perfil que dá acesso às telas administrativas.
+ * Quem autoriza é decidido pessoa a pessoa, na marcação `pode_autorizar` do
+ * vínculo com a clínica (tela de Equipe) — assim a diretoria restringe a
+ * alçada sem tirar de ninguém o acesso ao trabalho do dia.
+ *
+ * O papel continua valendo como segundo filtro: a marcação sozinha não
+ * transforma uma recepcionista em quem isenta cobrança.
+ */
+export function podeAutorizar(
+  escopo: EscopoAutorizacao,
+  role: string | null | undefined,
+  podeAutorizarMarcado: boolean | null | undefined,
+): boolean {
+  return Boolean(podeAutorizarMarcado) && rolesDoEscopo(escopo).includes(role ?? "");
 }
 
 /**

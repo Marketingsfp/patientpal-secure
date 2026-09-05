@@ -69,6 +69,8 @@ const emptyForm = (clinicaId: string) => ({
   email: "",
   senha: "",
   perfil: "recepcao",
+  /** Autoriza isenções e descontos com a própria senha (ver tela de Equipe). */
+  pode_autorizar: false,
 });
 
 export function FuncionarioFormDialog({
@@ -93,6 +95,7 @@ export function FuncionarioFormDialog({
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [perfilOriginal, setPerfilOriginal] = useState<string | null>(null);
+  const [autorizaOriginal, setAutorizaOriginal] = useState(false);
   const [ativoOriginal, setAtivoOriginal] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -140,6 +143,7 @@ export function FuncionarioFormDialog({
       setExistingEmail(null);
       setMembershipId(null);
       setPerfilOriginal(null);
+      setAutorizaOriginal(false);
       setAtivoOriginal(true);
       setForm(emptyForm(clinicaId));
       return;
@@ -160,7 +164,7 @@ export function FuncionarioFormDialog({
           .maybeSingle(),
         supabase
           .from("clinica_memberships")
-          .select("id, role, ativo")
+          .select("id, role, ativo, pode_autorizar")
           .eq("clinica_id", clinicaId)
           .eq("user_id", editingUserId)
           .maybeSingle(),
@@ -181,8 +185,11 @@ export function FuncionarioFormDialog({
       const telefone2 =
         ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
       const currentRole = (mem?.role as string | undefined) ?? "recepcao";
+      const autorizaAtual =
+        (mem as { pode_autorizar?: boolean | null } | null)?.pode_autorizar === true;
       setMembershipId((mem?.id as string | undefined) ?? null);
       setPerfilOriginal(currentRole);
+      setAutorizaOriginal(autorizaAtual);
       setAtivoOriginal((mem?.ativo as boolean | undefined) ?? true);
       if (contrato) {
         setEditingContratoId(contrato.id as string);
@@ -199,6 +206,7 @@ export function FuncionarioFormDialog({
           email: "",
           senha: "",
           perfil: currentRole,
+          pode_autorizar: autorizaAtual,
         });
       } else {
         setEditingContratoId(null);
@@ -209,6 +217,7 @@ export function FuncionarioFormDialog({
           telefone,
           telefone2,
           perfil: currentRole,
+          pode_autorizar: autorizaAtual,
         });
       }
       // Try to get email of this user
@@ -332,8 +341,15 @@ export function FuncionarioFormDialog({
       mostrarErro(error);
       return;
     }
-    // Atualiza perfil de acesso (membership) quando mudou
-    if (editingUserId && membershipId && form.perfil !== perfilOriginal) {
+    // Atualiza perfil de acesso e permissão de autorizar (membership) quando
+    // qualquer um dos dois mudou. A permissão de autorizar é enviada sempre
+    // que este formulário salva, porque é ele que a edita — as outras telas
+    // que chamam `editarMembro` omitem o campo e não a alteram.
+    if (
+      editingUserId &&
+      membershipId &&
+      (form.perfil !== perfilOriginal || form.pode_autorizar !== autorizaOriginal)
+    ) {
       try {
         await editarMembroFn({
           data: {
@@ -341,9 +357,11 @@ export function FuncionarioFormDialog({
             membershipId,
             role: form.perfil as "recepcao",
             ativo: ativoOriginal,
+            podeAutorizar: form.pode_autorizar,
           },
         });
         setPerfilOriginal(form.perfil);
+        setAutorizaOriginal(form.pode_autorizar);
       } catch (e) {
         toast.error((e as Error)?.message ?? "Erro ao atualizar perfil de acesso");
         return;
@@ -517,6 +535,31 @@ export function FuncionarioFormDialog({
                     <p className="text-xs text-muted-foreground mt-1">
                       Alterações no perfil são salvas ao clicar em "Salvar".
                     </p>
+                    {/*
+                      Autorizar isenções e descontos é permissão à parte, e não
+                      consequência do perfil: quase toda a equipe tem perfil de
+                      administrador, porque é ele que abre as telas
+                      administrativas. Quem não está marcado aqui continua com
+                      todo o acesso de sempre — só precisa da senha de quem
+                      está para isentar uma cobrança ou dar desconto.
+                    */}
+                    <label className="mt-3 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50/60 p-2 text-xs dark:border-amber-500/30 dark:bg-amber-500/10">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={form.pode_autorizar}
+                        onChange={(e) => setForm({ ...form, pode_autorizar: e.target.checked })}
+                      />
+                      <span>
+                        <strong>Pode autorizar descontos e isenções</strong>
+                        <br />
+                        <span className="text-muted-foreground">
+                          Libera "Sem Faturamento", desconto e cortesia com a própria senha, e passa
+                          a aparecer na lista de quem autoriza a ação de outra pessoa. Só vale para
+                          os perfis administrador, gestor, supervisor ou financeiro.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 )}
                 <div className="border-t pt-4 space-y-3">

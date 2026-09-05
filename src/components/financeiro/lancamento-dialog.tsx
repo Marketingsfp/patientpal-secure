@@ -194,7 +194,7 @@ export function LancamentoDialog({
   // Quando o próprio usuário já é supervisor, dispensamos o segundo login.
   // Alçada lida da tabela única (`@/lib/autorizacao-supervisor`), a mesma que
   // a server function confere ao validar a senha.
-  const ehSupervisor = podeAutorizar("desconto", role);
+  const ehSupervisor = podeAutorizar("desconto", role, clinicaAtual?.pode_autorizar);
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   /** Sessão de pacote já paga na venda; `null` quando não há cobertura. */
