@@ -39,17 +39,52 @@ export interface LinhaResumo {
   updated_at: string;
 }
 
+/** Marca os resumos vigentes desta conversa como superados/arquivados. */
+export async function superarResumos(
+  clinicaId: string,
+  conversaId: string,
+  situacao: "superseded" | "archived" = "superseded",
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from(TABELA as never)
+    .update({ situacao } as never)
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .eq("situacao", "active");
+  if (error) console.error("[handoff-resumo] falha ao superar", error.message);
+}
+
+/** Reabertura: o resumo do ciclo anterior deixa de valer como situação atual. */
+export async function arquivarResumosConversa(
+  clinicaId: string,
+  conversaId: string,
+): Promise<void> {
+  await superarResumos(clinicaId, conversaId, "archived");
+}
+
 /** Reserva a linha do resumo desta transferência (idempotente). */
 export async function reservarResumoHandoff(args: {
   clinicaId: string;
   conversaId: string;
   handoffEm: string;
   motivo?: string | null;
+  desfecho?: DesfechoConversa;
+  resolvidoPor?: string | null;
 }): Promise<void> {
+  const { data: existente } = await supabaseAdmin
+    .from(TABELA as never)
+    .select("id")
+    .eq("conversa_id", args.conversaId)
+    .eq("handoff_em", args.handoffEm)
+    .maybeSingle();
+  if (existente) return; // idempotente: mesma transferência não gera dois resumos
+
   const { count } = await supabaseAdmin
     .from(TABELA as never)
     .select("id", { count: "exact", head: true })
     .eq("conversa_id", args.conversaId);
+  // Só pode existir UM resumo vigente por conversa: o anterior vira histórico.
+  await superarResumos(args.clinicaId, args.conversaId);
   const { error } = await supabaseAdmin
     .from(TABELA as never)
     .upsert(
@@ -60,23 +95,79 @@ export async function reservarResumoHandoff(args: {
         motivo: args.motivo ?? null,
         versao: (count ?? 0) + 1,
         status: "gerando",
+        situacao: "active",
+        desfecho: args.desfecho ?? "handoff_humano",
+        ...(args.resolvidoPor ? { resolvido_por: args.resolvidoPor } : {}),
       } as never,
       { onConflict: "conversa_id,handoff_em", ignoreDuplicates: true },
     );
   if (error) console.error("[handoff-resumo] falha ao reservar", error.message);
 }
 
+/**
+ * Registra um desfecho relevante: supera o resumo anterior, abre uma versão
+ * nova e gera o conteúdo já coerente com o estado final. Nunca lança.
+ */
+export async function registrarDesfechoResumo(args: {
+  clinicaId: string;
+  conversaId: string;
+  desfecho: DesfechoConversa;
+  motivo?: string | null;
+  resolvidoPor?: string | null;
+}): Promise<LinhaResumo | null> {
+  try {
+    const agora = new Date().toISOString();
+    await reservarResumoHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      handoffEm: agora,
+      motivo: args.motivo ?? null,
+      desfecho: args.desfecho,
+      resolvidoPor: args.resolvidoPor ?? null,
+    });
+    if (args.resolvidoPor || args.desfecho === "conversa_resolvida") {
+      await supabaseAdmin
+        .from(TABELA as never)
+        .update({ resolvido_em: agora, resolvido_por: args.resolvidoPor ?? null } as never)
+        .eq("conversa_id", args.conversaId)
+        .eq("handoff_em", agora);
+    }
+    return await garantirResumoHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      forcar: true,
+      ignorarHandoff: true,
+    });
+  } catch (e) {
+    console.error("[handoff-resumo] falha ao registrar desfecho", e);
+    return null;
+  }
+}
+
+/** Resumo VIGENTE da conversa (o que o card do chat mostra). */
 async function ultimaLinha(clinicaId: string, conversaId: string): Promise<LinhaResumo | null> {
+  const { data: ativo } = await supabaseAdmin
+    .from(TABELA as never)
+    .select("*")
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .eq("situacao", "active")
+    .order("versao", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ativo) return ativo as LinhaResumo;
   const { data } = await supabaseAdmin
     .from(TABELA as never)
     .select("*")
     .eq("clinica_id", clinicaId)
     .eq("conversa_id", conversaId)
-    .order("handoff_em", { ascending: false })
+    .order("versao", { ascending: false })
     .limit(1)
     .maybeSingle();
   return (data as LinhaResumo | null) ?? null;
 }
+
+
 
 /** Agendamento REAL do paciente ligado a esta conversa (nunca inferido pela IA). */
 async function agendamentoReal(
