@@ -1,0 +1,531 @@
+/**
+ * Nina → Métricas de Aprendizado (FASE 6).
+ *
+ * Painel somente leitura. Nenhuma ação aqui altera planilha, Base de
+ * Conhecimentos, embeddings, prompt, modelo, regras, ferramentas ou
+ * feedbacks. Os números não expõem texto ou dados pessoais do paciente.
+ */
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { BarChart3, Loader2, RefreshCw, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useClinica } from "@/hooks/use-clinica";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import {
+  CATEGORIAS_FEEDBACK_NINA,
+  rotuloCategoriaFeedback,
+} from "@/lib/nina/feedback-erros";
+import {
+  CAUSAS_RAIZ_NINA,
+  PRIORIDADES_NINA,
+  rotuloCausaRaiz,
+  rotuloPrioridade,
+} from "@/lib/nina/feedback-diagnostico";
+import {
+  metricasAprendizadoNina,
+  trilhaAuditoriaAprendizadoNina,
+} from "@/lib/nina/feedback-metricas.functions";
+
+export const Route = createFileRoute("/_authenticated/app/nina-metricas")({
+  head: () => ({
+    meta: [
+      { title: "Nina — Métricas de Aprendizado" },
+      {
+        name: "description",
+        content:
+          "Indicadores de evolução da Nina: erros reportados, causas, correções aplicadas, revertidas e taxa de erro por período.",
+      },
+      { property: "og:title", content: "Nina — Métricas de Aprendizado" },
+      {
+        property: "og:description",
+        content: "Evolução medida dos erros reportados e das correções aplicadas na Nina.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: Pagina,
+});
+
+type Metricas = Awaited<ReturnType<typeof metricasAprendizadoNina>>;
+type Trilha = Awaited<ReturnType<typeof trilhaAuditoriaAprendizadoNina>>;
+
+const TODOS = "__todos__";
+
+const STATUS_ROTULO: Record<string, string> = {
+  pending: "Pendentes",
+  under_review: "Em revisão",
+  approved: "Aprovados",
+  rejected: "Rejeitados",
+  applied: "Aplicados",
+  reverted: "Revertidos",
+};
+
+function pct(v: number | null) {
+  return v === null ? "—" : `${v.toFixed(2)}%`;
+}
+
+function dataISO(diasAtras: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - diasAtras);
+  return d.toISOString().slice(0, 10);
+}
+
+function Indicador({ titulo, valor, detalhe }: { titulo: string; valor: string; detalhe?: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs text-muted-foreground">{titulo}</p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums">{valor}</p>
+        {detalhe ? <p className="text-xs text-muted-foreground">{detalhe}</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Pagina() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
+
+  const buscarMetricas = useServerFn(metricasAprendizadoNina);
+  const buscarTrilha = useServerFn(trilhaAuditoriaAprendizadoNina);
+
+  const [carregando, setCarregando] = useState(false);
+  const [dados, setDados] = useState<Metricas | null>(null);
+  const [unidades, setUnidades] = useState<{ id: string; nome: string }[]>([]);
+
+  const [granularidade, setGranularidade] = useState<"dia" | "semana" | "mes">("dia");
+  const [de, setDe] = useState(dataISO(30));
+  const [ate, setAte] = useState(dataISO(0));
+  const [status, setStatus] = useState(TODOS);
+  const [categoria, setCategoria] = useState(TODOS);
+  const [rootCause, setRootCause] = useState(TODOS);
+  const [prioridade, setPrioridade] = useState(TODOS);
+  const [unidadeId, setUnidadeId] = useState(TODOS);
+  const [assunto, setAssunto] = useState("");
+
+  const [trilhaId, setTrilhaId] = useState("");
+  const [trilha, setTrilha] = useState<Trilha | null>(null);
+  const [carregandoTrilha, setCarregandoTrilha] = useState(false);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    let ativo = true;
+    void supabase
+      .from("unidades")
+      .select("id, nome")
+      .eq("clinica_id", clinicaId)
+      .order("nome")
+      .then(({ data }) => {
+        if (ativo) setUnidades((data ?? []) as { id: string; nome: string }[]);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [clinicaId]);
+
+  const carregar = useCallback(async () => {
+    if (!clinicaId) return;
+    setCarregando(true);
+    try {
+      const res = await buscarMetricas({
+        data: {
+          clinicaId,
+          granularidade,
+          de: de ? `${de}T00:00:00.000Z` : null,
+          ate: ate ? `${ate}T23:59:59.999Z` : null,
+          status: status === TODOS ? null : (status as never),
+          categoria: categoria === TODOS ? null : (categoria as never),
+          rootCause: rootCause === TODOS ? null : (rootCause as never),
+          prioridade: prioridade === TODOS ? null : (prioridade as never),
+          unidadeId: unidadeId === TODOS ? null : unidadeId,
+          assunto: assunto.trim() || null,
+        },
+      });
+      setDados(res);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCarregando(false);
+    }
+  }, [
+    buscarMetricas,
+    clinicaId,
+    granularidade,
+    de,
+    ate,
+    status,
+    categoria,
+    rootCause,
+    prioridade,
+    unidadeId,
+    assunto,
+  ]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  const abrirTrilha = async () => {
+    if (!clinicaId || !trilhaId.trim()) return;
+    setCarregandoTrilha(true);
+    try {
+      setTrilha(await buscarTrilha({ data: { clinicaId, feedbackId: trilhaId.trim() } }));
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCarregandoTrilha(false);
+    }
+  };
+
+  const maxSerie = useMemo(
+    () => Math.max(1, ...(dados?.evolucao ?? []).map((p) => p.reportados)),
+    [dados],
+  );
+
+  const ind = dados?.indicadores;
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <BarChart3 className="h-6 w-6 text-primary" aria-hidden />
+            Nina — Métricas de Aprendizado
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Painel somente leitura. Sem dados pessoais do paciente e sem alterar nada da Nina.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => void carregar()} disabled={carregando}>
+          {carregando ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+          )}
+          Atualizar
+        </Button>
+      </header>
+
+      <Card>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-4">
+          <div className="space-y-1">
+            <Label htmlFor="de">De</Label>
+            <Input id="de" type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="ate">Até</Label>
+            <Input id="ate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Período do gráfico</Label>
+            <Select value={granularidade} onValueChange={(v) => setGranularidade(v as never)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dia">Por dia</SelectItem>
+                <SelectItem value="semana">Por semana</SelectItem>
+                <SelectItem value="mes">Por mês</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Situação</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {Object.entries(STATUS_ROTULO).map(([v, r]) => (
+                  <SelectItem key={v} value={v}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Tipo de erro</Label>
+            <Select value={categoria} onValueChange={setCategoria}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                {CATEGORIAS_FEEDBACK_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Causa</Label>
+            <Select value={rootCause} onValueChange={setRootCause}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {CAUSAS_RAIZ_NINA.map((c) => (
+                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Prioridade</Label>
+            <Select value={prioridade} onValueChange={setPrioridade}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {PRIORIDADES_NINA.map((p) => (
+                  <SelectItem key={p.valor} value={p.valor}>{p.rotulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Unidade</Label>
+            <Select value={unidadeId} onValueChange={setUnidadeId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {unidades.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label htmlFor="assunto">Assunto / procedimento</Label>
+            <Input
+              id="assunto"
+              placeholder="Ex.: Cardiologia"
+              value={assunto}
+              onChange={(e) => setAssunto(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {ind ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Indicador titulo="Erros reportados" valor={String(ind.reportados)} />
+            <Indicador
+              titulo="Erros confirmados"
+              valor={String(ind.confirmados)}
+              detalhe={`${ind.pendentes} pendentes · ${ind.emRevisao} em revisão`}
+            />
+            <Indicador titulo="Feedbacks rejeitados" valor={String(ind.rejeitados)} />
+            <Indicador
+              titulo="Correções aplicadas"
+              valor={String(ind.aplicados)}
+              detalhe={`${ind.validados} validadas · ${ind.falhasValidacao} falharam no teste`}
+            />
+            <Indicador titulo="Correções revertidas" valor={String(ind.revertidos)} />
+            <Indicador
+              titulo="Taxa de erro"
+              valor={pct(ind.taxaErro)}
+              detalhe={`${ind.execucoes} respostas da Nina no período`}
+            />
+            <Indicador titulo="Alucinações" valor={String(ind.porCausa.hallucination)} />
+            <Indicador
+              titulo="Prioridade crítica"
+              valor={String(ind.porPrioridade.critico)}
+              detalhe={`${ind.porPrioridade.alto} alto · ${ind.porPrioridade.normal} normal`}
+            />
+          </section>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Erros por causa</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {CAUSAS_RAIZ_NINA.map((c) => (
+                <div
+                  key={c.valor}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <span className="text-sm">{c.rotulo}</span>
+                  <span className="font-semibold tabular-nums">
+                    {ind.porCausa[c.valor as keyof typeof ind.porCausa] ?? 0}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Evolução temporal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dados.evolucao.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem registros no período.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {dados.evolucao.map((p) => (
+                    <li key={p.periodo} className="flex items-center gap-3">
+                      <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {p.periodo}
+                      </span>
+                      <span className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
+                        <span
+                          className="block h-full rounded-full bg-primary"
+                          style={{ width: `${(p.reportados / maxSerie) * 100}%` }}
+                        />
+                      </span>
+                      <span className="w-56 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {p.reportados} reportados · {p.aplicados} aplicados · {p.revertidos}{" "}
+                        revertidos · taxa {pct(p.taxaErro)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Problemas mais reportados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dados.recorrentes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem registros no período.</p>
+              ) : (
+                <ul className="divide-y">
+                  {dados.recorrentes.map((r) => (
+                    <li
+                      key={`${r.assunto}-${r.categoria}`}
+                      className="flex flex-wrap items-center justify-between gap-2 py-2"
+                    >
+                      <span className="text-sm font-medium">{r.assunto}</span>
+                      <span className="flex items-center gap-2">
+                        <Badge variant="secondary">{rotuloCategoriaFeedback(r.categoria)}</Badge>
+                        {r.rootCause ? (
+                          <Badge variant="outline">{rotuloCausaRaiz(r.rootCause)}</Badge>
+                        ) : null}
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                          {r.ocorrencias} ocorrência{r.ocorrencias > 1 ? "s" : ""}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Auditoria de um feedback</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-3">
+          <div className="min-w-64 flex-1 space-y-1">
+            <Label htmlFor="trilha">Código do feedback</Label>
+            <Input
+              id="trilha"
+              placeholder="Cole aqui o código do feedback"
+              value={trilhaId}
+              onChange={(e) => setTrilhaId(e.target.value)}
+            />
+          </div>
+          <Button onClick={() => void abrirTrilha()} disabled={carregandoTrilha || !trilhaId.trim()}>
+            {carregandoTrilha ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Search className="mr-2 h-4 w-4" aria-hidden />
+            )}
+            Ver trilha completa
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(trilha)} onOpenChange={(o) => !o && setTrilha(null)}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Trilha do aprendizado</DialogTitle>
+            <DialogDescription>
+              Erro → feedback → revisão → diagnóstico → aprovação → alteração → teste → resultado.
+            </DialogDescription>
+          </DialogHeader>
+          {trilha ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                <strong>Tipo de erro:</strong> {rotuloCategoriaFeedback(trilha.feedback.categoria)} ·{" "}
+                <strong>Situação:</strong>{" "}
+                {STATUS_ROTULO[trilha.feedback.status] ?? trilha.feedback.status}
+              </p>
+              <p>
+                <strong>Causa:</strong>{" "}
+                {trilha.feedback.root_cause ? rotuloCausaRaiz(trilha.feedback.root_cause) : "—"} ·{" "}
+                <strong>Prioridade:</strong>{" "}
+                {trilha.feedback.prioridade ? rotuloPrioridade(trilha.feedback.prioridade) : "—"}
+              </p>
+              <p>
+                <strong>Reportado em:</strong>{" "}
+                {new Date(trilha.feedback.created_at).toLocaleString("pt-BR")} ·{" "}
+                <strong>Revisado em:</strong>{" "}
+                {trilha.feedback.revisado_em
+                  ? new Date(trilha.feedback.revisado_em).toLocaleString("pt-BR")
+                  : "—"}
+              </p>
+              <p>
+                <strong>Aplicado em:</strong>{" "}
+                {trilha.feedback.aplicado_em
+                  ? new Date(trilha.feedback.aplicado_em).toLocaleString("pt-BR")
+                  : "—"}{" "}
+                · <strong>Teste:</strong> {trilha.feedback.validacao_status ?? "—"}
+              </p>
+              <div>
+                <p className="font-medium">Ações técnicas ({trilha.acoes.length})</p>
+                <ul className="mt-1 space-y-1">
+                  {trilha.acoes.map((a) => (
+                    <li key={a.id} className="rounded-md border px-3 py-2">
+                      {a.titulo} — {a.status}
+                      {a.homologado ? " · homologada" : ""}
+                    </li>
+                  ))}
+                  {trilha.acoes.length === 0 ? (
+                    <li className="text-muted-foreground">Nenhuma ação registrada.</li>
+                  ) : null}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium">Versões ({trilha.versoes.length})</p>
+                <ul className="mt-1 space-y-1">
+                  {trilha.versoes.map((v) => (
+                    <li key={v.id} className="rounded-md border px-3 py-2">
+                      v{v.versao} · {v.item}: {v.valor_anterior ?? "—"} → {v.valor_novo ?? "—"} ·{" "}
+                      {v.status}
+                      {v.teste_status ? ` · teste ${v.teste_status}` : ""}
+                    </li>
+                  ))}
+                  {trilha.versoes.length === 0 ? (
+                    <li className="text-muted-foreground">Nenhuma versão registrada.</li>
+                  ) : null}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
