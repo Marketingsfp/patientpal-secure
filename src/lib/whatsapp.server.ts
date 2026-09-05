@@ -929,12 +929,14 @@ ${procs || "(nenhum)"}`;
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
+  const { blocoPromptSessao: blocoPromptSessaoNina } = await import("@/lib/nina/sessao");
   const {
     normalizarEstado,
     blocoPromptEstado,
     salvarFluxoEstado,
   } = await import("@/lib/nina/fluxo-estado.server");
-  const fluxoEstado = normalizarEstado(estadoId.fluxoEstadoBruto);
+  // Estado já passado pelo TTL de sessão (ver `sessaoNina` acima).
+  const fluxoEstado = sessaoNina.estado ?? normalizarEstado(estadoId.fluxoEstadoBruto);
   // Fallbacks de reidratação, em ordem de confiança: estado do fluxo →
   // paciente já vinculado à conversa → casamento pelo telefone do remetente.
   let pacienteIdEfetivo =
@@ -1084,6 +1086,7 @@ ${procs || "(nenhum)"}`;
 
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
+    blocoPromptSessaoNina(sessaoNina),
   ]
     .filter(Boolean)
     .join("\n\n");
