@@ -11,6 +11,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { pontuarRelevancia } from "@/lib/busca/relevancia";
 
 export type SearchableMultiOption = { value: string; label: string };
 
@@ -101,13 +102,17 @@ export function SearchableMultiSelect({
       >
         <Command
           filter={(val, search) => {
-            const opt = options.find((o) => o.value === val);
+            // O cmdk devolve o valor já com `trim()`; comparar sem aparar
+            // esconderia opções cujo nome tem espaço sobrando no cadastro.
+            const opt = options.find((o) => o.value.trim() === val);
             if (!opt) return 0;
             const query = normalizeSearch(search);
             if (!query) return 1;
-            const label = normalizeSearch(opt.label);
-            const value = normalizeSearch(opt.value);
-            return label.includes(query) || value.includes(query) ? 1 : 0;
+            // O cmdk ordena pela pontuação: a correspondência exata vai ao topo.
+            return Math.max(
+              pontuarRelevancia(cleanLabel(opt.label), query),
+              pontuarRelevancia(opt.value, query),
+            );
           }}
         >
           <div className="flex items-center gap-2 border-b px-2">

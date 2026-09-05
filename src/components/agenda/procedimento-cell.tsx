@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, Pencil } from "lucide-react";
+import { ordenarPorRelevancia } from "@/lib/busca/relevancia";
 
 const norm = (s: string) =>
   (s ?? "")
@@ -60,7 +61,10 @@ export function ProcedimentoCell({
       const idx = parseInt(qn, 10) - 1;
       if (idx >= 0 && idx < lista.length) return [lista[idx]];
     }
-    return lista.filter((p) => norm(p.nome).includes(qn));
+    // A correspondência mais exata vem primeiro: com 240 serviços no médico,
+    // digitar "CONSULTA" precisa mostrar "CONSULTA" no topo, e não perdida no
+    // meio de "CONSULTA NOTURNA", "LAUDO CONSULTAS DIFERENCIADAS" etc.
+    return ordenarPorRelevancia(lista, q, (p) => p.nome);
   }, [lista, q]);
 
   useEffect(() => {

@@ -11,6 +11,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { normalizarBusca, pontuarRelevancia } from "@/lib/busca/relevancia";
 
 export type SearchableOption = { value: string; label: string };
 
@@ -75,9 +76,18 @@ export function SearchableSelect({
       >
         <Command
           filter={(val, search) => {
-            const opt = options.find((o) => o.value === val);
+            // O cmdk devolve o valor já com `trim()`; comparar sem aparar
+            // esconderia opções cujo nome tem espaço sobrando no cadastro.
+            const opt = options.find((o) => o.value.trim() === val);
             if (!opt) return 0;
-            return opt.label.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+            const query = normalizarBusca(search);
+            if (!query) return 1;
+            // O cmdk ordena pela pontuação, então a correspondência exata sobe
+            // para o topo em vez de ficar perdida no meio dos parecidos.
+            return Math.max(
+              pontuarRelevancia(opt.label, query),
+              pontuarRelevancia(opt.value, query),
+            );
           }}
         >
           <CommandInput placeholder={searchPlaceholder} />

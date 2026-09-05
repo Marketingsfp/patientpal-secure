@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Star, Loader2 } from "lucide-react";
 import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
+import { ordenarPorRelevancia } from "@/lib/busca/relevancia";
 
 export type ProcedimentoOption = {
   id: string;
@@ -63,15 +64,28 @@ export function ProcedimentoPicker({
     if (!clinicaId) return;
     setLoading(true);
     (async () => {
-      let q = supabase
-        .from("procedimentos")
-        .select("id,nome,tipo,grupo,valor_padrao,duracao_minutos,codigo")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .order("nome");
-      if (tipo) q = q.eq("tipo", tipo);
-      const { data } = await q;
-      let arr = (data ?? []) as ProcedimentoOption[];
+      // O PostgREST corta a resposta em 1000 linhas. O catálogo da clínica
+      // passa de 4.500 serviços ativos, e sem este laço tudo o que ficava
+      // depois da milésima linha em ordem alfabética simplesmente não era
+      // baixado — era por isso que "CONSULTA" (linha ~1.300) nunca aparecia
+      // na busca, por mais que estivesse cadastrada e ativa.
+      const pageSize = 1000;
+      let arr: ProcedimentoOption[] = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase
+          .from("procedimentos")
+          .select("id,nome,tipo,grupo,valor_padrao,duracao_minutos,codigo")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true)
+          .order("nome")
+          .range(from, from + pageSize - 1);
+        if (tipo) q = q.eq("tipo", tipo);
+        const { data, error } = await q;
+        if (error) break;
+        const page = (data ?? []) as ProcedimentoOption[];
+        arr.push(...page);
+        if (page.length < pageSize) break;
+      }
       if (especialidadeId) {
         const { data: pe } = await supabase
           .from("procedimento_especialidades")
@@ -113,15 +127,19 @@ export function ProcedimentoPicker({
   const top60Lab = useMemo(() => pickTop60(lista), [lista]);
 
   const filtradas = useMemo(() => {
-    const n = normalizar(busca);
-    return lista
-      .filter((p) => {
-        if (grupoFiltro && p.grupo !== grupoFiltro) return false;
-        if (!n) return true;
-        const alvo = normalizar(`${p.nome} ${p.codigo ?? ""} ${p.grupo ?? ""}`);
-        return alvo.includes(n);
-      })
-      .slice(0, 200);
+    const doGrupo = grupoFiltro ? lista.filter((p) => p.grupo === grupoFiltro) : lista;
+    if (!normalizar(busca)) return doGrupo.slice(0, 200);
+    // Ordena por relevância ANTES de cortar em 200: assim o serviço de nome
+    // igual ao que foi digitado nunca fica de fora do corte.
+    const porNome = ordenarPorRelevancia(doGrupo, busca, (p) => p.nome);
+    const jaTem = new Set(porNome.map((p) => p.id));
+    // Código e grupo continuam pesquisáveis, mas só depois dos nomes.
+    const porCodigoOuGrupo = ordenarPorRelevancia(
+      doGrupo.filter((p) => !jaTem.has(p.id)),
+      busca,
+      (p) => `${p.codigo ?? ""} ${p.grupo ?? ""}`,
+    );
+    return [...porNome, ...porCodigoOuGrupo].slice(0, 200);
   }, [lista, busca, grupoFiltro]);
 
   return (
