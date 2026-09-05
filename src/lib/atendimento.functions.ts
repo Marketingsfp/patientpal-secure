@@ -1548,6 +1548,8 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     let agendamentos: any[] = [];
     let contratos: any[] = [];
     const pendencias: any = null;
+    // FASE 4 — como o contato foi obtido nesta abertura ("id" = vínculo direto).
+    let contatoVia: "id" | "telefone" | "sem_contato" = "sem_contato";
 
     // Fase 2: o vínculo direto (`contato_paciente_id`) é a referência
     // principal. Só quando ele não existe é que buscamos pelo telefone
