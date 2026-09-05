@@ -697,6 +697,8 @@ export function AtendInbox() {
         buscando: !!busca,
         ctx: ctxEscopo,
       });
+      if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
+        deepLinkPendente.current = null;
       if (removeu && selIdRef.current === deepLinkPendente.current) {
         // Link direto: aguarda a lista do filtro certo antes de decidir.
       } else if (removeu) {
