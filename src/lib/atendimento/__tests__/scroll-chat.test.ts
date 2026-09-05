@@ -103,3 +103,46 @@ describe("scroll do chat de atendimento", () => {
     expect(rotuloNovasMensagens(3)).toBe("3 novas mensagens");
   });
 });
+
+describe("janela de abertura da conversa", () => {
+  const base = {
+    primeiraCarga: false,
+    totalAnterior: 10,
+    totalAtual: 12,
+    ultimoIdAnterior: "m-10",
+    ultimoIdAtual: "e-12",
+    posicao: lendoHistorico,
+    novasAtuais: 0,
+  };
+
+  it("conteúdo que chega logo após abrir (resumo, eventos) mantém a tela no fim", () => {
+    expect(decidirScroll({ ...base, emAbertura: true })).toEqual({
+      tipo: "ir_ao_fim",
+      suave: false,
+      zerarNovas: true,
+    });
+  });
+
+  it("não vira botão de novas mensagens durante a abertura", () => {
+    const acao = decidirScroll({ ...base, emAbertura: true });
+    expect(acao.tipo).not.toBe("manter");
+  });
+
+  it("depois que a atendente rola, volta a respeitar a leitura do histórico", () => {
+    expect(decidirScroll({ ...base, emAbertura: false })).toEqual({
+      tipo: "manter",
+      novas: 2,
+    });
+  });
+
+  it("carregar mensagens antigas nunca joga para o fim, mesmo na abertura", () => {
+    expect(
+      decidirScroll({
+        ...base,
+        emAbertura: true,
+        totalAtual: 50,
+        ultimoIdAtual: "m-10",
+      }),
+    ).toEqual({ tipo: "manter", novas: 0 });
+  });
+});

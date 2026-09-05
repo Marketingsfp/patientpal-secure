@@ -1001,9 +1001,12 @@ export function AtendInbox() {
     const cursor = cursorMaisAntigo(msgs);
     if (!cursor) return;
     setCarregandoAntigas(true);
+    // A partir daqui quem manda na posição é a atendente, não a abertura.
+    chat.encerrarAbertura();
     const cont = chat.containerRef.current;
     const alturaAntes = cont?.scrollHeight ?? 0;
     const topoAntes = cont?.scrollTop ?? 0;
+
     try {
       const antigas = await listarMsgs({
         data: { clinicaId, conversaId: alvo, limit: JANELA_ANTERIOR, antesDe: cursor },
