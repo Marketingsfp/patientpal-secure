@@ -935,6 +935,7 @@ export function AtendInbox() {
         selecionadaAgora: selIdRef.current,
         pedido,
         pedidoAtual: seqConversa.current,
+        conversaIdUrl: conversaIdUrlRef.current,
       });
 
     // Se o prefetch desta conversa já está em andamento (hover → clique),
@@ -1433,7 +1434,7 @@ export function AtendInbox() {
     const t = draft.trim();
     if (!t || !sel || !clinicaId || enviando) return;
     // A ação só vale para a conversa que está de fato aberta e carregada.
-    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa })) {
+    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, conversaIdUrl: conversaIdUrlRef.current })) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
       return;
     }
@@ -1473,6 +1474,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
+        conversaIdUrl: conversaIdUrlRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
@@ -1502,6 +1504,7 @@ export function AtendInbox() {
         alvo: sel.id,
         selecionadaAgora: selIdRef.current,
         carregando: carregandoConversa,
+        conversaIdUrl: conversaIdUrlRef.current,
       })
     ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
