@@ -81,12 +81,16 @@ export function respostaAindaVale(params: {
   selecionadaAgora: string | null;
   pedido: number;
   pedidoAtual: number;
+  /** Conversa indicada pelo endereço aberto agora (quando houver). */
+  conversaIdUrl?: string | null;
 }): boolean {
-  const { alvo, selecionadaAgora, pedido, pedidoAtual } = params;
+  const { alvo, selecionadaAgora, pedido, pedidoAtual, conversaIdUrl } = params;
   if (!alvo) return false;
   if (alvo !== selecionadaAgora) return false;
+  if (conversaIdUrl && alvo !== conversaIdUrl) return false;
   return pedido === pedidoAtual;
 }
+
 
 /**
  * Quais conversas em cache ficaram desatualizadas depois de uma atualização da
