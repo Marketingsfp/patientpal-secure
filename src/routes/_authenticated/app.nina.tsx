@@ -88,7 +88,6 @@ import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
 import {
-  AtendDashboard,
   AtendDepartamentos,
   AtendMacros,
   AtendKb,
@@ -97,7 +96,6 @@ import {
 } from "@/components/nina/AtendimentoTabs";
 import {
   AtendInbox,
-  AtendRoteamento,
 } from "@/components/nina/AtendimentoExtraTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
@@ -231,13 +229,11 @@ function NinaPage() {
     "templates",
     "homologacao",
     "atend-status",
-    "atend-dashboard",
     "atend-depto",
     "atend-macros",
     "atend-kb",
     "atend-pausas",
     "atend-inbox",
-    "atend-roteamento",
     "aprendizado",
     "base-conhecimento",
   ].includes(hashAba)
@@ -440,9 +436,6 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
-        <TabsContent value="atend-dashboard">
-          <AtendDashboard />
-        </TabsContent>
         <TabsContent value="atend-status">
           <AtendMeuStatus />
         </TabsContent>
@@ -460,9 +453,6 @@ function NinaPage() {
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
-        </TabsContent>
-        <TabsContent value="atend-roteamento">
-          <AtendRoteamento />
         </TabsContent>
 
         {/* ============ APRENDIZADO ============ */}
