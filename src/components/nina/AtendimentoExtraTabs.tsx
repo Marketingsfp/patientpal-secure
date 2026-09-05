@@ -138,6 +138,7 @@ import {
   cursorMaisAntigo,
 } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
+import { iniciarTroca, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
 import {
   acaoPermitida,
   gravarRascunho,
