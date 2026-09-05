@@ -87,8 +87,10 @@ import {
   meuStatusAgente,
   devolverParaNina,
   definirPresenca,
+  esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
@@ -131,6 +133,7 @@ export function AtendInbox() {
   const listarReasonsFn = useServerFn(listarPauseReasons);
   const meuStatusFn = useServerFn(meuStatusAgente);
   const presencaFn = useServerFn(definirPresenca);
+  const esperaFn = useServerFn(esperaConversas);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
