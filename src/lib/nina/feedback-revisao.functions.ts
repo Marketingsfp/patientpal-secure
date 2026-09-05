@@ -28,12 +28,15 @@ export type StatusFeedbackNina = (typeof STATUS)[number];
 const COLUNAS =
   "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at";
 
-async function assertRevisor(
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }> },
-  userId: string,
-  clinicaId: string,
-) {
-  const { data, error } = await supabase.rpc("nina_fb_pode_revisar", {
+type ClienteSupabase = {
+  rpc: (
+    fn: "nina_fb_pode_revisar",
+    args: { _user_id: string; _clinica_id: string },
+  ) => PromiseLike<{ data: boolean | null; error: { message: string } | null }>;
+};
+
+async function assertRevisor(supabase: unknown, userId: string, clinicaId: string) {
+  const { data, error } = await (supabase as ClienteSupabase).rpc("nina_fb_pode_revisar", {
     _user_id: userId,
     _clinica_id: clinicaId,
   });
@@ -159,15 +162,21 @@ export const revisarFeedbackErroNina = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRevisor(context.supabase, context.userId, data.clinicaId);
 
-    const patch: Record<string, unknown> = {
+    const patch: {
+      status: string;
+      revisado_por: string;
+      revisado_em: string;
+      motivo_rejeicao?: string | null;
+      correcao?: string;
+    } = {
       status: data.acao,
       revisado_por: context.userId,
       revisado_em: new Date().toISOString(),
     };
     if (data.acao === "rejected") {
-      patch['motivo_rejeicao'] = data.motivo?.trim() ? data.motivo.trim() : null;
+      patch.motivo_rejeicao = data.motivo?.trim() ? data.motivo.trim() : null;
     }
-    if (data.correcao) patch['correcao'] = data.correcao;
+    if (data.correcao) patch.correcao = data.correcao;
 
     const { data: linha, error } = await context.supabase
       .from("nina_feedback_erros")
