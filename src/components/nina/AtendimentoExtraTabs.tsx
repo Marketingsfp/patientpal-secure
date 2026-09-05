@@ -313,6 +313,9 @@ export function AtendInbox() {
   // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
   const seqConversa = useRef(0);
   const cacheConversas = useRef(criarCacheConversas(10));
+  // FASE 4 — cache por ["contact", contactId]: o mesmo paciente aparece na
+  // hora em qualquer conversa vinculada, sem lookup por telefone.
+  const cacheContatos = useRef(new CacheContatos<any>());
   // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
