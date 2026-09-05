@@ -481,6 +481,24 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           "fila do medico",
         ],
       },
+      // Histórico clínico de TODOS os pacientes da clínica, em ordem de data.
+      // A tela existia desde sempre, mas não tinha item de menu nenhum: só
+      // chegava nela quem digitasse o endereço ou caísse pela busca. O médico
+      // que terminava um atendimento não tinha caminho para reler o que
+      // escreveu, nem para consultar a consulta anterior do paciente.
+      {
+        to: "/app/prontuarios",
+        label: "Prontuários — Histórico",
+        icon: FileHeart,
+        busca: [
+          "prontuario",
+          "prontuarios",
+          "historico clinico",
+          "historico do paciente",
+          "evolucao",
+          "consultas anteriores",
+        ],
+      },
       { to: "/app/crm", label: "CRM", icon: Target },
       { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
       { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
