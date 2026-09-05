@@ -18,6 +18,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STATUS_ENCERRADOS, encaminharParaHumano } from "@/lib/atendimento/handoff.server";
 import { timeoutRespostaPacienteMinutos } from "./espera-paciente";
 import { MOTIVO_TIMEOUT_PACIENTE, textoInternoTimeout } from "./espera-timeout-motivo";
+import { normalizarEstado } from "./fluxo-estado-normalizar";
+import { encerrarEstadosTransacionais } from "./sessao";
+import { informacoesEstado, pendenciasTimeout, rotuloEtapa } from "./timeout-resumo";
 
 export { MOTIVO_TIMEOUT_PACIENTE };
 
@@ -113,8 +116,10 @@ export async function processarTimeoutsEsperaPaciente(args?: {
         urgencia: "normal",
         solicitadoPor: "SISTEMA",
       });
-      if (r.ok) resultado.transferidas += 1;
-      else resultado.erros += 1;
+      if (r.ok) {
+        resultado.transferidas += 1;
+        await finalizarContextoTimeout(linha);
+      } else resultado.erros += 1;
     } catch (e) {
       console.error("[nina-timeout] falha no handoff automático", e);
       resultado.erros += 1;
@@ -134,5 +139,83 @@ async function liberarEspera(linha: LinhaConversa): Promise<void> {
       .eq("clinica_id", linha.clinica_id);
   } catch (e) {
     console.error("[nina-timeout] falha ao limpar prazo obsoleto", e);
+  }
+}
+
+/**
+ * Depois da transferência por inatividade:
+ *  1. encerra os estados transacionais (escolha de vaga, confirmação final,
+ *     criação de agendamento) — um "Sim" que chegue depois NÃO pode executar
+ *     o agendamento antigo; a equipe revalida a disponibilidade;
+ *  2. gera o Resumo da Nina com o contexto real do fluxo.
+ *
+ * Nada é apagado: mensagens, CRM, eventos, resumos e agendamentos já
+ * confirmados permanecem. Só a operação pendente é invalidada.
+ */
+async function finalizarContextoTimeout(linha: LinhaConversa): Promise<void> {
+  let ultimaPergunta: string | null = null;
+  let etapaInterrompida: string | null = null;
+  let pendencias: string[] = [];
+  let informacoes: string[] = [];
+
+  try {
+    const { data } = await supabaseAdmin
+      .from("atend_conversas")
+      .select("nina_fluxo_estado")
+      .eq("id", linha.id)
+      .eq("clinica_id", linha.clinica_id)
+      .maybeSingle();
+    const estado = normalizarEstado((data as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null);
+    etapaInterrompida = rotuloEtapa(estado.flow?.stage ?? null);
+    pendencias = pendenciasTimeout(estado);
+    informacoes = informacoesEstado(estado);
+
+    const encerrado = encerrarEstadosTransacionais(estado);
+    await supabaseAdmin
+      .from("atend_conversas")
+      .update({
+        nina_fluxo_estado: {
+          ...encerrado,
+          flow: { stage: "HANDOFF" },
+          updated_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", linha.id)
+      .eq("clinica_id", linha.clinica_id);
+  } catch (e) {
+    console.error("[nina-timeout] falha ao encerrar estados transacionais", e);
+  }
+
+  try {
+    const { data } = await supabaseAdmin
+      .from("whatsapp_mensagens")
+      .select("body")
+      .eq("clinica_id", linha.clinica_id)
+      .eq("conversa_id", linha.id)
+      .eq("direction", "out")
+      .order("recebida_em", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const corpo = String((data as { body?: string } | null)?.body ?? "").trim();
+    if (corpo) ultimaPergunta = corpo.slice(0, 300);
+  } catch (e) {
+    console.error("[nina-timeout] falha ao ler última pergunta", e);
+  }
+
+  try {
+    const { garantirResumoHandoff } = await import("@/lib/atendimento/handoff-resumo.server");
+    await garantirResumoHandoff({
+      clinicaId: linha.clinica_id,
+      conversaId: linha.id,
+      extras: {
+        ultimaPergunta,
+        etapaInterrompida,
+        pendenciasExtras: pendencias,
+        informacoesExtras: informacoes,
+      },
+    });
+  } catch (e) {
+    console.error("[nina-timeout] falha ao gerar resumo do timeout", e);
   }
 }

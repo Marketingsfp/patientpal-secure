@@ -147,3 +147,93 @@ describe("FASE 3 — motivo estruturado do timeout", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// FASE 4 — contexto do resumo e invalidação dos estados de agendamento
+// ---------------------------------------------------------------------------
+import { estadoVazio } from "./fluxo-estado-normalizar";
+import { encerrarEstadosTransacionais, etapaTransacional } from "./sessao";
+import { informacoesEstado, pendenciasTimeout, rotuloEtapa } from "./timeout-resumo";
+import { normalizarResumo, blocosVisiveis } from "@/lib/atendimento/handoff-resumo";
+
+function estadoAguardandoConfirmacao() {
+  const e = estadoVazio();
+  e.patient.first_name = "João";
+  e.patient.identified = true;
+  e.appointment.specialty = "Cardiologia";
+  e.appointment.doctor_name = "Dra. Ana";
+  e.appointment.date = "2026-09-12";
+  e.appointment.time = "09:00";
+  e.appointment.slot_inicio = "2026-09-12T09:00:00Z";
+  e.appointment.intent_confirmed = true;
+  e.flow.stage = "WAITING_FINAL_CONFIRMATION";
+  return e;
+}
+
+describe("FASE 4 — resumo do timeout", () => {
+  it("descreve a etapa em que o fluxo parou", () => {
+    expect(rotuloEtapa("WAITING_FINAL_CONFIRMATION")).toBe(
+      "Aguardando confirmação final do agendamento",
+    );
+  });
+
+  it("pede revalidação de disponibilidade quando havia horário pendente", () => {
+    const p = pendenciasTimeout(estadoAguardandoConfirmacao());
+    expect(p.some((t) => /revalidar a disponibilidade/i.test(t))).toBe(true);
+    expect(p.some((t) => /ainda tem interesse/i.test(t))).toBe(true);
+  });
+
+  it("reaproveita dados já conversados", () => {
+    const i = informacoesEstado(estadoAguardandoConfirmacao());
+    expect(i).toContain("Especialidade: Cardiologia");
+    expect(i).toContain("Profissional: Dra. Ana");
+  });
+
+  it("invalida os estados de confirmação e agendamento", () => {
+    const e = encerrarEstadosTransacionais(estadoAguardandoConfirmacao());
+    expect(e.appointment.intent_confirmed).toBe(false);
+    expect(e.appointment.slot_confirmed_by_patient).toBe(false);
+    expect(e.appointment.date).toBeNull();
+    expect(e.appointment.time).toBeNull();
+    expect(e.appointment.slot_inicio).toBeNull();
+    expect(etapaTransacional(e.flow.stage)).toBe(false);
+    // Contexto permanece: especialidade e profissional não são apagados.
+    expect(e.appointment.specialty).toBe("Cardiologia");
+    expect(e.patient.first_name).toBe("João");
+  });
+
+  it("um 'sim' tardio não encontra nenhuma vaga confirmada para executar", () => {
+    const e = encerrarEstadosTransacionais(estadoAguardandoConfirmacao());
+    const podeAgendar =
+      e.appointment.intent_confirmed &&
+      e.appointment.slot_confirmed_by_patient &&
+      Boolean(e.appointment.slot_inicio);
+    expect(podeAgendar).toBe(false);
+  });
+
+  it("o resumo mostra a última pergunta, a etapa e o motivo do handoff", () => {
+    const r = normalizarResumo(
+      { intencao: "agendamento", motivo_contato: "Agendamento de Cardiologia" },
+      {
+        motivoHandoff: "patient_response_timeout",
+        ultimaPergunta: "Posso confirmar o horário das 09:00?",
+        etapaInterrompida: "Aguardando confirmação final do agendamento",
+        pendenciasExtras: ["Confirmar se o paciente ainda tem interesse"],
+        informacoesExtras: ["Especialidade: Cardiologia"],
+      },
+    );
+    expect(r.ultima_pergunta).toBe("Posso confirmar o horário das 09:00?");
+    expect(r.etapa_interrompida).toBe("Aguardando confirmação final do agendamento");
+    expect(r.motivo_handoff).toBe("patient_response_timeout");
+    expect(r.pendencias).toContain("Confirmar se o paciente ainda tem interesse");
+    expect(r.informacoes).toContain("Especialidade: Cardiologia");
+    const titulos = blocosVisiveis(r).map((b) => b.titulo);
+    expect(titulos).toContain("Última pergunta da Nina");
+    expect(titulos).toContain("Etapa em que parou");
+  });
+
+  it("nunca inventa agendamento confirmado a partir da IA", () => {
+    const r = normalizarResumo({ agendamento_confirmado: { medico: "Dr. X" } });
+    expect(r.agendamento_confirmado).toBeNull();
+  });
+});
