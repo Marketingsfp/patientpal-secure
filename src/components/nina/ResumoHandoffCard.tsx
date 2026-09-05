@@ -36,6 +36,7 @@ export function ResumoHandoffCard({
   // Regra: cada conversa começa com o resumo RECOLHIDO.
   const [aberto, setAberto] = useState(false);
   const [atualizado, setAtualizado] = useState(false);
+  const jaBuscado = useRef<string | null>(null);
 
   const carregar = useCallback(
     async (forcar = false) => {
