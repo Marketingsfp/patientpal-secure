@@ -918,20 +918,11 @@ export function AtendInbox() {
                       size="sm"
                       variant="default"
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
-                      onClick={() => {
-                        const params = new URLSearchParams();
-                        params.set("novo", "1");
-                        const pacId = contato?.paciente?.id;
-                        const pacNome = contato?.paciente?.nome || sel.contato_nome || "";
-                        const tel = sel.contato_telefone || contato?.paciente?.telefone || "";
-                        if (pacId) params.set("novoPacId", pacId);
-                        if (pacNome) params.set("novoPacNome", pacNome);
-                        if (tel) params.set("novoTelefone", tel);
-                        window.location.assign(`/app/agenda?${params.toString()}`);
-                      }}
+                      onClick={() => setAgendaOpen(true)}
                     >
                       <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
                     </Button>
+
                     {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
                     <Button
