@@ -64,7 +64,7 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
 
   if (rows.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-lg border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
         <Inbox className="h-3.5 w-3.5" />
         <span>Não atribuídas: 0 — tudo distribuído entre os atendentes online.</span>
         <Button
@@ -83,9 +83,9 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
   return (
     <Card>
       <CardHeader className="py-2 flex-row items-center gap-2 space-y-0">
-        <Inbox className="h-4 w-4" />
-        <CardTitle className="text-base">Não atribuídas</CardTitle>
-        <Badge variant="default" className="ml-1">
+        <Inbox className="h-4 w-4 text-atd-danger" />
+        <CardTitle className="text-base text-atd-danger-ink">🔴 Não atribuídas</CardTitle>
+        <Badge className="ml-1 bg-atd-danger text-atd-on-strong">
           {rows.length}
         </Badge>
         <Button size="sm" variant="ghost" className="ml-auto" onClick={carregar} disabled={loading}>
@@ -102,7 +102,11 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
               return (
                 <div
                   key={c.id}
-                  className={`flex items-start gap-3 rounded-lg border p-3 ${urgente ? "border-rose-300 bg-rose-500/5" : ""}`}
+                  className={`flex items-start gap-3 rounded-lg border p-3 ${
+                    urgente
+                      ? "border-atd-danger bg-atd-danger-bg"
+                      : "border-atd-border bg-atd-surface"
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -116,7 +120,7 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                         esperando {espera(c.aguardando_desde)}
                       </Badge>
                       {urgente && (
-                        <Badge className="bg-rose-500/15 text-rose-600 text-[11px]">
+                        <Badge className="bg-atd-danger-bg text-atd-danger-ink text-[11px] border border-atd-danger/40">
                           <AlertTriangle className="h-3 w-3 mr-1" /> urgente
                         </Badge>
                       )}

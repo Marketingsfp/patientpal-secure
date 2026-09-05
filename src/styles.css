@@ -1070,3 +1070,134 @@ html.a11y-reduzir-animacao body [class*="fila-alerta"] { animation: none !import
 html.a11y-cores-protanopia body { filter: url("#a11y-protanopia"); }
 html.a11y-cores-deuteranopia body { filter: url("#a11y-deuteranopia"); }
 html.a11y-cores-tritanopia body { filter: url("#a11y-tritanopia"); }
+
+/* =====================================================================
+ * Linguagem de cores do Atendimento (Nina / inbox humano)
+ *
+ * Azul = interação/humano · Verde = disponível/confirmação ·
+ * Roxo = Nina (IA) · Âmbar = atenção · Vermelho = precisa agir ·
+ * Cinza = inativo/finalizado.
+ *
+ * Tokens semânticos: os componentes usam apenas as classes derivadas
+ * (bg-atd-*, text-atd-*, border-atd-*), nunca o valor cru. Trocar a
+ * identidade visual depois é mexer só neste bloco.
+ * ===================================================================== */
+:root {
+  --atd-bg: oklch(0.978 0.005 258.3);
+  --atd-surface: oklch(1 0 0);
+  --atd-border: oklch(0.909 0.017 250.9);
+  --atd-ink: oklch(0.245 0.039 264.4);
+  --atd-ink-soft: oklch(0.554 0.041 257.4);
+  --atd-blue: oklch(0.546 0.215 262.9);
+  --atd-blue-ink: oklch(0.488 0.217 264.4);
+  --atd-blue-soft: oklch(0.961 0.019 255.5);
+  --atd-blue-hover: oklch(0.974 0.012 255.5);
+  --atd-blue-tint: oklch(0.97 0.014 254.6);
+  --atd-human-bg: oklch(0.951 0.025 236.8);
+  --atd-human-ink: oklch(0.5 0.119 242.7);
+  --atd-go: oklch(0.651 0.128 170.4);
+  --atd-go-hover: oklch(0.58 0.125 170.4);
+  --atd-ok: oklch(0.627 0.17 149.2);
+  --atd-ok-bg: oklch(0.962 0.043 156.7);
+  --atd-ok-ink: oklch(0.448 0.108 151.3);
+  --atd-ai: oklch(0.541 0.247 293);
+  --atd-ai-bg: oklch(0.943 0.028 294.6);
+  --atd-ai-ink: oklch(0.491 0.241 292.6);
+  --atd-ai-soft: oklch(0.969 0.016 293.8);
+  --atd-ai-line: oklch(0.894 0.055 293.3);
+  --atd-ai-deep: oklch(0.38 0.178 293.7);
+  --atd-warn: oklch(0.769 0.165 70.1);
+  --atd-warn-bg: oklch(0.987 0.021 95.3);
+  --atd-warn-ink: oklch(0.473 0.125 46.2);
+  --atd-danger: oklch(0.577 0.215 27.3);
+  --atd-danger-strong: oklch(0.637 0.208 25.3);
+  --atd-danger-bg: oklch(0.971 0.013 17.4);
+  --atd-danger-ink: oklch(0.505 0.19 27.5);
+  --atd-idle: oklch(0.554 0.041 257.4);
+  --atd-idle-bg: oklch(0.968 0.007 247.9);
+  --atd-idle-ink: oklch(0.446 0.037 257.3);
+  --atd-on-strong: oklch(1 0 0);
+}
+
+/* No escuro os fundos claros viram tintas sobre o card e os textos sobem
+ * de luminosidade — mesma semântica, contraste preservado. */
+.dark {
+  --atd-bg: var(--background);
+  --atd-surface: var(--card);
+  --atd-border: oklch(1 0 0 / 14%);
+  --atd-ink: var(--foreground);
+  --atd-ink-soft: oklch(0.75 0.03 257);
+  --atd-blue: oklch(0.66 0.17 262);
+  --atd-blue-ink: oklch(0.82 0.11 262);
+  --atd-blue-soft: color-mix(in oklch, oklch(0.66 0.17 262) 22%, var(--card));
+  --atd-blue-hover: color-mix(in oklch, oklch(0.66 0.17 262) 12%, var(--card));
+  --atd-blue-tint: color-mix(in oklch, oklch(0.66 0.17 262) 16%, var(--card));
+  --atd-human-bg: color-mix(in oklch, oklch(0.62 0.13 240) 24%, var(--card));
+  --atd-human-ink: oklch(0.84 0.09 236);
+  --atd-go: oklch(0.7 0.13 170);
+  --atd-go-hover: oklch(0.75 0.13 170);
+  --atd-ok: oklch(0.72 0.16 149);
+  --atd-ok-bg: color-mix(in oklch, oklch(0.72 0.16 149) 22%, var(--card));
+  --atd-ok-ink: oklch(0.86 0.11 152);
+  --atd-ai: oklch(0.68 0.19 293);
+  --atd-ai-bg: color-mix(in oklch, oklch(0.68 0.19 293) 24%, var(--card));
+  --atd-ai-ink: oklch(0.85 0.11 293);
+  --atd-ai-soft: color-mix(in oklch, oklch(0.68 0.19 293) 14%, var(--card));
+  --atd-ai-line: color-mix(in oklch, oklch(0.68 0.19 293) 40%, var(--card));
+  --atd-ai-deep: oklch(0.88 0.08 293);
+  --atd-warn: oklch(0.82 0.16 75);
+  --atd-warn-bg: color-mix(in oklch, oklch(0.82 0.16 75) 20%, var(--card));
+  --atd-warn-ink: oklch(0.9 0.11 85);
+  --atd-danger: oklch(0.65 0.2 27);
+  --atd-danger-strong: oklch(0.72 0.19 25);
+  --atd-danger-bg: color-mix(in oklch, oklch(0.65 0.2 27) 22%, var(--card));
+  --atd-danger-ink: oklch(0.88 0.1 22);
+  --atd-idle: oklch(0.7 0.03 257);
+  --atd-idle-bg: color-mix(in oklch, oklch(0.7 0.03 257) 16%, var(--card));
+  --atd-idle-ink: oklch(0.82 0.02 257);
+}
+
+@theme inline {
+  --color-atd-bg: var(--atd-bg);
+  --color-atd-surface: var(--atd-surface);
+  --color-atd-border: var(--atd-border);
+  --color-atd-ink: var(--atd-ink);
+  --color-atd-ink-soft: var(--atd-ink-soft);
+  --color-atd-blue: var(--atd-blue);
+  --color-atd-blue-ink: var(--atd-blue-ink);
+  --color-atd-blue-soft: var(--atd-blue-soft);
+  --color-atd-blue-hover: var(--atd-blue-hover);
+  --color-atd-blue-tint: var(--atd-blue-tint);
+  --color-atd-human-bg: var(--atd-human-bg);
+  --color-atd-human-ink: var(--atd-human-ink);
+  --color-atd-go: var(--atd-go);
+  --color-atd-go-hover: var(--atd-go-hover);
+  --color-atd-ok: var(--atd-ok);
+  --color-atd-ok-bg: var(--atd-ok-bg);
+  --color-atd-ok-ink: var(--atd-ok-ink);
+  --color-atd-ai: var(--atd-ai);
+  --color-atd-ai-bg: var(--atd-ai-bg);
+  --color-atd-ai-ink: var(--atd-ai-ink);
+  --color-atd-ai-soft: var(--atd-ai-soft);
+  --color-atd-ai-line: var(--atd-ai-line);
+  --color-atd-ai-deep: var(--atd-ai-deep);
+  --color-atd-warn: var(--atd-warn);
+  --color-atd-warn-bg: var(--atd-warn-bg);
+  --color-atd-warn-ink: var(--atd-warn-ink);
+  --color-atd-danger: var(--atd-danger);
+  --color-atd-danger-strong: var(--atd-danger-strong);
+  --color-atd-danger-bg: var(--atd-danger-bg);
+  --color-atd-danger-ink: var(--atd-danger-ink);
+  --color-atd-idle: var(--atd-idle);
+  --color-atd-idle-bg: var(--atd-idle-bg);
+  --color-atd-idle-ink: var(--atd-idle-ink);
+  --color-atd-on-strong: var(--atd-on-strong);
+}
+
+/* Alto contraste do painel de acessibilidade: reforça as bordas dos chips
+ * e superfícies do atendimento em vez de depender só de matiz. */
+html.a11y-alto-contraste {
+  --atd-border: oklch(0.45 0.03 257);
+  --atd-ink-soft: oklch(0.35 0.04 257);
+  --atd-idle-ink: oklch(0.3 0.03 257);
+}
