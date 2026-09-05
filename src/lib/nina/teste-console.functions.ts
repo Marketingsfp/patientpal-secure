@@ -584,7 +584,34 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
       updated_at: estado.updated_at,
     };
 
-    return { eventos, debug };
+    // Fase 5 — telemetria da última execução do modelo NESTA conversa.
+    // Só aparece na homologação; nunca é enviada ao paciente.
+    const { data: exec } = await supabaseAdmin
+      .from("nina_execucoes")
+      .select("model,thinking_level,route_reason,knowledge_status,tool_calls,latency_ms,input_tokens,output_tokens,retries,success,error_category,handoff")
+      .eq("conversation_id", data.conversaId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const observabilidade = exec
+      ? {
+          model: exec.model,
+          reasoning: String(exec.thinking_level ?? "").toUpperCase(),
+          route_reason: exec.route_reason,
+          knowledge: exec.knowledge_status ? String(exec.knowledge_status).toUpperCase() : "—",
+          tools: (exec.tool_calls ?? []).join(", ") || "—",
+          latency_ms: exec.latency_ms,
+          input_tokens: exec.input_tokens,
+          output_tokens: exec.output_tokens,
+          retries: exec.retries,
+          success: exec.success,
+          error_category: exec.error_category,
+          handoff: exec.handoff,
+        }
+      : null;
+
+    return { eventos, debug: { ...debug, ...(observabilidade ?? {}) } };
   });
 
 export const resolverConversaTeste = createServerFn({ method: "POST" })
