@@ -1040,6 +1040,10 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   const AFIRMA_AGENDAMENTO =
     /(estou|vou|irei)\s+agend|agendando|agendei|agendada|agendado|marcada|marquei|reserv(ei|ada)|confirmad[oa]\s+(seu|sua)\s+(consulta|agendamento|hor[áa]rio)/i;
   const MAX_RODADAS = podeAgendar ? 6 : 3;
+  // Estado do turno para o Reasoning Router (Fase 2).
+  const nomesFerramentasTurno: string[] = [];
+  let conflitoFerramenta = false;
+  let nivelAnteriorTurno: "low" | "medium" | "high" | undefined;
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
     const { ninaAIGateway } = await import("@/lib/nina/ai-gateway.server");
@@ -1048,7 +1052,17 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
       perfil: "whatsapp",
       messages: mensagens as never,
       ...(ferramentas ? { tools: ferramentas as readonly unknown[] } : {}),
+      raciocinio: {
+        mensagem: mensagemPaciente,
+        rodada,
+        temFerramentas: Boolean(ferramentas),
+        ferramentasExecutadas: nomesFerramentasTurno.length,
+        nomesFerramentas: nomesFerramentasTurno,
+        houveConflito: conflitoFerramenta,
+        ...(nivelAnteriorTurno ? { nivelAnterior: nivelAnteriorTurno } : {}),
+      },
     });
+    nivelAnteriorTurno = respostaIA.nivel;
 
     if (!respostaIA.ok) {
       throw new Error(respostaIA.erro ?? "Falha IA");
