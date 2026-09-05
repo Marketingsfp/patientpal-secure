@@ -48,10 +48,9 @@ export function pediuEncerramento(mensagem: string): boolean {
   const t = normalizar(mensagem);
   if (!t) return false;
   // Todos os padrões de fim são ancorados (^...$): a mensagem inteira precisa
-  // ser a confirmação de que não há mais nada. Qualquer texto extra cai no
-  // guarda de nova solicitação e a conversa continua aberta.
-  if (!PADROES_FIM.some((r) => r.test(t))) return false;
-  return !PADROES_NOVA_SOLICITACAO.some((r) => r.test(t.replace(/^(pode encerrar.*|nao precisa.*)$/, "")));
+  // ser a confirmação de que não há mais nada. Se vier qualquer coisa junto
+  // ("obrigado, mas queria..."), nenhum padrão casa e a conversa continua.
+  return PADROES_FIM.some((r) => r.test(t));
 }
 
 export type ContextoEncerramento = {
