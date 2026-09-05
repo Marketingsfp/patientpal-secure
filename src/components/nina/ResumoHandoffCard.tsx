@@ -59,9 +59,14 @@ export function ResumoHandoffCard({
     [clinicaId, conversaId, obter],
   );
 
+  // Uma única busca por conversa na abertura. Antes, a função de busca era
+  // recriada em outra renderização e o resumo era pedido duas vezes seguidas.
   useEffect(() => {
+    const chave = `${clinicaId}|${conversaId}`;
+    if (jaBuscado.current === chave) return;
+    jaBuscado.current = chave;
     void carregar(false);
-  }, [carregar]);
+  }, [carregar, clinicaId, conversaId]);
 
   // Resumo gerado pelo servidor (inclusive no timeout) aparece sem refresh.
   // Só o próprio resumo dispara recarga. Antes, qualquer alteração em
