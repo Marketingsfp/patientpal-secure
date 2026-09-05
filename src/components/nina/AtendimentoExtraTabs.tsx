@@ -106,6 +106,7 @@ import {
 import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas,
+  obterConversa,
   souGestorAtendimento,
   contarConversasInbox,
   listarMensagensConversa,
@@ -164,6 +165,7 @@ import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog"
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import { ESCOPO_INBOX_PADRAO, type EscopoInbox } from "@/lib/atendimento/escopo-inbox";
+import { devoAutoSelecionarComUrl, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
@@ -224,6 +226,7 @@ export function AtendInbox() {
   const presencaFn = useServerFn(definirPresenca);
   const esperaFn = useServerFn(esperaConversas);
   const assumirFn = useServerFn(assumirConversa);
+  const obterConversaFn = useServerFn(obterConversa);
   const { user } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
@@ -717,7 +720,20 @@ export function AtendInbox() {
       });
       // O número do filtro atual muda na hora; o servidor confirma em seguida.
       setContadores((c) => ajustarContadorAtual(c as ContadoresInbox, escopo, rows.length));
-      if (devoAutoSelecionar({ temSelecao: !!sel, removeuAgora: removeu, primeiraLinha: rows[0] as LinhaInbox }))
+      // Com uma conversa no endereço (F5, link colado, Voltar/Avançar), a
+      // tela nunca escolhe outra sozinha.
+      if (
+        devoAutoSelecionarComUrl({
+          conversaIdUrl: conversaIdUrlRef.current,
+          temSelecao: !!sel,
+          removeuAgora: removeu,
+          temPrimeiraLinha: devoAutoSelecionar({
+            temSelecao: !!sel,
+            removeuAgora: removeu,
+            primeiraLinha: rows[0] as LinhaInbox,
+          }),
+        })
+      )
         // A seleção automática também passa pela URL, para não existirem dois
         // estados divergentes (endereço x conversa aberta).
         abrirPelaUrl((rows[0] as any)?.id ?? null, true);
