@@ -77,3 +77,29 @@ export function respostaAindaVale(params: {
   if (alvo !== selecionadaAgora) return false;
   return pedido === pedidoAtual;
 }
+
+/**
+ * Quais conversas em cache ficaram desatualizadas depois de uma atualização da
+ * lista (realtime). Comparamos o instante da última mensagem: se mudou, o
+ * conteúdo guardado daquela conversa não vale mais.
+ *
+ * Cada conversa é avaliada isoladamente pelo seu próprio id — o cache de uma
+ * nunca é usado nem invalidado pelo movimento de outra.
+ */
+export function conversasDesatualizadas(params: {
+  anteriores: { id: string; ultima_mensagem_em?: string | null }[];
+  atuais: { id: string; ultima_mensagem_em?: string | null }[];
+  emCache: string[];
+}): string[] {
+  const antes = new Map(params.anteriores.map((c) => [c.id, c.ultima_mensagem_em ?? null]));
+  const cacheados = new Set(params.emCache);
+  const fora: string[] = [];
+  for (const c of params.atuais) {
+    if (!cacheados.has(c.id)) continue;
+    const anterior = antes.get(c.id);
+    const agora = c.ultima_mensagem_em ?? null;
+    if (anterior === undefined) continue;
+    if (anterior !== agora) fora.push(c.id);
+  }
+  return fora;
+}
