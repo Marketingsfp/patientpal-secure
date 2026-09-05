@@ -68,7 +68,7 @@ describe("FASE 4 — cache e realtime da Inbox individual", () => {
       nina: 10,
       nao_atribuidas: 4,
       fechadas: 2,
-      todas: 24,
+      equipe: 24,
     };
     const depois = moverContador(base, "nina", "minhas");
     expect(depois.nina).toBe(9);
