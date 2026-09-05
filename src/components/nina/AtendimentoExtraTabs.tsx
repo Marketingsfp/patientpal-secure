@@ -85,6 +85,9 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
+import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
+
 import {
   ConversationSystemEvent,
   type ConversaEvento,
