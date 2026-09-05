@@ -136,6 +136,7 @@ import {
   assumirConversa,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { destinoConversa } from "@/lib/atendimento/abrir-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -282,14 +283,12 @@ export function AtendInbox() {
   const conversaIdUrl = rotaParams?.conversationId ?? null;
   const abrirPelaUrl = useCallback(
     (id: string | null, replace = false) => {
-      if (!id) {
-        void navigate({ to: "/app/nina", replace });
-        return;
-      }
-      void navigate({ to: "/app/nina/$conversationId", params: { conversationId: id }, replace });
+      // Função central (Fase 5): todo módulo abre conversa por este caminho.
+      void navigate(destinoConversa(id, { replace }) as any);
     },
     [navigate],
   );
+
   // Leitura do endereço dentro de callbacks, sem recriá-los a cada navegação.
   const conversaIdUrlRef = useRef<string | null>(conversaIdUrl);
   useEffect(() => {
