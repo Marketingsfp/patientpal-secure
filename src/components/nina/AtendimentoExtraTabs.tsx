@@ -144,6 +144,7 @@ import {
   criarCacheConversas,
   respostaAindaVale,
 } from "@/lib/atendimento/conversa-cache";
+import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
 import {
   JANELA_INICIAL,
   JANELA_ANTERIOR,
