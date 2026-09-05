@@ -247,6 +247,10 @@ export function AtendInbox() {
   // histórico antigo) + prefetch em andamento + medição de desempenho.
   const janelaRef = useRef(JANELA_INICIAL);
   const prefetchEmCurso = useRef<Set<string>>(new Set());
+  // Buscas de prefetch em andamento (reaproveitadas quando o lead é clicado
+  // antes de o prefetch terminar) e temporizadores de intenção de abertura.
+  const prefetchMsgs = useRef<Map<string, Promise<any[]>>>(new Map());
+  const prefetchTimers = useRef<Map<string, number>>(new Map());
   const medidor = useRef<MedidorConversa | null>(null);
   const [temMaisAntigas, setTemMaisAntigas] = useState(false);
   const [carregandoAntigas, setCarregandoAntigas] = useState(false);
@@ -612,22 +616,20 @@ export function AtendInbox() {
       if (id === selIdRef.current) return;
       if (cacheConversas.current.obter(id) || prefetchEmCurso.current.has(id)) return;
       prefetchEmCurso.current.add(id);
+      // Só as mensagens recentes: o suficiente para o chat abrir na hora.
+      // Nada de histórico completo nem dados de apoio no prefetch.
+      const p = listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } });
+      prefetchMsgs.current.set(id, p as Promise<any[]>);
       void (async () => {
         try {
-          const [m, c, n, ev] = await Promise.all([
-            listarMsgs({ data: { clinicaId, conversaId: id, limit: JANELA_INICIAL } }),
-            obterContato({ data: { clinicaId, conversaId: id } }),
-            listarNotasFn({ data: { clinicaId, conversaId: id } }),
-            listarEventosFn({ data: { clinicaId, conversaId: id } }).catch(
-              () => [] as ConversaEvento[],
-            ),
-          ]);
-          if (c) {
+          const m = (await p) as any[];
+          if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m,
-              contato: c,
-              notas: n,
-              eventos: (ev ?? []) as ConversaEvento[],
+              contato: null,
+              notas: [],
+              eventos: [],
+              parcial: true,
             });
           }
         } catch {
@@ -637,7 +639,36 @@ export function AtendInbox() {
         }
       })();
     },
-    [clinicaId, listarMsgs, obterContato, listarNotasFn, listarEventosFn],
+    [clinicaId, listarMsgs],
+  );
+
+  // Intenção de abrir: o prefetch só dispara depois de ~150ms com o mouse (ou
+  // o foco) parado no lead — evita disparar dezenas de buscas ao passar o
+  // mouse pela lista inteira.
+  const agendarPrefetch = useCallback(
+    (id: string) => {
+      if (prefetchTimers.current.has(id)) return;
+      const t = window.setTimeout(() => {
+        prefetchTimers.current.delete(id);
+        prefetchConversa(id);
+      }, 150);
+      prefetchTimers.current.set(id, t);
+    },
+    [prefetchConversa],
+  );
+  const cancelarPrefetch = useCallback((id: string) => {
+    const t = prefetchTimers.current.get(id);
+    if (t !== undefined) {
+      window.clearTimeout(t);
+      prefetchTimers.current.delete(id);
+    }
+  }, []);
+  useEffect(
+    () => () => {
+      for (const t of prefetchTimers.current.values()) window.clearTimeout(t);
+      prefetchTimers.current.clear();
+    },
+    [],
   );
 
   const carregarConversa = useCallback(async () => {
@@ -659,10 +690,17 @@ export function AtendInbox() {
         pedidoAtual: seqConversa.current,
       });
 
-    const pMensagens = medirRequest(
-      "listarMensagensConversa",
-      listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
-    );
+    // Se o prefetch desta conversa já está em andamento (hover → clique),
+    // reaproveitamos a mesma busca em vez de pedir as mensagens duas vezes.
+    const emVoo =
+      janela === JANELA_INICIAL ? prefetchMsgs.current.get(alvo) : undefined;
+    const pMensagens = emVoo
+      ? emVoo
+      : medirRequest(
+          "listarMensagensConversa",
+          listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+        );
+    prefetchMsgs.current.delete(alvo);
     const pContato = medirRequest(
       "obterDadosContato",
       obterContato({ data: { clinicaId, conversaId: alvo } }),
@@ -761,11 +799,19 @@ export function AtendInbox() {
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
-      setContato(emCache.contato);
-      setNotas(emCache.notas);
-      setEventos(emCache.eventos);
       setConversaCarregadaId(id);
-      setSecundariosCarregadosId(id);
+      if (emCache.parcial) {
+        // Veio do prefetch: o chat já abre, os dados de apoio carregam agora.
+        setContato(null);
+        setNotas([]);
+        setEventos([]);
+        setSecundariosCarregadosId(null);
+      } else {
+        setContato(emCache.contato);
+        setNotas(emCache.notas);
+        setEventos(emCache.eventos);
+        setSecundariosCarregadosId(id);
+      }
       return;
     }
     setConversaCarregadaId(null);
@@ -1391,8 +1437,10 @@ export function AtendInbox() {
                   medidor.current.marcar("click");
                   setSel(c);
                 }}
-                onMouseEnter={() => prefetchConversa(c.id)}
-                onFocus={() => prefetchConversa(c.id)}
+                onMouseEnter={() => agendarPrefetch(c.id)}
+                onMouseLeave={() => cancelarPrefetch(c.id)}
+                onFocus={() => agendarPrefetch(c.id)}
+                onBlur={() => cancelarPrefetch(c.id)}
                 className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
                   sel?.id === c.id
                     ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
