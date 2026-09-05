@@ -834,9 +834,11 @@ export function AtendInbox() {
   useEffect(() => {
     if (!conteudoDaConversa) return;
     medidor.current?.marcar("render");
+    marcarTroca("T5_render");
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         medidor.current?.marcar("scroll");
+        marcarTroca("T6_scroll");
         medidor.current = null;
       });
     });
