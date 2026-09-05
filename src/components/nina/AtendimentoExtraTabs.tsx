@@ -162,7 +162,7 @@ import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEsper
 
 function fmtHora(s?: string | null) {
   if (!s) return "";
-  return new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return formatarDataHoraMensagem(s);
 }
 function fmtData(s?: string | null) {
   if (!s) return "—";
