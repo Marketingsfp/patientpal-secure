@@ -808,7 +808,18 @@ async function executarFerramentaInterna(
           dia: p.dia ?? null,
           canal: "whatsapp",
         });
+        // Guarda o valor OFICIAL da planilha para ele aparecer também no
+        // resumo final antes da confirmação. Nunca estimado.
+        const preco = (resultado as { price?: string | null } | null)?.price ?? null;
+        if (preco) {
+          try {
+            mutarEstado(ctx, { appointment: { price: preco } });
+          } catch {
+            /* estado é acessório aqui: não pode derrubar a consulta */
+          }
+        }
         return { ok: true, ...resultado };
+
       }
 
       case "listar_especialidades": {
