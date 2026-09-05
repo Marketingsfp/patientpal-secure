@@ -755,6 +755,7 @@ export type Database = {
           contato_nome: string | null
           contato_paciente_id: string | null
           contato_telefone: string | null
+          contato_telefone_norm: string | null
           created_at: string
           departamento_id: string | null
           fila_posicao: number | null
@@ -799,6 +800,7 @@ export type Database = {
           contato_nome?: string | null
           contato_paciente_id?: string | null
           contato_telefone?: string | null
+          contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
           fila_posicao?: number | null
@@ -843,6 +845,7 @@ export type Database = {
           contato_nome?: string | null
           contato_paciente_id?: string | null
           contato_telefone?: string | null
+          contato_telefone_norm?: string | null
           created_at?: string
           departamento_id?: string | null
           fila_posicao?: number | null
@@ -8996,7 +8999,9 @@ export type Database = {
           responsavel_telefone: string | null
           sexo: string
           telefone: string | null
+          telefone_norm: string | null
           telefone2: string | null
+          telefone2_norm: string | null
           teste: boolean
           updated_at: string
         }
@@ -9036,7 +9041,9 @@ export type Database = {
           responsavel_telefone?: string | null
           sexo?: string
           telefone?: string | null
+          telefone_norm?: string | null
           telefone2?: string | null
+          telefone2_norm?: string | null
           teste?: boolean
           updated_at?: string
         }
@@ -9076,7 +9083,9 @@ export type Database = {
           responsavel_telefone?: string | null
           sexo?: string
           telefone?: string | null
+          telefone_norm?: string | null
           telefone2?: string | null
+          telefone2_norm?: string | null
           teste?: boolean
           updated_at?: string
         }
@@ -11066,7 +11075,9 @@ export type Database = {
           responsavel_telefone: string | null
           sexo: string
           telefone: string | null
+          telefone_norm: string | null
           telefone2: string | null
+          telefone2_norm: string | null
           teste: boolean
           updated_at: string
         }[]
@@ -12012,6 +12023,7 @@ export type Database = {
           tipo: string
         }[]
       }
+      normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
         Args: { _clinica_id: string; _paciente_id: string }
@@ -12091,7 +12103,9 @@ export type Database = {
           responsavel_telefone: string | null
           sexo: string
           telefone: string | null
+          telefone_norm: string | null
           telefone2: string | null
+          telefone2_norm: string | null
           teste: boolean
           updated_at: string
         }[]
