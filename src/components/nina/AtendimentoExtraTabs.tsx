@@ -31,6 +31,14 @@ import {
   EVENTO_FILTRAR_NAO_ATRIBUIDAS,
   FILTRO_NAO_ATRIBUIDAS_KEY,
 } from "@/components/nina/BannerNaoAtribuidas";
+import {
+  ABRIR_CONVERSA_KEY,
+  EVENTO_ABRIR_CONVERSA,
+  EVENTO_FILTRAR_ESPERA_CRITICA,
+  FILTRO_ESPERA_CRITICA_KEY,
+} from "@/lib/atendimento/central-atencao";
+import { faixaEsperaAtd, minutosDesde } from "@/lib/atendimento/espera";
+
 
 import {
   Dialog,
