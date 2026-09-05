@@ -146,7 +146,41 @@ const ABAS = [
   { valor: "under_review", rotulo: "Em revisão" },
   { valor: "approved", rotulo: "Aprovados" },
   { valor: "rejected", rotulo: "Rejeitados" },
+  { valor: "applied", rotulo: "Aplicados" },
 ] as const;
+
+type Preparo = {
+  plano: PlanoCorrecao;
+  atual: string | null;
+  novo: string;
+  knowledge_status: string;
+  base_version: number | null;
+  ja_na_base: boolean;
+  status: string;
+  acoes: {
+    id: string;
+    tipo: string;
+    camada: string;
+    titulo: string;
+    instrucao: string;
+    status: string;
+    created_at: string;
+    concluido_em: string | null;
+  }[];
+};
+
+type AcaoTecnica = {
+  id: string;
+  feedback_id: string;
+  camada: string;
+  tipo: string;
+  titulo: string;
+  instrucao: string;
+  valor_atual: string | null;
+  valor_novo: string | null;
+  status: string;
+  created_at: string;
+};
 
 function fmtData(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
