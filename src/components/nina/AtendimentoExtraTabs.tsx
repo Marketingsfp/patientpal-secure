@@ -169,7 +169,10 @@ export function AtendInbox() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
   const [fecharOpen, setFecharOpen] = useState(false);
-  const [filaAberta, setFilaAberta] = useState<boolean>(true);
+  // Começa fechada: só entra em "online" depois de ler o status real gravado,
+  // senão a tela avisaria "ONLINE" ao abrir e receberia conversas sem querer.
+  const [filaAberta, setFilaAberta] = useState<boolean>(false);
+  const [statusCarregado, setStatusCarregado] = useState(false);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
   const [pauseReasons, setPauseReasons] = useState<any[]>([]);
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
