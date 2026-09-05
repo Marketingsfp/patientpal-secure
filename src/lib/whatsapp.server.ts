@@ -1015,6 +1015,24 @@ ${procs || "(nenhum)"}`;
     }
   })();
 
+  // FASE 5: execução real do agendamento (sucesso só com retorno do sistema),
+  // tratamento de falha/slot ocupado e encerramento da conversa.
+  const blocoFase5 = await (async () => {
+    try {
+      const { flagFluxoFase5Ativa } = await import("@/lib/nina/atendimento-fase5.server");
+      if (!(await flagFluxoFase5Ativa(clinicaId))) return "";
+      const { blocoPromptFase5 } = await import("@/lib/nina/atendimento-fase5");
+      return blocoPromptFase5({
+        mensagem: mensagemPaciente,
+        estado: fluxoEstado,
+        nomeUnidade,
+        baseAtiva: Boolean(blocoKb),
+      });
+    } catch {
+      return "";
+    }
+  })();
+
   const systemPromptFinal = [
     systemPrompt,
     blocoPromptDisponibilidade(),
@@ -1022,7 +1040,9 @@ ${procs || "(nenhum)"}`;
     blocoFase2,
     blocoFase3,
     blocoFase4,
+    blocoFase5,
     podeAgendar ? blocoPromptAgenda() : "",
+
     blocoAprendizado,
     blocoPromptEstado(fluxoEstado),
   ]
