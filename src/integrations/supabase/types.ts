@@ -7661,6 +7661,62 @@ export type Database = {
           },
         ]
       }
+      nina_feedback_erros: {
+        Row: {
+          categoria: string
+          clinica_id: string
+          conversa_id: string | null
+          correcao: string
+          created_at: string
+          id: string
+          mensagem_id: string | null
+          mensagem_texto: string | null
+          observacao: string | null
+          pergunta_texto: string | null
+          reportado_por: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          clinica_id: string
+          conversa_id?: string | null
+          correcao: string
+          created_at?: string
+          id?: string
+          mensagem_id?: string | null
+          mensagem_texto?: string | null
+          observacao?: string | null
+          pergunta_texto?: string | null
+          reportado_por: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          clinica_id?: string
+          conversa_id?: string | null
+          correcao?: string
+          created_at?: string
+          id?: string
+          mensagem_id?: string | null
+          mensagem_texto?: string | null
+          observacao?: string | null
+          pergunta_texto?: string | null
+          reportado_por?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_feedback_erros_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_kb_bases: {
         Row: {
           arquivo_hash: string | null

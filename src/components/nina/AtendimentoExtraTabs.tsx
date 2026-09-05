@@ -121,6 +121,7 @@ import {
 import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
+import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
@@ -1242,7 +1243,7 @@ export function AtendInbox() {
                 {msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
-                {timeline.map((item) => {
+                {timeline.map((item, idxTimeline) => {
                   if (item.kind === "evento") {
                     return <ConversationSystemEvent key={`ev-${item.ev.id}`} evento={item.ev} />;
                   }
@@ -1260,6 +1261,19 @@ export function AtendInbox() {
                       </div>
                     );
                   }
+                  const daNina = out && m.enviada_por === "nina";
+                  // Pergunta do paciente = última mensagem recebida antes desta.
+                  let perguntaPaciente: string | null = null;
+                  if (daNina) {
+                    for (let i = idxTimeline - 1; i >= 0; i--) {
+                      const ant = timeline[i];
+                      if (ant.kind !== "msg") continue;
+                      if (ant.msg.direction === "in") {
+                        perguntaPaciente = ant.msg.body ?? ant.msg.transcricao ?? null;
+                        break;
+                      }
+                    }
+                  }
                   return (
                     <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
                       <div
@@ -1271,14 +1285,26 @@ export function AtendInbox() {
                       >
                         <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
                         <div
-                          className={`text-[11px] mt-1 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                          className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
-                          {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                          <span>
+                            {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                          </span>
+                          {daNina && clinicaId && (
+                            <ReportarErroNinaBotao
+                              clinicaId={clinicaId}
+                              conversaId={sel.id}
+                              mensagemId={m.id}
+                              respostaNina={m.body ?? ""}
+                              perguntaPaciente={perguntaPaciente}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
                   );
                 })}
+
               </div>
               <div className="border-t p-3 space-y-2">
                 {motivoBloqueio && (
