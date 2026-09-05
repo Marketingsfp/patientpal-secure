@@ -1451,6 +1451,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       });
       contratos = ctR.data ?? [];
     }
+    marcar("agenda_contratos");
 
     const { data: atribuidoProfile } = conv.atribuida_user_id
       ? await context.supabase
