@@ -1278,7 +1278,9 @@ function AppShellInner() {
                 {subsystemLabel ?? "Portais"}
               </span>
             </button>
+            <BannerNaoAtribuidas />
           </div>
+
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
             {clinicaAtual && (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (
