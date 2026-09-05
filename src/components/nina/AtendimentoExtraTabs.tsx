@@ -169,7 +169,10 @@ export function AtendInbox() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
   const [fecharOpen, setFecharOpen] = useState(false);
-  const [filaAberta, setFilaAberta] = useState<boolean>(true);
+  // Começa fechada: só entra em "online" depois de ler o status real gravado,
+  // senão a tela avisaria "ONLINE" ao abrir e receberia conversas sem querer.
+  const [filaAberta, setFilaAberta] = useState<boolean>(false);
+  const [statusCarregado, setStatusCarregado] = useState(false);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
   const [pauseReasons, setPauseReasons] = useState<any[]>([]);
   const [pausaDialogOpen, setPausaDialogOpen] = useState(false);
@@ -228,6 +231,7 @@ export function AtendInbox() {
       setFilaAberta(s.filaAberta);
       setPausaAtiva(p);
       setPauseReasons(rs);
+      setStatusCarregado(true);
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
     }
@@ -287,7 +291,7 @@ export function AtendInbox() {
   }, [manualOffline, pausaAtiva, OCIOSO_MS]);
 
   useEffect(() => {
-    if (!clinicaId) return;
+    if (!clinicaId || !statusCarregado) return;
     const bater = () => {
       presencaFn({
         data: {
@@ -318,7 +322,7 @@ export function AtendInbox() {
       clearInterval(t);
       window.removeEventListener("pagehide", sair);
     };
-  }, [clinicaId, online, manualOffline, presencaFn]);
+  }, [clinicaId, statusCarregado, online, manualOffline, presencaFn]);
 
 
   const alternarFila = async (abrir: boolean) => {
