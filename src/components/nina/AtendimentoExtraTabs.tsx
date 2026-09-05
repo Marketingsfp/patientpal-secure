@@ -1101,13 +1101,21 @@ export function AtendInbox() {
     marcarTroca("T1_selecao");
     janelaRef.current = JANELA_INICIAL;
     setTemMaisAntigas(false);
+    // FASE 4 — conversa já vinculada a um paciente conhecido: o painel de
+    // contato usa o cache por ID enquanto o servidor revalida em segundo plano.
+    const plano = planoAberturaContato({
+      contactId: (sel as any)?.contato_paciente_id ?? null,
+      telefone: (sel as any)?.contato_telefone ?? null,
+    });
+    const contatoEmCache =
+      plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       setMsgs(emCache.msgs);
       setConversaCarregadaId(id);
       if (emCache.parcial) {
         // Veio do prefetch: o chat já abre, os dados de apoio carregam agora.
-        setContato(null);
+        setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
         setNotas([]);
         setEventos([]);
         setSecundariosCarregadosId(null);
@@ -1123,7 +1131,7 @@ export function AtendInbox() {
     setSecundariosCarregadosId(null);
     setMsgs([]);
     setEventos([]);
-    setContato(null);
+    setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
     setNotas([]);
   }, [sel?.id]);
 
