@@ -714,13 +714,24 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+            {soNaoAtribuidas && (
+              <button
+                type="button"
+                onClick={() => setSoNaoAtribuidas(false)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white"
+                title="Mostrar todas as conversas"
+              >
+                Só não atribuídas ({convsVisiveis.length}) ✕
+              </button>
+            )}
 
           </CardHeader>
           <div className="flex-1 overflow-auto border-t">
-            {convs.length === 0 && (
+            {convsVisiveis.length === 0 && (
               <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
             )}
-            {convs.map((c) => (
+            {convsVisiveis.map((c) => (
+
               <button
                 key={c.id}
                 onClick={() => setSel(c)}
