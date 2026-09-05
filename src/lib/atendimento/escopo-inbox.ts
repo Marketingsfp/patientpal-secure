@@ -8,14 +8,25 @@
  * Os filtros são aplicados no backend; o frontend nunca recebe conversas de
  * outro atendente para depois escondê-las.
  */
-export type EscopoInbox = "minhas" | "nao_atribuidas" | "nina" | "todas";
+export type EscopoInbox = "minhas" | "nina" | "nao_atribuidas" | "fechadas" | "todas";
+
+/** Estados considerados "conversa encerrada" pelo filtro Fechadas. */
+export const STATUS_FECHADOS = ["closed", "finished"] as const;
 
 export const ESCOPO_INBOX_PADRAO: EscopoInbox = "minhas";
 
 export interface ConversaEscopo {
   atribuida_user_id?: string | null;
   owner_type?: string | null;
+  status?: string | null;
 }
+
+export type FiltroEscopo =
+  | { tipo: "todas" }
+  | { tipo: "atribuida"; userId: string }
+  | { tipo: "sem_responsavel" }
+  | { tipo: "nina" }
+  | { tipo: "fechadas"; userId: string | null };
 
 /**
  * Escopo efetivo: "todas" só existe para gestor/admin da clínica. Qualquer
@@ -31,7 +42,7 @@ export function filtroEscopoInbox(args: {
   escopo: EscopoInbox;
   userId: string;
   gestor: boolean;
-}): { tipo: "todas" } | { tipo: "atribuida"; userId: string } | { tipo: "sem_responsavel" } | { tipo: "nina" } {
+}): FiltroEscopo {
   const efetivo = escopoEfetivo(args.escopo, args.gestor);
   switch (efetivo) {
     case "todas":
@@ -40,6 +51,10 @@ export function filtroEscopoInbox(args: {
       return { tipo: "sem_responsavel" };
     case "nina":
       return { tipo: "nina" };
+    case "fechadas":
+      // Gestor vê o histórico encerrado da clínica; atendente comum vê o
+      // histórico das conversas que estão sob sua responsabilidade.
+      return { tipo: "fechadas", userId: args.gestor ? null : args.userId };
     default:
       return { tipo: "atribuida", userId: args.userId };
   }
@@ -58,6 +73,11 @@ export function conversaVisivelNoEscopo(
       return !conversa.atribuida_user_id && conversa.owner_type !== "AI";
     case "nina":
       return conversa.owner_type === "AI";
+    case "fechadas":
+      return (
+        STATUS_FECHADOS.includes((conversa.status ?? "") as (typeof STATUS_FECHADOS)[number]) &&
+        (filtro.userId === null || conversa.atribuida_user_id === filtro.userId)
+      );
     default:
       return conversa.atribuida_user_id === filtro.userId;
   }
