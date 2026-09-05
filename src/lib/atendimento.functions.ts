@@ -1422,6 +1422,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
         .maybeSingle();
       paciente = p;
     }
+    marcar("paciente");
 
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
