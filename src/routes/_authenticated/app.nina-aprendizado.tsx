@@ -217,6 +217,13 @@ function Pagina() {
   const [causaEscolhida, setCausaEscolhida] = useState("");
   const [prioridadeEscolhida, setPrioridadeEscolhida] = useState("");
   const [assunto, setAssunto] = useState("");
+  const [aplicando, setAplicando] = useState<Item | null>(null);
+  const [preparo, setPreparo] = useState<Preparo | null>(null);
+  const [preparando, setPreparando] = useState(false);
+  const [confirmado, setConfirmado] = useState(false);
+  const [reindexar, setReindexar] = useState(false);
+  const [obsAplicacao, setObsAplicacao] = useState("");
+  const [acoesAbertas, setAcoesAbertas] = useState<AcaoTecnica[]>([]);
 
   const listar = useServerFn(listarRevisaoFeedbackNina);
   const listarAutores = useServerFn(listarAutoresFeedbackNina);
