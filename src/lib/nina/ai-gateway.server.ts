@@ -28,7 +28,6 @@ import type { KnowledgeStatus } from "./knowledge-contract";
 import {
   selectThinkingLevel,
   nivelNaoRegride,
-  rotuloDebug,
   type ContextoRaciocinio,
   type NivelRaciocinio,
 } from "./reasoning-router";
