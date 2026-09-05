@@ -244,6 +244,22 @@ export async function encaminharParaHumano(args: {
     detalhes: { posicao: count ?? 1 },
   });
 
+  // Reserva o resumo interno desta transferência (idempotente e barato).
+  // O texto em si é produzido depois, quando alguém abre a conversa: falha de
+  // IA nunca pode segurar a fila nem a resposta ao paciente.
+  try {
+    const { reservarResumoHandoff } = await import("./handoff-resumo.server");
+    await reservarResumoHandoff({
+      clinicaId: args.clinicaId,
+      conversaId: args.conversaId,
+      handoffEm: agora,
+      motivo: args.motivo,
+    });
+  } catch (e) {
+    console.error("[handoff] falha ao reservar resumo", e);
+  }
+
+
   await registrarMarcadorSistema({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,

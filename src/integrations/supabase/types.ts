@@ -977,6 +977,56 @@ export type Database = {
           },
         ]
       }
+      atend_handoff_resumos: {
+        Row: {
+          clinica_id: string
+          conversa_id: string
+          created_at: string
+          erro: string | null
+          handoff_em: string
+          id: string
+          motivo: string | null
+          payload: Json | null
+          status: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          clinica_id: string
+          conversa_id: string
+          created_at?: string
+          erro?: string | null
+          handoff_em: string
+          id?: string
+          motivo?: string | null
+          payload?: Json | null
+          status?: string
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          clinica_id?: string
+          conversa_id?: string
+          created_at?: string
+          erro?: string | null
+          handoff_em?: string
+          id?: string
+          motivo?: string | null
+          payload?: Json | null
+          status?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_handoff_resumos_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_horarios: {
         Row: {
           ativo: boolean

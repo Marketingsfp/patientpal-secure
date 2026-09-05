@@ -90,6 +90,7 @@ import {
   esperaConversas,
 } from "@/lib/atendimento.functions";
 import { FilaHumana } from "@/components/nina/FilaHumana";
+import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 
 function fmtHora(s?: string | null) {
@@ -955,6 +956,9 @@ export function AtendInbox() {
                 </div>
               </CardHeader>
               <div className="flex-1 overflow-auto p-4 space-y-2 bg-atd-bg">
+                {clinicaId && (
+                  <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
+                )}
                 {msgs.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
