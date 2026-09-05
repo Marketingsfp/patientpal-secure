@@ -1753,7 +1753,7 @@ export function AtendInbox() {
                         <div
                           className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
-                          <span>
+                          <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
                           </span>
                           {daNina && clinicaId && (
