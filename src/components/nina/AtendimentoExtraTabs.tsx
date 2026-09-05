@@ -130,6 +130,14 @@ import { FilaHumana } from "@/components/nina/FilaHumana";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
+import {
+  JANELA_INICIAL,
+  JANELA_ANTERIOR,
+  mesclarAnteriores,
+  podeCarregarMais,
+  cursorMaisAntigo,
+} from "@/lib/atendimento/mensagens-janela";
+import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
 import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
 import { ReportarErroNinaBotao } from "@/components/nina/ReportarErroNinaDialog";
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -218,6 +226,13 @@ export function AtendInbox() {
   // descartadas. Cache por conversation_id evita tela vazia ao reabrir.
   const seqConversa = useRef(0);
   const cacheConversas = useRef(criarCacheConversas(10));
+  // Janela de mensagens carregadas da conversa aberta (cresce ao pedir o
+  // histórico antigo) + prefetch em andamento + medição de desempenho.
+  const janelaRef = useRef(JANELA_INICIAL);
+  const prefetchEmCurso = useRef<Set<string>>(new Set());
+  const medidor = useRef<MedidorConversa | null>(null);
+  const [temMaisAntigas, setTemMaisAntigas] = useState(false);
+  const [carregandoAntigas, setCarregandoAntigas] = useState(false);
   const seqEspera = useRef(0);
   const convsVisiveis: any[] = (() => {
     let base = soNaoAtribuidas ? convs.filter((c: any) => !c.atribuida_user_id) : convs;
@@ -639,41 +654,6 @@ export function AtendInbox() {
     }
   }, [clinicaId, sel?.id, listarMsgs, obterContato, listarNotasFn, listarEventosFn]);
 
-  // Histórico antigo sob demanda: só é buscado quando a atendente pede,
-  // preservando a posição de leitura (a tela não "pula" ao carregar).
-  const carregarAntigas = useCallback(async () => {
-    if (!clinicaId || !sel?.id || carregandoAntigas) return;
-    const alvo: string = sel.id;
-    const cursor = cursorMaisAntigo(msgs);
-    if (!cursor) return;
-    setCarregandoAntigas(true);
-    const cont = chat.containerRef.current;
-    const alturaAntes = cont?.scrollHeight ?? 0;
-    const topoAntes = cont?.scrollTop ?? 0;
-    try {
-      const antigas = await listarMsgs({
-        data: { clinicaId, conversaId: alvo, limit: JANELA_ANTERIOR, antesDe: cursor },
-      });
-      if (selIdRef.current !== alvo) return;
-      janelaRef.current += JANELA_ANTERIOR;
-      setMsgs((prev) => {
-        const juntas = mesclarAnteriores(prev, antigas as any[]);
-        const atual = cacheConversas.current.obter(alvo);
-        if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
-        return juntas;
-      });
-      setTemMaisAntigas(podeCarregarMais((antigas as any[]).length, JANELA_ANTERIOR));
-      requestAnimationFrame(() => {
-        const c2 = chat.containerRef.current;
-        if (!c2) return;
-        c2.scrollTop = topoAntes + (c2.scrollHeight - alturaAntes);
-      });
-    } catch (e: any) {
-      mostrarErro(e);
-    } finally {
-      setCarregandoAntigas(false);
-    }
-  }, [clinicaId, sel?.id, msgs, carregandoAntigas, listarMsgs, chat]);
 
 
   useEffect(() => {
@@ -808,6 +788,42 @@ export function AtendInbox() {
     total: timeline.length,
     ultimoId: ultimoItemId,
   });
+
+  // Histórico antigo sob demanda: só é buscado quando a atendente pede,
+  // preservando a posição de leitura (a tela não "pula" ao carregar).
+  const carregarAntigas = useCallback(async () => {
+    if (!clinicaId || !sel?.id || carregandoAntigas) return;
+    const alvo: string = sel.id;
+    const cursor = cursorMaisAntigo(msgs);
+    if (!cursor) return;
+    setCarregandoAntigas(true);
+    const cont = chat.containerRef.current;
+    const alturaAntes = cont?.scrollHeight ?? 0;
+    const topoAntes = cont?.scrollTop ?? 0;
+    try {
+      const antigas = await listarMsgs({
+        data: { clinicaId, conversaId: alvo, limit: JANELA_ANTERIOR, antesDe: cursor },
+      });
+      if (selIdRef.current !== alvo) return;
+      janelaRef.current += JANELA_ANTERIOR;
+      setMsgs((prev) => {
+        const juntas = mesclarAnteriores(prev, antigas as any[]);
+        const atual = cacheConversas.current.obter(alvo);
+        if (atual) cacheConversas.current.guardar(alvo, { ...atual, msgs: juntas });
+        return juntas;
+      });
+      setTemMaisAntigas(podeCarregarMais((antigas as any[]).length, JANELA_ANTERIOR));
+      requestAnimationFrame(() => {
+        const c2 = chat.containerRef.current;
+        if (!c2) return;
+        c2.scrollTop = topoAntes + (c2.scrollHeight - alturaAntes);
+      });
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setCarregandoAntigas(false);
+    }
+  }, [clinicaId, sel?.id, msgs, carregandoAntigas, listarMsgs, chat]);
 
 
   const janela24hExpirada = (() => {
