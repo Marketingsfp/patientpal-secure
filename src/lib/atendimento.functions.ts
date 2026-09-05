@@ -1569,6 +1569,7 @@ export const obterDadosContato = createServerFn({ method: "POST" })
           .eq("id", resolvido.pacienteId)
           .maybeSingle();
         paciente = p;
+        contatoVia = resolvido.viaVinculo ? "id" : "telefone";
         if (resolvido.vinculado) (conv as any).contato_paciente_id = resolvido.pacienteId;
       }
     }
