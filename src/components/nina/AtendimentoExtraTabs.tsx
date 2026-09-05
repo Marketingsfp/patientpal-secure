@@ -693,6 +693,8 @@ export function AtendInbox() {
         setNotas([]);
         setEventos([]);
         toast.info(avisoSaidaEscopo(escopo));
+        // O endereço acompanha: sem conversa aberta, volta para /app/nina.
+        abrirPelaUrl(null, true);
       }
       setConvs((prev: any[]) => {
         // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
