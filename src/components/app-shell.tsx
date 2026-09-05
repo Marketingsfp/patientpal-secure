@@ -490,7 +490,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
             icon: FileText,
           },
           { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
-          { to: "/app/nina", hash: "aprendizado", label: "Aprendizado", icon: Brain },
           {
             to: "/app/nina",
             hash: "base-conhecimento",

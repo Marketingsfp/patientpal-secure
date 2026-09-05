@@ -45,7 +45,6 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { chatNina } from "@/lib/nina.functions";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
-import NinaAprendizado from "@/components/nina/NinaAprendizado";
 import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
 
 import {
@@ -226,7 +225,6 @@ function NinaPage() {
     "homologacao",
     "atend-macros",
     "atend-inbox",
-    "aprendizado",
     "base-conhecimento",
   ].includes(hashAba)
     ? hashAba === "chat"
@@ -436,9 +434,6 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ APRENDIZADO ============ */}
-        <TabsContent value="aprendizado">
-          <NinaAprendizado />
-        </TabsContent>
 
         {/* ============ BASE DE CONHECIMENTOS ============ */}
         <TabsContent value="base-conhecimento">
