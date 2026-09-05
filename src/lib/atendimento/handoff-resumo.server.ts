@@ -169,6 +169,13 @@ export async function garantirResumoHandoff(args: {
   clinicaId: string;
   conversaId: string;
   forcar?: boolean;
+  /** Contexto real do fluxo (não vem da IA): última pergunta, etapa, pendências. */
+  extras?: {
+    ultimaPergunta?: string | null;
+    etapaInterrompida?: string | null;
+    pendenciasExtras?: string[];
+    informacoesExtras?: string[];
+  };
 }): Promise<LinhaResumo | null> {
   const { clinicaId, conversaId } = args;
   const { data: convData } = await supabaseAdmin
@@ -210,6 +217,7 @@ export async function garantirResumoHandoff(args: {
     const payload = normalizarResumo(bruto, {
       motivoHandoff: conv.handoff_motivo ?? null,
       agendamentoReal: agendado,
+      ...(args.extras ?? {}),
     });
     const { data } = await supabaseAdmin
       .from(TABELA as never)
