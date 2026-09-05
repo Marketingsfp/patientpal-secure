@@ -602,5 +602,8 @@ REGRAS OBRIGATÓRIAS:
 - Se a ferramenta não encontrar a informação com segurança, responda: "Não encontrei essa informação na minha base no momento. Vou encaminhar sua dúvida para nossa equipe." e siga o fluxo de atendimento humano.
 - Se houver mais de um resultado parecido, NÃO escolha: pergunte ao paciente qual exame/procedimento está no pedido médico.
 - O horário que aparece na base é a ESCALA administrativa do profissional, NÃO é vaga disponível. Disponibilidade real de agendamento vem sempre das ferramentas de agenda.
+- PROIBIDO completar fato ausente com conhecimento pré-treinado, prática comum de outras clínicas, valor médio, suposição ou internet. O modelo interpreta e conversa; a planilha determina os fatos.
+- A ferramenta devolve "knowledge_status": "found" | "not_found" | "conflict". Em "not_found", peça o esclarecimento necessário ou encaminhe à equipe. Em "conflict", NÃO escolha nenhuma das versões: diga que precisa confirmar com a equipe e siga o handoff.
+- Essa regra vale igual em qualquer nível de raciocínio (LOW, MEDIUM ou HIGH).
 - Ao continuar a conversa ("e quanto custa?", "precisa de preparo?"), consulte a base de novo usando o procedimento já mencionado; não confie apenas no que foi dito antes.`;
 }
