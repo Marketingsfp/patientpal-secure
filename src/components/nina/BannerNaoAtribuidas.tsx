@@ -64,17 +64,17 @@ export function BannerNaoAtribuidas() {
       title="Ver apenas as conversas sem atendente"
       aria-label={`${total} conversas não atribuídas. Abrir fila.`}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 h-9 text-xs font-bold text-white",
-        "shadow-sm will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400",
-        nivel === "padrao" && "bg-red-600 animate-[fila-alerta_1.5s_ease-in-out_infinite]",
-        nivel === "alto" && "bg-red-600 animate-[fila-alerta-alto_1.2s_ease-in-out_infinite]",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-atd-on-strong",
+        "shadow-sm will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-atd-danger/60",
+        nivel === "padrao" && "bg-atd-danger animate-[fila-alerta_1.5s_ease-in-out_infinite]",
+        nivel === "alto" && "bg-atd-danger animate-[fila-alerta-alto_1.2s_ease-in-out_infinite]",
         nivel === "critico" &&
-          "bg-red-700 ring-2 ring-red-300 animate-[fila-alerta-critico_0.9s_ease-in-out_infinite]",
+          "bg-atd-danger-strong ring-2 ring-atd-danger/40 animate-[fila-alerta-critico_0.9s_ease-in-out_infinite]",
       )}
     >
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="hidden sm:inline">Não atribuídas</span>
-      <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-white/25 px-1 text-[11px] font-extrabold tabular-nums">
+      <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-atd-on-strong/25 px-1 text-[11px] font-extrabold tabular-nums">
         {total}
       </span>
     </button>
