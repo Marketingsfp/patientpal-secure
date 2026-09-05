@@ -7669,15 +7669,24 @@ export type Database = {
           correcao: string
           correcao_original: string | null
           created_at: string
+          diagnosticado_em: string | null
+          diagnosticado_por: string | null
+          grupo_chave: string | null
+          grupo_titulo: string | null
           id: string
+          knowledge_consultado_em: string | null
+          knowledge_snapshot: Json | null
+          knowledge_status: string | null
           mensagem_id: string | null
           mensagem_texto: string | null
           motivo_rejeicao: string | null
           observacao: string | null
           pergunta_texto: string | null
+          prioridade: string | null
           reportado_por: string
           revisado_em: string | null
           revisado_por: string | null
+          root_cause: string | null
           status: string
           unidade_id: string | null
           updated_at: string
@@ -7689,15 +7698,24 @@ export type Database = {
           correcao: string
           correcao_original?: string | null
           created_at?: string
+          diagnosticado_em?: string | null
+          diagnosticado_por?: string | null
+          grupo_chave?: string | null
+          grupo_titulo?: string | null
           id?: string
+          knowledge_consultado_em?: string | null
+          knowledge_snapshot?: Json | null
+          knowledge_status?: string | null
           mensagem_id?: string | null
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
+          prioridade?: string | null
           reportado_por: string
           revisado_em?: string | null
           revisado_por?: string | null
+          root_cause?: string | null
           status?: string
           unidade_id?: string | null
           updated_at?: string
@@ -7709,15 +7727,24 @@ export type Database = {
           correcao?: string
           correcao_original?: string | null
           created_at?: string
+          diagnosticado_em?: string | null
+          diagnosticado_por?: string | null
+          grupo_chave?: string | null
+          grupo_titulo?: string | null
           id?: string
+          knowledge_consultado_em?: string | null
+          knowledge_snapshot?: Json | null
+          knowledge_status?: string | null
           mensagem_id?: string | null
           mensagem_texto?: string | null
           motivo_rejeicao?: string | null
           observacao?: string | null
           pergunta_texto?: string | null
+          prioridade?: string | null
           reportado_por?: string
           revisado_em?: string | null
           revisado_por?: string | null
+          root_cause?: string | null
           status?: string
           unidade_id?: string | null
           updated_at?: string

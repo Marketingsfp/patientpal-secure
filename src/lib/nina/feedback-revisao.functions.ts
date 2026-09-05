@@ -26,7 +26,7 @@ const STATUS = [
 export type StatusFeedbackNina = (typeof STATUS)[number];
 
 const COLUNAS =
-  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at";
+  "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em";
 
 type ClienteSupabase = {
   rpc: (
@@ -121,7 +121,21 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
     const { data: todos } = await qc;
     for (const l of todos ?? []) contagens[l.status] = (contagens[l.status] ?? 0) + 1;
 
-    return { itens, pessoas, contagens };
+    // Agrupamento: quantas ocorrências existem por problema (registros
+    // individuais continuam intactos, só ficam vinculados pela chave).
+    const ocorrencias: Record<string, number> = {};
+    const { data: grupos } = await context.supabase
+      .from("nina_feedback_erros")
+      .select("grupo_chave")
+      .eq("clinica_id", data.clinicaId)
+      .not("grupo_chave", "is", null)
+      .limit(5000);
+    for (const g of grupos ?? []) {
+      const k = g.grupo_chave as string | null;
+      if (k) ocorrencias[k] = (ocorrencias[k] ?? 0) + 1;
+    }
+
+    return { itens, pessoas, contagens, ocorrencias };
   });
 
 /** Lista quem já reportou erros na clínica — alimenta o filtro por atendente. */
