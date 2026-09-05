@@ -481,8 +481,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         label: "Nina — WhatsApp",
         icon: MessageCircle,
         children: [
-          { to: "/app/nina", hash: "treinada", label: "Nina treinada", icon: Brain },
-          { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
           { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
           {
             to: "/app/nina",
@@ -1282,7 +1280,6 @@ function AppShellInner() {
             </button>
             <BannerNaoAtribuidas />
           </div>
-
 
           <div className="flex flex-1 items-center justify-end gap-3 min-w-0 sm:flex-none sm:justify-center">
             {clinicaAtual && (branding?.logo_url || logoDaClinica(clinicaAtual.clinica.nome)) && (
