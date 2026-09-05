@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CalendarPlus,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +32,7 @@ import {
   FileBarChart,
   FileSpreadsheet,
   Minus,
+  PhoneCall,
   Printer,
   Search,
 } from "lucide-react";
@@ -86,6 +88,26 @@ import {
   type TotaisSessoes,
 } from "@/lib/sessoes/relatorio-sessoes";
 import { carregarSessoes } from "@/lib/sessoes/carregar-sessoes";
+// Busca ativa: o relatório diz QUEM sumiu; estes três recursos são o que a
+// recepção faz com a lista sem sair da tela — ver o contato, marcar a próxima
+// e anotar o que já foi tentado.
+import {
+  COR_RESULTADO,
+  referenciaDaPosicao,
+  ROTULO_RESULTADO_CURTO,
+  ultimoContatoPorPaciente,
+  type ContatoBuscaAtiva,
+} from "@/lib/sessoes/busca-ativa-contatos";
+import { carregarContatos } from "@/lib/sessoes/carregar-contatos";
+import {
+  ContatoPacienteDrawer,
+  type PacienteDaLista,
+} from "@/components/sessoes/contato-paciente-drawer";
+import {
+  RegistrarContatoDialog,
+  type AlvoDoContato,
+} from "@/components/sessoes/registrar-contato-dialog";
+import { useAcessoModulo } from "@/hooks/use-permissoes";
 import {
   agruparRateio,
   carregarContextoRateio,
@@ -575,6 +597,24 @@ function Page() {
   // Recorte da MESMA lista carregada, como o sintético/analítico do extrato:
   // trocar de "Tudo" para "Busca ativa" não vai ao banco de novo.
   const [sFiltro, setSFiltro] = useState<FiltroSessoes>("todos");
+
+  // --- Busca ativa: contato, agendamento e histórico -----------------------
+  // Registrar contato é ato de recepção, mas a tela mora no Financeiro. Vale a
+  // escrita em qualquer um dos três módulos que já abrem o relatório, que é
+  // exatamente a régua da policy da tabela `busca_ativa_contatos`.
+  const acessoRecepcao = useAcessoModulo("recepcao");
+  const acessoFinanceiro = useAcessoModulo("financeiro");
+  const acessoRelatorios = useAcessoModulo("relatorios");
+  const podeRegistrarContato =
+    acessoRecepcao === "write" || acessoFinanceiro === "write" || acessoRelatorios === "write";
+  /** Paciente cujo painel de contato está aberto (clique no nome). */
+  const [pacienteAberto, setPacienteAberto] = useState<PacienteDaLista | null>(null);
+  /** Paciente do modal "Registrar contato". */
+  const [alvoContato, setAlvoContato] = useState<AlvoDoContato | null>(null);
+  const [contatos, setContatos] = useState<ContatoBuscaAtiva[]>([]);
+  /** Sobe a cada gravação para o efeito reler o histórico. */
+  const [contatosVersao, setContatosVersao] = useState(0);
+
   // --- Comparação de períodos ---------------------------------------------
   const [comparar, setComparar] = useState(false);
   const [modoComparacao, setModoComparacao] = useState<ModoComparacao>("anterior");
@@ -622,9 +662,30 @@ function Page() {
   // CONSULTA, e não o recorte: ela responde outra pergunta, com outra janela de
   // datas. Por isso entra na chave — sem isso, alternar entre posição e
   // movimento reaproveitaria o resultado já carregado, que é do outro modo.
+  /**
+   * Data de referência da visão de posição.
+   *
+   * A tela abre no mês corrente, cujo fim é uma data FUTURA — no dia 05 o
+   * período vai até o dia 30. Mandando o dia 30 ao banco, a coluna "Dias
+   * parado" contava 25 dias que ainda não passaram (um paciente visto em 09/07
+   * aparecia com 83 dias de atraso quando o real era 58) e quem já tinha
+   * remarcado para o dia 20 continuava listado como "sem agendamento", porque o
+   * banco só reconhece como próxima data o que cai DEPOIS da referência.
+   *
+   * No modo movimento a data continua sendo a digitada: lá ela é janela fechada
+   * de produção, e encolhê-la esconderia atendimento já realizado.
+   */
+  const hojeISO = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  })();
+  const ateSessoes = modoDoFiltro(sFiltro) === "posicao" ? referenciaDaPosicao(to, hojeISO) : to;
+
   const chaveAtual =
     tipo === "sessoes"
-      ? `sessoes|${from}|${to}|${modoDoFiltro(sFiltro)}`
+      ? `sessoes|${from}|${ateSessoes}|${modoDoFiltro(sFiltro)}`
       : tipo === "rateio"
         ? [
             "rateio",
@@ -748,6 +809,99 @@ function Page() {
     () => totaisSessoes(filtrarSessoes(sessoesCruas, sFiltro)),
     [sessoesCruas, sFiltro],
   );
+  /**
+   * As mesmas linhas da tabela, mas CRUAS.
+   *
+   * A tabela é genérica e trabalha com registros já formatados, que não
+   * carregam `paciente_id` — e não podem carregar: o CSV é montado a partir das
+   * chaves do primeiro registro, então qualquer campo extra vira uma coluna de
+   * ids na planilha do financeiro. Como `linhasSessoes` aplica exatamente este
+   * mesmo filtro e nesta mesma ordem, a linha `i` da tabela é a linha `i` daqui,
+   * e é assim que o clique no nome sabe de qual paciente se trata.
+   */
+  const sessoesFiltradas = useMemo(
+    () => filtrarSessoes(sessoesCruas, sFiltro),
+    [sessoesCruas, sFiltro],
+  );
+
+  /**
+   * Histórico de contato dos pacientes que estão na lista.
+   *
+   * Carregado à parte do relatório porque muda por outro motivo: o relatório só
+   * recarrega ao clicar em "Buscar", enquanto o contato acabou de ser
+   * registrado na linha ao lado e tem que aparecer na hora.
+   */
+  useEffect(() => {
+    if (tipo !== "sessoes" || !clinicaAtual || sessoesFiltradas.length === 0) {
+      setContatos([]);
+      return;
+    }
+    let cancelado = false;
+    void (async () => {
+      try {
+        const lista = await carregarContatos(
+          clinicaAtual.clinica_id,
+          sessoesFiltradas.map((l) => l.paciente_id),
+        );
+        if (!cancelado) setContatos(lista);
+      } catch {
+        // Silencioso de propósito: o relatório em si continua válido sem a
+        // coluna de contatos, e um toast de erro a cada busca atrapalharia a
+        // conferência do financeiro, que não usa essa coluna.
+        if (!cancelado) setContatos([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [tipo, clinicaAtual?.clinica_id, sessoesFiltradas, contatosVersao]);
+
+  const contatoPorPaciente = useMemo(() => ultimoContatoPorPaciente(contatos), [contatos]);
+
+  /** A tabela ganha as colunas de ação só na visão de posição, que é a da recepção. */
+  const mostrarAcoes = tipo === "sessoes" && modoDoFiltro(sFiltro) === "posicao";
+
+  /** Uma linha do relatório traduzida para o que os painéis de contato pedem. */
+  const pacienteDaLinha = (i: number): PacienteDaLista | null => {
+    const l = sessoesFiltradas[i];
+    if (!l) return null;
+    return {
+      pacienteId: l.paciente_id,
+      pacienteNome: l.paciente_nome,
+      origem: l.origem,
+      procedimento: l.procedimento,
+      profissional: l.profissional,
+      ultimaData: l.ultima_data,
+      diasParado: l.dias_parado,
+    };
+  };
+
+  /**
+   * "Agendar próxima" leva para a Agenda com o paciente, o serviço e o dia já
+   * escolhidos. Marcar dentro do relatório exigiria repetir aqui a grade do
+   * médico, os encaixes e as travas de horário — e uma segunda implementação
+   * dessas regras é como nasce agendamento em horário que não existe.
+   *
+   * O dia sugerido é hoje: a manutenção já está atrasada, então o que a recepção
+   * negocia ao telefone é a primeira data possível, não uma data do ciclo.
+   */
+  const irParaAgenda = (p: PacienteDaLista) => {
+    const hoje = new Date();
+    const dia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(
+      hoje.getDate(),
+    ).padStart(2, "0")}`;
+    const q = new URLSearchParams({
+      novo: "1",
+      novoPacId: p.pacienteId,
+      novoPacNome: p.pacienteNome,
+      novoData: dia,
+      novoProc: p.procedimento,
+    });
+    // Navegação de página inteira, e não do roteador: a Agenda lê estes
+    // parâmetros uma única vez, num efeito protegido por `useRef`, que só volta
+    // a valer quando a tela monta do zero. Entrar por aqui garante isso.
+    window.location.assign(`/app/agenda?${q.toString()}`);
+  };
   /**
    * Quebra das entradas por forma, no card "Recebido". Sai das movimentações
    * cruas, e não das linhas da tabela: trocar de sintético para analítico muda
@@ -1181,7 +1335,9 @@ function Page() {
         sessoes = await carregarSessoes({
           clinicaId: clinicaAtual.clinica_id,
           de: from,
-          ate: to,
+          // Na posição, o fim do período não vai além de hoje — ver o comentário
+          // de `ateSessoes`. No movimento é a data digitada.
+          ate: ateSessoes,
           modo: modoDoFiltro(sFiltro),
         });
         data = linhasSessoes(sessoes, sFiltro);
@@ -1288,7 +1444,7 @@ function Page() {
           "Só o que foi realizado dentro do período. Esta visão fecha com o caixa da janela.",
         );
       } else {
-        linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(to)}`);
+        linhasCtx.push(`${ROTULO_FILTRO[sFiltro]} · posição em ${fmtDate(ateSessoes)}`);
         linhasCtx.push(
           "Tratamento em andamento aparece mesmo tendo começado antes do período; o período só limita os pacotes já encerrados.",
         );
@@ -1526,7 +1682,7 @@ function Page() {
         periodo:
           modoDoFiltro(sFiltro) === "movimento"
             ? `${periodo} · ${ROTULO_FILTRO[sFiltro]} · só o que foi realizado dentro do período`
-            : `Posição em ${fmtDate(to)} · ${ROTULO_FILTRO[sFiltro]} · tratamento em andamento entra de qualquer data; o período (${periodo}) só limita os pacotes encerrados`,
+            : `Posição em ${fmtDate(ateSessoes)} · ${ROTULO_FILTRO[sFiltro]} · tratamento em andamento entra de qualquer data; o período (${periodo}) só limita os pacotes encerrados`,
         colunas: colunas.map((c) => ({ rotulo: c.rotulo, numerica: alinhaDireita(c) })),
         linhas: data.map((linha) => colunas.map((c) => celula(c, linha[c.chave]))),
         totais: rodapeSessoes(colunas, ts),
@@ -2012,10 +2168,23 @@ function Page() {
                     <strong>sessões contratadas x realizadas</strong> e situação de pagamento.
                     Manutenção de aparelho é cobrada <strong>por comparecimento</strong>: falta não
                     vira dívida, entra como paciente a buscar. A coluna <em>Dias parado</em> conta a
-                    partir de {fmtDate(to)}.
+                    partir de {fmtDate(ateSessoes)} — o atraso nunca é medido por uma data que ainda
+                    não chegou, mesmo quando o período escolhido termina no futuro.
                   </p>
                 )}
               </div>
+              {/* A recepção trabalha esta lista sem trocar de tela. Escrito aqui
+                  porque o nome do paciente virar botão não é óbvio: sem a dica,
+                  a coluna continua sendo lida como texto. */}
+              {modoDoFiltro(sFiltro) === "posicao" && (
+                <p className="mt-3 border-t border-slate-200 pt-2.5 text-xs text-muted-foreground">
+                  <strong>Para a recepção:</strong> clique no <strong>nome do paciente</strong> para
+                  ver telefone, WhatsApp e CPF. Use <strong>Agendar</strong> para abrir a Agenda já
+                  com o paciente e o serviço preenchidos, e <strong>Contato</strong> para anotar o
+                  que aconteceu na ligação — a anotação fica no histórico do paciente e aparece na
+                  coluna <em>Último contato</em>.
+                </p>
+              )}
             </div>
           )}
 
@@ -2244,14 +2413,14 @@ function Page() {
                 {tipo === "sessoes"
                   ? modoDoFiltro(sFiltro) === "movimento"
                     ? `${fmtDate(from)} a ${fmtDate(to)}`
-                    : `posição em ${fmtDate(to)}`
+                    : `posição em ${fmtDate(ateSessoes)}`
                   : `${fmtDate(from)} a ${fmtDate(to)}`}
               </CardTitle>
               {tipo === "sessoes" && modoDoFiltro(sFiltro) === "posicao" && (
                 <p className="text-xs text-muted-foreground">
                   Tratamento em andamento aparece sempre, mesmo tendo começado antes desta data — é
                   por isso que existem visitas antigas na lista. O período escolhido só limita os
-                  pacotes já <strong>encerrados</strong>: {fmtDate(from)} a {fmtDate(to)}.
+                  pacotes já <strong>encerrados</strong>: {fmtDate(from)} a {fmtDate(ateSessoes)}.
                 </p>
               )}
               {tipo === "sessoes" && modoDoFiltro(sFiltro) === "movimento" && (
@@ -2289,28 +2458,110 @@ function Page() {
                             {c.rotulo}
                           </TableHead>
                         ))}
+                        {/* Duas colunas que existem só na tela da recepção. Não
+                            entram em `colunas` de propósito: aquela lista é a
+                            fonte do CSV, do Excel e do papel, e botão não se
+                            imprime. */}
+                        {mostrarAcoes && <TableHead>Último contato</TableHead>}
+                        {mostrarAcoes && <TableHead className="text-right">Ação</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {linhasDaPagina.map((linha, i) => (
-                        <TableRow key={inicio + i}>
-                          {colunas.map((c) => (
-                            <TableCell
-                              key={c.chave}
-                              className={cn(
-                                alinhaDireita(c) && "text-right whitespace-nowrap tabular-nums",
-                                ehVariacao(c) && `font-medium ${corDaVariacao(linha[c.chave])}`,
-                                // Linha que só existe no período comparado: o
-                                // agrupador some do período atual, e o cinza
-                                // evita ler zero como se fosse produção real.
-                                linha.somenteAnterior === true && "text-muted-foreground",
-                              )}
-                            >
-                              {celula(c, linha[c.chave])}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
+                      {linhasDaPagina.map((linha, i) => {
+                        const pac = mostrarAcoes ? pacienteDaLinha(inicio + i) : null;
+                        const ultimo = pac ? contatoPorPaciente.get(pac.pacienteId) : undefined;
+                        return (
+                          <TableRow key={inicio + i}>
+                            {colunas.map((c) => (
+                              <TableCell
+                                key={c.chave}
+                                className={cn(
+                                  alinhaDireita(c) && "text-right whitespace-nowrap tabular-nums",
+                                  ehVariacao(c) && `font-medium ${corDaVariacao(linha[c.chave])}`,
+                                  // Linha que só existe no período comparado: o
+                                  // agrupador some do período atual, e o cinza
+                                  // evita ler zero como se fosse produção real.
+                                  linha.somenteAnterior === true && "text-muted-foreground",
+                                )}
+                              >
+                                {/* O nome do paciente abre o painel de contato.
+                                    É o clique mais natural da tela: quem lê a
+                                    lista está procurando com quem falar. */}
+                                {pac && c.chave === "paciente" ? (
+                                  <button
+                                    type="button"
+                                    className="text-left font-medium text-primary underline-offset-2 hover:underline"
+                                    onClick={() => setPacienteAberto(pac)}
+                                  >
+                                    {celula(c, linha[c.chave])}
+                                  </button>
+                                ) : (
+                                  celula(c, linha[c.chave])
+                                )}
+                              </TableCell>
+                            ))}
+                            {mostrarAcoes && (
+                              <TableCell className="whitespace-nowrap">
+                                {ultimo ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn("font-medium", COR_RESULTADO[ultimo.resultado])}
+                                    title={ultimo.observacao || undefined}
+                                  >
+                                    {ROTULO_RESULTADO_CURTO[ultimo.resultado]} ·{" "}
+                                    {fmtDate(ultimo.criado_em.slice(0, 10))}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
+                            {mostrarAcoes && (
+                              <TableCell className="whitespace-nowrap text-right">
+                                <div className={cn("flex justify-end gap-1", !pac && "hidden")}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-slate-600 hover:text-primary"
+                                    title="Agendar próxima"
+                                    onClick={() => pac && irParaAgenda(pac)}
+                                  >
+                                    <CalendarPlus className="h-4 w-4" />
+                                    <span className="sr-only sm:not-sr-only sm:ml-1.5">
+                                      Agendar
+                                    </span>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-slate-600 hover:text-primary"
+                                    title={
+                                      podeRegistrarContato
+                                        ? "Registrar contato"
+                                        : "Seu perfil não tem permissão para registrar contato."
+                                    }
+                                    disabled={!podeRegistrarContato}
+                                    onClick={() =>
+                                      pac &&
+                                      setAlvoContato({
+                                        pacienteId: pac.pacienteId,
+                                        pacienteNome: pac.pacienteNome,
+                                        origem: pac.origem,
+                                        procedimento: pac.procedimento,
+                                      })
+                                    }
+                                  >
+                                    <PhoneCall className="h-4 w-4" />
+                                    <span className="sr-only sm:not-sr-only sm:ml-1.5">
+                                      Contato
+                                    </span>
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                     <TableFooter>
                       <TableRow>
@@ -2326,6 +2577,11 @@ function Page() {
                             {rodape[i]}
                           </TableCell>
                         ))}
+                        {/* Duas células vazias fechando as colunas de tela. Sem
+                            elas o rodapé fica com menos colunas que o cabeçalho
+                            e o TOTAL GERAL desalinha da coluna que soma. */}
+                        {mostrarAcoes && <TableCell />}
+                        {mostrarAcoes && <TableCell />}
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -2385,6 +2641,32 @@ function Page() {
           </CardContent>
         </Card>
       )}
+
+      {/* Painéis da busca ativa. Ficam fora do card da tabela porque o painel de
+          contato continua aberto enquanto a recepção troca de página da lista. */}
+      <ContatoPacienteDrawer
+        alvo={pacienteAberto}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        clinicaNome={clinicaAtual?.clinica.nome ?? "clínica"}
+        contatos={contatos}
+        podeRegistrar={podeRegistrarContato}
+        onFechar={() => setPacienteAberto(null)}
+        onAgendar={irParaAgenda}
+        onRegistrarContato={(p) =>
+          setAlvoContato({
+            pacienteId: p.pacienteId,
+            pacienteNome: p.pacienteNome,
+            origem: p.origem,
+            procedimento: p.procedimento,
+          })
+        }
+      />
+      <RegistrarContatoDialog
+        alvo={alvoContato}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        onFechar={() => setAlvoContato(null)}
+        onRegistrado={() => setContatosVersao((v) => v + 1)}
+      />
     </div>
   );
 }

@@ -1652,7 +1652,8 @@ function AgendaPage() {
     editing?.id,
   ]);
   // Abre o diálogo "Novo agendamento" pré-preenchido a partir de querystring
-  // (usado pelo botão "Agendar" da conversa do WhatsApp).
+  // (usado pelo botão "Agendar" da conversa do WhatsApp e pelo "Agendar
+  // próxima" da busca ativa, na tela Sessões e Manutenções).
   const novoFromUrlConsumido = useRef(false);
   useEffect(() => {
     if (novoFromUrlConsumido.current) return;
@@ -1668,7 +1669,19 @@ function AgendaPage() {
     const pacIdParam = sp.get("novoPacId") || "";
     const pacNomeParam = sp.get("novoPacNome") || "";
     const telParam = sp.get("novoTelefone") || "";
-    const base = new Date(`${dataRef}T09:00:00`);
+    // Dia e serviço sugeridos pela busca ativa. A data só é aceita no formato
+    // ISO da própria URL; qualquer outra coisa cai no dia que a agenda já
+    // estava mostrando, porque uma data inválida viraria "Invalid Date" no
+    // campo de horário e o balcão perderia o agendamento.
+    const dataParam = sp.get("novoData") || "";
+    const dataValida = /^\d{4}-\d{2}-\d{2}$/.test(dataParam) ? dataParam : "";
+    const procParam = (sp.get("novoProc") || "").slice(0, 120);
+    const dia = dataValida || dataRef;
+    // O dia sugerido também vira o dia exibido na grade: abrir o formulário
+    // marcando 20/10 com a agenda desenhando 05/09 faria a recepção escolher
+    // um horário que não é o do agendamento.
+    if (dataValida && dataValida !== dataRef) setDataRef(dataValida);
+    const base = new Date(`${dia}T09:00:00`);
     const end = new Date(base.getTime() + 30 * 60000);
     void (async () => {
       let pacienteId = "";
@@ -1692,13 +1705,16 @@ function AgendaPage() {
         fim: toLocalInput(end.toISOString()),
         paciente_id: pacienteId,
         paciente_nome: pacienteNome,
+        procedimento: procParam,
         observacoes: "",
       });
       setOpen(true);
     })();
     // Limpa os params da URL para não reabrir ao recarregar.
     const url = new URL(window.location.href);
-    ["novo", "novoPacId", "novoPacNome", "novoTelefone"].forEach((k) => url.searchParams.delete(k));
+    ["novo", "novoPacId", "novoPacNome", "novoTelefone", "novoData", "novoProc"].forEach((k) =>
+      url.searchParams.delete(k),
+    );
     window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams}` : ""));
   }, [clinicaAtual?.clinica_id, dataRef]);
   // Reagendamento

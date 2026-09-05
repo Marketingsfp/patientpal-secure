@@ -1812,6 +1812,42 @@ export type Database = {
           },
         ]
       }
+      busca_ativa_contatos: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          id: string
+          observacao: string | null
+          origem: string
+          paciente_id: string
+          procedimento: string
+          registrado_por: string | null
+          resultado: string
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          origem?: string
+          paciente_id: string
+          procedimento?: string
+          registrado_por?: string | null
+          resultado: string
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          id?: string
+          observacao?: string | null
+          origem?: string
+          paciente_id?: string
+          procedimento?: string
+          registrado_por?: string | null
+          resultado?: string
+        }
+        Relationships: []
+      }
       caixa_movimentos: {
         Row: {
           clinica_id: string
