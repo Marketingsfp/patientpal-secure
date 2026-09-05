@@ -233,6 +233,10 @@ function Pagina() {
   const lerConversa = useServerFn(lerConversaFeedbackNina);
   const consultarBase = useServerFn(consultarBaseFeedbackNina);
   const salvarDiagnostico = useServerFn(salvarDiagnosticoFeedbackNina);
+  const prepararAplicacao = useServerFn(prepararAplicacaoFeedbackNina);
+  const aplicarCorrecao = useServerFn(aplicarFeedbackNina);
+  const concluirAcao = useServerFn(concluirAcaoFeedbackNina);
+  const listarAcoes = useServerFn(listarAcoesFeedbackNina);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
