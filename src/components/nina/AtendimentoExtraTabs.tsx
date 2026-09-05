@@ -562,6 +562,13 @@ export function AtendInbox() {
     }
   };
 
+  // Trocar de escopo recomeça a lista: nada de mesclar conversas de escopos
+  // diferentes (uma conversa de outro atendente jamais "sobra" na tela).
+  useEffect(() => {
+    seqConvs.current++;
+    setConvs([]);
+  }, [escopo]);
+
   const carregarConvs = useCallback(async () => {
     if (!clinicaId) return;
     const pedido = ++seqConvs.current;
@@ -1455,6 +1462,21 @@ export function AtendInbox() {
               />
             </div>
             <Select
+              value={escopo}
+              onValueChange={(v) => setEscopo(v as EscopoInbox)}
+              onOpenChange={setPainelMenuAberto}
+            >
+              <SelectTrigger className="h-8 text-xs" aria-label="Escopo das conversas">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                <SelectItem value="minhas">Minhas conversas</SelectItem>
+                <SelectItem value="nao_atribuidas">Não atribuídas</SelectItem>
+                <SelectItem value="nina">Nina</SelectItem>
+                {souGestor && <SelectItem value="todas">Todas da clínica (gestor)</SelectItem>}
+              </SelectContent>
+            </Select>
+            <Select
               value={filtroStatus}
               onValueChange={(v) => setFiltroStatus(v as any)}
               onOpenChange={setPainelMenuAberto}
@@ -1490,7 +1512,7 @@ export function AtendInbox() {
                 className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
                 title="Mostrar todas as conversas"
               >
-                Só não atribuídas ({convsVisiveis.length}) ✕
+                Não atribuídas ({convsVisiveis.length}) ✕
               </button>
             )}
 
