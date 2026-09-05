@@ -627,14 +627,29 @@ export function AtendInbox() {
     const pedido = ++seqConversa.current;
     const janela = janelaRef.current;
     medidor.current?.marcar("request");
+    marcarTroca("T2_requests");
     try {
       const [m, c, n, ev] = await Promise.all([
-        listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
-        obterContato({ data: { clinicaId, conversaId: alvo } }),
-        listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
-        listarEventosFn({ data: { clinicaId, conversaId: alvo } }).catch(
-          () => [] as ConversaEvento[],
-        ),
+        medirRequest(
+          "listarMensagensConversa",
+          listarMsgs({ data: { clinicaId, conversaId: alvo, limit: janela } }),
+        ).then((r) => {
+          marcarTroca("T4_mensagens");
+          return r;
+        }),
+        medirRequest(
+          "obterDadosContato",
+          obterContato({ data: { clinicaId, conversaId: alvo } }),
+        ).then((r) => {
+          marcarTroca("T3_conversa");
+          marcarTroca("T8_contato");
+          return r;
+        }),
+        medirRequest("listarNotas", listarNotasFn({ data: { clinicaId, conversaId: alvo } })),
+        medirRequest(
+          "listarEventosConversa",
+          listarEventosFn({ data: { clinicaId, conversaId: alvo } }),
+        ).catch(() => [] as ConversaEvento[]),
       ]);
       if (
         !respostaAindaVale({
