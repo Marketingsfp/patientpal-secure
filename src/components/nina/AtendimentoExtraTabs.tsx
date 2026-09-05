@@ -480,7 +480,30 @@ export function AtendInbox() {
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
 
+  // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
+  // atualiza o texto sozinho; o banco só é consultado quando algo muda
+  // (realtime) ou a cada 60s como rede de segurança.
+  const carregarEspera = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
+        string,
+        string
+      >;
+      setEspera(m ?? {});
+    } catch {
+      /* indicador auxiliar: falha não pode atrapalhar o atendimento */
+    }
+  }, [clinicaId, esperaFn]);
+
+  useEffect(() => {
+    void carregarEspera();
+    const t = setInterval(() => void carregarEspera(), 60_000);
+    return () => clearInterval(t);
+  }, [carregarEspera]);
+
   useRealtimeRefresh(["atend_conversas", "whatsapp_mensagens"], carregarConvs, !!clinicaId);
+  useRealtimeRefresh(["whatsapp_mensagens"], carregarEspera, !!clinicaId);
   useRealtimeRefresh(
     ["whatsapp_mensagens", "atend_notas_internas", "atend_conversa_eventos"],
     carregarConversa,
