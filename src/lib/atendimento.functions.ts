@@ -170,6 +170,10 @@ export const obterConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     const { data: row, error } = await context.supabase
       .from("atend_conversas")
       .select("*")
@@ -441,6 +445,10 @@ export const listarNotas = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     const { data: rows, error } = await context.supabase
       .from("atend_notas_internas")
       .select("*")
@@ -464,6 +472,10 @@ export const criarNota = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     // Sem isto, a nota entraria na conversa de outra clínica: o INSERT grava
     // `clinica_id` da clínica do autor, mas `conversa_id` vem do cliente.
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
@@ -1371,6 +1383,10 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     // Pega as mensagens MAIS RECENTES (descendente) e reordena para exibição.
     // Antes o limite cortava pelo começo e a conversa ficava parada no passado.
     let q = context.supabase
@@ -1403,6 +1419,10 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     const cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     const { data: conv, error: cErr } = await context.supabase
@@ -1510,6 +1530,10 @@ export const obterDadosContato = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     const { data: conv } = await context.supabase
       .from("atend_conversas")
       .select("*, atend_departamentos(nome)")
@@ -2218,6 +2242,10 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { data: rows, error } = await context.supabase
       .from("atend_conversa_eventos")

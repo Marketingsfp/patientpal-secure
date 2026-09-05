@@ -241,6 +241,9 @@ export function AtendInbox() {
   // renderiza mensagens/contato/notas/eventos quando este id é exatamente o
   // da conversa selecionada.
   const [conversaCarregadaId, setConversaCarregadaId] = useState<string | null>(null);
+  // FASE 3 — acesso direto por URL negado pelo backend (sem permissão ou id
+  // inexistente). Mostra aviso no lugar do chat, nunca um loading infinito.
+  const [erroAcesso, setErroAcesso] = useState<string | null>(null);
   // FASE 2 — caminho crítico: o chat abre assim que as MENSAGENS da conversa
   // selecionada chegam. Contato, notas e eventos entram depois, cada um com
   // seu próprio indicador, sem segurar a conversa.
@@ -777,6 +780,7 @@ export function AtendInbox() {
       return;
     }
     if (selIdRef.current === conversaIdUrl) return;
+    setErroAcesso(null);
     const c = convs.find((x: any) => x.id === conversaIdUrl);
     if (c) {
       setSel(c);
@@ -794,13 +798,13 @@ export function AtendInbox() {
         const row: any = await obterConversaFn({ data: { clinicaId, conversaId: idPedido } });
         if (conversaIdUrlRef.current !== idPedido) return;
         if (!row) {
-          toast.error("Conversa não encontrada.");
+          setErroAcesso("Conversa não encontrada.");
           abrirPelaUrl(null, true);
           return;
         }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
         if (!destino) {
-          toast.error("Você não tem acesso a esta conversa.");
+          setErroAcesso("Você não possui permissão para visualizar esta conversa.");
           abrirPelaUrl(null, true);
           return;
         }
@@ -813,7 +817,14 @@ export function AtendInbox() {
         if (destino !== escopo) setEscopo(destino);
       } catch (e: any) {
         if (conversaIdUrlRef.current !== idPedido) return;
-        mostrarErro(e);
+        const msg = String(e?.message ?? "");
+        setErroAcesso(
+          msg.includes("não encontrada")
+            ? "Conversa não encontrada."
+            : msg.includes("permissão")
+              ? "Você não possui permissão para visualizar esta conversa."
+              : msg || "Não foi possível abrir esta conversa.",
+        );
         abrirPelaUrl(null, true);
       }
     })();
@@ -1824,8 +1835,17 @@ export function AtendInbox() {
           className="flex min-w-0 flex-1 flex-col overflow-hidden"
         >
           {!sel ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              Selecione uma conversa
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+              {erroAcesso ? (
+                <>
+                  <p className="font-medium text-foreground">{erroAcesso}</p>
+                  <Button variant="outline" size="sm" onClick={() => setErroAcesso(null)}>
+                    Voltar para a Inbox
+                  </Button>
+                </>
+              ) : (
+                "Selecione uma conversa"
+              )}
             </div>
           ) : (
             <>

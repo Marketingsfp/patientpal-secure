@@ -19,6 +19,10 @@ export const obterResumoHandoff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // Autorização pelo próprio RLS: se a conversa não aparecer para este
     // usuário, ele não é membro da clínica e não recebe resumo nenhum.
+    {
+      const { assertAcessoConversa } = await import("./acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
     const { data: conv, error } = await context.supabase
       .from("atend_conversas")
       .select("id, clinica_id, handoff_em")
