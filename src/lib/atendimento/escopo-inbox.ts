@@ -117,3 +117,22 @@ export function conversaVisivelNoEscopo(
       return conversa.atribuida_user_id === filtro.userId;
   }
 }
+
+/**
+ * Pode este usuário ABRIR esta conversa (acesso direto por URL)?
+ *
+ * Gestor/supervisor vê qualquer conversa da clínica. Atendente comum vê
+ * apenas o que algum filtro dele mostraria: as suas conversas (abertas ou
+ * fechadas), as da Nina e as não atribuídas. Conversa ativa de outro
+ * atendente fica bloqueada.
+ */
+export function usuarioPodeVerConversa(
+  conversa: ConversaEscopo,
+  args: { userId: string; gestor: boolean },
+): boolean {
+  if (args.gestor) return true;
+  const escopos: EscopoInbox[] = ["minhas", "nina", "nao_atribuidas", "fechadas"];
+  return escopos.some((escopo) =>
+    conversaVisivelNoEscopo(conversa, { escopo, userId: args.userId, gestor: false }),
+  );
+}
