@@ -31,6 +31,7 @@ import {
   avancarRpsProximoNumero,
   cancelarNfse,
 } from "@/lib/nfse.functions";
+import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -321,6 +322,7 @@ function NfsePage() {
       const r = await reenviar({ data: { id } });
       if (r.ok) toast.success("Nota reenviada. Aguarde autorização.");
       else toast.error(r.error ?? "Falha ao reenviar");
+      avisarCepDoTomadorInvalido(r);
       await load();
     } catch (e) {
       toast.error((e as Error).message);

@@ -20,6 +20,10 @@ import {
   type ConvenioInfo,
   type DescontoConvenio,
 } from "@/lib/convenio/info-convenio-paciente";
+import {
+  buscarCartaoPagoDaFamilia,
+  type CartaoDaFamilia,
+} from "@/lib/convenio/cartao-da-familia";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
@@ -193,6 +197,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
+import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import {
@@ -1272,13 +1277,22 @@ function AgendaPage() {
    * saía pelo valor cheio, já que ele aparece como dono do contrato.
    */
   const [avisoApenasFinanceiro, setAvisoApenasFinanceiro] = useState<string | null>(null);
+  /**
+   * Falso enquanto a consulta de contrato acima não terminou. Sem isso, o aviso
+   * de cartão da família dispararia no piscar inicial (quando
+   * `contratoPacienteInfo` ainda é null por não ter carregado, e não por o
+   * paciente não ter cartão) e faria uma busca por paciente à toa.
+   */
+  const [contratoPacienteChecado, setContratoPacienteChecado] = useState(false);
   const contratoPacienteReqId = useRef(0);
   useEffect(() => {
     if (!open || !clinicaAtual || !form.paciente_id) {
       setContratoPacienteInfo(null);
       setAvisoApenasFinanceiro(null);
+      setContratoPacienteChecado(false);
       return;
     }
+    setContratoPacienteChecado(false);
     const reqId = ++contratoPacienteReqId.current;
     const pacId = form.paciente_id;
     const clinicaId = clinicaAtual.clinica_id;
@@ -1344,6 +1358,7 @@ function AgendaPage() {
         if (reqId !== contratoPacienteReqId.current) return;
         const linha = ((soFinanceiro ?? []) as any[])[0];
         setAvisoApenasFinanceiro(linha ? (linha.cb_convenios?.nome ?? "Convênio") : null);
+        setContratoPacienteChecado(true);
         return;
       }
       setAvisoApenasFinanceiro(null);
@@ -1391,9 +1406,47 @@ function AgendaPage() {
         ...f,
         tipo_atendimento: atrasadas.length === 0 ? "convenio" : "particular",
       }));
+      setContratoPacienteChecado(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form.paciente_id, clinicaAtual?.clinica_id]);
+
+  /**
+   * Cartão pago que existe na FAMÍLIA do paciente, quando ele próprio não tem
+   * direito ao desconto.
+   *
+   * Nasceu do caso de 05/09/2026: a esposa foi atendida pelo valor cheio porque
+   * estava pendurada num segundo contrato da família, em atraso, enquanto o
+   * marido tinha o cartão pago em dia. Do jeito que a tela era, a atendente via
+   * só "Particular" e não tinha como descobrir o motivo — o acerto levou três
+   * salvamentos do contrato com o paciente esperando no balcão.
+   *
+   * O aviso não muda preço nenhum: enquanto o cadastro estiver como está, a
+   * cobrança continua saindo Particular, que é o correto. Ele só diz onde está
+   * o cartão que falta incluir o paciente.
+   */
+  const [cartaoDaFamilia, setCartaoDaFamilia] = useState<CartaoDaFamilia | null>(null);
+  const semBeneficioDoCartao =
+    contratoPacienteChecado &&
+    (!contratoPacienteInfo ||
+      contratoPacienteInfo.qtdAtrasadas > 0 ||
+      contratoPacienteInfo.semConvenio);
+  useEffect(() => {
+    if (!open || !clinicaAtual || !form.paciente_id || !semBeneficioDoCartao) {
+      setCartaoDaFamilia(null);
+      return;
+    }
+    let cancelado = false;
+    const clinicaId = clinicaAtual.clinica_id;
+    const pacienteId = form.paciente_id;
+    void (async () => {
+      const achado = await buscarCartaoPagoDaFamilia({ clinicaId, pacienteId });
+      if (!cancelado) setCartaoDaFamilia(achado);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [open, form.paciente_id, clinicaAtual?.clinica_id, semBeneficioDoCartao]);
 
   /**
    * Trava de agendamento duplicado.
@@ -7398,6 +7451,7 @@ function AgendaPage() {
         },
       });
       avisarEmitenteDivergente(res);
+      avisarCepDoTomadorInvalido(res);
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e enviada. Consultando status...");
@@ -7532,6 +7586,7 @@ function AgendaPage() {
         },
       });
       avisarEmitenteDivergente(res);
+      avisarCepDoTomadorInvalido(res);
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e agrupada enviada. Consultando status...");
@@ -7734,6 +7789,7 @@ function AgendaPage() {
             },
           });
           avisarEmitenteDivergente(res);
+          avisarCepDoTomadorInvalido(res);
           const r = res as { ok?: boolean; id?: string; error?: string };
           if (r?.ok === false || !r?.id) {
             falhas.push(`${linha.pacienteNome} — ${r?.error ?? "a prefeitura recusou a nota"}`);
@@ -8865,6 +8921,17 @@ function AgendaPage() {
                         contratos.
                       </p>
                     )}
+                    {cartaoDaFamilia && (
+                      <p className="text-xs rounded-md border border-sky-300 bg-sky-50 text-sky-900 px-2 py-1.5 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                        Existe um cartão <b>pago e em dia</b> na família deste paciente:{" "}
+                        <b>{cartaoDaFamilia.convenioNome}</b>
+                        {cartaoDaFamilia.numero != null ? ` (cartão ${cartaoDaFamilia.numero})` : ""}
+                        , no nome de <b>{cartaoDaFamilia.titularNome.toUpperCase()}</b>. Este
+                        paciente <b>não está incluído</b> nele, por isso a cobrança sai pelo valor
+                        cheio. Se ele também deve usar esse cartão, peça ao setor de contratos para
+                        incluí-lo como dependente <b>antes</b> de cobrar.
+                      </p>
+                    )}
                     {avisoApenasFinanceiro && (
                       <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
                         Paciente é <b>titular apenas financeiro</b> do {avisoApenasFinanceiro}: paga
@@ -9838,6 +9905,7 @@ function AgendaPage() {
                           },
                         });
                         avisarEmitenteDivergente(res);
+                        avisarCepDoTomadorInvalido(res);
                         const nfseId = (res as { id?: string })?.id;
                         if (nfseId) {
                           toast.success("NFS-e enviada. Consultando status...");

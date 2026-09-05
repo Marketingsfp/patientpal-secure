@@ -40,6 +40,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { exportToExcel } from "@/lib/export-csv";
@@ -951,6 +952,7 @@ function AtendimentosPage() {
       });
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
+      avisarCepDoTomadorInvalido(res);
       if (nfseId) {
         await new Promise((r) => setTimeout(r, 4000));
         await consultarNfseFn({ data: { id: nfseId } });

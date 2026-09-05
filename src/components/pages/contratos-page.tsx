@@ -222,6 +222,7 @@ import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { avisarEmitenteDivergente } from "@/lib/nfse-aviso-emitente";
+import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
@@ -4470,6 +4471,7 @@ function DetalheContrato({
         },
       });
       avisarEmitenteDivergente(res);
+      avisarCepDoTomadorInvalido(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
       if (nfseId) {
@@ -4614,6 +4616,7 @@ function DetalheContrato({
         },
       });
       avisarEmitenteDivergente(res);
+      avisarCepDoTomadorInvalido(res);
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e agrupada enviada. Consultando status...");
       if (nfseId) {

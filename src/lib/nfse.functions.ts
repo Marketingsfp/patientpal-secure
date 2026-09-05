@@ -4,6 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
 import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse-tomador";
 import { avancarContadorDps, reservarNumeroDps } from "@/lib/nfse-numeracao";
+import type { Json } from "@/integrations/supabase/types";
+import { resolverEnderecoDoTomador } from "@/lib/nfse-endereco-tomador";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -69,21 +71,6 @@ function normalizeCodigoTributarioMunicipio(value: string | null | undefined) {
     );
   }
   return digits;
-}
-
-async function buscarCodigoMunicipioPorCep(cep: string | null | undefined) {
-  const digits = only(cep);
-  if (!/^\d{8}$/.test(digits)) return undefined;
-
-  try {
-    const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
-    if (!resp.ok) return undefined;
-    const body = (await resp.json().catch(() => null)) as { erro?: boolean; ibge?: string } | null;
-    const ibge = only(body?.ibge);
-    return body?.erro || !/^\d{7}$/.test(ibge) ? undefined : ibge;
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -213,7 +200,6 @@ export const emitirNfse = createServerFn({ method: "POST" })
       }
     }
 
-
     // Trava contra emissão sem CPF/CNPJ do tomador (ver `nfse-tomador.ts`).
     //
     // O diálogo de tomador já barra antes, mas a barreira tem que existir aqui
@@ -262,11 +248,15 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal =
       imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
-    const tomadorCodigoMunicipio = data.tomador.logradouro
-      ? ((await buscarCodigoMunicipioPorCep(data.tomador.cep)) ??
-        data.tomador.codigoMunicipio ??
-        emitente.codigo_municipio)
-      : undefined;
+    const enderecoTomador = await resolverEnderecoDoTomador({
+      temLogradouro: !!data.tomador.logradouro,
+      cep: data.tomador.cep,
+      codigoMunicipioCadastro: data.tomador.codigoMunicipio,
+      codigoMunicipioEmitente: emitente.codigo_municipio,
+      nomeTomador: data.tomador.nome,
+    });
+    const tomadorCodigoMunicipio = enderecoTomador.codigoMunicipio;
+    const avisoCep = enderecoTomador.aviso;
     const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
     const codigoOpcaoSimplesNacional = emitente.optante_simples
       ? regimeTributario === "mei"
@@ -292,7 +282,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
             : undefined,
         razao_social: data.tomador.nome,
         email: data.tomador.email,
-        endereco: data.tomador.logradouro
+        endereco: enderecoTomador.enviarEndereco
           ? {
               logradouro: data.tomador.logradouro,
               numero: data.tomador.numero ?? "S/N",
@@ -341,7 +331,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // NFS-e sai com o endereço que a Receita tem cadastrado para o CPF/CNPJ,
     // ignorando o cadastro do cliente na clínica. Só envia quando há
     // logradouro cadastrado — do contrário o schema rejeita campos vazios.
-    const enderecoTomadorNacional = data.tomador.logradouro
+    const enderecoTomadorNacional = enderecoTomador.enviarEndereco
       ? {
           logradouro_tomador: data.tomador.logradouro,
           numero_tomador: data.tomador.numero ?? "S/N",
@@ -446,9 +436,15 @@ export const emitirNfse = createServerFn({ method: "POST" })
         // Trilha de auditoria: a empresa emitida é sempre a escolhida, mas
         // quando ela contraria o tipo de serviço isso fica registrado na nota,
         // para dar para levantar depois as emitidas contra a orientação.
-        observacoes: emitenteDivergente
-          ? `Emitida por "${emitenteDivergente.usado}" conforme escolha do formulário; a orientação para este serviço seria "${emitenteDivergente.sugerido}" (${emitenteDivergente.motivo}).`
-          : null,
+        observacoes:
+          [
+            emitenteDivergente
+              ? `Emitida por "${emitenteDivergente.usado}" conforme escolha do formulário; a orientação para este serviço seria "${emitenteDivergente.sugerido}" (${emitenteDivergente.motivo}).`
+              : null,
+            avisoCep,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
       })
       .select()
       .single();
@@ -533,6 +529,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
         body,
         tentativas: attempts,
         emitenteDivergente,
+        avisoCep,
       };
     }
 
@@ -572,6 +569,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       focus: body,
       tentativas: attempts,
       emitenteDivergente,
+      avisoCep,
     };
   });
 
@@ -823,11 +821,58 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const imLower2 = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
     const inscricaoMunicipal2 =
       imRaw2 && imLower2 !== "isento" && imLower2 !== "insento" ? imRaw2 : undefined;
-    const tomadorCep = only(String(tomadorEndereco.cep ?? ""));
-    const tomadorCodigoMunicipio = tomadorEndereco?.logradouro
-      ? ((await buscarCodigoMunicipioPorCep(tomadorCep)) ??
-        String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio))
-      : undefined;
+    // Endereço do tomador no reenvio.
+    //
+    // Mesma regra da emissão: CEP que não existe nos Correios sai da nota em
+    // vez de derrubá-la com E0240.
+    //
+    // E, pelo mesmo motivo do CPF logo acima, quando o CEP gravado na nota não
+    // presta buscamos o endereço atual na ficha do paciente: o caminho normal é
+    // a recepção corrigir o CEP no cadastro e clicar "Reenviar", e repetir o
+    // endereço velho gravado na nota faria a correção não valer de nada.
+    let enderecoTomadorAtual = tomadorEndereco;
+    let enderecoDoReenvio = await resolverEnderecoDoTomador({
+      temLogradouro: !!tomadorEndereco?.logradouro,
+      cep: String(tomadorEndereco.cep ?? ""),
+      codigoMunicipioCadastro: tomadorEndereco?.codigoMunicipio
+        ? String(tomadorEndereco.codigoMunicipio)
+        : null,
+      codigoMunicipioEmitente: emitente.codigo_municipio,
+      nomeTomador: nota.tomador_nome ?? "paciente",
+    });
+    if (!enderecoDoReenvio.enviarEndereco && nota.paciente_id) {
+      const { data: pacEnd } = await supabase
+        .from("pacientes")
+        .select("cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", nota.paciente_id)
+        .maybeSingle();
+      if (pacEnd?.logradouro) {
+        const daFicha: Record<string, unknown> = {
+          ...tomadorEndereco,
+          cep: pacEnd.cep ?? "",
+          logradouro: pacEnd.logradouro,
+          numero: pacEnd.numero ?? "",
+          bairro: pacEnd.bairro ?? "",
+          municipio: pacEnd.cidade ?? "",
+          uf: pacEnd.estado ?? "",
+          codigoMunicipio: undefined,
+        };
+        const comFicha = await resolverEnderecoDoTomador({
+          temLogradouro: true,
+          cep: String(daFicha.cep ?? ""),
+          codigoMunicipioCadastro: null,
+          codigoMunicipioEmitente: emitente.codigo_municipio,
+          nomeTomador: nota.tomador_nome ?? "paciente",
+        });
+        if (comFicha.enviarEndereco) {
+          enderecoTomadorAtual = daFicha;
+          enderecoDoReenvio = comFicha;
+        }
+      }
+    }
+    const tomadorCep = only(String(enderecoTomadorAtual.cep ?? ""));
+    const tomadorCodigoMunicipio = enderecoDoReenvio.codigoMunicipio;
+    const avisoCep = enderecoDoReenvio.aviso;
     const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
     const codigoOpcaoSimplesNacional = emitente.optante_simples
       ? regimeTributario === "mei"
@@ -846,13 +891,13 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         cnpj: cpfCnpj.length === 14 ? cpfCnpj : undefined,
         razao_social: nota.tomador_nome,
         email: nota.tomador_email ?? undefined,
-        endereco: tomadorEndereco?.logradouro
+        endereco: enderecoDoReenvio.enviarEndereco
           ? {
-              logradouro: String(tomadorEndereco.logradouro),
-              numero: String(tomadorEndereco.numero ?? "S/N"),
-              bairro: String(tomadorEndereco.bairro ?? "Centro"),
+              logradouro: String(enderecoTomadorAtual.logradouro),
+              numero: String(enderecoTomadorAtual.numero || "S/N"),
+              bairro: String(enderecoTomadorAtual.bairro || "Centro"),
               codigo_municipio: tomadorCodigoMunicipio,
-              uf: String(tomadorEndereco.uf ?? emitente.uf),
+              uf: String(enderecoTomadorAtual.uf || emitente.uf),
               cep: tomadorCep,
             }
           : undefined,
@@ -895,6 +940,20 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       ...(cpfCnpj.length === 14 ? { cnpj_tomador: cpfCnpj } : {}),
       ...(cpfCnpj.length === 11 ? { cpf_tomador: cpfCnpj } : {}),
       razao_social_tomador: nota.tomador_nome,
+      // O reenvio mandava o tomador sem endereço, então uma nota reenviada
+      // saía com o endereço que a Receita tem para o CPF em vez do cadastro da
+      // clínica — diferente da nota emitida pelo caminho normal. Agora vai o
+      // mesmo bloco da emissão, e só quando o CEP existe de fato.
+      ...(enderecoDoReenvio.enviarEndereco
+        ? {
+            logradouro_tomador: String(enderecoTomadorAtual.logradouro),
+            numero_tomador: String(enderecoTomadorAtual.numero || "S/N"),
+            bairro_tomador: String(enderecoTomadorAtual.bairro || "Centro"),
+            cep_tomador: tomadorCep || undefined,
+            codigo_municipio_tomador: Number(tomadorCodMun),
+            uf_tomador: String(enderecoTomadorAtual.uf || emitente.uf),
+          }
+        : {}),
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
       ...(codigoTributarioMunicipio
@@ -941,6 +1000,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         // Grava o documento que foi realmente enviado — inclusive quando ele
         // veio da ficha do paciente por estar faltando na nota.
         tomador_documento: cpfCnpj,
+        // Idem para o endereço: se o CEP foi corrigido no cadastro e o reenvio
+        // usou a ficha, a nota passa a guardar o endereço que realmente saiu.
+        tomador_endereco: enderecoTomadorAtual as Json,
       })
       .eq("id", nota.id);
 
@@ -1012,6 +1074,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         error: body?.mensagem ?? `HTTP ${resp.status}`,
         body,
         tentativas: attempts,
+        avisoCep,
       };
     }
 
@@ -1024,7 +1087,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       })
       .eq("id", nota.id);
 
-    return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts };
+    return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts, avisoCep };
   });
 /**
  * Extrai dados de uma NFS-e a partir de imagem/PDF (DANFSe).

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { conferirEscolhaDeEmitente } from "@/lib/nfse-roteamento-emitente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,6 +185,7 @@ function TestarNfse() {
             { duration: 10000 },
           );
         }
+        avisarCepDoTomadorInvalido(r);
         // Faz um polling de consulta após alguns segundos
         setTimeout(() => void onConsultar(r.id), 4000);
       } else {

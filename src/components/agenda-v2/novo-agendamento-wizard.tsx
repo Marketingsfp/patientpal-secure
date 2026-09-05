@@ -35,6 +35,10 @@ import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.funct
 import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
 import { detectarTipoAtendimentoPadrao } from "@/lib/convenio/tipo-atendimento-padrao";
 import {
+  buscarCartaoPagoDaFamilia,
+  type CartaoDaFamilia,
+} from "@/lib/convenio/cartao-da-familia";
+import {
   calcularRepasseExterno,
   listarConveniosClinica,
 } from "@/lib/agenda/atendimento-externo-repasse";
@@ -187,20 +191,39 @@ export function NovoAgendamentoWizard({
   // vencida, que aqui não era verificada.
   const tipoEscolhidoManualRef = useRef(false);
   const [contratoDetectado, setContratoDetectado] = useState<{ nome: string } | null>(null);
+  /**
+   * Cartão pago que existe na família quando o próprio paciente não tem direito
+   * ao desconto — mesmo aviso da tela clássica da Agenda. Ver
+   * `src/lib/convenio/cartao-da-familia.ts` para o caso que originou a regra:
+   * a pessoa atendida estava num segundo contrato da família, em atraso,
+   * enquanto o cartão pago estava no nome de outro parente.
+   */
+  const [cartaoDaFamilia, setCartaoDaFamilia] = useState<CartaoDaFamilia | null>(null);
   useEffect(() => {
     tipoEscolhidoManualRef.current = false;
     if (!clinicaId || !paciente?.id) {
       setContratoDetectado(null);
+      setCartaoDaFamilia(null);
       return;
     }
     let cancelado = false;
+    const pacienteId = paciente.id;
     void (async () => {
-      const padrao = await detectarTipoAtendimentoPadrao(clinicaId, paciente.id);
+      const padrao = await detectarTipoAtendimentoPadrao(clinicaId, pacienteId);
       if (cancelado) return;
       setContratoDetectado(padrao.contratoId ? { nome: padrao.convenioNome ?? "Convênio" } : null);
       if (padrao.tipo === "convenio" && !tipoEscolhidoManualRef.current) {
         setTipoAtendimento("convenio");
       }
+      // Só procura o cartão da família quando ESTE paciente ficou de fora do
+      // benefício: sem contrato, com mensalidade atrasada ou com o contrato sem
+      // convênio vinculado. Nos demais casos não há nada a sugerir.
+      if (padrao.tipo === "convenio" && !padrao.semConvenio) {
+        setCartaoDaFamilia(null);
+        return;
+      }
+      const achado = await buscarCartaoPagoDaFamilia({ clinicaId, pacienteId });
+      if (!cancelado) setCartaoDaFamilia(achado);
     })();
     return () => {
       cancelado = true;
@@ -953,6 +976,18 @@ export function NovoAgendamentoWizard({
               <p className="mt-2 text-[12px] text-slate-600 dark:text-slate-400">
                 Paciente com contrato ativo do <b>{contratoDetectado.nome}</b> — a cobrança segue a
                 tabela do cartão.
+              </p>
+            )}
+
+            {cartaoDaFamilia && (
+              <p className="mt-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-[12px] text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                Existe um cartão <b>pago e em dia</b> na família deste paciente:{" "}
+                <b>{cartaoDaFamilia.convenioNome}</b>
+                {cartaoDaFamilia.numero != null ? ` (cartão ${cartaoDaFamilia.numero})` : ""}, no
+                nome de <b>{cartaoDaFamilia.titularNome.toUpperCase()}</b>. Este paciente{" "}
+                <b>não está incluído</b> nele, por isso a cobrança sai pelo valor cheio. Se ele
+                também deve usar esse cartão, peça ao setor de contratos para incluí-lo como
+                dependente <b>antes</b> de cobrar.
               </p>
             )}
 

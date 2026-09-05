@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Stethoscope, AlertTriangle, Users, Check, X, DollarSign } from "lucide-react";
+import { Stethoscope, AlertTriangle, Users, Check, X, DollarSign, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -533,7 +533,7 @@ function AtendimentoIaPage() {
                     <TableHead className="w-32">Pagamento</TableHead>
                     <TableHead className="w-24 text-center">Triagem</TableHead>
                     <TableHead className="w-28">Prioridade</TableHead>
-                    <TableHead className="w-32 text-right">Ação</TableHead>
+                    <TableHead className="w-48 text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -556,7 +556,14 @@ function AtendimentoIaPage() {
                     return (
                       <TableRow
                         key={it.id}
-                        className={`${atendido ? "bg-emerald-50/70 dark:bg-emerald-950/20" : ""} ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
+                        // Atendido = linha verde da esquerda a direita, com
+                        // tarja lateral grossa. E o sinal que a medica procura
+                        // de longe, sem ler nada: o que esta verde ja passou.
+                        className={`${
+                          atendido
+                            ? "border-l-4 border-l-green-600 bg-green-50 hover:bg-green-100/80 dark:border-l-green-500 dark:bg-green-950/30"
+                            : ""
+                        } ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
                       >
                         <TableCell className="tabular-nums text-xs text-muted-foreground">
                           {numeroNoDia.get(it.id) ?? "—"}
@@ -568,9 +575,8 @@ function AtendimentoIaPage() {
                         </TableCell>
                         <TableCell>
                           {atendido ? (
-                            <Badge className="border-0 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1">
-                              <Check className="h-3 w-3" />
-                              ATENDIDO
+                            <Badge className="border-0 bg-green-600 text-white font-bold tracking-wide text-[11px] gap-1 hover:bg-green-600">
+                              ✅ ATENDIDO
                             </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">Em espera</span>
@@ -741,12 +747,13 @@ function AtendimentoIaPage() {
                             // atestado ou a receita que perdeu.
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="ghost"
+                              className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
                               onClick={() => atender(it)}
                               title="Reabrir o prontuário para conferir ou imprimir segunda via"
                             >
-                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
-                              Ver / Reabrir
+                              <Eye className="h-3.5 w-3.5 mr-1.5" />
+                              Reabrir / Ver Atendimento
                             </Button>
                           ) : (
                             <Button
