@@ -1,16 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   avisoSaidaEscopo,
   devoAutoSelecionar,
   selecaoSaiuDoEscopo,
 } from "../inbox-realtime";
-import { filtroEscopoInbox, conversaVisivelNoEscopo } from "../escopo-inbox";
+import { conversaVisivelNoEscopo } from "../escopo-inbox";
 
 const jean = "11111111-1111-1111-1111-111111111111";
 const maria = "22222222-2222-2222-2222-222222222222";
 
 const visivel = (escopo: any, conversa: any, userId = jean, gestor = false) =>
-  conversaVisivelNoEscopo(conversa, filtroEscopoInbox({ escopo, userId, gestor }));
+  conversaVisivelNoEscopo(conversa, { escopo, userId, gestor });
 
 describe("FASE 3 — movimentação entre Inboxes", () => {
   it("Jean → Maria: sai de Minhas de Jean e entra em Minhas de Maria", () => {
