@@ -88,11 +88,9 @@ import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
 import { HomologacaoWhatsapp } from "@/components/nina/HomologacaoWhatsapp";
 import {
-  AtendDepartamentos,
   AtendMacros,
   AtendKb,
   AtendPausas,
-  AtendMeuStatus,
 } from "@/components/nina/AtendimentoTabs";
 import {
   AtendInbox,
@@ -228,8 +226,6 @@ function NinaPage() {
     "config",
     "templates",
     "homologacao",
-    "atend-status",
-    "atend-depto",
     "atend-macros",
     "atend-kb",
     "atend-pausas",
@@ -436,12 +432,6 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
-        <TabsContent value="atend-status">
-          <AtendMeuStatus />
-        </TabsContent>
-        <TabsContent value="atend-depto">
-          <AtendDepartamentos />
-        </TabsContent>
         <TabsContent value="atend-macros">
           <AtendMacros />
         </TabsContent>

@@ -482,18 +482,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         icon: MessageCircle,
         children: [
           { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-          {
-            to: "/app/nina",
-            hash: "atend-status",
-            label: "Atendimento — Meu Status (filas + pausa)",
-            icon: Play,
-          },
-          {
-            to: "/app/nina",
-            hash: "atend-depto",
-            label: "Atendimento — Departamentos",
-            icon: Users,
-          },
           { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
           {
             to: "/app/nina",
