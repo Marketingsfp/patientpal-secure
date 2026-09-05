@@ -25,6 +25,12 @@ export function useChatScroll(args: {
   const primeiraCarga = useRef(true);
   const totalAnterior = useRef(0);
   const ultimoIdAnterior = useRef<string | null>(null);
+  /**
+   * Abertura da conversa: vale até a atendente rolar por conta própria.
+   * Enquanto durar, tudo que chega depois (resumo da Nina, eventos, imagens,
+   * revalidação do cache) mantém a tela no fim em vez de virar indicador.
+   */
+  const emAbertura = useRef(true);
 
   const irParaFim = useCallback((suave = false) => {
     const alvo = ancoraRef.current;
@@ -39,7 +45,10 @@ export function useChatScroll(args: {
     primeiraCarga.current = true;
     totalAnterior.current = 0;
     ultimoIdAnterior.current = null;
+    emAbertura.current = true;
     setNovas(0);
+    const box = containerRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
   }, [args.conversaId]);
 
   useEffect(() => {
@@ -54,6 +63,7 @@ export function useChatScroll(args: {
     };
     const acao = decidirScroll({
       primeiraCarga: primeiraCarga.current,
+      emAbertura: emAbertura.current,
       totalAnterior: totalAnterior.current,
       totalAtual: args.total,
       ultimoIdAnterior: ultimoIdAnterior.current,
@@ -83,10 +93,29 @@ export function useChatScroll(args: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [args.conversaId, args.total, args.ultimoId, irParaFim]);
 
-  // Quando a pessoa volta ao fim por conta própria, o indicador some.
+  // Durante a abertura, o conteúdo ainda muda de altura (resumo da Nina,
+  // eventos, imagens). Sem isto a tela ficava parada num ponto antigo.
+  useEffect(() => {
+    const box = containerRef.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const obs = new ResizeObserver(() => {
+      if (!emAbertura.current || primeiraCarga.current) return;
+      const alvo = ancoraRef.current;
+      if (alvo) alvo.scrollIntoView({ behavior: "auto", block: "end" });
+      else box.scrollTop = box.scrollHeight;
+    });
+    for (const filho of Array.from(box.children)) obs.observe(filho);
+    obs.observe(box);
+    return () => obs.disconnect();
+  }, [args.conversaId, args.total]);
+
+  // Rolagem feita pela pessoa encerra a abertura e libera o indicador.
   useEffect(() => {
     const box = containerRef.current;
     if (!box) return;
+    const encerrarAbertura = () => {
+      emAbertura.current = false;
+    };
     const onScroll = () => {
       if (
         pertoDoFim({
@@ -99,8 +128,17 @@ export function useChatScroll(args: {
       }
     };
     box.addEventListener("scroll", onScroll, { passive: true });
-    return () => box.removeEventListener("scroll", onScroll);
+    box.addEventListener("wheel", encerrarAbertura, { passive: true });
+    box.addEventListener("touchmove", encerrarAbertura, { passive: true });
+    box.addEventListener("keydown", encerrarAbertura);
+    return () => {
+      box.removeEventListener("scroll", onScroll);
+      box.removeEventListener("wheel", encerrarAbertura);
+      box.removeEventListener("touchmove", encerrarAbertura);
+      box.removeEventListener("keydown", encerrarAbertura);
+    };
   }, [args.conversaId]);
+
 
   return { containerRef, ancoraRef, novas, irParaFim };
 }
