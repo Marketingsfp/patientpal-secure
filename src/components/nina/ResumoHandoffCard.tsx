@@ -86,15 +86,27 @@ export function ResumoHandoffCard({
             Resumo da Nina
             {r ? ` · ${ROTULO_INTENCAO[r.intencao]}` : ""}
           </span>
+          {rotuloDesfecho(linha.desfecho) && (
+            <span
+              className="shrink-0 rounded bg-purple-200/80 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/25"
+              title="Desfecho registrado pelo sistema para esta versão do resumo"
+            >
+              {rotuloDesfecho(linha.desfecho)}
+            </span>
+          )}
           {atualizado && !aberto && (
             <span className="shrink-0 rounded bg-purple-300/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/30">
               atualizado
             </span>
           )}
         </button>
-        <span className="shrink-0 rounded bg-purple-200/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/20">
-          uso interno
+        <span
+          className="shrink-0 rounded bg-purple-200/70 px-1.5 py-0.5 text-[10px] font-medium dark:bg-purple-400/20"
+          title={`Resumo vigente · versão ${linha.versao}`}
+        >
+          uso interno · v{linha.versao}
         </span>
+
         <Button
           size="icon"
           variant="ghost"
