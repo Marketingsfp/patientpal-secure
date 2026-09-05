@@ -116,7 +116,7 @@ export const testarCorrecaoAprendizadoNina = createServerFn({ method: "POST" })
     const testavel = versao.camada === "planilha" || versao.camada === "busca";
     let status: "validado" | "falhou" | "nao_aplicavel" = "nao_aplicavel";
     let resposta: string | null = null;
-    let detalhe: Record<string, unknown> = {
+    let detalhe: Record<string, string | number | null> = {
       motivo:
         "Esta camada não é validável só pela Base: a mudança precisa passar por homologação de comportamento.",
     };
@@ -129,9 +129,9 @@ export const testarCorrecaoAprendizadoNina = createServerFn({ method: "POST" })
       detalhe = {
         pergunta,
         esperado,
-        knowledge_status: kb.knowledge_status,
-        base_version: kb.base_version,
-        base_file: kb.base_file,
+        knowledge_status: String(kb.knowledge_status),
+        base_version: kb.base_version ?? null,
+        base_file: kb.base_file ?? null,
         testado_em: agora,
       };
     } else if (testavel) {
