@@ -2,7 +2,7 @@
  * Card interno com o resumo automático da Nina no handoff.
  * Uso interno da equipe: nada aqui é enviado ao paciente.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
