@@ -554,6 +554,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/configuracoes/prontuario", label: "Numeração de Prontuário", icon: FolderOpen },
       { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
       { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
+      { to: "/app/configuracoes/respostas-rapidas", label: "Mensagens rápidas", icon: Zap },
       { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
       { to: "/app/backups", label: "Backups", icon: ShieldCheck },
     ],

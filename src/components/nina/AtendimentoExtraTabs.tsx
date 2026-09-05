@@ -1,4 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ListaRespostasRapidas,
+  useRespostasFiltradas,
+  useRespostasRapidas,
+} from "@/components/nina/RespostasRapidas";
+import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
+import {
+  aplicarVariaveis,
+  detectarComandoNoTexto,
+  primeiroNome,
+  substituirTrecho,
+  type ComandoDigitado,
+  type ContextoVariaveis,
+  type RespostaRapida,
+} from "@/lib/atendimento/respostas-rapidas";
 import { confirmDialog } from "@/lib/confirm";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { useServerFn } from "@tanstack/react-start";
@@ -55,6 +70,7 @@ import {
   CalendarPlus,
   Pin,
   PinOff,
+  Zap,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -578,6 +594,93 @@ export function AtendInbox() {
   const conversaEncerrada = sel?.status === "closed" || sel?.status === "finished";
   const [assumindo, setAssumindo] = useState(false);
   const [assumirOpen, setAssumirOpen] = useState(false);
+
+  /* ---------- Mensagens rápidas (comandos "/") ---------- */
+  const respostasRapidas = useRespostasRapidas(clinicaId);
+  const registrarUsoFn = useServerFn(registrarUsoResposta);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const [slash, setSlash] = useState<ComandoDigitado | null>(null);
+  const [slashIdx, setSlashIdx] = useState(0);
+  // Prioriza (sem esconder) respostas ligadas ao que já está no atendimento.
+  const contextoResp = useMemo<string[]>(() => {
+    const ags: any[] = contato?.agendamentos ?? [];
+    return ags
+      .map((a) => String(a?.procedimento ?? "").trim())
+      .filter((s) => s.length > 3)
+      .slice(0, 3);
+  }, [contato]);
+  const itensResp = useRespostasFiltradas(respostasRapidas, slash?.termo ?? "", contextoResp);
+  useEffect(() => setSlashIdx(0), [slash?.termo]);
+
+  /**
+   * Variáveis: apenas dados reais. Só usa agendamento CONFIRMADO e futuro —
+   * uma intenção de agendar nunca vira confirmação.
+   */
+  const ctxVariaveis = useMemo<ContextoVariaveis>(() => {
+    const p = contato?.paciente ?? null;
+    const ags: any[] = contato?.agendamentos ?? [];
+    const agora = Date.now();
+    const ag = ags
+      .filter(
+        (a) =>
+          String(a?.status ?? "") === "confirmado" &&
+          a?.inicio &&
+          new Date(a.inicio).getTime() >= agora,
+      )
+      .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())[0];
+    const dt = ag?.inicio ? new Date(ag.inicio) : null;
+    return {
+      "patient.name": p?.nome ?? "",
+      "patient.first_name": primeiroNome(p?.nome),
+      "patient.phone": p?.telefone ?? "",
+      "doctor.name": ag?.medico_nome ?? "",
+      "appointment.date": dt ? dt.toLocaleDateString("pt-BR") : "",
+      "appointment.time": dt
+        ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : "",
+      "unit.name": (clinicaAtual as any)?.clinica?.nome ?? "",
+      "procedure.name": ag?.procedimento ?? "",
+      "attendant.name": nomeUsuario(meuId) ?? "",
+    };
+  }, [contato, clinicaAtual, nomeUsuario, meuId]);
+
+  /**
+   * Insere o texto no composer (nunca envia) substituindo apenas o comando
+   * digitado, ou na posição do cursor quando veio do botão ⚡.
+   */
+  const inserirRespostaRapida = useCallback(
+    (r: RespostaRapida) => {
+      const { texto: conteudo, faltantes } = aplicarVariaveis(r.conteudo, ctxVariaveis);
+      const el = composerRef.current;
+      const pos = slash ?? {
+        inicio: el?.selectionStart ?? draft.length,
+        fim: el?.selectionEnd ?? draft.length,
+        termo: "",
+      };
+      const { texto, cursor } = substituirTrecho(draft, pos.inicio, pos.fim, conteudo);
+      setDraft(texto);
+      setSlash(null);
+      if (faltantes.length > 0)
+        toast.warning(`Não foi possível preencher “${faltantes.join("”, “")}”. Complete antes de enviar.`);
+      requestAnimationFrame(() => {
+        el?.focus();
+        try {
+          el?.setSelectionRange(cursor, cursor);
+        } catch {
+          /* navegador sem suporte: o texto já foi inserido */
+        }
+      });
+      if (clinicaId)
+        void registrarUsoFn({
+          data: { clinicaId, respostaId: r.id, conversaId: sel?.id ?? null },
+        }).catch(() => {
+          /* log de uso é best-effort e nunca bloqueia o atendimento */
+        });
+    },
+    [ctxVariaveis, slash, draft, clinicaId, registrarUsoFn, sel],
+  );
+
+
 
   const motivoBloqueio = !sel
     ? null
@@ -1125,11 +1228,72 @@ export function AtendInbox() {
                     <span>{motivoBloqueio}</span>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="relative flex gap-2">
+                  {slash && (
+                    <ListaRespostasRapidas
+                      itens={itensResp}
+                      indice={slashIdx}
+                      termo={slash.termo}
+                      favoritos={respostasRapidas.favoritos}
+                      onSelecionar={inserirRespostaRapida}
+                      onIndice={setSlashIdx}
+                      onFavoritar={respostasRapidas.favoritar}
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    title="Respostas rápidas"
+                    aria-label="Respostas rápidas"
+                    aria-expanded={!!slash}
+                    className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
+                    disabled={enviando || !!motivoBloqueio}
+                    onClick={() => {
+                      const el = composerRef.current;
+                      const pos = el?.selectionStart ?? draft.length;
+                      setSlash((s) => (s ? null : { inicio: pos, fim: pos, termo: "" }));
+                      el?.focus();
+                    }}
+                  >
+                    <Zap className="h-4 w-4" />
+                  </Button>
                   <Textarea
+                    ref={composerRef}
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      setSlash(
+                        detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0),
+                      );
+                    }}
+                    onBlur={() => setSlash(null)}
                     onKeyDown={(e) => {
+                      // Com a lista aberta, o teclado navega nela — Enter insere
+                      // a resposta no campo e NUNCA envia a mensagem.
+                      if (slash && itensResp.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSlashIdx((i) => (i + 1) % itensResp.length);
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSlashIdx((i) => (i - 1 + itensResp.length) % itensResp.length);
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          const escolhida = itensResp[slashIdx];
+                          if (escolhida) inserirRespostaRapida(escolhida);
+                          return;
+                        }
+                      }
+                      if (slash && e.key === "Escape") {
+                        e.preventDefault();
+                        setSlash(null);
+                        return;
+                      }
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         enviar();
@@ -1138,12 +1302,13 @@ export function AtendInbox() {
                     placeholder={
                       motivoBloqueio
                         ? "Envio bloqueado"
-                        : "Mensagem… (Enter envia, Shift+Enter quebra linha)"
+                        : "Mensagem… (digite / para respostas rápidas)"
                     }
                     rows={1}
                     className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
                     disabled={enviando || !!motivoBloqueio}
                   />
+
                   <Button
                     onClick={enviar}
                     disabled={enviando || !draft.trim() || !!motivoBloqueio}
