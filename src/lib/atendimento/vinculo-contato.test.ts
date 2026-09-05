@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { normalizarTelefone } from "./telefone";
 import { resolverContatoConversa, vincularPacienteConversa } from "./vinculo-contato.server";
 
