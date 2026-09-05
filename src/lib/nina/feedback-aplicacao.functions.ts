@@ -36,7 +36,7 @@ async function assertRevisor(supabase: unknown, userId: string, clinicaId: strin
 }
 
 const COLUNAS_FB =
-  "id, clinica_id, categoria, correcao, pergunta_texto, mensagem_texto, status, root_cause, prioridade, knowledge_status";
+  "id, clinica_id, categoria, correcao, pergunta_texto, mensagem_texto, status, root_cause, prioridade, knowledge_status, reportado_por, revisado_por";
 
 async function lerBase(clinicaId: string, termo: string) {
   const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
@@ -198,6 +198,48 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
       .single();
     if (erroAcao) throw new Error(erroAcao.message);
 
+    // FASE 5 — versionamento: valor anterior, valor novo, motivo e autoria.
+    const { data: bases } = await context.supabase
+      .from("nina_kb_bases")
+      .select("id, versao, status")
+      .eq("clinica_id", data.clinicaId)
+      .order("versao", { ascending: false })
+      .limit(5);
+    const listaBases = bases ?? [];
+    const baseAtual = listaBases.find((b) => b.status === "ATIVA") ?? listaBases[0] ?? null;
+    const baseAnterior = listaBases.find((b) => b.id !== baseAtual?.id) ?? null;
+
+    const { count: versoesAnteriores } = await context.supabase
+      .from("nina_feedback_versoes")
+      .select("id", { count: "exact", head: true })
+      .eq("feedback_id", data.id);
+
+    const { data: versaoRegistrada } = await context.supabase
+      .from("nina_feedback_versoes")
+      .insert({
+        clinica_id: data.clinicaId,
+        feedback_id: data.id,
+        acao_id: acao.id,
+        versao: (versoesAnteriores ?? 0) + 1,
+        item: String(fb.pergunta_texto ?? "").slice(0, 500) || null,
+        valor_anterior: resumo,
+        valor_novo: fb.correcao,
+        motivo: data.observacao?.trim() || plano.titulo,
+        camada: plano.camada,
+        tipo: plano.tipo,
+        root_cause: fb.root_cause as string,
+        reportado_por: (fb as { reportado_por?: string | null }).reportado_por ?? null,
+        aprovado_por: (fb as { revisado_por?: string | null }).revisado_por ?? null,
+        aplicado_por: context.userId,
+        kb_base_id_anterior: baseAnterior?.id ?? null,
+        kb_versao_anterior: baseAnterior?.versao ?? null,
+        kb_versao_nova: baseAtual?.versao ?? null,
+        evidencia,
+        teste_status: "pendente",
+      })
+      .select("id, versao")
+      .single();
+
     if (aplicaAgora) {
       const { error: erroFb } = await context.supabase
         .from("nina_feedback_erros")
@@ -220,7 +262,7 @@ export const aplicarFeedbackNina = createServerFn({ method: "POST" })
         ? "A versão ativa da Base ainda não contém a informação corrigida. Corrija o arquivo oficial e reenvie uma nova versão pela Base de Conhecimentos; depois volte aqui e conclua a ação."
         : "Ação técnica registrada. Conclua a ação depois que a correção for feita na camada indicada.";
 
-    return { aplicado: aplicaAgora, acao, pendencia, evidencia };
+    return { aplicado: aplicaAgora, acao, versao: versaoRegistrada ?? null, pendencia, evidencia };
   });
 
 /** Conclui (ou cancela) a ação técnica. Concluir marca o feedback como aplicado. */
@@ -239,6 +281,23 @@ export const concluirAcaoFeedbackNina = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRevisor(context.supabase, context.userId, data.clinicaId);
     const agora = new Date().toISOString();
+
+    // FASE 5 — homologação: mudanças de busca, prompt, ferramenta ou fluxo só
+    // podem ser concluídas depois de homologadas.
+    if (data.resultado === "done") {
+      const { data: atual, error: erroAtual } = await context.supabase
+        .from("nina_feedback_acoes")
+        .select("camada, homologado")
+        .eq("id", data.acaoId)
+        .eq("clinica_id", data.clinicaId)
+        .single();
+      if (erroAtual) throw new Error(erroAtual.message);
+      const exigeHomologacao = atual.camada !== "planilha";
+      if (exigeHomologacao && !atual.homologado)
+        throw new Error(
+          "Esta mudança precisa passar pela homologação antes de ser concluída.",
+        );
+    }
 
     const { data: acao, error } = await context.supabase
       .from("nina_feedback_acoes")
