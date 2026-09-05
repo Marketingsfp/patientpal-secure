@@ -1219,7 +1219,9 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   // appointment_id verificado no banco — ou quando a conversa JÁ tem um
   // agendamento gravado (senão a Nina não conseguiria nem falar sobre a
   // consulta já marcada nos turnos seguintes).
-  let agendamentoConfirmado = Boolean(fluxoEstado.appointment.appointment_id);
+  const jaTinhaAgendamento = Boolean(fluxoEstado.appointment.appointment_id);
+  let agendamentoConfirmado = jaTinhaAgendamento;
+
   let correcaoFalsoSucessoUsada = false;
   // Frases que afirmam/prometem agendamento. Se aparecerem sem gravação
   // confirmada, a resposta é falso sucesso e não pode ir ao paciente.
@@ -1327,6 +1329,26 @@ ATENDIMENTO HUMANO — REGRA OBRIGATÓRIA:
   // rodada (paciente identificado, horário oferecido, agendamento criado)
   // vale para as próximas mensagens da MESMA conversa.
   await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+
+  // DESFECHO: agendamento concluído agora. O resumo interno é regerado para
+  // refletir o sucesso; o resumo anterior (tentativa/falha) vira histórico.
+  if (agendamentoConfirmado && !jaTinhaAgendamento && estadoId.conversaId) {
+    try {
+      const { registrarDesfechoResumo } = await import(
+        "@/lib/atendimento/handoff-resumo.server"
+      );
+      await registrarDesfechoResumo({
+        clinicaId,
+        conversaId: estadoId.conversaId,
+        desfecho: "agendamento_concluido",
+      });
+
+    } catch (e) {
+      console.error("[nina] falha ao atualizar resumo pós-agendamento", e);
+    }
+  }
+
+
 
 
   if (!resposta && houveHandoff) {

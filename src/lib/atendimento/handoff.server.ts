@@ -261,7 +261,10 @@ export async function encaminharParaHumano(args: {
       conversaId: args.conversaId,
       handoffEm: agora,
       motivo: args.motivo,
+      desfecho:
+        args.motivo === "patient_response_timeout" ? "timeout_sem_resposta" : "handoff_humano",
     });
+
   } catch (e) {
     console.error("[handoff] falha ao reservar resumo", e);
   }
@@ -461,12 +464,21 @@ export async function reabrirConversaPorMensagemPaciente(args: {
     if (!ok || ok.length === 0) continue;
 
     reabertas.push({ id: alvo.id });
+    // Ciclo novo: o resumo do atendimento anterior vira histórico e deixa de
+    // ser exibido como situação atual da conversa.
+    try {
+      const { arquivarResumosConversa } = await import("./handoff-resumo.server");
+      await arquivarResumosConversa(args.clinicaId, alvo.id);
+    } catch (e) {
+      console.error("[reabertura] falha ao arquivar resumo", e);
+    }
     await registrarEvento({
       clinicaId: args.clinicaId,
       conversaId: alvo.id,
       evento: "REABERTA",
       motivo: "Conversa reaberta automaticamente após nova mensagem do paciente",
     });
+
     if (!ninaOff) {
       await registrarEvento({
         clinicaId: args.clinicaId,

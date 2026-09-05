@@ -25,7 +25,8 @@ export function textoEvento(ev: ConversaEvento): string {
   const por = autor(ev);
   switch (ev.evento) {
     case "FINALIZADA":
-      return `Conversa foi marcada como resolvida por ${por}`;
+      return `Conversa encerrada e resolvida por ${por}`;
+
     case "REABERTA":
       return "Conversa reaberta por nova mensagem do paciente";
     case "ATRIBUIDA_IA":
