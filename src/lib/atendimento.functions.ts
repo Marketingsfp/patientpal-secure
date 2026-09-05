@@ -144,6 +144,22 @@ export const listarConversas = createServerFn({ method: "POST" })
 
 
 /**
+ * Diz se o usuário logado é gestor/admin da clínica — usado pela Inbox para
+ * oferecer (ou não) a visão "Todas as conversas da clínica".
+ */
+export const souGestorAtendimento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
+      _user_id: context.userId,
+      _clinica_id: data.clinicaId,
+    });
+    return { gestor: !!podeGerir };
+  });
+
+/**
  * Registra um evento de estado da conversa (resolvida, atribuída, transferida…)
  * usando a sessão do próprio usuário — a política de RLS exige ser membro da
  * clínica. Falha aqui nunca derruba a ação principal: o evento é o registro
