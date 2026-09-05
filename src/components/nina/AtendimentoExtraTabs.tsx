@@ -1824,8 +1824,17 @@ export function AtendInbox() {
           className="flex min-w-0 flex-1 flex-col overflow-hidden"
         >
           {!sel ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              Selecione uma conversa
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+              {erroAcesso ? (
+                <>
+                  <p className="font-medium text-foreground">{erroAcesso}</p>
+                  <Button variant="outline" size="sm" onClick={() => setErroAcesso(null)}>
+                    Voltar para a Inbox
+                  </Button>
+                </>
+              ) : (
+                "Selecione uma conversa"
+              )}
             </div>
           ) : (
             <>
