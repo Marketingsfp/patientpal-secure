@@ -778,6 +778,19 @@ export function AtendInbox() {
                 <SelectItem value="closed">Fechadas</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={ordem}
+              onValueChange={(v) => setOrdem(v as "recentes" | "espera")}
+              onOpenChange={setPainelMenuAberto}
+            >
+              <SelectTrigger className="h-8 text-xs" aria-label="Ordenar conversas">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                <SelectItem value="recentes">Ordenar por: mais recentes</SelectItem>
+                <SelectItem value="espera">Ordenar por: mais antigos aguardando</SelectItem>
+              </SelectContent>
+            </Select>
             {soNaoAtribuidas && (
               <button
                 type="button"
@@ -825,6 +838,7 @@ export function AtendInbox() {
                   {c.protocol_number && (
                     <code className="text-[11px] text-muted-foreground">#{c.protocol_number}</code>
                   )}
+                  <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-1">
                   {c.ultima_msg_preview || "—"}
@@ -865,6 +879,13 @@ export function AtendInbox() {
                         <> · 1ª resp: {fmtSeg(sel.sla_first_response_seg)}</>
                       )}
                     </p>
+                    {espera[sel.id] && (
+                      <BadgeEspera
+                        desde={espera[sel.id]}
+                        prefixo="Aguardando resposta há"
+                        className="mt-1"
+                      />
+                    )}
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button
